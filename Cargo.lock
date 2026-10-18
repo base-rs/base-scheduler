@@ -259,6 +259,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "futures-channel"
+version = "0.3.34"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b1f9e3d69d39e4862ffed03ed071a76f9a13ba1d9109d355b0f0aa6b15e393c4"
+dependencies = [
+ "futures-core",
+]
+
+[[package]]
 name = "futures-core"
 version = "0.3.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -545,6 +554,29 @@ version = "0.0.0"
 dependencies = [
  "bake",
  "core-project",
+]
+
+[[package]]
+name = "protocol-scheduler-conformance"
+version = "0.0.0"
+dependencies = [
+ "futures-channel",
+ "futures-lite",
+ "protocol-scheduler",
+]
+
+[[package]]
+name = "protocol-scheduler-direct"
+version = "0.0.0"
+dependencies = [
+ "event-listener",
+ "futures-channel",
+ "futures-lite",
+ "libc",
+ "protocol-scheduler",
+ "protocol-scheduler-conformance",
+ "tempfile",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

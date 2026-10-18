@@ -2,7 +2,12 @@
 
 Explicit scheduler capabilities for reusable Rust protocol libraries. Applications choose an execution environment; libraries ask for the operations they need.
 
-This crate defines interfaces and runtime-independent support. It contains no executor, reactor, operating-system I/O implementation, or runtime adapter. The initial API is extracted from [Socketry](https://github.com/core-rs/socketry-rust), and is not yet published to crates.io.
+The root crate defines interfaces and runtime-independent support. It contains no executor, reactor, operating-system I/O implementation, or runtime adapter. The initial API is extracted from [Socketry](https://github.com/core-rs/socketry-rust), and is not yet published to crates.io.
+
+The workspace also contains two companion crates, released together with the interface:
+
+- [`protocol-scheduler-conformance`](crates/conformance/readme.md): reusable capability-specific assertions for backend development dependencies.
+- [`protocol-scheduler-direct`](crates/direct/readme.md): bounded thread-pool file operations and blocking work, with a separate cleanup worker and no executor dependency.
 
 ## Explicit operation context
 
@@ -68,7 +73,7 @@ Install the launcher with `cargo install bake --locked`. The private `bake/` wor
 cargo bake --locked test:coverage --all-targets true
 ```
 
-The tests cover runtime-independent support and generic composition using test-only resources. A reusable backend conformance suite and migration of Socketry, Tokio, and other adapters are follow-up work.
+The tests cover runtime-independent support, generic composition, reusable conformance assertions, and the direct backend. Socketry, Tokio, and other adapter migrations remain follow-up work.
 
 ## Contributing
 

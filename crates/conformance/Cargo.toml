@@ -1,0 +1,14 @@
+[package]
+name = "protocol-scheduler-conformance"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT"
+repository = "https://github.com/core-rs/protocol-scheduler"
+description = "Reusable capability conformance tests for protocol-scheduler"
+readme = "readme.md"
+
+[dependencies]
+protocol-scheduler = { path = "../..", version = "=0.0.0" }
+futures-lite = "2.6.1"
+futures-channel = "0.3.31"

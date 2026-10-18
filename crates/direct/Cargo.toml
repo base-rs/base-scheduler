@@ -1,0 +1,25 @@
+[package]
+name = "protocol-scheduler-direct"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT"
+repository = "https://github.com/core-rs/protocol-scheduler"
+description = "Thread-pool file operations and blocking work for protocol-scheduler"
+readme = "readme.md"
+
+[dependencies]
+protocol-scheduler = { path = "../..", version = "=0.0.0" }
+event-listener = "5.4.2"
+futures-channel = "0.3.31"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation"] }
+
+[dev-dependencies]
+protocol-scheduler-conformance = { path = "../conformance", version = "=0.0.0" }
+futures-lite = "2.6.1"
+tempfile = "3"

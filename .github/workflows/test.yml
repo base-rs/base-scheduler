@@ -12,7 +12,11 @@ permissions:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
@@ -29,21 +33,9 @@ jobs:
       - name: Check API documentation
         env:
           RUSTDOCFLAGS: -D warnings
-        run: cargo doc --no-deps --locked --package protocol-scheduler
+        run: cargo doc --workspace --no-deps --locked
       - name: Run tests and require complete source-region coverage
         run: cargo bake --locked test:coverage --all-targets true
-
-  portable:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
-      - run: cargo test --locked --package protocol-scheduler
 
   msrv:
     runs-on: ubuntu-latest
@@ -51,11 +43,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@1.85.0
-      - run: cargo test --locked --package protocol-scheduler
+      - run: cargo test --locked --workspace --exclude protocol-scheduler-bake
 
   test-result:
     if: always()
-    needs: [test, portable, msrv]
+    needs: [test, msrv]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
