@@ -8,7 +8,7 @@ Track completed work and proposed changes below. Preserve the ownership, cancell
 
 ## 1. Remove per-wait cancellation allocations
 
-Status: implemented, with allocation regression tests. Points (2) and (3) remain follow-up work.
+Status: implemented, with allocation regression tests.
 
 `Cancellation::cancelled()` previously used `Event::listen()`, which heap-allocates its listener. It now retains listeners inline and initializes shared event state during token construction rather than on the first wait.
 
@@ -25,9 +25,11 @@ Acceptance: checking, cloning, and waiting on an existing initialized token requ
 
 ## 2. Remove prescribed `Vec` representations from message I/O and resolution
 
+Status: implemented in the interface, with allocation and ownership regression tests. Concrete socket and resolver backends remain separate work. Point (3) remains follow-up work.
+
 ### Message buffers
 
-`SocketMessage` and `SocketRecvMsg` currently prescribe `Vec<B>`. A vector can be reused, but callers cannot directly supply a fixed-size collection of buffer owners.
+`SocketMessage` and `SocketRecvMsg` previously prescribed `Vec<B>`. They now accept `IoBufSequence` and `IoBufSequenceMut` owners, including fixed-size collections of buffer owners.
 
 - Introduce an owned buffer-sequence abstraction supporting arrays, vectors, and pool-backed collections.
 - Take ownership of the collection and return the same owner on success, error, or cancellation.
@@ -38,7 +40,7 @@ Acceptance: fixed-size and reusable dynamic message collections work without fre
 
 ### Address resolution
 
-`AddressResolution` currently returns `Vec<AddressInfo>`, requiring a native resolver to materialize a separate Rust collection of normalized records. Follow the same pattern as `FileStat::Metadata` and the native `StatxMetadata` wrapper: retain the implementation's representation and expose semantic accessors.
+`AddressResolution` previously returned `Vec<AddressInfo>`, requiring a native resolver to materialize a separate Rust collection of normalized records. Its associated `Addresses` owner now supplies `AddressInfoCollection` and borrowed `AddressInfoView` accessors. Follow the same pattern as `FileStat::Metadata` and the native `StatxMetadata` wrapper: retain the implementation's representation and expose semantic accessors.
 
 - Give `AddressResolution` an associated owned result type, with borrowed iteration over entry views whose lifetimes are tied to that owner.
 - Let native implementations own the original `addrinfo` list, traverse `ai_next` directly, and release it exactly once through the matching platform deallocator on drop. Do not require an extra vector, per-entry allocation, or eager field conversion.

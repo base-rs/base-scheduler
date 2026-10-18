@@ -7,6 +7,8 @@
 
 mod address_hints;
 mod address_info;
+mod address_info_collection;
+mod address_info_view;
 mod address_resolution;
 mod address_resolve_error;
 mod address_resolve_error_kind;
@@ -41,6 +43,8 @@ mod file_write_at;
 mod interest;
 mod io_buf;
 mod io_buf_mut;
+mod io_buf_sequence;
+mod io_buf_sequence_mut;
 mod notify;
 mod operation_error;
 mod signals;
@@ -83,6 +87,8 @@ mod tcp_no_delay;
 
 pub use address_hints::AddressHints;
 pub use address_info::AddressInfo;
+pub use address_info_collection::AddressInfoCollection;
+pub use address_info_view::AddressInfoView;
 pub use address_resolution::AddressResolution;
 pub use address_resolve_error::AddressResolveError;
 pub use address_resolve_error_kind::AddressResolveErrorKind;
@@ -117,6 +123,8 @@ pub use file_write_at::FileWriteAt;
 pub use interest::Interest;
 pub use io_buf::IoBuf;
 pub use io_buf_mut::IoBufMut;
+pub use io_buf_sequence::IoBufSequence;
+pub use io_buf_sequence_mut::IoBufSequenceMut;
 pub use notify::Notify;
 pub use operation_error::{OperationError, OperationResult};
 pub use signals::Signals;
