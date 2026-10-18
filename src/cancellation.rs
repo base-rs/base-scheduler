@@ -20,9 +20,12 @@ struct Node {
 
 impl Node {
     fn new(tree: Arc<Mutex<()>>, parent: Option<Arc<Node>>) -> Self {
+        let event = Event::new();
+        // Allocate shared event state during setup, rather than on the first wait.
+        event.notify(0);
         Self {
             cancelled: AtomicBool::new(false),
-            event: Event::new(),
+            event,
             tree,
             parent,
             children: Mutex::new(HashMap::new()),
@@ -160,11 +163,12 @@ impl Cancellation {
     /// Wait for cancellation using standard future polling and wakeups.
     /// This future is immediately ready if already cancelled. Dropping the wait
     /// unregisters its listener without cancelling the signal or other waiters.
+    /// Listener storage is retained inline in the future, without a separate allocation.
     pub async fn cancelled(&self) {
         let Some(node) = &self.node else {
             return pending().await;
         };
-        let listener = node.event.listen();
+        event_listener::listener!(node.event => listener);
         // Register before checking to preserve a racing cancellation notification.
         if !node.cancelled.load(Ordering::Acquire) {
             listener.await;

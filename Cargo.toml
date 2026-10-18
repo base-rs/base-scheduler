@@ -23,4 +23,5 @@ reviewers = ["core-rs/maintainers"]
 event-listener = "5.4.2"
 
 [dev-dependencies]
+allocation-counter = "0.8.1"
 futures-lite = "2.6.1"
