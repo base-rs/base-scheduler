@@ -4,8 +4,8 @@
 //! Reusable IP socket assertions. Fixtures supply isolated connections and enforce test deadlines.
 
 use crate::{SocketIoFixture, SocketIoGuard};
+use core_scheduler::*;
 use futures_lite::future::{poll_once, zip};
-use protocol_scheduler::*;
 use std::{
     future::{Future, poll_fn},
     net::Shutdown,

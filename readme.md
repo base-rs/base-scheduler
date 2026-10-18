@@ -1,4 +1,4 @@
-# Protocol Scheduler
+# Core Scheduler
 
 Explicit scheduler capabilities for reusable Rust protocol libraries. Applications choose an execution environment; libraries ask for the operations they need.
 
@@ -6,17 +6,17 @@ The root crate defines interfaces and runtime-independent support. It contains n
 
 The workspace also contains three companion crates, released together with the interface:
 
-- [`protocol-scheduler-conformance`](crates/conformance/readme.md): reusable capability-specific assertions for backend development dependencies.
-- [`protocol-scheduler-direct`](crates/direct/readme.md): reference implementations of tasks, clocks, native address resolution, file/socket operations, and platform-supported signals and filesystem extensions, with explicit service ownership and bounded syscall admission.
+- [`core-scheduler-conformance`](crates/conformance/readme.md): reusable capability-specific assertions for backend development dependencies.
+- [`core-scheduler-direct`](crates/direct/readme.md): reference implementations of tasks, clocks, native address resolution, file/socket operations, and platform-supported signals and filesystem extensions, with explicit service ownership and bounded syscall admission.
 
-- [`protocol-scheduler-tokio`](crates/tokio/readme.md): an adapter for an explicitly selected Tokio runtime, preserving owning task handles, owned I/O, cancellation, and bounded native-work admission.
+- [`core-scheduler-tokio`](crates/tokio/readme.md): an adapter for an explicitly selected Tokio runtime, preserving owning task handles, owned I/O, cancellation, and bounded native-work admission.
 
 ## Explicit operation context
 
 Keep resources and protocol state in an object, and pass the scheduler and cancellation to each operation. The resulting future borrows that operation's execution context:
 
 ```rust
-use protocol_scheduler::{BufferResult, Cancellation, SocketRead};
+use core_scheduler::{BufferResult, Cancellation, SocketRead};
 
 struct Body<Socket> {
     socket: Socket,
@@ -79,7 +79,7 @@ The tests cover runtime-independent support, generic composition, reusable confo
 
 ## Contributing
 
-Please open an issue or pull request on [GitHub](https://github.com/core-rs/protocol-scheduler).
+Please open an issue or pull request on [GitHub](https://github.com/core-rs/core-scheduler).
 
 ### Agent Context
 

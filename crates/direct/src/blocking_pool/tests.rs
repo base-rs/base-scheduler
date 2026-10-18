@@ -12,7 +12,7 @@ const TIMEOUT: Duration = Duration::from_secs(10);
 #[test]
 fn prepared_work_allocates_only_jobs_and_completion_channels() {
     use crate::{DirectFile, DirectScheduler};
-    use protocol_scheduler::{Blocking, FileReadAt, FileWriteAt};
+    use core_scheduler::{Blocking, FileReadAt, FileWriteAt};
     use std::task::{Context, Waker};
     use std::time::Instant;
 

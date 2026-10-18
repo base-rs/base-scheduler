@@ -3,8 +3,8 @@
 
 //! A scheduler-local retry pulse, not a reactor. Waiting sockets occupy no worker or admission slot.
 
+use core_scheduler::{Cancellation, OperationResult};
 use event_listener::Event;
-use protocol_scheduler::{Cancellation, OperationResult};
 use std::future::{Future, poll_fn};
 use std::io;
 use std::pin::pin;
@@ -80,7 +80,7 @@ impl SocketRetry {
         let mut retry = pin!(retry);
         poll_fn(|context| {
             if cancelled.as_mut().poll(context).is_ready() {
-                return Poll::Ready(Err(protocol_scheduler::Cancelled.into()));
+                return Poll::Ready(Err(core_scheduler::Cancelled.into()));
             }
             retry.as_mut().poll(context).map(|()| Ok(()))
         })

@@ -4,7 +4,7 @@
 //! Resolver validation, hint, error, and owned-result assertions.
 
 use crate::AddressResolutionFixture;
-use protocol_scheduler::*;
+use core_scheduler::*;
 use std::io;
 
 /// Unpolled and pre-cancelled requests perform no lookup. Pre-cancellation also precedes validation.

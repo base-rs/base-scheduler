@@ -2,8 +2,9 @@
 
 ## Unreleased
 
+- Rename `protocol-scheduler` and its companion crates to the `core-scheduler` family; Rust imports now use `core_scheduler`, `core_scheduler_conformance`, `core_scheduler_direct`, and `core_scheduler_tokio`.
 - Contain native-worker and queued-capture panic payloads whose destructors panic, preserving worker capacity and shutdown progress in Direct and Tokio.
-- Add `protocol-scheduler-tokio` with explicit runtime selection, owning tasks, clocks, socket/file operations, native resolution, bounded blocking work, and platform-supported signals and filesystem extensions.
+- Add `core-scheduler-tokio` with explicit runtime selection, owning tasks, clocks, socket/file operations, native resolution, bounded blocking work, and platform-supported signals and filesystem extensions.
 
 - Implement Direct task execution, clocks, native address resolution with borrowed result views, typed socket options, TCP registration, Unix signals, and Linux file allocation/advice, with shared conformance suites and native lifecycle tests.
 
@@ -21,5 +22,5 @@
 - Keep cancellation and direct capacity listeners inline in waiting futures, avoiding per-wait allocations and unnecessary capacity registration during immediate admission.
 - Extract runtime-independent scheduler capabilities and shared types from Socketry.
 - Make operation context explicit, retain implementation-associated resources and owning task handles, and preserve owned-buffer and cooperative-cancellation contracts.
-- Add `protocol-scheduler-conformance` with reusable file and blocking-work assertions.
-- Add `protocol-scheduler-direct` with bounded file/blocking workers, independent cleanup, and explicit shutdown.
+- Add `core-scheduler-conformance` with reusable file and blocking-work assertions.
+- Add `core-scheduler-direct` with bounded file/blocking workers, independent cleanup, and explicit shutdown.

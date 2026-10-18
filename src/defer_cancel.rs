@@ -12,7 +12,7 @@ use std::pin::pin;
 /// The callback is synchronous: request graceful shutdown and wake the work; keep asynchronous draining in the protected future. Its operations must use cancellation inputs which allow draining. This wrapper does not mask signals, prevent its own destruction, or intercept scheduler task cancellation.
 ///
 /// ```
-/// use protocol_scheduler::{Cancellation, defer_cancel};
+/// use core_scheduler::{Cancellation, defer_cancel};
 /// # async fn example() {
 ///
 /// let shutdown = Cancellation::new();

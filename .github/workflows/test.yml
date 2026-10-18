@@ -43,7 +43,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@1.85.0
-      - run: cargo test --locked --workspace --exclude protocol-scheduler-bake
+      - run: cargo test --locked --workspace --exclude core-scheduler-bake
 
   test-result:
     if: always()

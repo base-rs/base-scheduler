@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::{DirectScheduler, DirectSocket};
-use protocol_scheduler::{
+use core_scheduler::{
     Cancellation, OperationResult, SocketGetOption, SocketKeepalive, SocketOption,
     SocketRegistration, SocketReuseAddress, SocketSetOption, TcpNoDelay,
 };

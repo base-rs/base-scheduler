@@ -3,8 +3,8 @@
 
 use super::*;
 use crate::test_support;
+use core_scheduler_conformance::ClockFixture;
 use futures_lite::future::{block_on, poll_once};
-use protocol_scheduler_conformance::ClockFixture;
 use std::{
     sync::atomic::{AtomicUsize, Ordering},
     time::Duration,
@@ -61,7 +61,7 @@ fn run(test: impl AsyncFnOnce(&Fixture) + Send + 'static) {
     });
 }
 mod conformance {
-    protocol_scheduler_conformance::clock_tests!(run: super::run);
+    core_scheduler_conformance::clock_tests!(run: super::run);
 }
 
 #[test]

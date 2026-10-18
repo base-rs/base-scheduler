@@ -164,7 +164,7 @@ fn socket_cleanup_is_independent_bounded_and_preserves_closed_admission_errors()
 fn accepted_shutdown_and_close_survive_abandonment_and_drain_during_shutdown() {
     for submit in [false, true] {
         let scheduler = scheduler(2);
-        let (client, server) = block_on(protocol_scheduler_conformance::socket::stream_pair(
+        let (client, server) = block_on(core_scheduler_conformance::socket::stream_pair(
             &scheduler,
             SocketDomain::Ipv4,
         ));
@@ -237,19 +237,17 @@ fn exclusive_close_rejects_retained_access_and_unpolled_close_drops_normally() {
 #[cfg(unix)]
 fn vectored_sends_preserve_short_counts_without_implicitly_advancing_the_owner() {
     let scheduler = scheduler(1);
-    let (client, server) = block_on(protocol_scheduler_conformance::socket::stream_pair(
+    let (client, server) = block_on(core_scheduler_conformance::socket::stream_pair(
         &scheduler,
         SocketDomain::Ipv4,
     ));
     client.0.set_send_buffer_size(4096).unwrap();
     server.0.set_recv_buffer_size(4096).unwrap();
-    block_on(
-        protocol_scheduler_conformance::socket_messages::partial_send(
-            &scheduler,
-            &client,
-            [vec![1; 2 * 1024 * 1024], vec![2; 2 * 1024 * 1024]],
-        ),
-    );
+    block_on(core_scheduler_conformance::socket_messages::partial_send(
+        &scheduler,
+        &client,
+        [vec![1; 2 * 1024 * 1024], vec![2; 2 * 1024 * 1024]],
+    ));
     block_on(scheduler.socket_close(client)).unwrap();
     block_on(scheduler.socket_close(server)).unwrap();
     block_on(scheduler.shutdown());

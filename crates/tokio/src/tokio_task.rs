@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::task_service::TaskOutcome;
-use protocol_scheduler::TaskError;
+use core_scheduler::TaskError;
 use std::{
     future::Future,
     pin::Pin,

@@ -4,7 +4,7 @@
 //! Linux-style reservation semantics, independent of the backend resource type.
 
 use crate::FileAllocateFixture;
-use protocol_scheduler::{AllocationMode, Cancellation, FileAllocate, OperationError};
+use core_scheduler::{AllocationMode, Cancellation, FileAllocate, OperationError};
 
 const OFFSET: u64 = 65536;
 const LENGTH: u64 = 4096;

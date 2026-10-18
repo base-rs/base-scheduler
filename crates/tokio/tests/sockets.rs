@@ -1,10 +1,10 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
+use core_scheduler::*;
+use core_scheduler_conformance::socket;
+use core_scheduler_tokio::{TokioOptions, TokioScheduler, TokioSocket};
 use futures_lite::future::block_on;
-use protocol_scheduler::*;
-use protocol_scheduler_conformance::socket;
-use protocol_scheduler_tokio::{TokioOptions, TokioScheduler, TokioSocket};
 use std::{sync::mpsc, time::Duration};
 
 const TIMEOUT: Duration = Duration::from_secs(20);
@@ -135,15 +135,15 @@ mod ipv4 {
     }
     mod scalar {
         use super::*;
-        protocol_scheduler_conformance::socket_tests!(run: run_stream_case);
+        core_scheduler_conformance::socket_tests!(run: run_stream_case);
     }
     mod messages {
         use super::*;
-        protocol_scheduler_conformance::socket_message_tests!(run: run_stream_case);
+        core_scheduler_conformance::socket_message_tests!(run: run_stream_case);
     }
     mod datagrams {
         use super::*;
-        protocol_scheduler_conformance::socket_datagram_tests!(run: run_datagram_case);
+        core_scheduler_conformance::socket_datagram_tests!(run: run_datagram_case);
     }
 }
 
@@ -161,15 +161,15 @@ mod ipv6 {
     }
     mod scalar {
         use super::*;
-        protocol_scheduler_conformance::socket_tests!(run: run_stream_case);
+        core_scheduler_conformance::socket_tests!(run: run_stream_case);
     }
     mod messages {
         use super::*;
-        protocol_scheduler_conformance::socket_message_tests!(run: run_stream_case);
+        core_scheduler_conformance::socket_message_tests!(run: run_stream_case);
     }
     mod datagrams {
         use super::*;
-        protocol_scheduler_conformance::socket_datagram_tests!(run: run_datagram_case);
+        core_scheduler_conformance::socket_datagram_tests!(run: run_datagram_case);
     }
 }
 
@@ -289,10 +289,9 @@ fn aggregate_socket_helpers_remain_compatible() {
         socket::stream(scheduler, sender, receiver).await;
     });
     run_stream(SocketDomain::Ipv4, async |scheduler, sender, receiver| {
-        protocol_scheduler_conformance::socket_messages::stream(scheduler, sender, receiver).await;
+        core_scheduler_conformance::socket_messages::stream(scheduler, sender, receiver).await;
     });
     run_datagram(SocketDomain::Ipv4, async |scheduler, sender, receiver| {
-        protocol_scheduler_conformance::socket_messages::datagrams(scheduler, sender, receiver)
-            .await;
+        core_scheduler_conformance::socket_messages::datagrams(scheduler, sender, receiver).await;
     });
 }

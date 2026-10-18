@@ -1,15 +1,15 @@
 [package]
-name = "protocol-scheduler-direct"
+name = "core-scheduler-direct"
 version = "0.0.0"
 edition = "2024"
 rust-version = "1.85"
 license = "MIT"
-repository = "https://github.com/core-rs/protocol-scheduler"
-description = "Reference thread-based scheduler implementation for protocol-scheduler"
+repository = "https://github.com/core-rs/core-scheduler"
+description = "Reference thread-based scheduler implementation for core-scheduler"
 readme = "readme.md"
 
 [dependencies]
-protocol-scheduler = { path = "../..", version = "=0.0.0" }
+core-scheduler = { path = "../..", version = "=0.0.0" }
 event-listener = "5.4.2"
 futures-channel = "0.3.31"
 socket2 = { version = "0.6.3", features = ["all"] }
@@ -23,7 +23,7 @@ signal-hook = "0.4.5"
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Networking_WinSock", "Win32_System_IO"] }
 
 [dev-dependencies]
-protocol-scheduler-conformance = { path = "../conformance", version = "=0.0.0" }
+core-scheduler-conformance = { path = "../conformance", version = "=0.0.0" }
 futures-lite = "2.6.1"
 tempfile = "3"
 allocation-counter = "0.8.1"

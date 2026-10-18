@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::TokioScheduler;
-use protocol_scheduler::{Cancellation, Clock, OperationResult};
+use core_scheduler::{Cancellation, Clock, OperationResult};
 use std::{
     future::{Future, poll_fn},
     pin::pin,
@@ -40,7 +40,7 @@ impl Clock for TokioScheduler {
                 return Poll::Ready(Ok(()));
             }
             if cancelled.as_mut().poll(context).is_ready() {
-                return Poll::Ready(Err(protocol_scheduler::Cancelled.into()));
+                return Poll::Ready(Err(core_scheduler::Cancelled.into()));
             }
             if closed.as_mut().poll(context).is_ready() {
                 return Poll::Ready(Err(std::io::Error::new(

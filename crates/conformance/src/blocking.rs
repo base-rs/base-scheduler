@@ -2,8 +2,8 @@
 // Copyright, 2026, by Samuel Williams.
 
 //! Blocking-work assertions. The caller drives futures on its own executor; synchronous closures run on the backend's blocking workers.
+use core_scheduler::{Blocking, BlockingError, Cancellation, TaskError};
 use futures_lite::future::poll_once;
-use protocol_scheduler::{Blocking, BlockingError, Cancellation, TaskError};
 use std::sync::{
     Arc,
     atomic::{AtomicUsize, Ordering},

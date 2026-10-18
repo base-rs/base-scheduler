@@ -9,7 +9,7 @@ use std::io::IoSlice;
 /// Inline byte arrays are not stable buffer owners, even when the outer collection is an array:
 ///
 /// ```compile_fail
-/// use protocol_scheduler::IoBufSequence;
+/// use core_scheduler::IoBufSequence;
 /// fn accepts_sequence(_: impl IoBufSequence) {}
 /// accepts_sequence([[0u8; 16]; 2]);
 /// ```

@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use protocol_scheduler::Cancellation;
+use core_scheduler::Cancellation;
 use std::future::Future;
 use std::pin::pin;
 use std::sync::Arc;

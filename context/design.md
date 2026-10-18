@@ -2,7 +2,9 @@
 
 ## Scope and provenance
 
-The root `protocol-scheduler` crate defines the interaction between protocol libraries and their execution environment. It implements runtime-independent cancellation and buffer support, but contains no scheduler, executor, reactor, operating-system I/O, or runtime adapter.
+The root `core-scheduler` crate defines the interaction between protocol libraries and their execution environment. It implements runtime-independent cancellation and buffer support, but contains no scheduler, executor, reactor, operating-system I/O, or runtime adapter.
+
+Core's scheduler and protocol libraries use the `core-*` naming family. Applications choose concrete implementations such as `core-scheduler-direct` or `core-scheduler-tokio`; downstream libraries depend on the `core-scheduler` interface for their execution capabilities. Libraries may use concrete schedulers as development dependencies to test their behavior against different implementations. Future native implementations can use names such as `core-scheduler-native` or `core-scheduler-iouring` without changing that dependency boundary.
 
 The initial extraction follows the Core ecosystem design and the [original interface proposal](proposal.md). Its source is [Socketry revision `b54b8d61bf80b71a1a5b97c3f5b80bae8a5ebabd`](https://github.com/core-rs/socketry-rust/tree/b54b8d61bf80b71a1a5b97c3f5b80bae8a5ebabd), specifically `crates/executor/src/scheduler/*.rs`, capability and shared-value modules in `crates/executor/src/`, and their runtime-independent tests. Existing MIT attribution is retained.
 
@@ -76,7 +78,7 @@ Tests cover cancellation propagation and wakeups, buffer ownership and invalid r
 
 ## Companion crates
 
-The same workspace now contains `protocol-scheduler-conformance` and `protocol-scheduler-direct`. All public packages share a version, root release notes, and release tag. Keep production interface dependencies independent of both companions. Direct depends on conformance only for development; conformance depends on the interface and runtime-independent test helpers, never a backend.
+The same workspace now contains `core-scheduler-conformance` and `core-scheduler-direct`. All public packages share a version, root release notes, and release tag. Keep production interface dependencies independent of both companions. Direct depends on conformance only for development; conformance depends on the interface and runtime-independent test helpers, never a backend.
 
 Conformance supplies async capability-specific assertions and backend-controlled fixtures. Its initial file tests accept resources and paths supplied by the backend, respect partial transfers, and cover ownership, pre-cancellation, laziness, cursor operations, positioned I/O, metadata, truncation, synchronization, and errors. Blocking tests cover lazy/cancelled admission, outputs, panic payloads, queued cancellation, bounded admission, and handle abandonment. The blocking queue fixture holds workers at a known execution boundary and releases them on guard destruction; assertions do not require global FIFO execution. Backends drive their own executors and remain responsible for test deadlines and implementation-specific retirement/shutdown tests. No passing aggregate claims support for capabilities that were not tested.
 
@@ -100,7 +102,7 @@ Direct task polling uses its own queue and workers backed by `async-task`, with 
 
 ## Tokio adapter
 
-`protocol-scheduler-tokio` is a companion crate under `crates/tokio`, sharing workspace versions and releases. It adapts the Socketry Tokio implementation at revision `7a70586`, updating its buffers, resolver views, cancellation, lifecycle, and conformance tests to the current interface. The interface and conformance crates remain independent of Tokio, and the two concrete adapters have no executor dependency on each other.
+`core-scheduler-tokio` is a companion crate under `crates/tokio`, sharing workspace versions and releases. It adapts the Socketry Tokio implementation at revision `7a70586`, updating its buffers, resolver views, cancellation, lifecycle, and conformance tests to the current interface. The interface and conformance crates remain independent of Tokio, and the two concrete adapters have no executor dependency on each other.
 
 `TokioScheduler` receives an explicit runtime handle. The application owns and drives that runtime, with I/O and time enabled. Both runtime flavours are supported; operation futures can also be polled outside the selected runtime while its driver continues running. Task admission registers before Tokio submission, with the registry lock released before calling the host, since a stopped runtime can immediately destroy the submitted future. `TokioTask` wraps a Tokio join handle with abort-on-drop ownership and translates host task errors. Guards contain user future and unconsumed-output destructor panics, including during abandonment.
 

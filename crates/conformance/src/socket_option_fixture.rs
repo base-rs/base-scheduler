@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use protocol_scheduler::{SocketOperation, SocketOption};
+use core_scheduler::{SocketOperation, SocketOption};
 use std::{fmt::Debug, io};
 
 /// One supported option and independently observed native state. Use separate getter/setter suites for read-only or write-only capabilities; this fixture requires neither operation by itself.

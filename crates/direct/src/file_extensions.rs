@@ -4,7 +4,7 @@
 use crate::{
     DirectFile, DirectScheduler, blocking_pool::admission_error, direct_scheduler::wait_close,
 };
-use protocol_scheduler::{
+use core_scheduler::{
     AdviceMode, AllocationMode, Cancellation, FileAdvice, FileAllocate, OperationResult,
 };
 use std::{io, os::fd::AsRawFd};
@@ -108,7 +108,7 @@ impl DirectScheduler {
         length: u64,
         advice: AdviceMode,
     ) -> io::Result<
-        futures_channel::oneshot::Receiver<Result<io::Result<()>, protocol_scheduler::TaskError>>,
+        futures_channel::oneshot::Receiver<Result<io::Result<()>, core_scheduler::TaskError>>,
     > {
         range(offset, length)?;
         let file = file.retain();

@@ -15,14 +15,14 @@ use super::{
 /// Optional platform capabilities are not implied by this aggregate:
 ///
 /// ```compile_fail,E0599
-/// use protocol_scheduler::{AdviceMode, FileScheduler, FileAdvice};
+/// use core_scheduler::{AdviceMode, FileScheduler, FileAdvice};
 /// async fn advise<S: FileScheduler>(scheduler: &S, file: &S::File) {
 ///     scheduler.file_advise(file, 0, 0, AdviceMode::Normal).await;
 /// }
 /// ```
 ///
 /// ```compile_fail,E0599
-/// use protocol_scheduler::{AllocationMode, Cancellation, FileScheduler, FileAllocate};
+/// use core_scheduler::{AllocationMode, Cancellation, FileScheduler, FileAllocate};
 /// async fn allocate<S: FileScheduler>(scheduler: &S, file: &S::File) {
 ///     scheduler.file_allocate(file, 0, 1, AllocationMode::Extend, &Cancellation::never()).await;
 /// }

@@ -1,8 +1,8 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
+use core_scheduler::TaskError;
 use futures_channel::oneshot;
-use protocol_scheduler::TaskError;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};

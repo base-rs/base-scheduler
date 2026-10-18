@@ -1,10 +1,10 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use futures_lite::future::block_on;
-use protocol_scheduler::{
+use core_scheduler::{
     BufferResult, Cancellation, IoBufMut, OperationError, SocketOperation, SocketRead,
 };
+use futures_lite::future::block_on;
 use std::sync::{
     Mutex,
     atomic::{AtomicUsize, Ordering},

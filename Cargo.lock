@@ -226,6 +226,71 @@ dependencies = [
 ]
 
 [[package]]
+name = "core-scheduler"
+version = "0.0.0"
+dependencies = [
+ "allocation-counter",
+ "event-listener",
+ "futures-channel",
+ "futures-lite",
+ "libc",
+]
+
+[[package]]
+name = "core-scheduler-bake"
+version = "0.0.0"
+dependencies = [
+ "bake",
+ "core-project",
+]
+
+[[package]]
+name = "core-scheduler-conformance"
+version = "0.0.0"
+dependencies = [
+ "core-scheduler",
+ "futures-channel",
+ "futures-lite",
+]
+
+[[package]]
+name = "core-scheduler-direct"
+version = "0.0.0"
+dependencies = [
+ "allocation-counter",
+ "async-task",
+ "core-scheduler",
+ "core-scheduler-conformance",
+ "event-listener",
+ "futures-channel",
+ "futures-lite",
+ "libc",
+ "signal-hook",
+ "socket2",
+ "tempfile",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "core-scheduler-tokio"
+version = "0.0.0"
+dependencies = [
+ "allocation-counter",
+ "async-io",
+ "core-scheduler",
+ "core-scheduler-conformance",
+ "event-listener",
+ "futures-channel",
+ "futures-lite",
+ "libc",
+ "signal-hook",
+ "socket2",
+ "tempfile",
+ "tokio",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "crc32fast"
 version = "1.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -620,71 +685,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "985e7ec9bb745e6ce6535b544d84d6cd6f7ad8bd711c398938ae983b91a766d9"
 dependencies = [
  "unicode-ident",
-]
-
-[[package]]
-name = "protocol-scheduler"
-version = "0.0.0"
-dependencies = [
- "allocation-counter",
- "event-listener",
- "futures-channel",
- "futures-lite",
- "libc",
-]
-
-[[package]]
-name = "protocol-scheduler-bake"
-version = "0.0.0"
-dependencies = [
- "bake",
- "core-project",
-]
-
-[[package]]
-name = "protocol-scheduler-conformance"
-version = "0.0.0"
-dependencies = [
- "futures-channel",
- "futures-lite",
- "protocol-scheduler",
-]
-
-[[package]]
-name = "protocol-scheduler-direct"
-version = "0.0.0"
-dependencies = [
- "allocation-counter",
- "async-task",
- "event-listener",
- "futures-channel",
- "futures-lite",
- "libc",
- "protocol-scheduler",
- "protocol-scheduler-conformance",
- "signal-hook",
- "socket2",
- "tempfile",
- "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "protocol-scheduler-tokio"
-version = "0.0.0"
-dependencies = [
- "allocation-counter",
- "async-io",
- "event-listener",
- "futures-channel",
- "futures-lite",
- "libc",
- "protocol-scheduler",
- "protocol-scheduler-conformance",
- "signal-hook",
- "socket2",
- "tempfile",
- "tokio",
- "windows-sys 0.61.2",
 ]
 
 [[package]]

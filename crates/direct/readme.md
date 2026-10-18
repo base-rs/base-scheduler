@@ -1,10 +1,10 @@
-# Protocol Scheduler Direct
+# Core Scheduler Direct
 
-`protocol-scheduler-direct` is a reference backend for `protocol-scheduler`, with task execution, clocks, native address resolution, file operations, IP sockets, scatter/gather I/O, and bounded blocking work. Operation futures work with any executor that polls standard Rust futures. Services belong to the explicit scheduler instance; there is no implicit current scheduler or global fallback executor.
+`core-scheduler-direct` is a reference backend for `core-scheduler`, with task execution, clocks, native address resolution, file operations, IP sockets, scatter/gather I/O, and bounded blocking work. Operation futures work with any executor that polls standard Rust futures. Services belong to the explicit scheduler instance; there is no implicit current scheduler or global fallback executor.
 
 ```rust
-use protocol_scheduler::{Cancellation, FileClose, FileOpen, FileOptions, FileRead};
-use protocol_scheduler_direct::{DirectOptions, DirectScheduler};
+use core_scheduler::{Cancellation, FileClose, FileOpen, FileOptions, FileRead};
+use core_scheduler_direct::{DirectOptions, DirectScheduler};
 
 # async fn example(path: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
 let scheduler = DirectScheduler::new(DirectOptions::default())?;
@@ -46,4 +46,4 @@ Sockets stay nonblocking throughout their lifetime. Each syscall attempt uses th
 
 `SocketSendMsg` and `SocketRecvMsg` use prepared `IoBuffers`/`IoBuffersMut` arrays directly during synchronous `sendmsg`/`recvmsg` or non-overlapped Winsock calls. Other sequences build native vectors in scratch storage reused across attempts. Each operation makes one transfer, preserves short counts and datagram boundaries, and returns the unchanged collection owner. Unix reports discarded control data when the OS supplies `MSG_CTRUNC`; the Windows payload/address path has no control metadata. No syscall retains vector or payload pointers after that attempt returns. Accepted attempts retain the entire owner even if the waiting future or scheduler is dropped. Between attempts, the future owns its input with no backend access remaining; dropping it safely ends retries. Scheduler shutdown wakes pending retry waiters and drains accepted attempts and cleanup, without requiring abandoned futures to be polled.
 
-The workspace is unpublished. Behavioral tests use the capability-specific `protocol-scheduler-conformance` macros as a development dependency. Each generated case has its own fixture and ordinary Rust test name, including separate IPv4/IPv6 suites and scalar/prepared I/O lifecycle suites. Backend runners enforce deadlines, drain accepted work on assertion failure, and preserve panics for test reporting. The implementation never depends on conformance in production.
+The workspace is unpublished. Behavioral tests use the capability-specific `core-scheduler-conformance` macros as a development dependency. Each generated case has its own fixture and ordinary Rust test name, including separate IPv4/IPv6 suites and scalar/prepared I/O lifecycle suites. Backend runners enforce deadlines, drain accepted work on assertion failure, and preserve panics for test reporting. The implementation never depends on conformance in production.

@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use protocol_scheduler::{
+use core_scheduler::{
     AddressHints, AddressInfo, AddressInfoCollection, AddressInfoView, AddressResolution,
     AddressService, Cancellation, OperationError, OperationResult, SocketProtocol, SocketType,
 };

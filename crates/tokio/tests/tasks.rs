@@ -1,8 +1,8 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use protocol_scheduler::{Cancellation, Spawn, SpawnError};
-use protocol_scheduler_tokio::TokioScheduler;
+use core_scheduler::{Cancellation, Spawn, SpawnError};
+use core_scheduler_tokio::TokioScheduler;
 
 struct Dropped(Option<futures_channel::oneshot::Sender<()>>);
 impl Drop for Dropped {

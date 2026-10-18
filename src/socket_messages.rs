@@ -11,7 +11,7 @@ use super::{SocketRecvMsg, SocketSendMsg};
 ///
 /// This capability carries payload and IP addresses only. It cannot send ancillary data and supplies no receive control storage. Unix reports `MSG_CTRUNC` through the result; the Windows payload/address fallback cannot observe control metadata. Ancillary data requires a separate capability rather than silent emulation. Unsupported flags are not part of this portable interface. A socket backend must explicitly implement message support:
 /// ```compile_fail
-/// use protocol_scheduler::{Cancellation, SocketScheduler, SocketRecvMsg, SocketRecvFlags};
+/// use core_scheduler::{Cancellation, SocketScheduler, SocketRecvMsg, SocketRecvFlags};
 /// async fn receive<S: SocketScheduler>(scheduler: &S, socket: &S::Socket) {
 ///     scheduler.socket_recvmsg(socket, vec![vec![0; 1024]], SocketRecvFlags::default(), &Cancellation::never()).await;
 /// }

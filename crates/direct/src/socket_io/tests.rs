@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use super::*;
-use protocol_scheduler::{IoBuffers, IoBuffersMut};
+use core_scheduler::{IoBuffers, IoBuffersMut};
 use std::net::TcpListener;
 use std::time::{Duration, Instant};
 

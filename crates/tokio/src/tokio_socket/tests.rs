@@ -77,12 +77,12 @@ fn invalid_accept_returns_without_waiting_for_readiness() {
 }
 #[test]
 fn transient_would_block_retries_with_the_requested_readiness_direction() {
-    use protocol_scheduler::{Cancellation, SocketDomain};
+    use core_scheduler::{Cancellation, SocketDomain};
     crate::test_support::run(|| {
         futures_lite::future::block_on(async {
             let scheduler = crate::test_support::scheduler();
             let (client, server) =
-                protocol_scheduler_conformance::socket::stream_pair(&scheduler, SocketDomain::Ipv4)
+                core_scheduler_conformance::socket::stream_pair(&scheduler, SocketDomain::Ipv4)
                     .await;
             // Model a socket becoming ready between the initial syscall and readiness registration. Both reactor directions must retry the actual syscall.
             let mut writes = 0;
@@ -114,7 +114,7 @@ fn transient_would_block_retries_with_the_requested_readiness_direction() {
             assert_eq!(&buffer, b"x");
             assert!(reads >= 2);
             // Confirm normal public operations still use the same registration.
-            use protocol_scheduler::{SocketClose, SocketWait};
+            use core_scheduler::{SocketClose, SocketWait};
             scheduler
                 .socket_wait(&client, Interest::Writable, &Cancellation::never())
                 .await

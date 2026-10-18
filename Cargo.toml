@@ -1,10 +1,10 @@
 [package]
-name = "protocol-scheduler"
+name = "core-scheduler"
 version = "0.0.0"
 edition = "2024"
 rust-version = "1.85"
 license = "MIT"
-repository = "https://github.com/core-rs/protocol-scheduler"
+repository = "https://github.com/core-rs/core-scheduler"
 description = "Explicit, runtime-independent scheduler capabilities for protocol libraries"
 readme = "readme.md"
 include = ["src/**", "context/**", "Cargo.toml", "readme.md", "license.md", "releases.md"]

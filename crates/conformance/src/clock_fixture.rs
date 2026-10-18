@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use protocol_scheduler::Clock;
+use core_scheduler::Clock;
 use std::time::Duration;
 
 /// A fresh, controlled clock domain. Time stays fixed until `advance`; advancing wakes expired timers before returning. Use a backend's paused-clock or test timer driver, rather than wall-clock sleeps.

@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use protocol_scheduler::FileScheduler;
+use core_scheduler::FileScheduler;
 use std::path::Path;
 
 /// An isolated, initially absent regular-file path and independent observations for the complete file suite.

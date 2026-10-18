@@ -2,9 +2,9 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::{BlockingTask, TokioOptions};
+use core_scheduler::{BlockingError, Cancellation, OperationError, OperationResult, TaskError};
 use event_listener::Event;
 use futures_channel::oneshot;
-use protocol_scheduler::{BlockingError, Cancellation, OperationError, OperationResult, TaskError};
 use std::collections::VecDeque;
 use std::future::{Future, poll_fn};
 use std::io;
@@ -337,7 +337,7 @@ mod tests;
 
 pub(crate) fn admission_error(error: BlockingError) -> OperationError {
     match error {
-        BlockingError::Cancelled => protocol_scheduler::Cancelled.into(),
+        BlockingError::Cancelled => core_scheduler::Cancelled.into(),
         BlockingError::SchedulerClosed => {
             io::Error::new(io::ErrorKind::BrokenPipe, "scheduler is closed").into()
         }

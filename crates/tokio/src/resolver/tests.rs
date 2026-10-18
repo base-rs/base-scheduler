@@ -3,12 +3,12 @@
 
 use super::*;
 use crate::test_support;
-use futures_lite::future::{block_on, poll_once};
-use protocol_scheduler::{
+use core_scheduler::{
     AddressInfo, AddressInfoCollection, AddressInfoView, AddressResolveError,
     AddressResolveErrorKind,
 };
-use protocol_scheduler_conformance::AddressResolutionFixture;
+use core_scheduler_conformance::AddressResolutionFixture;
+use futures_lite::future::{block_on, poll_once};
 
 struct Fixture {
     scheduler: TokioScheduler,
@@ -141,13 +141,13 @@ fn run(test: impl AsyncFnOnce(&Fixture) + Send + 'static) {
     });
 }
 mod conformance {
-    protocol_scheduler_conformance::address_resolution_tests!(run: super::run);
+    core_scheduler_conformance::address_resolution_tests!(run: super::run);
 }
 mod ipv4 {
-    protocol_scheduler_conformance::address_resolution_ip_tests!(run: super::run, domain: protocol_scheduler::SocketDomain::Ipv4);
+    core_scheduler_conformance::address_resolution_ip_tests!(run: super::run, domain: core_scheduler::SocketDomain::Ipv4);
 }
 mod ipv6 {
-    protocol_scheduler_conformance::address_resolution_ip_tests!(run: super::run, domain: protocol_scheduler::SocketDomain::Ipv6);
+    core_scheduler_conformance::address_resolution_ip_tests!(run: super::run, domain: core_scheduler::SocketDomain::Ipv6);
 }
 
 #[test]

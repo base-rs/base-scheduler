@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use protocol_scheduler::{SocketAddress, SocketDomain};
+use core_scheduler::{SocketAddress, SocketDomain};
 
 #[test]
 fn domains_follow_the_address_family() {

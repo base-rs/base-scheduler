@@ -1,9 +1,9 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use protocol_scheduler::*;
-use protocol_scheduler_conformance::{FileTestFixture, socket};
-use protocol_scheduler_tokio::{TokioScheduler, TokioSocket};
+use core_scheduler::*;
+use core_scheduler_conformance::{FileTestFixture, socket};
+use core_scheduler_tokio::{TokioScheduler, TokioSocket};
 
 fn run(test: impl FnOnce() + Send + 'static) {
     let (done, completed) = std::sync::mpsc::channel();
@@ -151,16 +151,16 @@ macro_rules! suites {
         mod $name {
             use super::*;
             fn file_case(test: impl AsyncFnOnce(&FileFixture) + Send + 'static) { run_file($build, test); }
-            mod files { protocol_scheduler_conformance::file_tests!(run: super::file_case); }
+            mod files { core_scheduler_conformance::file_tests!(run: super::file_case); }
             macro_rules! sockets {
                 ($family:ident, $domain:ident) => {
                     mod $family {
                         use super::*;
                         fn stream(test: impl AsyncFnOnce(&TokioScheduler, &TokioSocket, &TokioSocket) + Send + 'static) { run_stream($build, SocketDomain::$domain, test); }
                         fn datagram(test: impl AsyncFnOnce(&TokioScheduler, &TokioSocket, &TokioSocket) + Send + 'static) { run_datagram($build, SocketDomain::$domain, test); }
-                        mod scalar { protocol_scheduler_conformance::socket_tests!(run: super::stream); }
-                        mod messages { protocol_scheduler_conformance::socket_message_tests!(run: super::stream); }
-                        mod datagrams { protocol_scheduler_conformance::socket_datagram_tests!(run: super::datagram); }
+                        mod scalar { core_scheduler_conformance::socket_tests!(run: super::stream); }
+                        mod messages { core_scheduler_conformance::socket_message_tests!(run: super::stream); }
+                        mod datagrams { core_scheduler_conformance::socket_datagram_tests!(run: super::datagram); }
                     }
                 };
             }

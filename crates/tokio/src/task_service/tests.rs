@@ -3,9 +3,9 @@
 
 use super::*;
 use crate::{TokioScheduler, test_support};
+use core_scheduler::{Cancellation, Spawn};
+use core_scheduler_conformance::SpawnFixture;
 use futures_lite::future::block_on;
-use protocol_scheduler::{Cancellation, Spawn};
-use protocol_scheduler_conformance::SpawnFixture;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 #[derive(Default)]
@@ -39,6 +39,8 @@ pub(super) fn settled(state: &State, all: bool) -> bool {
                 status.polled.load(Ordering::SeqCst)
                     && !status.active.load(Ordering::SeqCst)
                     && !status.ready.load(Ordering::SeqCst)
+                    // A finished poll can return before Tokio destroys the task future and notifies its join handle.
+                    && !status.output.load(Ordering::SeqCst)
                     && !status.abandoned.load(Ordering::SeqCst)
             }));
     idle && state.history.iter().all(|status| {
@@ -157,10 +159,30 @@ fn run(test: impl AsyncFnOnce(&TokioScheduler) + Send + 'static) {
     });
 }
 mod conformance {
-    protocol_scheduler_conformance::spawn_tests!(run: super::run);
+    core_scheduler_conformance::spawn_tests!(run: super::run);
 }
 mod dispatch {
-    protocol_scheduler_conformance::spawn_dispatch_tests!(run: super::run);
+    core_scheduler_conformance::spawn_dispatch_tests!(run: super::run);
+}
+
+#[test]
+fn completed_poll_waits_for_registration_retirement_and_join_notification() {
+    let status = Arc::new(Status::default());
+    status.polled.store(true, Ordering::SeqCst);
+    status.output.store(true, Ordering::SeqCst);
+    status.waiting.store(true, Ordering::SeqCst);
+    let mut state = State {
+        closed: false,
+        next: 1,
+        registered: BTreeMap::from([(0, status.clone())]),
+        history: vec![status.clone()],
+    };
+    assert!(!settled(&state, false));
+    completed(&state, 0);
+    state.registered.remove(&0);
+    assert!(!settled(&state, false));
+    status.notified.store(true, Ordering::SeqCst);
+    assert!(settled(&state, false));
 }
 
 #[test]
@@ -178,7 +200,7 @@ fn identifier_exhaustion_rejects_without_polling() {
 fn tasks_progress_without_occupying_syscall_workers_and_survive_admission_close() {
     test_support::run(|| {
         block_on(async {
-            use protocol_scheduler::Blocking;
+            use core_scheduler::Blocking;
             let scheduler = test_support::scheduler();
             let token = Cancellation::new();
             let child = token.clone();
@@ -312,7 +334,7 @@ fn run_current_thread(test: impl AsyncFnOnce(&TokioScheduler) + Send + 'static) 
     });
 }
 mod current_thread {
-    protocol_scheduler_conformance::spawn_tests!(run: super::run_current_thread);
+    core_scheduler_conformance::spawn_tests!(run: super::run_current_thread);
 }
 
 #[test]

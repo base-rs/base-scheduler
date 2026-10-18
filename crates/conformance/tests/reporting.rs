@@ -1,9 +1,9 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
+use core_scheduler::{Blocking, BlockingError, Cancellation, TaskError};
+use core_scheduler_conformance as conformance;
 use futures_lite::future::block_on;
-use protocol_scheduler::{Blocking, BlockingError, Cancellation, TaskError};
-use protocol_scheduler_conformance as conformance;
 use std::{
     future::{Ready, ready},
     panic::{AssertUnwindSafe, catch_unwind},

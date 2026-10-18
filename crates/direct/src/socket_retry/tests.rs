@@ -22,13 +22,13 @@ fn retries_wake_without_workers_and_cancellation_and_close_do_not_lose_wakeups()
         token.cancel();
         assert!(matches!(
             block_on(waiting),
-            Err(protocol_scheduler::OperationError::Cancelled(_))
+            Err(core_scheduler::OperationError::Cancelled(_))
         ));
     }
     token.cancel();
     assert!(matches!(
         block_on(retry.wait(&token)),
-        Err(protocol_scheduler::OperationError::Cancelled(_))
+        Err(core_scheduler::OperationError::Cancelled(_))
     ));
     let never = Cancellation::never();
     let mut waiting = Box::pin(retry.wait(&never));

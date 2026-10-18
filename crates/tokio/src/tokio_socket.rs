@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use protocol_scheduler::Interest;
+use core_scheduler::Interest;
 use std::{io, net::SocketAddr, sync::Arc};
 use tokio::runtime::{Handle, Id};
 

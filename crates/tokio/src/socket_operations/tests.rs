@@ -83,7 +83,7 @@ fn socket_cleanup_is_independent_bounded_and_preserves_closed_admission_errors()
 fn accepted_shutdown_and_close_survive_abandonment_and_drain_during_shutdown() {
     for submit in [false, true] {
         let scheduler = scheduler(2);
-        let (client, server) = block_on(protocol_scheduler_conformance::socket::stream_pair(
+        let (client, server) = block_on(core_scheduler_conformance::socket::stream_pair(
             &scheduler,
             SocketDomain::Ipv4,
         ));
@@ -157,19 +157,17 @@ fn exclusive_close_rejects_retained_access_and_unpolled_close_drops_normally() {
 #[cfg(unix)]
 fn vectored_sends_preserve_short_counts_without_implicitly_advancing_the_owner() {
     let scheduler = scheduler(1);
-    let (client, server) = block_on(protocol_scheduler_conformance::socket::stream_pair(
+    let (client, server) = block_on(core_scheduler_conformance::socket::stream_pair(
         &scheduler,
         SocketDomain::Ipv4,
     ));
     client.get_ref().set_send_buffer_size(4096).unwrap();
     server.get_ref().set_recv_buffer_size(4096).unwrap();
-    block_on(
-        protocol_scheduler_conformance::socket_messages::partial_send(
-            &scheduler,
-            &client,
-            [vec![1; 2 * 1024 * 1024], vec![2; 2 * 1024 * 1024]],
-        ),
-    );
+    block_on(core_scheduler_conformance::socket_messages::partial_send(
+        &scheduler,
+        &client,
+        [vec![1; 2 * 1024 * 1024], vec![2; 2 * 1024 * 1024]],
+    ));
     block_on(scheduler.socket_close(client)).unwrap();
     block_on(scheduler.socket_close(server)).unwrap();
     block_on(scheduler.shutdown());
@@ -181,7 +179,7 @@ fn closure_wakes_pending_io_and_preserves_owned_inputs() {
         block_on(async {
             let scheduler = scheduler(1);
             let (client, server) =
-                protocol_scheduler_conformance::socket::stream_pair(&scheduler, SocketDomain::Ipv4)
+                core_scheduler_conformance::socket::stream_pair(&scheduler, SocketDomain::Ipv4)
                     .await;
             let never = Cancellation::never();
             let buffer = vec![0; 8];
@@ -251,8 +249,7 @@ fn incompatible_runtime_rejects_operations_and_returns_original_owners() {
                 .unwrap();
             let other = TokioScheduler::new(runtime.handle().clone());
             let (client, server) =
-                protocol_scheduler_conformance::socket::stream_pair(&first, SocketDomain::Ipv4)
-                    .await;
+                core_scheduler_conformance::socket::stream_pair(&first, SocketDomain::Ipv4).await;
             let never = Cancellation::never();
             let buffer = vec![7; 8];
             let allocation = buffer.as_ptr();
@@ -331,7 +328,7 @@ fn incompatible_runtime_rejects_operations_and_returns_original_owners() {
 fn native_cleanup_failure_is_reported_by_each_cleanup_operation() {
     for operation in 0..4 {
         let mut scheduler = scheduler(1);
-        let (client, server) = block_on(protocol_scheduler_conformance::socket::stream_pair(
+        let (client, server) = block_on(core_scheduler_conformance::socket::stream_pair(
             &scheduler,
             SocketDomain::Ipv4,
         ));
@@ -423,7 +420,7 @@ fn prepared_message_io_reuses_vectors_and_payload_without_fresh_allocations() {
         }
     }
     let scheduler = scheduler(1);
-    let (client, server) = block_on(protocol_scheduler_conformance::socket::stream_pair(
+    let (client, server) = block_on(core_scheduler_conformance::socket::stream_pair(
         &scheduler,
         SocketDomain::Ipv4,
     ));
@@ -493,7 +490,7 @@ fn socket_registration_uses_the_selected_runtime_under_another_ambient_host() {
         let scheduler = scheduler(1);
         let (client, server) = {
             let scope = ambient.enter();
-            let pair = block_on(protocol_scheduler_conformance::socket::stream_pair(
+            let pair = block_on(core_scheduler_conformance::socket::stream_pair(
                 &scheduler,
                 SocketDomain::Ipv4,
             ));
@@ -501,7 +498,7 @@ fn socket_registration_uses_the_selected_runtime_under_another_ambient_host() {
             pair
         };
         drop(ambient);
-        block_on(protocol_scheduler_conformance::socket::transfer(
+        block_on(core_scheduler_conformance::socket::transfer(
             &scheduler, &client, &server,
         ));
         block_on(scheduler.socket_close(client)).unwrap();

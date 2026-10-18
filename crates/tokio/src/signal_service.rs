@@ -2,8 +2,8 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::{TokioScheduler, TokioSubscription, thread};
+use core_scheduler::{Notify, Signals};
 use event_listener::Event;
-use protocol_scheduler::{Notify, Signals};
 use signal_hook::iterator::{Handle, Signals as NativeSignals};
 use std::{
     collections::BTreeMap,

@@ -1,6 +1,6 @@
-# Protocol Scheduler Conformance
+# Core Scheduler Conformance
 
-Reusable, capability-specific tests for implementations of `protocol-scheduler`. Add this crate as a **development dependency** of a backend. Generated suites report ordinary named Rust tests, while async assertion helpers remain available for custom fixtures and smaller capability sets.
+Reusable, capability-specific tests for implementations of `core-scheduler`. Add this crate as a **development dependency** of a backend. Generated suites report ordinary named Rust tests, while async assertion helpers remain available for custom fixtures and smaller capability sets.
 
 ## Generated suites
 
@@ -8,11 +8,11 @@ Invoke a suite inside a dedicated module and supply a runner function:
 
 ```rust,ignore
 mod blocking {
-    protocol_scheduler_conformance::blocking_tests!(run: super::run_blocking);
+    core_scheduler_conformance::blocking_tests!(run: super::run_blocking);
 }
 
 mod ipv4 {
-    protocol_scheduler_conformance::socket_tests!(run: super::run_ipv4_stream);
+    core_scheduler_conformance::socket_tests!(run: super::run_ipv4_stream);
 }
 ```
 
@@ -46,12 +46,12 @@ For example, a resolver fixture can select a numeric family independently of its
 
 ```rust,ignore
 mod resolution {
-    protocol_scheduler_conformance::address_resolution_tests!(run: super::run_resolver);
+    core_scheduler_conformance::address_resolution_tests!(run: super::run_resolver);
 }
 mod resolution_ipv4 {
-    protocol_scheduler_conformance::address_resolution_ip_tests!(
+    core_scheduler_conformance::address_resolution_ip_tests!(
         run: super::run_resolver,
-        domain: protocol_scheduler::SocketDomain::Ipv4,
+        domain: core_scheduler::SocketDomain::Ipv4,
     );
 }
 ```

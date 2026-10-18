@@ -1,12 +1,12 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use futures_channel::oneshot;
-use protocol_scheduler::{
+use core_scheduler::{
     Cancellation, IoBufSequence, IoBufSequenceMut, IoBuffers, IoBuffersMut, OperationError,
     OperationResult, SocketMessage, SocketOperation, SocketRecvFlags, SocketRecvMsg,
     SocketRecvResult, SocketSendFlags, SocketSendMsg,
 };
+use futures_channel::oneshot;
 use std::future::Future;
 use std::io;
 use std::pin::pin;

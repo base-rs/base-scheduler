@@ -3,7 +3,7 @@
 
 //! Standard-library TCP import retains established connections and listeners.
 
-use protocol_scheduler::*;
+use core_scheduler::*;
 use std::{
     io::{Read, Write},
     net::{TcpListener, TcpStream},

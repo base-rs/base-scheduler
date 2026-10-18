@@ -63,4 +63,4 @@ pub use spawn_fixture::SpawnFixture;
 
 // Macro expansions must resolve their support dependency through this crate even when dependencies are renamed by a backend.
 #[doc(hidden)]
-pub use protocol_scheduler as __protocol_scheduler;
+pub use core_scheduler as __core_scheduler;

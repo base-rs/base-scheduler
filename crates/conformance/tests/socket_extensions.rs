@@ -2,11 +2,11 @@
 // Copyright, 2026, by Samuel Williams.
 
 mod support;
-use futures_lite::future::block_on;
-use protocol_scheduler::*;
-use protocol_scheduler_conformance::{
+use core_scheduler::*;
+use core_scheduler_conformance::{
     SocketOptionFixture, SocketRegistrationFixture, socket_options, socket_registration,
 };
+use futures_lite::future::block_on;
 use std::{
     io::{self, Read, Write},
     net::{TcpListener, TcpStream},
@@ -301,10 +301,10 @@ fn run_set(test: impl AsyncFnOnce(&OptionsFixture<SetterOnly>) + Send + 'static)
     support::run(move || block_on(test(&OptionsFixture::new(Fault::None))));
 }
 mod getter_only {
-    protocol_scheduler_conformance::socket_get_option_tests!(run: super::run_get);
+    core_scheduler_conformance::socket_get_option_tests!(run: super::run_get);
 }
 mod setter_only {
-    protocol_scheduler_conformance::socket_set_option_tests!(run: super::run_set);
+    core_scheduler_conformance::socket_set_option_tests!(run: super::run_set);
 }
 struct RegistrationFixture {
     scheduler: Native,
@@ -336,10 +336,10 @@ fn run_ipv6(test: impl AsyncFnOnce(&RegistrationFixture) + Send + 'static) {
     });
 }
 mod ipv4 {
-    protocol_scheduler_conformance::socket_registration_tests!(run: super::run_ipv4);
+    core_scheduler_conformance::socket_registration_tests!(run: super::run_ipv4);
 }
 mod ipv6 {
-    protocol_scheduler_conformance::socket_registration_tests!(run: super::run_ipv6);
+    core_scheduler_conformance::socket_registration_tests!(run: super::run_ipv6);
 }
 #[test]
 fn rejects_socket_extension_contract_violations() {

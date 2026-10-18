@@ -1,12 +1,12 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use futures_lite::future::block_on;
-use protocol_scheduler::{
+use core_scheduler::{
     Blocking, Cancellation, FileClose, FileMetadata, FileOpen, FileOptions, FileStat,
 };
-use protocol_scheduler_conformance::{blocking, file};
-use protocol_scheduler_tokio::{TokioOptions, TokioScheduler};
+use core_scheduler_conformance::{blocking, file};
+use core_scheduler_tokio::{TokioOptions, TokioScheduler};
+use futures_lite::future::block_on;
 use std::{sync::mpsc, time::Duration};
 
 fn with_options(options: TokioOptions) -> std::io::Result<TokioScheduler> {
@@ -39,7 +39,7 @@ struct FileFixture {
     directory: tempfile::TempDir,
     path: std::path::PathBuf,
 }
-impl protocol_scheduler_conformance::FileTestFixture for FileFixture {
+impl core_scheduler_conformance::FileTestFixture for FileFixture {
     type Scheduler = TokioScheduler;
     fn scheduler(&self) -> &TokioScheduler {
         &self.scheduler
@@ -74,7 +74,7 @@ fn run_file(test: impl AsyncFnOnce(&FileFixture) + Send + 'static) {
 }
 mod files {
     use super::*;
-    use protocol_scheduler_conformance as conformance;
+    use core_scheduler_conformance as conformance;
     // Public macros must resolve support paths even when a caller shadows `std`.
     mod std {}
     conformance::file_tests!(run: run_file);
@@ -118,7 +118,7 @@ fn files_move_between_threads_and_compatible_scheduler_instances() {
 #[cfg(unix)]
 #[test]
 fn unix_positioned_operations_preserve_the_shared_cursor() {
-    use protocol_scheduler::FileSeek;
+    use core_scheduler::FileSeek;
     use std::io::SeekFrom;
 
     block_on(async {
@@ -159,7 +159,7 @@ fn unix_positioned_operations_preserve_the_shared_cursor() {
 struct QueueFixture(TokioScheduler);
 struct Hold {
     release: Option<mpsc::Sender<()>>,
-    _handle: protocol_scheduler_tokio::BlockingTask<()>,
+    _handle: core_scheduler_tokio::BlockingTask<()>,
 }
 impl Drop for Hold {
     fn drop(&mut self) {
@@ -224,9 +224,9 @@ fn run_queue(test: impl AsyncFnOnce(&QueueFixture) + Send + 'static) {
 }
 mod blocking_work {
     use super::*;
-    protocol_scheduler_conformance::blocking_tests!(run: run_blocking);
+    core_scheduler_conformance::blocking_tests!(run: run_blocking);
 }
 mod blocking_queue {
     use super::*;
-    protocol_scheduler_conformance::blocking_queue_tests!(run: run_queue);
+    core_scheduler_conformance::blocking_queue_tests!(run: run_queue);
 }

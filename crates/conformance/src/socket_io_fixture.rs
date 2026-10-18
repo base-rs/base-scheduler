@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::SocketIoGuard;
-use protocol_scheduler::{Cancellation, OperationResult};
+use core_scheduler::{Cancellation, OperationResult};
 
 /// Backend-controlled access boundary for deterministic completion/cancellation and abandonment tests, supporting scalar buffers and message sequences alike.
 ///

@@ -1,11 +1,11 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
+use core_scheduler::*;
+use core_scheduler_conformance::socket;
+use core_scheduler_direct::{DirectOptions, DirectScheduler, DirectSocket};
 use futures_channel::oneshot;
 use futures_lite::future::block_on;
-use protocol_scheduler::*;
-use protocol_scheduler_conformance::socket;
-use protocol_scheduler_direct::{DirectOptions, DirectScheduler, DirectSocket};
 use std::{
     sync::{
         Arc, Mutex,
@@ -131,15 +131,15 @@ mod ipv4 {
     }
     mod scalar {
         use super::*;
-        protocol_scheduler_conformance::socket_tests!(run: run_stream_case);
+        core_scheduler_conformance::socket_tests!(run: run_stream_case);
     }
     mod messages {
         use super::*;
-        protocol_scheduler_conformance::socket_message_tests!(run: run_stream_case);
+        core_scheduler_conformance::socket_message_tests!(run: run_stream_case);
     }
     mod datagrams {
         use super::*;
-        protocol_scheduler_conformance::socket_datagram_tests!(run: run_datagram_case);
+        core_scheduler_conformance::socket_datagram_tests!(run: run_datagram_case);
     }
 }
 
@@ -157,15 +157,15 @@ mod ipv6 {
     }
     mod scalar {
         use super::*;
-        protocol_scheduler_conformance::socket_tests!(run: run_stream_case);
+        core_scheduler_conformance::socket_tests!(run: run_stream_case);
     }
     mod messages {
         use super::*;
-        protocol_scheduler_conformance::socket_message_tests!(run: run_stream_case);
+        core_scheduler_conformance::socket_message_tests!(run: run_stream_case);
     }
     mod datagrams {
         use super::*;
-        protocol_scheduler_conformance::socket_datagram_tests!(run: run_datagram_case);
+        core_scheduler_conformance::socket_datagram_tests!(run: run_datagram_case);
     }
 }
 
@@ -312,7 +312,7 @@ impl Drop for Guard {
         }
     }
 }
-impl protocol_scheduler_conformance::SocketIoGuard for Guard {
+impl core_scheduler_conformance::SocketIoGuard for Guard {
     fn release(&mut self) {
         let _ = self.release.take().unwrap().send(());
     }
@@ -369,7 +369,7 @@ impl<'a> Fixture<'a> {
         }
     }
 }
-impl protocol_scheduler_conformance::SocketIoFixture for Fixture<'_> {
+impl core_scheduler_conformance::SocketIoFixture for Fixture<'_> {
     type Input = Input;
     type Output = usize;
     type Guard = Guard;
@@ -467,21 +467,21 @@ mod scalar_read_lifecycle {
     fn run_case(test: impl AsyncFnOnce(&Fixture<'_>) + Send + 'static) {
         run_io(0, test);
     }
-    protocol_scheduler_conformance::socket_io_tests!(run: run_case);
+    core_scheduler_conformance::socket_io_tests!(run: run_case);
 }
 mod prepared_receive_lifecycle {
     use super::*;
     fn run_case(test: impl AsyncFnOnce(&Fixture<'_>) + Send + 'static) {
         run_io(1, test);
     }
-    protocol_scheduler_conformance::socket_io_tests!(run: run_case);
+    core_scheduler_conformance::socket_io_tests!(run: run_case);
 }
 mod prepared_send_lifecycle {
     use super::*;
     fn run_case(test: impl AsyncFnOnce(&Fixture<'_>) + Send + 'static) {
         run_io(2, test);
     }
-    protocol_scheduler_conformance::socket_io_tests!(run: run_case);
+    core_scheduler_conformance::socket_io_tests!(run: run_case);
 }
 
 #[test]
@@ -551,10 +551,9 @@ fn aggregate_socket_helpers_remain_compatible() {
         socket::stream(scheduler, sender, receiver).await;
     });
     run_stream(SocketDomain::Ipv4, async |scheduler, sender, receiver| {
-        protocol_scheduler_conformance::socket_messages::stream(scheduler, sender, receiver).await;
+        core_scheduler_conformance::socket_messages::stream(scheduler, sender, receiver).await;
     });
     run_datagram(SocketDomain::Ipv4, async |scheduler, sender, receiver| {
-        protocol_scheduler_conformance::socket_messages::datagrams(scheduler, sender, receiver)
-            .await;
+        core_scheduler_conformance::socket_messages::datagrams(scheduler, sender, receiver).await;
     });
 }

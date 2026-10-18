@@ -1,10 +1,10 @@
-# Protocol Scheduler Tokio
+# Core Scheduler Tokio
 
-`protocol-scheduler-tokio` adapts an explicitly selected Tokio runtime to the `protocol-scheduler` capabilities. It supplies owning tasks, clocks, native address resolution, files, IP sockets, scatter/gather I/O, and bounded blocking work. Unix additionally supports signals; Linux supports file allocation and advice.
+`core-scheduler-tokio` adapts an explicitly selected Tokio runtime to the `core-scheduler` capabilities. It supplies owning tasks, clocks, native address resolution, files, IP sockets, scatter/gather I/O, and bounded blocking work. Unix additionally supports signals; Linux supports file allocation and advice.
 
 ```rust
-use protocol_scheduler::{Cancellation, FileClose, FileOpen, FileOptions, FileRead};
-use protocol_scheduler_tokio::TokioScheduler;
+use core_scheduler::{Cancellation, FileClose, FileOpen, FileOptions, FileRead};
+use core_scheduler_tokio::TokioScheduler;
 
 # async fn example(path: &std::path::Path, runtime: tokio::runtime::Handle) -> Result<(), Box<dyn std::error::Error>> {
 let scheduler = TokioScheduler::new(runtime);
@@ -31,4 +31,4 @@ Socket syscalls execute synchronously in readiness callbacks and retain no paylo
 
 Resolver results retain the native `addrinfo` list and matching deallocator, with allocation-free borrowed accessors. Unix signals use a scheduler-owned dispatch thread outside raw handlers and registry locks. Subscription drop stops new notifications without joining callbacks; callback and dispatch-owned target destructor panics are contained. Signal dispositions follow `signal-hook`'s process-wide policy and are not restored on unsubscribe. Linux allocation/advice implement the interface's native semantic contracts; other platforms omit those optional traits.
 
-The companion `protocol-scheduler-conformance` crate is a development dependency. Shared suites run against real adapter operations, with additional tests for runtime affinity, external polling, ownership, bounded admission, shutdown, native errors, and destructor panics.
+The companion `core-scheduler-conformance` crate is a development dependency. Shared suites run against real adapter operations, with additional tests for runtime affinity, external polling, ownership, bounded admission, shutdown, native errors, and destructor panics.

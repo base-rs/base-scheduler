@@ -5,7 +5,7 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
 #[cfg(not(any(unix, windows)))]
-compile_error!("protocol-scheduler-tokio currently supports Unix and Windows");
+compile_error!("core-scheduler-tokio currently supports Unix and Windows");
 
 mod blocking_pool;
 mod blocking_task;

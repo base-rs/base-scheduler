@@ -3,7 +3,7 @@
 
 //! Synchronous, nonblocking IP syscalls. No native pointer escapes a call.
 
-use protocol_scheduler::{
+use core_scheduler::{
     Interest, IoBufSequence, IoBufSequenceMut, SocketDomain, SocketProtocol, SocketRecvFlags,
     SocketRecvResult, SocketSendFlags, SocketType,
 };

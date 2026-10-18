@@ -10,7 +10,7 @@ use std::future::Future;
 /// Message sending does not imply message receiving:
 ///
 /// ```compile_fail,E0599
-/// use protocol_scheduler::{Cancellation, SocketRecvFlags, SocketRecvMsg, SocketSendMsg};
+/// use core_scheduler::{Cancellation, SocketRecvFlags, SocketRecvMsg, SocketSendMsg};
 /// async fn receive<S: SocketSendMsg>(scheduler: &S, socket: &S::Socket) {
 ///     scheduler.socket_recvmsg(socket, vec![vec![0; 16]], SocketRecvFlags::default(), &Cancellation::never()).await;
 /// }

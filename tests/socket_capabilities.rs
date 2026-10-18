@@ -1,11 +1,11 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use futures_lite::future::block_on;
-use protocol_scheduler::{
+use core_scheduler::{
     BufferResult, Cancellation, IoBuf, IoBufMut, OperationError, SocketOperation, SocketRead,
     SocketWrite,
 };
+use futures_lite::future::block_on;
 use std::sync::Mutex;
 
 // A protocol can run against existing in-memory connections without socket creation, listening, options, messages, or explicit close.

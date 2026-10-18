@@ -6,12 +6,12 @@ use crate::{
     blocking_pool::{BlockingPool, admission_error},
     file_io,
 };
-use futures_channel::oneshot;
-use protocol_scheduler::{
+use core_scheduler::{
     Blocking, BlockingError, BufferResult, Cancellation, FileClose, FileOpen, FileOperation,
     FileOptions, FileRead, FileReadAt, FileSeek, FileStat, FileSync, FileTruncate, FileWrite,
     FileWriteAt, IoBuf, IoBufMut, OperationResult, Spawn, SpawnError, SyncMode, TaskError,
 };
+use futures_channel::oneshot;
 use std::{
     io::{self, SeekFrom},
     path::Path,

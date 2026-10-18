@@ -1,18 +1,18 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use futures_lite::future::block_on;
-use protocol_scheduler::{
+use core_scheduler::{
     Blocking, BlockingError, BufferResult, Cancellation, FileOperation, FileRead, FileWrite, IoBuf,
     IoBufMut, TaskError,
 };
-use protocol_scheduler::{
+use core_scheduler::{
     Interest, IoBufSequence, IoBufSequenceMut, OperationResult, SocketMessage, SocketOperation,
     SocketRead, SocketRecvFlags, SocketRecvMsg, SocketRecvResult, SocketSendFlags, SocketSendMsg,
     SocketShutdown, SocketWait, SocketWrite,
 };
-use protocol_scheduler_conformance::{blocking, file};
-use protocol_scheduler_conformance::{socket, socket_messages};
+use core_scheduler_conformance::{blocking, file};
+use core_scheduler_conformance::{socket, socket_messages};
+use futures_lite::future::block_on;
 use std::{
     future::{Ready, ready},
     panic::{AssertUnwindSafe, catch_unwind},

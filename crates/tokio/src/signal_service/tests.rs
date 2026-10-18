@@ -3,9 +3,9 @@
 
 use super::*;
 use crate::test_support;
+use core_scheduler::Cancellation;
+use core_scheduler_conformance::SignalsFixture;
 use futures_lite::future::block_on;
-use protocol_scheduler::Cancellation;
-use protocol_scheduler_conformance::SignalsFixture;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
 struct Fixture {
@@ -40,10 +40,10 @@ fn run(test: impl AsyncFnOnce(&Fixture) + Send + 'static) {
     });
 }
 mod conformance {
-    protocol_scheduler_conformance::signals_tests!(run: super::run);
+    core_scheduler_conformance::signals_tests!(run: super::run);
 }
 mod dispatch {
-    protocol_scheduler_conformance::signals_dispatch_tests!(run: super::run);
+    core_scheduler_conformance::signals_dispatch_tests!(run: super::run);
 }
 
 #[test]
