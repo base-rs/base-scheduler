@@ -1,0 +1,9 @@
+[package]
+name = "protocol-scheduler-bake"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+bake = "0.20.0"
+core-project = ">=0.2.0"
