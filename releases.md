@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Contain native-worker and queued-capture panic payloads whose destructors panic, preserving worker capacity and shutdown progress in Direct and Tokio.
 - Add `protocol-scheduler-tokio` with explicit runtime selection, owning tasks, clocks, socket/file operations, native resolution, bounded blocking work, and platform-supported signals and filesystem extensions.
 
 - Implement Direct task execution, clocks, native address resolution with borrowed result views, typed socket options, TCP registration, Unix signals, and Linux file allocation/advice, with shared conformance suites and native lifecycle tests.
