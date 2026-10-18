@@ -6,7 +6,13 @@ use protocol_scheduler::{
     Blocking, BlockingError, BufferResult, Cancellation, FileOperation, FileRead, FileWrite, IoBuf,
     IoBufMut, TaskError,
 };
+use protocol_scheduler::{
+    Interest, IoBufSequence, IoBufSequenceMut, OperationResult, SocketMessage, SocketOperation,
+    SocketRead, SocketRecvFlags, SocketRecvMsg, SocketRecvResult, SocketSendFlags, SocketSendMsg,
+    SocketShutdown, SocketWait, SocketWrite,
+};
 use protocol_scheduler_conformance::{blocking, file};
+use protocol_scheduler_conformance::{socket, socket_messages};
 use std::{
     future::{Ready, ready},
     panic::{AssertUnwindSafe, catch_unwind},
@@ -99,4 +105,76 @@ fn rejects_eager_submission_ignored_cancellation_and_lost_panics() {
             .is_err()
         );
     }
+}
+
+struct IncorrectSocket;
+impl SocketOperation for IncorrectSocket {
+    type Socket = ();
+}
+impl SocketRead for IncorrectSocket {
+    async fn socket_read<B: IoBufMut>(
+        &self,
+        _: &(),
+        buffer: B,
+        _: &Cancellation,
+    ) -> BufferResult<B> {
+        (Ok(0), buffer)
+    }
+}
+impl SocketWrite for IncorrectSocket {
+    async fn socket_write<B: IoBuf>(&self, _: &(), buffer: B, _: &Cancellation) -> BufferResult<B> {
+        (Ok(0), buffer)
+    }
+}
+impl SocketWait for IncorrectSocket {
+    async fn socket_wait(&self, _: &(), _: Interest, _: &Cancellation) -> OperationResult<()> {
+        Ok(())
+    }
+}
+impl SocketShutdown for IncorrectSocket {
+    async fn socket_shutdown(&self, _: &(), _: std::net::Shutdown) -> std::io::Result<()> {
+        Ok(())
+    }
+    async fn socket_shutdown_submit(&self, _: &(), _: std::net::Shutdown) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+impl SocketSendMsg for IncorrectSocket {
+    async fn socket_sendmsg<B: IoBufSequence>(
+        &self,
+        _: &(),
+        message: SocketMessage<B>,
+        _: SocketSendFlags,
+        _: &Cancellation,
+    ) -> (OperationResult<usize>, SocketMessage<B>) {
+        (Ok(0), message)
+    }
+}
+impl SocketRecvMsg for IncorrectSocket {
+    async fn socket_recvmsg<B: IoBufSequenceMut>(
+        &self,
+        _: &(),
+        buffers: B,
+        _: SocketRecvFlags,
+        _: &Cancellation,
+    ) -> (OperationResult<SocketRecvResult>, B) {
+        (
+            Ok(SocketRecvResult {
+                bytes: 0,
+                address: None,
+                truncated: false,
+                control_truncated: false,
+            }),
+            buffers,
+        )
+    }
+}
+
+#[test]
+fn socket_conformance_rejects_ignored_cancellation_and_lost_os_errors() {
+    assert!(catch_unwind(|| block_on(socket::stream(&IncorrectSocket, &(), &()))).is_err());
+    assert!(catch_unwind(|| block_on(socket::write_error(&IncorrectSocket, &()))).is_err());
+    assert!(
+        catch_unwind(|| block_on(socket_messages::stream(&IncorrectSocket, &(), &()))).is_err()
+    );
 }

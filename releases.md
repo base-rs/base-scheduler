@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add reusable socket/message conformance tests and direct IPv4/IPv6 socket support, including prepared scatter/gather I/O, cancellation/retirement fixtures, nonblocking retry without occupied worker slots, and independent cleanup.
+
 - Add owned `IoBuffers` and `IoBuffersMut` packages with reusable native I/O vectors and explicit advancement after partial transfers. Sequence traits now expose indexed byte ranges and optional prepared vectors instead of mutable source-owner slices.
 
 - Reuse direct blocking-task completion state for handle abandonment, removing a separate shared allocation per blocking submission.
