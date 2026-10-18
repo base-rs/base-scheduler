@@ -18,6 +18,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "allocation-counter"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "beb9e990c0a33699f1984d85a6abead615ccc72dd8130bf3e15dcabe2ca149c9"
+
+[[package]]
 name = "bake"
 version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -544,6 +550,7 @@ dependencies = [
 name = "protocol-scheduler"
 version = "0.0.0"
 dependencies = [
+ "allocation-counter",
  "event-listener",
  "futures-lite",
 ]
@@ -569,6 +576,7 @@ dependencies = [
 name = "protocol-scheduler-direct"
 version = "0.0.0"
 dependencies = [
+ "allocation-counter",
  "event-listener",
  "futures-channel",
  "futures-lite",

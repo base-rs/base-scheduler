@@ -61,6 +61,9 @@ pub(crate) struct BlockingPool {
 
 impl BlockingPool {
     pub(crate) fn new(options: DirectOptions) -> Self {
+        let capacity = Event::new();
+        // Waiting uses inline listeners; initialize their shared state during setup.
+        capacity.notify(0);
         Self {
             shared: Arc::new(Shared {
                 state: Mutex::new(State {
@@ -69,7 +72,7 @@ impl BlockingPool {
                     queue: VecDeque::new(),
                 }),
                 work: Condvar::new(),
-                capacity: Event::new(),
+                capacity,
             }),
             options,
             started: OnceLock::new(),
@@ -215,9 +218,7 @@ impl BlockingPool {
         cancellation: &Cancellation,
         make_job: impl FnOnce() -> (Job, Output),
     ) -> Result<Output, BlockingError> {
-        let mut cancelled = pin!(cancellation.cancelled());
         loop {
-            let listener = self.shared.capacity.listen();
             if cancellation.is_cancelled() {
                 return Err(BlockingError::Cancelled);
             }
@@ -241,20 +242,37 @@ impl BlockingPool {
                     return Ok(result);
                 }
             }
-            let mut listener = pin!(listener);
-            poll_fn(|context| {
-                if cancelled.as_mut().poll(context).is_ready() {
-                    return Poll::Ready(());
-                }
-                listener.as_mut().poll(context)
-            })
-            .await;
+            self.wait_for_capacity(cancellation).await;
         }
     }
 
+    async fn wait_for_capacity(&self, cancellation: &Cancellation) {
+        event_listener::listener!(self.shared.capacity => listener);
+        // Capacity or closure may have changed since admission observed a full pool.
+        {
+            let state = self.shared.state.lock().unwrap();
+            if state.closed || state.outstanding < self.options.capacity {
+                return;
+            }
+        }
+        let mut cancelled = pin!(cancellation.cancelled());
+        let mut listener = pin!(listener);
+        poll_fn(|context| {
+            if cancelled.as_mut().poll(context).is_ready() {
+                return Poll::Ready(());
+            }
+            listener.as_mut().poll(context)
+        })
+        .await;
+    }
+
     pub(crate) async fn drain(&self) {
+        if self.shared.state.lock().unwrap().outstanding == 0 {
+            return;
+        }
         loop {
-            let listener = self.shared.capacity.listen();
+            event_listener::listener!(self.shared.capacity => listener);
+            // Retirement before registration is observed here; later retirement notifies us.
             if self.shared.state.lock().unwrap().outstanding == 0 {
                 return;
             }

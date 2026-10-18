@@ -10,6 +10,121 @@ static NEVER: Cancellation = Cancellation::never();
 const TIMEOUT: Duration = Duration::from_secs(10);
 
 #[test]
+fn capacity_wait_rechecks_available_or_closed_state_before_sleeping() {
+    use std::task::{Context, Waker};
+
+    let pool = BlockingPool::new(DirectOptions {
+        threads: 1,
+        capacity: 1,
+    });
+    for closed in [false, true] {
+        if closed {
+            pool.close();
+        }
+        // Admission can observe a full pool, then retirement or closure can
+        // happen before this wait begins. Its final state check must not sleep.
+        let mut waiting = pin!(pool.wait_for_capacity(&NEVER));
+        assert!(
+            waiting
+                .as_mut()
+                .poll(&mut Context::from_waker(Waker::noop()))
+                .is_ready()
+        );
+        assert_eq!(pool.shared.capacity.total_listeners(), 0);
+    }
+}
+
+#[test]
+fn immediate_admission_and_empty_drain_need_no_listeners_or_allocations() {
+    use std::task::{Context, Waker};
+
+    let pool = BlockingPool::new(DirectOptions {
+        threads: 1,
+        capacity: 1,
+    });
+    // Initialize worker synchronization and queue storage before measuring reuse.
+    block_on(block_on(pool.submit(|| ())).unwrap())
+        .unwrap()
+        .unwrap();
+    block_on(pool.drain());
+    pool.shared.state.lock().unwrap().queue.reserve(1);
+    let cancellation = Cancellation::new();
+    let mut admission = pin!(pool.admit(&cancellation, || {
+        assert_eq!(pool.shared.capacity.total_listeners(), 0);
+        (
+            Job {
+                run: Box::new(|| {}),
+                submitted: false,
+            },
+            (),
+        )
+    }));
+    let allocations = allocation_counter::measure(|| {
+        assert!(matches!(
+            admission
+                .as_mut()
+                .poll(&mut Context::from_waker(Waker::noop())),
+            Poll::Ready(Ok(()))
+        ));
+    });
+    assert_eq!(allocations.count_total, 0);
+    block_on(pool.drain());
+
+    let allocations = allocation_counter::measure(|| {
+        let mut drain = pin!(pool.drain());
+        assert!(
+            drain
+                .as_mut()
+                .poll(&mut Context::from_waker(Waker::noop()))
+                .is_ready()
+        );
+    });
+    assert_eq!(allocations.count_total, 0);
+}
+
+#[test]
+fn pending_capacity_and_drain_waits_do_not_allocate_and_unregister_on_drop() {
+    use std::task::{Context, Waker};
+
+    let pool = BlockingPool::new(DirectOptions {
+        threads: 1,
+        capacity: 1,
+    });
+    let (release, released) = mpsc::channel();
+    let running =
+        block_on(pool.spawn(move || released.recv_timeout(TIMEOUT).unwrap(), &NEVER)).unwrap();
+    let cancellation = Cancellation::new();
+
+    // Measure only waiter polling and destruction on this thread, not worker jobs.
+    let allocations = allocation_counter::measure(|| {
+        for _ in 0..16 {
+            let mut admission = pin!(pool.spawn(|| panic!("unadmitted job ran"), &cancellation));
+            let mut drain = pin!(pool.drain());
+            for _ in 0..2 {
+                assert!(
+                    admission
+                        .as_mut()
+                        .poll(&mut Context::from_waker(Waker::noop()))
+                        .is_pending()
+                );
+                assert!(
+                    drain
+                        .as_mut()
+                        .poll(&mut Context::from_waker(Waker::noop()))
+                        .is_pending()
+                );
+            }
+            assert_eq!(pool.shared.capacity.total_listeners(), 2);
+        }
+    });
+    assert_eq!(allocations.count_total, 0);
+    assert_eq!(pool.shared.capacity.total_listeners(), 0);
+    release.send(()).unwrap();
+    block_on(running).unwrap();
+    block_on(pool.drain());
+}
+
+#[test]
 fn submitted_jobs_survive_abandonment_and_shutdown_with_bounded_admission() {
     let pool = BlockingPool::new(DirectOptions {
         threads: 1,
