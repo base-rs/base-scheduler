@@ -31,6 +31,7 @@ impl Fixture {
             .open(&path)
             .unwrap();
         file.write_all(b"abcdef").unwrap();
+        file.sync_all().unwrap();
         file.seek(SeekFrom::Start(3)).unwrap();
         let read_only = std::fs::File::open(&path).unwrap();
         use std::os::{
