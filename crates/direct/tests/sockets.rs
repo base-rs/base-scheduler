@@ -324,6 +324,8 @@ impl protocol_scheduler_conformance::SocketIoFixture for Fixture<'_> {
         input: Input,
         cancellation: &Cancellation,
     ) -> (OperationResult<usize>, Input) {
+        // Require more than the initial poll to submit, exercising lifecycle assertions under delayed admission.
+        futures_lite::future::yield_now().await;
         match input {
             Input::Read(buffer) => {
                 let (result, buffer) = self

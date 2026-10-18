@@ -6,7 +6,11 @@
 use crate::{SocketIoFixture, SocketIoGuard};
 use futures_lite::future::{poll_once, zip};
 use protocol_scheduler::*;
-use std::{net::Shutdown, pin::pin};
+use std::{
+    future::{Future, poll_fn},
+    net::Shutdown,
+    pin::pin,
+};
 
 fn cancelled<T>(result: OperationResult<T>) {
     assert!(
@@ -49,9 +53,14 @@ pub async fn stream_pair<S: SocketScheduler>(
     }
     .parse()
     .unwrap();
+    let unbound_address = scheduler.socket_local_address(&listener).ok();
     drop(scheduler.socket_bind(&listener, local, &never));
     cancelled(scheduler.socket_bind(&listener, local, &token).await);
-    assert_eq!(scheduler.socket_local_address(&listener).unwrap().port(), 0);
+    // Winsock rejects address lookup before binding; Unix generally reports port zero.
+    assert_eq!(
+        scheduler.socket_local_address(&listener).ok(),
+        unbound_address
+    );
     scheduler
         .socket_bind(&listener, local, &never)
         .await
@@ -225,7 +234,16 @@ pub async fn completion_wins<F: SocketIoFixture>(fixture: &F) {
     let buffer = fixture.input();
     let mut reading = pin!(fixture.operation(buffer, &token));
     assert!(poll_once(&mut reading).await.is_none());
-    let mut guard = fixture.start().await;
+    let mut starting = pin!(fixture.start());
+    // Submission may itself await capacity. Keep driving the operation until the fixture reaches its access boundary.
+    let mut guard = poll_fn(|context| {
+        assert!(
+            reading.as_mut().poll(context).is_pending(),
+            "operation completed before fixture release"
+        );
+        starting.as_mut().poll(context)
+    })
+    .await;
     token.cancel();
     fixture.assert_retained();
     guard.release();
@@ -241,7 +259,15 @@ pub async fn abandoned_operation<F: SocketIoFixture>(fixture: &F) {
     let token = Cancellation::new();
     let mut reading = Box::pin(fixture.operation(fixture.input(), &token));
     assert!(poll_once(&mut reading).await.is_none());
-    let mut guard = fixture.start().await;
+    let mut starting = pin!(fixture.start());
+    let mut guard = poll_fn(|context| {
+        assert!(
+            reading.as_mut().poll(context).is_pending(),
+            "operation completed before fixture release"
+        );
+        starting.as_mut().poll(context)
+    })
+    .await;
     drop(reading);
     fixture.assert_retained();
     guard.release();

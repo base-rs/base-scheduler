@@ -221,7 +221,9 @@ fn exclusive_close_rejects_retained_access_and_unpolled_close_drops_normally() {
         )))
         .is_err()
     );
-    assert!(retained.local_addr().is_ok());
+    retained
+        .bind(&"127.0.0.1:0".parse::<SocketAddress>().unwrap().into())
+        .unwrap();
     let socket = super::tests::socket();
     let weak = Arc::downgrade(&socket.0);
     drop(scheduler.socket_close(socket));
