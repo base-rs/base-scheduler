@@ -5,7 +5,7 @@ edition = "2024"
 rust-version = "1.85"
 license = "MIT"
 repository = "https://github.com/core-rs/protocol-scheduler"
-description = "Thread-pool file and nonblocking socket operations for protocol-scheduler"
+description = "Reference thread-based scheduler implementation for protocol-scheduler"
 readme = "readme.md"
 
 [dependencies]
@@ -13,9 +13,11 @@ protocol-scheduler = { path = "../..", version = "=0.0.0" }
 event-listener = "5.4.2"
 futures-channel = "0.3.31"
 socket2 = { version = "0.6.3", features = ["all"] }
+async-task = "4.7.1"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
+signal-hook = "0.4.5"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Networking_WinSock", "Win32_System_IO"] }

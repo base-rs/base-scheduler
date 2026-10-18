@@ -11,22 +11,17 @@ pub trait Signals: Send + Sync {
     /// A backend's signal identifier; Unix implementations use `c_int`.
     type Signal: Copy + Send + 'static;
 
-    /// Owns one subscription. Dropping it stops admission of notifications;
-    /// dispatch already in progress may finish and must retain its destination.
-    /// Drop does not wait for callbacks or asynchronous backend cleanup.
-    type Registration: Send + 'static;
+    /// Owns one subscription. Dropping it stops admission of notifications; dispatch already in progress may finish and must retain its destination. Drop does not wait for callbacks or asynchronous backend cleanup.
+    type Subscription: Send + 'static;
 
-    /// Subscribe synchronously, returning a guard that must remain alive while
-    /// notifications are wanted. Setup failures are returned before success.
+    /// Subscribe synchronously, returning a guard that must remain alive while notifications are wanted. Setup failures are returned before success.
     ///
-    /// Callbacks run outside raw signal handlers and scheduler locks. Multiple
-    /// subscriptions are independent. Signals may coalesce before delivery;
-    /// this is not an exact counter or a globally ordered stream of OS events.
-    fn signal_notify<Target>(
+    /// Callbacks run outside raw signal handlers and scheduler locks. Multiple subscriptions are independent. Signals may coalesce before delivery; this is not an exact counter or a globally ordered stream of OS events.
+    fn signal_subscribe<Target>(
         &self,
         signals: &[Self::Signal],
         target: Target,
-    ) -> io::Result<Self::Registration>
+    ) -> io::Result<Self::Subscription>
     where
         Target: Notify<Self::Signal> + 'static;
 }

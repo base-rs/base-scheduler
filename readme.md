@@ -7,7 +7,7 @@ The root crate defines interfaces and runtime-independent support. It contains n
 The workspace also contains two companion crates, released together with the interface:
 
 - [`protocol-scheduler-conformance`](crates/conformance/readme.md): reusable capability-specific assertions for backend development dependencies.
-- [`protocol-scheduler-direct`](crates/direct/readme.md): bounded thread-pool file/socket operations and blocking work, with nonblocking socket retries, a separate cleanup worker, and no executor dependency.
+- [`protocol-scheduler-direct`](crates/direct/readme.md): reference implementations of tasks, clocks, native address resolution, file/socket operations, and platform-supported signals and filesystem extensions, with explicit service ownership and bounded syscall admission.
 
 ## Explicit operation context
 
