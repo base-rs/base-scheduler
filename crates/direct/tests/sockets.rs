@@ -4,7 +4,7 @@
 use futures_channel::oneshot;
 use futures_lite::future::block_on;
 use protocol_scheduler::*;
-use protocol_scheduler_conformance::{socket, socket_messages};
+use protocol_scheduler_conformance::socket;
 use protocol_scheduler_direct::{DirectOptions, DirectScheduler, DirectSocket};
 use std::{
     sync::{
@@ -39,67 +39,134 @@ fn scheduler() -> DirectScheduler {
     .unwrap()
 }
 
-#[test]
-fn socket_streams_and_messages_pass_conformance_with_one_worker_and_one_slot() {
-    run(|| {
+fn run_stream(
+    domain: SocketDomain,
+    test: impl AsyncFnOnce(&DirectScheduler, &DirectSocket, &DirectSocket) + Send + 'static,
+) {
+    run(move || {
+        let scheduler = scheduler();
+        let (client, server) = block_on(socket::stream_pair(&scheduler, domain));
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            block_on(test(&scheduler, &client, &server))
+        }));
         block_on(async {
-            let scheduler = scheduler();
-            for domain in [SocketDomain::Ipv4, SocketDomain::Ipv6] {
-                let (client, server) = socket::stream_pair(&scheduler, domain).await;
-                socket::pending_cancellation(&scheduler, &server).await;
-                socket_messages::stream(&scheduler, &client, &server).await;
-                socket::stream(&scheduler, &client, &server).await;
+            if result.is_ok() {
                 scheduler.socket_close(client).await.unwrap();
-                scheduler.socket_close_submit(server).await.unwrap();
+                scheduler.socket_close(server).await.unwrap();
             }
             scheduler.shutdown().await;
-        })
+        });
+        if let Err(payload) = result {
+            std::panic::resume_unwind(payload);
+        }
     });
 }
 
-#[test]
-fn message_datagrams_pass_conformance_for_ipv4_and_ipv6() {
-    run(|| {
+fn run_datagram(
+    domain: SocketDomain,
+    test: impl AsyncFnOnce(&DirectScheduler, &DirectSocket, &DirectSocket) + Send + 'static,
+) {
+    run(move || {
+        let scheduler = scheduler();
+        let never = Cancellation::never();
+        let local: SocketAddress = match domain {
+            SocketDomain::Ipv4 => "127.0.0.1:0",
+            SocketDomain::Ipv6 => "[::1]:0",
+        }
+        .parse()
+        .unwrap();
+        let (sender, receiver) = block_on(async {
+            let sender = scheduler
+                .socket_open(
+                    domain,
+                    SocketType::Datagram,
+                    Some(SocketProtocol::Udp),
+                    &never,
+                )
+                .await
+                .unwrap();
+            let receiver = scheduler
+                .socket_open(
+                    domain,
+                    SocketType::Datagram,
+                    Some(SocketProtocol::Udp),
+                    &never,
+                )
+                .await
+                .unwrap();
+            scheduler.socket_bind(&sender, local, &never).await.unwrap();
+            scheduler
+                .socket_bind(&receiver, local, &never)
+                .await
+                .unwrap();
+            (sender, receiver)
+        });
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            block_on(test(&scheduler, &sender, &receiver))
+        }));
         block_on(async {
-            let scheduler = scheduler();
-            let never = Cancellation::never();
-            for (domain, local) in [
-                (SocketDomain::Ipv4, "127.0.0.1:0"),
-                (SocketDomain::Ipv6, "[::1]:0"),
-            ] {
-                let sender = scheduler
-                    .socket_open(
-                        domain,
-                        SocketType::Datagram,
-                        Some(SocketProtocol::Udp),
-                        &never,
-                    )
-                    .await
-                    .unwrap();
-                let receiver = scheduler
-                    .socket_open(
-                        domain,
-                        SocketType::Datagram,
-                        Some(SocketProtocol::Udp),
-                        &never,
-                    )
-                    .await
-                    .unwrap();
-                scheduler
-                    .socket_bind(&sender, local.parse().unwrap(), &never)
-                    .await
-                    .unwrap();
-                scheduler
-                    .socket_bind(&receiver, local.parse().unwrap(), &never)
-                    .await
-                    .unwrap();
-                socket_messages::datagrams(&scheduler, &sender, &receiver).await;
-                scheduler.socket_close(sender).await.unwrap();
+            if result.is_ok() {
+                scheduler.socket_close_submit(sender).await.unwrap();
                 scheduler.socket_close(receiver).await.unwrap();
             }
             scheduler.shutdown().await;
-        })
+        });
+        if let Err(payload) = result {
+            std::panic::resume_unwind(payload);
+        }
     });
+}
+
+mod ipv4 {
+    use super::*;
+    fn run_stream_case(
+        test: impl AsyncFnOnce(&DirectScheduler, &DirectSocket, &DirectSocket) + Send + 'static,
+    ) {
+        run_stream(SocketDomain::Ipv4, test);
+    }
+    fn run_datagram_case(
+        test: impl AsyncFnOnce(&DirectScheduler, &DirectSocket, &DirectSocket) + Send + 'static,
+    ) {
+        run_datagram(SocketDomain::Ipv4, test);
+    }
+    mod scalar {
+        use super::*;
+        protocol_scheduler_conformance::socket_tests!(run: run_stream_case);
+    }
+    mod messages {
+        use super::*;
+        protocol_scheduler_conformance::socket_message_tests!(run: run_stream_case);
+    }
+    mod datagrams {
+        use super::*;
+        protocol_scheduler_conformance::socket_datagram_tests!(run: run_datagram_case);
+    }
+}
+
+mod ipv6 {
+    use super::*;
+    fn run_stream_case(
+        test: impl AsyncFnOnce(&DirectScheduler, &DirectSocket, &DirectSocket) + Send + 'static,
+    ) {
+        run_stream(SocketDomain::Ipv6, test);
+    }
+    fn run_datagram_case(
+        test: impl AsyncFnOnce(&DirectScheduler, &DirectSocket, &DirectSocket) + Send + 'static,
+    ) {
+        run_datagram(SocketDomain::Ipv6, test);
+    }
+    mod scalar {
+        use super::*;
+        protocol_scheduler_conformance::socket_tests!(run: run_stream_case);
+    }
+    mod messages {
+        use super::*;
+        protocol_scheduler_conformance::socket_message_tests!(run: run_stream_case);
+    }
+    mod datagrams {
+        use super::*;
+        protocol_scheduler_conformance::socket_datagram_tests!(run: run_datagram_case);
+    }
 }
 
 #[test]
@@ -369,34 +436,52 @@ impl protocol_scheduler_conformance::SocketIoFixture for Fixture<'_> {
         guard
     }
 }
-#[test]
-fn scalar_and_prepared_message_operations_pass_cancellation_race_and_abandonment_conformance() {
-    run(|| {
+fn run_io(mode: usize, test: impl AsyncFnOnce(&Fixture<'_>) + Send + 'static) {
+    run(move || {
+        let scheduler = scheduler();
+        let (client, server) = block_on(socket::stream_pair(&scheduler, SocketDomain::Ipv4));
+        if mode != 2 {
+            let (result, _) =
+                block_on(scheduler.socket_write(&client, vec![1, 2], &Cancellation::never()));
+            assert!(result.unwrap() > 0);
+        }
+        let fixture = Fixture::new(&scheduler, &server, mode);
+        let result =
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| block_on(test(&fixture))));
+        drop(fixture);
         block_on(async {
-            let scheduler = scheduler();
-            for mode in 0..3 {
-                for abandon in [false, true] {
-                    let (client, server) =
-                        socket::stream_pair(&scheduler, SocketDomain::Ipv4).await;
-                    if mode != 2 {
-                        let (result, _) = scheduler
-                            .socket_write(&client, vec![1, 2], &Cancellation::never())
-                            .await;
-                        assert!(result.unwrap() > 0);
-                    }
-                    let fixture = Fixture::new(&scheduler, &server, mode);
-                    if abandon {
-                        socket::abandoned_operation(&fixture).await;
-                    } else {
-                        socket::completion_wins(&fixture).await;
-                    }
-                    scheduler.socket_close(client).await.unwrap();
-                    scheduler.socket_close(server).await.unwrap();
-                }
+            if result.is_ok() {
+                scheduler.socket_close(client).await.unwrap();
+                scheduler.socket_close(server).await.unwrap();
             }
             scheduler.shutdown().await;
-        })
+        });
+        if let Err(payload) = result {
+            std::panic::resume_unwind(payload);
+        }
     });
+}
+
+mod scalar_read_lifecycle {
+    use super::*;
+    fn run_case(test: impl AsyncFnOnce(&Fixture<'_>) + Send + 'static) {
+        run_io(0, test);
+    }
+    protocol_scheduler_conformance::socket_io_tests!(run: run_case);
+}
+mod prepared_receive_lifecycle {
+    use super::*;
+    fn run_case(test: impl AsyncFnOnce(&Fixture<'_>) + Send + 'static) {
+        run_io(1, test);
+    }
+    protocol_scheduler_conformance::socket_io_tests!(run: run_case);
+}
+mod prepared_send_lifecycle {
+    use super::*;
+    fn run_case(test: impl AsyncFnOnce(&Fixture<'_>) + Send + 'static) {
+        run_io(2, test);
+    }
+    protocol_scheduler_conformance::socket_io_tests!(run: run_case);
 }
 
 #[test]
@@ -456,5 +541,20 @@ fn readiness_conformance_allows_spurious_notifications_while_preserving_cancella
             scheduler.socket_close(server).await.unwrap();
             scheduler.shutdown().await;
         })
+    });
+}
+
+// Existing callers can keep the aggregate helpers while migrating to generated suites.
+#[test]
+fn aggregate_socket_helpers_remain_compatible() {
+    run_stream(SocketDomain::Ipv4, async |scheduler, sender, receiver| {
+        socket::stream(scheduler, sender, receiver).await;
+    });
+    run_stream(SocketDomain::Ipv4, async |scheduler, sender, receiver| {
+        protocol_scheduler_conformance::socket_messages::stream(scheduler, sender, receiver).await;
+    });
+    run_datagram(SocketDomain::Ipv4, async |scheduler, sender, receiver| {
+        protocol_scheduler_conformance::socket_messages::datagrams(scheduler, sender, receiver)
+            .await;
     });
 }

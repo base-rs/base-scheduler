@@ -24,6 +24,14 @@ impl Drop for CountDrop {
 
 /// Check lazy and cancelled admission, successful output, and preservation of panic payloads.
 pub async fn lifecycle<S: Blocking>(scheduler: &S) {
+    lazy(scheduler).await;
+    pre_cancelled(scheduler).await;
+    output(scheduler).await;
+    panic_payload(scheduler).await;
+}
+
+/// An unpolled blocking submission drops its captures without executing the closure.
+pub async fn lazy<S: Blocking>(scheduler: &S) {
     let drops = Arc::new(AtomicUsize::new(0));
     let capture = CountDrop(Arc::clone(&drops), None);
     let calls = Arc::new(AtomicUsize::new(0));
@@ -39,6 +47,11 @@ pub async fn lifecycle<S: Blocking>(scheduler: &S) {
     ));
     assert_eq!(calls.load(Ordering::SeqCst), 0);
     assert_eq!(drops.load(Ordering::SeqCst), 1);
+}
+
+/// Pre-cancelled blocking submission rejects execution and releases captures.
+pub async fn pre_cancelled<S: Blocking>(scheduler: &S) {
+    let drops = Arc::new(AtomicUsize::new(0));
     let token = Cancellation::new();
     token.cancel();
     let capture = CountDrop(Arc::clone(&drops), None);
@@ -52,7 +65,12 @@ pub async fn lifecycle<S: Blocking>(scheduler: &S) {
         )
         .await;
     assert!(matches!(result, Err(BlockingError::Cancelled)));
-    assert_eq!(drops.load(Ordering::SeqCst), 2);
+    assert_eq!(drops.load(Ordering::SeqCst), 1);
+}
+
+/// Blocking handles return the closure's output.
+pub async fn output<S: Blocking>(scheduler: &S) {
+    let never = Cancellation::never();
     assert_eq!(
         scheduler
             .spawn_blocking(|| 42, &never)
@@ -62,6 +80,11 @@ pub async fn lifecycle<S: Blocking>(scheduler: &S) {
             .unwrap(),
         42
     );
+}
+
+/// Blocking handles preserve the original panic payload.
+pub async fn panic_payload<S: Blocking>(scheduler: &S) {
+    let never = Cancellation::never();
     let result = scheduler
         .spawn_blocking(
             || std::panic::panic_any(String::from("conformance panic")),
@@ -89,6 +112,12 @@ pub trait BlockingFixture {
 
 /// Check queued cancellation and bounded, cancellation-aware admission while workers are held by the fixture.
 pub async fn queue<F: BlockingFixture>(fixture: &F) {
+    queued_cancellation(fixture).await;
+    abandoned_handle(fixture).await;
+}
+
+/// Cancel queued work and cancellation-aware admission while execution is held.
+pub async fn queued_cancellation<F: BlockingFixture>(fixture: &F) {
     let scheduler = fixture.scheduler();
     let guard = fixture.hold_workers().await;
     let token = Cancellation::new();
@@ -105,7 +134,11 @@ pub async fn queue<F: BlockingFixture>(fixture: &F) {
     token.cancel();
     drop(guard);
     assert!(matches!(queued.await, Err(TaskError::Cancelled)));
+}
 
+/// Dropping a queued handle releases its capture without running the closure.
+pub async fn abandoned_handle<F: BlockingFixture>(fixture: &F) {
+    let scheduler = fixture.scheduler();
     let guard = fixture.hold_workers().await;
     let drops = Arc::new(AtomicUsize::new(0));
     let (completion, completed) = futures_channel::oneshot::channel();

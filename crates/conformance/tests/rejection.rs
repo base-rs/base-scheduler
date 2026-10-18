@@ -214,3 +214,125 @@ fn short_send_assertions_cover_advancement_and_reject_zero_and_full_counts() {
         );
     }
 }
+
+// Report cancellation correctly while deliberately performing the forbidden side effect. Each assertion must reject the violation without depending on another case's socket state.
+struct SideEffectSocket {
+    bytes: std::sync::Mutex<std::collections::VecDeque<u8>>,
+    cancelled_write: bool,
+    cancelled_read: bool,
+}
+impl SideEffectSocket {
+    fn send(&self, bytes: &[u8], cancellation: &Cancellation) -> OperationResult<usize> {
+        if !cancellation.is_cancelled() || self.cancelled_write {
+            self.bytes.lock().unwrap().extend(bytes);
+        }
+        cancellation.check()?;
+        Ok(bytes.len())
+    }
+    fn recv(&self, bytes: &mut [u8], cancellation: &Cancellation) -> OperationResult<usize> {
+        let mut count = 0;
+        if !cancellation.is_cancelled() || self.cancelled_read {
+            let mut queued = self.bytes.lock().unwrap();
+            for byte in bytes {
+                let Some(next) = queued.pop_front() else {
+                    break;
+                };
+                *byte = next;
+                count += 1;
+            }
+        }
+        cancellation.check()?;
+        Ok(count)
+    }
+}
+impl SocketOperation for SideEffectSocket {
+    type Socket = ();
+}
+impl SocketWrite for SideEffectSocket {
+    async fn socket_write<B: IoBuf>(
+        &self,
+        _: &(),
+        buffer: B,
+        cancellation: &Cancellation,
+    ) -> BufferResult<B> {
+        (self.send(buffer.as_ref(), cancellation), buffer)
+    }
+}
+impl SocketRead for SideEffectSocket {
+    async fn socket_read<B: IoBufMut>(
+        &self,
+        _: &(),
+        mut buffer: B,
+        cancellation: &Cancellation,
+    ) -> BufferResult<B> {
+        (self.recv(buffer.as_mut(), cancellation), buffer)
+    }
+}
+impl SocketWait for SideEffectSocket {
+    async fn socket_wait(
+        &self,
+        _: &(),
+        _: Interest,
+        cancellation: &Cancellation,
+    ) -> OperationResult<()> {
+        cancellation.check().map_err(Into::into)
+    }
+}
+impl SocketSendMsg for SideEffectSocket {
+    async fn socket_sendmsg<B: IoBufSequence>(
+        &self,
+        _: &(),
+        message: SocketMessage<B>,
+        _: SocketSendFlags,
+        cancellation: &Cancellation,
+    ) -> (OperationResult<usize>, SocketMessage<B>) {
+        let result = (0..message.buffers.buffer_count()).try_fold(0, |total, index| {
+            self.send(message.buffers.buffer(index), cancellation)
+                .map(|bytes| total + bytes)
+        });
+        (result, message)
+    }
+}
+impl SocketRecvMsg for SideEffectSocket {
+    async fn socket_recvmsg<B: IoBufSequenceMut>(
+        &self,
+        _: &(),
+        mut buffers: B,
+        _: SocketRecvFlags,
+        cancellation: &Cancellation,
+    ) -> (OperationResult<SocketRecvResult>, B) {
+        let result = (0..buffers.buffer_count()).try_fold(0, |total, index| {
+            self.recv(buffers.buffer_mut(index), cancellation)
+                .map(|bytes| total + bytes)
+        });
+        (
+            result.map(|bytes| SocketRecvResult {
+                bytes,
+                address: None,
+                truncated: false,
+                control_truncated: false,
+            }),
+            buffers,
+        )
+    }
+}
+
+#[test]
+fn isolated_pre_cancelled_assertions_reject_hidden_scalar_and_message_side_effects() {
+    for (cancelled_write, cancelled_read) in [(true, false), (false, true)] {
+        let fixture = SideEffectSocket {
+            bytes: Default::default(),
+            cancelled_write,
+            cancelled_read,
+        };
+        assert!(catch_unwind(|| block_on(socket::pre_cancelled(&fixture, &(), &()))).is_err());
+        let fixture = SideEffectSocket {
+            bytes: Default::default(),
+            cancelled_write,
+            cancelled_read,
+        };
+        assert!(
+            catch_unwind(|| block_on(socket_messages::pre_cancelled(&fixture, &(), &()))).is_err()
+        );
+    }
+}
