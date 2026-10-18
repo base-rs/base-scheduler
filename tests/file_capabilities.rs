@@ -42,6 +42,29 @@ async fn read_chunk<S: FileRead>(
 }
 
 #[test]
+fn the_file_read_interface_can_reuse_owned_storage_without_allocating() {
+    let file = Mutex::new(b"abc".as_slice());
+    let token = Cancellation::new();
+    let buffer = vec![0; 2];
+    let pointer = buffer.as_ptr();
+    // Initialize resource synchronization and the caller's executor before measurement.
+    drop(file.lock().unwrap());
+    block_on(async {});
+    let allocations = allocation_counter::measure(|| {
+        let mut buffer = buffer;
+        for _ in 0..16 {
+            *file.lock().unwrap() = b"abc";
+            let (result, returned) = block_on(read_chunk(&ReadOnly, &file, buffer, &token));
+            assert_eq!(result.unwrap(), 2);
+            buffer = returned;
+            assert_eq!(buffer, b"ab");
+            assert_eq!(buffer.as_ptr(), pointer);
+        }
+    });
+    assert_eq!(allocations.count_total, 0);
+}
+
+#[test]
 fn read_only_implementation_satisfies_a_read_only_consumer() {
     let file = Mutex::new(b"abc".as_slice());
     let buffer = vec![0; 2];

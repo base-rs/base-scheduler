@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Reuse direct blocking-task completion state for handle abandonment, removing a separate shared allocation per blocking submission.
 - Accept owned buffer sequences for message I/O and backend-associated address resolution results with borrowed entry views, allowing arrays, pooled collections, and native resolver lists without mandatory copied vectors.
 - Keep cancellation and direct capacity listeners inline in waiting futures, avoiding per-wait allocations and unnecessary capacity registration during immediate admission.
 - Extract runtime-independent scheduler capabilities and shared types from Socketry.

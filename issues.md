@@ -52,7 +52,11 @@ Acceptance: native results can be wrapped and iterated without additional collec
 
 ## 3. Use direct to identify allocations forced by the interface
 
+Status: audited, with a straightforward blocking-submission improvement and allocation regression tests. See the [direct allocation audit](context/allocation-audit.md) for costs, ownership constraints, and measurement limits. No further interface-imposed allocation was identified in the implemented capabilities.
+
 The direct backend currently allocates boxed jobs and completion channels per submission. These can be reasonable implementation choices for a simple reference backend. The important question is whether the interface forces an allocation that an implementation should be able to avoid.
+
+General blocking submissions now reuse the completion channel's receiver-abandonment state instead of allocating a separate shared flag. Prepared blocking and positioned-file operations retain only direct's job and channel allocations on the submitting thread, with no fresh Rust allocation in the measured worker loop. An immediate in-memory file implementation separately demonstrates allocation-free composition through the public interface. Accepted I/O and cleanup continue through retirement after their waiters are abandoned.
 
 - Trace allocation costs exposed by direct back to their source: interface requirements, shared support code, or backend implementation choices.
 - Fix interface requirements that unnecessarily prevent an implementation from using inline or reusable storage. Demonstrate the alternative with a focused implementation or test where useful; direct does not have to adopt that storage strategy.
