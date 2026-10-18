@@ -6,12 +6,8 @@ use protocol_scheduler::{
     Blocking, Cancellation, FileClose, FileMetadata, FileOpen, FileOptions, FileSeek, FileStat,
 };
 use protocol_scheduler_conformance::{blocking, file};
-use protocol_scheduler_direct::{DirectFile, DirectOptions, DirectScheduler};
-use std::{
-    io::{SeekFrom, Write},
-    sync::mpsc,
-    time::Duration,
-};
+use protocol_scheduler_direct::{DirectOptions, DirectScheduler};
+use std::{io::SeekFrom, sync::mpsc, time::Duration};
 
 #[test]
 fn direct_files_pass_capability_conformance_and_move_between_instances() {
@@ -69,15 +65,27 @@ fn direct_files_pass_capability_conformance_and_move_between_instances() {
 fn unix_positioned_operations_preserve_the_shared_cursor() {
     block_on(async {
         let scheduler = DirectScheduler::new(DirectOptions::default()).unwrap();
-        let mut original = tempfile::tempfile().unwrap();
-        original.write_all(b"abcdef").unwrap();
-        let file = DirectFile::from(original);
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("file");
+        std::fs::write(&path, b"abcdef").unwrap();
+        let file = scheduler
+            .file_open(
+                &path,
+                FileOptions {
+                    write: true,
+                    ..FileOptions::READ
+                },
+                &Cancellation::never(),
+            )
+            .await
+            .unwrap();
         scheduler
             .file_seek(&file, SeekFrom::Start(3), &Cancellation::never())
             .await
             .unwrap();
         file::read_at(&scheduler, &file, 0, b"abcdef").await;
         file::write_at(&scheduler, &file, 0, b"ABC").await;
+        assert_eq!(std::fs::read(&path).unwrap(), b"ABCdef");
         assert_eq!(
             scheduler
                 .file_seek(&file, SeekFrom::Current(0), &Cancellation::never())

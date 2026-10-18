@@ -37,7 +37,7 @@ fn invalid_options_and_closed_services_return_errors_and_buffers() {
         );
     }
     let scheduler = scheduler(1);
-    let file = DirectFile::from(tempfile::tempfile().unwrap());
+    let file = DirectFile::from_std(tempfile::tempfile().unwrap());
     scheduler.close();
     let buffer = vec![1; 4];
     let allocation = buffer.as_ptr();
@@ -59,7 +59,7 @@ fn invalid_options_and_closed_services_return_errors_and_buffers() {
         io::ErrorKind::BrokenPipe
     );
     assert_eq!(
-        block_on(scheduler.file_close_submit(tempfile::tempfile().unwrap().into()))
+        block_on(scheduler.file_close_submit(DirectFile::from_std(tempfile::tempfile().unwrap())))
             .unwrap_err()
             .kind(),
         io::ErrorKind::BrokenPipe
@@ -75,7 +75,7 @@ fn invalid_options_and_closed_services_return_errors_and_buffers() {
 fn startup_failures_preserve_io_ownership_and_report_cleanup_errors() {
     let mut scheduler = scheduler(1);
     scheduler.work.fail_start_at = Some(0);
-    let file = DirectFile::from(tempfile::tempfile().unwrap());
+    let file = DirectFile::from_std(tempfile::tempfile().unwrap());
     let (result, buffer) = block_on(scheduler.file_read(&file, vec![9], &Cancellation::never()));
     assert_eq!(buffer, vec![9]);
     assert_eq!(
@@ -104,8 +104,7 @@ fn file_errors_and_exclusive_close_are_observable() {
         ))
         .is_err()
     );
-    let file = DirectFile::from(tempfile::tempfile().unwrap());
-    assert_eq!(file.as_ref().metadata().unwrap().len(), 0);
+    let file = DirectFile::from_std(tempfile::tempfile().unwrap());
     let retained = file.retain();
     assert!(
         std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| block_on(
@@ -115,7 +114,7 @@ fn file_errors_and_exclusive_close_are_observable() {
     );
     assert!(retained.metadata().is_ok());
     drop(retained);
-    let file = DirectFile::from(tempfile::tempfile().unwrap());
+    let file = DirectFile::from_std(tempfile::tempfile().unwrap());
     let weak = Arc::downgrade(&file.0);
     drop(scheduler.file_close(file));
     assert_eq!(weak.strong_count(), 0);
@@ -136,7 +135,7 @@ fn cleanup_makes_progress_independently_and_accepted_close_survives_abandonment(
     ))
     .unwrap();
     start.recv_timeout(TIMEOUT).unwrap();
-    block_on(scheduler.file_close(tempfile::tempfile().unwrap().into())).unwrap();
+    block_on(scheduler.file_close(DirectFile::from_std(tempfile::tempfile().unwrap()))).unwrap();
     release.send(()).unwrap();
     block_on(running).unwrap();
 
@@ -149,7 +148,7 @@ fn cleanup_makes_progress_independently_and_accepted_close_survives_abandonment(
     .unwrap();
     start.recv_timeout(TIMEOUT).unwrap();
     // The cleanup pool is full: a waiter can abandon admission, releasing its file.
-    let file = DirectFile::from(tempfile::tempfile().unwrap());
+    let file = DirectFile::from_std(tempfile::tempfile().unwrap());
     let weak = Arc::downgrade(&file.0);
     let mut waiting = Box::pin(scheduler.file_close(file));
     assert!(block_on(poll_once(&mut waiting)).is_none());
@@ -168,7 +167,8 @@ fn cleanup_makes_progress_independently_and_accepted_close_survives_abandonment(
     }))
     .unwrap();
     start.recv_timeout(TIMEOUT).unwrap();
-    let mut close = Box::pin(scheduler.file_close(tempfile::tempfile().unwrap().into()));
+    let mut close =
+        Box::pin(scheduler.file_close(DirectFile::from_std(tempfile::tempfile().unwrap())));
     assert!(block_on(poll_once(&mut close)).is_none());
     drop(close);
     let mut shutdown = Box::pin(scheduler.shutdown());
@@ -230,7 +230,7 @@ impl Drop for GatedBuffer {
 #[test]
 fn abandoned_io_and_scheduler_drop_retain_worker_access_until_retirement() {
     let scheduler = scheduler(1);
-    let file = DirectFile::from(tempfile::tempfile().unwrap());
+    let file = DirectFile::from_std(tempfile::tempfile().unwrap());
     let retained = Arc::downgrade(&file.0);
     let (started, start) = mpsc::channel();
     let (release, released) = mpsc::channel();

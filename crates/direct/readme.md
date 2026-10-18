@@ -18,7 +18,7 @@ scheduler.shutdown().await;
 # Ok(()) }
 ```
 
-Each operation receives the scheduler and cancellation explicitly. `DirectFile` contains no scheduler or registration affinity; successive operations can use different direct instances. Its underlying standard-library file can also be supplied with `DirectFile::from`.
+Each operation receives the scheduler and cancellation explicitly. `DirectFile` contains no scheduler or registration affinity; successive operations can use different direct instances. Open files through `FileOpen`; native file import and access are deferred until descriptor flags and aliases can preserve positioned-write and exclusive-close guarantees.
 
 Admission is bounded by queued plus running jobs. Cancellation prevents admission or queued I/O execution; a running syscall preserves its actual result. Dropping an I/O future does not release its resources while a worker still uses them. General blocking-job handles own queued execution; dropping one can skip queued work, but cannot interrupt a running closure.
 

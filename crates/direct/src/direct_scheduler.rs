@@ -127,7 +127,7 @@ impl FileOpen for DirectScheduler {
                     .create_new(options.create_new)
                     .truncate(options.truncate)
                     .open(path)
-                    .map(DirectFile::from)
+                    .map(DirectFile::from_std)
             })
             .await
             .0
