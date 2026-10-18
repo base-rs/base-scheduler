@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add `protocol-scheduler-tokio` with explicit runtime selection, owning tasks, clocks, socket/file operations, native resolution, bounded blocking work, and platform-supported signals and filesystem extensions.
+
 - Implement Direct task execution, clocks, native address resolution with borrowed result views, typed socket options, TCP registration, Unix signals, and Linux file allocation/advice, with shared conformance suites and native lifecycle tests.
 
 - Add shared conformance suites for clocks, tasks, address resolution, signals, typed socket options, TCP registration, file allocation, and advice, with controlled fixtures and rejection tests.
