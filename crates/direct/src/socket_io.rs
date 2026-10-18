@@ -107,6 +107,11 @@ fn connected(
 }
 
 pub(crate) fn wait(socket: &Socket, interest: Interest) -> io::Result<()> {
+    // A per-thread, one-shot test shim makes connect readiness failures deterministic without depending on network timing.
+    #[cfg(test)]
+    if let Some(error) = tests::WAIT_ERROR.with(|slot| slot.take()) {
+        return Err(error.into());
+    }
     #[cfg(unix)]
     let (result, events) = {
         let mut descriptor = libc::pollfd {

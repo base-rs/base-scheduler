@@ -178,3 +178,39 @@ fn socket_conformance_rejects_ignored_cancellation_and_lost_os_errors() {
         catch_unwind(|| block_on(socket_messages::stream(&IncorrectSocket, &(), &()))).is_err()
     );
 }
+
+// Script a supported short-send outcome independently of the host TCP buffering policy.
+struct ShortSend(usize);
+impl SocketOperation for ShortSend {
+    type Socket = ();
+}
+impl SocketSendMsg for ShortSend {
+    async fn socket_sendmsg<B: IoBufSequence>(
+        &self,
+        _: &(),
+        message: SocketMessage<B>,
+        _: SocketSendFlags,
+        _: &Cancellation,
+    ) -> (OperationResult<usize>, SocketMessage<B>) {
+        (Ok(self.0), message)
+    }
+}
+
+#[test]
+fn short_send_assertions_cover_advancement_and_reject_zero_and_full_counts() {
+    block_on(socket_messages::partial_send(
+        &ShortSend(3),
+        &(),
+        [vec![1; 2], vec![2; 3]],
+    ));
+    for count in [0, 5] {
+        assert!(
+            catch_unwind(|| block_on(socket_messages::partial_send(
+                &ShortSend(count),
+                &(),
+                [vec![1; 2], vec![2; 3]]
+            )))
+            .is_err()
+        );
+    }
+}

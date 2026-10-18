@@ -6,6 +6,10 @@ use protocol_scheduler::{IoBuffers, IoBuffersMut};
 use std::net::TcpListener;
 use std::time::{Duration, Instant};
 
+thread_local! {
+    pub(super) static WAIT_ERROR: std::cell::Cell<Option<io::ErrorKind>> = const { std::cell::Cell::new(None) };
+}
+
 fn retry<T>(mut operation: impl FnMut() -> io::Result<T>) -> io::Result<T> {
     let deadline = Instant::now() + Duration::from_secs(5);
     loop {
@@ -81,6 +85,13 @@ fn native_connect_preserves_immediate_and_deferred_results() {
     let socket = open(SocketDomain::Ipv4, SocketType::Datagram, None).unwrap();
     connect(&socket, "127.0.0.1:9".parse().unwrap(), &mut false).unwrap();
     connect(&socket, "127.0.0.1:9".parse().unwrap(), &mut true).unwrap();
+    WAIT_ERROR.with(|slot| slot.set(Some(io::ErrorKind::WouldBlock)));
+    assert_eq!(
+        connect(&socket, "127.0.0.1:9".parse().unwrap(), &mut true)
+            .unwrap_err()
+            .kind(),
+        io::ErrorKind::WouldBlock
+    );
     let socket = open(SocketDomain::Ipv4, SocketType::Stream, None).unwrap();
     assert!(connect(&socket, "[::1]:9".parse().unwrap(), &mut false).is_err());
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
