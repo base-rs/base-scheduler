@@ -3,11 +3,11 @@
 
 use futures_lite::future::block_on;
 use protocol_scheduler::{
-    Blocking, Cancellation, FileClose, FileMetadata, FileOpen, FileOptions, FileSeek, FileStat,
+    Blocking, Cancellation, FileClose, FileMetadata, FileOpen, FileOptions, FileStat,
 };
 use protocol_scheduler_conformance::{blocking, file};
 use protocol_scheduler_direct::{DirectOptions, DirectScheduler};
-use std::{io::SeekFrom, sync::mpsc, time::Duration};
+use std::{sync::mpsc, time::Duration};
 
 fn run(test: impl FnOnce() + Send + 'static) {
     let (done, completion) = mpsc::channel();
@@ -106,6 +106,9 @@ fn files_move_between_threads_and_compatible_scheduler_instances() {
 #[cfg(unix)]
 #[test]
 fn unix_positioned_operations_preserve_the_shared_cursor() {
+    use protocol_scheduler::FileSeek;
+    use std::io::SeekFrom;
+
     block_on(async {
         let scheduler = DirectScheduler::new(DirectOptions::default()).unwrap();
         let directory = tempfile::tempdir().unwrap();
