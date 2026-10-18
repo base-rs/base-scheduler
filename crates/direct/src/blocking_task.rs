@@ -5,8 +5,6 @@ use futures_channel::oneshot;
 use protocol_scheduler::TaskError;
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::task::{Context, Poll};
 
 /// Owns a submitted blocking job. Await for completion; move to transfer ownership.
@@ -15,7 +13,6 @@ use std::task::{Context, Poll};
 #[must_use = "await or retain the job; dropping its handle abandons its result"]
 pub struct BlockingTask<Output> {
     pub(crate) result: oneshot::Receiver<Result<Output, TaskError>>,
-    pub(crate) abandoned: Arc<AtomicBool>,
 }
 
 impl<Output> Future for BlockingTask<Output> {
@@ -25,11 +22,5 @@ impl<Output> Future for BlockingTask<Output> {
         Pin::new(&mut self.result)
             .poll(context)
             .map(|result| result.unwrap_or(Err(TaskError::Cancelled)))
-    }
-}
-
-impl<Output> Drop for BlockingTask<Output> {
-    fn drop(&mut self) {
-        self.abandoned.store(true, Ordering::Release);
     }
 }

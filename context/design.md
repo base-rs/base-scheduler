@@ -82,6 +82,8 @@ Direct supplies the core file capability aggregate and `Blocking` on Unix and Wi
 
 `DirectScheduler::close` stops admission to both pools, discards queued general blocking jobs, and leaves accepted I/O and cleanup to retire. `shutdown().await` additionally waits for all admitted jobs to finish. Applications coordinate cooperative cancellation and asynchronous cleanup before closing admission. Destruction closes admission without synchronously joining workers, so destructors can safely run in worker callbacks. A never-returning synchronous operation can prevent graceful shutdown. Waiting for a scheduler's shutdown from one of its own jobs is a caller-created dependency cycle. Direct uses no process-wide fallback pool or implicit current scheduler.
 
+General blocking jobs reuse completion-channel receiver state to detect handle abandonment, avoiding a separate allocated flag. Accepted I/O and cleanup ignore receiver abandonment. Direct deliberately retains boxed jobs and completion channels; the interface's concrete futures and associated types permit other representations without imposing fixed limits on generic inputs or outputs.
+
 Regular files are the initial focus. Blocking sockets could exhaust all workers with reads while writes needed for progress remain queued, so they require a deliberate progress and capacity policy before inclusion. Timers must likewise not consume ordinary blocking workers for their entire wait.
 
 Extending conformance to clocks, tasks, sockets, and richer deterministic cancellation/retirement fixtures, then migrating the native and Tokio implementations and adding a smol adapter, remain follow-up work. Keep backend code in companion or adapter crates rather than the interface package.

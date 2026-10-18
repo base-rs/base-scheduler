@@ -10,6 +10,94 @@ static NEVER: Cancellation = Cancellation::never();
 const TIMEOUT: Duration = Duration::from_secs(10);
 
 #[test]
+fn prepared_work_allocates_only_jobs_and_completion_channels() {
+    use crate::{DirectFile, DirectScheduler};
+    use protocol_scheduler::{Blocking, FileReadAt, FileWriteAt};
+    use std::task::{Context, Waker};
+    use std::time::Instant;
+
+    // Avoid measuring lazy executor parking state or executor-specific wakers.
+    fn wait<T>(future: impl Future<Output = T>) -> T {
+        let mut future = pin!(future);
+        let started = Instant::now();
+        loop {
+            if let Poll::Ready(output) = future
+                .as_mut()
+                .poll(&mut Context::from_waker(Waker::noop()))
+            {
+                return output;
+            }
+            assert!(started.elapsed() < TIMEOUT, "operation timed out");
+            thread::yield_now();
+        }
+    }
+
+    let scheduler = DirectScheduler::new(DirectOptions {
+        threads: 1,
+        capacity: 1,
+    })
+    .unwrap();
+    let mut worker = None;
+    // Measure the entire worker loop, including dispatch, completion delivery, and retirement. Thread creation and reporting remain outside measurement.
+    scheduler
+        .work
+        .start_with(|shared, _| {
+            worker = Some(thread::spawn(move || {
+                // Some platforms allocate native synchronization storage lazily.
+                drop(
+                    shared
+                        .work
+                        .wait_timeout(shared.state.lock().unwrap(), Duration::ZERO)
+                        .unwrap(),
+                );
+                allocation_counter::measure(|| work(shared))
+            }));
+            Ok(())
+        })
+        .unwrap();
+    let token = Cancellation::new();
+    let file = DirectFile::from_std(tempfile::tempfile().unwrap());
+    let buffer = vec![7; 8];
+    let pointer = buffer.as_ptr();
+
+    // Warm queue capacity. This job is also included in the worker's allocation measurement.
+    wait(wait(scheduler.spawn_blocking(|| (), &token)).unwrap()).unwrap();
+    wait(scheduler.work.drain());
+
+    const REPETITIONS: u64 = 16;
+    let allocations = allocation_counter::measure(|| {
+        let mut buffer = buffer;
+        for _ in 0..REPETITIONS {
+            let task = wait(scheduler.spawn_blocking(|| 42, &token)).unwrap();
+            assert_eq!(wait(task).unwrap(), 42);
+            wait(scheduler.work.drain());
+
+            let (result, returned) = wait(scheduler.file_write_at(&file, buffer, 0, &token));
+            assert_eq!(result.unwrap(), 8);
+            buffer = returned;
+            wait(scheduler.work.drain());
+
+            buffer.fill(0);
+            let (result, returned) = wait(scheduler.file_read_at(&file, buffer, 0, &token));
+            assert_eq!(result.unwrap(), 8);
+            buffer = returned;
+            assert_eq!(buffer, [7; 8]);
+            assert_eq!(buffer.as_ptr(), pointer);
+            wait(scheduler.work.drain());
+        }
+    });
+    wait(scheduler.shutdown());
+    let worker_allocations = worker.unwrap().join().unwrap();
+
+    // Direct deliberately keeps a boxed job and one completion channel for each operation. Prevent additional allocations, including a separate shared abandonment flag, without requiring direct to eliminate these two.
+    assert!(
+        allocations.count_total <= REPETITIONS * 3 * 2,
+        "{allocations:?}"
+    );
+    assert_eq!(worker_allocations.count_total, 0, "{worker_allocations:?}");
+}
+
+#[test]
 fn capacity_wait_rechecks_available_or_closed_state_before_sleeping() {
     use std::task::{Context, Waker};
 
@@ -312,6 +400,54 @@ fn shutdown_during_startup_cannot_admit_work() {
 struct Destructor {
     shared: Arc<Shared>,
     dropped: mpsc::Sender<()>,
+}
+
+#[test]
+fn dropping_a_queued_handle_on_another_thread_skips_execution_and_preserves_the_worker() {
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    let pool = BlockingPool::new(DirectOptions {
+        threads: 1,
+        capacity: 2,
+    });
+    let (started, start) = mpsc::channel();
+    let (release, released) = mpsc::channel();
+    let running = block_on(pool.spawn(
+        move || {
+            started.send(()).unwrap();
+            released.recv_timeout(TIMEOUT).unwrap();
+        },
+        &NEVER,
+    ))
+    .unwrap();
+    start.recv_timeout(TIMEOUT).unwrap();
+
+    let (dropped, drops) = mpsc::channel();
+    let captured = Destructor {
+        shared: Arc::clone(&pool.shared),
+        dropped,
+    };
+    let executed = Arc::new(AtomicBool::new(false));
+    let observed = Arc::clone(&executed);
+    let queued = block_on(pool.spawn(
+        move || {
+            observed.store(true, Ordering::SeqCst);
+            drop(captured);
+        },
+        &NEVER,
+    ))
+    .unwrap();
+    thread::spawn(move || drop(queued)).join().unwrap();
+    assert!(drops.try_recv().is_err());
+    release.send(()).unwrap();
+    block_on(running).unwrap();
+    drops.recv_timeout(TIMEOUT).unwrap();
+    assert_eq!(
+        block_on(block_on(pool.spawn(|| 7, &NEVER)).unwrap()).unwrap(),
+        7
+    );
+    assert!(!executed.load(Ordering::SeqCst));
+    block_on(pool.drain());
 }
 
 impl Drop for Destructor {

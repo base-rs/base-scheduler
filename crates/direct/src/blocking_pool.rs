@@ -10,7 +10,6 @@ use std::future::{Future, poll_fn};
 use std::io;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::pin::pin;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex, OnceLock};
 use std::task::Poll;
 use std::thread;
@@ -125,8 +124,6 @@ impl BlockingPool {
     {
         self.admit(cancellation, || {
             let (sender, result) = oneshot::channel();
-            let abandoned = Arc::new(AtomicBool::new(false));
-            let owner = Arc::clone(&abandoned);
             let cancellation = cancellation.clone();
             let operation = Operation {
                 operation,
@@ -135,11 +132,14 @@ impl BlockingPool {
             (
                 Job {
                     run: Box::new(move || {
-                        operation.run(owner.load(Ordering::Acquire) || cancellation.is_cancelled())
+                        // The completion receiver already owns abandonment state.
+                        let cancelled =
+                            operation.completion.is_canceled() || cancellation.is_cancelled();
+                        operation.run(cancelled)
                     }),
                     submitted: false,
                 },
-                BlockingTask { result, abandoned },
+                BlockingTask { result },
             )
         })
         .await
