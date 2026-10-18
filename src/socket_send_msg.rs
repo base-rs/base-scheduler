@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use super::SocketOperation;
-use crate::{Cancellation, IoBuf, OperationResult, SocketMessage, SocketSendFlags};
+use crate::{Cancellation, IoBufSequence, OperationResult, SocketMessage, SocketSendFlags};
 use std::future::Future;
 
 /// Send one scatter/gather message through an existing socket. Buffer owners are returned on every result. See [`SocketMessages`](crate::SocketMessages) for the shared message I/O contract.
@@ -16,11 +16,11 @@ use std::future::Future;
 /// }
 /// ```
 pub trait SocketSendMsg: SocketOperation {
-    fn socket_sendmsg<B: IoBuf>(
+    fn socket_sendmsg<Buffers: IoBufSequence>(
         &self,
         socket: &Self::Socket,
-        message: SocketMessage<B>,
+        message: SocketMessage<Buffers>,
         flags: SocketSendFlags,
         cancellation: &Cancellation,
-    ) -> impl Future<Output = (OperationResult<usize>, SocketMessage<B>)> + Send;
+    ) -> impl Future<Output = (OperationResult<usize>, SocketMessage<Buffers>)> + Send;
 }

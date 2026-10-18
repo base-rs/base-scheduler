@@ -24,4 +24,8 @@ event-listener = "5.4.2"
 
 [dev-dependencies]
 allocation-counter = "0.8.1"
+futures-channel = "0.3.31"
 futures-lite = "2.6.1"
+
+[target."cfg(unix)".dev-dependencies]
+libc = "0.2"
