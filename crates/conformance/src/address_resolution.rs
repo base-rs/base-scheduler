@@ -83,6 +83,7 @@ pub async fn results<F: AddressResolutionFixture>(fixture: &F) {
         assert_eq!(actual, fixture.expected());
     }
     // A second lookup must not invalidate a previous result's borrowed entries.
+    let earlier = result.entries().next();
     let other = fixture
         .scheduler()
         .address_resolve(
@@ -94,6 +95,10 @@ pub async fn results<F: AddressResolutionFixture>(fixture: &F) {
         .await
         .unwrap();
     drop(other);
+    assert_eq!(
+        earlier.map(|entry| entry.to_address_info()),
+        fixture.expected().first().copied()
+    );
     assert_eq!(
         result
             .entries()
@@ -126,24 +131,46 @@ pub async fn service_name<F: AddressResolutionFixture>(fixture: &F) {
 
 /// All hint fields reach the actual resolver boundary. A configured-family lookup may fail on hosts without that family; native flag forwarding remains independently observable.
 pub async fn hints<F: AddressResolutionFixture>(fixture: &F) {
-    let hints = AddressHints {
+    let base = AddressHints {
         domain: Some(SocketDomain::Ipv4),
         socket_type: Some(SocketType::Datagram),
         protocol: Some(SocketProtocol::Udp),
-        passive: true,
-        numeric_host: true,
-        address_configured: true,
+        ..AddressHints::default()
     };
-    let _ = fixture
-        .scheduler()
-        .address_resolve(
-            Some("127.0.0.1"),
-            AddressService::Port(8080),
-            hints,
-            &Cancellation::never(),
-        )
-        .await;
-    fixture.assert_hints(hints);
+    // Exercise flags separately as well as together, so swapped native bits cannot pass.
+    for hints in [
+        AddressHints::default(),
+        base,
+        AddressHints {
+            passive: true,
+            ..base
+        },
+        AddressHints {
+            numeric_host: true,
+            ..base
+        },
+        AddressHints {
+            address_configured: true,
+            ..base
+        },
+        AddressHints {
+            passive: true,
+            numeric_host: true,
+            address_configured: true,
+            ..base
+        },
+    ] {
+        let _ = fixture
+            .scheduler()
+            .address_resolve(
+                Some("127.0.0.1"),
+                AddressService::Port(8080),
+                hints,
+                &Cancellation::never(),
+            )
+            .await;
+        fixture.assert_hints(hints);
+    }
 }
 
 /// Requiring a numeric host rejects the configured nonnumeric name instead of performing a successful name lookup.

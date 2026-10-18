@@ -23,6 +23,8 @@ enum Fault {
     PollClosed,
     IgnoreClose,
     Unregistered,
+    NoHandleWake,
+    JoinActivePoll,
 }
 trait Runnable: Send + Sync {
     fn tick(&self) -> bool;
@@ -56,7 +58,9 @@ impl<T: Send + 'static> Runnable for Task<T> {
         future.take();
         *self.result.lock().unwrap() = Some(result);
         if let Some(waker) = self.waiter.lock().unwrap().take() {
-            waker.wake();
+            if self.fault != Fault::NoHandleWake {
+                waker.wake();
+            }
         }
         false
     }
@@ -70,6 +74,9 @@ impl<T> Future for Handle<T> {
             Poll::Ready(result)
         } else {
             *self.0.waiter.lock().unwrap() = Some(context.waker().clone());
+            if self.0.fault == Fault::NoHandleWake {
+                context.waker().wake_by_ref();
+            }
             Poll::Pending
         }
     }
@@ -78,7 +85,9 @@ impl<T> Drop for Handle<T> {
     fn drop(&mut self) {
         if self.0.fault != Fault::Detach {
             self.0.abandoned.store(true, Ordering::SeqCst);
-            if let Ok(mut future) = self.0.future.try_lock() {
+            if self.0.fault == Fault::JoinActivePoll {
+                self.0.future.lock().unwrap().take();
+            } else if let Ok(mut future) = self.0.future.try_lock() {
                 future.take();
             }
         }
@@ -172,6 +181,7 @@ fn rejects_detaching_lost_panics_and_closed_service_violations() {
         Fault::PollClosed,
         Fault::IgnoreClose,
         Fault::Unregistered,
+        Fault::NoHandleWake,
     ] {
         support::run(move || {
             let fixture = Fixture::new(fault);
@@ -181,6 +191,7 @@ fn rejects_detaching_lost_panics_and_closed_service_violations() {
                         Fault::Detach => spawn::abandonment(&fixture).await,
                         Fault::LosePanic => spawn::panic_payload(&fixture).await,
                         Fault::Unregistered => spawn::registration(&fixture).await,
+                        Fault::NoHandleWake => spawn::cancellation(&fixture).await,
                         _ => spawn::closed(&fixture).await,
                     }
                 })
@@ -191,7 +202,7 @@ fn rejects_detaching_lost_panics_and_closed_service_violations() {
 }
 
 #[test]
-fn rejects_repolling_an_abandoned_active_task() {
+fn rejects_detaching_an_abandoned_active_task() {
     support::run(|| {
         let fixture = Fixture::new(Fault::Detach);
         assert!(
@@ -200,5 +211,12 @@ fn rejects_repolling_an_abandoned_active_task() {
             )))
             .is_err()
         );
+    });
+}
+
+#[test]
+fn handle_drop_may_wait_for_an_active_poll() {
+    support::run(|| {
+        block_on(spawn::active_poll(&Fixture::new(Fault::JoinActivePoll)));
     });
 }

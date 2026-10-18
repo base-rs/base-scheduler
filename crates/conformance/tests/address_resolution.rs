@@ -24,6 +24,7 @@ enum Fault {
     Deduplicate,
     LoseError,
     IgnoreHints,
+    SwapFlags,
     FalseSuccess,
 }
 struct Fixture {
@@ -80,11 +81,14 @@ impl AddressResolution for Fixture {
                 );
             }
             self.calls.fetch_add(1, Ordering::SeqCst);
-            let hints = if self.fault == Fault::IgnoreHints {
+            let mut hints = if self.fault == Fault::IgnoreHints {
                 AddressHints::default()
             } else {
                 hints
             };
+            if self.fault == Fault::SwapFlags {
+                std::mem::swap(&mut hints.passive, &mut hints.numeric_host);
+            }
             *self.hints.lock().unwrap() = Some(hints);
             if hints.numeric_host && name.is_some_and(|name| name.parse::<IpAddr>().is_err()) {
                 return Err(io::Error::from(AddressResolveError {
@@ -259,4 +263,15 @@ fn rejects_dropped_hint_fields_and_numeric_host_fallback() {
             .is_err()
         );
     }
+}
+
+#[test]
+fn rejects_swapped_native_hint_flags() {
+    let fixture = Fixture::new(Fault::SwapFlags);
+    assert!(
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| block_on(
+            address_resolution::hints(&fixture)
+        )))
+        .is_err()
+    );
 }

@@ -3,15 +3,19 @@
 
 //! Owning task-handle assertions, independent of executor and scheduling order.
 
-use crate::{SpawnFixture, probe::DropProbe};
+use crate::{
+    SpawnFixture,
+    probe::{DropProbe, WakeProbe},
+};
 use protocol_scheduler::{Cancellation, Spawn, SpawnError, TaskError};
 use std::{
     future::poll_fn,
+    pin::pin,
     sync::{
         Arc,
         atomic::{AtomicUsize, Ordering},
     },
-    task::Poll,
+    task::{Context, Poll, Waker},
 };
 
 /// Awaiting returns the output; moving a handle transfers ownership and does not abort the task.
@@ -69,7 +73,7 @@ pub async fn panic_payload<F: SpawnFixture>(fixture: &F) {
     );
 }
 
-/// A token captured explicitly by a task supports cooperative cancellation followed by awaiting completion.
+/// A token captured explicitly by a task supports cooperative cancellation, waking its pending owning handle on completion.
 pub async fn cancellation<F: SpawnFixture>(fixture: &F) {
     let token = Cancellation::new();
     let child = token.clone();
@@ -81,8 +85,22 @@ pub async fn cancellation<F: SpawnFixture>(fixture: &F) {
         })
         .unwrap();
     fixture.settle().await;
+    let mut handle = pin!(handle);
+    let probe = Arc::new(WakeProbe::default());
+    let waker = Waker::from(Arc::clone(&probe));
+    assert!(
+        handle
+            .as_mut()
+            .poll(&mut Context::from_waker(&waker))
+            .is_pending()
+    );
+    probe.0.store(0, Ordering::SeqCst);
     token.cancel();
     fixture.settle().await;
+    assert!(
+        probe.0.load(Ordering::SeqCst) > 0,
+        "completed task did not wake its owning handle"
+    );
     assert_eq!(handle.await.unwrap(), 73);
 }
 
@@ -141,11 +159,12 @@ struct PollingTask {
 impl std::future::Future for PollingTask {
     type Output = ();
     fn poll(self: std::pin::Pin<&mut Self>, _: &mut std::task::Context<'_>) -> Poll<()> {
-        self.polls.fetch_add(1, Ordering::SeqCst);
-        self.entered.send(()).unwrap();
-        self.released
-            .recv_timeout(std::time::Duration::from_secs(5))
-            .expect("poll release deadline exceeded");
+        if self.polls.fetch_add(1, Ordering::SeqCst) == 0 {
+            self.entered.send(()).unwrap();
+            self.released
+                .recv_timeout(std::time::Duration::from_secs(5))
+                .expect("poll release deadline exceeded");
+        }
         Poll::Pending
     }
 }
@@ -156,7 +175,7 @@ impl Drop for Release {
     }
 }
 
-/// Handle drop requests destruction without synchronously joining an active poll. The task is destroyed after that poll returns and is never polled again. Requires a fixture shareable with its background executor driver, without adding bounds to `Spawn`.
+/// An active task stays alive through its poll and is destroyed after its owning handle is dropped. Drop may wait for the active poll to return. Requires a fixture shareable with its background executor driver, without adding bounds to `Spawn`.
 pub async fn active_poll<F: SpawnFixture + Sync>(fixture: &F) {
     let drops = Arc::new(AtomicUsize::new(0));
     let polls = Arc::new(AtomicUsize::new(0));
@@ -177,13 +196,9 @@ pub async fn active_poll<F: SpawnFixture + Sync>(fixture: &F) {
         started
             .recv_timeout(std::time::Duration::from_secs(2))
             .expect("task poll start deadline exceeded");
-        let (finished, done) = std::sync::mpsc::channel();
         let dropping = scope.spawn(move || {
             drop(handle);
-            finished.send(()).unwrap();
         });
-        done.recv_timeout(std::time::Duration::from_secs(2))
-            .expect("handle drop synchronously joined active poll");
         assert_eq!(
             drops.load(Ordering::SeqCst),
             0,
@@ -195,9 +210,4 @@ pub async fn active_poll<F: SpawnFixture + Sync>(fixture: &F) {
     });
     fixture.settle().await;
     assert_eq!(drops.load(Ordering::SeqCst), 1);
-    assert_eq!(
-        polls.load(Ordering::SeqCst),
-        1,
-        "task polled again after abandonment"
-    );
 }

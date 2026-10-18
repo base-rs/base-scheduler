@@ -118,6 +118,7 @@ pub async fn cancellation<F: ClockFixture>(fixture: &F) {
             .poll(&mut Context::from_waker(&waker))
             .is_pending()
     );
+    probe.0.store(0, Ordering::SeqCst);
     token.cancel();
     assert!(
         probe.0.load(Ordering::SeqCst) > 0,

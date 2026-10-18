@@ -25,6 +25,7 @@ enum Fault {
     MissingWake,
     RelativeCancellation,
     PendingSuccess,
+    CancellationSelfWake,
 }
 struct State {
     now: Instant,
@@ -94,6 +95,10 @@ impl Clock for Fixture {
                 return Poll::Ready(Ok(()));
             }
             state.timers.insert(id, (deadline, context.waker().clone()));
+            if self.fault == Fault::CancellationSelfWake {
+                context.waker().wake_by_ref();
+                return Poll::Pending;
+            }
             if cancelled.as_mut().poll(context).is_ready() {
                 if self.fault == Fault::PendingSuccess {
                     return Poll::Ready(Ok(()));
@@ -172,6 +177,7 @@ fn rejects_clock_contract_violations() {
         (Fault::MissingWake, 1),
         (Fault::RelativeCancellation, 0),
         (Fault::PendingSuccess, 5),
+        (Fault::CancellationSelfWake, 5),
     ] {
         support::run(move || {
             let fixture = Fixture::new(fault);
