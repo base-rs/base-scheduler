@@ -65,22 +65,76 @@ pub async fn stream<S: SocketSendMsg + SocketRecvMsg>(
     sender: &S::Socket,
     receiver: &S::Socket,
 ) {
-    let never = Cancellation::never();
+    pre_cancelled(scheduler, sender, receiver).await;
+    transfer(scheduler, sender, receiver).await;
+}
+
+/// Pre-cancelled prepared sends and receives return their original owners.
+pub async fn pre_cancelled<S: SocketSendMsg + SocketRecvMsg>(
+    scheduler: &S,
+    sender: &S::Socket,
+    receiver: &S::Socket,
+) {
     let token = Cancellation::new();
     token.cancel();
+    let source = IoBuffers::new([b"head".to_vec(), b"body".to_vec()]);
+    let original = source.buffer(0).as_ptr() as usize;
+    let (result, message) = scheduler
+        .socket_sendmsg(
+            sender,
+            SocketMessage {
+                buffers: source,
+                address: None,
+            },
+            SocketSendFlags::default(),
+            &token,
+        )
+        .await;
+    cancelled(result);
+    assert_eq!(message.buffers.buffer(0).as_ptr() as usize, original);
+    let never = Cancellation::never();
+    let (result, _) = scheduler
+        .socket_sendmsg(
+            sender,
+            SocketMessage {
+                buffers: [vec![0xff]],
+                address: None,
+            },
+            SocketSendFlags::default(),
+            &never,
+        )
+        .await;
+    assert_eq!(result.unwrap(), 1);
+    let buffers = IoBuffersMut::new([vec![0x5a; 3], vec![0x5a; 3]]);
+    let original = buffers.buffer(0).as_ptr() as usize;
+    let (result, buffers) = scheduler
+        .socket_recvmsg(receiver, buffers, SocketRecvFlags::default(), &token)
+        .await;
+    cancelled(result);
+    assert_eq!(buffers.buffer(0).as_ptr() as usize, original);
+    assert_eq!(buffers.into_inner(), [vec![0x5a; 3], vec![0x5a; 3]]);
+    let (result, buffers) = scheduler
+        .socket_recvmsg(receiver, [vec![0; 1]], SocketRecvFlags::default(), &never)
+        .await;
+    assert_eq!(result.unwrap().bytes, 1);
+    assert_eq!(buffers, [vec![0xff]]);
+}
+
+/// Check prepared vectors, explicit advancement after short receives, collection ownership, and lazy submission on a fresh stream.
+pub async fn transfer<S: SocketSendMsg + SocketRecvMsg>(
+    scheduler: &S,
+    sender: &S::Socket,
+    receiver: &S::Socket,
+) {
+    let never = Cancellation::never();
     let header = b"head".to_vec();
     let body = b"body".to_vec();
     let original = header.as_ptr() as usize;
     // Separate arrays also exercise the no-prepared-vector fallback below.
-    let message = SocketMessage {
+    let mut message = SocketMessage {
         buffers: IoBuffers::new([header, body]),
         address: None,
     };
-    let (result, mut message) = scheduler
-        .socket_sendmsg(sender, message, SocketSendFlags::default(), &token)
-        .await;
-    cancelled(result);
-    assert_eq!(message.buffers.buffer(0).as_ptr() as usize, original);
     drop(scheduler.socket_sendmsg(
         sender,
         SocketMessage {
@@ -104,11 +158,6 @@ pub async fn stream<S: SocketSendMsg + SocketRecvMsg>(
     assert_eq!(message.buffers.into_inner()[0].as_ptr() as usize, original);
     let mut buffers = IoBuffersMut::new([vec![0; 3], vec![0; 3]]);
     let pointer = buffers.buffer(0).as_ptr() as usize;
-    let (result, returned) = scheduler
-        .socket_recvmsg(receiver, buffers, SocketRecvFlags::default(), &token)
-        .await;
-    cancelled(result);
-    buffers = returned;
     drop(scheduler.socket_recvmsg(receiver, [vec![0; 8]], SocketRecvFlags::default(), &never));
     let mut received = 0;
     while received < 6 {
@@ -147,6 +196,17 @@ pub async fn stream<S: SocketSendMsg + SocketRecvMsg>(
 
 /// Verify message boundaries, addresses, scatter/gather order, peek, truncation/discard, empty datagrams, and pending cancellation. Both sockets must be bound, unconnected datagram sockets with empty receive queues.
 pub async fn datagrams<S: SocketSendMsg + SocketRecvMsg + SocketLocalAddress>(
+    scheduler: &S,
+    sender: &S::Socket,
+    receiver: &S::Socket,
+) {
+    datagram_truncation(scheduler, sender, receiver).await;
+    datagram_boundaries(scheduler, sender, receiver).await;
+    pending_cancellation(scheduler, receiver).await;
+}
+
+/// Check source/destination addresses, scatter/gather ordering, peek, truncation, and discarded remainder on bound datagram sockets.
+pub async fn datagram_truncation<S: SocketSendMsg + SocketRecvMsg + SocketLocalAddress>(
     scheduler: &S,
     sender: &S::Socket,
     receiver: &S::Socket,
@@ -196,7 +256,39 @@ pub async fn datagrams<S: SocketSendMsg + SocketRecvMsg + SocketLocalAddress>(
     assert_eq!(result.address, Some(source));
     assert!(result.truncated);
     assert_eq!(buffers.into_inner(), [b"a".to_vec(), b"bc".to_vec()]);
-    // The truncated remainder is discarded rather than becoming another datagram.
+    // A later, distinct datagram must be received intact: cancellation alone cannot prove that the truncated remainder was discarded by a queued backend.
+    let (result, _) = scheduler
+        .socket_sendmsg(
+            sender,
+            SocketMessage {
+                buffers: [b"sentinel".to_vec()],
+                address: Some(destination),
+            },
+            SocketSendFlags::default(),
+            &never,
+        )
+        .await;
+    assert_eq!(result.unwrap(), 8);
+    let (result, buffers) = scheduler
+        .socket_recvmsg(receiver, [vec![0; 16]], SocketRecvFlags::default(), &never)
+        .await;
+    let result = result.unwrap();
+    assert_eq!(result.bytes, 8);
+    assert_eq!(result.address, Some(source));
+    assert!(!result.truncated);
+    assert!(!result.control_truncated);
+    assert_eq!(&buffers[0][..result.bytes], b"sentinel");
+}
+
+/// Check empty datagrams and message boundaries on bound sockets.
+pub async fn datagram_boundaries<S: SocketSendMsg + SocketRecvMsg + SocketLocalAddress>(
+    scheduler: &S,
+    sender: &S::Socket,
+    receiver: &S::Socket,
+) {
+    let never = Cancellation::never();
+    let destination = scheduler.socket_local_address(receiver).unwrap();
+    let source = scheduler.socket_local_address(sender).unwrap();
     for payload in [Vec::<Vec<u8>>::new(), vec![vec![]], vec![b"next".to_vec()]] {
         let expected: Vec<_> = payload.iter().flatten().copied().collect();
         let (result, _) = scheduler
@@ -226,6 +318,10 @@ pub async fn datagrams<S: SocketSendMsg + SocketRecvMsg + SocketLocalAddress>(
         assert!(!result.control_truncated);
         assert_eq!(&buffers[0][..result.bytes], expected);
     }
+}
+
+/// Cancel a message receive on a quiet socket without changing its initialized input.
+pub async fn pending_cancellation<S: SocketRecvMsg>(scheduler: &S, receiver: &S::Socket) {
     let token = Cancellation::new();
     let mut reading = pin!(scheduler.socket_recvmsg(
         receiver,

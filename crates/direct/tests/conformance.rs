@@ -3,66 +3,112 @@
 
 use futures_lite::future::block_on;
 use protocol_scheduler::{
-    Blocking, Cancellation, FileClose, FileMetadata, FileOpen, FileOptions, FileSeek, FileStat,
+    Blocking, Cancellation, FileClose, FileMetadata, FileOpen, FileOptions, FileStat,
 };
 use protocol_scheduler_conformance::{blocking, file};
 use protocol_scheduler_direct::{DirectOptions, DirectScheduler};
-use std::{io::SeekFrom, sync::mpsc, time::Duration};
+use std::{sync::mpsc, time::Duration};
+
+fn run(test: impl FnOnce() + Send + 'static) {
+    let (done, completion) = mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = done.send(std::panic::catch_unwind(std::panic::AssertUnwindSafe(test)));
+    });
+    if let Err(payload) = completion
+        .recv_timeout(Duration::from_secs(20))
+        .expect("conformance test deadline exceeded")
+    {
+        std::panic::resume_unwind(payload);
+    }
+}
+
+struct FileFixture {
+    scheduler: DirectScheduler,
+    directory: tempfile::TempDir,
+    path: std::path::PathBuf,
+}
+impl protocol_scheduler_conformance::FileTestFixture for FileFixture {
+    type Scheduler = DirectScheduler;
+    fn scheduler(&self) -> &DirectScheduler {
+        &self.scheduler
+    }
+    fn path(&self) -> &std::path::Path {
+        &self.path
+    }
+    fn assert_absent(&self) {
+        assert!(!self.path.exists());
+    }
+    fn assert_contents(&self, expected: &[u8]) {
+        assert_eq!(std::fs::read(&self.path).unwrap(), expected);
+    }
+}
+fn run_file(test: impl AsyncFnOnce(&FileFixture) + Send + 'static) {
+    run(move || {
+        let directory = tempfile::tempdir().unwrap();
+        let fixture = FileFixture {
+            scheduler: DirectScheduler::new(DirectOptions::default()).unwrap(),
+            path: directory.path().join("file"),
+            directory,
+        };
+        let result =
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| block_on(test(&fixture))));
+        block_on(fixture.scheduler.shutdown());
+        // Keep the temporary directory until every accepted operation has retired, including after a failed assertion.
+        drop(fixture.directory);
+        if let Err(payload) = result {
+            std::panic::resume_unwind(payload);
+        }
+    });
+}
+mod files {
+    use super::*;
+    use protocol_scheduler_conformance as conformance;
+    // Public macros must resolve support paths even when a caller shadows `std`.
+    mod std {}
+    conformance::file_tests!(run: run_file);
+}
 
 #[test]
-fn direct_files_pass_capability_conformance_and_move_between_instances() {
-    block_on(async {
-        let first = DirectScheduler::new(DirectOptions::default()).unwrap();
-        let second = DirectScheduler::new(DirectOptions {
-            threads: 1,
-            capacity: 1,
-        })
-        .unwrap();
-        let directory = tempfile::tempdir().unwrap();
-        let path = directory.path().join("file");
-        let file = file::create(&first, &path, || assert!(!path.exists())).await;
-        file::write(&first, &file, b"abcdef").await;
-        assert_eq!(std::fs::read(&path).unwrap(), b"abcdef");
-        first
-            .file_seek(&file, SeekFrom::Start(0), &Cancellation::never())
-            .await
+fn files_move_between_threads_and_compatible_scheduler_instances() {
+    run(|| {
+        block_on(async {
+            let first = DirectScheduler::new(DirectOptions::default()).unwrap();
+            let second = DirectScheduler::new(DirectOptions {
+                threads: 1,
+                capacity: 1,
+            })
             .unwrap();
-        file::seek(&first, &file, 6).await;
-        std::thread::scope(|scope| {
-            scope
-                .spawn(|| block_on(file::read(&second, &file, b"abcdef")))
-                .join()
+            let directory = tempfile::tempdir().unwrap();
+            let path = directory.path().join("file");
+            std::fs::write(&path, b"abcdef").unwrap();
+            let file = first
+                .file_open(&path, FileOptions::READ, &Cancellation::never())
+                .await
                 .unwrap();
-        });
-        file::metadata(&second, &file, 6).await;
-        let metadata = second
-            .file_stat(&file, &Cancellation::never())
-            .await
-            .unwrap();
-        assert_eq!(metadata.size(), Some(6));
-        file::read_at(&first, &file, 1, b"bcde").await;
-        file::write_at(&second, &file, 2, b"XY").await;
-        assert_eq!(std::fs::read(&path).unwrap(), b"abXYef");
-        file::truncate(&first, &file, 9).await;
-        assert_eq!(std::fs::read(&path).unwrap(), b"abXYef\0\0\0");
-        file::truncate(&second, &file, 3).await;
-        assert_eq!(std::fs::read(&path).unwrap(), b"abX");
-        file::sync(&second, &file).await;
-        second.file_close(file).await.unwrap();
-        let read_only = first
-            .file_open(&path, FileOptions::READ, &Cancellation::never())
-            .await
-            .unwrap();
-        file::write_error(&first, &read_only).await;
-        first.file_close_submit(read_only).await.unwrap();
-        first.shutdown().await;
-        second.shutdown().await;
+            std::thread::scope(|scope| {
+                scope
+                    .spawn(|| block_on(file::read(&second, &file, b"abcdef")))
+                    .join()
+                    .unwrap();
+            });
+            let metadata = second
+                .file_stat(&file, &Cancellation::never())
+                .await
+                .unwrap();
+            assert_eq!(metadata.size(), Some(6));
+            second.file_close(file).await.unwrap();
+            first.shutdown().await;
+            second.shutdown().await;
+        })
     });
 }
 
 #[cfg(unix)]
 #[test]
 fn unix_positioned_operations_preserve_the_shared_cursor() {
+    use protocol_scheduler::FileSeek;
+    use std::io::SeekFrom;
+
     block_on(async {
         let scheduler = DirectScheduler::new(DirectOptions::default()).unwrap();
         let directory = tempfile::tempdir().unwrap();
@@ -136,9 +182,19 @@ impl blocking::BlockingFixture for QueueFixture {
     }
 }
 
-#[test]
-fn direct_blocking_passes_lifecycle_and_bounded_queue_conformance() {
-    block_on(async {
+fn run_blocking(test: impl AsyncFnOnce(&DirectScheduler) + Send + 'static) {
+    run(move || {
+        let scheduler = DirectScheduler::new(DirectOptions::default()).unwrap();
+        let result =
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| block_on(test(&scheduler))));
+        block_on(scheduler.shutdown());
+        if let Err(payload) = result {
+            std::panic::resume_unwind(payload);
+        }
+    });
+}
+fn run_queue(test: impl AsyncFnOnce(&QueueFixture) + Send + 'static) {
+    run(move || {
         let fixture = QueueFixture(
             DirectScheduler::new(DirectOptions {
                 threads: 1,
@@ -146,10 +202,21 @@ fn direct_blocking_passes_lifecycle_and_bounded_queue_conformance() {
             })
             .unwrap(),
         );
-        blocking::lifecycle(&fixture.0).await;
-        blocking::queue(&fixture).await;
-        fixture.0.shutdown().await;
+        let result =
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| block_on(test(&fixture))));
+        block_on(fixture.0.shutdown());
+        if let Err(payload) = result {
+            std::panic::resume_unwind(payload);
+        }
     });
+}
+mod blocking_work {
+    use super::*;
+    protocol_scheduler_conformance::blocking_tests!(run: run_blocking);
+}
+mod blocking_queue {
+    use super::*;
+    protocol_scheduler_conformance::blocking_queue_tests!(run: run_queue);
 }
 
 #[derive(Clone, Copy)]

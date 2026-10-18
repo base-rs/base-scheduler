@@ -119,6 +119,17 @@ pub async fn stream<S: SocketRead + SocketWrite + SocketWait + SocketShutdown>(
     sender: &S::Socket,
     receiver: &S::Socket,
 ) {
+    pre_cancelled(scheduler, sender, receiver).await;
+    transfer(scheduler, sender, receiver).await;
+    shutdown(scheduler, sender, receiver).await;
+}
+
+/// Pre-cancelled scalar I/O preserves the original owners and submits no payload.
+pub async fn pre_cancelled<S: SocketRead + SocketWrite + SocketWait>(
+    scheduler: &S,
+    sender: &S::Socket,
+    receiver: &S::Socket,
+) {
     let never = Cancellation::never();
     let token = Cancellation::new();
     token.cancel();
@@ -133,14 +144,34 @@ pub async fn stream<S: SocketRead + SocketWrite + SocketWait + SocketShutdown>(
         .unwrap();
     let source = b"abcdef".to_vec();
     let allocation = source.as_ptr() as usize;
-    let (result, mut source) = scheduler.socket_write(sender, source, &token).await;
+    let (result, source) = scheduler.socket_write(sender, source, &token).await;
     cancelled(result);
     assert_eq!(source.as_ptr() as usize, allocation);
-    let target = vec![0; 2];
+    // A distinct sentinel exposes writes which incorrectly transferred bytes while reporting cancellation, and reads which consumed data despite pre-cancellation.
+    let (result, _) = scheduler.socket_write(sender, vec![0xff], &never).await;
+    assert_eq!(result.unwrap(), 1);
+    let target = vec![0x5a; 2];
     let target_allocation = target.as_ptr() as usize;
-    let (result, mut target) = scheduler.socket_read(receiver, target, &token).await;
+    let (result, target) = scheduler.socket_read(receiver, target, &token).await;
     cancelled(result);
     assert_eq!(target.as_ptr() as usize, target_allocation);
+    assert_eq!(target, vec![0x5a; 2]);
+    let (result, buffer) = scheduler.socket_read(receiver, vec![0; 1], &never).await;
+    assert_eq!(result.unwrap(), 1);
+    assert_eq!(buffer, vec![0xff]);
+}
+
+/// Check lazy scalar operations, short transfers, readiness, payload, and allocation identity on a fresh stream.
+pub async fn transfer<S: SocketRead + SocketWrite + SocketWait>(
+    scheduler: &S,
+    sender: &S::Socket,
+    receiver: &S::Socket,
+) {
+    let never = Cancellation::never();
+    let mut source = b"abcdef".to_vec();
+    let allocation = source.as_ptr() as usize;
+    let mut target = vec![0; 2];
+    let target_allocation = target.as_ptr() as usize;
     drop(scheduler.socket_write(sender, b"unpolled".to_vec(), &never));
     let mut sent = 0;
     while sent < 6 {
@@ -169,6 +200,17 @@ pub async fn stream<S: SocketRead + SocketWrite + SocketWait + SocketShutdown>(
         target = returned;
     }
     assert_eq!(received, b"abcdef");
+}
+
+/// Check lazy write shutdown and EOF on a fresh stream.
+pub async fn shutdown<S: SocketRead + SocketWrite + SocketShutdown>(
+    scheduler: &S,
+    sender: &S::Socket,
+    receiver: &S::Socket,
+) {
+    let never = Cancellation::never();
+    let target = vec![0; 2];
+    let target_allocation = target.as_ptr() as usize;
     drop(scheduler.socket_shutdown(sender, Shutdown::Write));
     // The dropped shutdown must not prevent this write.
     let (result, _) = scheduler.socket_write(sender, vec![7], &never).await;
@@ -186,6 +228,12 @@ pub async fn stream<S: SocketRead + SocketWrite + SocketWait + SocketShutdown>(
 
 /// Cancel a pending read and readiness waiter on a quiet connected stream. No payload may arrive during these assertions.
 pub async fn pending_cancellation<S: SocketRead + SocketWait>(scheduler: &S, socket: &S::Socket) {
+    pending_read_cancellation(scheduler, socket).await;
+    pending_wait_cancellation(scheduler, socket).await;
+}
+
+/// Cancel a pending read on a quiet stream and check that initialized bytes and allocation identity survive.
+pub async fn pending_read_cancellation<S: SocketRead>(scheduler: &S, socket: &S::Socket) {
     let token = Cancellation::new();
     let buffer = vec![0x5a; 8];
     let allocation = buffer.as_ptr() as usize;
@@ -199,6 +247,10 @@ pub async fn pending_cancellation<S: SocketRead + SocketWait>(scheduler: &S, soc
     cancelled(result);
     assert_eq!(buffer.as_ptr() as usize, allocation);
     assert_eq!(buffer, vec![0x5a; 8]);
+}
+
+/// Cancel readiness waiting on a quiet stream, allowing spurious readiness notifications.
+pub async fn pending_wait_cancellation<S: SocketWait>(scheduler: &S, socket: &S::Socket) {
     let token = Cancellation::new();
     let mut waiting = pin!(scheduler.socket_wait(socket, Interest::Readable, &token));
     if let Some(result) = poll_once(&mut waiting).await {
