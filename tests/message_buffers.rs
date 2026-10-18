@@ -3,9 +3,9 @@
 
 use futures_channel::oneshot;
 use protocol_scheduler::{
-    Cancellation, IoBufSequence, IoBufSequenceMut, OperationError, OperationResult, SocketMessage,
-    SocketOperation, SocketRecvFlags, SocketRecvMsg, SocketRecvResult, SocketSendFlags,
-    SocketSendMsg,
+    Cancellation, IoBufSequence, IoBufSequenceMut, IoBuffers, IoBuffersMut, OperationError,
+    OperationResult, SocketMessage, SocketOperation, SocketRecvFlags, SocketRecvMsg,
+    SocketRecvResult, SocketSendFlags, SocketSendMsg,
 };
 use std::future::Future;
 use std::io;
@@ -15,7 +15,7 @@ use std::sync::{Arc, Mutex, mpsc};
 use std::task::{Context, Poll, Waker};
 use std::time::Duration;
 
-// A deliberately small message backend: one partial transfer, with no native descriptor allocation.
+// A deliberately small message backend: one partial transfer, with no I/O-vector allocation.
 struct Messages;
 
 impl SocketOperation for Messages {
@@ -37,11 +37,8 @@ impl SocketSendMsg for Messages {
                 if *fail {
                     Err(io::Error::from(io::ErrorKind::BrokenPipe).into())
                 } else {
-                    Ok(message
-                        .buffers
-                        .buffers()
-                        .iter()
-                        .map(|buffer| buffer.as_ref().len())
+                    Ok((0..message.buffers.buffer_count())
+                        .map(|index| message.buffers.buffer(index).len())
                         .sum::<usize>()
                         .min(3))
                 }
@@ -66,8 +63,8 @@ impl SocketRecvMsg for Messages {
                     return Err(io::Error::from(io::ErrorKind::BrokenPipe).into());
                 }
                 let mut bytes = 0;
-                for buffer in buffers.buffers_mut() {
-                    for byte in buffer.as_mut().iter_mut().take(3 - bytes) {
+                for index in 0..buffers.buffer_count() {
+                    for byte in buffers.buffer_mut(index).iter_mut().take(3 - bytes) {
                         *byte = b'a' + bytes as u8;
                         bytes += 1;
                     }
@@ -107,25 +104,25 @@ impl Drop for PooledBuffers {
 
 // SAFETY: This owner retains the same two boxes in order; their byte allocations remain stable even when the owner moves, and no other owner accesses them.
 unsafe impl IoBufSequence for PooledBuffers {
-    type Buffer = Box<[u8]>;
+    fn buffer_count(&self) -> usize {
+        self.buffers.len()
+    }
 
-    fn buffers(&self) -> &[Self::Buffer] {
-        &self.buffers
+    fn buffer(&self, index: usize) -> &[u8] {
+        &self.buffers[index]
     }
 }
 
 // SAFETY: Exclusive borrowing exposes those same boxes without aliases.
 unsafe impl IoBufSequenceMut for PooledBuffers {
-    fn buffers_mut(&mut self) -> &mut [Self::Buffer] {
-        &mut self.buffers
+    fn buffer_mut(&mut self, index: usize) -> &mut [u8] {
+        &mut self.buffers[index]
     }
 }
 
 fn exercise<Buffers: IoBufSequenceMut>(buffers: Buffers) {
-    let pointers: Vec<_> = buffers
-        .buffers()
-        .iter()
-        .map(|buffer| buffer.as_ref().as_ptr())
+    let pointers: Vec<_> = (0..buffers.buffer_count())
+        .map(|index| buffers.buffer(index).as_ptr())
         .collect();
     let address = Some("127.0.0.1:1234".parse().unwrap());
     let mut buffers = Some(buffers);
@@ -158,12 +155,12 @@ fn exercise<Buffers: IoBufSequenceMut>(buffers: Buffers) {
                 } else {
                     assert_eq!(sent.unwrap(), 3);
                     assert_eq!(received.unwrap().bytes, 3);
-                    assert_eq!(owner.buffers()[0].as_ref(), b"ab");
-                    assert_eq!(owner.buffers()[1].as_ref(), b"c\0");
+                    assert_eq!(owner.buffer(0), b"ab");
+                    assert_eq!(owner.buffer(1), b"c\0");
                 }
-                for (buffer, pointer) in owner.buffers().iter().zip(&pointers) {
-                    assert_eq!(buffer.as_ref().as_ptr(), *pointer);
-                    assert_eq!(buffer.as_ref().len(), 2);
+                for (index, pointer) in pointers.iter().enumerate() {
+                    assert_eq!(owner.buffer(index).as_ptr(), *pointer);
+                    assert_eq!(owner.buffer(index).len(), 2);
                 }
                 buffers = Some(owner);
             }
@@ -185,8 +182,8 @@ fn exercise<Buffers: IoBufSequenceMut>(buffers: Buffers) {
     let (result, owner) =
         ready(Messages.socket_recvmsg(&true, message.buffers, SocketRecvFlags::default(), &live));
     assert_eq!(result.unwrap_err().kind(), io::ErrorKind::BrokenPipe);
-    for (buffer, pointer) in owner.buffers().iter().zip(pointers) {
-        assert_eq!(buffer.as_ref().as_ptr(), pointer);
+    for (index, pointer) in pointers.iter().enumerate() {
+        assert_eq!(owner.buffer(index).as_ptr(), *pointer);
     }
 }
 
@@ -195,12 +192,18 @@ fn arrays_vectors_boxed_slices_and_pool_owners_compose_without_new_allocations()
     exercise([vec![0; 2], vec![0; 2]]);
     exercise(vec![vec![0; 2], vec![0; 2]]);
     exercise(vec![vec![0; 2], vec![0; 2]].into_boxed_slice());
+    exercise(IoBuffersMut::new([vec![0; 2], vec![0; 2]]));
     let returned = Arc::new(AtomicUsize::new(0));
     exercise(PooledBuffers {
         buffers: [vec![0; 2].into_boxed_slice(), vec![0; 2].into_boxed_slice()],
         returned: Arc::clone(&returned),
     });
     assert_eq!(returned.load(Ordering::SeqCst), 1);
+    exercise(IoBuffersMut::new(PooledBuffers {
+        buffers: [vec![0; 2].into_boxed_slice(), vec![0; 2].into_boxed_slice()],
+        returned: Arc::clone(&returned),
+    }));
+    assert_eq!(returned.load(Ordering::SeqCst), 2);
 }
 
 #[test]
@@ -272,7 +275,7 @@ impl SocketSendMsg for RetainingSender {
                 .unwrap()
                 .recv_timeout(Duration::from_secs(10))
                 .unwrap();
-            assert_eq!(message.buffers.buffers()[0].as_ref(), b"ab");
+            assert_eq!(&*message.buffers.io_slices().unwrap()[0], b"ab");
             let _ = completion.send((Ok(2), message));
         }));
         result.await.unwrap()
@@ -290,10 +293,10 @@ fn abandoning_a_wait_retains_the_entire_collection_until_backend_retirement() {
     };
     let returned = Arc::new(AtomicUsize::new(0));
     let message = SocketMessage {
-        buffers: PooledBuffers {
+        buffers: IoBuffers::new(PooledBuffers {
             buffers: [Box::from(*b"ab"), Box::from(*b"cd")],
             returned: Arc::clone(&returned),
-        },
+        }),
         address: None,
     };
     let token = Cancellation::new();
