@@ -19,6 +19,8 @@ struct State {
     timers: BTreeMap<usize, (Instant, Waker)>,
     #[cfg(test)]
     paused: Option<Instant>,
+    #[cfg(test)]
+    waits: Option<std::sync::mpsc::Sender<bool>>,
 }
 struct Shared {
     state: Mutex<State>,
@@ -70,6 +72,8 @@ impl TimerService {
                     timers: BTreeMap::new(),
                     #[cfg(test)]
                     paused: None,
+                    #[cfg(test)]
+                    waits: None,
                 }),
                 changed: Condvar::new(),
             }),
@@ -177,6 +181,8 @@ fn work(shared: Arc<Shared>) {
             continue;
         }
         let next = state.timers.values().map(|(deadline, _)| *deadline).min();
+        #[cfg(test)]
+        tests::observe_wait(&state, next.is_some());
         state = match next {
             Some(deadline) => {
                 shared

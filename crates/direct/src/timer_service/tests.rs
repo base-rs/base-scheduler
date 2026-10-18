@@ -7,6 +7,15 @@ use futures_lite::future::{block_on, poll_once};
 use protocol_scheduler_conformance::ClockFixture;
 use std::time::Duration;
 
+pub(super) fn observe_wait(state: &State, deadline: bool) {
+    if let Some(waits) = &state.waits {
+        let _ = waits.send(deadline);
+    }
+}
+fn wait_for_driver(waits: &std::sync::mpsc::Receiver<bool>, deadline: bool) {
+    while waits.recv_timeout(Duration::from_secs(5)).unwrap() != deadline {}
+}
+
 impl ClockFixture for DirectScheduler {
     type Scheduler = Self;
     fn scheduler(&self) -> &Self {
@@ -48,6 +57,16 @@ fn native_timer_driver_wakes_and_retires_deadlines() {
     test_support::run(|| {
         block_on(async {
             let scheduler = test_support::scheduler();
+            let (waits, observed) = std::sync::mpsc::channel();
+            scheduler.timers.shared.state.lock().unwrap().waits = Some(waits);
+            scheduler.timers.start().unwrap();
+            wait_for_driver(&observed, false);
+            let never = Cancellation::never();
+            let mut distant = Box::pin(scheduler.sleep(Duration::from_secs(3600), &never));
+            assert!(poll_once(&mut distant).await.is_none());
+            wait_for_driver(&observed, true);
+            drop(distant);
+            wait_for_driver(&observed, false);
             let deadline = scheduler.now() + Duration::from_millis(50);
             scheduler
                 .sleep_until(deadline, &Cancellation::never())
