@@ -45,6 +45,8 @@ fn pending_socket_attempts_release_capacity_and_observe_cancellation_and_schedul
     let (result, returned) = block_on(pending);
     assert!(matches!(result, Err(OperationError::Cancelled(_))));
     assert_eq!(returned.as_ptr(), allocation);
+    // Result delivery precedes worker-slot retirement. Start the next isolated assertion with admission available.
+    block_on(scheduler.work.drain());
 
     let never = Cancellation::never();
     let (started, start) = mpsc::channel();
@@ -239,6 +241,9 @@ fn vectored_sends_preserve_short_counts_without_implicitly_advancing_the_owner()
         SocketDomain::Ipv4,
     ));
     client.0.set_send_buffer_size(4096).unwrap();
+    // Winsock may buffer a whole large non-overlapped send even with a small SO_SNDBUF. Disable its send buffering so receiver capacity forces a short transfer.
+    #[cfg(windows)]
+    client.0.set_send_buffer_size(0).unwrap();
     server.0.set_recv_buffer_size(4096).unwrap();
     block_on(
         protocol_scheduler_conformance::socket_messages::partial_send(
