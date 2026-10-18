@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 /// An owned nonblocking IP socket, usable by any direct scheduler instance.
 ///
-/// Private retention keeps accepted worker access alive after future abandonment. This handle has no scheduler affinity and is deliberately not `Clone`. Finish outstanding operations before explicit close. Native import and access are not exposed, so callers cannot change the nonblocking mode behind the scheduler.
+/// Private retention keeps accepted worker access alive after future abandonment. This handle has no scheduler affinity and is deliberately not `Clone`. Finish outstanding operations before explicit close. Standard-library TCP resources can be imported through `SocketRegistration`; their external aliases must not change the nonblocking mode required by this backend. Native access is not exposed by this wrapper.
 #[derive(Debug)]
 pub struct DirectSocket(pub(crate) Arc<Socket>);
 

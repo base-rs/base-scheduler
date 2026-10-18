@@ -11,24 +11,34 @@ use futures_channel::oneshot;
 use protocol_scheduler::{
     Blocking, BlockingError, BufferResult, Cancellation, FileClose, FileOpen, FileOperation,
     FileOptions, FileRead, FileReadAt, FileSeek, FileStat, FileSync, FileTruncate, FileWrite,
-    FileWriteAt, IoBuf, IoBufMut, OperationResult, SyncMode, TaskError,
+    FileWriteAt, IoBuf, IoBufMut, OperationResult, Spawn, SpawnError, SyncMode, TaskError,
 };
 use std::{
     io::{self, SeekFrom},
     path::Path,
 };
 
-/// Explicit file, socket, and blocking-work services, independent of the executor polling their futures.
+/// Explicit task, clock, file, socket, and blocking-work services, independent of the executor polling their operation futures.
 ///
-/// All direct instances accept the same file and socket resources. Ordinary operations use a bounded worker pool; cleanup uses an independent bounded worker. Nonblocking socket attempts release capacity before waiting to retry. This type supplies no executor, clocks, or signals.
+/// All direct instances accept the same file and socket resources. Ordinary operations use a bounded worker pool; cleanup uses an independent bounded worker. Tasks have separate polling workers, timers have a dedicated driver, and Unix signal callbacks run on a separate dispatch thread. Nonblocking socket attempts release capacity before waiting to retry.
 pub struct DirectScheduler {
     pub(crate) work: BlockingPool,
     pub(crate) cleanup: BlockingPool,
     pub(crate) socket_retry: SocketRetry,
+    pub(crate) tasks: crate::task_service::TaskService,
+    pub(crate) timers: crate::timer_service::TimerService,
+    #[cfg(test)]
+    pub(crate) option_probe: std::sync::Arc<crate::socket_options::Probe>,
+    #[cfg(test)]
+    pub(crate) resolver_probe: std::sync::Arc<crate::resolver::Probe>,
+    #[cfg(all(test, target_os = "linux"))]
+    pub(crate) file_probe: std::sync::Arc<crate::file_extensions::Probe>,
+    #[cfg(unix)]
+    pub(crate) signals: crate::signal_service::SignalService,
 }
 
 impl DirectScheduler {
-    /// Configure lazy worker startup. Counts and capacity must be nonzero.
+    /// Start task polling workers and configure lazy I/O, timer, and signal worker startup. Counts and capacity must be nonzero.
     pub fn new(options: DirectOptions) -> io::Result<Self> {
         if options.threads == 0 || options.capacity == 0 {
             return Err(io::Error::new(
@@ -37,6 +47,16 @@ impl DirectScheduler {
             ));
         }
         Ok(Self {
+            tasks: crate::task_service::TaskService::new(options.threads)?,
+            timers: crate::timer_service::TimerService::new(),
+            #[cfg(test)]
+            option_probe: Default::default(),
+            #[cfg(test)]
+            resolver_probe: Default::default(),
+            #[cfg(all(test, target_os = "linux"))]
+            file_probe: Default::default(),
+            #[cfg(unix)]
+            signals: crate::signal_service::SignalService::new(),
             socket_retry: SocketRetry::new(),
             work: BlockingPool::new(options),
             cleanup: BlockingPool::new(DirectOptions {
@@ -53,15 +73,22 @@ impl DirectScheduler {
         self.work.close();
         self.cleanup.close();
         self.socket_retry.close();
+        self.tasks.close();
+        self.timers.close();
+        #[cfg(unix)]
+        self.signals.close();
     }
 
-    /// Close admission and await retirement of all accepted work, including abandoned results.
+    /// Close admission and await retirement of all accepted work and tasks, including abandoned results. Pending timers fail and Unix signal delivery stops.
     ///
     /// Coordinate application cancellation and asynchronous cleanup before calling this. Waiting for shutdown from a blocking job owned by this scheduler would wait for that same job. A syscall or closure that never returns can prevent shutdown from completing.
     pub async fn shutdown(&self) {
         self.close();
         self.work.drain().await;
         self.cleanup.drain().await;
+        self.tasks.drain().await;
+        #[cfg(unix)]
+        self.signals.drain().await;
     }
 
     async fn buffer_operation<B: IoBuf>(
@@ -88,6 +115,23 @@ impl DirectScheduler {
             .submit(move || file_io::close(file))
             .await
             .map_err(|error| io::Error::from(admission_error(error)))
+    }
+}
+
+impl Drop for DirectScheduler {
+    fn drop(&mut self) {
+        self.close();
+    }
+}
+
+impl Spawn for DirectScheduler {
+    type Handle<Output: Send + 'static> = crate::DirectTask<Output>;
+    fn spawn<F>(&self, future: F) -> Result<Self::Handle<F::Output>, SpawnError>
+    where
+        F: std::future::Future + Send + 'static,
+        F::Output: Send + 'static,
+    {
+        self.tasks.spawn(future)
     }
 }
 
