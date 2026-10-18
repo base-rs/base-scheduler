@@ -5,6 +5,7 @@ use crate::{
     BlockingTask, DirectFile, DirectOptions, SystemFileMetadata,
     blocking_pool::{BlockingPool, admission_error},
     file_io,
+    socket_retry::SocketRetry,
 };
 use futures_channel::oneshot;
 use protocol_scheduler::{
@@ -17,12 +18,13 @@ use std::{
     path::Path,
 };
 
-/// Explicit file and blocking-work services, independent of the executor polling their futures.
+/// Explicit file, socket, and blocking-work services, independent of the executor polling their futures.
 ///
-/// All direct instances accept the same [`DirectFile`] resources. Ordinary operations use a bounded worker pool; close uses an independent bounded cleanup worker. This type implements neither asynchronous task spawning nor sockets, clocks, or signals.
+/// All direct instances accept the same file and socket resources. Ordinary operations use a bounded worker pool; cleanup uses an independent bounded worker. Nonblocking socket attempts release capacity before waiting to retry. This type supplies no executor, clocks, or signals.
 pub struct DirectScheduler {
     pub(crate) work: BlockingPool,
     pub(crate) cleanup: BlockingPool,
+    pub(crate) socket_retry: SocketRetry,
 }
 
 impl DirectScheduler {
@@ -35,6 +37,7 @@ impl DirectScheduler {
             ));
         }
         Ok(Self {
+            socket_retry: SocketRetry::new(),
             work: BlockingPool::new(options),
             cleanup: BlockingPool::new(DirectOptions {
                 threads: 1,
@@ -49,6 +52,7 @@ impl DirectScheduler {
     pub fn close(&self) {
         self.work.close();
         self.cleanup.close();
+        self.socket_retry.close();
     }
 
     /// Close admission and await retirement of all accepted work, including abandoned results.
@@ -267,7 +271,7 @@ impl FileClose for DirectScheduler {
 
 type CloseCompletion = oneshot::Receiver<Result<io::Result<()>, TaskError>>;
 
-async fn wait_close(completion: CloseCompletion) -> io::Result<()> {
+pub(crate) async fn wait_close(completion: CloseCompletion) -> io::Result<()> {
     completion
         .await
         .map_err(io::Error::other)?
