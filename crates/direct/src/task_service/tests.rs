@@ -111,3 +111,75 @@ fn future_destructor_panic_is_reported_and_worker_stays_available() {
         assert_eq!(scheduler.spawn(async { 17 }).unwrap().await.unwrap(), 17);
     });
 }
+
+#[test]
+fn abandoned_task_destructor_panics_do_not_abort_or_stop_workers() {
+    const CHILD: &str = "PROTOCOL_DIRECT_TASK_DROP_CHILD";
+    if std::env::var_os(CHILD).is_none() {
+        let status = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "task_service::tests::abandoned_task_destructor_panics_do_not_abort_or_stop_workers",
+                "--nocapture",
+            ])
+            .env(CHILD, "1")
+            .status()
+            .unwrap();
+        assert!(status.success());
+        return;
+    }
+    struct PanicsOnDrop;
+    impl Drop for PanicsOnDrop {
+        fn drop(&mut self) {
+            panic!("abandoned destructor");
+        }
+    }
+    struct Pending;
+    impl Future for Pending {
+        type Output = ();
+        fn poll(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<()> {
+            Poll::Pending
+        }
+    }
+    impl Drop for Pending {
+        fn drop(&mut self) {
+            // The payload also panics when destroyed: swallowing only the first unwind is insufficient.
+            std::panic::panic_any(PanicsOnDrop);
+        }
+    }
+    struct Ready;
+    impl Future for Ready {
+        type Output = PanicsOnDrop;
+        fn poll(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Self::Output> {
+            Poll::Ready(PanicsOnDrop)
+        }
+    }
+    impl Drop for Ready {
+        fn drop(&mut self) {
+            panic!("completed future destructor");
+        }
+    }
+    run(async |scheduler| {
+        let pending = scheduler.spawn(Pending).unwrap();
+        scheduler.tasks.wait(false).await;
+        drop(pending);
+        scheduler.tasks.drain().await;
+
+        let output = scheduler.spawn(async { PanicsOnDrop }).unwrap();
+        scheduler.tasks.wait(false).await;
+        drop(output);
+
+        let panic_payload = scheduler
+            .spawn(async { std::panic::panic_any(PanicsOnDrop) })
+            .unwrap();
+        scheduler.tasks.wait(false).await;
+        drop(panic_payload);
+
+        // Both the completed future and its unconsumed output panic during destruction.
+        assert!(matches!(
+            scheduler.spawn(Ready).unwrap().await,
+            Err(TaskError::Panicked(_))
+        ));
+        assert_eq!(scheduler.spawn(async { 42 }).unwrap().await.unwrap(), 42);
+    });
+}

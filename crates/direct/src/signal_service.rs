@@ -8,7 +8,6 @@ use signal_hook::iterator::{Handle, Signals as NativeSignals};
 use std::{
     collections::BTreeMap,
     io,
-    panic::{AssertUnwindSafe, catch_unwind},
     sync::{Arc, Mutex},
 };
 
@@ -27,6 +26,14 @@ pub(crate) struct SignalService {
     pub(crate) shared: Arc<Shared>,
     handle: Mutex<Option<Handle>>,
 }
+// Always release shutdown waiters when the native dispatch loop exits.
+struct DispatchExit(Arc<Shared>);
+impl Drop for DispatchExit {
+    fn drop(&mut self) {
+        self.0.state.lock().unwrap().exited = true;
+        self.0.changed.notify(usize::MAX);
+    }
+}
 impl Shared {
     pub(crate) fn dispatch(&self, signal: i32) {
         let targets: Vec<_> = self
@@ -40,7 +47,8 @@ impl Shared {
             .collect();
         for target in targets {
             // Each snapshot admits its callbacks under the registry lock, then executes user code without that lock or a raw OS handler.
-            let _ = catch_unwind(AssertUnwindSafe(|| target.notify(signal)));
+            crate::panic::contain(|| target.notify(signal));
+            crate::panic::discard(target);
         }
     }
 }
@@ -91,11 +99,10 @@ impl SignalService {
             let shared = Arc::clone(&self.shared);
             shared.state.lock().unwrap().exited = false;
             if let Err(error) = thread::start("protocol-direct-signal", move || {
+                let _exit = DispatchExit(shared.clone());
                 for signal in native.forever() {
                     shared.dispatch(signal);
                 }
-                shared.state.lock().unwrap().exited = true;
-                shared.changed.notify(usize::MAX);
             }) {
                 self.shared.state.lock().unwrap().exited = true;
                 return Err(error);

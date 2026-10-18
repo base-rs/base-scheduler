@@ -7,11 +7,12 @@ use event_listener::Event;
 use protocol_scheduler::{SpawnError, TaskError};
 use std::{
     collections::{HashSet, VecDeque},
-    future::{Future, poll_fn},
+    future::Future,
     io,
     panic::{AssertUnwindSafe, catch_unwind},
+    pin::Pin,
     sync::{Arc, Condvar, Mutex},
-    task::Poll,
+    task::{Context, Poll},
 };
 
 pub(crate) struct State {
@@ -43,6 +44,42 @@ impl Drop for Registration {
             .remove(&self.id);
         self.shared.ready.notify_all();
         self.shared.changed.notify(usize::MAX);
+    }
+}
+
+// async-task aborts if its future or stored output destructor unwinds. Keep both user-owned values behind guards, including when the task is abandoned.
+struct TaskFuture<F: Future> {
+    future: Option<Pin<Box<F>>>,
+    _registration: Registration,
+}
+impl<F: Future> Unpin for TaskFuture<F> {}
+impl<F: Future> Future for TaskFuture<F> {
+    type Output = TaskOutcome<F::Output>;
+    fn poll(self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.get_mut();
+        let mut result = match catch_unwind(AssertUnwindSafe(|| {
+            this.future.as_mut().unwrap().as_mut().poll(context)
+        })) {
+            Ok(Poll::Pending) => return Poll::Pending,
+            Ok(Poll::Ready(output)) => Ok(output),
+            Err(payload) => Err(TaskError::Panicked(payload)),
+        };
+        if let Err(payload) = catch_unwind(AssertUnwindSafe(|| drop(this.future.take()))) {
+            crate::panic::discard(result);
+            result = Err(TaskError::Panicked(payload));
+        }
+        Poll::Ready(TaskOutcome(Some(result)))
+    }
+}
+impl<F: Future> Drop for TaskFuture<F> {
+    fn drop(&mut self) {
+        crate::panic::discard(self.future.take());
+    }
+}
+pub(crate) struct TaskOutcome<T>(pub(crate) Option<Result<T, TaskError>>);
+impl<T> Drop for TaskOutcome<T> {
+    fn drop(&mut self) {
+        crate::panic::discard(self.0.take());
     }
 }
 
@@ -93,20 +130,9 @@ impl TaskService {
         };
         let shared = Arc::clone(&self.shared);
         let (runnable, task) = async_task::spawn(
-            async move {
-                let _registration = registration;
-                let mut future = Box::pin(future);
-                let result = poll_fn(|context| {
-                    match catch_unwind(AssertUnwindSafe(|| future.as_mut().poll(context))) {
-                        Ok(poll) => poll.map(Ok),
-                        Err(payload) => Poll::Ready(Err(TaskError::Panicked(payload))),
-                    }
-                })
-                .await;
-                match catch_unwind(AssertUnwindSafe(|| drop(future))) {
-                    Ok(()) => result,
-                    Err(payload) => Err(TaskError::Panicked(payload)),
-                }
+            TaskFuture {
+                future: Some(Box::pin(future)),
+                _registration: registration,
             },
             move |runnable| {
                 shared.state.lock().unwrap().queue.push_back(runnable);
@@ -168,7 +194,9 @@ fn work(shared: Arc<Shared>) {
             }
         };
         // A panicking user destructor must not kill a worker or strand drain waiters.
-        let _ = catch_unwind(AssertUnwindSafe(|| runnable.run()));
+        crate::panic::contain(|| {
+            runnable.run();
+        });
         shared.state.lock().unwrap().active -= 1;
         shared.changed.notify(usize::MAX);
     }

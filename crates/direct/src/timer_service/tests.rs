@@ -48,7 +48,7 @@ fn native_timer_driver_wakes_and_retires_deadlines() {
     test_support::run(|| {
         block_on(async {
             let scheduler = test_support::scheduler();
-            let deadline = scheduler.now() + Duration::from_millis(2);
+            let deadline = scheduler.now() + Duration::from_millis(50);
             scheduler
                 .sleep_until(deadline, &Cancellation::never())
                 .await
@@ -61,6 +61,7 @@ fn native_timer_driver_wakes_and_retires_deadlines() {
 #[test]
 fn startup_failure_exhaustion_and_shutdown_release_waiters() {
     run(async |scheduler| {
+        scheduler.timers.shared.state.lock().unwrap().paused = None;
         let never = Cancellation::never();
         thread::FAIL_AFTER.set(Some(0));
         assert!(

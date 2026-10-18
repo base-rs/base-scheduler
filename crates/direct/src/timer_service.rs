@@ -77,6 +77,11 @@ impl TimerService {
         }
     }
     fn start(&self) -> io::Result<()> {
+        // Controlled clocks are driven by advance(), through the same registration and expiry paths, without racing a native driver thread.
+        #[cfg(test)]
+        if self.shared.state.lock().unwrap().paused.is_some() {
+            return Ok(());
+        }
         let mut started = self.started.lock().unwrap();
         if !*started {
             let shared = Arc::clone(&self.shared);
@@ -172,8 +177,6 @@ fn work(shared: Arc<Shared>) {
             continue;
         }
         let next = state.timers.values().map(|(deadline, _)| *deadline).min();
-        #[cfg(test)]
-        let next = if state.paused.is_some() { None } else { next };
         state = match next {
             Some(deadline) => {
                 shared

@@ -6,6 +6,7 @@ use crate::test_support;
 use futures_lite::future::block_on;
 use protocol_scheduler::Cancellation;
 use protocol_scheduler_conformance::SignalsFixture;
+use std::panic::{AssertUnwindSafe, catch_unwind};
 
 struct Fixture {
     scheduler: Arc<DirectScheduler>,
@@ -142,5 +143,47 @@ fn os_signal_bridge_delivers_outside_the_raw_handler() {
             .unwrap(),
         libc::SIGUSR1
     );
-    block_on(scheduler.shutdown());
+
+    struct Target {
+        gate: Arc<test_support::Gate>,
+        dropped: std::sync::mpsc::Sender<()>,
+    }
+    impl Notify<i32> for Target {
+        fn notify(&self, _: i32) {
+            self.gate.wait();
+        }
+    }
+    impl Drop for Target {
+        fn drop(&mut self) {
+            self.dropped.send(()).unwrap();
+            panic!("signal target destructor");
+        }
+    }
+    let (gate, entered, release) = test_support::Gate::new();
+    let (dropped, destruction) = std::sync::mpsc::channel();
+    let target = scheduler
+        .signal_subscribe(&[libc::SIGUSR1], Target { gate, dropped })
+        .unwrap();
+    // SAFETY: The isolated child has already installed this signal handler.
+    assert_eq!(unsafe { libc::raise(libc::SIGUSR1) }, 0);
+    entered
+        .recv_timeout(std::time::Duration::from_secs(5))
+        .unwrap();
+    // The active dispatch snapshot now retains the final target reference.
+    drop(target);
+    drop(release);
+    destruction
+        .recv_timeout(std::time::Duration::from_secs(5))
+        .unwrap();
+    receiver
+        .recv_timeout(std::time::Duration::from_secs(5))
+        .unwrap();
+    assert_eq!(unsafe { libc::raise(libc::SIGUSR1) }, 0);
+    assert_eq!(
+        receiver
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .unwrap(),
+        libc::SIGUSR1
+    );
+    test_support::run(move || block_on(scheduler.shutdown()));
 }

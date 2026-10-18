@@ -19,6 +19,7 @@ mod direct_task;
 #[cfg(target_os = "linux")]
 mod file_extensions;
 mod file_io;
+mod panic;
 mod resolver;
 #[cfg(unix)]
 mod signal_service;

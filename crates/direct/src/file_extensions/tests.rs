@@ -16,6 +16,7 @@ struct Fixture {
     read_only: DirectFile,
     failing: DirectFile,
     path: std::path::PathBuf,
+    initial_blocks: u64,
     _directory: tempfile::TempDir,
     started: Mutex<Option<mpsc::Receiver<()>>>,
 }
@@ -32,15 +33,23 @@ impl Fixture {
         file.write_all(b"abcdef").unwrap();
         file.seek(SeekFrom::Start(3)).unwrap();
         let read_only = std::fs::File::open(&path).unwrap();
-        let (pipe, peer) = std::os::unix::net::UnixStream::pair().unwrap();
-        drop(peer);
-        let pipe: std::os::fd::OwnedFd = pipe.into();
+        use std::os::{
+            fd::{FromRawFd, OwnedFd},
+            unix::fs::MetadataExt,
+        };
+        let initial_blocks = file.metadata().unwrap().blocks();
+        let mut pipes = [-1; 2];
+        // SAFETY: pipe initializes both descriptors on success; each is immediately transferred to exactly one owner.
+        assert_eq!(unsafe { libc::pipe(pipes.as_mut_ptr()) }, 0);
+        let pipe = unsafe { OwnedFd::from_raw_fd(pipes[0]) };
+        drop(unsafe { OwnedFd::from_raw_fd(pipes[1]) });
         Self {
             scheduler: test_support::scheduler(),
             file: DirectFile::from_std(file),
             read_only: DirectFile::from_std(read_only),
             failing: DirectFile::from_std(pipe.into()),
             path,
+            initial_blocks,
             _directory: directory,
             started: Mutex::new(None),
         }
@@ -78,7 +87,15 @@ impl FileAllocateFixture for Fixture {
                         == (offset, length)
                 )
         );
-        assert!(self.file.0.metadata().unwrap().blocks() > 0);
+        let blocks = self.file.0.metadata().unwrap().blocks();
+        if offset >= 65536 {
+            assert!(
+                blocks > self.initial_blocks,
+                "allocation beyond EOF must reserve additional blocks"
+            );
+        } else {
+            assert!(blocks >= self.initial_blocks);
+        }
     }
     fn calls(&self) -> usize {
         self.scheduler.file_probe.allocations.lock().unwrap().len()
