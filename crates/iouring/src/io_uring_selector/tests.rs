@@ -7,7 +7,7 @@ use std::{sync::atomic::AtomicUsize, time::Instant};
 
 use std::cell::RefCell;
 thread_local! {
-    static FAILURES: RefCell<VecDeque<(&'static str, io::Error)>> = const { RefCell::new(VecDeque::new()) };
+    static FAILURES: RefCell<VecDeque<(&'static str, Option<io::Error>)>> = const { RefCell::new(VecDeque::new()) };
 }
 
 pub(super) fn syscall<T>(
@@ -20,7 +20,7 @@ pub(super) fn syscall<T>(
             .front()
             .is_some_and(|(expected, _)| *expected == name)
         {
-            failures.pop_front().map(|(_, error)| error)
+            failures.pop_front().and_then(|(_, error)| error)
         } else {
             None
         }
@@ -34,7 +34,12 @@ pub(super) fn syscall<T>(
 struct Failures;
 impl Failures {
     fn new(failures: impl IntoIterator<Item = (&'static str, io::Error)>) -> Self {
-        FAILURES.with(|state| *state.borrow_mut() = failures.into_iter().collect());
+        FAILURES.with(|state| {
+            *state.borrow_mut() = failures
+                .into_iter()
+                .map(|(name, error)| (name, Some(error)))
+                .collect()
+        });
         Self
     }
 }
@@ -917,26 +922,32 @@ fn dropping_local_driver_returns_queued_owners_before_shutdown_and_allows_reentr
 #[test]
 fn closing_a_full_local_batch_drains_all_accepted_owners() {
     use core_scheduler_selector::{SelectorDriver, SelectorWorker};
-    let (selector, driver) = pair(300);
-    let (_directory, file) = fifo(&selector);
-    let mut worker = driver.enter();
-    let never = Cancellation::never();
-    let mut operations = Vec::new();
-    for _ in 0..300 {
-        let mut operation = Box::pin(selector.file_read(&file, vec![7], &never));
-        assert!(block_on(poll_once(&mut operation)).is_none());
-        operations.push(operation);
+    for remote_close in [false, true] {
+        let (selector, driver) = pair(300);
+        let (_directory, file) = fifo(&selector);
+        let mut worker = driver.enter();
+        let never = Cancellation::never();
+        let mut operations = Vec::new();
+        for _ in 0..300 {
+            let mut operation = Box::pin(selector.file_read(&file, vec![7], &never));
+            assert!(block_on(poll_once(&mut operation)).is_none());
+            operations.push(operation);
+        }
+        if remote_close {
+            std::thread::scope(|scope| scope.spawn(|| selector.close()).join().unwrap());
+        } else {
+            selector.close();
+        }
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while !worker.turn(Some(Duration::from_millis(10))).unwrap() {
+            assert!(Instant::now() < deadline);
+        }
+        assert_eq!(active(&selector.controllers[0]), 0);
+        for operation in operations {
+            assert!(block_on(operation).0.is_err());
+        }
+        block_on(selector.shutdown());
     }
-    selector.close();
-    let deadline = Instant::now() + Duration::from_secs(10);
-    while !worker.turn(Some(Duration::from_millis(10))).unwrap() {
-        assert!(Instant::now() < deadline);
-    }
-    assert_eq!(active(&selector.controllers[0]), 0);
-    for operation in operations {
-        assert!(block_on(operation).0.is_err());
-    }
-    block_on(selector.shutdown());
 }
 
 #[test]
@@ -1055,4 +1066,50 @@ fn native_workers_use_distinct_rings_without_external_submission_routing() {
             .all(|controller| controller.next_identifier.load(Ordering::Relaxed) > 0)
     );
     block_on(scheduler.shutdown());
+}
+
+#[test]
+fn partial_ring_construction_releases_previously_created_drivers() {
+    let _failures = Failures;
+    FAILURES.with(|failures| {
+        *failures.borrow_mut() = VecDeque::from([
+            ("ring", None),
+            ("ring", Some(io::ErrorKind::PermissionDenied.into())),
+        ])
+    });
+    assert_eq!(
+        IoUringSelector::with_workers(IoUringOptions::default(), 3)
+            .err()
+            .unwrap()
+            .kind(),
+        io::ErrorKind::PermissionDenied
+    );
+    assert!(FAILURES.with(|failures| failures.borrow().is_empty()));
+}
+
+#[test]
+fn external_admission_remains_bounded_under_contention() {
+    let capacity = Arc::new(Capacity {
+        state: AtomicUsize::new(0),
+        available: CompletionEvent::new(),
+        limit: 4,
+    });
+    std::thread::scope(|scope| {
+        let barrier = Arc::new(std::sync::Barrier::new(8));
+        for _ in 0..8 {
+            let capacity = Arc::clone(&capacity);
+            let barrier = Arc::clone(&barrier);
+            scope.spawn(move || {
+                barrier.wait();
+                for _ in 0..500 {
+                    let permit = block_on(capacity.acquire(&Cancellation::never())).unwrap();
+                    assert!(capacity.state.load(Ordering::Acquire) <= capacity.limit);
+                    std::thread::yield_now();
+                    drop(permit);
+                }
+            });
+        }
+    });
+    assert_eq!(capacity.state.load(Ordering::Acquire), 0);
+    capacity.close();
 }

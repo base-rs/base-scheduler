@@ -13,6 +13,8 @@ The completion engine is adapted from Socketry revision `7a70586d5d37fb640d696d0
 `IoUringSelector::with_workers(options, workers)` creates one ring per worker, with one shared readiness fallback. `NativeScheduler::with_drivers` owns and drives those rings directly on its task workers:
 
 ```rust
+# #[cfg(target_os = "linux")]
+# {
 use core_scheduler_iouring::{IoUringOptions, IoUringSelector};
 use core_scheduler_native::{NativeExecutorOptions, NativeScheduler};
 
@@ -23,6 +25,7 @@ let scheduler = NativeScheduler::with_drivers(selector, drivers, NativeExecutorO
     timer_capacity: 128,
 })?;
 scheduler.block_on(scheduler.shutdown());
+# }
 # Ok::<(), std::io::Error>(())
 ```
 
