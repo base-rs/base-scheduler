@@ -275,6 +275,7 @@ dependencies = [
 name = "core-scheduler-iouring"
 version = "0.0.0"
 dependencies = [
+ "async-io",
  "core-scheduler",
  "core-scheduler-conformance",
  "core-scheduler-native",
@@ -285,6 +286,7 @@ dependencies = [
  "io-uring",
  "libc",
  "polling",
+ "socket2",
  "tempfile",
 ]
 

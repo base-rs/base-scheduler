@@ -39,3 +39,30 @@ fn transient_would_block_retries_through_writable_readiness() {
         assert_eq!(result.as_socket().unwrap(), socket.local_addr().unwrap());
     });
 }
+
+#[test]
+fn native_retention_preserves_the_registration_until_completion() {
+    let socket = NativeSocket::new(
+        socket2::Socket::new(socket2::Domain::IPV4, socket2::Type::DGRAM, None).unwrap(),
+    )
+    .unwrap();
+    socket
+        .get_ref()
+        .bind(
+            &"127.0.0.1:0"
+                .parse::<std::net::SocketAddr>()
+                .unwrap()
+                .into(),
+        )
+        .unwrap();
+    // SAFETY: The simulated backend only observes the address and drops its retained owner before exclusive close.
+    let retained = unsafe { socket.retain_native() };
+    assert_eq!(Arc::strong_count(&socket.inner), 2);
+    assert_eq!(
+        retained.get_ref().local_addr().unwrap().as_socket(),
+        Some(socket.local_addr().unwrap())
+    );
+    drop(retained);
+    assert_eq!(Arc::strong_count(&socket.inner), 1);
+    socket.into_close()().unwrap();
+}

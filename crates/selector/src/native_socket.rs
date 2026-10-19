@@ -13,6 +13,14 @@ pub struct NativeSocket {
     pub(crate) inner: Arc<RegisteredSocket>,
 }
 impl NativeSocket {
+    /// Retain the registered native socket for another I/O backend.
+    ///
+    /// # Safety
+    /// Keep this owner alive until all submitted operations using its handle have retired, including after cancellation or abandonment. Do not close or replace the raw handle, remove its readiness registration, or change its nonblocking mode. Release the retained owner before reporting completion to callers that may immediately close the socket.
+    pub unsafe fn retain_native(&self) -> Arc<RegisteredSocket> {
+        Arc::clone(&self.inner)
+    }
+
     pub(crate) fn new(socket: socket2::Socket) -> io::Result<Self> {
         Self::new_with(socket, RegisteredSocket::new)
     }

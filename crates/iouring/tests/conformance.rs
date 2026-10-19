@@ -178,7 +178,7 @@ fn one_thread_can_poll_a_borrowing_future_and_drive_the_ring() {
 }
 
 #[test]
-fn composed_tasks_clocks_and_socket_fallback_share_one_explicit_scheduler() {
+fn composed_tasks_clocks_and_socket_completions_share_one_explicit_scheduler() {
     run_native(async |fixture| {
         let scheduler = &fixture.scheduler;
         assert_eq!(scheduler.spawn(async { 42 }).unwrap().await.unwrap(), 42);
@@ -287,3 +287,77 @@ fn fallback_capabilities_compose_with_completion_io() {
         scheduler.socket_close_submit(listener).await.unwrap();
     });
 }
+
+macro_rules! socket_suites {
+    ($name:ident, $run:ident, $scheduler:ty, $domain:expr) => {
+        mod $name {
+            use super::*;
+            use core_scheduler_selector::NativeSocket;
+            fn streams(test: impl AsyncFnOnce(&$scheduler, &NativeSocket, &NativeSocket) + Send + 'static) {
+                $run(async move |fixture| {
+                    let scheduler = &fixture.scheduler;
+                    let (sender, receiver) = core_scheduler_conformance::socket::stream_pair(scheduler, $domain).await;
+                    test(scheduler, &sender, &receiver).await;
+                    scheduler.socket_close(sender).await.unwrap();
+                    scheduler.socket_close(receiver).await.unwrap();
+                });
+            }
+            fn datagrams(test: impl AsyncFnOnce(&$scheduler, &NativeSocket, &NativeSocket) + Send + 'static) {
+                $run(async move |fixture| {
+                    let scheduler = &fixture.scheduler;
+                    let never = Cancellation::never();
+                    let address: SocketAddress = match $domain {
+                        SocketDomain::Ipv4 => "127.0.0.1:0",
+                        SocketDomain::Ipv6 => "[::1]:0",
+                    }.parse().unwrap();
+                    let sender = scheduler.socket_open($domain, SocketType::Datagram, None, &never).await.unwrap();
+                    let receiver = scheduler.socket_open($domain, SocketType::Datagram, None, &never).await.unwrap();
+                    scheduler.socket_bind(&sender, address, &never).await.unwrap();
+                    scheduler.socket_bind(&receiver, address, &never).await.unwrap();
+                    test(scheduler, &sender, &receiver).await;
+                    scheduler.socket_close(sender).await.unwrap();
+                    scheduler.socket_close(receiver).await.unwrap();
+                });
+            }
+            mod scalar { use super::*; core_scheduler_conformance::socket_tests!(run: streams); }
+            mod message { use super::*; core_scheduler_conformance::socket_message_tests!(run: streams); }
+            mod datagram { use super::*; core_scheduler_conformance::socket_datagram_tests!(run: datagrams); }
+        }
+    };
+}
+socket_suites!(
+    selector_ipv4,
+    run_selector,
+    IoUringSelector,
+    SocketDomain::Ipv4
+);
+socket_suites!(
+    selector_ipv6,
+    run_selector,
+    IoUringSelector,
+    SocketDomain::Ipv6
+);
+socket_suites!(
+    native_ipv4,
+    run_native,
+    NativeScheduler<IoUringSelector>,
+    SocketDomain::Ipv4
+);
+socket_suites!(
+    native_ipv6,
+    run_native,
+    NativeScheduler<IoUringSelector>,
+    SocketDomain::Ipv6
+);
+socket_suites!(
+    workers_ipv4,
+    run_native_workers,
+    NativeScheduler<IoUringSelector>,
+    SocketDomain::Ipv4
+);
+socket_suites!(
+    workers_ipv6,
+    run_native_workers,
+    NativeScheduler<IoUringSelector>,
+    SocketDomain::Ipv6
+);

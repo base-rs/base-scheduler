@@ -49,7 +49,7 @@ impl Drop for Failures {
     }
 }
 
-fn pair(capacity: usize) -> (IoUringSelector, IoUringDriver) {
+pub(super) fn pair(capacity: usize) -> (IoUringSelector, IoUringDriver) {
     IoUringSelector::new(IoUringOptions {
         capacity,
         ..Default::default()
@@ -89,7 +89,7 @@ fn fifo(selector: &IoUringSelector) -> (tempfile::TempDir, NativeFile) {
     .unwrap();
     (directory, file)
 }
-fn drain(selector: &IoUringSelector, driver: &mut IoUringDriver) {
+pub(super) fn drain(selector: &IoUringSelector, driver: &mut IoUringDriver) {
     selector.close();
     let deadline = Instant::now() + Duration::from_secs(10);
     while !driver.turn(Some(Duration::from_millis(10))).unwrap() {
@@ -116,6 +116,10 @@ fn setup_probes_and_errors_are_explicit() {
     for missing in [
         opcode::Read::CODE,
         opcode::Write::CODE,
+        opcode::Recv::CODE,
+        opcode::Send::CODE,
+        opcode::RecvMsg::CODE,
+        opcode::SendMsg::CODE,
         opcode::AsyncCancel::CODE,
     ] {
         assert_eq!(
@@ -451,7 +455,7 @@ fn successful_completion_wins_cancellation_and_releases_the_file_before_waking()
     drain(&selector, &mut driver);
 }
 
-fn drive<F: Future>(driver: &mut IoUringDriver, future: F) -> F::Output {
+pub(super) fn drive<F: Future>(driver: &mut IoUringDriver, future: F) -> F::Output {
     let mut future = pin!(future);
     let deadline = Instant::now() + Duration::from_secs(10);
     loop {

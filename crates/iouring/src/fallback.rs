@@ -202,32 +202,6 @@ impl SocketPeerAddress for IoUringSelector {
     }
 }
 
-impl SocketRead for IoUringSelector {
-    async fn socket_read<B: IoBufMut>(
-        &self,
-        socket: &Self::Socket,
-        buffer: B,
-        cancellation: &Cancellation,
-    ) -> BufferResult<B> {
-        self.fallback
-            .socket_read(socket, buffer, cancellation)
-            .await
-    }
-}
-
-impl SocketWrite for IoUringSelector {
-    async fn socket_write<B: IoBuf>(
-        &self,
-        socket: &Self::Socket,
-        buffer: B,
-        cancellation: &Cancellation,
-    ) -> BufferResult<B> {
-        self.fallback
-            .socket_write(socket, buffer, cancellation)
-            .await
-    }
-}
-
 impl SocketWait for IoUringSelector {
     async fn socket_wait(
         &self,
@@ -256,34 +230,6 @@ impl SocketShutdown for IoUringSelector {
     }
     async fn socket_shutdown_submit(&self, socket: &Self::Socket, how: Shutdown) -> io::Result<()> {
         self.fallback.socket_shutdown_submit(socket, how).await
-    }
-}
-
-impl SocketSendMsg for IoUringSelector {
-    async fn socket_sendmsg<Buffers: IoBufSequence>(
-        &self,
-        socket: &Self::Socket,
-        message: SocketMessage<Buffers>,
-        flags: SocketSendFlags,
-        cancellation: &Cancellation,
-    ) -> (OperationResult<usize>, SocketMessage<Buffers>) {
-        self.fallback
-            .socket_sendmsg(socket, message, flags, cancellation)
-            .await
-    }
-}
-
-impl SocketRecvMsg for IoUringSelector {
-    async fn socket_recvmsg<Buffers: IoBufSequenceMut>(
-        &self,
-        socket: &Self::Socket,
-        buffers: Buffers,
-        flags: SocketRecvFlags,
-        cancellation: &Cancellation,
-    ) -> (OperationResult<SocketRecvResult>, Buffers) {
-        self.fallback
-            .socket_recvmsg(socket, buffers, flags, cancellation)
-            .await
     }
 }
 

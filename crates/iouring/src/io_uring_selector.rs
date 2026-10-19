@@ -3,7 +3,7 @@
 
 use crate::{IoUringDriver, IoUringOptions};
 use core_scheduler::*;
-use core_scheduler_selector::{NativeFile, ReadinessSelector, Selector};
+use core_scheduler_selector::{NativeFile, NativeSocket, ReadinessSelector, Selector};
 use event_listener::Event as CompletionEvent;
 use futures_channel::oneshot;
 use io_uring::{IoUring, opcode, squeue, types};
@@ -62,6 +62,10 @@ fn validate_operation_support(supported: impl Fn(u8) -> bool) -> io::Result<()> 
     for operation in [
         opcode::Read::CODE,
         opcode::Write::CODE,
+        opcode::Recv::CODE,
+        opcode::Send::CODE,
+        opcode::RecvMsg::CODE,
+        opcode::SendMsg::CODE,
         opcode::AsyncCancel::CODE,
     ] {
         if !supported(operation) {
@@ -83,7 +87,10 @@ fn discard<T>(value: T) {
 
 type RawBufferResult<B> = (io::Result<usize>, B);
 
+type RegisteredSocket = Arc<async_io::Async<socket2::Socket>>;
+
 enum Resource {
+    Socket(RegisteredSocket),
     // None uses the shared OS cursor; Some is a validated explicit offset.
     File(Arc<StdFile>, Option<u64>),
 }
@@ -109,6 +116,16 @@ impl<B: IoBuf> Request<B> {
             .as_ref()
             .expect("request retains its resource")
         {
+            Resource::Socket(socket) => {
+                let descriptor = types::Fd(socket.get_ref().as_raw_fd());
+                if self.write {
+                    opcode::Send::new(descriptor, pointer, length)
+                        .flags(libc::MSG_NOSIGNAL)
+                        .build()
+                } else {
+                    opcode::Recv::new(descriptor, pointer, length).build()
+                }
+            }
             Resource::File(file, offset) => {
                 let descriptor = types::Fd(file.as_raw_fd());
                 if self.write {
@@ -375,7 +392,7 @@ impl DriverGroup {
 
 /// Owned I/O admission endpoint, independent of the executor polling its futures.
 ///
-/// Construction returns separate drivers and starts no ring thread. File transfers use io_uring; other capabilities share one readiness fallback. Dropping this endpoint closes admission without blocking.
+/// Construction returns separate drivers and starts no ring thread. Owned file and socket transfers use io_uring; other capabilities share one readiness fallback. Dropping this endpoint closes admission without blocking.
 pub struct IoUringSelector {
     controllers: Vec<Arc<Controller>>,
     group: Arc<DriverGroup>,
@@ -383,7 +400,7 @@ pub struct IoUringSelector {
     pub(crate) fallback: Arc<ReadinessSelector>,
 }
 impl IoUringSelector {
-    /// Create an endpoint and its driver. The driver must be run throughout operation and shutdown. Unsupported kernels or restricted ring setup return errors; ring file transfers never silently fall back.
+    /// Create an endpoint and its driver. The driver must be run throughout operation and shutdown. Unsupported kernels or restricted ring setup return errors; ring transfers never silently fall back.
     pub fn new(options: IoUringOptions) -> io::Result<(Self, IoUringDriver)> {
         let (selector, mut drivers) = Self::with_workers(options, 1)?;
         Ok((selector, drivers.pop().expect("one driver was requested")))
@@ -515,6 +532,7 @@ impl IoUringSelector {
 
     async fn operation<B: IoBuf>(
         &self,
+        controller: Arc<Controller>,
         resource: Resource,
         buffer: B,
         write: bool,
@@ -542,7 +560,6 @@ impl IoUringSelector {
                 buffer,
             );
         }
-        let controller = self.route();
         let permit = match controller.capacity.acquire(cancellation).await {
             Ok(permit) => permit,
             Err(error) => return (Err(error), buffer),
@@ -638,6 +655,7 @@ impl FileRead for IoUringSelector {
     ) -> BufferResult<B> {
         let (result, buffer) = self
             .operation(
+                self.route(),
                 Resource::File(retain_file(file), None),
                 buffer,
                 false,
@@ -658,6 +676,7 @@ impl FileWrite for IoUringSelector {
     ) -> BufferResult<B> {
         let (result, buffer) = self
             .operation(
+                self.route(),
                 Resource::File(retain_file(file), None),
                 buffer,
                 true,
@@ -679,6 +698,7 @@ impl FileReadAt for IoUringSelector {
     ) -> BufferResult<B> {
         let (result, buffer) = self
             .operation(
+                self.route(),
                 Resource::File(retain_file(file), Some(offset)),
                 buffer,
                 false,
@@ -700,6 +720,7 @@ impl FileWriteAt for IoUringSelector {
     ) -> BufferResult<B> {
         let (result, buffer) = self
             .operation(
+                self.route(),
                 Resource::File(retain_file(file), Some(offset)),
                 buffer,
                 true,
@@ -1001,6 +1022,9 @@ impl std::task::Wake for Controller {
         self.notify();
     }
 }
+
+mod message;
+mod socket;
 
 #[cfg(test)]
 mod tests;

@@ -1,12 +1,14 @@
 # Core Scheduler io_uring
 
-A Linux selector with independently driven completion I/O. File reads and writes, including positioned operations, use io_uring. Other file operations, sockets, resolution, blocking work, and signals use an explicitly owned `ReadinessSelector` fallback.
+A Linux selector with independently driven completion I/O. Owned file reads and writes (including positioned operations), socket reads/writes, and socket message sends/receives use io_uring. Other file operations, socket lifecycle and borrowed `_poll` operations, resolution, blocking work, and signals use an explicitly owned `ReadinessSelector` fallback.
 
 `IoUringSelector::new` returns the selector and an `IoUringDriver`. It starts no ring thread. An application can call `driver.turn(timeout)` from its event loop or move the driver into a dedicated thread and call `run`. Operation futures use ordinary wakers and can be polled on any executor.
 
 A separately driven selector composes with `NativeScheduler::with_selector`. The driver must remain active throughout operation and asynchronous shutdown. Dropping a pending operation requests cancellation while the driver retains its buffer and file until original completion. Cancellation completion alone never releases original request storage.
 
 Admission bounds queued plus in-flight original requests. This initial extraction uses one boxed request and completion channel per operation; it does not yet pool request records. Setup probes required kernel support and reports unavailable rings explicitly. Unexpected driver failure retains memory whose kernel access cannot be proven complete and causes affected operation futures to panic when polled, because their original buffers cannot safely be returned. Queued requests that never reached the kernel return errors and their buffers. Graceful shutdown drains instead.
+
+Socket transfers submit `Recv`, `Send`, `RecvMsg`, and `SendMsg`. An `EAGAIN` completion retires that attempt before a readiness wait and retry on the original ring. Message requests retain their header, address, iovec array, and complete sequence owner until original completion. Prepared `IoBuffers` packages supply their existing vectors directly; ordinary sequences use request-owned vectors.
 
 The completion engine is adapted from Socketry revision `7a70586d5d37fb640d696d0c03a05b2ee3cbe06b`, preserving its MIT attribution.
 
