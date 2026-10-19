@@ -129,6 +129,18 @@ mod ipv4 {
     ) {
         run_datagram(SocketDomain::Ipv4, test);
     }
+    mod borrowed_scalar {
+        use super::*;
+        core_scheduler_conformance::socket_poll_tests!(run: run_stream_case);
+    }
+    mod borrowed_messages {
+        use super::*;
+        core_scheduler_conformance::socket_message_poll_tests!(run: run_stream_case);
+    }
+    mod borrowed_datagrams {
+        use super::*;
+        core_scheduler_conformance::socket_datagram_poll_tests!(run: run_datagram_case);
+    }
     mod scalar {
         use super::*;
         core_scheduler_conformance::socket_tests!(run: run_stream_case);
@@ -154,6 +166,18 @@ mod ipv6 {
         test: impl AsyncFnOnce(&DirectScheduler, &DirectSocket, &DirectSocket) + Send + 'static,
     ) {
         run_datagram(SocketDomain::Ipv6, test);
+    }
+    mod borrowed_scalar {
+        use super::*;
+        core_scheduler_conformance::socket_poll_tests!(run: run_stream_case);
+    }
+    mod borrowed_messages {
+        use super::*;
+        core_scheduler_conformance::socket_message_poll_tests!(run: run_stream_case);
+    }
+    mod borrowed_datagrams {
+        use super::*;
+        core_scheduler_conformance::socket_datagram_poll_tests!(run: run_datagram_case);
     }
     mod scalar {
         use super::*;
@@ -444,6 +468,14 @@ fn run_io(mode: usize, test: impl AsyncFnOnce(&Fixture<'_>) + Send + 'static) {
             let (result, _) =
                 block_on(scheduler.socket_write(&client, vec![1, 2], &Cancellation::never()));
             assert!(result.unwrap() > 0);
+            // Sending completes when the local kernel accepts bytes. Wait until they reach the peer before gating its first read attempt.
+            let (result, _) = block_on(scheduler.socket_recvmsg(
+                &server,
+                [vec![0; 2]],
+                SocketRecvFlags { peek: true },
+                &Cancellation::never(),
+            ));
+            assert!(result.unwrap().bytes > 0);
         }
         let fixture = Fixture::new(&scheduler, &server, mode);
         let result =

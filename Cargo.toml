@@ -16,6 +16,8 @@ members = [
     "crates/direct",
     "crates/tokio",
     "crates/native",
+    "crates/selector",
+    "crates/iouring",
     "crates/timers",
 ]
 resolver = "3"

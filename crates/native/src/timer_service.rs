@@ -196,7 +196,7 @@ fn work(shared: Arc<Shared>, clock: TimerAssist<SleepWake>, capacity: usize) {
     shared.running.store(false, Ordering::Release);
     shared.changed.notify(usize::MAX);
 }
-impl Clock for NativeScheduler {
+impl<S: crate::Selector> Clock for NativeScheduler<S> {
     fn now(&self) -> Instant {
         self.timers.now()
     }

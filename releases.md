@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Separate native I/O into `core-scheduler-selector` and compose `NativeScheduler<S>` with independently selected capabilities, preserving the default readiness constructor.
+- Add `core-scheduler-iouring` with completion file and owned socket transfers, per-worker rings driven by Native, local submission queues, and independent event-loop or thread driving.
+- Publish completion batches to ready queues before resuming local tasks, and retain ring affinity for cancellation after task migration.
+- Defer Unix Tokio socket readiness registration until I/O needs to wait, avoiding stale unconnected TCP hangup events which could make a later full-queue send spin indefinitely.
+- Add optional borrowed recv/send and message `_poll` capabilities with stack-buffer support, explicit cancellation, and shared conformance suites in Direct, Tokio, and Native. Windows attempts explicitly enable nonblocking mode.
+
 - Add `core-scheduler-native`, porting Socketry's work-stealing executor and readiness I/O with owned operations, explicit cancellation, bounded blocking services, and asynchronous shutdown.
 - Extract `core-scheduler-timers` with reserved timer storage, constant-time cancellation, batched expiry, and reusable sleep registrations.
 
