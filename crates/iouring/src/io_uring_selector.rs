@@ -13,7 +13,7 @@ use std::{
     fs::File as StdFile,
     future::{Future, poll_fn},
     io::{self, Read, Write},
-    os::{fd::AsRawFd, unix::net::UnixStream},
+    os::fd::{AsRawFd, FromRawFd},
     pin::pin,
     sync::{
         Arc, OnceLock, Weak,
@@ -76,6 +76,20 @@ fn validate_operation_support(supported: impl Fn(u8) -> bool) -> io::Result<()> 
         }
     }
     Ok(())
+}
+
+fn notification() -> io::Result<StdFile> {
+    syscall("notification", || {
+        // SAFETY: eventfd has no pointer arguments. The returned descriptor is
+        // private to this selector, nonblocking, and closed on exec.
+        let descriptor = unsafe { libc::eventfd(0, libc::EFD_CLOEXEC | libc::EFD_NONBLOCK) };
+        if descriptor < 0 {
+            Err(io::Error::last_os_error())
+        } else {
+            // SAFETY: This successful syscall returns a fresh owned descriptor.
+            Ok(unsafe { StdFile::from_raw_fd(descriptor) })
+        }
+    })
 }
 
 fn completion_result(result: i32) -> io::Result<usize> {
@@ -255,7 +269,7 @@ impl Drop for SignalCompletion {
 pub(crate) struct Controller {
     capacity: Arc<Capacity>,
     commands: mpsc::Sender<Command>,
-    notification: UnixStream,
+    notification: Arc<StdFile>,
     next_identifier: AtomicU64,
     closed: AtomicBool,
     shutdown: Arc<Shutdown>,
@@ -279,10 +293,12 @@ impl Controller {
     }
 
     fn notify(&self) {
-        // A full pipe already contains a wakeup. Other errors mean the selector
+        // A saturated event counter already contains a wakeup. Other errors mean the selector
         // has exited; dropping its receivers wakes pending operation futures.
         loop {
-            match syscall("notify", || (&self.notification).write(&[1])) {
+            match syscall("notify", || {
+                (&*self.notification).write(&1_u64.to_ne_bytes())
+            }) {
                 Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
                 _ => break,
             }
@@ -482,9 +498,7 @@ impl IoUringSelector {
         syscall("operation-support", || {
             validate_operation_support(|operation| probe.is_supported(operation))
         })?;
-        let (notification, receiver) = syscall("notification-pair", UnixStream::pair)?;
-        syscall("notification-mode", || notification.set_nonblocking(true))?;
-        syscall("receiver-mode", || receiver.set_nonblocking(true))?;
+        let notification = Arc::new(notification()?);
         let (commands, incoming) = mpsc::channel();
         let shutdown = Arc::new(Shutdown {
             finished: AtomicBool::new(false),
@@ -498,12 +512,12 @@ impl IoUringSelector {
         let controller = Arc::new(Controller {
             capacity,
             commands,
-            notification,
+            notification: Arc::clone(&notification),
             next_identifier: AtomicU64::new(0),
             closed: AtomicBool::new(false),
             shutdown: Arc::clone(&shutdown),
         });
-        let reactor = Reactor::new(ring, receiver, incoming, Arc::clone(&controller))?;
+        let reactor = Reactor::new(ring, notification, incoming, Arc::clone(&controller))?;
         Ok(IoUringDriver {
             reactor: Some(reactor),
             controller,
@@ -770,7 +784,7 @@ impl Selector for IoUringSelector {
 }
 pub(crate) struct Reactor {
     ring: IoUring,
-    notification: UnixStream,
+    notification: Arc<StdFile>,
     incoming: mpsc::Receiver<Command>,
     controller: Arc<Controller>,
     pending: VecDeque<Box<dyn PendingRequest>>,
@@ -784,7 +798,7 @@ pub(crate) struct Reactor {
 impl Reactor {
     fn new(
         ring: IoUring,
-        notification: UnixStream,
+        notification: Arc<StdFile>,
         incoming: mpsc::Receiver<Command>,
         controller: Arc<Controller>,
     ) -> io::Result<Self> {
@@ -981,12 +995,11 @@ impl Reactor {
 
         // Bound notification reads too: continuous producers must not monopolize a turn. A notification may represent executor work or a command arriving after the command batch above. Return before sleeping; a later idle turn will inspect both level-triggered sources, preserving notifications and CQEs which race this check.
         let mut notified = false;
-        let mut bytes = [0; 256];
+        let mut bytes = [0; 8];
         for _ in 0..16 {
-            match syscall("notification-read", || self.notification.read(&mut bytes)) {
-                Ok(0) => unreachable!(
-                    "the driver retains the private notification writer until this reactor is destroyed"
-                ),
+            match syscall("notification-read", || {
+                (&*self.notification).read(&mut bytes)
+            }) {
                 Ok(_) => notified = true,
                 Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
                 Err(error) if error.kind() == io::ErrorKind::WouldBlock => break,

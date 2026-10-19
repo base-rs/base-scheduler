@@ -182,9 +182,7 @@ fn setup_probes_and_errors_are_explicit() {
         "probe",
         "completion-support",
         "operation-support",
-        "notification-pair",
-        "notification-mode",
-        "receiver-mode",
+        "notification",
     ] {
         let _failures = Failures::new([(name, io::ErrorKind::PermissionDenied.into())]);
         assert_eq!(
@@ -1454,4 +1452,46 @@ fn completions_published_during_submission_return_before_idle_preparation() {
     assert_eq!(buffer, b"x");
     drop(_failures);
     drain(&selector, &mut driver);
+}
+
+#[test]
+fn notification_creation_reports_descriptor_exhaustion() {
+    const CHILD: &str = "CORE_SCHEDULER_TEST_EVENTFD_EXHAUSTION";
+    if std::env::var_os(CHILD).is_none() {
+        assert!(
+            std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "io_uring_selector::tests::notification_creation_reports_descriptor_exhaustion",
+                    "--nocapture"
+                ])
+                .env(CHILD, "1")
+                .status()
+                .unwrap()
+                .success()
+        );
+        return;
+    }
+    let mut previous = libc::rlimit {
+        rlim_cur: 0,
+        rlim_max: 0,
+    };
+    // SAFETY: The pointer is valid; this isolated child modifies only its own soft limit.
+    assert_eq!(
+        unsafe { libc::getrlimit(libc::RLIMIT_NOFILE, &mut previous) },
+        0
+    );
+    let limit = libc::rlimit {
+        rlim_cur: 0,
+        ..previous
+    };
+    // SAFETY: Lowering the soft limit is permitted; the hard limit remains unchanged.
+    assert_eq!(unsafe { libc::setrlimit(libc::RLIMIT_NOFILE, &limit) }, 0);
+    let result = notification();
+    // SAFETY: Restore the previous soft limit before profile output and test cleanup.
+    assert_eq!(
+        unsafe { libc::setrlimit(libc::RLIMIT_NOFILE, &previous) },
+        0
+    );
+    assert_eq!(result.unwrap_err().raw_os_error(), Some(libc::EMFILE));
 }
