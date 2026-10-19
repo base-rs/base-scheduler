@@ -1,0 +1,45 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 20K of event 'cycles:u'
+# Event count (approx.): 27028442591
+#
+# Overhead Symbol IPC [IPC Coverage]
+# ........ .................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................. ....................
+#
+ 9.34% [.] <tokio::runtime::io::scheduled_io::Readiness as core::future::future::Future>::poll - -
+ 6.41% [.] <tokio::runtime::io::scheduled_io::Readiness as core::ops::drop::Drop>::drop - -
+ 5.77% [.] <event_listener::Inner<()>>::with_inner::<event_listener::RegisterResult<()>, <event_listener::Inner<()>>::register::{closure#0}> - -
+ 4.63% [.] <event_listener::Inner<()>>::with_inner::<core::option::Option<event_listener::State<()>>, <event_listener::Inner<()>>::remove::{closure#0}> - -
+ 4.37% [.] <core_scheduler_tokio::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0}::{closure#0}> as core::future::future::Future>::poll - -
+ 4.06% [.] <tokio::runtime::scheduler::multi_thread::worker::Context>::run - -
+ 3.58% [k] 0xffffffff9de00080 - -
+ 3.56% [.] <std::sys::sync::mutex::futex::Mutex>::lock_contended - -
+ 3.21% [.] <tokio::runtime::task::state::State>::transition_to_notified_by_val - -
+ 2.98% [.] <tokio::runtime::scheduler::multi_thread::queue::Steal<alloc::sync::Arc<tokio::runtime::scheduler::multi_thread::handle::Handle>>>::steal_into - -
+ 2.98% [.] __vdso_clock_gettime - -
+ 2.75% [k] 0xffffffff9e60c656 - -
+ 2.51% [.] <tokio::runtime::task::state::State>::transition_to_running - -
+ 2.44% [.] <tokio::runtime::io::scheduled_io::ScheduledIo>::wake - -
+ 2.38% [.] <event_listener::Inner<()>>::with_inner::<(), <event_listener::Inner<()>>::insert::{closure#0}> - -
+ 2.35% [.] tokio::runtime::task::waker::wake_by_val - -
+ 2.35% [.] <tokio::runtime::task::state::State>::transition_to_idle - -
+ 2.09% [.] tokio::runtime::task::waker::clone_waker - -
+ 1.88% [.] <tokio::runtime::io::driver::Driver>::turn - -
+ 1.76% [.] tokio::runtime::task::waker::drop_waker - -
+ 1.67% [.] <tokio::runtime::scheduler::multi_thread::worker::Context>::run_task - -
+ 1.51% [.] 0x000000000018f4d4 - -
+ 1.50% [.] <core::future::poll_fn::PollFn<<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::cancellable<usize, <core_scheduler_tokio::tokio_socket::TokioSocket>::io<usize, <core_scheduler_tokio::tokio_scheduler::TokioScheduler>::socket_operation<alloc::vec::Vec<u8>, usize, <core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_read::SocketRead>::socket_read<alloc::vec::Vec<u8>>::{closure#0}::{closure#0}>::{closure#0}::{closure#0}::{closure#0}>::{closure#0}>::{closure#0}::{closure#0}> as core::future::future::Future>::poll - -
+ 1.28% [.] <core_scheduler_tokio::tokio_scheduler::TokioScheduler>::check_socket - -
+ 1.26% [.] <tokio::runtime::io::registration::Registration>::clear_readiness - -
+ 1.22% [.] <tokio::runtime::scheduler::multi_thread::worker::Context>::park_internal - -
+ 1.11% [.] <tokio::runtime::scheduler::multi_thread::worker::Core>::maintenance - -
+ 1.06% [.] 0x000000000018f393 - -
+ 1.05% [.] <tokio::runtime::scheduler::multi_thread::idle::Idle>::worker_to_notify - -
+
+
+#
+# (Tip: To show context switches in perf report sample context add --switch-events to perf record.)
+#

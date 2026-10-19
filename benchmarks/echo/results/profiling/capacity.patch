@@ -1,0 +1,24 @@
+diff --git a/crates/iouring/src/io_uring_selector.rs b/crates/iouring/src/io_uring_selector.rs
+index 6de99d7..53f160a 100644
+--- a/crates/iouring/src/io_uring_selector.rs
++++ b/crates/iouring/src/io_uring_selector.rs
+@@ -336,7 +336,6 @@ impl Capacity {
+     async fn acquire(self: &Arc<Self>, cancellation: &Cancellation) -> io::Result<Permit> {
+         let mut cancelled = pin!(cancellation.cancelled());
+         loop {
+-            event_listener::listener!(self.available => listener);
+             cancellation
+                 .check()
+                 .map_err(|error| io::Error::new(io::ErrorKind::Interrupted, error))?;
+@@ -361,6 +360,11 @@ impl Capacity {
+                     continue;
+                 }
+             }
++            event_listener::listener!(self.available => listener);
++            let state = self.state.load(Ordering::Acquire);
++            if state < self.limit || state & CAPACITY_CLOSED != 0 {
++                continue;
++            }
+             let mut listener = pin!(listener);
+             poll_fn(|cx| {
+                 if cancelled.as_mut().poll(cx).is_ready() {

@@ -1,0 +1,38 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 19K of event 'cycles:u'
+# Event count (approx.): 16388199568
+#
+# Overhead Symbol IPC [IPC Coverage]
+# ........ ........................................................................................................................................................................................................................ ....................
+#
+ 12.65% [.] <tokio::runtime::scheduler::multi_thread::worker::Context>::run - -
+ 7.53% [.] __vdso_clock_gettime - -
+ 6.69% [.] <tokio::runtime::scheduler::multi_thread::queue::Steal<alloc::sync::Arc<tokio::runtime::scheduler::multi_thread::handle::Handle>>>::steal_into - -
+ 6.54% [.] <tokio::runtime::io::scheduled_io::ScheduledIo>::poll_readiness - -
+ 6.25% [.] <tokio::runtime::task::state::State>::transition_to_running - -
+ 5.28% [k] 0xffffffff9de00080 - -
+ 3.98% [.] tokio::runtime::task::waker::wake_by_val - -
+ 3.92% [.] <tokio::runtime::scheduler::multi_thread::worker::Context>::run_task - -
+ 3.52% [.] <tokio::runtime::io::driver::Driver>::turn - -
+ 3.44% [.] <tokio::runtime::scheduler::multi_thread::worker::Context>::park_internal - -
+ 3.21% [.] <tokio::runtime::io::scheduled_io::ScheduledIo>::wake - -
+ 2.74% [.] <tokio::runtime::scheduler::multi_thread::worker::Core>::maintenance - -
+ 2.68% [.] <tokio::runtime::task::state::State>::transition_to_idle - -
+ 2.22% [.] <tokio::runtime::scheduler::multi_thread::idle::Idle>::worker_to_notify - -
+ 2.20% [k] 0xffffffff9e60c656 - -
+ 2.14% [.] <tokio::runtime::scheduler::multi_thread::park::Inner>::park_condvar - -
+ 2.07% [.] <tokio::runtime::task::state::State>::transition_to_notified_by_val - -
+ 2.00% [.] <std::sys::pal::unix::time::Timespec>::sub_timespec - -
+ 1.68% [.] tokio::runtime::task::waker::clone_waker - -
+ 1.40% [.] <tokio::net::tcp::stream::TcpStream>::poll_read_priv - -
+ 1.40% [.] <tokio::runtime::time::handle::Handle>::process_at_time - -
+ 1.19% [.] <tokio::runtime::scheduler::multi_thread::park::Unparker>::unpark - -
+
+
+#
+# (Tip: To show context switches in perf report sample context add --switch-events to perf record.)
+#

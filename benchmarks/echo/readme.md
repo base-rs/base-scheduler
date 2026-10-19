@@ -4,6 +4,8 @@ Compare pure Tokio, `TokioScheduler`, and `NativeScheduler<IoUringSelector>` usi
 
 The [initial Aiko results](results.md) include throughput, latency, variation across repetitions, and raw samples.
 
+The [performance investigation](profiling.md) compares compiler settings, identifies CPU and syscall costs, and measures isolated optimization prototypes.
+
 Build and run the comparison on Linux:
 
 ```sh

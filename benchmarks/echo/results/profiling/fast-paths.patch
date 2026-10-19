@@ -1,0 +1,60 @@
+diff --git a/crates/iouring/src/io_uring_selector.rs b/crates/iouring/src/io_uring_selector.rs
+index 6de99d7..4502ee2 100644
+--- a/crates/iouring/src/io_uring_selector.rs
++++ b/crates/iouring/src/io_uring_selector.rs
+@@ -957,6 +957,11 @@ impl Reactor {
+             return Ok(true);
+         }
+ 
++        // Diagnostic experiment: avoid idle wait housekeeping after useful work.
++        if progressed {
++            return Ok(false);
++        }
++
+         // Bound notification reads too: continuous producers must not monopolize a turn. Unread bytes remain readable after rearming, and any observed notification makes this turn's wait nonblocking.
+         let mut notified = false;
+         let mut bytes = [0; 256];
+diff --git a/crates/tokio/src/tokio_socket.rs b/crates/tokio/src/tokio_socket.rs
+index 44bdf4a..63b3cec 100644
+--- a/crates/tokio/src/tokio_socket.rs
++++ b/crates/tokio/src/tokio_socket.rs
+@@ -138,9 +138,15 @@ impl TokioSocket {
+         Operation: FnMut(&socket2::Socket) -> io::Result<Output> + Send,
+     {
+         // Try the syscall before registration or waiting. In particular, Linux can report EPOLLHUP for an unconnected TCP socket; Tokio retains closed readiness permanently, which would spin after the socket later connects and a syscall returns WouldBlock.
+-        let result = operation(self.get_ref());
+-        if !matches!(&result, Err(error) if error.kind() == io::ErrorKind::WouldBlock) {
+-            return result;
++        #[cfg(unix)]
++        let try_first = self.inner.registration.get().is_none();
++        #[cfg(windows)]
++        let try_first = true;
++        if try_first {
++            let result = operation(self.get_ref());
++            if !matches!(&result, Err(error) if error.kind() == io::ErrorKind::WouldBlock) {
++                return result;
++            }
+         }
+ 
+         #[cfg(unix)]
+@@ -149,11 +155,15 @@ impl TokioSocket {
+                 Interest::Readable => tokio::io::Interest::READABLE,
+                 Interest::Writable => tokio::io::Interest::WRITABLE,
+             };
+-            self.inner
+-                .registration()
+-                .await?
+-                .async_io(interest, |_| operation(self.inner.get_ref()))
+-                .await
++            let registration = self.inner.registration().await?;
++            match registration.try_io(interest, |_| operation(self.inner.get_ref())) {
++                Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
++                    registration
++                        .async_io(interest, |_| operation(self.inner.get_ref()))
++                        .await
++                }
++                result => result,
++            }
+         }
+ 
+         #[cfg(windows)]
