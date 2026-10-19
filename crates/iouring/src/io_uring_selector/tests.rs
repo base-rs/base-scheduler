@@ -145,6 +145,8 @@ fn setup_probes_and_errors_are_explicit() {
     for name in [
         "ring",
         "probe",
+        "completion-support",
+        "operation-support",
         "notification-pair",
         "notification-mode",
         "receiver-mode",
@@ -549,4 +551,111 @@ fn abandoned_buffer_destructor_panics_do_not_stop_other_operations() {
         drain(&selector, &mut driver);
         assert_eq!(drops.load(Ordering::SeqCst), 1);
     }
+}
+
+#[test]
+fn close_returns_pending_owners_and_cancellation_tolerates_retired_requests() {
+    let (selector, mut driver) = pair(2);
+    let (_directory, file) = file(&selector);
+    let never = Cancellation::never();
+    let drops = Arc::new(AtomicUsize::new(0));
+    let mut operation = Box::pin(selector.file_read_at(
+        &file,
+        ObservedBuffer {
+            bytes: vec![0],
+            drops: Arc::clone(&drops),
+        },
+        0,
+        &never,
+    ));
+    assert!(block_on(poll_once(&mut operation)).is_none());
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while selector.controller.capacity.state.lock().unwrap().0 != 0 {
+        driver.turn(Some(Duration::from_millis(10))).unwrap();
+        assert!(Instant::now() < deadline);
+    }
+    // Completion is stored, but the future has not observed it. Abandonment sends a now-stale cancellation which must be harmless.
+    drop(operation);
+    assert_eq!(drops.load(Ordering::SeqCst), 1);
+    driver.turn(Some(Duration::ZERO)).unwrap();
+    let mut queued = Box::pin(selector.file_read(&file, vec![5], &never));
+    assert!(block_on(poll_once(&mut queued)).is_none());
+    selector.close();
+    assert!(driver.turn(None).unwrap());
+    let (result, buffer) = block_on(queued);
+    assert_eq!(result.unwrap_err().kind(), io::ErrorKind::Interrupted);
+    assert_eq!(buffer, [5]);
+    block_on(selector.shutdown());
+}
+
+#[test]
+fn full_submission_queue_defers_cancellations_and_shutdown_tolerates_duplicate_requests() {
+    let (selector, mut driver) = IoUringSelector::new(IoUringOptions {
+        entries: 1,
+        capacity: 4,
+        ..Default::default()
+    })
+    .unwrap();
+    let (_directory, file) = fifo(&selector);
+    let never = Cancellation::never();
+    let mut operations = Vec::new();
+    for _ in 0..4 {
+        let mut operation = Box::pin(selector.file_read(&file, vec![0], &never));
+        assert!(block_on(poll_once(&mut operation)).is_none());
+        driver.turn(Some(Duration::ZERO)).unwrap();
+        operations.push(operation);
+    }
+    assert_eq!(driver.reactor.as_ref().unwrap().in_flight.0.len(), 4);
+    selector.close();
+    // Shutdown marks each request as cancelling; dropping each future also sends its own cancellation to the same owner.
+    drop(operations);
+    drain(&selector, &mut driver);
+    assert_eq!(selector.controller.capacity.state.lock().unwrap().0, 0);
+}
+
+#[test]
+fn submission_racing_shutdown_or_driver_exit_returns_unpublished_storage() {
+    for driver_exited in [false, true] {
+        let (selector, driver) = pair(1);
+        let (_directory, file) = file(&selector);
+        let never = Cancellation::never();
+        // Stage the legitimate interval after admission and request preparation but before publication, so shutdown can deterministically win that race.
+        let permit = block_on(selector.controller.capacity.acquire(&never)).unwrap();
+        let (reply, result) = oneshot::channel();
+        let request = Box::new(Request {
+            identifier: selector.next_identifier().unwrap(),
+            _permit: permit,
+            resource: Some(Resource::File(retain_file(&file), None)),
+            buffer: Some(vec![3]),
+            pointer: |buffer| buffer.as_mut_ptr(),
+            write: false,
+            reply: Cell::new(Some(reply)),
+            cancelling: Cell::new(false),
+        });
+        selector.close();
+        if driver_exited {
+            drop(driver);
+            let (result, buffer) = block_on(selector.submit(request, result, &never));
+            assert_eq!(result.unwrap_err().kind(), io::ErrorKind::BrokenPipe);
+            assert_eq!(buffer, [3]);
+        } else {
+            let mut driver = driver;
+            let (result, buffer) = drive(&mut driver, selector.submit(request, result, &never));
+            assert_eq!(result.unwrap_err().kind(), io::ErrorKind::Interrupted);
+            assert_eq!(buffer, [3]);
+        }
+        assert_eq!(selector.controller.capacity.state.lock().unwrap().0, 0);
+        block_on(selector.shutdown());
+    }
+}
+
+#[test]
+fn convenience_driver_loop_reports_the_original_failure() {
+    let (selector, driver) = pair(1);
+    let _failures = Failures::new([("submit", io::ErrorKind::PermissionDenied.into())]);
+    assert_eq!(
+        driver.run().unwrap_err().kind(),
+        io::ErrorKind::PermissionDenied
+    );
+    block_on(selector.shutdown());
 }

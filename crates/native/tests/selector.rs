@@ -246,3 +246,43 @@ fn registered_sockets_options_resolution_and_signals_forward_to_the_selector() {
         scheduler.shutdown().await;
     });
 }
+
+impl core_scheduler::Signals for MemorySelector {
+    type Signal = u8;
+    type Subscription = Box<dyn core_scheduler::Notify<u8>>;
+
+    fn signal_subscribe<T: core_scheduler::Notify<u8> + 'static>(
+        &self,
+        signals: &[u8],
+        target: T,
+    ) -> std::io::Result<Self::Subscription> {
+        assert_eq!(signals, [7]);
+        Ok(Box::new(target))
+    }
+}
+
+#[test]
+fn custom_signal_capability_preserves_the_selectors_signal_and_subscription_types() {
+    use core_scheduler::Signals;
+    let scheduler = NativeScheduler::with_selector(
+        MemorySelector {
+            closed: Arc::default(),
+            retired: Arc::default(),
+        },
+        NativeExecutorOptions {
+            workers: 1,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let (target, receiver) = std::sync::mpsc::channel();
+    let subscription = scheduler.signal_subscribe(&[7], target).unwrap();
+    subscription.notify(7);
+    assert_eq!(receiver.try_recv().unwrap(), 7);
+    drop(subscription);
+    assert_eq!(
+        receiver.try_recv().unwrap_err(),
+        std::sync::mpsc::TryRecvError::Disconnected
+    );
+    scheduler.block_on(scheduler.shutdown());
+}

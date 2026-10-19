@@ -348,13 +348,17 @@ impl IoUringSelector {
         }
         let fallback = Arc::new(ReadinessSelector::with_options(options.fallback)?);
         let ring = syscall("ring", || IoUring::new(options.entries))?;
-        validate_completion_support(
-            ring.params().is_feature_nodrop(),
-            ring.params().is_feature_rw_cur_pos(),
-        )?;
+        syscall("completion-support", || {
+            validate_completion_support(
+                ring.params().is_feature_nodrop(),
+                ring.params().is_feature_rw_cur_pos(),
+            )
+        })?;
         let mut probe = io_uring::Probe::new();
         syscall("probe", || ring.submitter().register_probe(&mut probe))?;
-        validate_operation_support(|operation| probe.is_supported(operation))?;
+        syscall("operation-support", || {
+            validate_operation_support(|operation| probe.is_supported(operation))
+        })?;
         let (notification, receiver) = syscall("notification-pair", UnixStream::pair)?;
         syscall("notification-mode", || notification.set_nonblocking(true))?;
         syscall("receiver-mode", || receiver.set_nonblocking(true))?;
@@ -813,7 +817,9 @@ impl Reactor {
         let mut bytes = [0; 256];
         for _ in 0..16 {
             match syscall("notification-read", || self.notification.read(&mut bytes)) {
-                Ok(0) => break,
+                Ok(0) => unreachable!(
+                    "the driver retains the private notification writer until this reactor is destroyed"
+                ),
                 Ok(_) => notified = true,
                 Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
                 Err(error) if error.kind() == io::ErrorKind::WouldBlock => break,
