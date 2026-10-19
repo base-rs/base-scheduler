@@ -7,7 +7,6 @@ use core_scheduler_selector::{NativeFile, NativeSocket, ReadinessSelector, Selec
 use event_listener::Event as CompletionEvent;
 use futures_channel::oneshot;
 use io_uring::{IoUring, opcode, squeue, types};
-use polling::{Event, Events, Poller};
 use std::{
     cell::Cell,
     collections::{HashMap, VecDeque},
@@ -25,8 +24,6 @@ use std::{
     time::Duration,
 };
 const CANCEL_TAG: u64 = 1 << 63;
-const COMMAND_EVENT: usize = 0;
-const RING_EVENT: usize = 1;
 
 // Keep syscall failures deterministic in unit tests while production calls the OS directly.
 fn syscall<T>(name: &'static str, operation: impl FnOnce() -> io::Result<T>) -> io::Result<T> {
@@ -760,8 +757,6 @@ impl Selector for IoUringSelector {
     }
 }
 pub(crate) struct Reactor {
-    // The poller is destroyed before its registered sources on error/unwind.
-    poller: Poller,
     ring: IoUring,
     notification: UnixStream,
     incoming: mpsc::Receiver<Command>,
@@ -770,7 +765,6 @@ pub(crate) struct Reactor {
     in_flight: InFlight,
     cancellations: VecDeque<u64>,
     closing: bool,
-    events: Events,
 }
 
 impl Reactor {
@@ -781,7 +775,6 @@ impl Reactor {
         controller: Arc<Controller>,
     ) -> io::Result<Self> {
         let reactor = Self {
-            poller: syscall("poller", Poller::new)?,
             ring,
             notification,
             incoming,
@@ -790,22 +783,7 @@ impl Reactor {
             in_flight: InFlight::default(),
             cancellations: VecDeque::new(),
             closing: false,
-            events: Events::new(),
         };
-        // SAFETY: Reactor owns both sources and deletes their registrations in
-        // Drop, before the poller and sources are destroyed.
-        unsafe {
-            syscall("add-notification", || {
-                reactor
-                    .poller
-                    .add(&reactor.notification, Event::readable(COMMAND_EVENT))
-            })?;
-            syscall("add-ring", || {
-                reactor
-                    .poller
-                    .add(&reactor.ring, Event::readable(RING_EVENT))
-            })?;
-        }
         Ok(reactor)
     }
 
@@ -967,7 +945,7 @@ impl Reactor {
             return Ok(true);
         }
 
-        // The CQ is checked directly above; a zero-timeout poller wait cannot publish any more completions. Return to the executor after progress or a nonblocking turn, and prepare the poller only when we may actually sleep. Requests and cancellations left in the SQ must be retried before sleeping too.
+        // The CQ is checked directly above; a zero-timeout readiness wait cannot publish any more completions. Return to the executor after progress or a nonblocking turn, and prepare the wait only when we may actually sleep. Requests and cancellations left in the SQ must be retried before sleeping too.
         if progressed
             || timeout == Some(Duration::ZERO)
             || !self.pending.is_empty()
@@ -976,7 +954,7 @@ impl Reactor {
             return Ok(false);
         }
 
-        // Bound notification reads too: continuous producers must not monopolize a turn. A notification may represent executor work or a command arriving after the command batch above. Return before sleeping; a later idle turn will rearm both level-triggered sources, preserving notifications and CQEs which race this check.
+        // Bound notification reads too: continuous producers must not monopolize a turn. A notification may represent executor work or a command arriving after the command batch above. Return before sleeping; a later idle turn will inspect both level-triggered sources, preserving notifications and CQEs which race this check.
         let mut notified = false;
         let mut bytes = [0; 256];
         for _ in 0..16 {
@@ -993,15 +971,45 @@ impl Reactor {
         if notified {
             return Ok(false);
         }
-        syscall("modify-notification", || {
-            self.poller
-                .modify(&self.notification, Event::readable(COMMAND_EVENT))
-        })?;
-        syscall("modify-ring", || {
-            self.poller.modify(&self.ring, Event::readable(RING_EVENT))
-        })?;
-        self.events.clear();
-        let result = syscall("wait", || self.poller.wait(&mut self.events, timeout));
+        // Exactly two worker-owned descriptors need an idle wait. ppoll keeps
+        // this wait independent of epoll registrations and timerfd setup. Both
+        // sources are level-triggered, so events racing the checks above remain
+        // visible when this syscall starts.
+        let mut sources = [
+            libc::pollfd {
+                fd: self.notification.as_raw_fd(),
+                events: libc::POLLIN,
+                revents: 0,
+            },
+            libc::pollfd {
+                fd: self.ring.as_raw_fd(),
+                events: libc::POLLIN,
+                revents: 0,
+            },
+        ];
+        let deadline = timeout.map(|timeout| libc::timespec {
+            tv_sec: timeout.as_secs().try_into().unwrap_or(libc::time_t::MAX),
+            tv_nsec: timeout.subsec_nanos().into(),
+        });
+        let result = syscall("wait", || {
+            // SAFETY: The stack array and optional timespec remain valid for
+            // the synchronous call. Reactor owns both descriptors throughout.
+            let result = unsafe {
+                libc::ppoll(
+                    sources.as_mut_ptr(),
+                    sources.len() as libc::nfds_t,
+                    deadline
+                        .as_ref()
+                        .map_or(std::ptr::null(), |timeout| timeout),
+                    std::ptr::null(),
+                )
+            };
+            if result < 0 {
+                Err(io::Error::last_os_error())
+            } else {
+                Ok(())
+            }
+        });
         if let Err(error) = result {
             if error.kind() != io::ErrorKind::Interrupted {
                 return Err(error);
@@ -1013,8 +1021,6 @@ impl Reactor {
 
 impl Drop for Reactor {
     fn drop(&mut self) {
-        let _ = self.poller.delete(&self.notification);
-        let _ = self.poller.delete(&self.ring);
         // Pop without retaining a queue borrow: returning a buffer or waking its owner can reenter local routing.
         while let Some(command) = crate::io_uring_worker::pop(&self.controller) {
             discard(command);

@@ -185,9 +185,6 @@ fn setup_probes_and_errors_are_explicit() {
         "notification-pair",
         "notification-mode",
         "receiver-mode",
-        "poller",
-        "add-notification",
-        "add-ring",
     ] {
         let _failures = Failures::new([(name, io::ErrorKind::PermissionDenied.into())]);
         assert_eq!(
@@ -402,13 +399,7 @@ fn transient_syscall_errors_preserve_progress_and_fatal_errors_stop_the_driver()
         assert!(FAILURES.with(|failures| failures.borrow().is_empty()));
         drain(&selector, &mut driver);
     }
-    for name in [
-        "submit",
-        "notification-read",
-        "modify-notification",
-        "modify-ring",
-        "wait",
-    ] {
+    for name in ["submit", "notification-read", "wait"] {
         let (selector, mut driver) = pair(1);
         let _failures = Failures::new([(name, io::ErrorKind::PermissionDenied.into())]);
         assert_eq!(
@@ -1179,11 +1170,8 @@ fn nonblocking_turn_preserves_notifications_for_the_next_idle_turn() {
     driver.waker().wake_by_ref();
     assert!(!driver.turn(Some(Duration::ZERO)).unwrap());
     {
-        let _failures = Failures::new([(
-            "modify-notification",
-            io::ErrorKind::PermissionDenied.into(),
-        )]);
-        // The previously published notification must return us to the executor before rearming or waiting.
+        let _failures = Failures::new([("wait", io::ErrorKind::PermissionDenied.into())]);
+        // The previously published notification must return us to the executor before waiting.
         assert!(!driver.turn(None).unwrap());
         assert_eq!(FAILURES.with(|failures| failures.borrow().len()), 1);
     }
@@ -1192,30 +1180,111 @@ fn nonblocking_turn_preserves_notifications_for_the_next_idle_turn() {
 
 #[test]
 fn notifications_racing_idle_preparation_remain_observable() {
-    for name in ["modify-notification", "modify-ring", "wait"] {
-        let (selector, mut driver) = pair(1);
-        {
-            let _failures = Failures;
-            let waker = driver.waker();
-            BEFORE_SYSCALL.with(|hook| {
-                *hook.borrow_mut() = Some((name, Box::new(move || waker.wake_by_ref())));
-            });
-            assert!(!driver.turn(Some(Duration::from_secs(1))).unwrap());
-            assert!(BEFORE_SYSCALL.with(|hook| hook.borrow().is_none()));
-            assert!(
-                driver
-                    .reactor
-                    .as_ref()
-                    .unwrap()
-                    .events
-                    .iter()
-                    .any(|event| event.key == COMMAND_EVENT)
-            );
-            // The next turn consumes the notification without another wait.
-            assert!(!driver.turn(None).unwrap());
-        }
-        drain(&selector, &mut driver);
+    let (selector, mut driver) = pair(1);
+    {
+        let _failures = Failures;
+        let waker = driver.waker();
+        BEFORE_SYSCALL.with(|hook| {
+            *hook.borrow_mut() = Some(("wait", Box::new(move || waker.wake_by_ref())));
+        });
+        // A huge requested duration must saturate rather than wrap into a negative timeout.
+        assert!(!driver.turn(Some(Duration::MAX)).unwrap());
+        assert!(BEFORE_SYSCALL.with(|hook| hook.borrow().is_none()));
+        let _failures = Failures::new([("wait", io::ErrorKind::PermissionDenied.into())]);
+        // The next turn consumes the notification without another wait.
+        assert!(!driver.turn(None).unwrap());
+        assert_eq!(FAILURES.with(|failures| failures.borrow().len()), 1);
     }
+    drain(&selector, &mut driver);
+}
+
+#[test]
+fn idle_wait_observes_timeout_and_cross_thread_wakes() {
+    let (selector, mut driver) = pair(1);
+    let timeout = Duration::from_millis(5);
+    let started = Instant::now();
+    assert!(!driver.turn(Some(timeout)).unwrap());
+    assert!(started.elapsed() >= timeout);
+    let (send, receive) = mpsc::channel();
+    let waker = driver.waker();
+    let producer = std::thread::spawn(move || {
+        while receive.recv().is_ok() {
+            waker.wake_by_ref();
+        }
+    });
+    for _ in 0..100 {
+        let _failures = Failures;
+        let send = send.clone();
+        BEFORE_SYSCALL.with(|hook| {
+            *hook.borrow_mut() = Some(("wait", Box::new(move || send.send(()).unwrap())));
+        });
+        // Exercise an external wake racing the transition into the kernel wait.
+        assert!(!driver.turn(Some(Duration::from_secs(1))).unwrap());
+        assert!(BEFORE_SYSCALL.with(|hook| hook.borrow().is_none()));
+        let _failures = Failures::new([("wait", io::ErrorKind::PermissionDenied.into())]);
+        assert!(!driver.turn(None).unwrap());
+        assert_eq!(FAILURES.with(|failures| failures.borrow().len()), 1);
+    }
+    drop(send);
+    producer.join().unwrap();
+    drain(&selector, &mut driver);
+}
+
+#[test]
+fn idle_wait_is_interruptible() {
+    // Isolate the temporary process-wide disposition from concurrently running tests.
+    const CHILD: &str = "CORE_SCHEDULER_TEST_PPOLL_INTERRUPT";
+    if std::env::var_os(CHILD).is_none() {
+        assert!(
+            std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "io_uring_selector::tests::idle_wait_is_interruptible",
+                    "--nocapture"
+                ])
+                .env(CHILD, "1")
+                .status()
+                .unwrap()
+                .success()
+        );
+        return;
+    }
+    extern "C" fn handle(_: libc::c_int) {}
+    // SAFETY: sigaction is initialized before use; the child runs only this test.
+    let mut action: libc::sigaction = unsafe { std::mem::zeroed() };
+    action.sa_sigaction = handle as *const () as usize;
+    let mut previous = action;
+    // SAFETY: The signal handler does nothing, and both sigaction pointers are valid.
+    assert_eq!(
+        unsafe { libc::sigaction(libc::SIGURG, &action, &mut previous) },
+        0
+    );
+    let (selector, mut driver) = pair(1);
+    // SAFETY: pthread_self returns the current live thread identifier.
+    let target = unsafe { libc::pthread_self() };
+    let (send, receive) = mpsc::channel();
+    let interrupted = Arc::new(AtomicBool::new(false));
+    let finished = Arc::clone(&interrupted);
+    let sender = std::thread::spawn(move || {
+        receive.recv().unwrap();
+        while !finished.load(Ordering::Acquire) {
+            std::thread::sleep(Duration::from_millis(1));
+            // SAFETY: The driver thread remains alive until this sender is joined.
+            assert_eq!(unsafe { libc::pthread_kill(target, libc::SIGURG) }, 0);
+        }
+    });
+    BEFORE_SYSCALL.with(|hook| {
+        *hook.borrow_mut() = Some(("wait", Box::new(move || send.send(()).unwrap())));
+    });
+    assert!(!driver.turn(None).unwrap());
+    interrupted.store(true, Ordering::Release);
+    sender.join().unwrap();
+    // SAFETY: Restore the action captured from this process before installation.
+    assert_eq!(
+        unsafe { libc::sigaction(libc::SIGURG, &previous, std::ptr::null_mut()) },
+        0
+    );
+    drain(&selector, &mut driver);
 }
 
 #[test]
