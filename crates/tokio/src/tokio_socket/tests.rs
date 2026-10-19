@@ -77,13 +77,16 @@ fn invalid_accept_returns_without_waiting_for_readiness() {
 }
 #[test]
 fn transient_would_block_retries_with_the_requested_readiness_direction() {
-    use core_scheduler::{Cancellation, SocketDomain};
+    use core_scheduler::Cancellation;
     crate::test_support::run(|| {
         futures_lite::future::block_on(async {
             let scheduler = crate::test_support::scheduler();
-            let (client, server) =
-                core_scheduler_conformance::socket::stream_pair(&scheduler, SocketDomain::Ipv4)
-                    .await;
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+            let native = std::net::TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+            let (peer, _) = listener.accept().unwrap();
+            // These sockets have no readiness cache yet. A synthetic first WouldBlock models the initial registration race without clearing a real readiness event on an already-writable socket.
+            let client = TokioSocket::new(&scheduler.runtime, native.into()).unwrap();
+            let server = TokioSocket::new(&scheduler.runtime, peer.into()).unwrap();
             // Model a socket becoming ready between the initial syscall and readiness registration. Both reactor directions must retry the actual syscall.
             let mut writes = 0;
             let sent = client
@@ -213,30 +216,21 @@ fn reserved_and_concurrent_waiters_both_receive_readiness_wakeups() {
     }
     crate::test_support::run(|| {
         for interest in [Interest::Readable, Interest::Writable] {
-            let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-            socket2::SockRef::from(&listener)
-                .set_recv_buffer_size(4096)
-                .unwrap();
-            let native = socket2::Socket::from(
-                std::net::TcpStream::connect(listener.local_addr().unwrap()).unwrap(),
-            );
+            // A Unix socket pair stays full until its peer reads. TCP acknowledgements can reopen a send window after WouldBlock and make the initial Pending assertion timing-dependent.
+            let (native, mut peer) = std::os::unix::net::UnixStream::pair().unwrap();
+            let native = socket2::Socket::from(native);
             native.set_send_buffer_size(4096).unwrap();
-            let (mut peer, _) = listener.accept().unwrap();
             peer.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
             let descriptor =
                 TokioSocket::new(crate::test_support::runtime().handle(), native).unwrap();
             let mut filled = 0;
             if interest == Interest::Writable {
-                // Fill the peer receive window, allow outstanding acknowledgements to settle, and then exhaust the local send queue too.
-                for _ in 0..2 {
-                    loop {
-                        match crate::socket_io::send(descriptor.get_ref(), &[0; 65536]) {
-                            Ok(count) => filled += count,
-                            Err(error) if error.kind() == io::ErrorKind::WouldBlock => break,
-                            Err(error) => panic!("fill socket: {error}"),
-                        }
+                loop {
+                    match crate::socket_io::send(descriptor.get_ref(), &[0; 65536]) {
+                        Ok(count) => filled += count,
+                        Err(error) if error.kind() == io::ErrorKind::WouldBlock => break,
+                        Err(error) => panic!("fill socket: {error}"),
                     }
-                    std::thread::sleep(Duration::from_millis(100));
                 }
             }
             let mut first_buffer = [0];
