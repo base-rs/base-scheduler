@@ -197,7 +197,13 @@ fn fallback_capabilities_compose_with_completion_io() {
             .file_advise_submit(&file, 0, 0, AdviceMode::Normal)
             .await
             .unwrap();
-        scheduler.file_close_submit(file).await.unwrap();
+        // Submission-only advice retains its file until execution finishes. Ordinary destruction can release our owner while shutdown drains it; exclusive close requires a separate idle handle.
+        drop(file);
+        let idle_file = scheduler
+            .file_open(&fixture.path, FileOptions::READ, &never)
+            .await
+            .unwrap();
+        scheduler.file_close_submit(idle_file).await.unwrap();
         assert_eq!(
             scheduler
                 .spawn_blocking(|| 42, &never)
@@ -246,7 +252,8 @@ fn fallback_capabilities_compose_with_completion_io() {
                 .unwrap(),
             0
         );
-        scheduler.socket_close(client).await.unwrap();
+        // Observing peer EOF does not guarantee that the submission-only shutdown has released its retained socket owner yet.
+        drop(client);
         scheduler.socket_close(server).await.unwrap();
         scheduler.socket_close_submit(listener).await.unwrap();
     });
