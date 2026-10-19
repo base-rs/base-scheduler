@@ -2,6 +2,8 @@
 
 Compare pure Tokio, `TokioScheduler`, and `NativeScheduler<IoUringSelector>` using the same persistent-connection TCP echo workload. The private workspace package adds no dependencies to the public scheduler interface.
 
+The [initial Aiko results](results.md) include throughput, latency, variation across repetitions, and raw samples.
+
 Build and run the comparison on Linux:
 
 ```sh
