@@ -1,4 +1,4 @@
-import argparse, itertools, json, os, queue, random, resource, subprocess, threading, time
+import argparse, itertools, json, os, queue, random, resource, signal, subprocess, threading, time
 from pathlib import Path
 ROOT=Path.home()/'Developer/core-rs/core-scheduler'
 OUT=Path('/tmp/core-echo-profile');OUT.mkdir(exist_ok=True)
@@ -18,7 +18,7 @@ def sample(variant,backend,workers,connections,mode,repeat):
     if mode=='strace':prefix=['strace','-f','-c','-S','calls','-o',str(OUT/(ident+'.strace'))]
     warmup,seconds=(0,0.5) if mode=='strace' else (1,5 if mode=='perf' else 3)
     with open(OUT/(ident+'.stderr'),'w+') as errors:
-        server=subprocess.Popen(prefix+['taskset','-c',','.join(map(str,range(workers))),str(binary),'server',backend,str(workers),str(connections)],cwd=ROOT,stdout=subprocess.PIPE,stderr=errors,text=True)
+        server=subprocess.Popen(prefix+['taskset','-c',','.join(map(str,range(workers))),str(binary),'server',backend,str(workers),str(connections)],cwd=ROOT,stdout=subprocess.PIPE,stderr=errors,text=True,start_new_session=True)
         try:
             ready=queue.Queue();threading.Thread(target=lambda:ready.put(server.stdout.readline()),daemon=True).start()
             address=ready.get(timeout=30).strip()
@@ -33,7 +33,10 @@ def sample(variant,backend,workers,connections,mode,repeat):
         except BaseException:
             errors.seek(0);print(errors.read(),flush=True);raise
         finally:
-            if server.poll() is None:server.kill()
+            # perf/strace can exit while their server child still owns stdout.
+            # Kill the whole session's process group, even if the wrapper exited.
+            try:os.killpg(server.pid,signal.SIGKILL)
+            except ProcessLookupError:pass
             server.wait();server.stdout.close()
 p=argparse.ArgumentParser();p.add_argument('mode',choices=['compare','experiments','capacity','perf','strace']);p.add_argument('--variant',default='baseline');args=p.parse_args()
 if args.mode in ['compare','experiments','capacity']:

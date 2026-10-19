@@ -42,7 +42,7 @@ These use default release optimization with symbols, without LTO. Each backend i
 | 4 | 32 | tokio-adapter | 1,541,880 | 1,589,537 | +3.1% |
 | 4 | 32 | iouring | 1,271,171 | 1,474,640 | +16.0% |
 
-The io_uring improvement is largest with one connection, where there is little opportunity to amortize poller work across requests. The four-worker gain is also substantial. The Tokio change provides a smaller, repeatable direction of improvement. These are separate experiments; their percentages must not be added to LTO gains or to other prototypes. [All fast-path samples](results/profiling/fast-paths.json).
+The io_uring improvement is largest with one connection, where there is little opportunity to amortize poller work across requests. That prototype varied from 210,582 to 243,993 req/s across the three runs, versus 164,619 to 168,106 for the baseline: every run improved, but the median gain is not a precise prediction. The four-worker gain is also substantial. The Tokio change provides a smaller, repeatable direction of improvement. These are separate experiments; their percentages must not be added to LTO gains or to other prototypes. [All fast-path samples](results/profiling/fast-paths.json).
 
 `strace -f -c` corroborates the mechanism. With one worker and 32 connections, the baseline io_uring trace contained 31,425 `epoll_ctl` calls, 7,838 `timerfd_settime` calls, and 7,837 `epoll_pwait` calls. The reactor prototype reduced those to 85, 3, and 2 respectively, while continuing to perform real `io_uring_enter` submissions. These are whole-process counts from separate half-second traced runs, including startup; tracing changes timing and request counts, so their throughput is not used above. [Baseline trace](results/profiling/strace-baseline-iouring-w1-c32-r1.strace), [prototype trace](results/profiling/strace-prototype-iouring-w1-c32-r1.strace).
 
@@ -72,7 +72,7 @@ Each uninstrumented case used one second of warmup and three seconds of measurem
 
 Raw JSON includes child user/system CPU time and context-switch counts collected with `getrusage(RUSAGE_CHILDREN)` around reaping each process. Those cover the whole process lifecycle, including startup, warmup, and shutdown; they are not measurement-window-only utilization. For sampled/traced runs, the server totals include profiler/tracer overhead. The existing loopback, closed-loop, and client-placement limitations still apply. No throughput claim is an isolated server-capacity measurement.
 
-The [investigation driver](results/profiling/run.py) is a snapshot of the Linux experiment harness. It uses the checkout at `~/Developer/core-rs/core-scheduler` and the following build directories:
+The [investigation driver](results/profiling/run.py) is a snapshot of the Linux experiment harness. Process-group cleanup was hardened after collection to terminate server children if a profiler/tracer exits or a run fails; the workload and recorded successful samples are unchanged. It uses the checkout at `~/Developer/core-rs/core-scheduler` and the following build directories:
 
 ```sh
 CARGO_TARGET_DIR=/tmp/core-scheduler-profile-baseline CARGO_PROFILE_RELEASE_DEBUG=1 cargo build --release --locked -p core-scheduler-echo-benchmark
@@ -81,6 +81,14 @@ python3 benchmarks/echo/results/profiling/run.py compare
 ```
 
 For the fast-path and capacity experiments, create separate worktrees at the recorded source revision, apply the corresponding patch, and build into `/tmp/core-scheduler-profile-prototype` and `/tmp/core-scheduler-profile-capacity`, respectively, with the baseline build flags. Run the driver with `experiments` or `capacity`. `perf` and `strace` collect the baseline diagnostic runs; `strace --variant prototype` collects the revised syscall trace. The driver writes under `/tmp/core-echo-profile`. Only one workload was run at a time, with builds and profile analysis outside timed runs.
+
+The compact profile reports use self samples (`--no-children`), group by symbol, and omit symbols below 1%. For example:
+
+```sh
+perf report --stdio --no-children -g none --sort symbol --percent-limit 1 -i /tmp/core-echo-profile/perf-baseline-iouring-w1-c32-r1.data
+```
+
+Whitespace is collapsed in the saved text reports. Re-exporting all six recordings with these flags reproduced every saved percentage and symbol row.
 
 ## Priorities
 
