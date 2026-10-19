@@ -24,7 +24,7 @@ use std::{
     time::Duration,
 };
 const CANCEL_TAG: u64 = 1 << 63;
-// Normal identifiers stop below CANCEL_TAG - 1, including tagged cancellations.
+// The largest request identifier is CANCEL_TAG - 2, so tagged cancellations cannot produce u64::MAX.
 const NOTIFICATION_TAG: u64 = u64::MAX;
 
 // Keep syscall failures deterministic in unit tests while production calls the OS directly.
