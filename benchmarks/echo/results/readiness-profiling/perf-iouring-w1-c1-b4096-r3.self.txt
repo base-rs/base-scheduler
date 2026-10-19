@@ -1,0 +1,123 @@
+# ========
+# captured on : Mon Oct 19 19:36:54 2026
+# header version : 1
+# data offset : 520
+# data size : 44353568
+# feat offset : 44354088
+# hostname : aiko
+# os release : 7.2.6-arch2-1
+# perf version : 7.2.8-2
+# arch : x86_64
+# nrcpus online : 32
+# nrcpus avail : 32
+# cpudesc : AMD Ryzen 9 9950X3D 16-Core Processor
+# cpuid : AuthenticAMD,26,68,0
+# total memory : 48436160 kB
+# cmdline : /usr/bin/perf
+# event : name = cycles:u, , id = { 3114, 3115, 3116, 3117, 3118, 3119, 3120, 3121, 3122, 3123, 3124, 3125, 3126, 3127, 3128, 3129, 3130, 3131, 3132, 3133, 3134, 3135, 3136, 3137, 3138, 3139, 3140, 3141, 3142, 3143, 3144, 3145 }, type = 0 (PERF_TYPE_HARDWARE), size = 144, config = 0 (PERF_COUNT_HW_CPU_CYCLES), { sample_period, sample_freq } = 999, sample_type = IP|TID|TIME|CALLCHAIN|PERIOD|REGS_USER|STACK_USER, read_format = ID|LOST, disabled = 1, inherit = 1, exclude_kernel = 1, exclude_hv = 1, mmap = 1, comm = 1, freq = 1, enable_on_exec = 1, task = 1, mmap_data = 1, sample_id_all = 1, exclude_callchain_user = 1, mmap2 = 1, comm_exec = 1, ksymbol = 1, bpf_event = 1, build_id = 1, sample_regs_user = 0xff0fff, sample_stack_user = 8192
+# CPU_TOPOLOGY info available, use -I to display
+# NUMA_TOPOLOGY info available, use -I to display
+# pmu mappings: cpu = 4, amd_iommu_0 = 12, breakpoint = 5, drm_amdgpu = 4294836224, hwmon_amdgpu = 4294901762, hwmon_asusec = 4294901766, hwmon_asus = 4294901765, hwmon_eno2 = 4294901769, hwmon_iwlwifi_1 = 4294901770, hwmon_k10temp = 4294901764, hwmon_nct6799 = 4294901763, hwmon_nvme = 4294901760, hwmon_nvme = 4294901761, hwmon_spd5118 = 4294901768, hwmon_spd5118 = 4294901767, ibs_fetch = 10, ibs_op = 11, kprobe = 8, msr = 13, power = 14, power_core = 15, software = 1, tool = 4294967294, tracepoint = 2, uprobe = 9
+# CACHE info available, use -I to display
+# time of first sample : 1980815.553229
+# time of last sample : 1980821.555129
+# sample duration : 6001.900 ms
+# MEM_TOPOLOGY info available, use -I to display
+# bpf_prog_info empty
+# btf info empty
+# cpu pmu capabilities: branches=16, max_precise=0
+# ibs_fetch pmu capabilities: zen4_ibs_extensions=1
+# ibs_op pmu capabilities: zen4_ibs_extensions=1, ldlat=1, dtlb_pgsize=1
+# AMD systems uses ibs_op// PMU for some precise events, e.g.: cycles:p, see the 'perf list' man page for further details.
+# CPU_DOMAIN_INFO info available, use -I to display
+# e_machine : 62
+# e_flags : 0
+# cacheline size: 64
+# missing features: TRACING_DATA BUILD_ID BRANCH_STACK GROUP_DESC AUXTRACE STAT CLOCKID DIR_FORMAT COMPRESSED CLOCK_DATA HYBRID_TOPOLOGY
+# ========
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 5K of event 'cycles:u'
+# Event count (approx.): 6138703315
+#
+# Overhead Samples Symbol IPC [IPC Coverage]
+# ........ ............ ............................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................ ....................
+#
+11.82% 631 [.] core_scheduler_native::worker::run_loop - -
+9.21% 488 [.] core_scheduler_echo_benchmark::server::scheduler_server::<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0} - -
+7.12% 375 [.] <crossbeam_deque::deque::Injector<async_task::runnable::Runnable<core_scheduler_native::task_service::TaskState>>>::steal_batch_with_limit_and_pop - -
+5.48% 292 [.] <std::sync::mpmc::list::Channel<core_scheduler_iouring::io_uring_selector::Command>>::try_recv - -
+5.44% 287 [k] 0xffffffff9e60c656 - -
+4.16% 220 [.] <core_scheduler_iouring::io_uring_selector::Capacity>::acquire::{closure#0} - -
+3.03% 162 [.] <async_task::raw::RawTask<core_scheduler_native::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0}>, core_scheduler_native::task_service::TaskOutcome<()>, <core_scheduler_native::task_service::TaskService>::spawn<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0}>::{closure#1}, core_scheduler_native::task_service::TaskState>>::run - -
+2.80% 147 [k] 0xffffffff9e60c332 - -
+2.68% 143 [.] <core_scheduler_iouring::io_uring_selector::Reactor>::turn - -
+2.14% 115 [.] <core::future::poll_fn::PollFn<<core_scheduler_iouring::io_uring_selector::IoUringSelector>::submit<(core::result::Result<usize, core::io::error::Error>, core_scheduler::buffer_slice::BufferSlice<alloc::vec::Vec<u8>>)>::{closure#0}::{closure#0}> as core::future::future::Future>::poll - -
+2.02% 109 [.] <core_scheduler_iouring::io_uring_selector::IoUringSelector>::route - -
+1.94% 104 [.] <core_scheduler_iouring::io_uring_selector::Request<core_scheduler::buffer_slice::BufferSlice<alloc::vec::Vec<u8>>> as core::ops::drop::Drop>::drop - -
+1.92% 102 [.] core::ptr::drop_glue::<futures_channel::oneshot::Sender<(core::result::Result<usize, core::io::error::Error>, alloc::vec::Vec<u8>)>> - -
+1.82% 94 [.] <event_listener::Inner<()>>::with_inner::<usize, <event_listener::Inner<()>>::notify<event_listener::notify::Notify>::{closure#0}> - -
+1.81% 97 [.] core::ptr::drop_glue::<futures_channel::oneshot::Sender<(core::result::Result<usize, core::io::error::Error>, core_scheduler::buffer_slice::BufferSlice<alloc::vec::Vec<u8>>)>> - -
+1.79% 97 [.] <core_scheduler_iouring::io_uring_selector::Controller>::send - -
+1.79% 97 [.] <core::future::poll_fn::PollFn<<core_scheduler_iouring::io_uring_selector::IoUringSelector>::submit<(core::result::Result<usize, core::io::error::Error>, alloc::vec::Vec<u8>)>::{closure#0}::{closure#0}> as core::future::future::Future>::poll - -
+1.62% 86 [.] <event_listener::Inner<()>>::with_inner::<usize, <event_listener::Inner<()>>::notify<event_listener::notify::Notify>::{closure#0}> - -
+1.61% 86 [.] <core_scheduler_native::task_service::Shared>::wake_idle - -
+1.44% 76 [.] futures_channel::oneshot::channel::<(core::result::Result<usize, core::io::error::Error>, core_scheduler::buffer_slice::BufferSlice<alloc::vec::Vec<u8>>)> - -
+1.41% 76 [.] <async_task::raw::RawTask<core_scheduler_native::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0}>, core_scheduler_native::task_service::TaskOutcome<()>, <core_scheduler_native::task_service::TaskService>::spawn<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0}>::{closure#1}, core_scheduler_native::task_service::TaskState>>::wake - -
+1.40% 73 [.] <core_scheduler_iouring::io_uring_selector::Request as core::ops::drop::Drop>::drop - -
+1.35% 72 [.] <async_task::raw::RawTask<core_scheduler_native::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0}>, core_scheduler_native::task_service::TaskOutcome<()>, <core_scheduler_native::task_service::TaskService>::spawn<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0}>::{closure#1}, core_scheduler_native::task_service::TaskState>>::clone_waker - -
+1.26% 66 [.] <async_task::raw::RawTask<core_scheduler_native::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0}>, core_scheduler_native::task_service::TaskOutcome<()>, <core_scheduler_native::task_service::TaskService>::spawn<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0}>::{closure#1}, core_scheduler_native::task_service::TaskState>>::drop_waker - -
+0.98% 53 [.] <core_scheduler_iouring::io_uring_selector::Permit as core::ops::drop::Drop>::drop - -
+0.91% 48 [k] 0xffffffff9de00080 - -
+0.89% 48 [.] <event_listener::Event>::notify::<usize> - -
+0.86% 45 [.] <crossbeam_deque::deque::Worker<async_task::runnable::Runnable<core_scheduler_native::task_service::TaskState>>>::pop - -
+0.85% 46 [.] <polling::Poller>::wait_impl - -
+0.80% 43 [.] <futures_channel::oneshot::Sender<(core::result::Result<usize, core::io::error::Error>, alloc::vec::Vec<u8>)>>::send - -
+0.80% 43 [.] <core_scheduler_iouring::io_uring_selector::IoUringSelector>::next_identifier - -
+0.75% 39 [.] <futures_channel::oneshot::Sender<(core::result::Result<usize, core::io::error::Error>, core_scheduler::buffer_slice::BufferSlice<alloc::vec::Vec<u8>>)>>::send - -
+0.75% 39 [.] <event_listener::Event>::notify::<usize> - -
+0.72% 38 [.] futures_channel::oneshot::channel::<(core::result::Result<usize, core::io::error::Error>, alloc::vec::Vec<u8>)> - -
+0.69% 36 [k] 0xffffffff9f389ac1 - -
+0.66% 35 [k] 0xffffffff9eab1c34 - -
+0.65% 34 [k] 0xffffffff9de0008f - -
+0.64% 35 [.] <core_scheduler_native::task_service::Shared>::retire_runnable - -
+0.59% 31 [k] 0xffffffff9f389a79 - -
+0.54% 29 [k] 0xffffffff9de00087 - -
+0.51% 27 [k] 0xffffffff9de000ab - -
+0.49% 26 [.] <alloc::sync::Arc<futures_channel::oneshot::Inner<(core::result::Result<usize, core::io::error::Error>, alloc::vec::Vec<u8>)>>>::drop_slow - -
+0.45% 24 [.] 0x000000000018f470 - -
+0.41% 23 [k] 0xffffffff9e60e385 - -
+0.38% 20 [.] core::ptr::drop_glue::<core_scheduler_iouring::io_uring_selector::Request> - -
+0.38% 20 [k] 0xffffffff9e60c307 - -
+0.37% 20 [.] core::ptr::drop_glue::<core_scheduler_iouring::io_uring_selector::Request<core_scheduler::buffer_slice::BufferSlice<alloc::vec::Vec<u8>>>> - -
+0.34% 19 [k] 0xffffffff9e60c648 - -
+0.32% 16 [k] 0xffffffff9de00084 - -
+0.29% 15 [.] <alloc::sync::Arc<futures_channel::oneshot::Inner<(core::result::Result<usize, core::io::error::Error>, core_scheduler::buffer_slice::BufferSlice<alloc::vec::Vec<u8>>)>>>::drop_slow - -
+0.25% 13 [k] 0xffffffff9de000ad - -
+0.24% 12 [k] 0xffffffff9e0aae30 - -
+0.21% 11 [k] 0xffffffff9eab1c3a - -
+0.21% 11 [.] <core_scheduler_iouring::io_uring_selector::Request as core_scheduler_iouring::io_uring_selector::PendingRequest>::finish - -
+0.17% 9 [.] <core_scheduler_iouring::io_uring_selector::Request<core_scheduler::buffer_slice::BufferSlice<alloc::vec::Vec<u8>>> as core_scheduler_iouring::io_uring_selector::PendingRequest>::entry - -
+0.17% 9 [k] 0xffffffff9de000be - -
+0.17% 9 [k] 0xffffffff9eaa1956 - -
+0.17% 9 [k] 0xffffffff9eab1c2f - -
+0.17% 8 [k] 0xffffffff9eaa198a - -
+0.15% 8 [k] 0xffffffff9f389aaa - -
+0.15% 8 [k] 0xffffffff9de000ce - -
+0.15% 8 [k] 0xffffffff9f389a85 - -
+0.14% 8 [k] 0xffffffff9de000b9 - -
+0.14% 7 [.] <core_scheduler_iouring::io_uring_selector::Request<core_scheduler::buffer_slice::BufferSlice<alloc::vec::Vec<u8>>> as core_scheduler_iouring::io_uring_selector::PendingRequest>::finish - -
+0.13% 7 [k] 0xffffffff9de000c2 - -
+0.12% 7 [k] 0xffffffff9eab1c37 - -
+0.11% 6 [k] 0xffffffff9eaa19a6 - -
+0.11% 6 [k] 0xffffffff9eaa19c4 - -
+0.11% 6 [k] 0xffffffff9eaa196c - -
+0.11% 6 [k] 0xffffffff9ea544bd - -
+0.11% 6 [k] 0xffffffff9e25cb58 - -
+
+
+#
+# (Tip: To see how parallelism changes over time, try: perf report -F time,latency,parallelism --time-quantum=1s)
+#

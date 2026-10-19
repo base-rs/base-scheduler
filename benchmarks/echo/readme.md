@@ -12,6 +12,8 @@ The historical [borrowed socket comparison](poll-performance.md) measures both a
 
 The [worker-ring readiness comparison](ring-readiness-performance.md) measures the replacement of the shared readiness fallback with direct nonblocking syscalls and per-worker ring waits.
 
+The [fresh socket-path profiles](readiness-profiling.md) combine optimized-build controls, userspace/kernel sampling, and syscall counters to distinguish idle-wait costs from request and worker bookkeeping.
+
 Build and run the comparison on Linux:
 
 ```sh

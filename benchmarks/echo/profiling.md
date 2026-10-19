@@ -93,3 +93,5 @@ Whitespace is collapsed in the saved text reports. Re-exporting all six recordin
 ## Priorities
 
 The [implementation follow-up](performance.md) addresses the reactor's unnecessary idle-wait work and capacity admission. Remaining candidates include the Tokio readiness fast path, completion-channel reuse, and worker wakeups. Those changes need their own compatibility checks and measurements; completion and worker changes touch ownership and concurrency more deeply.
+
+For the current direct-syscall and per-worker readiness implementation, see the follow-up [socket-path profiles](readiness-profiling.md).

@@ -1,0 +1,54 @@
+% time     seconds  usecs/call     calls    errors syscall
+------ ----------- ----------- --------- --------- ------------------
+ 14.44    0.029443           0     39985        19 recvfrom
+ 23.40    0.047701           1     39974           sendto
+  0.01    0.000030           0        37           io_uring_enter
+  0.03    0.000066           1        36           mmap
+  0.01    0.000021           0        35           epoll_ctl
+  0.00    0.000006           0        21         5 read
+  0.01    0.000025           1        20           close
+ 61.93    0.126249        8416        15         1 futex
+  0.01    0.000012           0        13           mprotect
+  0.01    0.000011           0        13         1 openat
+  0.00    0.000002           0        10           rt_sigprocmask
+  0.00    0.000007           0         8           fstat
+  0.01    0.000011           1         7           munmap
+  0.00    0.000003           0         7           brk
+  0.00    0.000007           1         7           sigaltstack
+  0.00    0.000000           0         6           lseek
+  0.00    0.000000           0         6           rt_sigaction
+  0.01    0.000012           2         6           newfstatat
+  0.00    0.000002           0         6           timerfd_settime
+  0.00    0.000001           0         5           sched_getaffinity
+  0.00    0.000004           0         5           epoll_pwait
+  0.00    0.000001           0         5           getrandom
+  0.00    0.000000           0         5           statx
+  0.00    0.000000           0         4           ioctl
+  0.00    0.000001           0         4           set_robust_list
+  0.00    0.000002           0         4           rseq
+  0.00    0.000002           0         3           madvise
+  0.00    0.000000           0         3           gettid
+  0.00    0.000001           0         3           prlimit64
+  0.00    0.000003           1         2         2 access
+  0.00    0.000000           0         2           setsockopt
+  0.10    0.000211         105         2           execve
+  0.00    0.000000           0         2           prctl
+  0.00    0.000002           1         2           arch_prctl
+  0.00    0.000002           1         2           set_tid_address
+  0.00    0.000000           0         2           timerfd_create
+  0.00    0.000000           0         2           eventfd2
+  0.00    0.000000           0         2           epoll_create1
+  0.00    0.000000           0         2           clone3
+  0.00    0.000000           0         1           write
+  0.00    0.000000           0         1           poll
+  0.00    0.000000           0         1           socket
+  0.00    0.000000           0         1           bind
+  0.00    0.000000           0         1           listen
+  0.00    0.000000           0         1           getsockname
+  0.00    0.000000           0         1           socketpair
+  0.01    0.000022          22         1           sched_setaffinity
+  0.00    0.000000           0         1           accept4
+  0.00    0.000000           0         1           io_uring_setup
+  0.00    0.000000           0         1           io_uring_register
+------ ----------- ----------- --------- --------- ------------------
+100.00    0.203860           2     80284        28 total

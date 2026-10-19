@@ -10,6 +10,7 @@ import time
 import unittest
 
 
+@unittest.skipUnless(sys.platform.startswith("linux"), "retirement checks use Linux /proc")
 class SupervisorTests(unittest.TestCase):
     def start(self, workload, timeout=2):
         prefix = ["sudo", "-n"] if os.environ.get("PROFILE_TEST_SUDO") == "1" else []

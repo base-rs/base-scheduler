@@ -1,0 +1,1414 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 23K of event 'cycles'
+# Event count (approx.): 124154566476
+#
+# Children      Self  Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        IPC   [IPC Coverage]
+# ........  ........  ............................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................  ....................
+#
+    54.52%     0.02%  [.] entry_SYSCALL_64_after_hwframe -      -
+            |
+             --54.51%--entry_SYSCALL_64_after_hwframe
+                       |
+                        --54.50%--do_syscall_64
+                                  |
+                                   --49.71%--__do_sys_io_uring_enter
+                                             |
+                                              --48.66%--io_submit_sqes
+                                                        |
+                                                         --45.90%--io_issue_sqe
+                                                                   |
+                                                                    --44.16%--__io_issue_sqe
+                                                                              |
+                                                                              |--38.55%--io_send
+                                                                              |          |
+                                                                              |           --38.55%--sock_sendmsg
+                                                                              |                     |
+                                                                              |                      --37.56%--tcp_sendmsg
+                                                                              |                                |
+                                                                              |                                 --35.99%--tcp_sendmsg_locked
+                                                                              |                                           |
+                                                                              |                                            --31.95%--__tcp_push_pending_frames
+                                                                              |                                                      tcp_write_xmit
+                                                                              |                                                      |
+                                                                              |                                                       --30.67%--__tcp_transmit_skb
+                                                                              |                                                                 |
+                                                                              |                                                                  --28.77%--__ip_queue_xmit
+                                                                              |                                                                            |
+                                                                              |                                                                            |--23.98%--ip_output
+                                                                              |                                                                            |          |
+                                                                              |                                                                            |           --23.27%--ip_finish_output2
+                                                                              |                                                                            |                     |
+                                                                              |                                                                            |                      --22.61%--__dev_queue_xmit
+                                                                              |                                                                            |                                |
+                                                                              |                                                                            |                                 --20.34%--__local_bh_enable_ip
+                                                                              |                                                                            |                                           do_softirq.part.0
+                                                                              |                                                                            |                                           |
+                                                                              |                                                                            |                                            --20.27%--handle_softirqs
+                                                                              |                                                                            |                                                      |
+                                                                              |                                                                            |                                                       --19.86%--net_rx_action
+                                                                              |                                                                            |                                                                 |
+                                                                              |                                                                            |                                                                 |--16.46%--__napi_poll
+                                                                              |                                                                            |                                                                 |          |
+                                                                              |                                                                            |                                                                 |           --16.43%--process_backlog
+                                                                              |                                                                            |                                                                 |                     |
+                                                                              |                                                                            |                                                                 |                      --15.51%--__netif_receive_skb_one_core
+                                                                              |                                                                            |                                                                 |                                |
+                                                                              |                                                                            |                                                                 |                                 --13.33%--ip_local_deliver_finish
+                                                                              |                                                                            |                                                                 |                                           |
+                                                                              |                                                                            |                                                                 |                                            --12.48%--ip_protocol_deliver_rcu
+                                                                              |                                                                            |                                                                 |                                                      |
+                                                                              |                                                                            |                                                                 |                                                       --12.45%--tcp_v4_rcv
+                                                                              |                                                                            |                                                                 |                                                                 |
+                                                                              |                                                                            |                                                                 |                                                                  --8.41%--tcp_v4_do_rcv
+                                                                              |                                                                            |                                                                 |                                                                            |
+                                                                              |                                                                            |                                                                 |                                                                             --8.40%--tcp_rcv_established
+                                                                              |                                                                            |                                                                 |                                                                                       |
+                                                                              |                                                                            |                                                                 |                                                                                       |--3.08%--tcp_ack
+                                                                              |                                                                            |                                                                 |                                                                                       |
+                                                                              |                                                                            |                                                                 |                                                                                        --2.15%--sock_def_readable
+                                                                              |                                                                            |                                                                 |
+                                                                              |                                                                            |                                                                  --3.04%--skb_defer_free_flush
+                                                                              |                                                                            |
+                                                                              |                                                                             --4.33%--ip_local_out
+                                                                              |                                                                                       |
+                                                                              |                                                                                        --4.29%--__ip_local_out
+                                                                              |                                                                                                  |
+                                                                              |                                                                                                   --3.54%--nf_hook_slow
+                                                                              |                                                                                                             |
+                                                                              |                                                                                                              --3.46%--nf_conntrack_in
+                                                                              |
+                                                                               --5.61%--io_recv
+                                                                                         |
+                                                                                          --5.58%--sock_recvmsg
+                                                                                                    |
+                                                                                                     --5.56%--tcp_recvmsg
+                                                                                                               |
+                                                                                                                --3.39%--tcp_recvmsg_locked
+
+    54.50%     0.10%  [.] do_syscall_64 -      -
+            |
+             --54.40%--do_syscall_64
+                       |
+                        --49.71%--__do_sys_io_uring_enter
+                                  |
+                                   --48.66%--io_submit_sqes
+                                             |
+                                              --45.90%--io_issue_sqe
+                                                        |
+                                                         --44.16%--__io_issue_sqe
+                                                                   |
+                                                                   |--38.55%--io_send
+                                                                   |          |
+                                                                   |           --38.55%--sock_sendmsg
+                                                                   |                     |
+                                                                   |                      --37.56%--tcp_sendmsg
+                                                                   |                                |
+                                                                   |                                 --35.99%--tcp_sendmsg_locked
+                                                                   |                                           |
+                                                                   |                                            --31.95%--__tcp_push_pending_frames
+                                                                   |                                                      tcp_write_xmit
+                                                                   |                                                      |
+                                                                   |                                                       --30.67%--__tcp_transmit_skb
+                                                                   |                                                                 |
+                                                                   |                                                                  --28.77%--__ip_queue_xmit
+                                                                   |                                                                            |
+                                                                   |                                                                            |--23.98%--ip_output
+                                                                   |                                                                            |          |
+                                                                   |                                                                            |           --23.27%--ip_finish_output2
+                                                                   |                                                                            |                     |
+                                                                   |                                                                            |                      --22.61%--__dev_queue_xmit
+                                                                   |                                                                            |                                |
+                                                                   |                                                                            |                                 --20.34%--__local_bh_enable_ip
+                                                                   |                                                                            |                                           do_softirq.part.0
+                                                                   |                                                                            |                                           |
+                                                                   |                                                                            |                                            --20.27%--handle_softirqs
+                                                                   |                                                                            |                                                      |
+                                                                   |                                                                            |                                                       --19.86%--net_rx_action
+                                                                   |                                                                            |                                                                 |
+                                                                   |                                                                            |                                                                 |--16.46%--__napi_poll
+                                                                   |                                                                            |                                                                 |          |
+                                                                   |                                                                            |                                                                 |           --16.43%--process_backlog
+                                                                   |                                                                            |                                                                 |                     |
+                                                                   |                                                                            |                                                                 |                      --15.51%--__netif_receive_skb_one_core
+                                                                   |                                                                            |                                                                 |                                |
+                                                                   |                                                                            |                                                                 |                                 --13.33%--ip_local_deliver_finish
+                                                                   |                                                                            |                                                                 |                                           |
+                                                                   |                                                                            |                                                                 |                                            --12.48%--ip_protocol_deliver_rcu
+                                                                   |                                                                            |                                                                 |                                                      |
+                                                                   |                                                                            |                                                                 |                                                       --12.45%--tcp_v4_rcv
+                                                                   |                                                                            |                                                                 |                                                                 |
+                                                                   |                                                                            |                                                                 |                                                                  --8.41%--tcp_v4_do_rcv
+                                                                   |                                                                            |                                                                 |                                                                            |
+                                                                   |                                                                            |                                                                 |                                                                             --8.40%--tcp_rcv_established
+                                                                   |                                                                            |                                                                 |                                                                                       |
+                                                                   |                                                                            |                                                                 |                                                                                       |--3.08%--tcp_ack
+                                                                   |                                                                            |                                                                 |                                                                                       |
+                                                                   |                                                                            |                                                                 |                                                                                        --2.15%--sock_def_readable
+                                                                   |                                                                            |                                                                 |
+                                                                   |                                                                            |                                                                  --3.04%--skb_defer_free_flush
+                                                                   |                                                                            |
+                                                                   |                                                                             --4.33%--ip_local_out
+                                                                   |                                                                                       |
+                                                                   |                                                                                        --4.29%--__ip_local_out
+                                                                   |                                                                                                  |
+                                                                   |                                                                                                   --3.54%--nf_hook_slow
+                                                                   |                                                                                                             |
+                                                                   |                                                                                                              --3.46%--nf_conntrack_in
+                                                                   |
+                                                                    --5.61%--io_recv
+                                                                              |
+                                                                               --5.58%--sock_recvmsg
+                                                                                         |
+                                                                                          --5.56%--tcp_recvmsg
+                                                                                                    |
+                                                                                                     --3.39%--tcp_recvmsg_locked
+
+    50.84%     0.04%  [.] syscall -      -
+            |
+             --50.51%--entry_SYSCALL_64_after_hwframe
+                       |
+                        --50.50%--do_syscall_64
+                                  |
+                                   --49.71%--__do_sys_io_uring_enter
+                                             |
+                                              --48.66%--io_submit_sqes
+                                                        |
+                                                         --45.90%--io_issue_sqe
+                                                                   |
+                                                                    --44.16%--__io_issue_sqe
+                                                                              |
+                                                                              |--38.55%--io_send
+                                                                              |          |
+                                                                              |           --38.55%--sock_sendmsg
+                                                                              |                     |
+                                                                              |                      --37.56%--tcp_sendmsg
+                                                                              |                                |
+                                                                              |                                 --35.99%--tcp_sendmsg_locked
+                                                                              |                                           |
+                                                                              |                                            --31.95%--__tcp_push_pending_frames
+                                                                              |                                                      tcp_write_xmit
+                                                                              |                                                      |
+                                                                              |                                                       --30.67%--__tcp_transmit_skb
+                                                                              |                                                                 |
+                                                                              |                                                                  --28.77%--__ip_queue_xmit
+                                                                              |                                                                            |
+                                                                              |                                                                            |--23.98%--ip_output
+                                                                              |                                                                            |          |
+                                                                              |                                                                            |           --23.27%--ip_finish_output2
+                                                                              |                                                                            |                     |
+                                                                              |                                                                            |                      --22.61%--__dev_queue_xmit
+                                                                              |                                                                            |                                |
+                                                                              |                                                                            |                                 --20.34%--__local_bh_enable_ip
+                                                                              |                                                                            |                                           do_softirq.part.0
+                                                                              |                                                                            |                                           |
+                                                                              |                                                                            |                                            --20.27%--handle_softirqs
+                                                                              |                                                                            |                                                      |
+                                                                              |                                                                            |                                                       --19.86%--net_rx_action
+                                                                              |                                                                            |                                                                 |
+                                                                              |                                                                            |                                                                 |--16.46%--__napi_poll
+                                                                              |                                                                            |                                                                 |          |
+                                                                              |                                                                            |                                                                 |           --16.43%--process_backlog
+                                                                              |                                                                            |                                                                 |                     |
+                                                                              |                                                                            |                                                                 |                      --15.51%--__netif_receive_skb_one_core
+                                                                              |                                                                            |                                                                 |                                |
+                                                                              |                                                                            |                                                                 |                                 --13.33%--ip_local_deliver_finish
+                                                                              |                                                                            |                                                                 |                                           |
+                                                                              |                                                                            |                                                                 |                                            --12.48%--ip_protocol_deliver_rcu
+                                                                              |                                                                            |                                                                 |                                                      |
+                                                                              |                                                                            |                                                                 |                                                       --12.45%--tcp_v4_rcv
+                                                                              |                                                                            |                                                                 |                                                                 |
+                                                                              |                                                                            |                                                                 |                                                                  --8.41%--tcp_v4_do_rcv
+                                                                              |                                                                            |                                                                 |                                                                            |
+                                                                              |                                                                            |                                                                 |                                                                             --8.40%--tcp_rcv_established
+                                                                              |                                                                            |                                                                 |                                                                                       |
+                                                                              |                                                                            |                                                                 |                                                                                       |--3.08%--tcp_ack
+                                                                              |                                                                            |                                                                 |                                                                                       |
+                                                                              |                                                                            |                                                                 |                                                                                        --2.15%--sock_def_readable
+                                                                              |                                                                            |                                                                 |
+                                                                              |                                                                            |                                                                  --3.04%--skb_defer_free_flush
+                                                                              |                                                                            |
+                                                                              |                                                                             --4.33%--ip_local_out
+                                                                              |                                                                                       |
+                                                                              |                                                                                        --4.29%--__ip_local_out
+                                                                              |                                                                                                  |
+                                                                              |                                                                                                   --3.54%--nf_hook_slow
+                                                                              |                                                                                                             |
+                                                                              |                                                                                                              --3.46%--nf_conntrack_in
+                                                                              |
+                                                                               --5.61%--io_recv
+                                                                                         |
+                                                                                          --5.58%--sock_recvmsg
+                                                                                                    |
+                                                                                                     --5.56%--tcp_recvmsg
+                                                                                                               |
+                                                                                                                --3.39%--tcp_recvmsg_locked
+
+    49.71%     0.03%  [.] __do_sys_io_uring_enter -      -
+            |
+             --49.68%--__do_sys_io_uring_enter
+                       |
+                        --48.66%--io_submit_sqes
+                                  |
+                                   --45.90%--io_issue_sqe
+                                             |
+                                              --44.16%--__io_issue_sqe
+                                                        |
+                                                        |--38.55%--io_send
+                                                        |          |
+                                                        |           --38.55%--sock_sendmsg
+                                                        |                     |
+                                                        |                      --37.56%--tcp_sendmsg
+                                                        |                                |
+                                                        |                                 --35.99%--tcp_sendmsg_locked
+                                                        |                                           |
+                                                        |                                            --31.95%--__tcp_push_pending_frames
+                                                        |                                                      tcp_write_xmit
+                                                        |                                                      |
+                                                        |                                                       --30.67%--__tcp_transmit_skb
+                                                        |                                                                 |
+                                                        |                                                                  --28.77%--__ip_queue_xmit
+                                                        |                                                                            |
+                                                        |                                                                            |--23.98%--ip_output
+                                                        |                                                                            |          |
+                                                        |                                                                            |           --23.27%--ip_finish_output2
+                                                        |                                                                            |                     |
+                                                        |                                                                            |                      --22.61%--__dev_queue_xmit
+                                                        |                                                                            |                                |
+                                                        |                                                                            |                                 --20.34%--__local_bh_enable_ip
+                                                        |                                                                            |                                           do_softirq.part.0
+                                                        |                                                                            |                                           |
+                                                        |                                                                            |                                            --20.27%--handle_softirqs
+                                                        |                                                                            |                                                      |
+                                                        |                                                                            |                                                       --19.86%--net_rx_action
+                                                        |                                                                            |                                                                 |
+                                                        |                                                                            |                                                                 |--16.46%--__napi_poll
+                                                        |                                                                            |                                                                 |          |
+                                                        |                                                                            |                                                                 |           --16.43%--process_backlog
+                                                        |                                                                            |                                                                 |                     |
+                                                        |                                                                            |                                                                 |                      --15.51%--__netif_receive_skb_one_core
+                                                        |                                                                            |                                                                 |                                |
+                                                        |                                                                            |                                                                 |                                 --13.33%--ip_local_deliver_finish
+                                                        |                                                                            |                                                                 |                                           |
+                                                        |                                                                            |                                                                 |                                            --12.48%--ip_protocol_deliver_rcu
+                                                        |                                                                            |                                                                 |                                                      |
+                                                        |                                                                            |                                                                 |                                                       --12.45%--tcp_v4_rcv
+                                                        |                                                                            |                                                                 |                                                                 |
+                                                        |                                                                            |                                                                 |                                                                  --8.41%--tcp_v4_do_rcv
+                                                        |                                                                            |                                                                 |                                                                            |
+                                                        |                                                                            |                                                                 |                                                                             --8.40%--tcp_rcv_established
+                                                        |                                                                            |                                                                 |                                                                                       |
+                                                        |                                                                            |                                                                 |                                                                                       |--3.08%--tcp_ack
+                                                        |                                                                            |                                                                 |                                                                                       |
+                                                        |                                                                            |                                                                 |                                                                                        --2.15%--sock_def_readable
+                                                        |                                                                            |                                                                 |
+                                                        |                                                                            |                                                                  --3.04%--skb_defer_free_flush
+                                                        |                                                                            |
+                                                        |                                                                             --4.33%--ip_local_out
+                                                        |                                                                                       |
+                                                        |                                                                                        --4.29%--__ip_local_out
+                                                        |                                                                                                  |
+                                                        |                                                                                                   --3.54%--nf_hook_slow
+                                                        |                                                                                                             |
+                                                        |                                                                                                              --3.46%--nf_conntrack_in
+                                                        |
+                                                         --5.61%--io_recv
+                                                                   |
+                                                                    --5.58%--sock_recvmsg
+                                                                              |
+                                                                               --5.56%--tcp_recvmsg
+                                                                                         |
+                                                                                          --3.39%--tcp_recvmsg_locked
+
+    48.66%     0.18%  [.] io_submit_sqes -      -
+            |
+             --48.48%--io_submit_sqes
+                       |
+                        --45.90%--io_issue_sqe
+                                  |
+                                   --44.16%--__io_issue_sqe
+                                             |
+                                             |--38.55%--io_send
+                                             |          |
+                                             |           --38.55%--sock_sendmsg
+                                             |                     |
+                                             |                      --37.56%--tcp_sendmsg
+                                             |                                |
+                                             |                                 --35.99%--tcp_sendmsg_locked
+                                             |                                           |
+                                             |                                            --31.95%--__tcp_push_pending_frames
+                                             |                                                      tcp_write_xmit
+                                             |                                                      |
+                                             |                                                       --30.67%--__tcp_transmit_skb
+                                             |                                                                 |
+                                             |                                                                  --28.77%--__ip_queue_xmit
+                                             |                                                                            |
+                                             |                                                                            |--23.98%--ip_output
+                                             |                                                                            |          |
+                                             |                                                                            |           --23.27%--ip_finish_output2
+                                             |                                                                            |                     |
+                                             |                                                                            |                      --22.61%--__dev_queue_xmit
+                                             |                                                                            |                                |
+                                             |                                                                            |                                 --20.34%--__local_bh_enable_ip
+                                             |                                                                            |                                           do_softirq.part.0
+                                             |                                                                            |                                           |
+                                             |                                                                            |                                            --20.27%--handle_softirqs
+                                             |                                                                            |                                                      |
+                                             |                                                                            |                                                       --19.86%--net_rx_action
+                                             |                                                                            |                                                                 |
+                                             |                                                                            |                                                                 |--16.46%--__napi_poll
+                                             |                                                                            |                                                                 |          |
+                                             |                                                                            |                                                                 |           --16.43%--process_backlog
+                                             |                                                                            |                                                                 |                     |
+                                             |                                                                            |                                                                 |                      --15.51%--__netif_receive_skb_one_core
+                                             |                                                                            |                                                                 |                                |
+                                             |                                                                            |                                                                 |                                 --13.33%--ip_local_deliver_finish
+                                             |                                                                            |                                                                 |                                           |
+                                             |                                                                            |                                                                 |                                            --12.48%--ip_protocol_deliver_rcu
+                                             |                                                                            |                                                                 |                                                      |
+                                             |                                                                            |                                                                 |                                                       --12.45%--tcp_v4_rcv
+                                             |                                                                            |                                                                 |                                                                 |
+                                             |                                                                            |                                                                 |                                                                  --8.41%--tcp_v4_do_rcv
+                                             |                                                                            |                                                                 |                                                                            |
+                                             |                                                                            |                                                                 |                                                                             --8.40%--tcp_rcv_established
+                                             |                                                                            |                                                                 |                                                                                       |
+                                             |                                                                            |                                                                 |                                                                                       |--3.08%--tcp_ack
+                                             |                                                                            |                                                                 |                                                                                       |
+                                             |                                                                            |                                                                 |                                                                                        --2.15%--sock_def_readable
+                                             |                                                                            |                                                                 |
+                                             |                                                                            |                                                                  --3.04%--skb_defer_free_flush
+                                             |                                                                            |
+                                             |                                                                             --4.33%--ip_local_out
+                                             |                                                                                       |
+                                             |                                                                                        --4.29%--__ip_local_out
+                                             |                                                                                                  |
+                                             |                                                                                                   --3.54%--nf_hook_slow
+                                             |                                                                                                             |
+                                             |                                                                                                              --3.46%--nf_conntrack_in
+                                             |
+                                              --5.61%--io_recv
+                                                        |
+                                                         --5.58%--sock_recvmsg
+                                                                   |
+                                                                    --5.56%--tcp_recvmsg
+                                                                              |
+                                                                               --3.39%--tcp_recvmsg_locked
+
+    46.66%     0.06%  [.] io_issue_sqe -      -
+            |
+             --46.59%--io_issue_sqe
+                       |
+                        --44.92%--__io_issue_sqe
+                                  |
+                                  |--38.55%--io_send
+                                  |          |
+                                  |           --38.55%--sock_sendmsg
+                                  |                     |
+                                  |                      --37.56%--tcp_sendmsg
+                                  |                                |
+                                  |                                 --35.99%--tcp_sendmsg_locked
+                                  |                                           |
+                                  |                                            --31.95%--__tcp_push_pending_frames
+                                  |                                                      tcp_write_xmit
+                                  |                                                      |
+                                  |                                                       --30.67%--__tcp_transmit_skb
+                                  |                                                                 |
+                                  |                                                                  --28.77%--__ip_queue_xmit
+                                  |                                                                            |
+                                  |                                                                            |--23.98%--ip_output
+                                  |                                                                            |          |
+                                  |                                                                            |           --23.27%--ip_finish_output2
+                                  |                                                                            |                     |
+                                  |                                                                            |                      --22.61%--__dev_queue_xmit
+                                  |                                                                            |                                |
+                                  |                                                                            |                                 --20.34%--__local_bh_enable_ip
+                                  |                                                                            |                                           do_softirq.part.0
+                                  |                                                                            |                                           |
+                                  |                                                                            |                                            --20.27%--handle_softirqs
+                                  |                                                                            |                                                      |
+                                  |                                                                            |                                                       --19.86%--net_rx_action
+                                  |                                                                            |                                                                 |
+                                  |                                                                            |                                                                 |--16.46%--__napi_poll
+                                  |                                                                            |                                                                 |          |
+                                  |                                                                            |                                                                 |           --16.43%--process_backlog
+                                  |                                                                            |                                                                 |                     |
+                                  |                                                                            |                                                                 |                      --15.51%--__netif_receive_skb_one_core
+                                  |                                                                            |                                                                 |                                |
+                                  |                                                                            |                                                                 |                                 --13.33%--ip_local_deliver_finish
+                                  |                                                                            |                                                                 |                                           |
+                                  |                                                                            |                                                                 |                                            --12.48%--ip_protocol_deliver_rcu
+                                  |                                                                            |                                                                 |                                                      |
+                                  |                                                                            |                                                                 |                                                       --12.45%--tcp_v4_rcv
+                                  |                                                                            |                                                                 |                                                                 |
+                                  |                                                                            |                                                                 |                                                                  --8.41%--tcp_v4_do_rcv
+                                  |                                                                            |                                                                 |                                                                            |
+                                  |                                                                            |                                                                 |                                                                             --8.40%--tcp_rcv_established
+                                  |                                                                            |                                                                 |                                                                                       |
+                                  |                                                                            |                                                                 |                                                                                       |--3.08%--tcp_ack
+                                  |                                                                            |                                                                 |                                                                                       |
+                                  |                                                                            |                                                                 |                                                                                        --2.15%--sock_def_readable
+                                  |                                                                            |                                                                 |
+                                  |                                                                            |                                                                  --3.04%--skb_defer_free_flush
+                                  |                                                                            |
+                                  |                                                                             --4.33%--ip_local_out
+                                  |                                                                                       |
+                                  |                                                                                        --4.29%--__ip_local_out
+                                  |                                                                                                  |
+                                  |                                                                                                   --3.54%--nf_hook_slow
+                                  |                                                                                                             |
+                                  |                                                                                                              --3.46%--nf_conntrack_in
+                                  |
+                                   --6.36%--io_recv
+                                             |
+                                              --6.34%--sock_recvmsg
+                                                        |
+                                                         --6.30%--tcp_recvmsg
+                                                                   |
+                                                                    --3.91%--tcp_recvmsg_locked
+
+    44.92%     0.00%  [.] __io_issue_sqe -      -
+            |
+            |--38.55%--io_send
+            |          |
+            |           --38.55%--sock_sendmsg
+            |                     |
+            |                      --37.56%--tcp_sendmsg
+            |                                |
+            |                                 --35.99%--tcp_sendmsg_locked
+            |                                           |
+            |                                            --31.95%--__tcp_push_pending_frames
+            |                                                      tcp_write_xmit
+            |                                                      |
+            |                                                       --30.67%--__tcp_transmit_skb
+            |                                                                 |
+            |                                                                  --28.77%--__ip_queue_xmit
+            |                                                                            |
+            |                                                                            |--23.98%--ip_output
+            |                                                                            |          |
+            |                                                                            |           --23.27%--ip_finish_output2
+            |                                                                            |                     |
+            |                                                                            |                      --22.61%--__dev_queue_xmit
+            |                                                                            |                                |
+            |                                                                            |                                 --20.34%--__local_bh_enable_ip
+            |                                                                            |                                           do_softirq.part.0
+            |                                                                            |                                           |
+            |                                                                            |                                            --20.27%--handle_softirqs
+            |                                                                            |                                                      |
+            |                                                                            |                                                       --19.86%--net_rx_action
+            |                                                                            |                                                                 |
+            |                                                                            |                                                                 |--16.46%--__napi_poll
+            |                                                                            |                                                                 |          |
+            |                                                                            |                                                                 |           --16.43%--process_backlog
+            |                                                                            |                                                                 |                     |
+            |                                                                            |                                                                 |                      --15.51%--__netif_receive_skb_one_core
+            |                                                                            |                                                                 |                                |
+            |                                                                            |                                                                 |                                 --13.33%--ip_local_deliver_finish
+            |                                                                            |                                                                 |                                           |
+            |                                                                            |                                                                 |                                            --12.48%--ip_protocol_deliver_rcu
+            |                                                                            |                                                                 |                                                      |
+            |                                                                            |                                                                 |                                                       --12.45%--tcp_v4_rcv
+            |                                                                            |                                                                 |                                                                 |
+            |                                                                            |                                                                 |                                                                  --8.41%--tcp_v4_do_rcv
+            |                                                                            |                                                                 |                                                                            |
+            |                                                                            |                                                                 |                                                                             --8.40%--tcp_rcv_established
+            |                                                                            |                                                                 |                                                                                       |
+            |                                                                            |                                                                 |                                                                                       |--3.08%--tcp_ack
+            |                                                                            |                                                                 |                                                                                       |
+            |                                                                            |                                                                 |                                                                                        --2.15%--sock_def_readable
+            |                                                                            |                                                                 |
+            |                                                                            |                                                                  --3.04%--skb_defer_free_flush
+            |                                                                            |
+            |                                                                             --4.33%--ip_local_out
+            |                                                                                       |
+            |                                                                                        --4.29%--__ip_local_out
+            |                                                                                                  |
+            |                                                                                                   --3.54%--nf_hook_slow
+            |                                                                                                             |
+            |                                                                                                              --3.46%--nf_conntrack_in
+            |
+             --6.36%--io_recv
+                       |
+                        --6.34%--sock_recvmsg
+                                  |
+                                   --6.30%--tcp_recvmsg
+                                             |
+                                              --3.91%--tcp_recvmsg_locked
+
+    38.55%     0.00%  [.] io_send -      -
+            |
+             --38.55%--io_send
+                       sock_sendmsg
+                       |
+                        --37.56%--tcp_sendmsg
+                                  |
+                                   --35.99%--tcp_sendmsg_locked
+                                             |
+                                              --31.95%--__tcp_push_pending_frames
+                                                        tcp_write_xmit
+                                                        |
+                                                         --30.67%--__tcp_transmit_skb
+                                                                   |
+                                                                    --28.77%--__ip_queue_xmit
+                                                                              |
+                                                                              |--23.98%--ip_output
+                                                                              |          |
+                                                                              |           --23.27%--ip_finish_output2
+                                                                              |                     |
+                                                                              |                      --22.61%--__dev_queue_xmit
+                                                                              |                                |
+                                                                              |                                 --20.34%--__local_bh_enable_ip
+                                                                              |                                           do_softirq.part.0
+                                                                              |                                           |
+                                                                              |                                            --20.27%--handle_softirqs
+                                                                              |                                                      |
+                                                                              |                                                       --19.86%--net_rx_action
+                                                                              |                                                                 |
+                                                                              |                                                                 |--16.46%--__napi_poll
+                                                                              |                                                                 |          |
+                                                                              |                                                                 |           --16.43%--process_backlog
+                                                                              |                                                                 |                     |
+                                                                              |                                                                 |                      --15.51%--__netif_receive_skb_one_core
+                                                                              |                                                                 |                                |
+                                                                              |                                                                 |                                 --13.33%--ip_local_deliver_finish
+                                                                              |                                                                 |                                           |
+                                                                              |                                                                 |                                            --12.48%--ip_protocol_deliver_rcu
+                                                                              |                                                                 |                                                      |
+                                                                              |                                                                 |                                                       --12.45%--tcp_v4_rcv
+                                                                              |                                                                 |                                                                 |
+                                                                              |                                                                 |                                                                  --8.41%--tcp_v4_do_rcv
+                                                                              |                                                                 |                                                                            |
+                                                                              |                                                                 |                                                                             --8.40%--tcp_rcv_established
+                                                                              |                                                                 |                                                                                       |
+                                                                              |                                                                 |                                                                                       |--3.08%--tcp_ack
+                                                                              |                                                                 |                                                                                       |
+                                                                              |                                                                 |                                                                                        --2.15%--sock_def_readable
+                                                                              |                                                                 |
+                                                                              |                                                                  --3.04%--skb_defer_free_flush
+                                                                              |
+                                                                               --4.33%--ip_local_out
+                                                                                         |
+                                                                                          --4.29%--__ip_local_out
+                                                                                                    |
+                                                                                                     --3.54%--nf_hook_slow
+                                                                                                               |
+                                                                                                                --3.46%--nf_conntrack_in
+
+    38.55%     0.00%  [.] sock_sendmsg -      -
+            |
+             --38.55%--sock_sendmsg
+                       |
+                        --37.56%--tcp_sendmsg
+                                  |
+                                   --35.99%--tcp_sendmsg_locked
+                                             |
+                                              --31.95%--__tcp_push_pending_frames
+                                                        tcp_write_xmit
+                                                        |
+                                                         --30.67%--__tcp_transmit_skb
+                                                                   |
+                                                                    --28.77%--__ip_queue_xmit
+                                                                              |
+                                                                              |--23.98%--ip_output
+                                                                              |          |
+                                                                              |           --23.27%--ip_finish_output2
+                                                                              |                     |
+                                                                              |                      --22.61%--__dev_queue_xmit
+                                                                              |                                |
+                                                                              |                                 --20.34%--__local_bh_enable_ip
+                                                                              |                                           do_softirq.part.0
+                                                                              |                                           |
+                                                                              |                                            --20.27%--handle_softirqs
+                                                                              |                                                      |
+                                                                              |                                                       --19.86%--net_rx_action
+                                                                              |                                                                 |
+                                                                              |                                                                 |--16.46%--__napi_poll
+                                                                              |                                                                 |          |
+                                                                              |                                                                 |           --16.43%--process_backlog
+                                                                              |                                                                 |                     |
+                                                                              |                                                                 |                      --15.51%--__netif_receive_skb_one_core
+                                                                              |                                                                 |                                |
+                                                                              |                                                                 |                                 --13.33%--ip_local_deliver_finish
+                                                                              |                                                                 |                                           |
+                                                                              |                                                                 |                                            --12.48%--ip_protocol_deliver_rcu
+                                                                              |                                                                 |                                                      |
+                                                                              |                                                                 |                                                       --12.45%--tcp_v4_rcv
+                                                                              |                                                                 |                                                                 |
+                                                                              |                                                                 |                                                                  --8.41%--tcp_v4_do_rcv
+                                                                              |                                                                 |                                                                            |
+                                                                              |                                                                 |                                                                             --8.40%--tcp_rcv_established
+                                                                              |                                                                 |                                                                                       |
+                                                                              |                                                                 |                                                                                       |--3.08%--tcp_ack
+                                                                              |                                                                 |                                                                                       |
+                                                                              |                                                                 |                                                                                        --2.15%--sock_def_readable
+                                                                              |                                                                 |
+                                                                              |                                                                  --3.04%--skb_defer_free_flush
+                                                                              |
+                                                                               --4.33%--ip_local_out
+                                                                                         |
+                                                                                          --4.29%--__ip_local_out
+                                                                                                    |
+                                                                                                     --3.54%--nf_hook_slow
+                                                                                                               |
+                                                                                                                --3.46%--nf_conntrack_in
+
+    37.56%     0.00%  [.] tcp_sendmsg -      -
+            |
+             --37.56%--tcp_sendmsg
+                       |
+                        --35.99%--tcp_sendmsg_locked
+                                  |
+                                   --31.95%--__tcp_push_pending_frames
+                                             tcp_write_xmit
+                                             |
+                                              --30.67%--__tcp_transmit_skb
+                                                        |
+                                                         --28.77%--__ip_queue_xmit
+                                                                   |
+                                                                   |--23.98%--ip_output
+                                                                   |          |
+                                                                   |           --23.27%--ip_finish_output2
+                                                                   |                     |
+                                                                   |                      --22.61%--__dev_queue_xmit
+                                                                   |                                |
+                                                                   |                                 --20.34%--__local_bh_enable_ip
+                                                                   |                                           do_softirq.part.0
+                                                                   |                                           |
+                                                                   |                                            --20.27%--handle_softirqs
+                                                                   |                                                      |
+                                                                   |                                                       --19.86%--net_rx_action
+                                                                   |                                                                 |
+                                                                   |                                                                 |--16.46%--__napi_poll
+                                                                   |                                                                 |          |
+                                                                   |                                                                 |           --16.43%--process_backlog
+                                                                   |                                                                 |                     |
+                                                                   |                                                                 |                      --15.51%--__netif_receive_skb_one_core
+                                                                   |                                                                 |                                |
+                                                                   |                                                                 |                                 --13.33%--ip_local_deliver_finish
+                                                                   |                                                                 |                                           |
+                                                                   |                                                                 |                                            --12.48%--ip_protocol_deliver_rcu
+                                                                   |                                                                 |                                                      |
+                                                                   |                                                                 |                                                       --12.45%--tcp_v4_rcv
+                                                                   |                                                                 |                                                                 |
+                                                                   |                                                                 |                                                                  --8.41%--tcp_v4_do_rcv
+                                                                   |                                                                 |                                                                            |
+                                                                   |                                                                 |                                                                             --8.40%--tcp_rcv_established
+                                                                   |                                                                 |                                                                                       |
+                                                                   |                                                                 |                                                                                       |--3.08%--tcp_ack
+                                                                   |                                                                 |                                                                                       |
+                                                                   |                                                                 |                                                                                        --2.15%--sock_def_readable
+                                                                   |                                                                 |
+                                                                   |                                                                  --3.04%--skb_defer_free_flush
+                                                                   |
+                                                                    --4.33%--ip_local_out
+                                                                              |
+                                                                               --4.29%--__ip_local_out
+                                                                                         |
+                                                                                          --3.54%--nf_hook_slow
+                                                                                                    |
+                                                                                                     --3.46%--nf_conntrack_in
+
+    35.99%     1.24%  [.] tcp_sendmsg_locked -      -
+            |
+             --34.75%--tcp_sendmsg_locked
+                       |
+                        --31.95%--__tcp_push_pending_frames
+                                  tcp_write_xmit
+                                  |
+                                   --30.67%--__tcp_transmit_skb
+                                             |
+                                              --28.77%--__ip_queue_xmit
+                                                        |
+                                                        |--23.98%--ip_output
+                                                        |          |
+                                                        |           --23.27%--ip_finish_output2
+                                                        |                     |
+                                                        |                      --22.61%--__dev_queue_xmit
+                                                        |                                |
+                                                        |                                 --20.34%--__local_bh_enable_ip
+                                                        |                                           do_softirq.part.0
+                                                        |                                           |
+                                                        |                                            --20.27%--handle_softirqs
+                                                        |                                                      |
+                                                        |                                                       --19.86%--net_rx_action
+                                                        |                                                                 |
+                                                        |                                                                 |--16.46%--__napi_poll
+                                                        |                                                                 |          |
+                                                        |                                                                 |           --16.43%--process_backlog
+                                                        |                                                                 |                     |
+                                                        |                                                                 |                      --15.51%--__netif_receive_skb_one_core
+                                                        |                                                                 |                                |
+                                                        |                                                                 |                                 --13.33%--ip_local_deliver_finish
+                                                        |                                                                 |                                           |
+                                                        |                                                                 |                                            --12.48%--ip_protocol_deliver_rcu
+                                                        |                                                                 |                                                      |
+                                                        |                                                                 |                                                       --12.45%--tcp_v4_rcv
+                                                        |                                                                 |                                                                 |
+                                                        |                                                                 |                                                                  --8.41%--tcp_v4_do_rcv
+                                                        |                                                                 |                                                                            |
+                                                        |                                                                 |                                                                             --8.40%--tcp_rcv_established
+                                                        |                                                                 |                                                                                       |
+                                                        |                                                                 |                                                                                       |--3.08%--tcp_ack
+                                                        |                                                                 |                                                                                       |
+                                                        |                                                                 |                                                                                        --2.15%--sock_def_readable
+                                                        |                                                                 |
+                                                        |                                                                  --3.04%--skb_defer_free_flush
+                                                        |
+                                                         --4.33%--ip_local_out
+                                                                   |
+                                                                    --4.29%--__ip_local_out
+                                                                              |
+                                                                               --3.54%--nf_hook_slow
+                                                                                         |
+                                                                                          --3.46%--nf_conntrack_in
+
+    31.95%     0.00%  [.] __tcp_push_pending_frames -      -
+            |
+            ---tcp_write_xmit
+               |
+                --30.67%--__tcp_transmit_skb
+                          |
+                           --28.77%--__ip_queue_xmit
+                                     |
+                                     |--23.98%--ip_output
+                                     |          |
+                                     |           --23.28%--ip_finish_output2
+                                     |                     |
+                                     |                      --22.61%--__dev_queue_xmit
+                                     |                                |
+                                     |                                 --20.35%--__local_bh_enable_ip
+                                     |                                           do_softirq.part.0
+                                     |                                           |
+                                     |                                            --20.28%--handle_softirqs
+                                     |                                                      |
+                                     |                                                       --19.86%--net_rx_action
+                                     |                                                                 |
+                                     |                                                                 |--16.46%--__napi_poll
+                                     |                                                                 |          |
+                                     |                                                                 |           --16.43%--process_backlog
+                                     |                                                                 |                     |
+                                     |                                                                 |                      --15.51%--__netif_receive_skb_one_core
+                                     |                                                                 |                                |
+                                     |                                                                 |                                 --13.34%--ip_local_deliver_finish
+                                     |                                                                 |                                           |
+                                     |                                                                 |                                            --12.49%--ip_protocol_deliver_rcu
+                                     |                                                                 |                                                      |
+                                     |                                                                 |                                                       --12.45%--tcp_v4_rcv
+                                     |                                                                 |                                                                 |
+                                     |                                                                 |                                                                  --8.41%--tcp_v4_do_rcv
+                                     |                                                                 |                                                                            |
+                                     |                                                                 |                                                                             --8.40%--tcp_rcv_established
+                                     |                                                                 |                                                                                       |
+                                     |                                                                 |                                                                                       |--3.08%--tcp_ack
+                                     |                                                                 |                                                                                       |
+                                     |                                                                 |                                                                                        --2.15%--sock_def_readable
+                                     |                                                                 |
+                                     |                                                                  --3.04%--skb_defer_free_flush
+                                     |
+                                      --4.33%--ip_local_out
+                                                |
+                                                 --4.29%--__ip_local_out
+                                                           |
+                                                            --3.54%--nf_hook_slow
+                                                                      |
+                                                                       --3.46%--nf_conntrack_in
+
+    31.95%     0.11%  [.] tcp_write_xmit -      -
+            |
+             --31.84%--tcp_write_xmit
+                       |
+                        --30.67%--__tcp_transmit_skb
+                                  |
+                                   --28.77%--__ip_queue_xmit
+                                             |
+                                             |--23.98%--ip_output
+                                             |          |
+                                             |           --23.28%--ip_finish_output2
+                                             |                     |
+                                             |                      --22.61%--__dev_queue_xmit
+                                             |                                |
+                                             |                                 --20.35%--__local_bh_enable_ip
+                                             |                                           do_softirq.part.0
+                                             |                                           |
+                                             |                                            --20.28%--handle_softirqs
+                                             |                                                      |
+                                             |                                                       --19.86%--net_rx_action
+                                             |                                                                 |
+                                             |                                                                 |--16.46%--__napi_poll
+                                             |                                                                 |          |
+                                             |                                                                 |           --16.43%--process_backlog
+                                             |                                                                 |                     |
+                                             |                                                                 |                      --15.51%--__netif_receive_skb_one_core
+                                             |                                                                 |                                |
+                                             |                                                                 |                                 --13.34%--ip_local_deliver_finish
+                                             |                                                                 |                                           |
+                                             |                                                                 |                                            --12.49%--ip_protocol_deliver_rcu
+                                             |                                                                 |                                                      |
+                                             |                                                                 |                                                       --12.45%--tcp_v4_rcv
+                                             |                                                                 |                                                                 |
+                                             |                                                                 |                                                                  --8.41%--tcp_v4_do_rcv
+                                             |                                                                 |                                                                            |
+                                             |                                                                 |                                                                             --8.40%--tcp_rcv_established
+                                             |                                                                 |                                                                                       |
+                                             |                                                                 |                                                                                       |--3.08%--tcp_ack
+                                             |                                                                 |                                                                                       |
+                                             |                                                                 |                                                                                        --2.15%--sock_def_readable
+                                             |                                                                 |
+                                             |                                                                  --3.04%--skb_defer_free_flush
+                                             |
+                                              --4.33%--ip_local_out
+                                                        |
+                                                         --4.29%--__ip_local_out
+                                                                   |
+                                                                    --3.54%--nf_hook_slow
+                                                                              |
+                                                                               --3.46%--nf_conntrack_in
+
+    30.67%     0.41%  [.] __tcp_transmit_skb -      -
+            |
+             --30.26%--__tcp_transmit_skb
+                       |
+                        --28.77%--__ip_queue_xmit
+                                  |
+                                  |--23.98%--ip_output
+                                  |          |
+                                  |           --23.28%--ip_finish_output2
+                                  |                     |
+                                  |                      --22.61%--__dev_queue_xmit
+                                  |                                |
+                                  |                                 --20.35%--__local_bh_enable_ip
+                                  |                                           do_softirq.part.0
+                                  |                                           |
+                                  |                                            --20.28%--handle_softirqs
+                                  |                                                      |
+                                  |                                                       --19.86%--net_rx_action
+                                  |                                                                 |
+                                  |                                                                 |--16.46%--__napi_poll
+                                  |                                                                 |          |
+                                  |                                                                 |           --16.43%--process_backlog
+                                  |                                                                 |                     |
+                                  |                                                                 |                      --15.51%--__netif_receive_skb_one_core
+                                  |                                                                 |                                |
+                                  |                                                                 |                                 --13.34%--ip_local_deliver_finish
+                                  |                                                                 |                                           |
+                                  |                                                                 |                                            --12.49%--ip_protocol_deliver_rcu
+                                  |                                                                 |                                                      |
+                                  |                                                                 |                                                       --12.45%--tcp_v4_rcv
+                                  |                                                                 |                                                                 |
+                                  |                                                                 |                                                                  --8.41%--tcp_v4_do_rcv
+                                  |                                                                 |                                                                            |
+                                  |                                                                 |                                                                             --8.40%--tcp_rcv_established
+                                  |                                                                 |                                                                                       |
+                                  |                                                                 |                                                                                       |--3.08%--tcp_ack
+                                  |                                                                 |                                                                                       |
+                                  |                                                                 |                                                                                        --2.15%--sock_def_readable
+                                  |                                                                 |
+                                  |                                                                  --3.04%--skb_defer_free_flush
+                                  |
+                                   --4.33%--ip_local_out
+                                             |
+                                              --4.29%--__ip_local_out
+                                                        |
+                                                         --3.54%--nf_hook_slow
+                                                                   |
+                                                                    --3.46%--nf_conntrack_in
+
+    28.77%     0.24%  [.] __ip_queue_xmit -      -
+            |
+             --28.54%--__ip_queue_xmit
+                       |
+                       |--23.98%--ip_output
+                       |          |
+                       |           --23.28%--ip_finish_output2
+                       |                     |
+                       |                      --22.61%--__dev_queue_xmit
+                       |                                |
+                       |                                 --20.35%--__local_bh_enable_ip
+                       |                                           do_softirq.part.0
+                       |                                           |
+                       |                                            --20.28%--handle_softirqs
+                       |                                                      |
+                       |                                                       --19.86%--net_rx_action
+                       |                                                                 |
+                       |                                                                 |--16.46%--__napi_poll
+                       |                                                                 |          |
+                       |                                                                 |           --16.43%--process_backlog
+                       |                                                                 |                     |
+                       |                                                                 |                      --15.51%--__netif_receive_skb_one_core
+                       |                                                                 |                                |
+                       |                                                                 |                                 --13.34%--ip_local_deliver_finish
+                       |                                                                 |                                           |
+                       |                                                                 |                                            --12.49%--ip_protocol_deliver_rcu
+                       |                                                                 |                                                      |
+                       |                                                                 |                                                       --12.45%--tcp_v4_rcv
+                       |                                                                 |                                                                 |
+                       |                                                                 |                                                                  --8.41%--tcp_v4_do_rcv
+                       |                                                                 |                                                                            |
+                       |                                                                 |                                                                             --8.40%--tcp_rcv_established
+                       |                                                                 |                                                                                       |
+                       |                                                                 |                                                                                       |--3.08%--tcp_ack
+                       |                                                                 |                                                                                       |
+                       |                                                                 |                                                                                        --2.15%--sock_def_readable
+                       |                                                                 |
+                       |                                                                  --3.04%--skb_defer_free_flush
+                       |
+                        --4.33%--ip_local_out
+                                  |
+                                   --4.29%--__ip_local_out
+                                             |
+                                              --3.54%--nf_hook_slow
+                                                        |
+                                                         --3.46%--nf_conntrack_in
+
+    23.98%     0.05%  [.] ip_output -      -
+            |
+             --23.93%--ip_output
+                       |
+                        --23.28%--ip_finish_output2
+                                  |
+                                   --22.61%--__dev_queue_xmit
+                                             |
+                                              --20.35%--__local_bh_enable_ip
+                                                        do_softirq.part.0
+                                                        |
+                                                         --20.28%--handle_softirqs
+                                                                   |
+                                                                    --19.86%--net_rx_action
+                                                                              |
+                                                                              |--16.46%--__napi_poll
+                                                                              |          |
+                                                                              |           --16.43%--process_backlog
+                                                                              |                     |
+                                                                              |                      --15.51%--__netif_receive_skb_one_core
+                                                                              |                                |
+                                                                              |                                 --13.34%--ip_local_deliver_finish
+                                                                              |                                           |
+                                                                              |                                            --12.49%--ip_protocol_deliver_rcu
+                                                                              |                                                      |
+                                                                              |                                                       --12.45%--tcp_v4_rcv
+                                                                              |                                                                 |
+                                                                              |                                                                  --8.41%--tcp_v4_do_rcv
+                                                                              |                                                                            |
+                                                                              |                                                                             --8.40%--tcp_rcv_established
+                                                                              |                                                                                       |
+                                                                              |                                                                                       |--3.08%--tcp_ack
+                                                                              |                                                                                       |
+                                                                              |                                                                                        --2.15%--sock_def_readable
+                                                                              |
+                                                                               --3.04%--skb_defer_free_flush
+
+    23.28%     0.63%  [.] ip_finish_output2 -      -
+            |
+             --22.64%--ip_finish_output2
+                       |
+                        --22.61%--__dev_queue_xmit
+                                  |
+                                   --20.35%--__local_bh_enable_ip
+                                             do_softirq.part.0
+                                             |
+                                              --20.28%--handle_softirqs
+                                                        |
+                                                         --19.86%--net_rx_action
+                                                                   |
+                                                                   |--16.46%--__napi_poll
+                                                                   |          |
+                                                                   |           --16.43%--process_backlog
+                                                                   |                     |
+                                                                   |                      --15.51%--__netif_receive_skb_one_core
+                                                                   |                                |
+                                                                   |                                 --13.34%--ip_local_deliver_finish
+                                                                   |                                           |
+                                                                   |                                            --12.49%--ip_protocol_deliver_rcu
+                                                                   |                                                      |
+                                                                   |                                                       --12.45%--tcp_v4_rcv
+                                                                   |                                                                 |
+                                                                   |                                                                  --8.41%--tcp_v4_do_rcv
+                                                                   |                                                                            |
+                                                                   |                                                                             --8.40%--tcp_rcv_established
+                                                                   |                                                                                       |
+                                                                   |                                                                                       |--3.08%--tcp_ack
+                                                                   |                                                                                       |
+                                                                   |                                                                                        --2.15%--sock_def_readable
+                                                                   |
+                                                                    --3.04%--skb_defer_free_flush
+
+    22.61%     0.88%  [.] __dev_queue_xmit -      -
+            |
+             --21.73%--__dev_queue_xmit
+                       |
+                        --20.35%--__local_bh_enable_ip
+                                  do_softirq.part.0
+                                  |
+                                   --20.28%--handle_softirqs
+                                             |
+                                              --19.86%--net_rx_action
+                                                        |
+                                                        |--16.46%--__napi_poll
+                                                        |          |
+                                                        |           --16.43%--process_backlog
+                                                        |                     |
+                                                        |                      --15.51%--__netif_receive_skb_one_core
+                                                        |                                |
+                                                        |                                 --13.34%--ip_local_deliver_finish
+                                                        |                                           |
+                                                        |                                            --12.49%--ip_protocol_deliver_rcu
+                                                        |                                                      |
+                                                        |                                                       --12.45%--tcp_v4_rcv
+                                                        |                                                                 |
+                                                        |                                                                  --8.41%--tcp_v4_do_rcv
+                                                        |                                                                            |
+                                                        |                                                                             --8.40%--tcp_rcv_established
+                                                        |                                                                                       |
+                                                        |                                                                                       |--3.08%--tcp_ack
+                                                        |                                                                                       |
+                                                        |                                                                                        --2.15%--sock_def_readable
+                                                        |
+                                                         --3.04%--skb_defer_free_flush
+
+    20.38%     0.07%  [.] __local_bh_enable_ip -      -
+            |
+             --20.31%--__local_bh_enable_ip
+                       do_softirq.part.0
+                       |
+                        --20.23%--handle_softirqs
+                                  |
+                                   --19.82%--net_rx_action
+                                             |
+                                             |--16.42%--__napi_poll
+                                             |          |
+                                             |           --16.39%--process_backlog
+                                             |                     |
+                                             |                      --15.47%--__netif_receive_skb_one_core
+                                             |                                |
+                                             |                                 --13.34%--ip_local_deliver_finish
+                                             |                                           |
+                                             |                                            --12.49%--ip_protocol_deliver_rcu
+                                             |                                                      |
+                                             |                                                       --12.45%--tcp_v4_rcv
+                                             |                                                                 |
+                                             |                                                                  --8.41%--tcp_v4_do_rcv
+                                             |                                                                            |
+                                             |                                                                             --8.40%--tcp_rcv_established
+                                             |                                                                                       |
+                                             |                                                                                       |--3.08%--tcp_ack
+                                             |                                                                                       |
+                                             |                                                                                        --2.15%--sock_def_readable
+                                             |
+                                              --3.04%--skb_defer_free_flush
+
+    20.35%     0.07%  [.] do_softirq.part.0 -      -
+            |
+             --20.28%--do_softirq.part.0
+                       |
+                        --20.28%--handle_softirqs
+                                  |
+                                   --19.86%--net_rx_action
+                                             |
+                                             |--16.46%--__napi_poll
+                                             |          |
+                                             |           --16.43%--process_backlog
+                                             |                     |
+                                             |                      --15.51%--__netif_receive_skb_one_core
+                                             |                                |
+                                             |                                 --13.34%--ip_local_deliver_finish
+                                             |                                           |
+                                             |                                            --12.49%--ip_protocol_deliver_rcu
+                                             |                                                      |
+                                             |                                                       --12.45%--tcp_v4_rcv
+                                             |                                                                 |
+                                             |                                                                  --8.41%--tcp_v4_do_rcv
+                                             |                                                                            |
+                                             |                                                                             --8.40%--tcp_rcv_established
+                                             |                                                                                       |
+                                             |                                                                                       |--3.08%--tcp_ack
+                                             |                                                                                       |
+                                             |                                                                                        --2.15%--sock_def_readable
+                                             |
+                                              --3.04%--skb_defer_free_flush
+
+    20.28%     0.11%  [.] handle_softirqs -      -
+            |
+             --20.16%--handle_softirqs
+                       |
+                        --19.86%--net_rx_action
+                                  |
+                                  |--16.46%--__napi_poll
+                                  |          |
+                                  |           --16.43%--process_backlog
+                                  |                     |
+                                  |                      --15.51%--__netif_receive_skb_one_core
+                                  |                                |
+                                  |                                 --13.34%--ip_local_deliver_finish
+                                  |                                           |
+                                  |                                            --12.49%--ip_protocol_deliver_rcu
+                                  |                                                      |
+                                  |                                                       --12.45%--tcp_v4_rcv
+                                  |                                                                 |
+                                  |                                                                  --8.41%--tcp_v4_do_rcv
+                                  |                                                                            |
+                                  |                                                                             --8.40%--tcp_rcv_established
+                                  |                                                                                       |
+                                  |                                                                                       |--3.08%--tcp_ack
+                                  |                                                                                       |
+                                  |                                                                                        --2.15%--sock_def_readable
+                                  |
+                                   --3.04%--skb_defer_free_flush
+
+    19.86%     0.34%  [.] net_rx_action -      -
+            |
+             --19.52%--net_rx_action
+                       |
+                       |--16.46%--__napi_poll
+                       |          |
+                       |           --16.43%--process_backlog
+                       |                     |
+                       |                      --15.51%--__netif_receive_skb_one_core
+                       |                                |
+                       |                                 --13.34%--ip_local_deliver_finish
+                       |                                           |
+                       |                                            --12.49%--ip_protocol_deliver_rcu
+                       |                                                      |
+                       |                                                       --12.45%--tcp_v4_rcv
+                       |                                                                 |
+                       |                                                                  --8.41%--tcp_v4_do_rcv
+                       |                                                                            |
+                       |                                                                             --8.40%--tcp_rcv_established
+                       |                                                                                       |
+                       |                                                                                       |--3.08%--tcp_ack
+                       |                                                                                       |
+                       |                                                                                        --2.15%--sock_def_readable
+                       |
+                        --3.04%--skb_defer_free_flush
+
+    16.46%     0.03%  [.] __napi_poll -      -
+            |
+             --16.43%--__napi_poll
+                       process_backlog
+                       |
+                        --15.51%--__netif_receive_skb_one_core
+                                  |
+                                   --13.34%--ip_local_deliver_finish
+                                             |
+                                              --12.49%--ip_protocol_deliver_rcu
+                                                        |
+                                                         --12.45%--tcp_v4_rcv
+                                                                   |
+                                                                    --8.41%--tcp_v4_do_rcv
+                                                                              |
+                                                                               --8.40%--tcp_rcv_established
+                                                                                         |
+                                                                                         |--3.08%--tcp_ack
+                                                                                         |
+                                                                                          --2.15%--sock_def_readable
+
+    16.43%     0.02%  [.] process_backlog -      -
+            |
+             --16.42%--process_backlog
+                       |
+                        --15.51%--__netif_receive_skb_one_core
+                                  |
+                                   --13.34%--ip_local_deliver_finish
+                                             |
+                                              --12.49%--ip_protocol_deliver_rcu
+                                                        |
+                                                         --12.45%--tcp_v4_rcv
+                                                                   |
+                                                                    --8.41%--tcp_v4_do_rcv
+                                                                              |
+                                                                               --8.40%--tcp_rcv_established
+                                                                                         |
+                                                                                         |--3.08%--tcp_ack
+                                                                                         |
+                                                                                          --2.15%--sock_def_readable
+
+    15.51%     0.00%  [.] __netif_receive_skb_one_core -      -
+            |
+             --13.34%--ip_local_deliver_finish
+                       |
+                        --12.49%--ip_protocol_deliver_rcu
+                                  |
+                                   --12.45%--tcp_v4_rcv
+                                             |
+                                              --8.41%--tcp_v4_do_rcv
+                                                        |
+                                                         --8.40%--tcp_rcv_established
+                                                                   |
+                                                                   |--3.08%--tcp_ack
+                                                                   |
+                                                                    --2.15%--sock_def_readable
+
+    13.34%     0.05%  [.] ip_local_deliver_finish -      -
+            |
+             --13.28%--ip_local_deliver_finish
+                       |
+                        --12.49%--ip_protocol_deliver_rcu
+                                  |
+                                   --12.45%--tcp_v4_rcv
+                                             |
+                                              --8.41%--tcp_v4_do_rcv
+                                                        |
+                                                         --8.40%--tcp_rcv_established
+                                                                   |
+                                                                   |--3.08%--tcp_ack
+                                                                   |
+                                                                    --2.15%--sock_def_readable
+
+    12.49%     0.01%  [.] ip_protocol_deliver_rcu -      -
+            |
+             --12.48%--ip_protocol_deliver_rcu
+                       |
+                        --12.45%--tcp_v4_rcv
+                                  |
+                                   --8.41%--tcp_v4_do_rcv
+                                             |
+                                              --8.40%--tcp_rcv_established
+                                                        |
+                                                        |--3.08%--tcp_ack
+                                                        |
+                                                         --2.15%--sock_def_readable
+
+    12.45%     1.77%  [.] tcp_v4_rcv -      -
+            |
+             --10.68%--tcp_v4_rcv
+                       |
+                        --8.41%--tcp_v4_do_rcv
+                                  |
+                                   --8.40%--tcp_rcv_established
+                                             |
+                                             |--3.08%--tcp_ack
+                                             |
+                                              --2.15%--sock_def_readable
+
+     8.42%     0.01%  [.] tcp_v4_do_rcv -      -
+            |
+             --8.41%--tcp_v4_do_rcv
+                       |
+                        --8.40%--tcp_rcv_established
+                                  |
+                                  |--3.08%--tcp_ack
+                                  |
+                                   --2.15%--sock_def_readable
+
+     8.40%     1.75%  [.] tcp_rcv_established -      -
+            |
+             --6.65%--tcp_rcv_established
+                       |
+                       |--3.08%--tcp_ack
+                       |
+                        --2.15%--sock_def_readable
+
+     7.24%     0.01%  [.] sock_recvmsg -      -
+            |
+             --7.23%--sock_recvmsg
+                       |
+                        --6.30%--tcp_recvmsg
+                                  |
+                                   --3.91%--tcp_recvmsg_locked
+
+     6.36%     0.01%  [.] io_recv -      -
+            |
+             --6.36%--io_recv
+                       |
+                        --6.34%--sock_recvmsg
+                                  |
+                                   --6.30%--tcp_recvmsg
+                                             |
+                                              --3.91%--tcp_recvmsg_locked
+
+     6.30%     0.81%  [.] tcp_recvmsg -      -
+            |
+             --5.49%--tcp_recvmsg
+                       |
+                        --3.91%--tcp_recvmsg_locked
+
+     5.55%     0.21%  [.] nf_hook_slow -      -
+            |
+             --5.34%--nf_hook_slow
+                       |
+                        --3.67%--nf_conntrack_in
+
+     4.73%     4.72%  [.] core_scheduler_echo_benchmark::server::scheduler_server::<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0} -      -
+     4.33%     0.03%  [.] ip_local_out -      -
+            |
+             --4.30%--ip_local_out
+                       __ip_local_out
+                       |
+                        --3.54%--nf_hook_slow
+                                  |
+                                   --3.46%--nf_conntrack_in
+
+     4.30%     0.06%  [.] __ip_local_out -      -
+            |
+             --4.24%--__ip_local_out
+                       |
+                        --3.54%--nf_hook_slow
+                                  |
+                                   --3.46%--nf_conntrack_in
+
+     3.91%     0.12%  [.] tcp_recvmsg_locked -      -
+            |
+             --3.79%--tcp_recvmsg_locked
+
+     3.70%     3.70%  [.] <core_scheduler_native::task_service::Shared>::wake_idle -      -
+     3.67%     0.64%  [.] nf_conntrack_in -      -
+            |
+             --3.03%--nf_conntrack_in
+
+     3.08%     0.70%  [k] tcp_ack -      -
+            |
+             --2.38%--tcp_ack
+
+     3.04%     0.89%  [.] skb_defer_free_flush -      -
+            |
+             --2.15%--skb_defer_free_flush
+
+     3.03%     0.00%  [.] 0x00007f3e5c4a08f2 -      -
+            |
+             --2.96%--entry_SYSCALL_64_after_hwframe
+                       |
+                        --2.95%--do_syscall_64
+
+     3.00%     2.87%  [k] skb_release_data -      -
+            |
+             --2.87%--syscall
+                       entry_SYSCALL_64_after_hwframe
+                       do_syscall_64
+                       __do_sys_io_uring_enter
+                       io_submit_sqes
+                       io_issue_sqe
+                       __io_issue_sqe
+                       io_send
+                       sock_sendmsg
+                       tcp_sendmsg
+                       tcp_sendmsg_locked
+                       __tcp_push_pending_frames
+                       tcp_write_xmit
+                       __tcp_transmit_skb
+                       __ip_queue_xmit
+                       ip_output
+                       ip_finish_output2
+                       __dev_queue_xmit
+                       __local_bh_enable_ip
+                       do_softirq.part.0
+                       handle_softirqs
+                       net_rx_action
+
+     2.52%     0.96%  [.] sock_def_readable -      -
+     2.36%     2.36%  [.] <core_scheduler_iouring::io_uring_selector::Capacity>::acquire::{closure#0} -      -
+     2.30%     2.27%  [k] fget -      -
+            |
+             --2.27%--syscall
+                       entry_SYSCALL_64_after_hwframe
+                       do_syscall_64
+                       __do_sys_io_uring_enter
+
+     2.18%     2.18%  [.] <async_task::raw::RawTask<core_scheduler_native::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0}>, core_scheduler_native::task_service::TaskOutcome<()>, <core_scheduler_native::task_service::TaskService>::spawn<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0}>::{closure#1}, core_scheduler_native::task_service::TaskState>>::run -      -
+     2.11%     2.11%  [.] <crossbeam_deque::deque::Injector<async_task::runnable::Runnable<core_scheduler_native::task_service::TaskState>>>::steal_batch_with_limit_and_pop -      -
+     2.04%     1.96%  [k] lock_sock_nested -      -
+
+
+#
+# (Tip: To separate samples by time use perf report --sort time,overhead,sym)
+#

@@ -1,0 +1,34 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 23K of event 'cycles:u'
+# Event count (approx.): 54943544445
+#
+# Children      Self  Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        IPC   [IPC Coverage]
+# ........  ........  ............................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................  ....................
+#
+    11.01%    11.01%  [.] core_scheduler_echo_benchmark::server::scheduler_server::<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0} -      -
+     8.47%     8.47%  [.] <core_scheduler_native::task_service::Shared>::wake_idle -      -
+     5.36%     5.36%  [.] <core_scheduler_iouring::io_uring_selector::Capacity>::acquire::{closure#0} -      -
+     5.22%     5.22%  [.] <async_task::raw::RawTask<core_scheduler_native::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0}>, core_scheduler_native::task_service::TaskOutcome<()>, <core_scheduler_native::task_service::TaskService>::spawn<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0}>::{closure#1}, core_scheduler_native::task_service::TaskState>>::run -      -
+     4.75%     4.75%  [.] crossbeam_epoch::default::with_handle::<crossbeam_epoch::default::pin::{closure#0}, crossbeam_epoch::guard::Guard> -      -
+     4.27%     4.27%  [.] <crossbeam_deque::deque::Injector<async_task::runnable::Runnable<core_scheduler_native::task_service::TaskState>>>::steal_batch_with_limit_and_pop -      -
+     3.76%     3.76%  [.] <core::future::poll_fn::PollFn<<core_scheduler_iouring::io_uring_selector::IoUringSelector>::submit<(core::result::Result<usize, core::io::error::Error>, core_scheduler::buffer_slice::BufferSlice<alloc::vec::Vec<u8>>)>::{closure#0}::{closure#0}> as core::future::future::Future>::poll -      -
+     3.75%     3.75%  [.] <crossbeam_deque::deque::Stealer<async_task::runnable::Runnable<core_scheduler_native::task_service::TaskState>>>::steal_batch_with_limit_and_pop -      -
+     3.61%     3.61%  [.] <core::future::poll_fn::PollFn<<core_scheduler_iouring::io_uring_selector::IoUringSelector>::submit<(core::result::Result<usize, core::io::error::Error>, alloc::vec::Vec<u8>)>::{closure#0}::{closure#0}> as core::future::future::Future>::poll -      -
+     3.17%     3.17%  [.] core_scheduler_native::worker::run_loop -      -
+     2.76%     2.76%  [.] <event_listener::Inner<()>>::with_inner::<usize, <event_listener::Inner<()>>::notify<event_listener::notify::Notify>::{closure#0}> -      -
+     2.59%     2.59%  [.] core::ptr::drop_glue::<futures_channel::oneshot::Sender<(core::result::Result<usize, core::io::error::Error>, core_scheduler::buffer_slice::BufferSlice<alloc::vec::Vec<u8>>)>> -      -
+     2.48%     2.48%  [.] <core_scheduler_iouring::io_uring_selector::IoUringSelector>::route -      -
+     2.47%     2.47%  [.] <event_listener::Event>::notify::<usize> -      -
+     2.46%     2.46%  [.] core::ptr::drop_glue::<futures_channel::oneshot::Sender<(core::result::Result<usize, core::io::error::Error>, alloc::vec::Vec<u8>)>> -      -
+     2.31%     2.31%  [.] <async_task::raw::RawTask<core_scheduler_native::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0}>, core_scheduler_native::task_service::TaskOutcome<()>, <core_scheduler_native::task_service::TaskService>::spawn<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0}>::{closure#1}, core_scheduler_native::task_service::TaskState>>::drop_waker -      -
+     2.31%     2.31%  [.] <core_scheduler_iouring::io_uring_selector::Reactor>::turn -      -
+     2.01%     2.01%  [.] <core_scheduler_iouring::io_uring_selector::Controller>::send -      -
+
+
+#
+# (Tip: Create an archive with symtabs to analyse on other machine: perf archive)
+#

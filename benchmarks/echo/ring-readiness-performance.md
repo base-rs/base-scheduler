@@ -77,3 +77,5 @@ python3 benchmarks/echo/results/ring-readiness/run.py \
 Regression tests verify zero allocation for immediately ready scalar and vectored I/O even when ring capacity is full, readiness arriving before submission, spurious readiness, migration between threads, cancellation, backpressure, capacity exhaustion, and selector/driver shutdown. Borrowed-operation conformance suites run for IPv4 and IPv6 against independently driven rings, native composition, and per-worker rings.
 
 The Linux workspace passed 18,258/18,258 measured source regions, with the existing single invariant `unreachable!` exclusion. macOS passed 15,802/15,802 regions without exclusions. Formatting, Clippy, and API documentation checks pass. GitHub Actions also passes the Windows coverage gate and Rust 1.85 compatibility tests. Linux coverage excludes only distro standard-library paths under `/usr/src/debug/rust/`, as in the earlier investigation; no project sources are excluded.
+
+The follow-up [socket-path profiling investigation](readiness-profiling.md) examines the remaining latency and CPU-efficiency gaps with fresh controls and kernel evidence.

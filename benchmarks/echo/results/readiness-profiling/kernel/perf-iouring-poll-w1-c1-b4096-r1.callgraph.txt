@@ -1,0 +1,1966 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 5K of event 'cycles'
+# Event count (approx.): 21226746971
+#
+# Children      Self  Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        IPC   [IPC Coverage]
+# ........  ........  ............................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................  ....................
+#
+    83.58%     0.22%  [.] entry_SYSCALL_64_after_hwframe -      -
+            |
+             --83.52%--entry_SYSCALL_64_after_hwframe
+                       |
+                        --83.36%--do_syscall_64
+                                  |
+                                  |--34.25%--__x64_sys_sendto
+                                  |          __sys_sendto
+                                  |          |
+                                  |           --33.40%--tcp_sendmsg
+                                  |                     |
+                                  |                      --32.25%--tcp_sendmsg_locked
+                                  |                                |
+                                  |                                |--25.86%--__tcp_push_pending_frames
+                                  |                                |          tcp_write_xmit
+                                  |                                |          |
+                                  |                                |           --25.00%--__tcp_transmit_skb
+                                  |                                |                     |
+                                  |                                |                      --23.25%--__ip_queue_xmit
+                                  |                                |                                |
+                                  |                                |                                |--19.83%--ip_output
+                                  |                                |                                |          |
+                                  |                                |                                |           --19.16%--ip_finish_output2
+                                  |                                |                                |                     |
+                                  |                                |                                |                      --18.62%--__dev_queue_xmit
+                                  |                                |                                |                                |
+                                  |                                |                                |                                 --17.08%--__local_bh_enable_ip
+                                  |                                |                                |                                           do_softirq.part.0
+                                  |                                |                                |                                           handle_softirqs
+                                  |                                |                                |                                           |
+                                  |                                |                                |                                            --16.89%--net_rx_action
+                                  |                                |                                |                                                      |
+                                  |                                |                                |                                                      |--14.06%--__napi_poll
+                                  |                                |                                |                                                      |          process_backlog
+                                  |                                |                                |                                                      |          |
+                                  |                                |                                |                                                      |           --13.56%--__netif_receive_skb_one_core
+                                  |                                |                                |                                                      |                     |
+                                  |                                |                                |                                                      |                      --12.00%--ip_local_deliver_finish
+                                  |                                |                                |                                                      |                                |
+                                  |                                |                                |                                                      |                                 --11.49%--ip_protocol_deliver_rcu
+                                  |                                |                                |                                                      |                                           |
+                                  |                                |                                |                                                      |                                            --11.47%--tcp_v4_rcv
+                                  |                                |                                |                                                      |                                                      |
+                                  |                                |                                |                                                      |                                                       --9.49%--tcp_v4_do_rcv
+                                  |                                |                                |                                                      |                                                                 tcp_rcv_established
+                                  |                                |                                |                                                      |                                                                 |
+                                  |                                |                                |                                                      |                                                                 |--6.18%--tcp_data_queue
+                                  |                                |                                |                                                      |                                                                 |          |
+                                  |                                |                                |                                                      |                                                                 |           --4.63%--sock_def_readable
+                                  |                                |                                |                                                      |                                                                 |                     |
+                                  |                                |                                |                                                      |                                                                 |                      --4.20%--__wake_up_sync_key
+                                  |                                |                                |                                                      |                                                                 |                                |
+                                  |                                |                                |                                                      |                                                                 |                                 --3.99%--__wake_up_common
+                                  |                                |                                |                                                      |                                                                 |                                           ep_poll_callback
+                                  |                                |                                |                                                      |                                                                 |                                           |
+                                  |                                |                                |                                                      |                                                                 |                                            --3.63%--__wake_up_sync
+                                  |                                |                                |                                                      |                                                                 |                                                      |
+                                  |                                |                                |                                                      |                                                                 |                                                       --2.91%--__wake_up_common
+                                  |                                |                                |                                                      |                                                                 |                                                                 ep_autoremove_wake_function
+                                  |                                |                                |                                                      |                                                                 |                                                                 try_to_wake_up
+                                  |                                |                                |                                                      |                                                                 |
+                                  |                                |                                |                                                      |                                                                  --2.79%--tcp_ack
+                                  |                                |                                |                                                      |
+                                  |                                |                                |                                                       --2.57%--skb_defer_free_flush
+                                  |                                |                                |
+                                  |                                |                                 --3.11%--ip_local_out
+                                  |                                |                                           __ip_local_out
+                                  |                                |                                           |
+                                  |                                |                                            --2.56%--nf_hook_slow
+                                  |                                |                                                      |
+                                  |                                |                                                       --2.52%--nf_conntrack_in
+                                  |                                |
+                                  |                                 --2.80%--sk_page_frag_refill
+                                  |                                           skb_page_frag_refill
+                                  |                                           |
+                                  |                                            --2.16%--alloc_pages_noprof
+                                  |                                                      alloc_pages_mpol
+                                  |                                                      __alloc_frozen_pages_noprof
+                                  |                                                      get_page_from_freelist
+                                  |                                                      |
+                                  |                                                       --2.04%--clear_highpages_kasan_tagged
+                                  |
+                                  |--12.92%--__x64_sys_epoll_pwait
+                                  |          |
+                                  |           --12.90%--do_epoll_pwait.part.0
+                                  |                     do_epoll_wait
+                                  |                     |
+                                  |                      --8.60%--schedule_hrtimeout_range_clock
+                                  |                                schedule
+                                  |                                __schedule
+                                  |                                |
+                                  |                                 --2.87%--dequeue_task_fair
+                                  |                                           |
+                                  |                                            --2.85%--dequeue_entities
+                                  |
+                                  |--10.47%--__x64_sys_epoll_ctl
+                                  |          |
+                                  |           --10.24%--do_epoll_ctl
+                                  |                     |
+                                  |                     |--4.60%--fdget
+                                  |                     |
+                                  |                      --4.50%--do_epoll_ctl_file
+                                  |                                |
+                                  |                                 --2.21%--ep_item_poll.isra.0
+                                  |
+                                  |--10.39%--__x64_sys_recvfrom
+                                  |          __sys_recvfrom
+                                  |          |
+                                  |          |--7.78%--sock_recvmsg
+                                  |          |          |
+                                  |          |           --6.87%--tcp_recvmsg
+                                  |          |                     |
+                                  |          |                      --4.86%--tcp_recvmsg_locked
+                                  |          |                                |
+                                  |          |                                 --2.67%--skb_copy_datagram_iter
+                                  |          |                                           __skb_datagram_iter
+                                  |          |
+                                  |           --2.08%--fdget
+                                  |
+                                  |--4.44%--__do_sys_io_uring_enter
+                                  |
+                                  |--3.98%--__x64_sys_timerfd_settime
+                                  |          |
+                                  |           --3.10%--do_timerfd_settime
+                                  |
+                                   --3.87%--exit_to_user_mode_loop
+                                             |
+                                              --3.82%--arch_do_signal_or_restart
+                                                        |
+                                                         --3.78%--get_signal
+                                                                   |
+                                                                    --3.34%--task_work_run
+                                                                              |
+                                                                               --2.82%--tctx_task_work
+                                                                                         tctx_task_work_run
+
+    83.36%     0.54%  [.] do_syscall_64 -      -
+            |
+             --82.83%--do_syscall_64
+                       |
+                       |--34.25%--__x64_sys_sendto
+                       |          __sys_sendto
+                       |          |
+                       |           --33.40%--tcp_sendmsg
+                       |                     |
+                       |                      --32.25%--tcp_sendmsg_locked
+                       |                                |
+                       |                                |--25.86%--__tcp_push_pending_frames
+                       |                                |          tcp_write_xmit
+                       |                                |          |
+                       |                                |           --25.00%--__tcp_transmit_skb
+                       |                                |                     |
+                       |                                |                      --23.25%--__ip_queue_xmit
+                       |                                |                                |
+                       |                                |                                |--19.83%--ip_output
+                       |                                |                                |          |
+                       |                                |                                |           --19.16%--ip_finish_output2
+                       |                                |                                |                     |
+                       |                                |                                |                      --18.62%--__dev_queue_xmit
+                       |                                |                                |                                |
+                       |                                |                                |                                 --17.08%--__local_bh_enable_ip
+                       |                                |                                |                                           do_softirq.part.0
+                       |                                |                                |                                           handle_softirqs
+                       |                                |                                |                                           |
+                       |                                |                                |                                            --16.89%--net_rx_action
+                       |                                |                                |                                                      |
+                       |                                |                                |                                                      |--14.06%--__napi_poll
+                       |                                |                                |                                                      |          process_backlog
+                       |                                |                                |                                                      |          |
+                       |                                |                                |                                                      |           --13.56%--__netif_receive_skb_one_core
+                       |                                |                                |                                                      |                     |
+                       |                                |                                |                                                      |                      --12.00%--ip_local_deliver_finish
+                       |                                |                                |                                                      |                                |
+                       |                                |                                |                                                      |                                 --11.49%--ip_protocol_deliver_rcu
+                       |                                |                                |                                                      |                                           |
+                       |                                |                                |                                                      |                                            --11.47%--tcp_v4_rcv
+                       |                                |                                |                                                      |                                                      |
+                       |                                |                                |                                                      |                                                       --9.49%--tcp_v4_do_rcv
+                       |                                |                                |                                                      |                                                                 tcp_rcv_established
+                       |                                |                                |                                                      |                                                                 |
+                       |                                |                                |                                                      |                                                                 |--6.18%--tcp_data_queue
+                       |                                |                                |                                                      |                                                                 |          |
+                       |                                |                                |                                                      |                                                                 |           --4.63%--sock_def_readable
+                       |                                |                                |                                                      |                                                                 |                     |
+                       |                                |                                |                                                      |                                                                 |                      --4.20%--__wake_up_sync_key
+                       |                                |                                |                                                      |                                                                 |                                |
+                       |                                |                                |                                                      |                                                                 |                                 --3.99%--__wake_up_common
+                       |                                |                                |                                                      |                                                                 |                                           ep_poll_callback
+                       |                                |                                |                                                      |                                                                 |                                           |
+                       |                                |                                |                                                      |                                                                 |                                            --3.63%--__wake_up_sync
+                       |                                |                                |                                                      |                                                                 |                                                      |
+                       |                                |                                |                                                      |                                                                 |                                                       --2.91%--__wake_up_common
+                       |                                |                                |                                                      |                                                                 |                                                                 ep_autoremove_wake_function
+                       |                                |                                |                                                      |                                                                 |                                                                 try_to_wake_up
+                       |                                |                                |                                                      |                                                                 |
+                       |                                |                                |                                                      |                                                                  --2.79%--tcp_ack
+                       |                                |                                |                                                      |
+                       |                                |                                |                                                       --2.57%--skb_defer_free_flush
+                       |                                |                                |
+                       |                                |                                 --3.11%--ip_local_out
+                       |                                |                                           __ip_local_out
+                       |                                |                                           |
+                       |                                |                                            --2.56%--nf_hook_slow
+                       |                                |                                                      |
+                       |                                |                                                       --2.52%--nf_conntrack_in
+                       |                                |
+                       |                                 --2.80%--sk_page_frag_refill
+                       |                                           skb_page_frag_refill
+                       |                                           |
+                       |                                            --2.16%--alloc_pages_noprof
+                       |                                                      alloc_pages_mpol
+                       |                                                      __alloc_frozen_pages_noprof
+                       |                                                      get_page_from_freelist
+                       |                                                      |
+                       |                                                       --2.04%--clear_highpages_kasan_tagged
+                       |
+                       |--12.92%--__x64_sys_epoll_pwait
+                       |          |
+                       |           --12.90%--do_epoll_pwait.part.0
+                       |                     do_epoll_wait
+                       |                     |
+                       |                      --8.60%--schedule_hrtimeout_range_clock
+                       |                                schedule
+                       |                                __schedule
+                       |                                |
+                       |                                 --2.87%--dequeue_task_fair
+                       |                                           |
+                       |                                            --2.85%--dequeue_entities
+                       |
+                       |--10.47%--__x64_sys_epoll_ctl
+                       |          |
+                       |           --10.24%--do_epoll_ctl
+                       |                     |
+                       |                     |--4.60%--fdget
+                       |                     |
+                       |                      --4.50%--do_epoll_ctl_file
+                       |                                |
+                       |                                 --2.21%--ep_item_poll.isra.0
+                       |
+                       |--10.39%--__x64_sys_recvfrom
+                       |          __sys_recvfrom
+                       |          |
+                       |          |--7.78%--sock_recvmsg
+                       |          |          |
+                       |          |           --6.87%--tcp_recvmsg
+                       |          |                     |
+                       |          |                      --4.86%--tcp_recvmsg_locked
+                       |          |                                |
+                       |          |                                 --2.67%--skb_copy_datagram_iter
+                       |          |                                           __skb_datagram_iter
+                       |          |
+                       |           --2.08%--fdget
+                       |
+                       |--4.44%--__do_sys_io_uring_enter
+                       |
+                       |--3.98%--__x64_sys_timerfd_settime
+                       |          |
+                       |           --3.10%--do_timerfd_settime
+                       |
+                        --3.87%--exit_to_user_mode_loop
+                                  |
+                                   --3.82%--arch_do_signal_or_restart
+                                             |
+                                              --3.78%--get_signal
+                                                        |
+                                                         --3.34%--task_work_run
+                                                                   |
+                                                                    --2.82%--tctx_task_work
+                                                                              tctx_task_work_run
+
+    45.42%     0.00%  [.] 0x00007fc9b86a08f2 -      -
+            |
+             --44.93%--entry_SYSCALL_64_after_hwframe
+                       |
+                        --44.89%--do_syscall_64
+                                  |
+                                  |--34.25%--__x64_sys_sendto
+                                  |          __sys_sendto
+                                  |          |
+                                  |           --33.40%--tcp_sendmsg
+                                  |                     |
+                                  |                      --32.25%--tcp_sendmsg_locked
+                                  |                                |
+                                  |                                |--25.86%--__tcp_push_pending_frames
+                                  |                                |          tcp_write_xmit
+                                  |                                |          |
+                                  |                                |           --25.00%--__tcp_transmit_skb
+                                  |                                |                     |
+                                  |                                |                      --23.25%--__ip_queue_xmit
+                                  |                                |                                |
+                                  |                                |                                |--19.83%--ip_output
+                                  |                                |                                |          |
+                                  |                                |                                |           --19.16%--ip_finish_output2
+                                  |                                |                                |                     |
+                                  |                                |                                |                      --18.62%--__dev_queue_xmit
+                                  |                                |                                |                                |
+                                  |                                |                                |                                 --17.08%--__local_bh_enable_ip
+                                  |                                |                                |                                           do_softirq.part.0
+                                  |                                |                                |                                           handle_softirqs
+                                  |                                |                                |                                           |
+                                  |                                |                                |                                            --16.89%--net_rx_action
+                                  |                                |                                |                                                      |
+                                  |                                |                                |                                                      |--14.06%--__napi_poll
+                                  |                                |                                |                                                      |          process_backlog
+                                  |                                |                                |                                                      |          |
+                                  |                                |                                |                                                      |           --13.56%--__netif_receive_skb_one_core
+                                  |                                |                                |                                                      |                     |
+                                  |                                |                                |                                                      |                      --12.00%--ip_local_deliver_finish
+                                  |                                |                                |                                                      |                                |
+                                  |                                |                                |                                                      |                                 --11.49%--ip_protocol_deliver_rcu
+                                  |                                |                                |                                                      |                                           |
+                                  |                                |                                |                                                      |                                            --11.47%--tcp_v4_rcv
+                                  |                                |                                |                                                      |                                                      |
+                                  |                                |                                |                                                      |                                                       --9.49%--tcp_v4_do_rcv
+                                  |                                |                                |                                                      |                                                                 tcp_rcv_established
+                                  |                                |                                |                                                      |                                                                 |
+                                  |                                |                                |                                                      |                                                                 |--6.18%--tcp_data_queue
+                                  |                                |                                |                                                      |                                                                 |          |
+                                  |                                |                                |                                                      |                                                                 |           --4.63%--sock_def_readable
+                                  |                                |                                |                                                      |                                                                 |                     |
+                                  |                                |                                |                                                      |                                                                 |                      --4.20%--__wake_up_sync_key
+                                  |                                |                                |                                                      |                                                                 |                                |
+                                  |                                |                                |                                                      |                                                                 |                                 --3.99%--__wake_up_common
+                                  |                                |                                |                                                      |                                                                 |                                           ep_poll_callback
+                                  |                                |                                |                                                      |                                                                 |                                           |
+                                  |                                |                                |                                                      |                                                                 |                                            --3.63%--__wake_up_sync
+                                  |                                |                                |                                                      |                                                                 |                                                      |
+                                  |                                |                                |                                                      |                                                                 |                                                       --2.91%--__wake_up_common
+                                  |                                |                                |                                                      |                                                                 |                                                                 ep_autoremove_wake_function
+                                  |                                |                                |                                                      |                                                                 |                                                                 try_to_wake_up
+                                  |                                |                                |                                                      |                                                                 |
+                                  |                                |                                |                                                      |                                                                  --2.79%--tcp_ack
+                                  |                                |                                |                                                      |
+                                  |                                |                                |                                                       --2.57%--skb_defer_free_flush
+                                  |                                |                                |
+                                  |                                |                                 --3.11%--ip_local_out
+                                  |                                |                                           __ip_local_out
+                                  |                                |                                           |
+                                  |                                |                                            --2.56%--nf_hook_slow
+                                  |                                |                                                      |
+                                  |                                |                                                       --2.52%--nf_conntrack_in
+                                  |                                |
+                                  |                                 --2.80%--sk_page_frag_refill
+                                  |                                           skb_page_frag_refill
+                                  |                                           |
+                                  |                                            --2.16%--alloc_pages_noprof
+                                  |                                                      alloc_pages_mpol
+                                  |                                                      __alloc_frozen_pages_noprof
+                                  |                                                      get_page_from_freelist
+                                  |                                                      |
+                                  |                                                       --2.04%--clear_highpages_kasan_tagged
+                                  |
+                                   --10.39%--__x64_sys_recvfrom
+                                             __sys_recvfrom
+                                             |
+                                             |--7.78%--sock_recvmsg
+                                             |          |
+                                             |           --6.87%--tcp_recvmsg
+                                             |                     |
+                                             |                      --4.86%--tcp_recvmsg_locked
+                                             |                                |
+                                             |                                 --2.67%--skb_copy_datagram_iter
+                                             |                                           __skb_datagram_iter
+                                             |
+                                              --2.08%--fdget
+
+    34.47%     0.02%  [.] send -      -
+            |
+             --34.45%--0x7fc9b86a08f2
+                       |
+                        --34.29%--entry_SYSCALL_64_after_hwframe
+                                  do_syscall_64
+                                  |
+                                   --34.25%--__x64_sys_sendto
+                                             __sys_sendto
+                                             |
+                                              --33.40%--tcp_sendmsg
+                                                        |
+                                                         --32.25%--tcp_sendmsg_locked
+                                                                   |
+                                                                   |--25.86%--__tcp_push_pending_frames
+                                                                   |          tcp_write_xmit
+                                                                   |          |
+                                                                   |           --25.00%--__tcp_transmit_skb
+                                                                   |                     |
+                                                                   |                      --23.25%--__ip_queue_xmit
+                                                                   |                                |
+                                                                   |                                |--19.83%--ip_output
+                                                                   |                                |          |
+                                                                   |                                |           --19.16%--ip_finish_output2
+                                                                   |                                |                     |
+                                                                   |                                |                      --18.62%--__dev_queue_xmit
+                                                                   |                                |                                |
+                                                                   |                                |                                 --17.08%--__local_bh_enable_ip
+                                                                   |                                |                                           do_softirq.part.0
+                                                                   |                                |                                           handle_softirqs
+                                                                   |                                |                                           |
+                                                                   |                                |                                            --16.89%--net_rx_action
+                                                                   |                                |                                                      |
+                                                                   |                                |                                                      |--14.06%--__napi_poll
+                                                                   |                                |                                                      |          process_backlog
+                                                                   |                                |                                                      |          |
+                                                                   |                                |                                                      |           --13.56%--__netif_receive_skb_one_core
+                                                                   |                                |                                                      |                     |
+                                                                   |                                |                                                      |                      --12.00%--ip_local_deliver_finish
+                                                                   |                                |                                                      |                                |
+                                                                   |                                |                                                      |                                 --11.49%--ip_protocol_deliver_rcu
+                                                                   |                                |                                                      |                                           |
+                                                                   |                                |                                                      |                                            --11.47%--tcp_v4_rcv
+                                                                   |                                |                                                      |                                                      |
+                                                                   |                                |                                                      |                                                       --9.49%--tcp_v4_do_rcv
+                                                                   |                                |                                                      |                                                                 tcp_rcv_established
+                                                                   |                                |                                                      |                                                                 |
+                                                                   |                                |                                                      |                                                                 |--6.18%--tcp_data_queue
+                                                                   |                                |                                                      |                                                                 |          |
+                                                                   |                                |                                                      |                                                                 |           --4.63%--sock_def_readable
+                                                                   |                                |                                                      |                                                                 |                     |
+                                                                   |                                |                                                      |                                                                 |                      --4.20%--__wake_up_sync_key
+                                                                   |                                |                                                      |                                                                 |                                |
+                                                                   |                                |                                                      |                                                                 |                                 --3.99%--__wake_up_common
+                                                                   |                                |                                                      |                                                                 |                                           ep_poll_callback
+                                                                   |                                |                                                      |                                                                 |                                           |
+                                                                   |                                |                                                      |                                                                 |                                            --3.63%--__wake_up_sync
+                                                                   |                                |                                                      |                                                                 |                                                      |
+                                                                   |                                |                                                      |                                                                 |                                                       --2.91%--__wake_up_common
+                                                                   |                                |                                                      |                                                                 |                                                                 ep_autoremove_wake_function
+                                                                   |                                |                                                      |                                                                 |                                                                 try_to_wake_up
+                                                                   |                                |                                                      |                                                                 |
+                                                                   |                                |                                                      |                                                                  --2.79%--tcp_ack
+                                                                   |                                |                                                      |
+                                                                   |                                |                                                       --2.57%--skb_defer_free_flush
+                                                                   |                                |
+                                                                   |                                 --3.11%--ip_local_out
+                                                                   |                                           __ip_local_out
+                                                                   |                                           |
+                                                                   |                                            --2.56%--nf_hook_slow
+                                                                   |                                                      |
+                                                                   |                                                       --2.52%--nf_conntrack_in
+                                                                   |
+                                                                    --2.80%--sk_page_frag_refill
+                                                                              skb_page_frag_refill
+                                                                              |
+                                                                               --2.16%--alloc_pages_noprof
+                                                                                         alloc_pages_mpol
+                                                                                         __alloc_frozen_pages_noprof
+                                                                                         get_page_from_freelist
+                                                                                         |
+                                                                                          --2.04%--clear_highpages_kasan_tagged
+
+    34.25%     0.00%  [.] __x64_sys_sendto -      -
+            |
+            ---__sys_sendto
+               |
+                --33.40%--tcp_sendmsg
+                          |
+                           --32.25%--tcp_sendmsg_locked
+                                     |
+                                     |--25.86%--__tcp_push_pending_frames
+                                     |          tcp_write_xmit
+                                     |          |
+                                     |           --25.00%--__tcp_transmit_skb
+                                     |                     |
+                                     |                      --23.25%--__ip_queue_xmit
+                                     |                                |
+                                     |                                |--19.83%--ip_output
+                                     |                                |          |
+                                     |                                |           --19.16%--ip_finish_output2
+                                     |                                |                     |
+                                     |                                |                      --18.62%--__dev_queue_xmit
+                                     |                                |                                |
+                                     |                                |                                 --17.08%--__local_bh_enable_ip
+                                     |                                |                                           do_softirq.part.0
+                                     |                                |                                           handle_softirqs
+                                     |                                |                                           |
+                                     |                                |                                            --16.89%--net_rx_action
+                                     |                                |                                                      |
+                                     |                                |                                                      |--14.06%--__napi_poll
+                                     |                                |                                                      |          process_backlog
+                                     |                                |                                                      |          |
+                                     |                                |                                                      |           --13.56%--__netif_receive_skb_one_core
+                                     |                                |                                                      |                     |
+                                     |                                |                                                      |                      --12.00%--ip_local_deliver_finish
+                                     |                                |                                                      |                                |
+                                     |                                |                                                      |                                 --11.49%--ip_protocol_deliver_rcu
+                                     |                                |                                                      |                                           |
+                                     |                                |                                                      |                                            --11.47%--tcp_v4_rcv
+                                     |                                |                                                      |                                                      |
+                                     |                                |                                                      |                                                       --9.49%--tcp_v4_do_rcv
+                                     |                                |                                                      |                                                                 tcp_rcv_established
+                                     |                                |                                                      |                                                                 |
+                                     |                                |                                                      |                                                                 |--6.18%--tcp_data_queue
+                                     |                                |                                                      |                                                                 |          |
+                                     |                                |                                                      |                                                                 |           --4.63%--sock_def_readable
+                                     |                                |                                                      |                                                                 |                     |
+                                     |                                |                                                      |                                                                 |                      --4.20%--__wake_up_sync_key
+                                     |                                |                                                      |                                                                 |                                |
+                                     |                                |                                                      |                                                                 |                                 --3.99%--__wake_up_common
+                                     |                                |                                                      |                                                                 |                                           ep_poll_callback
+                                     |                                |                                                      |                                                                 |                                           |
+                                     |                                |                                                      |                                                                 |                                            --3.63%--__wake_up_sync
+                                     |                                |                                                      |                                                                 |                                                      |
+                                     |                                |                                                      |                                                                 |                                                       --2.91%--__wake_up_common
+                                     |                                |                                                      |                                                                 |                                                                 ep_autoremove_wake_function
+                                     |                                |                                                      |                                                                 |                                                                 try_to_wake_up
+                                     |                                |                                                      |                                                                 |
+                                     |                                |                                                      |                                                                  --2.79%--tcp_ack
+                                     |                                |                                                      |
+                                     |                                |                                                       --2.57%--skb_defer_free_flush
+                                     |                                |
+                                     |                                 --3.11%--ip_local_out
+                                     |                                           __ip_local_out
+                                     |                                           |
+                                     |                                            --2.56%--nf_hook_slow
+                                     |                                                      |
+                                     |                                                       --2.52%--nf_conntrack_in
+                                     |
+                                      --2.80%--sk_page_frag_refill
+                                                skb_page_frag_refill
+                                                |
+                                                 --2.16%--alloc_pages_noprof
+                                                           alloc_pages_mpol
+                                                           __alloc_frozen_pages_noprof
+                                                           get_page_from_freelist
+                                                           |
+                                                            --2.04%--clear_highpages_kasan_tagged
+
+    34.25%     0.09%  [.] __sys_sendto -      -
+            |
+             --34.16%--__sys_sendto
+                       |
+                        --33.40%--tcp_sendmsg
+                                  |
+                                   --32.25%--tcp_sendmsg_locked
+                                             |
+                                             |--25.86%--__tcp_push_pending_frames
+                                             |          tcp_write_xmit
+                                             |          |
+                                             |           --25.00%--__tcp_transmit_skb
+                                             |                     |
+                                             |                      --23.25%--__ip_queue_xmit
+                                             |                                |
+                                             |                                |--19.83%--ip_output
+                                             |                                |          |
+                                             |                                |           --19.16%--ip_finish_output2
+                                             |                                |                     |
+                                             |                                |                      --18.62%--__dev_queue_xmit
+                                             |                                |                                |
+                                             |                                |                                 --17.08%--__local_bh_enable_ip
+                                             |                                |                                           do_softirq.part.0
+                                             |                                |                                           handle_softirqs
+                                             |                                |                                           |
+                                             |                                |                                            --16.89%--net_rx_action
+                                             |                                |                                                      |
+                                             |                                |                                                      |--14.06%--__napi_poll
+                                             |                                |                                                      |          process_backlog
+                                             |                                |                                                      |          |
+                                             |                                |                                                      |           --13.56%--__netif_receive_skb_one_core
+                                             |                                |                                                      |                     |
+                                             |                                |                                                      |                      --12.00%--ip_local_deliver_finish
+                                             |                                |                                                      |                                |
+                                             |                                |                                                      |                                 --11.49%--ip_protocol_deliver_rcu
+                                             |                                |                                                      |                                           |
+                                             |                                |                                                      |                                            --11.47%--tcp_v4_rcv
+                                             |                                |                                                      |                                                      |
+                                             |                                |                                                      |                                                       --9.49%--tcp_v4_do_rcv
+                                             |                                |                                                      |                                                                 tcp_rcv_established
+                                             |                                |                                                      |                                                                 |
+                                             |                                |                                                      |                                                                 |--6.18%--tcp_data_queue
+                                             |                                |                                                      |                                                                 |          |
+                                             |                                |                                                      |                                                                 |           --4.63%--sock_def_readable
+                                             |                                |                                                      |                                                                 |                     |
+                                             |                                |                                                      |                                                                 |                      --4.20%--__wake_up_sync_key
+                                             |                                |                                                      |                                                                 |                                |
+                                             |                                |                                                      |                                                                 |                                 --3.99%--__wake_up_common
+                                             |                                |                                                      |                                                                 |                                           ep_poll_callback
+                                             |                                |                                                      |                                                                 |                                           |
+                                             |                                |                                                      |                                                                 |                                            --3.63%--__wake_up_sync
+                                             |                                |                                                      |                                                                 |                                                      |
+                                             |                                |                                                      |                                                                 |                                                       --2.91%--__wake_up_common
+                                             |                                |                                                      |                                                                 |                                                                 ep_autoremove_wake_function
+                                             |                                |                                                      |                                                                 |                                                                 try_to_wake_up
+                                             |                                |                                                      |                                                                 |
+                                             |                                |                                                      |                                                                  --2.79%--tcp_ack
+                                             |                                |                                                      |
+                                             |                                |                                                       --2.57%--skb_defer_free_flush
+                                             |                                |
+                                             |                                 --3.11%--ip_local_out
+                                             |                                           __ip_local_out
+                                             |                                           |
+                                             |                                            --2.56%--nf_hook_slow
+                                             |                                                      |
+                                             |                                                       --2.52%--nf_conntrack_in
+                                             |
+                                              --2.80%--sk_page_frag_refill
+                                                        skb_page_frag_refill
+                                                        |
+                                                         --2.16%--alloc_pages_noprof
+                                                                   alloc_pages_mpol
+                                                                   __alloc_frozen_pages_noprof
+                                                                   get_page_from_freelist
+                                                                   |
+                                                                    --2.04%--clear_highpages_kasan_tagged
+
+    33.40%     0.00%  [.] tcp_sendmsg -      -
+            |
+             --32.25%--tcp_sendmsg_locked
+                       |
+                       |--25.86%--__tcp_push_pending_frames
+                       |          tcp_write_xmit
+                       |          |
+                       |           --25.00%--__tcp_transmit_skb
+                       |                     |
+                       |                      --23.25%--__ip_queue_xmit
+                       |                                |
+                       |                                |--19.83%--ip_output
+                       |                                |          |
+                       |                                |           --19.16%--ip_finish_output2
+                       |                                |                     |
+                       |                                |                      --18.62%--__dev_queue_xmit
+                       |                                |                                |
+                       |                                |                                 --17.08%--__local_bh_enable_ip
+                       |                                |                                           do_softirq.part.0
+                       |                                |                                           handle_softirqs
+                       |                                |                                           |
+                       |                                |                                            --16.89%--net_rx_action
+                       |                                |                                                      |
+                       |                                |                                                      |--14.06%--__napi_poll
+                       |                                |                                                      |          process_backlog
+                       |                                |                                                      |          |
+                       |                                |                                                      |           --13.56%--__netif_receive_skb_one_core
+                       |                                |                                                      |                     |
+                       |                                |                                                      |                      --12.00%--ip_local_deliver_finish
+                       |                                |                                                      |                                |
+                       |                                |                                                      |                                 --11.49%--ip_protocol_deliver_rcu
+                       |                                |                                                      |                                           |
+                       |                                |                                                      |                                            --11.47%--tcp_v4_rcv
+                       |                                |                                                      |                                                      |
+                       |                                |                                                      |                                                       --9.49%--tcp_v4_do_rcv
+                       |                                |                                                      |                                                                 tcp_rcv_established
+                       |                                |                                                      |                                                                 |
+                       |                                |                                                      |                                                                 |--6.18%--tcp_data_queue
+                       |                                |                                                      |                                                                 |          |
+                       |                                |                                                      |                                                                 |           --4.63%--sock_def_readable
+                       |                                |                                                      |                                                                 |                     |
+                       |                                |                                                      |                                                                 |                      --4.20%--__wake_up_sync_key
+                       |                                |                                                      |                                                                 |                                |
+                       |                                |                                                      |                                                                 |                                 --3.99%--__wake_up_common
+                       |                                |                                                      |                                                                 |                                           ep_poll_callback
+                       |                                |                                                      |                                                                 |                                           |
+                       |                                |                                                      |                                                                 |                                            --3.63%--__wake_up_sync
+                       |                                |                                                      |                                                                 |                                                      |
+                       |                                |                                                      |                                                                 |                                                       --2.91%--__wake_up_common
+                       |                                |                                                      |                                                                 |                                                                 ep_autoremove_wake_function
+                       |                                |                                                      |                                                                 |                                                                 try_to_wake_up
+                       |                                |                                                      |                                                                 |
+                       |                                |                                                      |                                                                  --2.79%--tcp_ack
+                       |                                |                                                      |
+                       |                                |                                                       --2.57%--skb_defer_free_flush
+                       |                                |
+                       |                                 --3.11%--ip_local_out
+                       |                                           __ip_local_out
+                       |                                           |
+                       |                                            --2.56%--nf_hook_slow
+                       |                                                      |
+                       |                                                       --2.52%--nf_conntrack_in
+                       |
+                        --2.80%--sk_page_frag_refill
+                                  skb_page_frag_refill
+                                  |
+                                   --2.16%--alloc_pages_noprof
+                                             alloc_pages_mpol
+                                             __alloc_frozen_pages_noprof
+                                             get_page_from_freelist
+                                             |
+                                              --2.04%--clear_highpages_kasan_tagged
+
+    32.25%     0.81%  [.] tcp_sendmsg_locked -      -
+            |
+             --31.43%--tcp_sendmsg_locked
+                       |
+                       |--25.86%--__tcp_push_pending_frames
+                       |          tcp_write_xmit
+                       |          |
+                       |           --25.00%--__tcp_transmit_skb
+                       |                     |
+                       |                      --23.25%--__ip_queue_xmit
+                       |                                |
+                       |                                |--19.83%--ip_output
+                       |                                |          |
+                       |                                |           --19.16%--ip_finish_output2
+                       |                                |                     |
+                       |                                |                      --18.62%--__dev_queue_xmit
+                       |                                |                                |
+                       |                                |                                 --17.08%--__local_bh_enable_ip
+                       |                                |                                           do_softirq.part.0
+                       |                                |                                           handle_softirqs
+                       |                                |                                           |
+                       |                                |                                            --16.89%--net_rx_action
+                       |                                |                                                      |
+                       |                                |                                                      |--14.06%--__napi_poll
+                       |                                |                                                      |          process_backlog
+                       |                                |                                                      |          |
+                       |                                |                                                      |           --13.56%--__netif_receive_skb_one_core
+                       |                                |                                                      |                     |
+                       |                                |                                                      |                      --12.00%--ip_local_deliver_finish
+                       |                                |                                                      |                                |
+                       |                                |                                                      |                                 --11.49%--ip_protocol_deliver_rcu
+                       |                                |                                                      |                                           |
+                       |                                |                                                      |                                            --11.47%--tcp_v4_rcv
+                       |                                |                                                      |                                                      |
+                       |                                |                                                      |                                                       --9.49%--tcp_v4_do_rcv
+                       |                                |                                                      |                                                                 tcp_rcv_established
+                       |                                |                                                      |                                                                 |
+                       |                                |                                                      |                                                                 |--6.18%--tcp_data_queue
+                       |                                |                                                      |                                                                 |          |
+                       |                                |                                                      |                                                                 |           --4.63%--sock_def_readable
+                       |                                |                                                      |                                                                 |                     |
+                       |                                |                                                      |                                                                 |                      --4.20%--__wake_up_sync_key
+                       |                                |                                                      |                                                                 |                                |
+                       |                                |                                                      |                                                                 |                                 --3.99%--__wake_up_common
+                       |                                |                                                      |                                                                 |                                           ep_poll_callback
+                       |                                |                                                      |                                                                 |                                           |
+                       |                                |                                                      |                                                                 |                                            --3.63%--__wake_up_sync
+                       |                                |                                                      |                                                                 |                                                      |
+                       |                                |                                                      |                                                                 |                                                       --2.91%--__wake_up_common
+                       |                                |                                                      |                                                                 |                                                                 ep_autoremove_wake_function
+                       |                                |                                                      |                                                                 |                                                                 try_to_wake_up
+                       |                                |                                                      |                                                                 |
+                       |                                |                                                      |                                                                  --2.79%--tcp_ack
+                       |                                |                                                      |
+                       |                                |                                                       --2.57%--skb_defer_free_flush
+                       |                                |
+                       |                                 --3.11%--ip_local_out
+                       |                                           __ip_local_out
+                       |                                           |
+                       |                                            --2.56%--nf_hook_slow
+                       |                                                      |
+                       |                                                       --2.52%--nf_conntrack_in
+                       |
+                        --2.80%--sk_page_frag_refill
+                                  skb_page_frag_refill
+                                  |
+                                   --2.16%--alloc_pages_noprof
+                                             alloc_pages_mpol
+                                             __alloc_frozen_pages_noprof
+                                             get_page_from_freelist
+                                             |
+                                              --2.04%--clear_highpages_kasan_tagged
+
+    25.86%     0.00%  [.] __tcp_push_pending_frames -      -
+            |
+            ---tcp_write_xmit
+               |
+                --25.00%--__tcp_transmit_skb
+                          |
+                           --23.25%--__ip_queue_xmit
+                                     |
+                                     |--19.83%--ip_output
+                                     |          |
+                                     |           --19.16%--ip_finish_output2
+                                     |                     |
+                                     |                      --18.62%--__dev_queue_xmit
+                                     |                                |
+                                     |                                 --17.08%--__local_bh_enable_ip
+                                     |                                           do_softirq.part.0
+                                     |                                           handle_softirqs
+                                     |                                           |
+                                     |                                            --16.89%--net_rx_action
+                                     |                                                      |
+                                     |                                                      |--14.06%--__napi_poll
+                                     |                                                      |          process_backlog
+                                     |                                                      |          |
+                                     |                                                      |           --13.56%--__netif_receive_skb_one_core
+                                     |                                                      |                     |
+                                     |                                                      |                      --12.00%--ip_local_deliver_finish
+                                     |                                                      |                                |
+                                     |                                                      |                                 --11.49%--ip_protocol_deliver_rcu
+                                     |                                                      |                                           |
+                                     |                                                      |                                            --11.47%--tcp_v4_rcv
+                                     |                                                      |                                                      |
+                                     |                                                      |                                                       --9.49%--tcp_v4_do_rcv
+                                     |                                                      |                                                                 tcp_rcv_established
+                                     |                                                      |                                                                 |
+                                     |                                                      |                                                                 |--6.18%--tcp_data_queue
+                                     |                                                      |                                                                 |          |
+                                     |                                                      |                                                                 |           --4.63%--sock_def_readable
+                                     |                                                      |                                                                 |                     |
+                                     |                                                      |                                                                 |                      --4.20%--__wake_up_sync_key
+                                     |                                                      |                                                                 |                                |
+                                     |                                                      |                                                                 |                                 --3.99%--__wake_up_common
+                                     |                                                      |                                                                 |                                           ep_poll_callback
+                                     |                                                      |                                                                 |                                           |
+                                     |                                                      |                                                                 |                                            --3.63%--__wake_up_sync
+                                     |                                                      |                                                                 |                                                      |
+                                     |                                                      |                                                                 |                                                       --2.91%--__wake_up_common
+                                     |                                                      |                                                                 |                                                                 ep_autoremove_wake_function
+                                     |                                                      |                                                                 |                                                                 try_to_wake_up
+                                     |                                                      |                                                                 |
+                                     |                                                      |                                                                  --2.79%--tcp_ack
+                                     |                                                      |
+                                     |                                                       --2.57%--skb_defer_free_flush
+                                     |
+                                      --3.11%--ip_local_out
+                                                __ip_local_out
+                                                |
+                                                 --2.56%--nf_hook_slow
+                                                           |
+                                                            --2.52%--nf_conntrack_in
+
+    25.86%     0.06%  [.] tcp_write_xmit -      -
+            |
+             --25.80%--tcp_write_xmit
+                       |
+                        --25.00%--__tcp_transmit_skb
+                                  |
+                                   --23.25%--__ip_queue_xmit
+                                             |
+                                             |--19.83%--ip_output
+                                             |          |
+                                             |           --19.16%--ip_finish_output2
+                                             |                     |
+                                             |                      --18.62%--__dev_queue_xmit
+                                             |                                |
+                                             |                                 --17.08%--__local_bh_enable_ip
+                                             |                                           do_softirq.part.0
+                                             |                                           handle_softirqs
+                                             |                                           |
+                                             |                                            --16.89%--net_rx_action
+                                             |                                                      |
+                                             |                                                      |--14.06%--__napi_poll
+                                             |                                                      |          process_backlog
+                                             |                                                      |          |
+                                             |                                                      |           --13.56%--__netif_receive_skb_one_core
+                                             |                                                      |                     |
+                                             |                                                      |                      --12.00%--ip_local_deliver_finish
+                                             |                                                      |                                |
+                                             |                                                      |                                 --11.49%--ip_protocol_deliver_rcu
+                                             |                                                      |                                           |
+                                             |                                                      |                                            --11.47%--tcp_v4_rcv
+                                             |                                                      |                                                      |
+                                             |                                                      |                                                       --9.49%--tcp_v4_do_rcv
+                                             |                                                      |                                                                 tcp_rcv_established
+                                             |                                                      |                                                                 |
+                                             |                                                      |                                                                 |--6.18%--tcp_data_queue
+                                             |                                                      |                                                                 |          |
+                                             |                                                      |                                                                 |           --4.63%--sock_def_readable
+                                             |                                                      |                                                                 |                     |
+                                             |                                                      |                                                                 |                      --4.20%--__wake_up_sync_key
+                                             |                                                      |                                                                 |                                |
+                                             |                                                      |                                                                 |                                 --3.99%--__wake_up_common
+                                             |                                                      |                                                                 |                                           ep_poll_callback
+                                             |                                                      |                                                                 |                                           |
+                                             |                                                      |                                                                 |                                            --3.63%--__wake_up_sync
+                                             |                                                      |                                                                 |                                                      |
+                                             |                                                      |                                                                 |                                                       --2.91%--__wake_up_common
+                                             |                                                      |                                                                 |                                                                 ep_autoremove_wake_function
+                                             |                                                      |                                                                 |                                                                 try_to_wake_up
+                                             |                                                      |                                                                 |
+                                             |                                                      |                                                                  --2.79%--tcp_ack
+                                             |                                                      |
+                                             |                                                       --2.57%--skb_defer_free_flush
+                                             |
+                                              --3.11%--ip_local_out
+                                                        __ip_local_out
+                                                        |
+                                                         --2.56%--nf_hook_slow
+                                                                   |
+                                                                    --2.52%--nf_conntrack_in
+
+    25.00%     0.30%  [.] __tcp_transmit_skb -      -
+            |
+             --24.70%--__tcp_transmit_skb
+                       |
+                        --23.25%--__ip_queue_xmit
+                                  |
+                                  |--19.83%--ip_output
+                                  |          |
+                                  |           --19.16%--ip_finish_output2
+                                  |                     |
+                                  |                      --18.62%--__dev_queue_xmit
+                                  |                                |
+                                  |                                 --17.08%--__local_bh_enable_ip
+                                  |                                           do_softirq.part.0
+                                  |                                           handle_softirqs
+                                  |                                           |
+                                  |                                            --16.89%--net_rx_action
+                                  |                                                      |
+                                  |                                                      |--14.06%--__napi_poll
+                                  |                                                      |          process_backlog
+                                  |                                                      |          |
+                                  |                                                      |           --13.56%--__netif_receive_skb_one_core
+                                  |                                                      |                     |
+                                  |                                                      |                      --12.00%--ip_local_deliver_finish
+                                  |                                                      |                                |
+                                  |                                                      |                                 --11.49%--ip_protocol_deliver_rcu
+                                  |                                                      |                                           |
+                                  |                                                      |                                            --11.47%--tcp_v4_rcv
+                                  |                                                      |                                                      |
+                                  |                                                      |                                                       --9.49%--tcp_v4_do_rcv
+                                  |                                                      |                                                                 tcp_rcv_established
+                                  |                                                      |                                                                 |
+                                  |                                                      |                                                                 |--6.18%--tcp_data_queue
+                                  |                                                      |                                                                 |          |
+                                  |                                                      |                                                                 |           --4.63%--sock_def_readable
+                                  |                                                      |                                                                 |                     |
+                                  |                                                      |                                                                 |                      --4.20%--__wake_up_sync_key
+                                  |                                                      |                                                                 |                                |
+                                  |                                                      |                                                                 |                                 --3.99%--__wake_up_common
+                                  |                                                      |                                                                 |                                           ep_poll_callback
+                                  |                                                      |                                                                 |                                           |
+                                  |                                                      |                                                                 |                                            --3.63%--__wake_up_sync
+                                  |                                                      |                                                                 |                                                      |
+                                  |                                                      |                                                                 |                                                       --2.91%--__wake_up_common
+                                  |                                                      |                                                                 |                                                                 ep_autoremove_wake_function
+                                  |                                                      |                                                                 |                                                                 try_to_wake_up
+                                  |                                                      |                                                                 |
+                                  |                                                      |                                                                  --2.79%--tcp_ack
+                                  |                                                      |
+                                  |                                                       --2.57%--skb_defer_free_flush
+                                  |
+                                   --3.11%--ip_local_out
+                                             __ip_local_out
+                                             |
+                                              --2.56%--nf_hook_slow
+                                                        |
+                                                         --2.52%--nf_conntrack_in
+
+    23.25%     0.15%  [.] __ip_queue_xmit -      -
+            |
+             --23.10%--__ip_queue_xmit
+                       |
+                       |--19.83%--ip_output
+                       |          |
+                       |           --19.16%--ip_finish_output2
+                       |                     |
+                       |                      --18.62%--__dev_queue_xmit
+                       |                                |
+                       |                                 --17.08%--__local_bh_enable_ip
+                       |                                           do_softirq.part.0
+                       |                                           handle_softirqs
+                       |                                           |
+                       |                                            --16.89%--net_rx_action
+                       |                                                      |
+                       |                                                      |--14.06%--__napi_poll
+                       |                                                      |          process_backlog
+                       |                                                      |          |
+                       |                                                      |           --13.56%--__netif_receive_skb_one_core
+                       |                                                      |                     |
+                       |                                                      |                      --12.00%--ip_local_deliver_finish
+                       |                                                      |                                |
+                       |                                                      |                                 --11.49%--ip_protocol_deliver_rcu
+                       |                                                      |                                           |
+                       |                                                      |                                            --11.47%--tcp_v4_rcv
+                       |                                                      |                                                      |
+                       |                                                      |                                                       --9.49%--tcp_v4_do_rcv
+                       |                                                      |                                                                 tcp_rcv_established
+                       |                                                      |                                                                 |
+                       |                                                      |                                                                 |--6.18%--tcp_data_queue
+                       |                                                      |                                                                 |          |
+                       |                                                      |                                                                 |           --4.63%--sock_def_readable
+                       |                                                      |                                                                 |                     |
+                       |                                                      |                                                                 |                      --4.20%--__wake_up_sync_key
+                       |                                                      |                                                                 |                                |
+                       |                                                      |                                                                 |                                 --3.99%--__wake_up_common
+                       |                                                      |                                                                 |                                           ep_poll_callback
+                       |                                                      |                                                                 |                                           |
+                       |                                                      |                                                                 |                                            --3.63%--__wake_up_sync
+                       |                                                      |                                                                 |                                                      |
+                       |                                                      |                                                                 |                                                       --2.91%--__wake_up_common
+                       |                                                      |                                                                 |                                                                 ep_autoremove_wake_function
+                       |                                                      |                                                                 |                                                                 try_to_wake_up
+                       |                                                      |                                                                 |
+                       |                                                      |                                                                  --2.79%--tcp_ack
+                       |                                                      |
+                       |                                                       --2.57%--skb_defer_free_flush
+                       |
+                        --3.11%--ip_local_out
+                                  __ip_local_out
+                                  |
+                                   --2.56%--nf_hook_slow
+                                             |
+                                              --2.52%--nf_conntrack_in
+
+    19.83%     0.09%  [.] ip_output -      -
+            |
+             --19.73%--ip_output
+                       |
+                        --19.16%--ip_finish_output2
+                                  |
+                                   --18.62%--__dev_queue_xmit
+                                             |
+                                              --17.08%--__local_bh_enable_ip
+                                                        do_softirq.part.0
+                                                        handle_softirqs
+                                                        |
+                                                         --16.89%--net_rx_action
+                                                                   |
+                                                                   |--14.06%--__napi_poll
+                                                                   |          process_backlog
+                                                                   |          |
+                                                                   |           --13.56%--__netif_receive_skb_one_core
+                                                                   |                     |
+                                                                   |                      --12.00%--ip_local_deliver_finish
+                                                                   |                                |
+                                                                   |                                 --11.49%--ip_protocol_deliver_rcu
+                                                                   |                                           |
+                                                                   |                                            --11.47%--tcp_v4_rcv
+                                                                   |                                                      |
+                                                                   |                                                       --9.49%--tcp_v4_do_rcv
+                                                                   |                                                                 tcp_rcv_established
+                                                                   |                                                                 |
+                                                                   |                                                                 |--6.18%--tcp_data_queue
+                                                                   |                                                                 |          |
+                                                                   |                                                                 |           --4.63%--sock_def_readable
+                                                                   |                                                                 |                     |
+                                                                   |                                                                 |                      --4.20%--__wake_up_sync_key
+                                                                   |                                                                 |                                |
+                                                                   |                                                                 |                                 --3.99%--__wake_up_common
+                                                                   |                                                                 |                                           ep_poll_callback
+                                                                   |                                                                 |                                           |
+                                                                   |                                                                 |                                            --3.63%--__wake_up_sync
+                                                                   |                                                                 |                                                      |
+                                                                   |                                                                 |                                                       --2.91%--__wake_up_common
+                                                                   |                                                                 |                                                                 ep_autoremove_wake_function
+                                                                   |                                                                 |                                                                 try_to_wake_up
+                                                                   |                                                                 |
+                                                                   |                                                                  --2.79%--tcp_ack
+                                                                   |
+                                                                    --2.57%--skb_defer_free_flush
+
+    19.16%     0.54%  [.] ip_finish_output2 -      -
+            |
+             --18.62%--ip_finish_output2
+                       __dev_queue_xmit
+                       |
+                        --17.08%--__local_bh_enable_ip
+                                  do_softirq.part.0
+                                  handle_softirqs
+                                  |
+                                   --16.89%--net_rx_action
+                                             |
+                                             |--14.06%--__napi_poll
+                                             |          process_backlog
+                                             |          |
+                                             |           --13.56%--__netif_receive_skb_one_core
+                                             |                     |
+                                             |                      --12.00%--ip_local_deliver_finish
+                                             |                                |
+                                             |                                 --11.49%--ip_protocol_deliver_rcu
+                                             |                                           |
+                                             |                                            --11.47%--tcp_v4_rcv
+                                             |                                                      |
+                                             |                                                       --9.49%--tcp_v4_do_rcv
+                                             |                                                                 tcp_rcv_established
+                                             |                                                                 |
+                                             |                                                                 |--6.18%--tcp_data_queue
+                                             |                                                                 |          |
+                                             |                                                                 |           --4.63%--sock_def_readable
+                                             |                                                                 |                     |
+                                             |                                                                 |                      --4.20%--__wake_up_sync_key
+                                             |                                                                 |                                |
+                                             |                                                                 |                                 --3.99%--__wake_up_common
+                                             |                                                                 |                                           ep_poll_callback
+                                             |                                                                 |                                           |
+                                             |                                                                 |                                            --3.63%--__wake_up_sync
+                                             |                                                                 |                                                      |
+                                             |                                                                 |                                                       --2.91%--__wake_up_common
+                                             |                                                                 |                                                                 ep_autoremove_wake_function
+                                             |                                                                 |                                                                 try_to_wake_up
+                                             |                                                                 |
+                                             |                                                                  --2.79%--tcp_ack
+                                             |
+                                              --2.57%--skb_defer_free_flush
+
+    18.62%     0.43%  [.] __dev_queue_xmit -      -
+            |
+             --18.19%--__dev_queue_xmit
+                       |
+                        --17.08%--__local_bh_enable_ip
+                                  do_softirq.part.0
+                                  handle_softirqs
+                                  |
+                                   --16.89%--net_rx_action
+                                             |
+                                             |--14.06%--__napi_poll
+                                             |          process_backlog
+                                             |          |
+                                             |           --13.56%--__netif_receive_skb_one_core
+                                             |                     |
+                                             |                      --12.00%--ip_local_deliver_finish
+                                             |                                |
+                                             |                                 --11.49%--ip_protocol_deliver_rcu
+                                             |                                           |
+                                             |                                            --11.47%--tcp_v4_rcv
+                                             |                                                      |
+                                             |                                                       --9.49%--tcp_v4_do_rcv
+                                             |                                                                 tcp_rcv_established
+                                             |                                                                 |
+                                             |                                                                 |--6.18%--tcp_data_queue
+                                             |                                                                 |          |
+                                             |                                                                 |           --4.63%--sock_def_readable
+                                             |                                                                 |                     |
+                                             |                                                                 |                      --4.20%--__wake_up_sync_key
+                                             |                                                                 |                                |
+                                             |                                                                 |                                 --3.99%--__wake_up_common
+                                             |                                                                 |                                           ep_poll_callback
+                                             |                                                                 |                                           |
+                                             |                                                                 |                                            --3.63%--__wake_up_sync
+                                             |                                                                 |                                                      |
+                                             |                                                                 |                                                       --2.91%--__wake_up_common
+                                             |                                                                 |                                                                 ep_autoremove_wake_function
+                                             |                                                                 |                                                                 try_to_wake_up
+                                             |                                                                 |
+                                             |                                                                  --2.79%--tcp_ack
+                                             |
+                                              --2.57%--skb_defer_free_flush
+
+    17.13%     0.02%  [.] handle_softirqs -      -
+            |
+             --17.11%--handle_softirqs
+                       |
+                        --16.89%--net_rx_action
+                                  |
+                                  |--14.06%--__napi_poll
+                                  |          process_backlog
+                                  |          |
+                                  |           --13.56%--__netif_receive_skb_one_core
+                                  |                     |
+                                  |                      --12.00%--ip_local_deliver_finish
+                                  |                                |
+                                  |                                 --11.49%--ip_protocol_deliver_rcu
+                                  |                                           |
+                                  |                                            --11.47%--tcp_v4_rcv
+                                  |                                                      |
+                                  |                                                       --9.49%--tcp_v4_do_rcv
+                                  |                                                                 tcp_rcv_established
+                                  |                                                                 |
+                                  |                                                                 |--6.18%--tcp_data_queue
+                                  |                                                                 |          |
+                                  |                                                                 |           --4.63%--sock_def_readable
+                                  |                                                                 |                     |
+                                  |                                                                 |                      --4.20%--__wake_up_sync_key
+                                  |                                                                 |                                |
+                                  |                                                                 |                                 --3.99%--__wake_up_common
+                                  |                                                                 |                                           ep_poll_callback
+                                  |                                                                 |                                           |
+                                  |                                                                 |                                            --3.63%--__wake_up_sync
+                                  |                                                                 |                                                      |
+                                  |                                                                 |                                                       --2.91%--__wake_up_common
+                                  |                                                                 |                                                                 ep_autoremove_wake_function
+                                  |                                                                 |                                                                 try_to_wake_up
+                                  |                                                                 |
+                                  |                                                                  --2.79%--tcp_ack
+                                  |
+                                   --2.57%--skb_defer_free_flush
+
+    17.08%     0.00%  [.] __local_bh_enable_ip -      -
+            |
+            ---do_softirq.part.0
+               handle_softirqs
+               |
+                --16.89%--net_rx_action
+                          |
+                          |--14.06%--__napi_poll
+                          |          process_backlog
+                          |          |
+                          |           --13.56%--__netif_receive_skb_one_core
+                          |                     |
+                          |                      --12.00%--ip_local_deliver_finish
+                          |                                |
+                          |                                 --11.49%--ip_protocol_deliver_rcu
+                          |                                           |
+                          |                                            --11.47%--tcp_v4_rcv
+                          |                                                      |
+                          |                                                       --9.49%--tcp_v4_do_rcv
+                          |                                                                 tcp_rcv_established
+                          |                                                                 |
+                          |                                                                 |--6.18%--tcp_data_queue
+                          |                                                                 |          |
+                          |                                                                 |           --4.63%--sock_def_readable
+                          |                                                                 |                     |
+                          |                                                                 |                      --4.20%--__wake_up_sync_key
+                          |                                                                 |                                |
+                          |                                                                 |                                 --3.99%--__wake_up_common
+                          |                                                                 |                                           ep_poll_callback
+                          |                                                                 |                                           |
+                          |                                                                 |                                            --3.63%--__wake_up_sync
+                          |                                                                 |                                                      |
+                          |                                                                 |                                                       --2.91%--__wake_up_common
+                          |                                                                 |                                                                 ep_autoremove_wake_function
+                          |                                                                 |                                                                 try_to_wake_up
+                          |                                                                 |
+                          |                                                                  --2.79%--tcp_ack
+                          |
+                           --2.57%--skb_defer_free_flush
+
+    17.08%     0.00%  [.] do_softirq.part.0 -      -
+            |
+            ---handle_softirqs
+               |
+                --16.89%--net_rx_action
+                          |
+                          |--14.06%--__napi_poll
+                          |          process_backlog
+                          |          |
+                          |           --13.56%--__netif_receive_skb_one_core
+                          |                     |
+                          |                      --12.00%--ip_local_deliver_finish
+                          |                                |
+                          |                                 --11.49%--ip_protocol_deliver_rcu
+                          |                                           |
+                          |                                            --11.47%--tcp_v4_rcv
+                          |                                                      |
+                          |                                                       --9.49%--tcp_v4_do_rcv
+                          |                                                                 tcp_rcv_established
+                          |                                                                 |
+                          |                                                                 |--6.18%--tcp_data_queue
+                          |                                                                 |          |
+                          |                                                                 |           --4.63%--sock_def_readable
+                          |                                                                 |                     |
+                          |                                                                 |                      --4.20%--__wake_up_sync_key
+                          |                                                                 |                                |
+                          |                                                                 |                                 --3.99%--__wake_up_common
+                          |                                                                 |                                           ep_poll_callback
+                          |                                                                 |                                           |
+                          |                                                                 |                                            --3.63%--__wake_up_sync
+                          |                                                                 |                                                      |
+                          |                                                                 |                                                       --2.91%--__wake_up_common
+                          |                                                                 |                                                                 ep_autoremove_wake_function
+                          |                                                                 |                                                                 try_to_wake_up
+                          |                                                                 |
+                          |                                                                  --2.79%--tcp_ack
+                          |
+                           --2.57%--skb_defer_free_flush
+
+    16.89%     0.26%  [.] net_rx_action -      -
+            |
+             --16.63%--net_rx_action
+                       |
+                       |--14.06%--__napi_poll
+                       |          process_backlog
+                       |          |
+                       |           --13.56%--__netif_receive_skb_one_core
+                       |                     |
+                       |                      --12.00%--ip_local_deliver_finish
+                       |                                |
+                       |                                 --11.49%--ip_protocol_deliver_rcu
+                       |                                           |
+                       |                                            --11.47%--tcp_v4_rcv
+                       |                                                      |
+                       |                                                       --9.49%--tcp_v4_do_rcv
+                       |                                                                 tcp_rcv_established
+                       |                                                                 |
+                       |                                                                 |--6.18%--tcp_data_queue
+                       |                                                                 |          |
+                       |                                                                 |           --4.63%--sock_def_readable
+                       |                                                                 |                     |
+                       |                                                                 |                      --4.20%--__wake_up_sync_key
+                       |                                                                 |                                |
+                       |                                                                 |                                 --3.99%--__wake_up_common
+                       |                                                                 |                                           ep_poll_callback
+                       |                                                                 |                                           |
+                       |                                                                 |                                            --3.63%--__wake_up_sync
+                       |                                                                 |                                                      |
+                       |                                                                 |                                                       --2.91%--__wake_up_common
+                       |                                                                 |                                                                 ep_autoremove_wake_function
+                       |                                                                 |                                                                 try_to_wake_up
+                       |                                                                 |
+                       |                                                                  --2.79%--tcp_ack
+                       |
+                        --2.57%--skb_defer_free_flush
+
+    14.06%     0.00%  [.] __napi_poll -      -
+            |
+            ---process_backlog
+               |
+                --13.56%--__netif_receive_skb_one_core
+                          |
+                           --12.00%--ip_local_deliver_finish
+                                     |
+                                      --11.49%--ip_protocol_deliver_rcu
+                                                |
+                                                 --11.47%--tcp_v4_rcv
+                                                           |
+                                                            --9.49%--tcp_v4_do_rcv
+                                                                      tcp_rcv_established
+                                                                      |
+                                                                      |--6.18%--tcp_data_queue
+                                                                      |          |
+                                                                      |           --4.63%--sock_def_readable
+                                                                      |                     |
+                                                                      |                      --4.20%--__wake_up_sync_key
+                                                                      |                                |
+                                                                      |                                 --3.99%--__wake_up_common
+                                                                      |                                           ep_poll_callback
+                                                                      |                                           |
+                                                                      |                                            --3.63%--__wake_up_sync
+                                                                      |                                                      |
+                                                                      |                                                       --2.91%--__wake_up_common
+                                                                      |                                                                 ep_autoremove_wake_function
+                                                                      |                                                                 try_to_wake_up
+                                                                      |
+                                                                       --2.79%--tcp_ack
+
+    14.06%     0.00%  [.] process_backlog -      -
+            |
+             --13.56%--__netif_receive_skb_one_core
+                       |
+                        --12.00%--ip_local_deliver_finish
+                                  |
+                                   --11.49%--ip_protocol_deliver_rcu
+                                             |
+                                              --11.47%--tcp_v4_rcv
+                                                        |
+                                                         --9.49%--tcp_v4_do_rcv
+                                                                   tcp_rcv_established
+                                                                   |
+                                                                   |--6.18%--tcp_data_queue
+                                                                   |          |
+                                                                   |           --4.63%--sock_def_readable
+                                                                   |                     |
+                                                                   |                      --4.20%--__wake_up_sync_key
+                                                                   |                                |
+                                                                   |                                 --3.99%--__wake_up_common
+                                                                   |                                           ep_poll_callback
+                                                                   |                                           |
+                                                                   |                                            --3.63%--__wake_up_sync
+                                                                   |                                                      |
+                                                                   |                                                       --2.91%--__wake_up_common
+                                                                   |                                                                 ep_autoremove_wake_function
+                                                                   |                                                                 try_to_wake_up
+                                                                   |
+                                                                    --2.79%--tcp_ack
+
+    13.56%     0.00%  [.] __netif_receive_skb_one_core -      -
+            |
+             --12.00%--ip_local_deliver_finish
+                       |
+                        --11.49%--ip_protocol_deliver_rcu
+                                  |
+                                   --11.47%--tcp_v4_rcv
+                                             |
+                                              --9.49%--tcp_v4_do_rcv
+                                                        tcp_rcv_established
+                                                        |
+                                                        |--6.18%--tcp_data_queue
+                                                        |          |
+                                                        |           --4.63%--sock_def_readable
+                                                        |                     |
+                                                        |                      --4.20%--__wake_up_sync_key
+                                                        |                                |
+                                                        |                                 --3.99%--__wake_up_common
+                                                        |                                           ep_poll_callback
+                                                        |                                           |
+                                                        |                                            --3.63%--__wake_up_sync
+                                                        |                                                      |
+                                                        |                                                       --2.91%--__wake_up_common
+                                                        |                                                                 ep_autoremove_wake_function
+                                                        |                                                                 try_to_wake_up
+                                                        |
+                                                         --2.79%--tcp_ack
+
+    12.92%     0.02%  [.] __x64_sys_epoll_pwait -      -
+            |
+             --12.90%--__x64_sys_epoll_pwait
+                       do_epoll_pwait.part.0
+                       do_epoll_wait
+                       |
+                        --8.60%--schedule_hrtimeout_range_clock
+                                  schedule
+                                  __schedule
+                                  |
+                                   --2.87%--dequeue_task_fair
+                                             |
+                                              --2.85%--dequeue_entities
+
+    12.90%     0.00%  [.] do_epoll_pwait.part.0 -      -
+            |
+            ---do_epoll_wait
+               |
+                --8.60%--schedule_hrtimeout_range_clock
+                          schedule
+                          __schedule
+                          |
+                           --2.87%--dequeue_task_fair
+                                     |
+                                      --2.85%--dequeue_entities
+
+    12.90%     0.03%  [.] do_epoll_wait -      -
+            |
+             --12.88%--do_epoll_wait
+                       |
+                        --8.60%--schedule_hrtimeout_range_clock
+                                  schedule
+                                  __schedule
+                                  |
+                                   --2.87%--dequeue_task_fair
+                                             |
+                                              --2.85%--dequeue_entities
+
+    12.00%     0.00%  [.] ip_local_deliver_finish -      -
+            |
+             --11.49%--ip_protocol_deliver_rcu
+                       |
+                        --11.47%--tcp_v4_rcv
+                                  |
+                                   --9.49%--tcp_v4_do_rcv
+                                             tcp_rcv_established
+                                             |
+                                             |--6.18%--tcp_data_queue
+                                             |          |
+                                             |           --4.63%--sock_def_readable
+                                             |                     |
+                                             |                      --4.20%--__wake_up_sync_key
+                                             |                                |
+                                             |                                 --3.99%--__wake_up_common
+                                             |                                           ep_poll_callback
+                                             |                                           |
+                                             |                                            --3.63%--__wake_up_sync
+                                             |                                                      |
+                                             |                                                       --2.91%--__wake_up_common
+                                             |                                                                 ep_autoremove_wake_function
+                                             |                                                                 try_to_wake_up
+                                             |
+                                              --2.79%--tcp_ack
+
+    11.49%     0.00%  [.] ip_protocol_deliver_rcu -      -
+            |
+             --11.47%--tcp_v4_rcv
+                       |
+                        --9.49%--tcp_v4_do_rcv
+                                  tcp_rcv_established
+                                  |
+                                  |--6.18%--tcp_data_queue
+                                  |          |
+                                  |           --4.63%--sock_def_readable
+                                  |                     |
+                                  |                      --4.20%--__wake_up_sync_key
+                                  |                                |
+                                  |                                 --3.99%--__wake_up_common
+                                  |                                           ep_poll_callback
+                                  |                                           |
+                                  |                                            --3.63%--__wake_up_sync
+                                  |                                                      |
+                                  |                                                       --2.91%--__wake_up_common
+                                  |                                                                 ep_autoremove_wake_function
+                                  |                                                                 try_to_wake_up
+                                  |
+                                   --2.79%--tcp_ack
+
+    11.47%     0.42%  [.] tcp_v4_rcv -      -
+            |
+             --11.05%--tcp_v4_rcv
+                       |
+                        --9.49%--tcp_v4_do_rcv
+                                  tcp_rcv_established
+                                  |
+                                  |--6.18%--tcp_data_queue
+                                  |          |
+                                  |           --4.63%--sock_def_readable
+                                  |                     |
+                                  |                      --4.20%--__wake_up_sync_key
+                                  |                                |
+                                  |                                 --3.99%--__wake_up_common
+                                  |                                           ep_poll_callback
+                                  |                                           |
+                                  |                                            --3.63%--__wake_up_sync
+                                  |                                                      |
+                                  |                                                       --2.91%--__wake_up_common
+                                  |                                                                 ep_autoremove_wake_function
+                                  |                                                                 try_to_wake_up
+                                  |
+                                   --2.79%--tcp_ack
+
+    10.93%     0.04%  [.] recv -      -
+            |
+             --10.89%--0x7fc9b86a08f2
+                       |
+                        --10.64%--entry_SYSCALL_64_after_hwframe
+                                  |
+                                   --10.60%--do_syscall_64
+                                             |
+                                              --10.39%--__x64_sys_recvfrom
+                                                        __sys_recvfrom
+                                                        |
+                                                        |--7.78%--sock_recvmsg
+                                                        |          |
+                                                        |           --6.87%--tcp_recvmsg
+                                                        |                     |
+                                                        |                      --4.86%--tcp_recvmsg_locked
+                                                        |                                |
+                                                        |                                 --2.67%--skb_copy_datagram_iter
+                                                        |                                           __skb_datagram_iter
+                                                        |
+                                                         --2.08%--fdget
+
+    10.47%     0.06%  [.] __x64_sys_epoll_ctl -      -
+            |
+             --10.41%--__x64_sys_epoll_ctl
+                       |
+                        --10.24%--do_epoll_ctl
+                                  |
+                                  |--4.60%--fdget
+                                  |
+                                   --4.50%--do_epoll_ctl_file
+                                             |
+                                              --2.21%--ep_item_poll.isra.0
+
+    10.39%     0.00%  [.] __x64_sys_recvfrom -      -
+            |
+            ---__sys_recvfrom
+               |
+               |--7.78%--sock_recvmsg
+               |          |
+               |           --6.87%--tcp_recvmsg
+               |                     |
+               |                      --4.86%--tcp_recvmsg_locked
+               |                                |
+               |                                 --2.67%--skb_copy_datagram_iter
+               |                                           __skb_datagram_iter
+               |
+                --2.08%--fdget
+
+    10.39%     0.10%  [.] __sys_recvfrom -      -
+            |
+             --10.30%--__sys_recvfrom
+                       |
+                       |--7.78%--sock_recvmsg
+                       |          |
+                       |           --6.87%--tcp_recvmsg
+                       |                     |
+                       |                      --4.86%--tcp_recvmsg_locked
+                       |                                |
+                       |                                 --2.67%--skb_copy_datagram_iter
+                       |                                           __skb_datagram_iter
+                       |
+                        --2.08%--fdget
+
+    10.24%     0.04%  [.] do_epoll_ctl -      -
+            |
+             --10.20%--do_epoll_ctl
+                       |
+                       |--4.60%--fdget
+                       |
+                        --4.50%--do_epoll_ctl_file
+                                  |
+                                   --2.21%--ep_item_poll.isra.0
+
+    10.02%    10.00%  [k] fdget -      -
+            |
+            |--7.35%--entry_SYSCALL_64_after_hwframe
+            |          do_syscall_64
+            |          |
+            |           --4.51%--__x64_sys_epoll_ctl
+            |                     do_epoll_ctl
+            |                     fdget
+            |
+             --2.08%--recv
+                       0x7fc9b86a08f2
+                       entry_SYSCALL_64_after_hwframe
+                       do_syscall_64
+                       __x64_sys_recvfrom
+                       __sys_recvfrom
+                       fdget
+
+     9.49%     0.46%  [.] tcp_rcv_established -      -
+            |
+             --9.03%--tcp_rcv_established
+                       |
+                       |--6.18%--tcp_data_queue
+                       |          |
+                       |           --4.63%--sock_def_readable
+                       |                     |
+                       |                      --4.20%--__wake_up_sync_key
+                       |                                |
+                       |                                 --3.99%--__wake_up_common
+                       |                                           ep_poll_callback
+                       |                                           |
+                       |                                            --3.63%--__wake_up_sync
+                       |                                                      |
+                       |                                                       --2.91%--__wake_up_common
+                       |                                                                 ep_autoremove_wake_function
+                       |                                                                 try_to_wake_up
+                       |
+                        --2.79%--tcp_ack
+
+     9.49%     0.00%  [.] tcp_v4_do_rcv -      -
+            |
+            ---tcp_rcv_established
+               |
+               |--6.18%--tcp_data_queue
+               |          |
+               |           --4.63%--sock_def_readable
+               |                     |
+               |                      --4.20%--__wake_up_sync_key
+               |                                |
+               |                                 --3.99%--__wake_up_common
+               |                                           ep_poll_callback
+               |                                           |
+               |                                            --3.63%--__wake_up_sync
+               |                                                      |
+               |                                                       --2.91%--__wake_up_common
+               |                                                                 ep_autoremove_wake_function
+               |                                                                 try_to_wake_up
+               |
+                --2.79%--tcp_ack
+
+     8.60%     0.66%  [.] __schedule -      -
+            |
+             --7.94%--__schedule
+                       |
+                        --2.87%--dequeue_task_fair
+                                  |
+                                   --2.85%--dequeue_entities
+
+     8.60%     0.00%  [.] schedule -      -
+            |
+            ---__schedule
+               |
+                --2.87%--dequeue_task_fair
+                          |
+                           --2.85%--dequeue_entities
+
+     8.60%     0.00%  [.] schedule_hrtimeout_range_clock -      -
+            |
+            ---schedule
+               __schedule
+               |
+                --2.87%--dequeue_task_fair
+                          |
+                           --2.85%--dequeue_entities
+
+     7.78%     0.02%  [.] sock_recvmsg -      -
+            |
+             --7.76%--sock_recvmsg
+                       |
+                        --6.87%--tcp_recvmsg
+                                  |
+                                   --4.86%--tcp_recvmsg_locked
+                                             |
+                                              --2.67%--skb_copy_datagram_iter
+                                                        __skb_datagram_iter
+
+     6.87%     0.12%  [.] tcp_recvmsg -      -
+            |
+             --6.75%--tcp_recvmsg
+                       |
+                        --4.86%--tcp_recvmsg_locked
+                                  |
+                                   --2.67%--skb_copy_datagram_iter
+                                             __skb_datagram_iter
+
+     6.18%     0.00%  [.] tcp_data_queue -      -
+            |
+             --4.63%--sock_def_readable
+                       |
+                        --4.20%--__wake_up_sync_key
+                                  |
+                                   --3.99%--__wake_up_common
+                                             ep_poll_callback
+                                             |
+                                              --3.63%--__wake_up_sync
+                                                        |
+                                                         --2.91%--__wake_up_common
+                                                                   ep_autoremove_wake_function
+                                                                   try_to_wake_up
+
+     5.19%     0.00%  [.] syscall -      -
+            |
+             --4.66%--entry_SYSCALL_64_after_hwframe
+                       |
+                        --4.64%--do_syscall_64
+                                  |
+                                   --4.44%--__do_sys_io_uring_enter
+
+     5.14%     5.14%  [k] fput -      -
+            |
+             --4.04%--entry_SYSCALL_64_after_hwframe
+                       do_syscall_64
+                       |
+                        --2.17%--__x64_sys_epoll_ctl
+                                  do_epoll_ctl
+
+     4.86%     0.04%  [.] tcp_recvmsg_locked -      -
+            |
+             --4.82%--tcp_recvmsg_locked
+                       |
+                        --2.67%--skb_copy_datagram_iter
+                                  __skb_datagram_iter
+
+     4.63%     0.41%  [.] sock_def_readable -      -
+            |
+             --4.22%--sock_def_readable
+                       |
+                        --4.20%--__wake_up_sync_key
+                                  |
+                                   --3.99%--__wake_up_common
+                                             ep_poll_callback
+                                             |
+                                              --3.63%--__wake_up_sync
+                                                        |
+                                                         --2.91%--__wake_up_common
+                                                                   ep_autoremove_wake_function
+                                                                   try_to_wake_up
+
+     4.50%     0.90%  [.] do_epoll_ctl_file -      -
+            |
+             --3.60%--do_epoll_ctl_file
+                       |
+                        --2.21%--ep_item_poll.isra.0
+
+     4.44%     0.04%  [.] __do_sys_io_uring_enter -      -
+            |
+             --4.40%--__do_sys_io_uring_enter
+
+     4.42%     0.00%  [.] __wake_up_common -      -
+            |
+            ---ep_poll_callback
+               |
+                --3.63%--__wake_up_sync
+                          |
+                           --2.91%--__wake_up_common
+                                     ep_autoremove_wake_function
+                                     try_to_wake_up
+
+     4.42%     0.00%  [.] ep_poll_callback -      -
+            |
+             --3.63%--__wake_up_sync
+                       |
+                        --2.91%--__wake_up_common
+                                  ep_autoremove_wake_function
+                                  try_to_wake_up
+
+     4.23%     0.25%  [.] nf_hook_slow -      -
+            |
+             --3.98%--nf_hook_slow
+                       |
+                        --2.67%--nf_conntrack_in
+
+     4.20%     0.02%  [.] __wake_up_sync_key -      -
+            |
+             --4.19%--__wake_up_sync_key
+                       |
+                        --3.99%--__wake_up_common
+                                  ep_poll_callback
+                                  |
+                                   --3.63%--__wake_up_sync
+                                             |
+                                              --2.91%--__wake_up_common
+                                                        ep_autoremove_wake_function
+                                                        try_to_wake_up
+
+     3.98%     0.00%  [.] __x64_sys_timerfd_settime -      -
+            |
+             --3.10%--do_timerfd_settime
+
+     3.93%     3.93%  [k] _raw_spin_lock_irqsave -      -
+     3.87%     0.06%  [k] exit_to_user_mode_loop -      -
+            |
+             --3.82%--exit_to_user_mode_loop
+                       arch_do_signal_or_restart
+                       |
+                        --3.78%--get_signal
+                                  |
+                                   --3.34%--task_work_run
+                                             |
+                                              --2.82%--tctx_task_work
+                                                        tctx_task_work_run
+
+     3.82%     0.04%  [.] arch_do_signal_or_restart -      -
+            |
+             --3.78%--arch_do_signal_or_restart
+                       get_signal
+                       |
+                        --3.34%--task_work_run
+                                  |
+                                   --2.82%--tctx_task_work
+                                             tctx_task_work_run
+
+     3.78%     0.44%  [k] get_signal -      -
+            |
+             --3.34%--get_signal
+                       task_work_run
+                       |
+                        --2.82%--tctx_task_work
+                                  tctx_task_work_run
+
+     3.63%     0.00%  [.] __wake_up_sync -      -
+            |
+             --2.91%--__wake_up_common
+                       ep_autoremove_wake_function
+                       try_to_wake_up
+
+     3.34%     0.44%  [.] task_work_run -      -
+            |
+             --2.90%--task_work_run
+                       |
+                        --2.82%--tctx_task_work
+                                  tctx_task_work_run
+
+     3.11%     0.00%  [.] ip_local_out -      -
+            |
+            ---__ip_local_out
+               |
+                --2.56%--nf_hook_slow
+                          |
+                           --2.52%--nf_conntrack_in
+
+     3.11%     0.00%  [.] __ip_local_out -      -
+            |
+             --2.56%--nf_hook_slow
+                       |
+                        --2.52%--nf_conntrack_in
+
+     3.10%     0.04%  [.] do_timerfd_settime -      -
+            |
+             --3.06%--do_timerfd_settime
+
+     2.98%     2.98%  [k] _raw_spin_lock_irq -      -
+            |
+             --2.47%--entry_SYSCALL_64_after_hwframe
+                       do_syscall_64
+
+     2.91%     0.02%  [.] try_to_wake_up -      -
+            |
+             --2.89%--try_to_wake_up
+
+     2.91%     0.00%  [.] ep_autoremove_wake_function -      -
+            |
+            ---try_to_wake_up
+
+     2.87%     0.02%  [.] dequeue_task_fair -      -
+            |
+             --2.85%--dequeue_task_fair
+                       dequeue_entities
+
+     2.85%     0.34%  [.] dequeue_entities -      -
+            |
+             --2.51%--dequeue_entities
+
+     2.82%     0.00%  [.] tctx_task_work -      -
+            |
+            ---tctx_task_work_run
+
+     2.82%     0.74%  [.] tctx_task_work_run -      -
+            |
+             --2.08%--tctx_task_work_run
+
+     2.80%     0.65%  [.] skb_page_frag_refill -      -
+            |
+             --2.16%--skb_page_frag_refill
+                       alloc_pages_noprof
+                       alloc_pages_mpol
+                       __alloc_frozen_pages_noprof
+                       get_page_from_freelist
+                       |
+                        --2.04%--clear_highpages_kasan_tagged
+
+     2.80%     0.00%  [.] sk_page_frag_refill -      -
+            |
+            ---skb_page_frag_refill
+               |
+                --2.16%--alloc_pages_noprof
+                          alloc_pages_mpol
+                          __alloc_frozen_pages_noprof
+                          get_page_from_freelist
+                          |
+                           --2.04%--clear_highpages_kasan_tagged
+
+     2.79%     0.90%  [.] tcp_ack -      -
+     2.67%     0.19%  [k] __skb_datagram_iter -      -
+            |
+             --2.48%--__skb_datagram_iter
+
+     2.67%     0.00%  [.] skb_copy_datagram_iter -      -
+            |
+            ---__skb_datagram_iter
+
+     2.67%     0.37%  [.] nf_conntrack_in -      -
+            |
+             --2.30%--nf_conntrack_in
+
+     2.67%     0.62%  [.] ep_item_poll.isra.0 -      -
+            |
+             --2.04%--ep_item_poll.isra.0
+
+     2.57%     0.76%  [.] skb_defer_free_flush -      -
+     2.57%     2.57%  [k] mutex_lock -      -
+     2.39%     2.39%  [k] _raw_spin_lock -      -
+     2.38%     2.11%  [k] skb_release_data -      -
+            |
+             --2.11%--send
+                       0x7fc9b86a08f2
+                       entry_SYSCALL_64_after_hwframe
+                       do_syscall_64
+                       __x64_sys_sendto
+                       __sys_sendto
+                       tcp_sendmsg
+                       tcp_sendmsg_locked
+                       __tcp_push_pending_frames
+                       tcp_write_xmit
+                       __tcp_transmit_skb
+                       __ip_queue_xmit
+                       ip_output
+                       ip_finish_output2
+                       __dev_queue_xmit
+                       __local_bh_enable_ip
+                       do_softirq.part.0
+                       handle_softirqs
+                       net_rx_action
+
+     2.35%     2.35%  [k] lock_sock_nested -      -
+     2.22%     2.22%  [.] core_scheduler_native::worker::run_loop -      -
+     2.16%     0.00%  [.] alloc_pages_noprof -      -
+            |
+            ---alloc_pages_mpol
+               __alloc_frozen_pages_noprof
+               |
+                --2.16%--get_page_from_freelist
+                          |
+                           --2.04%--clear_highpages_kasan_tagged
+
+     2.16%     0.00%  [.] alloc_pages_mpol -      -
+            |
+            ---__alloc_frozen_pages_noprof
+               |
+                --2.16%--get_page_from_freelist
+                          |
+                           --2.04%--clear_highpages_kasan_tagged
+
+     2.16%     0.00%  [.] __alloc_frozen_pages_noprof -      -
+            |
+             --2.16%--get_page_from_freelist
+                       |
+                        --2.04%--clear_highpages_kasan_tagged
+
+     2.16%     0.04%  [.] get_page_from_freelist -      -
+            |
+             --2.12%--get_page_from_freelist
+                       |
+                        --2.04%--clear_highpages_kasan_tagged
+
+     2.04%     2.04%  [k] clear_highpages_kasan_tagged -      -
+     2.04%     2.04%  [k] fget -      -
+            |
+             --2.02%--syscall
+                       entry_SYSCALL_64_after_hwframe
+                       do_syscall_64
+                       __do_sys_io_uring_enter
+
+
+
+#
+# (Tip: Use --symfs <dir>[,layout] if your symbol files are in non-standard locations.)
+#
