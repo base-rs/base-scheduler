@@ -1,6 +1,6 @@
 # Echo performance investigation
 
-The baseline was already optimized. Compiler tuning made small differences; repeated experiments identified larger costs in reactor waiting and readiness bookkeeping. All measurements below used Aiko and source revision `5736301fded46c4e5f11d5387950ae2ee0807b94` from the [initial benchmark](results.md). Experimental patches are included as evidence, not applied to the scheduler implementations in this branch.
+The baseline was already optimized. Compiler tuning made small differences; repeated experiments identified larger costs in reactor waiting and readiness bookkeeping. All measurements below used Aiko and source revision `5736301fded46c4e5f11d5387950ae2ee0807b94` from the [initial benchmark](results.md). Experimental patches preserve the isolated investigations. The [implementation follow-up](performance.md) records the final io_uring changes and their combined measurements; the Tokio readiness change remains a prototype.
 
 ## Compiler settings
 
@@ -92,4 +92,4 @@ Whitespace is collapsed in the saved text reports. Re-exporting all six recordin
 
 ## Priorities
 
-Start with the reactor's unnecessary idle-wait work, then the Tokio readiness fast path. Both have measured benefits with small implementation changes. Follow with the capacity fast path and focused experiments on completion-channel reuse and worker wakeups. The latter changes touch ownership and concurrency more deeply, so their safety and performance need to be demonstrated independently.
+The [implementation follow-up](performance.md) addresses the reactor's unnecessary idle-wait work and capacity admission. Remaining candidates include the Tokio readiness fast path, completion-channel reuse, and worker wakeups. Those changes need their own compatibility checks and measurements; completion and worker changes touch ownership and concurrency more deeply.

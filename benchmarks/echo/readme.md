@@ -6,6 +6,8 @@ The [initial Aiko results](results.md) include throughput, latency, variation ac
 
 The [performance investigation](profiling.md) compares compiler settings, identifies CPU and syscall costs, and measures isolated optimization prototypes.
 
+The [io_uring performance improvements](performance.md) describe the implemented fast paths, their relationship to `io-event`, and repeated before/after measurements.
+
 Build and run the comparison on Linux:
 
 ```sh
