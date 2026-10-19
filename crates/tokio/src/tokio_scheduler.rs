@@ -15,6 +15,7 @@ use futures_channel::oneshot;
 use std::{
     io::{self, SeekFrom},
     path::Path,
+    sync::atomic::{AtomicBool, Ordering},
 };
 
 /// Scheduler capabilities backed by an explicitly selected Tokio runtime.
@@ -22,7 +23,7 @@ use std::{
 /// The application keeps the runtime alive and driven, with I/O and time enabled. Sockets belong to their registering runtime; files are compatible across adapter instances. Blocking native work and accepted cleanup use independent bounded pools.
 pub struct TokioScheduler {
     pub(crate) runtime: tokio::runtime::Handle,
-    pub(crate) closed: Cancellation,
+    closed: AtomicBool,
     pub(crate) work: BlockingPool,
     pub(crate) cleanup: BlockingPool,
     pub(crate) tasks: crate::task_service::TaskService,
@@ -56,7 +57,7 @@ impl TokioScheduler {
         Ok(Self {
             tasks: crate::task_service::TaskService::new(runtime.clone()),
             runtime,
-            closed: Cancellation::new(),
+            closed: AtomicBool::new(false),
             work: BlockingPool::new(options),
             cleanup: BlockingPool::new(TokioOptions {
                 threads: 1,
@@ -75,7 +76,7 @@ impl TokioScheduler {
         })
     }
     pub(crate) fn check_open(&self) -> io::Result<()> {
-        if self.closed.is_cancelled() {
+        if self.closed.load(Ordering::Acquire) {
             Err(io::Error::new(
                 io::ErrorKind::BrokenPipe,
                 "scheduler is closed",
@@ -94,9 +95,9 @@ impl TokioScheduler {
         }
         Ok(())
     }
-    /// Close admission and wake pending socket and clock operations. Existing owning task handles remain valid; accepted I/O and cleanup retire normally.
+    /// Close admission without cancelling accepted socket or clock operations. Existing owning task handles remain valid; callers use their explicit cancellation tokens to stop pending operations. Accepted native I/O and cleanup retire normally, while queued general blocking jobs can be discarded and signal delivery stops.
     pub fn close(&self) {
-        self.closed.cancel();
+        self.closed.store(true, Ordering::Release);
         self.tasks.close();
         self.work.close();
         self.cleanup.close();
@@ -105,7 +106,7 @@ impl TokioScheduler {
     }
     /// Close admission and await owned tasks and all accepted native work and cleanup. The Tokio runtime must remain alive and driven throughout shutdown.
     ///
-    /// Coordinate cooperative task cancellation and await task handles before shutdown. A task cannot await shutdown of the scheduler that must drain it. Running synchronous work cannot be interrupted and can prevent shutdown indefinitely. This never shuts down the application's Tokio runtime.
+    /// Coordinate cooperative cancellation and await socket and clock operations before shutdown. These operations are owned by their calling futures and are not separately tracked; shutdown waits for them only through tasks spawned by this adapter. A task cannot await shutdown of the scheduler that must drain it. An uncancelled task or running synchronous work can prevent shutdown indefinitely. This never shuts down the application's Tokio runtime.
     pub async fn shutdown(&self) {
         self.close();
         self.tasks.drain().await;

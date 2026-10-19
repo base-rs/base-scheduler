@@ -33,7 +33,6 @@ impl Clock for TokioScheduler {
         let _registration = tests::Registration::new(&self.timers);
         let mut sleep = pin!(sleep);
         let mut cancelled = pin!(cancellation.cancelled());
-        let mut closed = pin!(self.closed.cancelled());
         poll_fn(|context| {
             let _scope = self.runtime.enter();
             if sleep.as_mut().poll(context).is_ready() {
@@ -41,13 +40,6 @@ impl Clock for TokioScheduler {
             }
             if cancelled.as_mut().poll(context).is_ready() {
                 return Poll::Ready(Err(core_scheduler::Cancelled.into()));
-            }
-            if closed.as_mut().poll(context).is_ready() {
-                return Poll::Ready(Err(std::io::Error::new(
-                    std::io::ErrorKind::BrokenPipe,
-                    "clock is closed",
-                )
-                .into()));
             }
             Poll::Pending
         })

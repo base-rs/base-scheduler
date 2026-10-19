@@ -174,7 +174,7 @@ fn vectored_sends_preserve_short_counts_without_implicitly_advancing_the_owner()
 }
 
 #[test]
-fn closure_wakes_pending_io_and_preserves_owned_inputs() {
+fn closure_preserves_pending_io_and_rejects_new_operations() {
     crate::test_support::run(|| {
         block_on(async {
             let scheduler = scheduler(1);
@@ -196,10 +196,21 @@ fn closure_wakes_pending_io_and_preserves_owned_inputs() {
                     .unwrap(),
                 42
             );
+            let unpolled = scheduler.socket_read(&server, vec![0; 8], &never);
             scheduler.close();
+            assert!(poll_once(&mut reading).await.is_none());
+            // Externally owned operations are not part of the task drain.
+            scheduler.shutdown().await;
+            // The peer can still send after this adapter closes admission.
+            assert_eq!(socket_io::send(client.get_ref(), b"data").unwrap(), 4);
             let (result, buffer) = reading.await;
-            assert_eq!(result.unwrap_err().kind(), io::ErrorKind::BrokenPipe);
+            assert_eq!(result.unwrap(), 4);
             assert_eq!(buffer.as_ptr(), allocation);
+            assert_eq!(&buffer[..4], b"data");
+            assert_eq!(
+                unpolled.await.0.unwrap_err().kind(),
+                io::ErrorKind::BrokenPipe
+            );
             assert_eq!(
                 scheduler.socket_local_address(&client).unwrap_err().kind(),
                 io::ErrorKind::BrokenPipe
@@ -235,6 +246,41 @@ fn closure_wakes_pending_io_and_preserves_owned_inputs() {
             );
             scheduler.shutdown().await;
         })
+    });
+}
+
+#[test]
+fn shutdown_drains_task_owned_io_after_explicit_cancellation() {
+    crate::test_support::run(|| {
+        block_on(async {
+            let scheduler = Arc::new(scheduler(1));
+            let (_client, server) =
+                core_scheduler_conformance::socket::stream_pair(&*scheduler, SocketDomain::Ipv4)
+                    .await;
+            let cancellation = Cancellation::new();
+            let child = cancellation.clone();
+            let owner = scheduler.clone();
+            let buffer = vec![7; 8];
+            let allocation = buffer.as_ptr() as usize;
+            let (started, ready) = futures_channel::oneshot::channel();
+            let task = scheduler
+                .spawn(async move {
+                    let mut reading = Box::pin(owner.socket_read(&server, buffer, &child));
+                    assert!(poll_once(&mut reading).await.is_none());
+                    started.send(()).unwrap();
+                    reading.await
+                })
+                .unwrap();
+            ready.await.unwrap();
+            let mut shutdown = Box::pin(scheduler.shutdown());
+            assert!(poll_once(&mut shutdown).await.is_none());
+            cancellation.cancel();
+            let (result, buffer) = task.await.unwrap();
+            assert!(matches!(result, Err(OperationError::Cancelled(_))));
+            assert_eq!(buffer.as_ptr() as usize, allocation);
+            assert_eq!(buffer, vec![7; 8]);
+            shutdown.await;
+        });
     });
 }
 
@@ -543,6 +589,7 @@ fn borrowed_operations_reject_closed_schedulers_and_preserve_storage_on_errors()
     let address: SocketAddress = "127.0.0.1:0".parse().unwrap();
     socket.get_ref().bind(&address.into()).unwrap();
     let never = Cancellation::never();
+    let token = Cancellation::new();
     let mut target = [0x5a; 4];
     // An unconnected datagram send must report the immediate native error.
     assert!(matches!(
@@ -563,14 +610,16 @@ fn borrowed_operations_reject_closed_schedulers_and_preserve_storage_on_errors()
         &socket,
         &mut target,
         SocketRecvFlags::default(),
-        &never,
+        &token,
     ));
     assert!(block_on(poll_once(&mut pending)).is_none());
     scheduler.close();
-    assert_eq!(
-        block_on(pending).unwrap_err().kind(),
-        io::ErrorKind::BrokenPipe
-    );
+    assert!(block_on(poll_once(&mut pending)).is_none());
+    token.cancel();
+    assert!(matches!(
+        block_on(pending),
+        Err(OperationError::Cancelled(_))
+    ));
     assert_eq!(
         block_on(scheduler.socket_recv_poll(
             &socket,

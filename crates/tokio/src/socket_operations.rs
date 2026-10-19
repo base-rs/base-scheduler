@@ -47,7 +47,6 @@ impl TokioScheduler {
         self.check_open()?;
         let mut operation = pin!(operation);
         let mut cancelled = pin!(cancellation.cancelled());
-        let mut closed = pin!(self.closed.cancelled());
         poll_fn(|context| {
             match operation.as_mut().poll(context) {
                 Poll::Ready(result) => return Poll::Ready(result.map_err(Into::into)),
@@ -55,13 +54,6 @@ impl TokioScheduler {
             }
             if cancelled.as_mut().poll(context).is_ready() {
                 return Poll::Ready(Err(Cancelled.into()));
-            }
-            if closed.as_mut().poll(context).is_ready() {
-                return Poll::Ready(Err(io::Error::new(
-                    io::ErrorKind::BrokenPipe,
-                    "scheduler is closed",
-                )
-                .into()));
             }
             Poll::Pending
         })
