@@ -3,6 +3,7 @@
 
 import argparse
 import datetime
+import hashlib
 import itertools
 import json
 import os
@@ -50,7 +51,7 @@ def sample(binary, backend, workers, connections, size, args):
                 raise RuntimeError("server did not become ready within 30 seconds") from None
             if not address:
                 raise RuntimeError("server exited before printing its address")
-            client_command = client_prefix + [str(binary), "client", address, str(args.client_workers), str(connections), str(size), str(args.warmup), str(args.seconds)]
+            client_command = client_prefix + [str(args.client_binary or binary), "client", address, str(args.client_workers), str(connections), str(size), str(args.warmup), str(args.seconds)]
             result = subprocess.run(client_command, cwd=ROOT, capture_output=True, text=True, timeout=args.warmup + args.seconds + 30, check=True)
             status = server.wait(timeout=30)
             if status:
@@ -75,7 +76,8 @@ def main():
     parser.add_argument("--workers", type=int, nargs="+", default=[1, 4])
     parser.add_argument("--connections", type=int, nargs="+", default=[1, 32])
     parser.add_argument("--bytes", type=int, nargs="+", default=[64, 4096])
-    parser.add_argument("--backends", nargs="+", default=["tokio", "tokio-adapter", "iouring"])
+    parser.add_argument("--backends", nargs="+", default=["tokio", "tokio-adapter", "tokio-adapter-poll", "iouring", "iouring-poll"])
+    parser.add_argument("--client-binary", type=Path, help="reuse a fixed client executable instead of the newly built binary")
     parser.add_argument("--client-workers", type=int, default=4)
     parser.add_argument("--warmup", type=float, default=1)
     parser.add_argument("--seconds", type=float, default=3)
@@ -84,6 +86,10 @@ def main():
     parser.add_argument("--client-cpus", type=cpu_list, default=[])
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
+    if args.client_binary:
+        args.client_binary = args.client_binary.resolve()
+        if not args.client_binary.is_file():
+            parser.error("client binary must exist")
     if min(args.workers + args.connections + args.bytes + [args.client_workers, args.repeats]) < 1 or args.warmup < 0 or args.seconds <= 0:
         parser.error("counts and measurement duration must be positive; warmup must be nonnegative")
     if args.server_cpus and len(args.server_cpus) < max(args.workers):
@@ -99,7 +105,9 @@ def main():
         "dirty": bool(command_output("git", "status", "--porcelain")),
         "rustc": command_output("rustc", "--version"),
         "cargo": command_output("cargo", "--version"),
-        "arguments": dict(vars(args), output=str(args.output)),
+        "arguments": dict(vars(args), output=str(args.output), client_binary=str(args.client_binary) if args.client_binary else None),
+        "binaries": {name: {"path": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+                     for name, path in [("server", binary), ("client", args.client_binary or binary)]},
         "cpu_topology": command_output("lscpu", "-e=CPU,CORE,SOCKET,NODE,CACHE") if sys.platform == "linux" else None,
         "cpu_model": command_output("lscpu") if sys.platform == "linux" else platform.processor(),
         "load_average_before": os.getloadavg() if hasattr(os, "getloadavg") else None,

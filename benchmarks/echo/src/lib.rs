@@ -7,7 +7,7 @@ mod server;
 use std::{error::Error, time::Duration};
 type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;
 
-const USAGE: &str = "Usage: core-scheduler-echo-benchmark server BACKEND WORKERS CONNECTIONS\n       core-scheduler-echo-benchmark client ADDRESS WORKERS CONNECTIONS BYTES WARMUP_SECONDS MEASURE_SECONDS\nBackends: tokio, tokio-adapter, iouring (Linux). Server binds 127.0.0.1:0 and prints its address.";
+const USAGE: &str = "Usage: core-scheduler-echo-benchmark server BACKEND WORKERS CONNECTIONS\n       core-scheduler-echo-benchmark client ADDRESS WORKERS CONNECTIONS BYTES WARMUP_SECONDS MEASURE_SECONDS\nBackends: tokio, tokio-adapter, tokio-adapter-poll, iouring, iouring-poll (last two require Linux). Server binds 127.0.0.1:0 and prints its address.";
 
 fn positive(value: &str) -> Result<usize> {
     let value = value.parse::<usize>()?;

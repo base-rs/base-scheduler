@@ -79,10 +79,19 @@ fn pure_tokio() {
 fn tokio_adapter() {
     smoke("tokio-adapter");
 }
+#[test]
+fn tokio_adapter_poll() {
+    smoke("tokio-adapter-poll");
+}
 #[cfg(target_os = "linux")]
 #[test]
 fn native_iouring() {
     smoke("iouring");
+}
+#[cfg(target_os = "linux")]
+#[test]
+fn native_iouring_poll() {
+    smoke("iouring-poll");
 }
 
 #[test]

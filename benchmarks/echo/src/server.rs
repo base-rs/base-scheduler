@@ -3,8 +3,9 @@
 
 use crate::Result;
 use core_scheduler::{
-    Cancellation, IoBuf, SocketAccept, SocketRead, SocketRegistration, SocketSetOption,
-    SocketWrite, Spawn, TcpNoDelay,
+    Cancellation, IoBuf, SocketAccept, SocketRead, SocketRecvFlags, SocketRecvPoll,
+    SocketRegistration, SocketSendFlags, SocketSendPoll, SocketSetOption, SocketWrite, Spawn,
+    TcpNoDelay,
 };
 use core_scheduler_tokio::TokioScheduler;
 use std::{
@@ -73,12 +74,46 @@ async fn echo<S: SocketRead + SocketWrite>(scheduler: &S, socket: S::Socket) {
     }
 }
 
-async fn scheduler_server<S>(scheduler: Arc<S>, listener: TcpListener, connections: usize)
-where
+async fn echo_poll<S: SocketRecvPoll + SocketSendPoll>(scheduler: &S, socket: S::Socket) {
+    let never = Cancellation::never();
+    let mut buffer = vec![0; BUFFER_SIZE];
+    loop {
+        let count = scheduler
+            .socket_recv_poll(&socket, &mut buffer, SocketRecvFlags::default(), &never)
+            .await
+            .expect("echo operation");
+        if count == 0 {
+            return;
+        }
+        let mut sent = 0;
+        while sent < count {
+            let count = scheduler
+                .socket_send_poll(
+                    &socket,
+                    &buffer[sent..count],
+                    SocketSendFlags::default(),
+                    &never,
+                )
+                .await
+                .expect("echo operation");
+            assert!(count != 0, "echo write made zero progress");
+            sent += count;
+        }
+    }
+}
+
+async fn scheduler_server<S>(
+    scheduler: Arc<S>,
+    listener: TcpListener,
+    connections: usize,
+    poll: bool,
+) where
     S: SocketRegistration
         + SocketAccept
         + SocketRead
         + SocketWrite
+        + SocketRecvPoll
+        + SocketSendPoll
         + SocketSetOption<TcpNoDelay>
         + Spawn
         + Send
@@ -102,7 +137,13 @@ where
         let shared = Arc::clone(&scheduler);
         tasks.push(
             scheduler
-                .spawn(async move { echo(shared.as_ref(), socket).await })
+                .spawn(async move {
+                    if poll {
+                        echo_poll(shared.as_ref(), socket).await;
+                    } else {
+                        echo(shared.as_ref(), socket).await;
+                    }
+                })
                 .expect("spawn echo task"),
         );
     }
@@ -119,7 +160,7 @@ pub(crate) fn run(backend: &str, workers: usize, connections: usize) -> Result<(
             ready(&listener);
             runtime.block_on(tokio_server(listener, connections));
         }
-        "tokio-adapter" => {
+        "tokio-adapter" | "tokio-adapter-poll" => {
             let runtime = crate::runtime(workers);
             let scheduler = Arc::new(TokioScheduler::new(runtime.handle().clone()));
             ready(&listener);
@@ -127,11 +168,12 @@ pub(crate) fn run(backend: &str, workers: usize, connections: usize) -> Result<(
                 Arc::clone(&scheduler),
                 listener,
                 connections,
+                backend == "tokio-adapter-poll",
             ));
             runtime.block_on(scheduler.shutdown());
         }
         #[cfg(target_os = "linux")]
-        "iouring" => {
+        "iouring" | "iouring-poll" => {
             use core_scheduler_iouring::{IoUringOptions, IoUringSelector};
             use core_scheduler_native::{NativeExecutorOptions, NativeScheduler};
             let (selector, drivers) = IoUringSelector::with_workers(
@@ -158,6 +200,7 @@ pub(crate) fn run(backend: &str, workers: usize, connections: usize) -> Result<(
                 Arc::clone(&scheduler),
                 listener,
                 connections,
+                backend == "iouring-poll",
             ));
             scheduler.block_on(scheduler.shutdown());
         }

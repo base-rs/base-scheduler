@@ -1,6 +1,6 @@
 # TCP echo benchmark
 
-Compare pure Tokio, `TokioScheduler`, and `NativeScheduler<IoUringSelector>` using the same persistent-connection TCP echo workload. The private workspace package adds no dependencies to the public scheduler interface.
+Compare pure Tokio, `TokioScheduler`, and `NativeScheduler<IoUringSelector>` using the same persistent-connection TCP echo workload. Both scheduler adapters offer owned-buffer and borrowed `_poll` cases. The private workspace package adds no dependencies to the public scheduler interface.
 
 The [initial Aiko results](results.md) include throughput, latency, variation across repetitions, and raw samples.
 
@@ -14,11 +14,21 @@ Build and run the comparison on Linux:
 python3 benchmarks/echo/run.py --server-cpus 0-3 --client-cpus 4-7 --output /tmp/echo-results.json
 ```
 
-Check `lscpu -e=CPU,CORE,SOCKET,NODE,CACHE` first: those CPU numbers must refer to separate physical cores, preferably sharing one last-level cache. The runner uses the first `workers` entries from the server CPU set. CPU affinity is optional; omit both options on platforms without `taskset`. io_uring requires Linux; use `--backends tokio tokio-adapter` elsewhere.
+Check `lscpu -e=CPU,CORE,SOCKET,NODE,CACHE` first: those CPU numbers must refer to separate physical cores, preferably sharing one last-level cache. The runner uses the first `workers` entries from the server CPU set. CPU affinity is optional; omit both options on platforms without `taskset`. io_uring requires Linux; use `--backends tokio tokio-adapter tokio-adapter-poll` elsewhere.
 
 The default matrix compares 1 and 4 server workers, 1 and 32 connections, and 64-byte and 4 KiB payloads. Each case runs three times with a one-second warmup and three-second measurement. Case and backend order are shuffled with a fixed seed. Adjust `--workers`, `--connections`, `--bytes`, `--repeats`, `--warmup`, and `--seconds` for longer or different workloads. The client has four Tokio workers by default (`--client-workers`).
 
-The runner builds an optimized binary using the checked-in lockfile, then starts separate server and client processes for every sample. Servers bind an ephemeral IPv4 loopback port, accept the requested number of connections, and exit after all clients close. Both peers enable `TCP_NODELAY`. Server buffers are 64 KiB and allocated once per connection; writes handle short transfers. The two scheduler backends run exactly the same generic owned-buffer echo loop. The io_uring configuration uses one ring per worker, 256 SQ entries per ring, and admission capacity of at least the connection count. Its owned reads and writes submit `Recv` and `Send`, while listener handling uses the readiness fallback.
+The runner builds an optimized binary using the checked-in lockfile, then starts separate server and client processes for every sample. Pass `--client-binary /path/to/baseline` to keep an existing client executable fixed across server changes. Raw results record both binary hashes. Servers bind an ephemeral IPv4 loopback port, accept the requested number of connections, and exit after all clients close. Both peers enable `TCP_NODELAY`. Server buffers are 64 KiB and allocated once per connection; writes handle short transfers.
+
+| Backend | Executor | Socket payload I/O |
+| --- | --- | --- |
+| `tokio` | Tokio | `TcpStream::read` / `write_all` with borrowed buffers |
+| `tokio-adapter` | Tokio | Owned `socket_read` / `socket_write`, implemented with readiness |
+| `tokio-adapter-poll` | Tokio | Borrowed `socket_recv_poll` / `socket_send_poll`, implemented with readiness |
+| `iouring` | Native | Owned `socket_read` / `socket_write`, submitting io_uring `Recv` / `Send` |
+| `iouring-poll` | Native | Borrowed `socket_recv_poll` / `socket_send_poll`, using the shared readiness fallback |
+
+The adapters share one generic owned echo loop and one generic borrowed echo loop. The borrowed loop uses default send/receive flags and keeps the buffer in its connection future. Ready calls can finish in the same task poll; calls returning `WouldBlock` wait for readiness. The io_uring configurations both retain one ring per worker, 256 SQ entries per ring, and admission capacity of at least the connection count. `iouring-poll` does not submit payload transfers to those rings. Listener handling uses the readiness fallback in both cases. Comparing owned and borrowed modes therefore measures a change of I/O mechanism for the native backend, while both Tokio adapter modes already use readiness.
 
 The client connects and allocates buffers and histograms before warmup. All connections use one shared measurement window. Each sends one complete payload, waits for its full echo, verifies the bytes, and then sends the next request. Only round trips entirely inside the measurement window are counted. Neither connection setup nor warmup contributes to the reported throughput or latency histogram. One request means one round trip; payload MiB/s counts bytes in one direction, so aggregate TCP payload traffic is twice that figure.
 
