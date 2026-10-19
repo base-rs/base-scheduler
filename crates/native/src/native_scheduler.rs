@@ -64,6 +64,38 @@ impl<S: Selector> NativeScheduler<S> {
         }
     }
 
+    /// Compose one independently owned I/O driver per native task worker. Drivers are entered and driven by those workers; no separate I/O thread is started. Root and external operations use the selector's documented routing policy.
+    ///
+    /// The number of drivers must equal `options.workers`. Failed construction closes the selector and drops unstarted drivers. Worker shutdown continues driving accepted I/O until it retires, even after task abandonment.
+    pub fn with_drivers<D: core_scheduler_selector::SelectorDriver>(
+        selector: S,
+        drivers: Vec<D>,
+        options: NativeExecutorOptions,
+    ) -> io::Result<Self> {
+        let result = if options.workers == 0
+            || options.timer_capacity == 0
+            || drivers.len() != options.workers
+        {
+            Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "one driver per nonzero worker and nonzero timer capacity are required",
+            ))
+        } else {
+            crate::task_service::TaskService::with_drivers(drivers)
+        };
+        match result {
+            Ok(tasks) => Ok(Self {
+                selector,
+                tasks,
+                timers: crate::timer_service::TimerService::new(options.timer_capacity),
+            }),
+            Err(error) => {
+                selector.close();
+                Err(error)
+            }
+        }
+    }
+
     /// Access the explicitly selected I/O capabilities.
     pub fn selector(&self) -> &S {
         &self.selector
@@ -140,3 +172,6 @@ impl<S: Selector> Spawn for NativeScheduler<S> {
 }
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod driver_tests;

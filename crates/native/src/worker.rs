@@ -8,6 +8,7 @@ use std::cell::RefCell;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, OnceLock, Weak};
 use std::thread::{self, Thread};
+use std::{task::Waker, time::Duration};
 
 // Check external work regularly even when the local queue stays busy.
 const EXTERNAL_INTERVAL: usize = 61;
@@ -17,6 +18,7 @@ pub(crate) struct WorkerState {
     stealer: Stealer<Runnable>,
     sleeping: AtomicBool,
     thread: OnceLock<Thread>,
+    driver_waker: OnceLock<Waker>,
 }
 
 impl WorkerState {
@@ -26,6 +28,7 @@ impl WorkerState {
             stealer,
             sleeping: AtomicBool::new(false),
             thread: OnceLock::new(),
+            driver_waker: OnceLock::new(),
         }
     }
 
@@ -35,6 +38,9 @@ impl WorkerState {
                 .get()
                 .expect("sleeping worker has registered its thread")
                 .unpark();
+            if let Some(waker) = self.driver_waker.get() {
+                waker.wake_by_ref();
+            }
             true
         } else {
             false
@@ -221,7 +227,44 @@ fn find_work(shared: &Shared, iteration: usize) -> Steal<Runnable> {
     })
 }
 
+fn drive(
+    driver: &mut Option<&mut dyn core_scheduler_selector::SelectorWorker>,
+    timeout: Option<Duration>,
+) {
+    if let Some(active) = driver.as_mut() {
+        if !matches!(active.turn(timeout), Ok(false)) {
+            *driver = None;
+        }
+    } else if timeout.is_none() {
+        thread::park();
+    }
+}
+
 pub(crate) fn run(shared: Arc<Shared>, identifier: usize, ready: Worker<Runnable>) {
+    run_loop(shared, identifier, ready, None);
+}
+
+pub(crate) fn run_driven<D: core_scheduler_selector::SelectorDriver>(
+    shared: Arc<Shared>,
+    identifier: usize,
+    ready: Worker<Runnable>,
+    driver: D,
+) {
+    use core_scheduler_selector::SelectorWorker;
+    let mut driver = driver.enter();
+    shared.workers[identifier]
+        .driver_waker
+        .set(driver.waker())
+        .expect("worker driver registered once");
+    run_loop(shared, identifier, ready, Some(&mut driver));
+}
+
+fn run_loop(
+    shared: Arc<Shared>,
+    identifier: usize,
+    ready: Worker<Runnable>,
+    mut driver: Option<&mut dyn core_scheduler_selector::SelectorWorker>,
+) {
     let worker = &shared.workers[identifier];
     worker
         .thread
@@ -238,7 +281,16 @@ pub(crate) fn run(shared: Arc<Shared>, identifier: usize, ready: Worker<Runnable
     loop {
         iteration = iteration.wrapping_add(1);
         if shared.finished() {
+            if let Some(active) = driver.as_mut() {
+                active.close();
+                drive(&mut driver, None);
+                continue;
+            }
             break;
+        }
+        // Publish the whole completion batch before polling any task on this worker. Bound task polling so a permanently runnable task cannot starve ring progress.
+        if iteration % EXTERNAL_INTERVAL == 1 {
+            drive(&mut driver, Some(Duration::ZERO));
         }
         let search_result = classify_search(find_work(&shared, iteration));
         let should_park = matches!(&search_result, SearchResult::Empty);
@@ -247,17 +299,19 @@ pub(crate) fn run(shared: Arc<Shared>, identifier: usize, ready: Worker<Runnable
             SearchResult::Retry | SearchResult::Empty => None,
         };
         let runnable = if should_park {
+            drive(&mut driver, Some(Duration::ZERO));
             worker.sleeping.store(true, Ordering::SeqCst);
             shared.idle_workers.fetch_add(1, Ordering::SeqCst);
             // Pair with the enqueuer's fence: either this search observes its queued work, or the enqueuer observes an idle worker.
             std::sync::atomic::fence(Ordering::SeqCst);
             // Recheck after publishing the sleeping flag. An unpark token remains available if work arrives immediately before park().
+            let driver = RefCell::new(&mut driver);
             take_idle_runnable(finish_idle_search(
                 worker,
                 &shared.idle_workers,
                 find_work(&shared, iteration),
                 &|| !shared.finished(),
-                &thread::park,
+                &|| drive(&mut driver.borrow_mut(), None),
             ))
         } else {
             runnable

@@ -169,6 +169,21 @@ impl TaskService {
         }
         Ok(service)
     }
+    pub(crate) fn with_drivers<D: core_scheduler_selector::SelectorDriver>(
+        drivers: Vec<D>,
+    ) -> io::Result<Self> {
+        let queues: Vec<_> = (0..drivers.len()).map(|_| Worker::new_fifo()).collect();
+        let service = Self {
+            shared: Arc::new(Shared::new(&queues)),
+        };
+        for (identifier, (queue, driver)) in queues.into_iter().zip(drivers).enumerate() {
+            let shared = Arc::clone(&service.shared);
+            thread::start("core-native-task", move || {
+                worker::run_driven(shared, identifier, queue, driver)
+            })?;
+        }
+        Ok(service)
+    }
     pub(crate) fn spawn<F>(&self, future: F) -> Result<NativeTask<F::Output>, SpawnError>
     where
         F: Future + Send + 'static,

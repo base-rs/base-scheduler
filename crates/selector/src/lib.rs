@@ -46,3 +46,9 @@ mod selector_options;
 pub use readiness_selector::ReadinessSelector;
 pub use selector::Selector;
 pub use selector_options::SelectorOptions;
+
+mod selector_driver;
+pub use selector_driver::SelectorDriver;
+
+mod selector_worker;
+pub use selector_worker::SelectorWorker;

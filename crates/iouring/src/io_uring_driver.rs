@@ -1,8 +1,8 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use crate::io_uring_selector::{Controller, Reactor, SignalCompletion};
-use core_scheduler_selector::ReadinessSelector;
+use crate::io_uring_selector::{Controller, DriverGroup, Reactor, SignalCompletion};
+use core_scheduler_selector::SelectorDriver;
 use std::{io, sync::Arc, time::Duration};
 
 /// Exclusive ring driver. Submission handles may be used on other threads; only this owner processes the ring.
@@ -11,7 +11,7 @@ use std::{io, sync::Arc, time::Duration};
 pub struct IoUringDriver {
     pub(crate) reactor: Option<Reactor>,
     pub(crate) controller: Arc<Controller>,
-    pub(crate) fallback: Arc<ReadinessSelector>,
+    pub(crate) group: Arc<DriverGroup>,
     pub(crate) completion: Option<SignalCompletion>,
 }
 impl IoUringDriver {
@@ -35,9 +35,9 @@ impl IoUringDriver {
         while !self.turn(None)? {}
         Ok(())
     }
-    fn stop(&mut self) {
+    pub(crate) fn stop(&mut self) {
         self.controller.close();
-        self.fallback.close();
+        self.group.close();
         // Retain unknown in-flight storage before waking shutdown or result waiters.
         drop(self.reactor.take());
         drop(self.completion.take());
@@ -46,5 +46,12 @@ impl IoUringDriver {
 impl Drop for IoUringDriver {
     fn drop(&mut self) {
         self.stop();
+    }
+}
+
+impl SelectorDriver for IoUringDriver {
+    type Worker = crate::IoUringWorker;
+    fn enter(self) -> Self::Worker {
+        crate::IoUringWorker::new(self)
     }
 }

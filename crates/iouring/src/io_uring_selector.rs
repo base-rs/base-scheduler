@@ -17,8 +17,8 @@ use std::{
     os::{fd::AsRawFd, unix::net::UnixStream},
     pin::pin,
     sync::{
-        Arc, Mutex,
-        atomic::{AtomicBool, AtomicU64, Ordering},
+        Arc, OnceLock, Weak,
+        atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
         mpsc,
     },
     task::Poll,
@@ -158,7 +158,7 @@ impl<B: IoBuf> Drop for Request<B> {
 
 // One erased request allocation lets a selector queue heterogeneous owned buffer types. Its typed completion returns the exact original owner.
 // Only entry preparation (before publication) and original completion may access the request exclusively. In-flight bookkeeping uses shared access so inline UnsafeCell output can remain kernel-accessible without creating an aliasing mutable reference.
-trait PendingRequest: Send {
+pub(crate) trait PendingRequest: Send {
     fn identifier(&self) -> u64;
     fn entry(&mut self) -> squeue::Entry;
     fn finish(self: Box<Self>, result: io::Result<usize>);
@@ -207,9 +207,10 @@ impl Drop for InFlight {
     }
 }
 
-enum Command {
+pub(crate) enum Command {
     Submit(Box<dyn PendingRequest>),
     Cancel(u64),
+    CancelAfterSubmission(u64),
     Shutdown,
 }
 
@@ -236,6 +237,22 @@ pub(crate) struct Controller {
 }
 
 impl Controller {
+    pub(crate) fn send(&self, command: Command) -> Result<(), mpsc::SendError<Command>> {
+        if matches!(&command, Command::Submit(_)) && self.closed.load(Ordering::Acquire) {
+            return Err(mpsc::SendError(command));
+        }
+        let command = match crate::io_uring_worker::enqueue(self, command) {
+            Ok(()) => return Ok(()),
+            Err(command) => command,
+        };
+        self.send_remote(command)
+    }
+    pub(crate) fn send_remote(&self, command: Command) -> Result<(), mpsc::SendError<Command>> {
+        let result = self.commands.send(command);
+        self.notify();
+        result
+    }
+
     fn notify(&self) {
         // A full pipe already contains a wakeup. Other errors mean the selector
         // has exited; dropping its receivers wakes pending operation futures.
@@ -250,8 +267,7 @@ impl Controller {
     pub(crate) fn close(&self) {
         if !self.closed.swap(true, Ordering::AcqRel) {
             self.capacity.close();
-            let _ = self.commands.send(Command::Shutdown);
-            self.notify();
+            let _ = self.send(Command::Shutdown);
         }
     }
 }
@@ -270,11 +286,7 @@ struct CancelOnDrop {
 impl CancelOnDrop {
     fn request(&mut self) {
         if self.armed {
-            let _ = self
-                .controller
-                .commands
-                .send(Command::Cancel(self.identifier));
-            self.controller.notify();
+            let _ = self.controller.send(Command::Cancel(self.identifier));
             self.armed = false;
         }
     }
@@ -285,21 +297,23 @@ impl Drop for CancelOnDrop {
     }
 }
 
+const CAPACITY_CLOSED: usize = 1 << (usize::BITS - 1);
+
 struct Capacity {
-    state: Mutex<(usize, bool)>,
+    state: AtomicUsize,
     available: CompletionEvent,
     limit: usize,
 }
 struct Permit(Arc<Capacity>);
 impl Drop for Permit {
     fn drop(&mut self) {
-        self.0.state.lock().unwrap().0 -= 1;
+        self.0.state.fetch_sub(1, Ordering::AcqRel);
         self.0.available.notify(usize::MAX);
     }
 }
 impl Capacity {
     pub(crate) fn close(&self) {
-        self.state.lock().unwrap().1 = true;
+        self.state.fetch_or(CAPACITY_CLOSED, Ordering::AcqRel);
         self.available.notify(usize::MAX);
     }
     async fn acquire(self: &Arc<Self>, cancellation: &Cancellation) -> io::Result<Permit> {
@@ -310,13 +324,24 @@ impl Capacity {
                 .check()
                 .map_err(|error| io::Error::new(io::ErrorKind::Interrupted, error))?;
             {
-                let mut state = self.state.lock().unwrap();
-                if state.1 {
+                let state = self.state.load(Ordering::Acquire);
+                if state & CAPACITY_CLOSED != 0 {
                     return Err(io::ErrorKind::BrokenPipe.into());
                 }
-                if state.0 < self.limit {
-                    state.0 += 1;
-                    return Ok(Permit(Arc::clone(self)));
+                if state < self.limit {
+                    if self
+                        .state
+                        .compare_exchange_weak(
+                            state,
+                            state + 1,
+                            Ordering::AcqRel,
+                            Ordering::Acquire,
+                        )
+                        .is_ok()
+                    {
+                        return Ok(Permit(Arc::clone(self)));
+                    }
+                    continue;
                 }
             }
             let mut listener = pin!(listener);
@@ -330,23 +355,85 @@ impl Capacity {
         }
     }
 }
+pub(crate) struct DriverGroup {
+    controllers: OnceLock<Vec<Weak<Controller>>>,
+    fallback: Arc<ReadinessSelector>,
+    closed: AtomicBool,
+}
+impl DriverGroup {
+    pub(crate) fn close(&self) {
+        if !self.closed.swap(true, Ordering::AcqRel) {
+            self.fallback.close();
+            if let Some(controllers) = self.controllers.get() {
+                for controller in controllers.iter().filter_map(Weak::upgrade) {
+                    controller.close();
+                }
+            }
+        }
+    }
+}
+
 /// Owned I/O admission endpoint, independent of the executor polling its futures.
 ///
-/// `new` returns a separate driver and starts no ring thread. File transfers use io_uring; other capabilities explicitly use the readiness fallback. Dropping this endpoint closes admission without blocking.
+/// Construction returns separate drivers and starts no ring thread. File transfers use io_uring; other capabilities share one readiness fallback. Dropping this endpoint closes admission without blocking.
 pub struct IoUringSelector {
-    controller: Arc<Controller>,
+    controllers: Vec<Arc<Controller>>,
+    group: Arc<DriverGroup>,
+    external_next: AtomicUsize,
     pub(crate) fallback: Arc<ReadinessSelector>,
 }
 impl IoUringSelector {
     /// Create an endpoint and its driver. The driver must be run throughout operation and shutdown. Unsupported kernels or restricted ring setup return errors; ring file transfers never silently fall back.
     pub fn new(options: IoUringOptions) -> io::Result<(Self, IoUringDriver)> {
-        if options.entries == 0 || options.capacity == 0 {
+        let (selector, mut drivers) = Self::with_workers(options, 1)?;
+        Ok((selector, drivers.pop().expect("one driver was requested")))
+    }
+
+    /// Create one ring per worker and one shared readiness fallback. Entries and request capacity apply separately to each ring. Local operations select the entered worker belonging to this selector; external callers use round-robin routing. An operation keeps its chosen ring through admission, completion, and cancellation, even if its task migrates.
+    ///
+    /// Move the returned drivers into `NativeScheduler::with_drivers`, or enter and drive each from its own event loop. Stopping or failing any driver closes admission across the group; all other drivers must continue retiring their accepted work.
+    pub fn with_workers(
+        options: IoUringOptions,
+        workers: usize,
+    ) -> io::Result<(Self, Vec<IoUringDriver>)> {
+        if options.entries == 0
+            || options.capacity == 0
+            || options.capacity >= CAPACITY_CLOSED
+            || workers == 0
+        {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                "ring entries and request capacity must be nonzero",
+                "nonzero ring entries, workers, and capacity below isize::MAX + 1 are required",
             ));
         }
         let fallback = Arc::new(ReadinessSelector::with_options(options.fallback)?);
+        let group = Arc::new(DriverGroup {
+            controllers: OnceLock::new(),
+            fallback: Arc::clone(&fallback),
+            closed: AtomicBool::new(false),
+        });
+        let mut controllers = Vec::with_capacity(workers);
+        let mut drivers = Vec::with_capacity(workers);
+        for _ in 0..workers {
+            let driver = Self::driver(options, Arc::clone(&group))?;
+            controllers.push(Arc::clone(&driver.controller));
+            drivers.push(driver);
+        }
+        let _ = group
+            .controllers
+            .set(controllers.iter().map(Arc::downgrade).collect());
+        Ok((
+            Self {
+                controllers,
+                group,
+                external_next: AtomicUsize::new(0),
+                fallback,
+            },
+            drivers,
+        ))
+    }
+
+    fn driver(options: IoUringOptions, group: Arc<DriverGroup>) -> io::Result<IoUringDriver> {
         let ring = syscall("ring", || IoUring::new(options.entries))?;
         syscall("completion-support", || {
             validate_completion_support(
@@ -368,7 +455,7 @@ impl IoUringSelector {
             event: CompletionEvent::new(),
         });
         let capacity = Arc::new(Capacity {
-            state: Mutex::new((0, false)),
+            state: AtomicUsize::new(0),
             available: CompletionEvent::new(),
             limit: options.capacity,
         });
@@ -380,44 +467,36 @@ impl IoUringSelector {
             closed: AtomicBool::new(false),
             shutdown: Arc::clone(&shutdown),
         });
-        let reactor = Reactor::new(ring, receiver, incoming)?;
-        let driver = IoUringDriver {
+        let reactor = Reactor::new(ring, receiver, incoming, Arc::clone(&controller))?;
+        Ok(IoUringDriver {
             reactor: Some(reactor),
-            controller: Arc::clone(&controller),
-            fallback: Arc::clone(&fallback),
+            controller,
+            group,
             completion: Some(SignalCompletion(shutdown)),
-        };
-        Ok((
-            Self {
-                controller,
-                fallback,
-            },
-            driver,
-        ))
+        })
     }
 
     /// Stop admission and request cancellation of accepted ring work. This does not wait for retirement.
     pub fn close(&self) {
-        self.controller.close();
-        self.fallback.close();
+        self.group.close();
     }
 
     /// Close admission and await fallback and ring retirement. Continue driving the separately owned driver while awaiting this method.
     pub async fn shutdown(&self) {
         self.close();
         self.fallback.shutdown().await;
-        loop {
-            event_listener::listener!(self.controller.shutdown.event => listener);
-            if self.controller.shutdown.finished.load(Ordering::Acquire) {
-                return;
+        for controller in &self.controllers {
+            loop {
+                event_listener::listener!(controller.shutdown.event => listener);
+                if controller.shutdown.finished.load(Ordering::Acquire) {
+                    break;
+                }
+                listener.await;
             }
-            listener.await;
         }
     }
     fn check_open(&self) -> io::Result<()> {
-        if self.controller.closed.load(Ordering::Acquire)
-            || self.controller.shutdown.finished.load(Ordering::Acquire)
-        {
+        if self.group.closed.load(Ordering::Acquire) {
             Err(io::Error::new(
                 io::ErrorKind::BrokenPipe,
                 "io_uring selector is closed",
@@ -425,6 +504,13 @@ impl IoUringSelector {
         } else {
             Ok(())
         }
+    }
+
+    fn route(&self) -> Arc<Controller> {
+        crate::io_uring_worker::route(&self.group).unwrap_or_else(|| {
+            let index = self.external_next.fetch_add(1, Ordering::Relaxed) % self.controllers.len();
+            Arc::clone(&self.controllers[index])
+        })
     }
 
     async fn operation<B: IoBuf>(
@@ -456,11 +542,12 @@ impl IoUringSelector {
                 buffer,
             );
         }
-        let permit = match self.controller.capacity.acquire(cancellation).await {
+        let controller = self.route();
+        let permit = match controller.capacity.acquire(cancellation).await {
             Ok(permit) => permit,
             Err(error) => return (Err(error), buffer),
         };
-        let identifier = match self.next_identifier() {
+        let identifier = match Self::next_identifier(&controller) {
             Ok(identifier) => identifier,
             Err(error) => return (Err(error), buffer),
         };
@@ -475,13 +562,13 @@ impl IoUringSelector {
             reply: Cell::new(Some(reply)),
             cancelling: Cell::new(false),
         };
-        self.submit(Box::new(request), result, cancellation).await
+        Self::submit(controller, Box::new(request), result, cancellation).await
     }
 
     // `try_update` is not available on the supported Rust 1.85 toolchain.
     #[allow(deprecated)]
-    fn next_identifier(&self) -> io::Result<u64> {
-        self.controller
+    fn next_identifier(controller: &Controller) -> io::Result<u64> {
+        controller
             .next_identifier
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |identifier| {
                 (identifier < CANCEL_TAG - 1).then_some(identifier + 1)
@@ -490,14 +577,14 @@ impl IoUringSelector {
     }
 
     async fn submit<T>(
-        &self,
+        controller: Arc<Controller>,
         request: Box<dyn PendingRequest>,
         result: oneshot::Receiver<T>,
         cancellation: &Cancellation,
     ) -> T {
         let identifier = request.identifier();
         if let Err(mpsc::SendError(Command::Submit(request))) =
-            self.controller.commands.send(Command::Submit(request))
+            controller.send(Command::Submit(request))
         {
             request.finish(Err(io::Error::new(
                 io::ErrorKind::BrokenPipe,
@@ -506,11 +593,10 @@ impl IoUringSelector {
         }
 
         let mut cancel_request = CancelOnDrop {
-            controller: Arc::clone(&self.controller),
+            controller,
             identifier,
             armed: true,
         };
-        self.controller.notify();
         // A disconnected reply is an unexpected selector failure. Resources whose kernel completion cannot be established are deliberately retained.
         let mut result = pin!(result);
         let mut cancelled = pin!(cancellation.cancelled());
@@ -648,6 +734,7 @@ pub(crate) struct Reactor {
     ring: IoUring,
     notification: UnixStream,
     incoming: mpsc::Receiver<Command>,
+    controller: Arc<Controller>,
     pending: VecDeque<Box<dyn PendingRequest>>,
     in_flight: InFlight,
     cancellations: VecDeque<u64>,
@@ -660,12 +747,14 @@ impl Reactor {
         ring: IoUring,
         notification: UnixStream,
         incoming: mpsc::Receiver<Command>,
+        controller: Arc<Controller>,
     ) -> io::Result<Self> {
         let reactor = Self {
             poller: syscall("poller", Poller::new)?,
             ring,
             notification,
             incoming,
+            controller,
             pending: VecDeque::new(),
             in_flight: InFlight::default(),
             cancellations: VecDeque::new(),
@@ -689,7 +778,7 @@ impl Reactor {
         Ok(reactor)
     }
 
-    fn cancel(&mut self, identifier: u64) {
+    fn cancel(&mut self, identifier: u64) -> bool {
         if let Some(position) = self
             .pending
             .iter()
@@ -700,11 +789,15 @@ impl Reactor {
                 .remove(position)
                 .expect("pending queue is unchanged since finding this position");
             request.finish(Err(io::ErrorKind::Interrupted.into()));
+            true
         } else if let Some(request) = self.in_flight.0.get(&identifier) {
             if !request.cancelling() {
                 request.set_cancelling();
                 self.cancellations.push_back(identifier);
             }
+            true
+        } else {
+            false
         }
     }
 
@@ -712,21 +805,47 @@ impl Reactor {
         let mut progressed = false;
         // Bound command processing so a busy producer cannot starve completions.
         let mut command_batch_full = true;
-        for _ in 0..256 {
-            match self.incoming.try_recv() {
-                Ok(Command::Submit(request)) if !self.closing => {
+        for index in 0..256 {
+            // Alternate local and remote preference so neither producer can starve the other.
+            let local =
+                || crate::io_uring_worker::pop(&self.controller).map(|command| (command, true));
+            let remote = || {
+                self.incoming
+                    .try_recv()
+                    .ok()
+                    .map(|command| (command, false))
+            };
+            let command = if index % 2 == 0 {
+                local().or_else(remote)
+            } else {
+                remote().or_else(local)
+            };
+            match command {
+                Some((Command::Submit(request), _)) if !self.closing => {
                     progressed = true;
                     self.pending.push_back(request)
                 }
-                Ok(Command::Submit(request)) => {
+                Some((Command::Submit(request), _)) => {
                     progressed = true;
                     request.finish(Err(io::ErrorKind::Interrupted.into()))
                 }
-                Ok(Command::Cancel(identifier)) => {
+                Some((Command::Cancel(identifier), local)) => {
+                    progressed = true;
+                    if !self.cancel(identifier) {
+                        // A migrated waiter can cancel through the other queue before its Submit is processed. Defer once to that opposite FIFO: the original Submit was already published before this Cancel existed. Late cancellations are discarded on the second pass rather than retained as tombstones.
+                        let command = Command::CancelAfterSubmission(identifier);
+                        if local {
+                            let _ = self.controller.commands.send(command);
+                        } else {
+                            let _ = crate::io_uring_worker::enqueue(&self.controller, command);
+                        }
+                    }
+                }
+                Some((Command::CancelAfterSubmission(identifier), _)) => {
                     progressed = true;
                     self.cancel(identifier);
                 }
-                Ok(Command::Shutdown) => {
+                Some((Command::Shutdown, _)) => {
                     progressed = true;
                     self.closing = true;
                     for request in self.pending.drain(..) {
@@ -739,13 +858,14 @@ impl Reactor {
                         }
                     }
                 }
-                Err(mpsc::TryRecvError::Empty | mpsc::TryRecvError::Disconnected) => {
+                None => {
                     command_batch_full = false;
                     break;
                 }
             }
         }
 
+        // The CQ iterator snapshots the available batch. Finish publishing every completion in that batch before returning to the executor; application futures are polled only from its ready queue.
         for completion in self.ring.completion() {
             progressed = true;
             let identifier = completion.user_data();
@@ -808,7 +928,11 @@ impl Reactor {
             }
         }
 
-        if self.closing && self.in_flight.0.is_empty() && self.pending.is_empty() {
+        if self.closing
+            && !command_batch_full
+            && self.in_flight.0.is_empty()
+            && self.pending.is_empty()
+        {
             return Ok(true);
         }
 
@@ -862,6 +986,10 @@ impl Drop for Reactor {
     fn drop(&mut self) {
         let _ = self.poller.delete(&self.notification);
         let _ = self.poller.delete(&self.ring);
+        // Pop without retaining a queue borrow: returning a buffer or waking its owner can reenter local routing.
+        while let Some(command) = crate::io_uring_worker::pop(&self.controller) {
+            discard(command);
+        }
     }
 }
 

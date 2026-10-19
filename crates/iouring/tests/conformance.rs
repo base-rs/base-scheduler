@@ -94,6 +94,35 @@ fn run_native(test: impl AsyncFnOnce(&Fixture<NativeScheduler<IoUringSelector>>)
         }
     });
 }
+fn run_native_workers(
+    test: impl AsyncFnOnce(&Fixture<NativeScheduler<IoUringSelector>>) + Send + 'static,
+) {
+    watchdog(move || {
+        let (selector, drivers) =
+            IoUringSelector::with_workers(IoUringOptions::default(), 2).unwrap();
+        let scheduler = NativeScheduler::with_drivers(
+            selector,
+            drivers,
+            NativeExecutorOptions {
+                workers: 2,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let fixture = fixture(scheduler);
+        let result = catch_unwind(AssertUnwindSafe(|| {
+            fixture.scheduler.block_on(test(&fixture))
+        }));
+        block_on(fixture.scheduler.shutdown());
+        if let Err(panic) = result {
+            std::panic::resume_unwind(panic);
+        }
+    });
+}
+mod native_worker_rings {
+    use super::*;
+    core_scheduler_conformance::file_tests!(run: run_native_workers);
+}
 mod independent_selector {
     use super::*;
     core_scheduler_conformance::file_tests!(run: run_selector);

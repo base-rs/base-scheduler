@@ -12,3 +12,6 @@ mod io_uring_selector;
 pub use io_uring_driver::IoUringDriver;
 pub use io_uring_options::IoUringOptions;
 pub use io_uring_selector::IoUringSelector;
+
+mod io_uring_worker;
+pub use io_uring_worker::IoUringWorker;
