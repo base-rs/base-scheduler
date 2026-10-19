@@ -7,7 +7,7 @@ type RegisteredSocket = async_io::Async<socket2::Socket>;
 
 /// An owned nonblocking socket with a retained readiness registration.
 ///
-/// Usable by any native scheduler instance. Operation futures retain their buffers; the reactor retains no payload pointers. Finish outstanding operations before exclusive close. Imported TCP resources must remain nonblocking through external aliases.
+/// Usable by any native scheduler instance. Readiness operations retain their buffers in the waiting future without leaving payload pointers in the reactor. Completion backends retain the socket and buffers independently until their operations retire. Finish outstanding operations before exclusive close. Imported TCP resources must remain nonblocking through external aliases.
 #[derive(Debug)]
 pub struct NativeSocket {
     pub(crate) inner: Arc<RegisteredSocket>,
