@@ -44,9 +44,9 @@ pub(super) fn syscall<T>(
     }
 }
 
-pub(super) struct Failures;
+struct Failures;
 impl Failures {
-    pub(super) fn new(failures: impl IntoIterator<Item = (&'static str, io::Error)>) -> Self {
+    fn new(failures: impl IntoIterator<Item = (&'static str, io::Error)>) -> Self {
         FAILURES.with(|state| {
             *state.borrow_mut() = failures
                 .into_iter()

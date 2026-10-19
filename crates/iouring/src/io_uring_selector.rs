@@ -427,7 +427,7 @@ impl DriverGroup {
 
 /// Owned I/O admission endpoint, independent of the executor polling its futures.
 ///
-/// Construction returns separate drivers and starts no ring thread. Owned file and socket transfers use io_uring, with direct nonblocking attempts for ready scalar socket writes; borrowed sockets try nonblocking syscalls and wait for ring readiness. Other capabilities share one readiness fallback. Dropping this endpoint closes admission without blocking.
+/// Construction returns separate drivers and starts no ring thread. Owned file and socket transfers use io_uring; borrowed sockets try nonblocking syscalls and wait for ring readiness. Other capabilities share one readiness fallback. Dropping this endpoint closes admission without blocking.
 pub struct IoUringSelector {
     controllers: Vec<Arc<Controller>>,
     group: Arc<DriverGroup>,
