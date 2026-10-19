@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import pwd
 import queue
 import random
 import resource
@@ -31,11 +32,21 @@ def sample(args, mode, backend, workers, connections, size, repeat):
     identifier = f"{mode}-{backend}-w{workers}-c{connections}-b{size}-r{repeat}"
     prefix = []
     if mode == "perf":
-        prefix = ["perf", "record", "-q", "-m", "32", "-e", "cycles:u", "-F", "999",
+        prefix = ["perf", "record", "-q", "-m", "32", "-e", args.perf_event, "-F", "999",
                   "--call-graph", "dwarf,8192", "-o", str(args.output / (identifier + ".data")), "--"]
+    elif mode == "stat":
+        events = ["task-clock", "cycles", "instructions", "context-switches", "cpu-migrations"]
+        events += ["syscalls:sys_enter_" + name for name in [
+            "recvfrom", "sendto", "io_uring_enter", "epoll_ctl", "epoll_pwait", "read", "write", "futex",
+        ]]
+        prefix = ["perf", "stat", "-x", ";", "-e", ",".join(events),
+                  "-o", str(args.output / (identifier + ".stat")), "--"]
     elif mode == "strace":
         prefix = ["strace", "-f", "-c", "-S", "calls", "-o", str(args.output / (identifier + ".strace"))]
-    warmup, seconds = (0, 0.5) if mode == "strace" else (1, 5 if mode == "perf" else 3)
+    if args.privileged_perf and mode in ["perf", "stat"]:
+        # Give only the profiler elevated access; execute the server as the original user.
+        prefix = ["sudo", "-n"] + prefix + ["sudo", "-n", "-u", pwd.getpwuid(os.getuid()).pw_name, "--"]
+    warmup, seconds = (0, 0.5) if mode == "strace" else ((0, 3) if mode == "stat" else (1, 5 if mode == "perf" else 3))
     with (args.output / (identifier + ".stderr")).open("w+") as errors:
         started = time.monotonic()
         server = subprocess.Popen(
@@ -84,8 +95,10 @@ def main():
     parser.add_argument("--source", required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--repeats", type=int, default=3)
-    parser.add_argument("--modes", nargs="+", choices=["control", "perf", "strace"],
+    parser.add_argument("--modes", nargs="+", choices=["control", "perf", "strace", "stat"],
                         default=["control", "perf", "strace"])
+    parser.add_argument("--perf-event", default="cycles:u")
+    parser.add_argument("--privileged-perf", action="store_true")
     args = parser.parse_args()
     if args.repeats < 1:
         parser.error("repeats must be positive")
@@ -104,6 +117,7 @@ def main():
         cpu_topology=subprocess.check_output(["lscpu", "-e=CPU,CORE,SOCKET,NODE,CACHE"], text=True),
         server_cpus="0 through workers-1", client_cpus="4-7", client_workers=4,
         seed=20261023, repeats=args.repeats, modes=args.modes,
+        perf_event=args.perf_event, privileged_perf=args.privileged_perf,
         load_average_before=os.getloadavg(), samples=[],
     )
     # Profile and trace separately from controls. Neither instrumented throughput nor CPU totals are capacity measurements.
@@ -113,7 +127,7 @@ def main():
             range(1, repeats + 1), [(1, 1, 64), (1, 1, 4096), (1, 32, 64), (4, 32, 64)],
             ["tokio", "iouring", "iouring-poll"],
         ))
-        random.Random(report["seed"] + ["control", "perf", "strace"].index(mode)).shuffle(cases)
+        random.Random(report["seed"] + ["control", "perf", "strace", "stat"].index(mode)).shuffle(cases)
         for repeat, (workers, connections, size), backend in cases:
             result = sample(args, mode, backend, workers, connections, size, repeat)
             report["samples"].append(result)
@@ -127,13 +141,14 @@ def main():
             continue
         identifier = result["identifier"]
         data = args.output / (identifier + ".data")
+        perf = ["sudo", "-n", "perf"] if args.privileged_perf else ["perf"]
         with (args.output / (identifier + ".self.txt")).open("w") as output:
-            subprocess.run(["perf", "report", "--stdio", "--header", "--no-children", "-g", "none",
+            subprocess.run(perf + ["report", "--stdio", "--header", "--no-children", "-g", "none",
                             "--show-nr-samples", "--sort", "symbol", "--percent-limit", "0.1",
                             "-i", str(data)], stdout=output, check=True)
         if result["repeat"] == 1:
             with (args.output / (identifier + ".callgraph.txt")).open("w") as output:
-                subprocess.run(["perf", "report", "--stdio", "--children", "-g", "graph,1,caller",
+                subprocess.run(perf + ["report", "--stdio", "--children", "-g", "graph,1,caller",
                                 "--sort", "symbol", "--percent-limit", "2", "-i", str(data)],
                                stdout=output, check=True)
 
