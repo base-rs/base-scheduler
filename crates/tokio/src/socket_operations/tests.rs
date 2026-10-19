@@ -407,22 +407,26 @@ fn immediate_cancellation_and_closure_prevent_readiness_submission() {
         Err(OperationError::Cancelled(_))
     ));
     assert!(matches!(
-        block_on(scheduler.cancellable(
+        block_on(scheduler.socket_operation(
+            &socket(),
+            (),
             &cancelled,
-            std::future::poll_fn(|_| -> std::task::Poll<io::Result<()>> {
-                panic!("cancelled operation ran")
-            })
-        )),
+            Interest::Readable,
+            |_, _| -> io::Result<()> { panic!("cancelled operation ran") }
+        ))
+        .0,
         Err(OperationError::Cancelled(_))
     ));
     scheduler.close();
     assert_eq!(
-        block_on(scheduler.cancellable(
+        block_on(scheduler.socket_operation(
+            &socket(),
+            (),
             &never,
-            std::future::poll_fn(|_| -> std::task::Poll<io::Result<()>> {
-                panic!("closed operation ran")
-            })
+            Interest::Readable,
+            |_, _| -> io::Result<()> { panic!("closed operation ran") }
         ))
+        .0
         .unwrap_err()
         .kind(),
         io::ErrorKind::BrokenPipe

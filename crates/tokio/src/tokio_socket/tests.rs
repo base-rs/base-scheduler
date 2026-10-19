@@ -171,6 +171,7 @@ fn registration_is_deferred_until_waiting_and_reused_after_cancellation() {
             token.cancel();
             assert!(matches!(receiving.await, Err(OperationError::Cancelled(_))));
             assert_eq!(target, [0x5a]);
+            assert!(!socket.inner.read_waiting.load(Ordering::Acquire));
             peer.write_all(b"x").unwrap();
             assert_eq!(
                 scheduler
@@ -190,4 +191,182 @@ fn registration_is_deferred_until_waiting_and_reused_after_cancellation() {
             scheduler.shutdown().await;
         });
     });
+}
+
+#[cfg(unix)]
+#[test]
+fn reserved_and_concurrent_waiters_both_receive_readiness_wakeups() {
+    use std::{
+        future::Future,
+        io::{Read, Write},
+        sync::mpsc,
+        task::{Context, Poll, Wake, Waker},
+    };
+    struct Notify(usize, mpsc::Sender<usize>);
+    impl Wake for Notify {
+        fn wake(self: Arc<Self>) {
+            self.wake_by_ref();
+        }
+        fn wake_by_ref(self: &Arc<Self>) {
+            let _ = self.1.send(self.0);
+        }
+    }
+    crate::test_support::run(|| {
+        for interest in [Interest::Readable, Interest::Writable] {
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+            socket2::SockRef::from(&listener)
+                .set_recv_buffer_size(4096)
+                .unwrap();
+            let native = socket2::Socket::from(
+                std::net::TcpStream::connect(listener.local_addr().unwrap()).unwrap(),
+            );
+            native.set_send_buffer_size(4096).unwrap();
+            let (mut peer, _) = listener.accept().unwrap();
+            peer.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+            let descriptor =
+                TokioSocket::new(crate::test_support::runtime().handle(), native).unwrap();
+            let mut filled = 0;
+            if interest == Interest::Writable {
+                // Fill the peer receive window, allow outstanding acknowledgements to settle, and then exhaust the local send queue too.
+                for _ in 0..2 {
+                    loop {
+                        match crate::socket_io::send(descriptor.get_ref(), &[0; 65536]) {
+                            Ok(count) => filled += count,
+                            Err(error) if error.kind() == io::ErrorKind::WouldBlock => break,
+                            Err(error) => panic!("fill socket: {error}"),
+                        }
+                    }
+                    std::thread::sleep(Duration::from_millis(100));
+                }
+            }
+            let mut first_buffer = [0];
+            let mut second_buffer = [0];
+            let operation = |socket: &socket2::Socket, buffer: &mut [u8]| {
+                if interest == Interest::Readable {
+                    crate::socket_io::recv(socket, buffer)
+                } else {
+                    crate::socket_io::send(socket, b"x")
+                }
+            };
+            let mut first =
+                Box::pin(descriptor.io(interest, |socket| operation(socket, &mut first_buffer)));
+            let mut second =
+                Box::pin(descriptor.io(interest, |socket| operation(socket, &mut second_buffer)));
+            let (notified, notifications) = mpsc::channel();
+            let first_waker = Waker::from(Arc::new(Notify(0, notified.clone())));
+            let second_waker = Waker::from(Arc::new(Notify(1, notified)));
+            assert!(matches!(
+                first.as_mut().poll(&mut Context::from_waker(&first_waker)),
+                Poll::Pending
+            ));
+            assert!(matches!(
+                second
+                    .as_mut()
+                    .poll(&mut Context::from_waker(&second_waker)),
+                Poll::Pending
+            ));
+            let draining = if interest == Interest::Readable {
+                peer.write_all(b"ab").unwrap();
+                None
+            } else {
+                Some(std::thread::spawn(move || {
+                    let mut remaining = filled + 2;
+                    let mut buffer = [0; 65536];
+                    while remaining > 0 {
+                        let count = peer.read(&mut buffer).unwrap();
+                        assert_ne!(count, 0);
+                        remaining -= count;
+                    }
+                }))
+            };
+            let mut seen = [false; 2];
+            while !seen.iter().all(|seen| *seen) {
+                seen[notifications
+                    .recv_timeout(Duration::from_secs(5))
+                    .expect("both independent waiters must be woken")] = true;
+            }
+            let (first, second) =
+                futures_lite::future::block_on(futures_lite::future::zip(first, second));
+            assert_eq!(first.unwrap(), 1);
+            assert_eq!(second.unwrap(), 1);
+            if let Some(draining) = draining {
+                draining.join().unwrap();
+            }
+            let waiting = if interest == Interest::Readable {
+                &descriptor.inner.read_waiting
+            } else {
+                &descriptor.inner.write_waiting
+            };
+            assert!(!waiting.load(Ordering::Acquire));
+        }
+    });
+}
+
+#[cfg(unix)]
+#[test]
+fn dropping_or_forgetting_a_reserved_waiter_preserves_other_waiters() {
+    use futures_lite::future::{block_on, poll_once};
+    use std::io::Write;
+    crate::test_support::run(|| {
+        for forget in [false, true] {
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+            let native = std::net::TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+            let (mut peer, _) = listener.accept().unwrap();
+            let descriptor =
+                TokioSocket::new(crate::test_support::runtime().handle(), native.into()).unwrap();
+            let mut first = Box::pin(descriptor.io(Interest::Readable, |socket| {
+                crate::socket_io::recv(socket, &mut [0])
+            }));
+            assert!(block_on(poll_once(&mut first)).is_none());
+            assert!(descriptor.inner.read_waiting.load(Ordering::Acquire));
+            let mut second = Box::pin(descriptor.io(Interest::Readable, |socket| {
+                crate::socket_io::recv(socket, &mut [0])
+            }));
+            assert!(block_on(poll_once(&mut second)).is_none());
+            if forget {
+                std::mem::forget(first);
+            } else {
+                drop(first);
+            }
+            assert_eq!(
+                descriptor.inner.read_waiting.load(Ordering::Acquire),
+                forget
+            );
+            peer.write_all(b"ab").unwrap();
+            assert_eq!(block_on(second).unwrap(), 1);
+            assert_eq!(
+                block_on(
+                    descriptor.io(Interest::Readable, |socket| crate::socket_io::recv(
+                        socket,
+                        &mut [0]
+                    ))
+                )
+                .unwrap(),
+                1
+            );
+        }
+    });
+}
+
+#[cfg(unix)]
+#[test]
+fn runtime_shutdown_wakes_both_reserved_and_concurrent_waiters() {
+    use futures_lite::future::{block_on, poll_once};
+    let runtime = runtime();
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let native = std::net::TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+    let (_peer, _) = listener.accept().unwrap();
+    let descriptor = TokioSocket::new(runtime.handle(), native.into()).unwrap();
+    let mut first = Box::pin(descriptor.io(Interest::Readable, |socket| {
+        crate::socket_io::recv(socket, &mut [0])
+    }));
+    let mut second = Box::pin(descriptor.io(Interest::Readable, |socket| {
+        crate::socket_io::recv(socket, &mut [0])
+    }));
+    assert!(block_on(poll_once(&mut first)).is_none());
+    assert!(block_on(poll_once(&mut second)).is_none());
+    drop(runtime);
+    assert!(block_on(first).is_err());
+    assert!(block_on(second).is_err());
+    assert!(!descriptor.inner.read_waiting.load(Ordering::Acquire));
 }

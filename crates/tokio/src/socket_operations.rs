@@ -21,43 +21,30 @@ impl TokioScheduler {
         interest: Interest,
         mut operation: impl FnMut(&Socket, &mut Input) -> io::Result<Output> + Send,
     ) -> (OperationResult<Output>, Input) {
-        let result = async {
-            cancellation.check()?;
-            self.check_socket(socket)?;
-            self.cancellable(
-                cancellation,
-                socket.io(interest, |socket| operation(socket, &mut input)),
-            )
-            .await
-        }
-        .await;
-        (result, input)
-    }
-    async fn cancellable<T>(
-        &self,
-        cancellation: &Cancellation,
-        operation: impl std::future::Future<Output = io::Result<T>> + Send,
-    ) -> OperationResult<T> {
         use std::{
             future::{Future, poll_fn},
             pin::pin,
             task::Poll,
         };
-        cancellation.check()?;
-        self.check_open()?;
-        let mut operation = pin!(operation);
-        let mut cancelled = pin!(cancellation.cancelled());
-        poll_fn(|context| {
-            match operation.as_mut().poll(context) {
-                Poll::Ready(result) => return Poll::Ready(result.map_err(Into::into)),
-                Poll::Pending => (),
-            }
-            if cancelled.as_mut().poll(context).is_ready() {
-                return Poll::Ready(Err(Cancelled.into()));
-            }
-            Poll::Pending
-        })
-        .await
+        let result = async {
+            cancellation.check()?;
+            self.check_socket(socket)?;
+            let mut operation = pin!(socket.io(interest, |socket| operation(socket, &mut input)));
+            let mut cancelled = pin!(cancellation.cancelled());
+            poll_fn(|context| {
+                match operation.as_mut().poll(context) {
+                    Poll::Ready(result) => return Poll::Ready(result.map_err(Into::into)),
+                    Poll::Pending => (),
+                }
+                if cancelled.as_mut().poll(context).is_ready() {
+                    return Poll::Ready(Err(Cancelled.into()));
+                }
+                Poll::Pending
+            })
+            .await
+        }
+        .await;
+        (result, input)
     }
 }
 

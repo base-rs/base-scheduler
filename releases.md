@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Reuse Tokio cached socket readiness and reserve its lightweight polling path per direction, retaining concurrent waiter and cancellation support.
+
 - Make Tokio scheduler closure admission-only for sockets and clocks. Accepted operations complete or respond to their explicit cancellation token, avoiding per-operation shutdown listeners; applications coordinate cancellation before draining tasks.
 
 - Run io_uring borrowed socket operations as direct nonblocking syscalls followed by per-worker ring readiness waits, avoiding the separate readiness reactor on that path.
