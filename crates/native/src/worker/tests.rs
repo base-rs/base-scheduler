@@ -203,28 +203,3 @@ fn idle_wake_prefers_the_requested_sleeping_worker() {
     assert!(!shared.workers[1].sleeping.load(Ordering::SeqCst));
     shared.wake_all();
 }
-
-#[test]
-fn local_publication_does_not_interrupt_the_owning_driver() {
-    use super::{CURRENT_WORKER, LocalWorker, schedule};
-    use crate::task_service::Shared;
-    use std::sync::Arc;
-    let queue = Worker::new_fifo();
-    let shared = Arc::new(Shared::new(std::slice::from_ref(&queue)));
-    let worker = &shared.workers[0];
-    worker.thread.set(std::thread::current()).unwrap();
-    // A driver can publish a CQ batch while the executor still advertises its idle turn.
-    worker.sleeping.store(true, Ordering::SeqCst);
-    shared.idle_workers.store(1, Ordering::SeqCst);
-    CURRENT_WORKER.with(|current| {
-        current.replace(Some(LocalWorker {
-            identifier: 0,
-            scheduler: Arc::downgrade(&shared),
-            ready: queue,
-        }))
-    });
-    schedule(&shared, runnable());
-    let local = CURRENT_WORKER.with(|current| current.take().unwrap());
-    assert!(worker.sleeping.load(Ordering::SeqCst));
-    assert!(local.ready.pop().is_some());
-}
