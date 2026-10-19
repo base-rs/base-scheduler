@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use super::super::tests::{drain, drive, pair};
+use super::super::tests::{Failures, drain, drive, pair};
 use super::*;
 use futures_lite::future::{block_on, poll_once};
 
@@ -77,6 +77,11 @@ fn scalar_socket_requests_use_ring_opcodes_and_release_before_notification() {
     ));
     let never = Cancellation::never();
     for write in [false, true] {
+        let _failures = Failures::new(if write {
+            vec![("socket-send", io::ErrorKind::WouldBlock.into())]
+        } else {
+            Vec::new()
+        });
         let token = Cancellation::new();
         let mut operation: std::pin::Pin<Box<dyn Future<Output = BufferResult<Vec<u8>>>>> = if write
         {
@@ -137,5 +142,81 @@ fn scalar_socket_requests_use_ring_opcodes_and_release_before_notification() {
     assert_eq!(bytes, [1, 2, 3]);
     block_on(selector.socket_close(sender)).unwrap();
     block_on(selector.socket_close(receiver)).unwrap();
+    drain(&selector, &mut driver);
+}
+
+#[test]
+fn ready_owned_sends_bypass_full_ring_capacity_without_allocating() {
+    let (selector, mut driver) = pair(1);
+    let (sender, receiver) = block_on(core_scheduler_conformance::socket::stream_pair(
+        &selector,
+        SocketDomain::Ipv4,
+    ));
+    let never = Cancellation::never();
+    let permit = block_on(selector.controllers[0].capacity.acquire(&never)).unwrap();
+    selector.controllers[0]
+        .next_identifier
+        .store(CANCEL_TAG - 1, Ordering::Relaxed);
+    let buffer = vec![1, 2, 3];
+    let pointer = buffer.as_ptr();
+    let allocations = {
+        let mut operation = pin!(selector.socket_write(&sender, buffer, &never));
+        let mut context = std::task::Context::from_waker(std::task::Waker::noop());
+        allocation_counter::measure(|| {
+            let Poll::Ready((result, returned)) = operation.as_mut().poll(&mut context) else {
+                panic!("ready writes bypass ring admission");
+            };
+            assert_eq!(result.unwrap(), 3);
+            assert_eq!(returned.as_ptr(), pointer);
+        })
+    };
+    assert_eq!(allocations.count_total, 0);
+    let mut bytes = [0; 3];
+    assert_eq!(
+        receiver
+            .try_recv(&mut bytes, SocketRecvFlags::default())
+            .unwrap(),
+        3
+    );
+    assert_eq!(bytes, [1, 2, 3]);
+    drop(permit);
+    block_on(selector.socket_close(sender)).unwrap();
+    block_on(selector.socket_close(receiver)).unwrap();
+    drain(&selector, &mut driver);
+}
+
+#[test]
+fn owned_send_errors_and_interruption_preserve_the_owner() {
+    let (selector, mut driver) = pair(1);
+    let (sender, receiver) = block_on(core_scheduler_conformance::socket::stream_pair(
+        &selector,
+        SocketDomain::Ipv4,
+    ));
+    let never = Cancellation::never();
+    {
+        let _failures = Failures::new([("socket-send", io::ErrorKind::PermissionDenied.into())]);
+        let (result, returned) = block_on(selector.socket_write(&sender, vec![7], &never));
+        assert_eq!(result.unwrap_err().kind(), io::ErrorKind::PermissionDenied);
+        assert_eq!(returned, [7]);
+    }
+    {
+        let _failures = Failures::new([("socket-send", io::ErrorKind::Interrupted.into())]);
+        assert_eq!(
+            drive(&mut driver, selector.socket_write(&sender, vec![9], &never))
+                .0
+                .unwrap(),
+            1
+        );
+    }
+    let token = Cancellation::new();
+    token.cancel();
+    let (result, buffer) = block_on(selector.socket_write(&sender, vec![3], &token));
+    assert!(matches!(result, Err(OperationError::Cancelled(_))));
+    assert_eq!(buffer, [3]);
+    selector.close();
+    let (result, buffer) = block_on(selector.socket_write(&sender, vec![5], &never));
+    assert_eq!(result.unwrap_err().kind(), io::ErrorKind::BrokenPipe);
+    assert_eq!(buffer, [5]);
+    drop((sender, receiver));
     drain(&selector, &mut driver);
 }

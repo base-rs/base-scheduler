@@ -83,6 +83,27 @@ impl SocketWrite for IoUringSelector {
         buffer: B,
         cancellation: &Cancellation,
     ) -> BufferResult<B> {
+        if let Err(error) = cancellation.check() {
+            return (Err(error.into()), buffer);
+        }
+        if let Err(error) = self.check_open() {
+            return (Err(error.into()), buffer);
+        }
+        // Ready sends need no ring request. The synchronous attempt retains no payload access; a blocked send still transfers ownership to the ring until original completion.
+        let bytes = buffer.as_ref();
+        match syscall("socket-send", || {
+            socket.try_send(
+                &bytes[..bytes.len().min(i32::MAX as usize)],
+                SocketSendFlags::default(),
+            )
+        }) {
+            Err(error)
+                if matches!(
+                    error.kind(),
+                    io::ErrorKind::WouldBlock | io::ErrorKind::Interrupted
+                ) => {}
+            result => return (result.map_err(Into::into), buffer),
+        }
         let controller = self.route();
         let (result, buffer) = retry_operation(
             self,
