@@ -25,6 +25,46 @@ fn socket() -> TokioSocket {
 }
 
 #[test]
+fn cached_readiness_does_not_delay_lifecycle_calls_or_invalid_operations() {
+    crate::test_support::run(|| {
+        block_on(async {
+            let scheduler = scheduler(2);
+            let never = Cancellation::never();
+            let native = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+            let listener = TokioSocket::new(&scheduler.runtime, native.into()).unwrap();
+            let mut accept = std::pin::pin!(scheduler.socket_accept(&listener, &never));
+            assert!(poll_once(&mut accept).await.is_none());
+            assert!(
+                poll_once(scheduler.socket_listen(&listener, 256, &never))
+                    .await
+                    .expect("listen must not wait on cached write readiness")
+                    .is_ok()
+            );
+
+            let (client, server) =
+                core_scheduler_conformance::socket::stream_pair(&scheduler, SocketDomain::Ipv4)
+                    .await;
+            let mut byte = [0];
+            let mut read = std::pin::pin!(scheduler.socket_recv_poll(
+                &server,
+                &mut byte,
+                SocketRecvFlags::default(),
+                &never,
+            ));
+            assert!(poll_once(&mut read).await.is_none());
+            assert!(
+                poll_once(scheduler.socket_accept(&server, &never))
+                    .await
+                    .expect("invalid accept must return its OS error without waiting")
+                    .is_err()
+            );
+            drop(client);
+            scheduler.shutdown().await;
+        });
+    });
+}
+
+#[test]
 fn socket_cleanup_is_independent_bounded_and_preserves_closed_admission_errors() {
     let scheduler = scheduler(1);
     let (started, start) = mpsc::channel();

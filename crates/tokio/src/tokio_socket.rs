@@ -153,18 +153,17 @@ impl TokioSocket {
     where
         Operation: FnMut(&socket2::Socket) -> io::Result<Output> + Send,
     {
+        // Try every operation before gating on readiness: lifecycle calls, invalid arguments, and state errors can complete even when a previous operation cleared the cached readiness.
+        let result = operation(self.get_ref());
+        if !matches!(&result, Err(error) if error.kind() == io::ErrorKind::WouldBlock) {
+            return result;
+        }
         #[cfg(unix)]
         {
-            // Before the first wait, try the syscall without registration. Linux can report EPOLLHUP for an unconnected TCP socket; Tokio retains closed readiness permanently, which would spin after the socket later connects and a syscall returns WouldBlock. Once registered, consult Tokio's cached readiness instead of repeating a syscall already known to block.
+            // Linux can report EPOLLHUP for an unconnected TCP socket; Tokio retains closed readiness permanently, which would spin after the socket later connects and a syscall returns WouldBlock. Register only after a syscall needs to wait, then reuse the registration on subsequent waits.
             let registration = match self.inner.registration.get() {
                 Some(registration) => registration,
-                None => {
-                    let result = operation(self.get_ref());
-                    if !matches!(&result, Err(error) if error.kind() == io::ErrorKind::WouldBlock) {
-                        return result;
-                    }
-                    self.inner.registration().await?
-                }
+                None => self.inner.registration().await?,
             };
             let interest = match interest {
                 Interest::Readable => tokio::io::Interest::READABLE,
@@ -203,10 +202,6 @@ impl TokioSocket {
 
         #[cfg(windows)]
         {
-            let result = operation(self.get_ref());
-            if !matches!(&result, Err(error) if error.kind() == io::ErrorKind::WouldBlock) {
-                return result;
-            }
             match interest {
                 Interest::Readable => self.inner.read_with(|socket| operation(socket)).await,
                 Interest::Writable => self.inner.write_with(|socket| operation(socket)).await,

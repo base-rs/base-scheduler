@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Reuse Tokio cached socket readiness and reserve its lightweight polling path per direction, retaining concurrent waiter and cancellation support.
+- Reserve Tokio's lightweight socket readiness polling path per direction, retaining concurrent waiter and cancellation support.
 
 - Make Tokio scheduler closure admission-only for sockets and clocks. Accepted operations complete or respond to their explicit cancellation token, avoiding per-operation shutdown listeners; applications coordinate cancellation before draining tasks.
 
