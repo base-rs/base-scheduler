@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add a reproducible TCP echo benchmark comparing pure Tokio, the Tokio adapter, and Native with io_uring, with repeated throughput and round-trip latency measurements.
+
 - Separate native I/O into `core-scheduler-selector` and compose `NativeScheduler<S>` with independently selected capabilities, preserving the default readiness constructor.
 - Add `core-scheduler-iouring` with completion file and owned socket transfers, per-worker rings driven by Native, local submission queues, and independent event-loop or thread driving.
 - Publish completion batches to ready queues before resuming local tasks, and retain ring affinity for cancellation after task migration.

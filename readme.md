@@ -12,7 +12,7 @@ The workspace also contains seven companion crates, released together with the i
 
 - [`core-scheduler-native`](crates/native/readme.md): Socketry's work-stealing executor and native readiness I/O, with Core ownership and shutdown semantics.
 - [`core-scheduler-selector`](crates/selector/readme.md): independent I/O lifecycle contracts and the portable readiness selector.
-- [`core-scheduler-iouring`](crates/iouring/readme.md): Linux completion file I/O with a separately owned event driver and explicit readiness fallback.
+- [`core-scheduler-iouring`](crates/iouring/readme.md): Linux completion file and socket I/O with a separately owned event driver and explicit readiness fallback.
 - [`core-scheduler-timers`](crates/timers/readme.md): runtime-independent batched timers, reusable sleep registrations, and deadline notifications.
 
 ## Explicit operation context
@@ -83,6 +83,8 @@ cargo bake --locked test:coverage --all-targets true
 ```
 
 The tests cover runtime-independent support, generic composition, reusable conformance assertions, and the Direct, Tokio, and Native backends.
+
+The [TCP echo benchmark](benchmarks/echo/readme.md) compares pure Tokio, the Tokio scheduler adapter, and Native with per-worker io_uring rings using separate server and client processes.
 
 ## Contributing
 
