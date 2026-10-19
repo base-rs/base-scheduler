@@ -53,3 +53,22 @@ impl NativeFile {
             .expect("cannot close a file with outstanding operations; cancel and await them first")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn native_retention_keeps_the_file_alive_until_backend_retirement() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("file");
+        std::fs::write(&path, b"retained").unwrap();
+        let file = NativeFile::from_std(File::open(path).unwrap());
+        // SAFETY: This simulated backend only observes metadata, makes no raw-handle or flag changes, and releases its owner before exclusive close.
+        let retained = unsafe { file.retain_native() };
+        assert_eq!(Arc::strong_count(&file.0), 2);
+        assert_eq!(retained.metadata().unwrap().len(), 8);
+        drop(retained);
+        assert_eq!(file.into_file().metadata().unwrap().len(), 8);
+    }
+}

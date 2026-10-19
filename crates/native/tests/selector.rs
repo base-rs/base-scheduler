@@ -105,3 +105,144 @@ fn readiness_is_usable_without_native_task_workers() {
         selector.shutdown().await;
     });
 }
+
+impl core_scheduler::FileAllocate for MemorySelector {
+    async fn file_allocate(
+        &self,
+        file: &Self::File,
+        offset: u64,
+        length: u64,
+        mode: core_scheduler::AllocationMode,
+        cancellation: &Cancellation,
+    ) -> core_scheduler::OperationResult<()> {
+        cancellation.check()?;
+        assert_eq!(file, b"abc");
+        assert_eq!(
+            (offset, length, mode),
+            (1, 2, core_scheduler::AllocationMode::KeepSize)
+        );
+        Err(std::io::Error::from(std::io::ErrorKind::Unsupported).into())
+    }
+}
+impl core_scheduler::FileAdvice for MemorySelector {
+    async fn file_advise(
+        &self,
+        file: &Self::File,
+        offset: u64,
+        length: u64,
+        advice: core_scheduler::AdviceMode,
+    ) -> std::io::Result<()> {
+        assert_eq!(file, b"abc");
+        assert_eq!(
+            (offset, length, advice),
+            (1, 2, core_scheduler::AdviceMode::Sequential)
+        );
+        Err(std::io::ErrorKind::Unsupported.into())
+    }
+    async fn file_advise_submit(
+        &self,
+        file: &Self::File,
+        offset: u64,
+        length: u64,
+        advice: core_scheduler::AdviceMode,
+    ) -> std::io::Result<()> {
+        self.file_advise(file, offset, length, advice).await
+    }
+}
+
+#[test]
+fn optional_file_capabilities_preserve_custom_resources_arguments_and_errors() {
+    use core_scheduler::{AdviceMode, AllocationMode, FileAdvice, FileAllocate};
+    let scheduler = NativeScheduler::with_selector(
+        MemorySelector {
+            closed: Arc::default(),
+            retired: Arc::default(),
+        },
+        NativeExecutorOptions {
+            workers: 1,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    scheduler.block_on(async {
+        assert_eq!(
+            scheduler
+                .file_allocate(
+                    b"abc",
+                    1,
+                    2,
+                    AllocationMode::KeepSize,
+                    &Cancellation::never()
+                )
+                .await
+                .unwrap_err()
+                .kind(),
+            std::io::ErrorKind::Unsupported
+        );
+        assert_eq!(
+            scheduler
+                .file_advise(b"abc", 1, 2, AdviceMode::Sequential)
+                .await
+                .unwrap_err()
+                .kind(),
+            std::io::ErrorKind::Unsupported
+        );
+        assert_eq!(
+            scheduler
+                .file_advise_submit(b"abc", 1, 2, AdviceMode::Sequential)
+                .await
+                .unwrap_err()
+                .kind(),
+            std::io::ErrorKind::Unsupported
+        );
+        scheduler.shutdown().await;
+    });
+}
+
+#[test]
+fn registered_sockets_options_resolution_and_signals_forward_to_the_selector() {
+    use core_scheduler::*;
+    use std::net::{TcpListener, TcpStream};
+    let scheduler = NativeScheduler::new().unwrap();
+    scheduler.block_on(async {
+        let never = Cancellation::never();
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let stream = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+        let peer = scheduler
+            .register_socket(listener.accept().unwrap().0)
+            .unwrap();
+        let listener = scheduler.register_listener(listener).unwrap();
+        let stream = scheduler.register_socket(stream).unwrap();
+        scheduler
+            .socket_set_option(&stream, TcpNoDelay, true, &never)
+            .await
+            .unwrap();
+        assert!(
+            scheduler
+                .socket_get_option(&stream, TcpNoDelay, &never)
+                .await
+                .unwrap()
+        );
+        scheduler
+            .socket_shutdown_submit(&stream, std::net::Shutdown::Write)
+            .await
+            .unwrap();
+        let (result, _) = scheduler.socket_read(&peer, vec![0; 1], &never).await;
+        assert_eq!(result.unwrap(), 0);
+        scheduler.socket_close(stream).await.unwrap();
+        scheduler.socket_close(peer).await.unwrap();
+        scheduler.socket_close(listener).await.unwrap();
+        core_scheduler_conformance::address_resolution::numeric(&scheduler, SocketDomain::Ipv4)
+            .await;
+        #[cfg(unix)]
+        {
+            let target = Cancellation::new();
+            let subscription = scheduler
+                .signal_subscribe(&[libc::SIGUSR1], target.clone())
+                .unwrap();
+            assert!(!target.is_cancelled());
+            drop(subscription);
+        }
+        scheduler.shutdown().await;
+    });
+}

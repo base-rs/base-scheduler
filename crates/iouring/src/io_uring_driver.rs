@@ -7,7 +7,7 @@ use std::{io, sync::Arc, time::Duration};
 
 /// Exclusive ring driver. Submission handles may be used on other threads; only this owner processes the ring.
 ///
-/// Call `turn` from an event loop, or move the driver into a dedicated thread and call `run`. Dropping the driver closes admission; any unretired kernel-accessible requests are deliberately retained on this exceptional path. Orderly shutdown keeps driving until `turn` returns `true`.
+/// Call `turn` from an event loop, or move the driver into a dedicated thread and call `run`. Dropping the driver closes admission; any unretired kernel-accessible requests are deliberately retained on this exceptional path. Their waiting operation futures panic when polled because their owners cannot safely be returned. Orderly shutdown keeps driving until `turn` returns `true`.
 pub struct IoUringDriver {
     pub(crate) reactor: Option<Reactor>,
     pub(crate) controller: Arc<Controller>,

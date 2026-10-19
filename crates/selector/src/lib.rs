@@ -28,6 +28,7 @@ mod system_addresses;
 mod system_file_metadata;
 #[cfg(test)]
 mod test_support;
+#[cfg(unix)]
 mod thread;
 
 pub use blocking_task::BlockingTask;

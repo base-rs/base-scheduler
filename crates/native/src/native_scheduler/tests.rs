@@ -54,6 +54,10 @@ fn default_scheduler_and_borrowed_non_send_root_future_work() {
 fn zero_executor_workers_and_timer_slots_are_rejected() {
     for options in [
         NativeOptions {
+            threads: 0,
+            ..Default::default()
+        },
+        NativeOptions {
             workers: 0,
             ..Default::default()
         },

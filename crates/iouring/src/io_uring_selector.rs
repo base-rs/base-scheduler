@@ -41,7 +41,13 @@ fn syscall<T>(name: &'static str, operation: impl FnOnce() -> io::Result<T>) -> 
     }
 }
 
-fn validate_completion_support(nodrop: bool) -> io::Result<()> {
+fn validate_completion_support(nodrop: bool, rw_cur_pos: bool) -> io::Result<()> {
+    if !rw_cur_pos {
+        return Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "io_uring requires shared file cursor support",
+        ));
+    }
     if nodrop {
         Ok(())
     } else {
@@ -66,6 +72,13 @@ fn validate_operation_support(supported: impl Fn(u8) -> bool) -> io::Result<()> 
         }
     }
     Ok(())
+}
+
+fn discard<T>(value: T) {
+    if let Err(payload) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| drop(value))) {
+        // A destructor panic has no receiving caller; its payload can itself panic on drop.
+        std::mem::forget(payload);
+    }
 }
 
 type RawBufferResult<B> = (io::Result<usize>, B);
@@ -120,7 +133,7 @@ impl<B: IoBuf> Request<B> {
         let buffer = self.buffer.take().expect("request returns its buffer once");
         // Release the retained descriptor before waking a caller that may immediately close it.
         drop(self);
-        let _ = reply.send((result, buffer));
+        discard(reply.send((result, buffer)));
     }
 }
 
@@ -132,13 +145,13 @@ impl<B: IoBuf> Drop for Request<B> {
         // can return their buffers normally. InFlight deliberately suppresses
         // this destructor for requests whose completion is unknown.
         if let Some(reply) = self.reply.take() {
-            let _ = reply.send((
+            discard(reply.send((
                 Err(io::Error::new(
                     io::ErrorKind::BrokenPipe,
                     "selector closed before submission",
                 )),
                 self.buffer.take().expect("request returns its buffer once"),
-            ));
+            )));
         }
     }
 }
@@ -335,7 +348,10 @@ impl IoUringSelector {
         }
         let fallback = Arc::new(ReadinessSelector::with_options(options.fallback)?);
         let ring = syscall("ring", || IoUring::new(options.entries))?;
-        validate_completion_support(ring.params().is_feature_nodrop())?;
+        validate_completion_support(
+            ring.params().is_feature_nodrop(),
+            ring.params().is_feature_rw_cur_pos(),
+        )?;
         let mut probe = io_uring::Probe::new();
         syscall("probe", || ring.submitter().register_probe(&mut probe))?;
         validate_operation_support(|operation| probe.is_supported(operation))?;
@@ -435,9 +451,6 @@ impl IoUringSelector {
                 )),
                 buffer,
             );
-        }
-        if matches!(&resource, Resource::File(_, _)) && buffer.as_ref().is_empty() {
-            return (Ok(0), buffer);
         }
         let permit = match self.controller.capacity.acquire(cancellation).await {
             Ok(permit) => permit,
@@ -795,12 +808,10 @@ impl Reactor {
             return Ok(true);
         }
 
-        // Drain the notification pipe before checking the channel again on
-        // the next iteration. A racing send either leaves a byte or is seen
-        // by try_recv. Use a nonblocking wait when commands may remain.
+        // Bound notification reads too: continuous producers must not monopolize a turn. Unread bytes remain readable after rearming, and any observed notification makes this turn's wait nonblocking.
         let mut notified = false;
         let mut bytes = [0; 256];
-        loop {
+        for _ in 0..16 {
             match syscall("notification-read", || self.notification.read(&mut bytes)) {
                 Ok(0) => break,
                 Ok(_) => notified = true,

@@ -159,9 +159,95 @@ fn composed_tasks_clocks_and_socket_fallback_share_one_explicit_scheduler() {
             .unwrap();
         let (sender, receiver) =
             core_scheduler_conformance::socket::stream_pair(scheduler, SocketDomain::Ipv4).await;
-        core_scheduler_conformance::socket::stream(scheduler, &sender, &receiver).await;
         core_scheduler_conformance::socket_messages::stream(scheduler, &sender, &receiver).await;
+        core_scheduler_conformance::socket::stream(scheduler, &sender, &receiver).await;
         scheduler.socket_close(sender).await.unwrap();
         scheduler.socket_close(receiver).await.unwrap();
+    });
+}
+
+#[test]
+fn fallback_capabilities_compose_with_completion_io() {
+    run_native(async |fixture| {
+        use std::net::{Shutdown, TcpListener, TcpStream};
+        let scheduler = &fixture.scheduler;
+        let never = Cancellation::never();
+        let file = scheduler
+            .file_open(
+                &fixture.path,
+                FileOptions {
+                    write: true,
+                    create: true,
+                    ..FileOptions::READ
+                },
+                &never,
+            )
+            .await
+            .unwrap();
+        scheduler
+            .file_allocate(&file, 0, 4096, AllocationMode::Extend, &never)
+            .await
+            .unwrap();
+        assert_eq!(std::fs::metadata(&fixture.path).unwrap().len(), 4096);
+        scheduler
+            .file_advise(&file, 0, 0, AdviceMode::Sequential)
+            .await
+            .unwrap();
+        scheduler
+            .file_advise_submit(&file, 0, 0, AdviceMode::Normal)
+            .await
+            .unwrap();
+        scheduler.file_close_submit(file).await.unwrap();
+        assert_eq!(
+            scheduler
+                .spawn_blocking(|| 42, &never)
+                .await
+                .unwrap()
+                .await
+                .unwrap(),
+            42
+        );
+        core_scheduler_conformance::address_resolution::numeric(scheduler, SocketDomain::Ipv4)
+            .await;
+        let subscription = scheduler
+            .signal_subscribe(&[libc::SIGUSR1], Cancellation::new())
+            .unwrap();
+        drop(subscription);
+
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let client = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+        let server = scheduler
+            .register_socket(listener.accept().unwrap().0)
+            .unwrap();
+        let listener = scheduler.register_listener(listener).unwrap();
+        let client = scheduler.register_socket(client).unwrap();
+        scheduler
+            .socket_set_option(&client, TcpNoDelay, true, &never)
+            .await
+            .unwrap();
+        assert!(
+            scheduler
+                .socket_get_option(&client, TcpNoDelay, &never)
+                .await
+                .unwrap()
+        );
+        core_scheduler_conformance::socket_poll::scalar_transfer(scheduler, &client, &server).await;
+        core_scheduler_conformance::socket_poll::message_transfer(scheduler, &client, &server)
+            .await;
+        scheduler
+            .socket_shutdown_submit(&client, Shutdown::Write)
+            .await
+            .unwrap();
+        let mut byte = [0];
+        assert_eq!(
+            scheduler
+                .socket_recv_poll(&server, &mut byte, SocketRecvFlags::default(), &never)
+                .await
+                .unwrap(),
+            0
+        );
+        scheduler.socket_close(client).await.unwrap();
+        scheduler.socket_close(server).await.unwrap();
+        scheduler.socket_close_submit(listener).await.unwrap();
     });
 }

@@ -63,7 +63,7 @@ fn rejects_empty_forbidden_native_and_closed_registrations_and_startup_failure()
                 .is_err()
         );
     }
-    thread::FAIL_AFTER.set(Some(0));
+    thread::FAIL_NEXT.set(true);
     assert!(
         scheduler
             .signal_subscribe(&[libc::SIGUSR1], Cancellation::never())

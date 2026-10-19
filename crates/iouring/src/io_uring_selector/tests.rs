@@ -98,9 +98,13 @@ fn drain(selector: &IoUringSelector, driver: &mut IoUringDriver) {
 
 #[test]
 fn setup_probes_and_errors_are_explicit() {
-    assert!(validate_completion_support(true).is_ok());
+    assert!(validate_completion_support(true, true).is_ok());
     assert_eq!(
-        validate_completion_support(false).unwrap_err().kind(),
+        validate_completion_support(false, true).unwrap_err().kind(),
+        io::ErrorKind::Unsupported
+    );
+    assert_eq!(
+        validate_completion_support(true, false).unwrap_err().kind(),
         io::ErrorKind::Unsupported
     );
     assert!(validate_operation_support(|_| true).is_ok());
@@ -172,12 +176,6 @@ fn lazy_precancelled_empty_invalid_and_closed_operations_preserve_the_buffer() {
     let (result, buffer) = block_on(selector.file_read(&file, vec![7], &cancelled));
     assert!(matches!(result, Err(OperationError::Cancelled(_))));
     assert_eq!(buffer, [7]);
-    assert_eq!(
-        block_on(selector.file_read_at(&file, Vec::new(), 0, &never))
-            .0
-            .unwrap(),
-        0
-    );
     let (result, buffer) = block_on(selector.file_write_at(&file, vec![9], u64::MAX, &never));
     assert_eq!(result.unwrap_err().kind(), io::ErrorKind::InvalidInput);
     assert_eq!(buffer, [9]);
@@ -400,4 +398,155 @@ fn successful_completion_wins_cancellation_and_releases_the_file_before_waking()
     assert_eq!(buffer, b"abcdef");
     block_on(selector.file_close(file)).unwrap();
     drain(&selector, &mut driver);
+}
+
+fn drive<F: Future>(driver: &mut IoUringDriver, future: F) -> F::Output {
+    let mut future = pin!(future);
+    let deadline = Instant::now() + Duration::from_secs(10);
+    loop {
+        if let Some(output) = block_on(poll_once(&mut future)) {
+            return output;
+        }
+        driver.turn(Some(Duration::from_millis(10))).unwrap();
+        assert!(Instant::now() < deadline);
+    }
+}
+
+#[test]
+fn empty_operations_keep_native_access_mode_errors() {
+    let (selector, mut driver) = pair(2);
+    let (directory, file) = file(&selector);
+    let never = Cancellation::never();
+    assert_eq!(
+        drive(
+            &mut driver,
+            selector.file_read_at(&file, Vec::new(), 0, &never)
+        )
+        .0
+        .unwrap(),
+        0
+    );
+    assert_eq!(
+        drive(&mut driver, selector.file_write(&file, Vec::new(), &never))
+            .0
+            .unwrap(),
+        0
+    );
+    let read_only =
+        block_on(selector.file_open(&directory.path().join("file"), FileOptions::READ, &never))
+            .unwrap();
+    let write_only = block_on(selector.file_open(
+        &directory.path().join("file"),
+        FileOptions {
+            read: false,
+            write: true,
+            ..Default::default()
+        },
+        &never,
+    ))
+    .unwrap();
+    assert_eq!(
+        drive(
+            &mut driver,
+            selector.file_write(&read_only, Vec::new(), &never)
+        )
+        .0
+        .unwrap_err()
+        .kind(),
+        io::Error::from_raw_os_error(libc::EBADF).kind()
+    );
+    assert_eq!(
+        drive(
+            &mut driver,
+            selector.file_read(&write_only, Vec::new(), &never)
+        )
+        .0
+        .unwrap_err()
+        .kind(),
+        io::Error::from_raw_os_error(libc::EBADF).kind()
+    );
+    drain(&selector, &mut driver);
+}
+
+#[test]
+fn driver_failure_retains_submitted_storage_and_wakes_waiters_with_a_panic() {
+    for fatal_turn in [false, true] {
+        let (selector, mut driver) = pair(1);
+        let (_directory, file) = fifo(&selector);
+        let drops = Arc::new(AtomicUsize::new(0));
+        let never = Cancellation::never();
+        let mut operation = Box::pin(selector.file_read(
+            &file,
+            ObservedBuffer {
+                bytes: vec![0],
+                drops: Arc::clone(&drops),
+            },
+            &never,
+        ));
+        assert!(block_on(poll_once(&mut operation)).is_none());
+        driver.turn(Some(Duration::ZERO)).unwrap();
+        assert_eq!(driver.reactor.as_ref().unwrap().in_flight.0.len(), 1);
+        if fatal_turn {
+            let _failures = Failures::new([("wait", io::ErrorKind::PermissionDenied.into())]);
+            assert_eq!(
+                driver.turn(Some(Duration::ZERO)).unwrap_err().kind(),
+                io::ErrorKind::PermissionDenied
+            );
+        }
+        drop(driver);
+        assert!(
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| block_on(operation))).is_err()
+        );
+        assert_eq!(drops.load(Ordering::SeqCst), 0);
+        assert_eq!(selector.controller.capacity.state.lock().unwrap().0, 1);
+        // SAFETY: Observe the retained owner count without using its descriptor, and release this temporary alias immediately.
+        assert_eq!(Arc::strong_count(&unsafe { file.retain_native() }), 3);
+        block_on(selector.shutdown());
+    }
+}
+
+#[test]
+fn abandoned_buffer_destructor_panics_do_not_stop_other_operations() {
+    struct PanicsOnDrop(Vec<u8>, Arc<AtomicUsize>);
+    impl AsRef<[u8]> for PanicsOnDrop {
+        fn as_ref(&self) -> &[u8] {
+            &self.0
+        }
+    }
+    impl AsMut<[u8]> for PanicsOnDrop {
+        fn as_mut(&mut self) -> &mut [u8] {
+            &mut self.0
+        }
+    }
+    // SAFETY: The wrapper retains stable initialized heap storage across moves.
+    unsafe impl IoBuf for PanicsOnDrop {}
+    // SAFETY: The wrapper exclusively owns its writable storage.
+    unsafe impl IoBufMut for PanicsOnDrop {}
+    impl Drop for PanicsOnDrop {
+        fn drop(&mut self) {
+            self.1.fetch_add(1, Ordering::SeqCst);
+            panic!("abandoned buffer destructor");
+        }
+    }
+    for submitted in [false, true] {
+        let (selector, mut driver) = pair(2);
+        let (_directory, file) = file(&selector);
+        let never = Cancellation::never();
+        let drops = Arc::new(AtomicUsize::new(0));
+        let mut operation =
+            Box::pin(selector.file_read(&file, PanicsOnDrop(vec![0], Arc::clone(&drops)), &never));
+        assert!(block_on(poll_once(&mut operation)).is_none());
+        if submitted {
+            driver.turn(Some(Duration::ZERO)).unwrap();
+        }
+        drop(operation);
+        let (result, buffer) = drive(
+            &mut driver,
+            selector.file_read_at(&file, vec![0; 6], 0, &never),
+        );
+        assert_eq!(result.unwrap(), 6);
+        assert_eq!(buffer, b"abcdef");
+        drain(&selector, &mut driver);
+        assert_eq!(drops.load(Ordering::SeqCst), 1);
+    }
 }

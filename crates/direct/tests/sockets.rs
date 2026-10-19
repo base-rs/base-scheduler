@@ -468,6 +468,14 @@ fn run_io(mode: usize, test: impl AsyncFnOnce(&Fixture<'_>) + Send + 'static) {
             let (result, _) =
                 block_on(scheduler.socket_write(&client, vec![1, 2], &Cancellation::never()));
             assert!(result.unwrap() > 0);
+            // Sending completes when the local kernel accepts bytes. Wait until they reach the peer before gating its first read attempt.
+            let (result, _) = block_on(scheduler.socket_recvmsg(
+                &server,
+                [vec![0; 2]],
+                SocketRecvFlags { peek: true },
+                &Cancellation::never(),
+            ));
+            assert!(result.unwrap().bytes > 0);
         }
         let fixture = Fixture::new(&scheduler, &server, mode);
         let result =
