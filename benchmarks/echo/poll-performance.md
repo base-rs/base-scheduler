@@ -1,5 +1,7 @@
 # Borrowed socket performance
 
+This report records the earlier shared-readiness fallback. The [worker-ring readiness comparison](ring-readiness-performance.md) measures its replacement with direct nonblocking syscalls and per-worker ring waits; references below to the current implementation describe the historical build measured here.
+
 The echo benchmark compares both owned operations and borrowed `socket_recv_poll` / `socket_send_poll` operations against pure Tokio. The goal is to measure the fastest available socket path as well as the completion path. An operation that completes immediately can avoid registration and rescheduling, but the cost of waiting for the next readable socket still matters in this closed-loop workload.
 
 ## Implementations
