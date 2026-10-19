@@ -8,12 +8,12 @@ import json
 import os
 from pathlib import Path
 import platform
-import pwd
 import queue
 import random
 import resource
 import signal
 import subprocess
+import sys
 import threading
 import time
 
@@ -37,21 +37,26 @@ def sample(args, mode, backend, workers, connections, size, repeat):
     elif mode == "stat":
         events = ["task-clock", "cycles", "instructions", "context-switches", "cpu-migrations"]
         events += ["syscalls:sys_enter_" + name for name in [
-            "recvfrom", "sendto", "io_uring_enter", "epoll_ctl", "epoll_pwait", "read", "write", "futex",
+            "recvfrom", "sendto", "io_uring_enter", "epoll_ctl", "epoll_wait", "epoll_pwait", "read", "write", "futex",
         ]]
         prefix = ["perf", "stat", "-x", ";", "-e", ",".join(events),
                   "-o", str(args.output / (identifier + ".stat")), "--"]
     elif mode == "strace":
         prefix = ["strace", "-f", "-c", "-S", "calls", "-o", str(args.output / (identifier + ".strace"))]
-    if args.privileged_perf and mode in ["perf", "stat"]:
+    privileged = args.privileged_perf and mode in ["perf", "stat"]
+    if privileged:
         # Give only the profiler elevated access; execute the server as the original user.
-        prefix = ["sudo", "-n"] + prefix + ["sudo", "-n", "-u", pwd.getpwuid(os.getuid()).pw_name, "--"]
+        # setpriv execs in place, keeping descendants in the supervisor's group.
+        prefix = ["sudo", "-n", sys.executable, str(Path(__file__).with_name("supervise.py"))] + prefix + [
+            "setpriv", f"--reuid={os.getuid()}", f"--regid={os.getgid()}", "--init-groups", "--",
+        ]
     warmup, seconds = (0, 0.5) if mode == "strace" else ((0, 3) if mode == "stat" else (1, 5 if mode == "perf" else 3))
     with (args.output / (identifier + ".stderr")).open("w+") as errors:
         started = time.monotonic()
         server = subprocess.Popen(
             prefix + ["taskset", "-c", ",".join(map(str, range(workers))), str(args.server),
                       "server", backend, str(workers), str(connections)],
+            stdin=subprocess.PIPE if privileged else subprocess.DEVNULL,
             stdout=subprocess.PIPE, stderr=errors, text=True, start_new_session=True,
         )
         try:
@@ -79,12 +84,17 @@ def sample(args, mode, backend, workers, connections, size, repeat):
             print(errors.read(), flush=True)
             raise
         finally:
-            # A profiler can exit while its server child still owns stdout.
-            try:
-                os.killpg(server.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
-            server.wait()
+            if privileged:
+                # The privileged supervisor owns termination of its process group.
+                server.stdin.close()
+                server.wait(timeout=10)
+            else:
+                # A profiler can exit while its server child still owns stdout.
+                try:
+                    os.killpg(server.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                server.wait()
             server.stdout.close()
 
 
