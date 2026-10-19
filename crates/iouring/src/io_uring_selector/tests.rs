@@ -134,6 +134,7 @@ fn setup_probes_and_errors_are_explicit() {
         opcode::Send::CODE,
         opcode::RecvMsg::CODE,
         opcode::SendMsg::CODE,
+        opcode::PollAdd::CODE,
         opcode::AsyncCancel::CODE,
     ] {
         assert_eq!(

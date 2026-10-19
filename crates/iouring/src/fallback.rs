@@ -8,7 +8,7 @@ use core_scheduler_selector::{
 };
 use std::{
     io,
-    io::{IoSlice, IoSliceMut, SeekFrom},
+    io::SeekFrom,
     net::{Shutdown, TcpListener, TcpStream},
     path::Path,
 };
@@ -202,19 +202,6 @@ impl SocketPeerAddress for IoUringSelector {
     }
 }
 
-impl SocketWait for IoUringSelector {
-    async fn socket_wait(
-        &self,
-        socket: &Self::Socket,
-        interest: Interest,
-        cancellation: &Cancellation,
-    ) -> OperationResult<()> {
-        self.fallback
-            .socket_wait(socket, interest, cancellation)
-            .await
-    }
-}
-
 impl SocketClose for IoUringSelector {
     async fn socket_close(&self, socket: Self::Socket) -> io::Result<()> {
         self.fallback.socket_close(socket).await
@@ -230,63 +217,6 @@ impl SocketShutdown for IoUringSelector {
     }
     async fn socket_shutdown_submit(&self, socket: &Self::Socket, how: Shutdown) -> io::Result<()> {
         self.fallback.socket_shutdown_submit(socket, how).await
-    }
-}
-
-impl SocketRecvPoll for IoUringSelector {
-    async fn socket_recv_poll(
-        &self,
-        socket: &Self::Socket,
-        buffer: &mut [u8],
-        flags: SocketRecvFlags,
-        cancellation: &Cancellation,
-    ) -> OperationResult<usize> {
-        self.fallback
-            .socket_recv_poll(socket, buffer, flags, cancellation)
-            .await
-    }
-}
-
-impl SocketSendPoll for IoUringSelector {
-    async fn socket_send_poll(
-        &self,
-        socket: &Self::Socket,
-        buffer: &[u8],
-        flags: SocketSendFlags,
-        cancellation: &Cancellation,
-    ) -> OperationResult<usize> {
-        self.fallback
-            .socket_send_poll(socket, buffer, flags, cancellation)
-            .await
-    }
-}
-
-impl SocketRecvMsgPoll for IoUringSelector {
-    async fn socket_recvmsg_poll(
-        &self,
-        socket: &Self::Socket,
-        buffers: &mut [IoSliceMut<'_>],
-        flags: SocketRecvFlags,
-        cancellation: &Cancellation,
-    ) -> OperationResult<SocketRecvResult> {
-        self.fallback
-            .socket_recvmsg_poll(socket, buffers, flags, cancellation)
-            .await
-    }
-}
-
-impl SocketSendMsgPoll for IoUringSelector {
-    async fn socket_sendmsg_poll(
-        &self,
-        socket: &Self::Socket,
-        buffers: &[IoSlice<'_>],
-        address: Option<SocketAddress>,
-        flags: SocketSendFlags,
-        cancellation: &Cancellation,
-    ) -> OperationResult<usize> {
-        self.fallback
-            .socket_sendmsg_poll(socket, buffers, address, flags, cancellation)
-            .await
     }
 }
 

@@ -66,6 +66,7 @@ fn validate_operation_support(supported: impl Fn(u8) -> bool) -> io::Result<()> 
         opcode::Send::CODE,
         opcode::RecvMsg::CODE,
         opcode::SendMsg::CODE,
+        opcode::PollAdd::CODE,
         opcode::AsyncCancel::CODE,
     ] {
         if !supported(operation) {
@@ -401,7 +402,7 @@ impl DriverGroup {
 
 /// Owned I/O admission endpoint, independent of the executor polling its futures.
 ///
-/// Construction returns separate drivers and starts no ring thread. Owned file and socket transfers use io_uring; other capabilities share one readiness fallback. Dropping this endpoint closes admission without blocking.
+/// Construction returns separate drivers and starts no ring thread. Owned file and socket transfers use io_uring; borrowed sockets try nonblocking syscalls and wait for ring readiness. Other capabilities share one readiness fallback. Dropping this endpoint closes admission without blocking.
 pub struct IoUringSelector {
     controllers: Vec<Arc<Controller>>,
     group: Arc<DriverGroup>,
@@ -1031,6 +1032,7 @@ impl std::task::Wake for Controller {
 }
 
 mod message;
+mod readiness;
 mod socket;
 
 #[cfg(test)]

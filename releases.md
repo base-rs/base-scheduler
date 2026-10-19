@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Run io_uring borrowed socket operations as direct nonblocking syscalls followed by per-worker ring readiness waits, avoiding the separate readiness reactor on that path.
+
 - Avoid io_uring idle-wait setup after useful progress or nonblocking turns, preserve wakeups during sleep preparation, and register capacity listeners only when admission is full.
 
 - Add a reproducible TCP echo benchmark comparing pure Tokio, the Tokio adapter, and Native with io_uring, including owned-buffer and borrowed readiness paths, with repeated throughput and round-trip latency measurements.
