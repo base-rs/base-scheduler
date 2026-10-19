@@ -11,12 +11,12 @@ use core_scheduler_conformance::AddressResolutionFixture;
 use futures_lite::future::{block_on, poll_once};
 
 struct Fixture {
-    scheduler: NativeScheduler,
+    scheduler: ReadinessSelector,
     expected: Vec<AddressInfo>,
 }
 impl AddressResolutionFixture for Fixture {
-    type Scheduler = NativeScheduler;
-    fn scheduler(&self) -> &NativeScheduler {
+    type Scheduler = ReadinessSelector;
+    fn scheduler(&self) -> &ReadinessSelector {
         &self.scheduler
     }
     fn name(&self) -> &str {

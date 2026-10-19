@@ -11,7 +11,7 @@ const TIMEOUT: Duration = Duration::from_secs(10);
 
 #[test]
 fn prepared_work_allocates_only_jobs_and_completion_channels() {
-    use crate::{NativeFile, NativeScheduler};
+    use crate::{NativeFile, ReadinessSelector};
     use core_scheduler::{Blocking, FileReadAt, FileWriteAt};
     use std::task::{Context, Waker};
     use std::time::Instant;
@@ -32,11 +32,9 @@ fn prepared_work_allocates_only_jobs_and_completion_channels() {
         }
     }
 
-    let scheduler = NativeScheduler::with_options(NativeOptions {
-        workers: 1,
+    let scheduler = ReadinessSelector::with_options(SelectorOptions {
         threads: 1,
         capacity: 1,
-        ..Default::default()
     })
     .unwrap();
     let mut worker = None;
@@ -103,11 +101,9 @@ fn prepared_work_allocates_only_jobs_and_completion_channels() {
 fn capacity_wait_rechecks_available_or_closed_state_before_sleeping() {
     use std::task::{Context, Waker};
 
-    let pool = BlockingPool::new(NativeOptions {
-        workers: 1,
+    let pool = BlockingPool::new(SelectorOptions {
         threads: 1,
         capacity: 1,
-        ..Default::default()
     });
     for closed in [false, true] {
         if closed {
@@ -129,11 +125,9 @@ fn capacity_wait_rechecks_available_or_closed_state_before_sleeping() {
 fn immediate_admission_and_empty_drain_need_no_listeners_or_allocations() {
     use std::task::{Context, Waker};
 
-    let pool = BlockingPool::new(NativeOptions {
-        workers: 1,
+    let pool = BlockingPool::new(SelectorOptions {
         threads: 1,
         capacity: 1,
-        ..Default::default()
     });
     // Initialize worker synchronization and queue storage before measuring reuse.
     block_on(block_on(pool.submit(|| ())).unwrap())
@@ -179,11 +173,9 @@ fn immediate_admission_and_empty_drain_need_no_listeners_or_allocations() {
 fn pending_capacity_and_drain_waits_do_not_allocate_and_unregister_on_drop() {
     use std::task::{Context, Waker};
 
-    let pool = BlockingPool::new(NativeOptions {
-        workers: 1,
+    let pool = BlockingPool::new(SelectorOptions {
         threads: 1,
         capacity: 1,
-        ..Default::default()
     });
     let (release, released) = mpsc::channel();
     let running =
@@ -221,11 +213,9 @@ fn pending_capacity_and_drain_waits_do_not_allocate_and_unregister_on_drop() {
 
 #[test]
 fn submitted_jobs_survive_abandonment_and_shutdown_with_bounded_admission() {
-    let pool = BlockingPool::new(NativeOptions {
-        workers: 1,
+    let pool = BlockingPool::new(SelectorOptions {
         threads: 1,
         capacity: 2,
-        ..Default::default()
     });
     let (started, start) = mpsc::channel();
     let (release, released) = mpsc::channel();
@@ -260,11 +250,9 @@ fn submitted_jobs_survive_abandonment_and_shutdown_with_bounded_admission() {
 
 #[test]
 fn draining_waits_for_running_work_and_releases_capacity() {
-    let pool = BlockingPool::new(NativeOptions {
-        workers: 1,
+    let pool = BlockingPool::new(SelectorOptions {
         threads: 1,
         capacity: 1,
-        ..Default::default()
     });
     let (started, start) = mpsc::channel();
     let (release, released) = mpsc::channel();
@@ -299,11 +287,9 @@ impl Drop for DropGate {
 #[test]
 fn skipped_jobs_release_captures_before_reporting_completion() {
     for shutdown in [false, true] {
-        let pool = BlockingPool::new(NativeOptions {
-            workers: 1,
+        let pool = BlockingPool::new(SelectorOptions {
             threads: 1,
             capacity: 2,
-            ..Default::default()
         });
         let (release_worker, worker_released) = mpsc::channel();
         let (started, start) = mpsc::channel();
@@ -346,11 +332,9 @@ fn skipped_jobs_release_captures_before_reporting_completion() {
 
 #[test]
 fn admission_reports_worker_startup_failure() {
-    let mut pool = BlockingPool::new(NativeOptions {
-        workers: 1,
+    let mut pool = BlockingPool::new(SelectorOptions {
         threads: 2,
         capacity: 2,
-        ..Default::default()
     });
     pool.fail_start_at = Some(1);
     assert!(
@@ -364,11 +348,9 @@ fn admission_reports_worker_startup_failure() {
 
 #[test]
 fn partial_startup_failure_closes_admission_and_releases_started_workers() {
-    let pool = BlockingPool::new(NativeOptions {
-        workers: 1,
+    let pool = BlockingPool::new(SelectorOptions {
         threads: 2,
         capacity: 2,
-        ..Default::default()
     });
     let (exited, exit) = mpsc::channel();
     let result = pool.start_with(|shared, identifier| {
@@ -398,11 +380,9 @@ fn partial_startup_failure_closes_admission_and_releases_started_workers() {
 
 #[test]
 fn shutdown_during_startup_cannot_admit_work() {
-    let pool = BlockingPool::new(NativeOptions {
-        workers: 1,
+    let pool = BlockingPool::new(SelectorOptions {
         threads: 1,
         capacity: 1,
-        ..Default::default()
     });
     pool.start_with(|shared, _| {
         pool.close();
@@ -425,11 +405,9 @@ struct Destructor {
 fn dropping_a_queued_handle_on_another_thread_skips_execution_and_preserves_the_worker() {
     use std::sync::atomic::{AtomicBool, Ordering};
 
-    let pool = BlockingPool::new(NativeOptions {
-        workers: 1,
+    let pool = BlockingPool::new(SelectorOptions {
         threads: 1,
         capacity: 2,
-        ..Default::default()
     });
     let (started, start) = mpsc::channel();
     let (release, released) = mpsc::channel();
@@ -482,11 +460,9 @@ impl Drop for Destructor {
 
 #[test]
 fn abandoned_result_panics_release_capacity_and_preserve_the_worker() {
-    let pool = BlockingPool::new(NativeOptions {
-        workers: 1,
+    let pool = BlockingPool::new(SelectorOptions {
         threads: 1,
         capacity: 1,
-        ..Default::default()
     });
     let (release, released) = mpsc::channel();
     let (started, start) = mpsc::channel();
@@ -516,11 +492,9 @@ fn abandoned_result_panics_release_capacity_and_preserve_the_worker() {
 
 #[test]
 fn shutdown_catches_capture_destructor_panics_and_cancels_other_queued_jobs() {
-    let pool = BlockingPool::new(NativeOptions {
-        workers: 1,
+    let pool = BlockingPool::new(SelectorOptions {
         threads: 1,
         capacity: 3,
-        ..Default::default()
     });
     let (release, released) = mpsc::channel();
     let (started, start) = mpsc::channel();
@@ -556,11 +530,9 @@ fn shutdown_catches_capture_destructor_panics_and_cancels_other_queued_jobs() {
 
 #[test]
 fn concurrent_first_admissions_share_one_startup() {
-    let pool = BlockingPool::new(NativeOptions {
-        workers: 1,
+    let pool = BlockingPool::new(SelectorOptions {
         threads: 2,
         capacity: 2,
-        ..Default::default()
     });
     thread::scope(|scope| {
         for value in 0..8 {
@@ -577,11 +549,9 @@ fn concurrent_first_admissions_share_one_startup() {
 
 #[test]
 fn io_cancellation_returns_owned_input_and_worker_panics_resume_in_the_waiter() {
-    let pool = BlockingPool::new(NativeOptions {
-        workers: 1,
+    let pool = BlockingPool::new(SelectorOptions {
         threads: 1,
         capacity: 2,
-        ..Default::default()
     });
     let (started, start) = mpsc::channel();
     let (release, released) = mpsc::channel();
@@ -622,11 +592,9 @@ fn io_cancellation_returns_owned_input_and_worker_panics_resume_in_the_waiter() 
 
 #[test]
 fn shutdown_drain_waits_until_discarded_capture_destructors_finish() {
-    let pool = BlockingPool::new(NativeOptions {
-        workers: 1,
+    let pool = BlockingPool::new(SelectorOptions {
         threads: 1,
         capacity: 2,
-        ..Default::default()
     });
     let (started, start) = mpsc::channel();
     let (release, released) = mpsc::channel();
@@ -681,11 +649,9 @@ fn panicking_unobserved_payloads_preserve_native_capacity_and_shutdown() {
     }
     crate::test_support::run(|| {
         // A queued capture is destroyed synchronously during admission close.
-        let pool = BlockingPool::new(NativeOptions {
-            workers: 1,
+        let pool = BlockingPool::new(SelectorOptions {
             threads: 1,
             capacity: 2,
-            ..Default::default()
         });
         let (started, start) = mpsc::channel();
         let (release, released) = mpsc::channel();
@@ -708,11 +674,9 @@ fn panicking_unobserved_payloads_preserve_native_capacity_and_shutdown() {
 
         // Both an abandoned result and an abandoned execution panic can create a second panic payload when destroyed on the worker.
         for panics in [false, true] {
-            let pool = BlockingPool::new(NativeOptions {
-                workers: 1,
+            let pool = BlockingPool::new(SelectorOptions {
                 threads: 1,
                 capacity: 1,
-                ..Default::default()
             });
             let (started, start) = mpsc::channel();
             let (release, released) = mpsc::channel();

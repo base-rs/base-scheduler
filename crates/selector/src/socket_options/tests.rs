@@ -9,7 +9,7 @@ use futures_lite::future::block_on;
 use std::sync::atomic::Ordering;
 
 struct Fixture<O> {
-    scheduler: NativeScheduler,
+    scheduler: ReadinessSelector,
     socket: NativeSocket,
     failing: NativeSocket,
     option: O,
@@ -17,9 +17,9 @@ struct Fixture<O> {
     set: fn(&Socket, bool) -> io::Result<()>,
 }
 impl<O: NativeOption<Value = bool> + Copy> SocketOptionFixture for Fixture<O> {
-    type Scheduler = NativeScheduler;
+    type Scheduler = ReadinessSelector;
     type Option = O;
-    fn scheduler(&self) -> &NativeScheduler {
+    fn scheduler(&self) -> &ReadinessSelector {
         &self.scheduler
     }
     fn socket(&self) -> &NativeSocket {
@@ -127,12 +127,12 @@ mod reuse_set {
 }
 
 struct RegistrationFixture {
-    scheduler: NativeScheduler,
+    scheduler: ReadinessSelector,
     domain: SocketDomain,
 }
 impl SocketRegistrationFixture for RegistrationFixture {
-    type Scheduler = NativeScheduler;
-    fn scheduler(&self) -> &NativeScheduler {
+    type Scheduler = ReadinessSelector;
+    fn scheduler(&self) -> &ReadinessSelector {
         &self.scheduler
     }
     fn domain(&self) -> SocketDomain {

@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use crate::{NativeScheduler, NativeSocket};
+use crate::{NativeSocket, ReadinessSelector};
 use core_scheduler::{
     Cancellation, OperationResult, SocketGetOption, SocketKeepalive, SocketOption,
     SocketRegistration, SocketReuseAddress, SocketSetOption, TcpNoDelay,
@@ -33,7 +33,7 @@ option!(SocketReuseAddress, reuse_address, set_reuse_address);
 option!(SocketKeepalive, keepalive, set_keepalive);
 option!(TcpNoDelay, tcp_nodelay, set_tcp_nodelay);
 
-impl<O: NativeOption + 'static> SocketGetOption<O> for NativeScheduler {
+impl<O: NativeOption + 'static> SocketGetOption<O> for ReadinessSelector {
     async fn socket_get_option(
         &self,
         socket: &NativeSocket,
@@ -47,7 +47,7 @@ impl<O: NativeOption + 'static> SocketGetOption<O> for NativeScheduler {
         Ok(option.get(socket.get_ref())?)
     }
 }
-impl<O: NativeOption + 'static> SocketSetOption<O> for NativeScheduler {
+impl<O: NativeOption + 'static> SocketSetOption<O> for ReadinessSelector {
     async fn socket_set_option(
         &self,
         socket: &NativeSocket,
@@ -82,13 +82,13 @@ impl Probe {
     }
 }
 
-impl NativeScheduler {
+impl ReadinessSelector {
     fn register_tcp(&self, socket: Socket) -> io::Result<NativeSocket> {
         self.check_open()?;
         NativeSocket::new(socket)
     }
 }
-impl SocketRegistration for NativeScheduler {
+impl SocketRegistration for ReadinessSelector {
     fn register_socket(&self, socket: TcpStream) -> io::Result<NativeSocket> {
         self.register_tcp(socket.into())
     }

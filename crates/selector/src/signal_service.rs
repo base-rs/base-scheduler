@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use crate::{NativeScheduler, NativeSubscription, thread};
+use crate::{NativeSubscription, ReadinessSelector, thread};
 use core_scheduler::{Notify, Signals};
 use event_listener::Event;
 use signal_hook::iterator::{Handle, Signals as NativeSignals};
@@ -150,7 +150,7 @@ impl Drop for SignalService {
         self.close();
     }
 }
-impl Signals for NativeScheduler {
+impl Signals for ReadinessSelector {
     type Signal = i32;
     type Subscription = NativeSubscription;
     fn signal_subscribe<T: Notify<i32> + 'static>(

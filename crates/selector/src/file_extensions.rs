@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::{
-    NativeFile, NativeScheduler, blocking_pool::admission_error, native_scheduler::wait_close,
+    NativeFile, ReadinessSelector, blocking_pool::admission_error, readiness_selector::wait_close,
 };
 use core_scheduler::{
     AdviceMode, AllocationMode, Cancellation, FileAdvice, FileAllocate, OperationResult,
@@ -23,7 +23,7 @@ fn range(offset: u64, length: u64) -> io::Result<()> {
     }
 }
 
-impl FileAllocate for NativeScheduler {
+impl FileAllocate for ReadinessSelector {
     async fn file_allocate(
         &self,
         file: &NativeFile,
@@ -78,7 +78,7 @@ fn allocate(
     }
 }
 
-impl FileAdvice for NativeScheduler {
+impl FileAdvice for ReadinessSelector {
     async fn file_advise(
         &self,
         file: &NativeFile,
@@ -100,7 +100,7 @@ impl FileAdvice for NativeScheduler {
             .map(drop)
     }
 }
-impl NativeScheduler {
+impl ReadinessSelector {
     async fn submit_advice(
         &self,
         file: &NativeFile,

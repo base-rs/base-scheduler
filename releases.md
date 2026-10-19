@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Separate native I/O into `core-scheduler-selector` and compose `NativeScheduler<S>` with independently selected capabilities, preserving the default readiness constructor.
+- Add an initial `core-scheduler-iouring` selector with completion file transfers, bounded retained requests, and a separately driven event loop or thread.
 - Defer Unix Tokio socket readiness registration until I/O needs to wait, avoiding stale unconnected TCP hangup events which could make a later full-queue send spin indefinitely.
 - Add optional borrowed recv/send and message `_poll` capabilities with stack-buffer support, explicit cancellation, and shared conformance suites in Direct, Tokio, and Native. Windows attempts explicitly enable nonblocking mode.
 

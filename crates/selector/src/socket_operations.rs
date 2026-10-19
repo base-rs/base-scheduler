@@ -2,16 +2,16 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::{
-    NativeScheduler, NativeSocket,
+    NativeSocket, ReadinessSelector,
     blocking_pool::admission_error,
-    native_scheduler::wait_close,
+    readiness_selector::wait_close,
     socket_io::{self, IoVectors},
 };
 use core_scheduler::*;
 use socket2::Socket;
 use std::{io, net::Shutdown};
 
-impl NativeScheduler {
+impl ReadinessSelector {
     // All payload access happens synchronously inside the readiness callback. Pending futures retain their owners; the reactor retains no payload pointers.
     async fn socket_operation<Input: Send, Output: Send>(
         &self,
@@ -69,11 +69,11 @@ impl NativeScheduler {
     }
 }
 
-impl SocketOperation for NativeScheduler {
+impl SocketOperation for ReadinessSelector {
     type Socket = NativeSocket;
 }
 
-impl SocketOpen for NativeScheduler {
+impl SocketOpen for ReadinessSelector {
     async fn socket_open(
         &self,
         domain: SocketDomain,
@@ -87,7 +87,7 @@ impl SocketOpen for NativeScheduler {
     }
 }
 
-impl SocketBind for NativeScheduler {
+impl SocketBind for ReadinessSelector {
     async fn socket_bind(
         &self,
         socket: &NativeSocket,
@@ -106,7 +106,7 @@ impl SocketBind for NativeScheduler {
     }
 }
 
-impl SocketListen for NativeScheduler {
+impl SocketListen for ReadinessSelector {
     async fn socket_listen(
         &self,
         socket: &NativeSocket,
@@ -125,21 +125,21 @@ impl SocketListen for NativeScheduler {
     }
 }
 
-impl SocketLocalAddress for NativeScheduler {
+impl SocketLocalAddress for ReadinessSelector {
     fn socket_local_address(&self, socket: &NativeSocket) -> io::Result<SocketAddress> {
         self.check_open()?;
         socket.local_addr()
     }
 }
 
-impl SocketPeerAddress for NativeScheduler {
+impl SocketPeerAddress for ReadinessSelector {
     fn socket_peer_address(&self, socket: &NativeSocket) -> io::Result<SocketAddress> {
         self.check_open()?;
         socket.peer_addr()
     }
 }
 
-impl SocketConnect for NativeScheduler {
+impl SocketConnect for ReadinessSelector {
     async fn socket_connect(
         &self,
         socket: &NativeSocket,
@@ -158,7 +158,7 @@ impl SocketConnect for NativeScheduler {
     }
 }
 
-impl SocketAccept for NativeScheduler {
+impl SocketAccept for ReadinessSelector {
     async fn socket_accept(
         &self,
         socket: &NativeSocket,
@@ -174,7 +174,7 @@ impl SocketAccept for NativeScheduler {
     }
 }
 
-impl SocketRead for NativeScheduler {
+impl SocketRead for ReadinessSelector {
     async fn socket_read<B: IoBufMut>(
         &self,
         socket: &NativeSocket,
@@ -192,7 +192,7 @@ impl SocketRead for NativeScheduler {
     }
 }
 
-impl SocketWrite for NativeScheduler {
+impl SocketWrite for ReadinessSelector {
     async fn socket_write<B: IoBuf>(
         &self,
         socket: &NativeSocket,
@@ -210,7 +210,7 @@ impl SocketWrite for NativeScheduler {
     }
 }
 
-impl SocketRecvPoll for NativeScheduler {
+impl SocketRecvPoll for ReadinessSelector {
     async fn socket_recv_poll(
         &self,
         socket: &NativeSocket,
@@ -230,7 +230,7 @@ impl SocketRecvPoll for NativeScheduler {
     }
 }
 
-impl SocketSendPoll for NativeScheduler {
+impl SocketSendPoll for ReadinessSelector {
     async fn socket_send_poll(
         &self,
         socket: &NativeSocket,
@@ -250,7 +250,7 @@ impl SocketSendPoll for NativeScheduler {
     }
 }
 
-impl SocketRecvMsgPoll for NativeScheduler {
+impl SocketRecvMsgPoll for ReadinessSelector {
     async fn socket_recvmsg_poll(
         &self,
         socket: &NativeSocket,
@@ -270,7 +270,7 @@ impl SocketRecvMsgPoll for NativeScheduler {
     }
 }
 
-impl SocketSendMsgPoll for NativeScheduler {
+impl SocketSendMsgPoll for ReadinessSelector {
     async fn socket_sendmsg_poll(
         &self,
         socket: &NativeSocket,
@@ -291,7 +291,7 @@ impl SocketSendMsgPoll for NativeScheduler {
     }
 }
 
-impl SocketWait for NativeScheduler {
+impl SocketWait for ReadinessSelector {
     async fn socket_wait(
         &self,
         socket: &NativeSocket,
@@ -306,7 +306,7 @@ impl SocketWait for NativeScheduler {
     }
 }
 
-impl SocketSendMsg for NativeScheduler {
+impl SocketSendMsg for ReadinessSelector {
     async fn socket_sendmsg<B: IoBufSequence>(
         &self,
         socket: &NativeSocket,
@@ -326,7 +326,7 @@ impl SocketSendMsg for NativeScheduler {
     }
 }
 
-impl SocketRecvMsg for NativeScheduler {
+impl SocketRecvMsg for ReadinessSelector {
     async fn socket_recvmsg<B: IoBufSequenceMut>(
         &self,
         socket: &NativeSocket,
@@ -346,7 +346,7 @@ impl SocketRecvMsg for NativeScheduler {
     }
 }
 
-impl SocketClose for NativeScheduler {
+impl SocketClose for ReadinessSelector {
     async fn socket_close(&self, socket: NativeSocket) -> io::Result<()> {
         self.check_open()?;
         let close = socket.into_close();
@@ -369,7 +369,7 @@ impl SocketClose for NativeScheduler {
     }
 }
 
-impl SocketShutdown for NativeScheduler {
+impl SocketShutdown for ReadinessSelector {
     async fn socket_shutdown(&self, socket: &NativeSocket, how: Shutdown) -> io::Result<()> {
         self.check_open()?;
         let socket = socket.retain();

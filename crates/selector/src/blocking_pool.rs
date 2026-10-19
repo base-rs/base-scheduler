@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use crate::{BlockingTask, NativeOptions};
+use crate::{BlockingTask, SelectorOptions};
 use core_scheduler::{BlockingError, Cancellation, OperationError, OperationResult, TaskError};
 use event_listener::Event;
 use futures_channel::oneshot;
@@ -52,14 +52,14 @@ struct Shared {
 /// A scheduler-owned service, independent of its future workers and I/O selector.
 pub(crate) struct BlockingPool {
     shared: Arc<Shared>,
-    pub(crate) options: NativeOptions,
+    pub(crate) options: SelectorOptions,
     started: OnceLock<io::Result<()>>,
     #[cfg(test)]
     pub(crate) fail_start_at: Option<usize>,
 }
 
 impl BlockingPool {
-    pub(crate) fn new(options: NativeOptions) -> Self {
+    pub(crate) fn new(options: SelectorOptions) -> Self {
         let capacity = Event::new();
         // Waiting uses inline listeners; initialize their shared state during setup.
         capacity.notify(0);

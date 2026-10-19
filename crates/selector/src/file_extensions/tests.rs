@@ -11,7 +11,7 @@ use std::{
 };
 
 struct Fixture {
-    scheduler: NativeScheduler,
+    scheduler: ReadinessSelector,
     file: NativeFile,
     read_only: NativeFile,
     failing: NativeFile,
@@ -61,8 +61,8 @@ impl Fixture {
     }
 }
 impl FileAllocateFixture for Fixture {
-    type Scheduler = NativeScheduler;
-    fn scheduler(&self) -> &NativeScheduler {
+    type Scheduler = ReadinessSelector;
+    fn scheduler(&self) -> &ReadinessSelector {
         &self.scheduler
     }
     fn file(&self) -> &NativeFile {
@@ -112,9 +112,9 @@ impl Drop for Hold {
     }
 }
 impl FileAdviceFixture for Fixture {
-    type Scheduler = NativeScheduler;
+    type Scheduler = ReadinessSelector;
     type Guard = Hold;
-    fn scheduler(&self) -> &NativeScheduler {
+    fn scheduler(&self) -> &ReadinessSelector {
         &self.scheduler
     }
     fn file(&self) -> &NativeFile {

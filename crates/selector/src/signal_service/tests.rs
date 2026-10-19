@@ -9,12 +9,12 @@ use futures_lite::future::block_on;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
 struct Fixture {
-    scheduler: Arc<NativeScheduler>,
+    scheduler: Arc<ReadinessSelector>,
 }
 impl SignalsFixture for Fixture {
-    type Scheduler = NativeScheduler;
+    type Scheduler = ReadinessSelector;
     type Signal = i32;
-    fn scheduler(&self) -> &Arc<NativeScheduler> {
+    fn scheduler(&self) -> &Arc<ReadinessSelector> {
         &self.scheduler
     }
     fn signals(&self) -> [i32; 2] {

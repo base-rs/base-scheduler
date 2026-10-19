@@ -3,7 +3,7 @@
 
 #![allow(clippy::unnecessary_cast)]
 
-use crate::{NativeScheduler, SystemAddresses};
+use crate::{ReadinessSelector, SystemAddresses};
 use core_scheduler::{
     AddressHints, AddressResolution, AddressService, Cancellation, OperationResult, SocketDomain,
     SocketProtocol, SocketType,
@@ -18,7 +18,7 @@ pub(crate) mod platform;
 pub(crate) mod platform;
 pub(crate) use platform::{AddrInfo, sys};
 
-impl AddressResolution for NativeScheduler {
+impl AddressResolution for ReadinessSelector {
     type Addresses = SystemAddresses;
     async fn address_resolve(
         &self,

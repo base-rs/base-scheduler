@@ -9,13 +9,10 @@ use std::{
 };
 
 const TIMEOUT: Duration = Duration::from_secs(10);
-fn scheduler(capacity: usize) -> NativeScheduler {
-    NativeScheduler::with_options(crate::NativeOptions {
-        workers: 1,
-
+fn scheduler(capacity: usize) -> ReadinessSelector {
+    ReadinessSelector::with_options(crate::SelectorOptions {
         threads: 1,
         capacity,
-        ..Default::default()
     })
     .unwrap()
 }
@@ -246,12 +243,9 @@ fn native_cleanup_failure_is_reported_by_each_cleanup_operation() {
             &scheduler,
             SocketDomain::Ipv4,
         ));
-        scheduler.cleanup = crate::blocking_pool::BlockingPool::new(crate::NativeOptions {
-            workers: 1,
-
+        scheduler.cleanup = crate::blocking_pool::BlockingPool::new(crate::SelectorOptions {
             threads: 1,
             capacity: 1,
-            ..Default::default()
         });
         scheduler.cleanup.fail_start_at = Some(0);
         let error = match operation {
