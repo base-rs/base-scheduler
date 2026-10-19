@@ -324,24 +324,34 @@ fn blocked_scalar_and_vector_sends_wait_on_the_ring_and_cancel_safely() {
         }
         let token = Cancellation::new();
         let source = [IoSlice::new(b"pending")];
-        let mut sending: std::pin::Pin<Box<dyn Future<Output = OperationResult<usize>>>> =
-            if vectored {
-                Box::pin(selector.socket_sendmsg_poll(
-                    &sender,
-                    &source,
-                    None,
-                    SocketSendFlags::default(),
-                    &token,
-                ))
-            } else {
-                Box::pin(selector.socket_send_poll(
-                    &sender,
-                    b"pending",
-                    SocketSendFlags::default(),
-                    &token,
-                ))
-            };
-        assert!(block_on(poll_once(&mut sending)).is_none());
+        // A TCP acknowledgement can free a little capacity after the fill loop. Keep sending until this operation really suspends; the undrained peer eventually applies backpressure.
+        let sending = loop {
+            let mut sending: std::pin::Pin<Box<dyn Future<Output = OperationResult<usize>>>> =
+                if vectored {
+                    Box::pin(selector.socket_sendmsg_poll(
+                        &sender,
+                        &source,
+                        None,
+                        SocketSendFlags::default(),
+                        &token,
+                    ))
+                } else {
+                    Box::pin(selector.socket_send_poll(
+                        &sender,
+                        b"pending",
+                        SocketSendFlags::default(),
+                        &token,
+                    ))
+                };
+            match block_on(poll_once(&mut sending)) {
+                None => break sending,
+                Some(result) => assert!(result.unwrap() > 0),
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "peer did not apply backpressure"
+            );
+        };
         let mut request = submitted(&driver);
         assert_eq!(request.entry().get_opcode() as u8, opcode::PollAdd::CODE);
         selector.controllers[0]
