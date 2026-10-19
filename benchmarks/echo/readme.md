@@ -14,6 +14,8 @@ The [worker-ring readiness comparison](ring-readiness-performance.md) measures t
 
 The [fresh socket-path profiles](readiness-profiling.md) combine optimized-build controls, userspace/kernel sampling, and syscall counters to distinguish idle-wait costs from request and worker bookkeeping.
 
+The [Tokio admission-only comparison](tokio-admission-performance.md) measures removing per-operation scheduler-shutdown listeners, with before/after pure Tokio controls and both adapter buffer interfaces.
+
 Build and run the comparison on Linux:
 
 ```sh
