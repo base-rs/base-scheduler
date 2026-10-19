@@ -4,6 +4,8 @@
 
 - Reserve Tokio's lightweight socket readiness polling path per direction, retaining concurrent waiter and cancellation support.
 
+- Wake idle io_uring workers directly through a ring request on an eventfd, avoiding epoll rearming and timerfd setup; retain bounded waits on older kernels and check newly published completions before sleeping.
+
 - Make Tokio scheduler closure admission-only for sockets and clocks. Accepted operations complete or respond to their explicit cancellation token, avoiding per-operation shutdown listeners; applications coordinate cancellation before draining tasks.
 
 - Run io_uring borrowed socket operations as direct nonblocking syscalls followed by per-worker ring readiness waits, avoiding the separate readiness reactor on that path.

@@ -33,7 +33,7 @@ scheduler.block_on(scheduler.shutdown());
 # Ok::<(), std::io::Error>(())
 ```
 
-Each ring has its own request capacity, operation identifiers, pending queue, and in-flight storage. Local submissions bypass the synchronized inbox and notification pipe. A private thread-local lookup selects only the current worker belonging to the explicitly supplied selector; it does not select an implicit scheduler. Root futures and other external callers use round-robin routing through per-ring inboxes. Submitted operations retain their original ring through completion and cancellation even when their tasks migrate.
+Each ring has its own request capacity, operation identifiers, pending queue, and in-flight storage. Local submissions bypass the synchronized inbox and notification eventfd. A private thread-local lookup selects only the current worker belonging to the explicitly supplied selector; it does not select an implicit scheduler. Root futures and other external callers use round-robin routing through per-ring inboxes. Submitted operations retain their original ring through completion and cancellation even when their tasks migrate.
 
 An idle worker submits a one-shot ring readiness request for its notification eventfd and sleeps directly in `io_uring_enter`. The request contains no userspace buffer pointer and remains registered until its completion is observed. External wakes still write only to the notification eventfd, preserving single-owner access to SQ and CQ. On kernels without extended enter timeouts, bounded waits use `ppoll` on the ring and notification eventfd. Neither path uses separate epoll registrations, rearming, or timerfd. Notifications and completions racing the transition to sleep remain observable.
 
