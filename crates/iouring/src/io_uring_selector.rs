@@ -24,6 +24,8 @@ use std::{
     time::Duration,
 };
 const CANCEL_TAG: u64 = 1 << 63;
+// Normal identifiers stop below CANCEL_TAG - 1, including tagged cancellations.
+const NOTIFICATION_TAG: u64 = u64::MAX;
 
 // Keep syscall failures deterministic in unit tests while production calls the OS directly.
 fn syscall<T>(name: &'static str, operation: impl FnOnce() -> io::Result<T>) -> io::Result<T> {
@@ -74,6 +76,14 @@ fn validate_operation_support(supported: impl Fn(u8) -> bool) -> io::Result<()> 
         }
     }
     Ok(())
+}
+
+fn completion_result(result: i32) -> io::Result<usize> {
+    if result < 0 {
+        Err(io::Error::from_raw_os_error(-result))
+    } else {
+        Ok(result as usize)
+    }
 }
 
 fn discard<T>(value: T) {
@@ -765,6 +775,8 @@ pub(crate) struct Reactor {
     in_flight: InFlight,
     cancellations: VecDeque<u64>,
     closing: bool,
+    notification_pending: bool,
+    extended_wait: bool,
 }
 
 impl Reactor {
@@ -774,6 +786,7 @@ impl Reactor {
         incoming: mpsc::Receiver<Command>,
         controller: Arc<Controller>,
     ) -> io::Result<Self> {
+        let extended_wait = ring.params().is_feature_ext_arg();
         let reactor = Self {
             ring,
             notification,
@@ -783,6 +796,8 @@ impl Reactor {
             in_flight: InFlight::default(),
             cancellations: VecDeque::new(),
             closing: false,
+            notification_pending: false,
+            extended_wait,
         };
         Ok(reactor)
     }
@@ -875,9 +890,18 @@ impl Reactor {
         }
 
         // The CQ iterator snapshots the available batch. Finish publishing every completion in that batch before returning to the executor; application futures are polled only from its ready queue.
+        let mut notification_error = None;
         for completion in self.ring.completion() {
             progressed = true;
             let identifier = completion.user_data();
+            if identifier == NOTIFICATION_TAG {
+                self.notification_pending = false;
+                notification_error = syscall("notification-completion", || {
+                    completion_result(completion.result())
+                })
+                .err();
+                continue;
+            }
             if identifier & CANCEL_TAG != 0 {
                 continue;
             }
@@ -888,14 +912,12 @@ impl Reactor {
                 .0
                 .remove(&identifier)
                 .expect("original completion retains its in-flight request");
-            let result = completion.result();
-            request.finish(if result < 0 {
-                Err(io::Error::from_raw_os_error(-result))
-            } else {
-                Ok(result as usize)
-            });
+            request.finish(completion_result(completion.result()));
         }
 
+        if let Some(error) = notification_error {
+            return Err(error);
+        }
         {
             let mut submissions = self.ring.submission();
             while let Some(&identifier) = self.cancellations.front() {
@@ -971,10 +993,51 @@ impl Reactor {
         if notified {
             return Ok(false);
         }
-        // Exactly two worker-owned descriptors need an idle wait. ppoll keeps
-        // this wait independent of epoll registrations and timerfd setup. Both
-        // sources are level-triggered, so events racing the checks above remain
-        // visible when this syscall starts.
+        let result = self.wait(timeout);
+        if let Err(error) = result {
+            if error.kind() != io::ErrorKind::Interrupted
+                && !matches!(
+                    error.raw_os_error(),
+                    Some(libc::ETIME | libc::EBUSY | libc::EAGAIN)
+                )
+            {
+                return Err(error);
+            }
+        }
+        Ok(false)
+    }
+
+    fn wait(&mut self, timeout: Option<Duration>) -> io::Result<()> {
+        if timeout.is_none() || self.extended_wait {
+            if !self.notification_pending {
+                let entry = opcode::PollAdd::new(
+                    types::Fd(self.notification.as_raw_fd()),
+                    libc::POLLIN as u32,
+                )
+                .build()
+                .user_data(NOTIFICATION_TAG);
+                // SAFETY: PollAdd retains no userspace pointer. Reactor owns the
+                // notification descriptor, and this worker alone accesses SQ.
+                unsafe { self.ring.submission().push(&entry) }
+                    .expect("an idle wait has an empty submission queue");
+                self.notification_pending = true;
+            }
+            let deadline = timeout.map(|timeout| {
+                types::Timespec::new()
+                    .sec(timeout.as_secs().min(i64::MAX as u64))
+                    .nsec(timeout.subsec_nanos())
+            });
+            return syscall("wait", || match deadline {
+                Some(ref deadline) => self
+                    .ring
+                    .submitter()
+                    .submit_with_args(1, &types::SubmitArgs::new().timespec(deadline)),
+                None => self.ring.submit_and_wait(1),
+            })
+            .map(|_| ());
+        }
+        // Older kernels lack the extended enter timeout. Keep their bounded
+        // waits on these two level-triggered descriptors without epoll setup.
         let mut sources = [
             libc::pollfd {
                 fd: self.notification.as_raw_fd(),
@@ -991,7 +1054,7 @@ impl Reactor {
             tv_sec: timeout.as_secs().try_into().unwrap_or(libc::time_t::MAX),
             tv_nsec: timeout.subsec_nanos().into(),
         });
-        let result = syscall("wait", || {
+        syscall("wait", || {
             // SAFETY: The stack array and optional timespec remain valid for
             // the synchronous call. Reactor owns both descriptors throughout.
             let result = unsafe {
@@ -1009,13 +1072,7 @@ impl Reactor {
             } else {
                 Ok(())
             }
-        });
-        if let Err(error) = result {
-            if error.kind() != io::ErrorKind::Interrupted {
-                return Err(error);
-            }
-        }
-        Ok(false)
+        })
     }
 }
 
