@@ -1,0 +1,160 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 5K of event 'cycles:u'
+# Event count (approx.): 6164183521
+#
+# Children      Self  Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        IPC   [IPC Coverage]
+# ........  ........  ............................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................  ....................
+#
+    11.48%     0.00%  [.] 0x00007fae3d8a08f2 -      -
+            |
+             --8.93%--0xffffffff9de0012f
+                       |
+                        --6.17%--0xffffffff9f389afa
+                                  |
+                                   --3.02%--0xffffffff9f06f034
+                                             |
+                                              --2.27%--0xffffffff9f06ef2b
+                                                        |
+                                                         --2.05%--0xffffffff9e60c656
+
+     9.22%     9.22%  [.] <core_scheduler_iouring::io_uring_selector::IoUringSelector>::wait_ready::{closure#0} -      -
+     9.01%     0.00%  [.] 0xffffffff9de0012f -      -
+            |
+             --6.26%--0xffffffff9f389afa
+                       |
+                        --3.02%--0xffffffff9f06f034
+                                  |
+                                   --2.27%--0xffffffff9f06ef2b
+                                             |
+                                              --2.05%--0xffffffff9e60c656
+
+     7.43%     0.03%  [.] recv -      -
+            |
+            ---syscall_cancel (inlined)
+               internal_syscall_cancel (inlined)
+               |
+                --7.34%--0x7fae3d8a08f2
+                          |
+                           --5.91%--0xffffffff9de0012f
+                                     |
+                                      --3.50%--0xffffffff9f389afa
+                                                |
+                                                 --3.02%--0xffffffff9f06f034
+                                                           |
+                                                            --2.27%--0xffffffff9f06ef2b
+                                                                      |
+                                                                       --2.05%--0xffffffff9e60c656
+
+     7.43%     0.00%  [.] syscall_cancel (inlined) -      -
+            |
+            ---internal_syscall_cancel (inlined)
+               |
+                --7.34%--0x7fae3d8a08f2
+                          |
+                           --5.91%--0xffffffff9de0012f
+                                     |
+                                      --3.50%--0xffffffff9f389afa
+                                                |
+                                                 --3.02%--0xffffffff9f06f034
+                                                           |
+                                                            --2.27%--0xffffffff9f06ef2b
+                                                                      |
+                                                                       --2.05%--0xffffffff9e60c656
+
+     7.43%     0.00%  [.] internal_syscall_cancel (inlined) -      -
+            |
+             --7.34%--0x7fae3d8a08f2
+                       |
+                        --5.91%--0xffffffff9de0012f
+                                  |
+                                   --3.50%--0xffffffff9f389afa
+                                             |
+                                              --3.02%--0xffffffff9f06f034
+                                                        |
+                                                         --2.27%--0xffffffff9f06ef2b
+                                                                   |
+                                                                    --2.05%--0xffffffff9e60c656
+
+     7.21%     7.21%  [.] core::ptr::drop_glue::<futures_channel::oneshot::Sender<core::result::Result<usize, core::io::error::Error>>> -      -
+     6.26%     0.00%  [.] 0xffffffff9f389afa -      -
+            |
+             --3.02%--0xffffffff9f06f034
+                       |
+                        --2.27%--0xffffffff9f06ef2b
+                                  |
+                                   --2.05%--0xffffffff9e60c656
+
+     6.12%     6.12%  [.] core_scheduler_echo_benchmark::server::scheduler_server::<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0} -      -
+     5.50%     5.50%  [.] <core::future::poll_fn::PollFn<<core_scheduler_iouring::io_uring_selector::IoUringSelector>::submit<core::result::Result<usize, core::io::error::Error>>::{closure#0}::{closure#0}> as core::future::future::Future>::poll -      -
+     5.45%     5.45%  [.] <async_task::raw::RawTask<core_scheduler_native::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0}>, core_scheduler_native::task_service::TaskOutcome<()>, <core_scheduler_native::task_service::TaskService>::spawn<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0}>::{closure#1}, core_scheduler_native::task_service::TaskState>>::run -      -
+     4.97%     4.97%  [.] <core_scheduler_iouring::io_uring_selector::Capacity>::acquire::{closure#0} -      -
+     4.62%     4.62%  [.] <core_scheduler_iouring::io_uring_selector::IoUringSelector>::route -      -
+     3.97%     3.97%  [.] <core_scheduler_iouring::io_uring_selector::Reactor>::turn -      -
+     3.97%     0.00%  [.] send -      -
+            |
+            ---syscall_cancel (inlined)
+               internal_syscall_cancel (inlined)
+               0x7fae3d8a08f2
+               |
+                --3.02%--0xffffffff9de0012f
+                          |
+                           --2.67%--0xffffffff9f389afa
+
+     3.97%     0.00%  [.] syscall_cancel (inlined) -      -
+            |
+            ---internal_syscall_cancel (inlined)
+               0x7fae3d8a08f2
+               |
+                --3.02%--0xffffffff9de0012f
+                          |
+                           --2.67%--0xffffffff9f389afa
+
+     3.97%     0.00%  [.] internal_syscall_cancel (inlined) -      -
+            |
+            ---0x7fae3d8a08f2
+               |
+                --3.02%--0xffffffff9de0012f
+                          |
+                           --2.67%--0xffffffff9f389afa
+
+     3.22%     3.22%  [.] <core_scheduler_iouring::io_uring_selector::readiness::ReadinessRequest as core::ops::drop::Drop>::drop -      -
+     3.02%     0.00%  [.] 0xffffffff9f06f034 -      -
+            |
+             --2.27%--0xffffffff9f06ef2b
+                       |
+                        --2.05%--0xffffffff9e60c656
+
+     2.90%     2.90%  [k] 0xffffffff9e60c656 -      -
+            |
+             --2.05%--recv
+                       syscall_cancel (inlined)
+                       internal_syscall_cancel (inlined)
+                       0x7fae3d8a08f2
+                       0xffffffff9de0012f
+                       0xffffffff9f389afa
+                       0xffffffff9f06f034
+                       0xffffffff9f06ef2b
+                       0xffffffff9e60c656
+
+     2.87%     2.87%  [.] <event_listener::Inner<()>>::with_inner::<usize, <event_listener::Inner<()>>::notify<event_listener::notify::Notify>::{closure#0}> -      -
+     2.69%     2.69%  [.] <futures_channel::oneshot::Sender<core::result::Result<usize, core::io::error::Error>>>::send -      -
+     2.65%     2.65%  [.] <event_listener::Inner<()>>::with_inner::<usize, <event_listener::Inner<()>>::notify<event_listener::notify::Notify>::{closure#0}> -      -
+     2.57%     2.57%  [.] core::ptr::drop_glue::<alloc::boxed::Box<core_scheduler_iouring::io_uring_selector::readiness::ReadinessRequest>> -      -
+     2.27%     0.00%  [.] 0xffffffff9f06ef2b -      -
+            |
+             --2.05%--0xffffffff9e60c656
+
+     2.25%     2.25%  [.] <async_task::raw::RawTask<core_scheduler_native::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0}>, core_scheduler_native::task_service::TaskOutcome<()>, <core_scheduler_native::task_service::TaskService>::spawn<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0}>::{closure#1}, core_scheduler_native::task_service::TaskState>>::clone_waker -      -
+     2.15%     2.15%  [.] <core_scheduler_iouring::io_uring_selector::Controller>::send -      -
+     2.15%     2.15%  [.] <async_task::raw::RawTask<core_scheduler_native::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0}>, core_scheduler_native::task_service::TaskOutcome<()>, <core_scheduler_native::task_service::TaskService>::spawn<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0}>::{closure#1}, core_scheduler_native::task_service::TaskState>>::wake -      -
+     2.15%     2.15%  [.] <core_scheduler_native::task_service::Shared>::wake_idle -      -
+     2.07%     2.07%  [.] futures_channel::oneshot::channel::<core::result::Result<usize, core::io::error::Error>> -      -
+
+
+#
+# (Tip: Profiling branch (mis)predictions with: perf record -b / perf report)
+#

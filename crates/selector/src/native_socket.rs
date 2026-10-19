@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::Interest;
+use core_scheduler::{Interest, SocketRecvFlags, SocketRecvResult, SocketSendFlags};
 use std::{io, net::SocketAddr, sync::Arc};
 type RegisteredSocket = async_io::Async<socket2::Socket>;
 
@@ -68,6 +68,39 @@ impl NativeSocket {
     }
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
         self.get_ref().peer_addr().map(crate::socket_io::address)
+    }
+
+    /// Attempt a synchronous nonblocking receive. No buffer access survives this call; `WouldBlock` requires a separate readiness wait.
+    #[inline]
+    pub fn try_recv(&self, buffer: &mut [u8], flags: SocketRecvFlags) -> io::Result<usize> {
+        crate::socket_io::recv_poll(self.get_ref(), buffer, flags)
+    }
+
+    /// Attempt a synchronous nonblocking send. No buffer access survives this call; `WouldBlock` requires a separate readiness wait.
+    #[inline]
+    pub fn try_send(&self, buffer: &[u8], flags: SocketSendFlags) -> io::Result<usize> {
+        crate::socket_io::send_poll(self.get_ref(), buffer, flags)
+    }
+
+    /// Attempt a synchronous nonblocking message receive using the borrowed I/O vectors directly. No payload, vector, or metadata pointer survives this call.
+    #[inline]
+    pub fn try_recvmsg(
+        &self,
+        buffers: &mut [io::IoSliceMut<'_>],
+        flags: SocketRecvFlags,
+    ) -> io::Result<SocketRecvResult> {
+        crate::socket_io::recvmsg_poll(self.get_ref(), buffers, flags)
+    }
+
+    /// Attempt a synchronous nonblocking message send using the borrowed I/O vectors directly. No payload, vector, or address pointer survives this call.
+    #[inline]
+    pub fn try_sendmsg(
+        &self,
+        buffers: &[io::IoSlice<'_>],
+        address: Option<SocketAddr>,
+        flags: SocketSendFlags,
+    ) -> io::Result<usize> {
+        crate::socket_io::sendmsg_poll(self.get_ref(), buffers, address, flags)
     }
 }
 

@@ -1,0 +1,198 @@
+# ========
+# captured on : Mon Oct 19 19:42:15 2026
+# header version : 1
+# data offset : 520
+# data size : 38417648
+# feat offset : 38418168
+# hostname : aiko
+# os release : 7.2.6-arch2-1
+# perf version : 7.2.8-2
+# arch : x86_64
+# nrcpus online : 32
+# nrcpus avail : 32
+# cpudesc : AMD Ryzen 9 9950X3D 16-Core Processor
+# cpuid : AuthenticAMD,26,68,0
+# total memory : 48436160 kB
+# cmdline : /usr/bin/perf
+# event : name = cycles, , id = { 7850, 7851, 7852, 7853, 7854, 7855, 7856, 7857, 7858, 7859, 7860, 7861, 7862, 7863, 7864, 7865, 7866, 7867, 7868, 7869, 7870, 7871, 7872, 7873, 7874, 7875, 7876, 7877, 7878, 7879, 7880, 7881 }, type = 0 (PERF_TYPE_HARDWARE), size = 144, config = 0 (PERF_COUNT_HW_CPU_CYCLES), { sample_period, sample_freq } = 999, sample_type = IP|TID|TIME|CALLCHAIN|PERIOD|REGS_USER|STACK_USER, read_format = ID|LOST, disabled = 1, inherit = 1, mmap = 1, comm = 1, freq = 1, enable_on_exec = 1, task = 1, mmap_data = 1, sample_id_all = 1, exclude_callchain_user = 1, mmap2 = 1, comm_exec = 1, ksymbol = 1, bpf_event = 1, build_id = 1, sample_regs_user = 0xff0fff, sample_stack_user = 8192
+# CPU_TOPOLOGY info available, use -I to display
+# NUMA_TOPOLOGY info available, use -I to display
+# pmu mappings: cpu = 4, amd_iommu_0 = 12, breakpoint = 5, drm_amdgpu = 4294836224, hwmon_amdgpu = 4294901762, hwmon_asusec = 4294901766, hwmon_asus = 4294901765, hwmon_eno2 = 4294901769, hwmon_iwlwifi_1 = 4294901770, hwmon_k10temp = 4294901764, hwmon_nct6799 = 4294901763, hwmon_nvme = 4294901760, hwmon_nvme = 4294901761, hwmon_spd5118 = 4294901768, hwmon_spd5118 = 4294901767, ibs_fetch = 10, ibs_op = 11, kprobe = 8, msr = 13, power = 14, power_core = 15, software = 1, tool = 4294967294, tracepoint = 2, uprobe = 9
+# CACHE info available, use -I to display
+# time of first sample : 1981136.874442
+# time of last sample : 1981142.880892
+# sample duration : 6006.450 ms
+# MEM_TOPOLOGY info available, use -I to display
+# bpf_prog_info 24: bpf_prog_31efb7c56239148b_restrict_filesystems addr 0xffffffffc00e3114 size 294
+# bpf_prog_info 41:
+# sub_prog 0: bpf_prog_0b855acee93a0b0b_sysctl_monitor addr 0xffffffffc00edbdc size 688
+# sub_prog 1: bpf_prog_417237dd50306dd0_cut_last addr 0xffffffffc00edef4 size 109
+# bpf_prog_info 199: bpf_prog_772db7720b2728e9_sd_fw_egress addr 0xffffffffc00e7d38 size 64
+# bpf_prog_info 200: bpf_prog_772db7720b2728e9_sd_fw_ingress addr 0xffffffffc00f0c34 size 64
+# bpf_prog_info 220: bpf_prog_772db7720b2728e9_sd_fw_egress addr 0xffffffffc00e29bc size 64
+# bpf_prog_info 221: bpf_prog_772db7720b2728e9_sd_fw_ingress addr 0xffffffffc00e2ce0 size 64
+# bpf_prog_info 222: bpf_prog_71bba91db5466642_sd_devices addr 0xffffffffc00f0ee4 size 490
+# bpf_prog_info 223: bpf_prog_772db7720b2728e9_sd_fw_egress addr 0xffffffffc00ed9b4 size 64
+# bpf_prog_info 224: bpf_prog_772db7720b2728e9_sd_fw_ingress addr 0xffffffffc00eda3c size 64
+# bpf_prog_info 225: bpf_prog_c1591dae5f5bcd9f_sd_devices addr 0xffffffffc00f1114 size 298
+# bpf_prog_info 226: bpf_prog_98b7b6f166b26c8a_sd_devices addr 0xffffffffc00f0cbc size 111
+# bpf_prog_info 227: bpf_prog_a97c143260cd9940_sd_devices addr 0xffffffffc00f1e64 size 268
+# bpf_prog_info 228: bpf_prog_a97c143260cd9940_sd_devices addr 0xffffffffc00f84ac size 268
+# bpf_prog_info 229: bpf_prog_c1591dae5f5bcd9f_sd_devices addr 0xffffffffc00ff908 size 298
+# bpf_prog_info 230: bpf_prog_772db7720b2728e9_sd_fw_egress addr 0xffffffffc00f12b8 size 64
+# bpf_prog_info 231: bpf_prog_772db7720b2728e9_sd_fw_ingress addr 0xffffffffc00f1338 size 64
+# bpf_prog_info 232: bpf_prog_feaab199760324c9_sd_devices addr 0xffffffffc00ffaa0 size 319
+# bpf_prog_info 233: bpf_prog_a97c143260cd9940_sd_devices addr 0xffffffffc00fe8ec size 268
+# bpf_prog_info 234: bpf_prog_a97c143260cd9940_sd_devices addr 0xffffffffc00ffc20 size 268
+# bpf_prog_info 235: bpf_prog_feaab199760324c9_sd_devices addr 0xffffffffc0100ecc size 319
+# bpf_prog_info 236: bpf_prog_772db7720b2728e9_sd_fw_egress addr 0xffffffffc00f64a4 size 64
+# bpf_prog_info 237: bpf_prog_772db7720b2728e9_sd_fw_ingress addr 0xffffffffc00fe1a4 size 64
+# bpf_prog_info 294: bpf_prog_772db7720b2728e9_sd_fw_egress addr 0xffffffffc00e7bc8 size 64
+# bpf_prog_info 295: bpf_prog_772db7720b2728e9_sd_fw_ingress addr 0xffffffffc00e7c60 size 64
+# btf info of id 35
+# btf info of id 142
+# cpu pmu capabilities: branches=16, max_precise=0
+# ibs_fetch pmu capabilities: zen4_ibs_extensions=1
+# ibs_op pmu capabilities: zen4_ibs_extensions=1, ldlat=1, dtlb_pgsize=1
+# AMD systems uses ibs_op// PMU for some precise events, e.g.: cycles:p, see the 'perf list' man page for further details.
+# CPU_DOMAIN_INFO info available, use -I to display
+# e_machine : 62
+# e_flags : 0
+# cacheline size: 64
+# missing features: TRACING_DATA BUILD_ID BRANCH_STACK GROUP_DESC AUXTRACE STAT CLOCKID DIR_FORMAT COMPRESSED CLOCK_DATA HYBRID_TOPOLOGY
+# ========
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 4K of event 'cycles'
+# Event count (approx.): 14688927811
+#
+# Overhead Samples Symbol IPC [IPC Coverage]
+# ........ ............ ........................................................................................................................................................................................ ....................
+#
+3.67% 162 [k] skb_release_data - -
+3.20% 143 [.] <tokio::runtime::scheduler::multi_thread::worker::Context>::run - -
+3.18% 143 [k] _raw_spin_lock_irqsave - -
+3.02% 113 [k] __check_object_size - -
+2.92% 131 [k] _raw_spin_lock - -
+2.48% 110 [k] __inet_lookup_established - -
+2.42% 108 [k] finish_task_switch.isra.0 - -
+2.42% 107 [k] __nf_conntrack_find_get - -
+2.23% 101 [k] fdget - -
+2.19% 103 [k] fput - -
+2.06% 90 [k] skb_defer_free_flush - -
+2.01% 90 [.] __vdso_clock_gettime - -
+1.66% 75 [.] <tokio::runtime::io::driver::Driver>::turn - -
+1.62% 72 [k] mutex_lock - -
+1.58% 73 [k] tcp_rcv_established - -
+1.53% 69 [k] _raw_spin_lock_irq - -
+1.52% 67 [k] lock_sock_nested - -
+1.43% 66 [.] <tokio::runtime::io::scheduled_io::ScheduledIo>::poll_readiness - -
+1.42% 61 [k] tcp_sendmsg_locked - -
+1.39% 64 [.] <tokio::runtime::time::handle::Handle>::process_at_time - -
+1.38% 62 [k] dst_release - -
+1.34% 61 [.] <tokio::runtime::io::scheduled_io::ScheduledIo>::wake - -
+1.33% 59 [k] sock_rfree - -
+1.29% 58 [k] __copy_skb_header - -
+1.20% 54 [k] sock_def_readable - -
+1.18% 53 [k] nf_conntrack_in - -
+1.11% 49 [k] choose_idle_cpu - -
+1.07% 50 [k] _raw_spin_lock_bh - -
+1.02% 41 [k] psi_group_change - -
+1.00% 43 [.] <tokio::runtime::scheduler::multi_thread::worker::Context>::park_internal - -
+0.99% 45 [k] __smp_call_single_queue - -
+0.97% 43 [k] __schedule - -
+0.97% 45 [k] tcp_wfree - -
+0.96% 44 [k] kfree_skbmem - -
+0.96% 43 [k] ep_item_poll.isra.0 - -
+0.95% 44 [.] <tokio::runtime::task::state::State>::transition_to_running - -
+0.92% 43 [k] tcp_event_new_data_sent - -
+0.91% 42 [k] __dev_queue_xmit - -
+0.90% 39 [k] native_read_msr - -
+0.90% 39 [k] update_curr - -
+0.89% 40 [k] tcp_tso_segs - -
+0.87% 39 [k] native_write_msr - -
+0.85% 37 [k] skb_attempt_defer_free - -
+0.84% 38 [k] tcp_v4_rcv - -
+0.81% 36 [k] ip_finish_output2 - -
+0.81% 38 [k] __siphash_unaligned - -
+0.81% 36 [k] skb_page_frag_refill - -
+0.79% 36 [.] 0x00000000000934d9 - -
+0.76% 33 [.] <tokio::net::tcp::stream::TcpStream>::poll_read_priv - -
+0.73% 34 [k] dequeue_entities - -
+0.67% 30 [k] call_function_single_prep_ipi - -
+0.65% 29 [k] ip_send_check - -
+0.61% 27 [k] update_se - -
+0.59% 26 [k] skb_clone - -
+0.56% 26 [k] nf_confirm - -
+0.56% 27 [k] __pi_memset - -
+0.55% 25 [k] ktime_get_with_offset - -
+0.55% 24 [k] do_epoll_wait - -
+0.52% 24 [k] tcp_update_pacing_rate - -
+0.52% 23 [k] entry_SYSCALL_64 - -
+0.51% 22 [k] entity_lag.isra.0 - -
+0.50% 22 [k] __skb_datagram_iter - -
+0.46% 20 [.] <tokio::runtime::time::Driver>::park_internal - -
+0.45% 21 [.] tokio::runtime::task::waker::wake_by_val - -
+0.45% 18 [k] nft_do_chain - -
+0.44% 20 [k] tcp_poll - -
+0.43% 20 [.] <std::sync::poison::mutex::Mutex<core::option::Option<alloc::collections::vec_deque::VecDeque<tokio::runtime::task::Notified<alloc::sync::Arc<tokio::task::local::Shared>>>>>>::lock - -
+0.42% 19 [k] net_rx_action - -
+0.42% 19 [.] <tokio::runtime::scheduler::multi_thread::worker::Core>::maintenance - -
+0.41% 18 [k] vruntime_eligible - -
+0.40% 19 [k] tcp_ack - -
+0.40% 19 [k] __tcp_transmit_skb - -
+0.40% 18 [k] pick_task_fair - -
+0.40% 19 [k] native_sched_clock - -
+0.39% 18 [k] kmem_cache_alloc_node_noprof - -
+0.39% 18 [k] tcp_skb_entail - -
+0.38% 17 [k] put_prev_task_fair - -
+0.33% 15 [k] __alloc_skb - -
+0.33% 15 [k] __update_load_avg_cfs_rq - -
+0.32% 14 [k] update_load_avg - -
+0.31% 14 [k] account_llc_dequeue - -
+0.31% 14 [k] nf_nat_ipv4_pre_routing - -
+0.30% 14 [k] mutex_unlock - -
+0.29% 14 [k] switch_fpu_return - -
+0.29% 14 [k] __update_load_avg_se - -
+0.29% 14 [.] <std::sys::pal::unix::time::Timespec>::sub_timespec - -
+0.28% 13 [.] <tokio::runtime::task::state::State>::transition_to_idle - -
+0.28% 11 [.] epoll_wait - -
+0.27% 14 [k] ip_rcv_finish_core - -
+0.27% 10 [k] __update_idle_core - -
+0.26% 12 [k] nf_hook_slow - -
+0.25% 11 [.] <tokio::runtime::task::state::State>::transition_to_notified_by_val - -
+0.24% 11 [k] __ip_queue_xmit - -
+0.24% 11 [k] tcp_queue_rcv - -
+0.24% 11 [k] nf_nat_inet_fn - -
+0.23% 11 [.] clock_gettime - -
+0.22% 7 [k] avg_vruntime - -
+0.22% 11 [.] <std::time::Instant>::elapsed - -
+0.20% 9 [k] sk_free - -
+0.20% 9 [k] nft_do_chain_ipv4 - -
+0.20% 9 [k] sk_forced_mem_schedule - -
+0.20% 9 [k] __sys_sendto - -
+0.19% 8 [.] 0x00000000000936a0 - -
+0.19% 9 [k] __virt_addr_valid - -
+0.18% 10 [k] __rcu_read_unlock - -
+0.18% 8 [k] cubictcp_acked - -
+0.16% 7 [k] nf_conntrack_tcp_packet - -
+0.16% 7 [k] __rcu_read_lock - -
+0.15% 6 [k] nf_nat_ipv4_local_in - -
+0.15% 6 [k] ttwu_queue_wakelist - -
+0.14% 6 [k] __local_bh_enable_ip - -
+0.14% 6 [k] supdrvLinuxFunction.constprop.0.isra.0 - -
+0.13% 7 [k] set_next_task_idle - -
+0.12% 6 [k] psi_task_switch - -
+0.12% 5 [k] try_charge_memcg - -
+0.12% 5 [k] update_cfs_rq_load_avg - -
+0.12% 5 [k] ip_local_deliver - -
+0.12% 6 [k] ktime_get - -
+0.11% 5 [k] sock_poll - -
+0.10% 4 [k] dequeue_task_fair - -
+
+
+#
+# (Tip: To adjust path to source files to local file system use perf report --prefix=... --prefix-strip=...)
+#

@@ -1,0 +1,200 @@
+# ========
+# captured on : Mon Oct 19 19:43:06 2026
+# header version : 1
+# data offset : 520
+# data size : 43889472
+# feat offset : 43889992
+# hostname : aiko
+# os release : 7.2.6-arch2-1
+# perf version : 7.2.8-2
+# arch : x86_64
+# nrcpus online : 32
+# nrcpus avail : 32
+# cpudesc : AMD Ryzen 9 9950X3D 16-Core Processor
+# cpuid : AuthenticAMD,26,68,0
+# total memory : 48436160 kB
+# cmdline : /usr/bin/perf
+# event : name = cycles, , id = { 9325, 9326, 9327, 9328, 9329, 9330, 9331, 9332, 9333, 9334, 9335, 9336, 9337, 9338, 9339, 9340, 9341, 9342, 9343, 9344, 9345, 9346, 9347, 9348, 9349, 9350, 9351, 9352, 9353, 9354, 9355, 9356 }, type = 0 (PERF_TYPE_HARDWARE), size = 144, config = 0 (PERF_COUNT_HW_CPU_CYCLES), { sample_period, sample_freq } = 999, sample_type = IP|TID|TIME|CALLCHAIN|PERIOD|REGS_USER|STACK_USER, read_format = ID|LOST, disabled = 1, inherit = 1, mmap = 1, comm = 1, freq = 1, enable_on_exec = 1, task = 1, mmap_data = 1, sample_id_all = 1, exclude_callchain_user = 1, mmap2 = 1, comm_exec = 1, ksymbol = 1, bpf_event = 1, build_id = 1, sample_regs_user = 0xff0fff, sample_stack_user = 8192
+# CPU_TOPOLOGY info available, use -I to display
+# NUMA_TOPOLOGY info available, use -I to display
+# pmu mappings: cpu = 4, amd_iommu_0 = 12, breakpoint = 5, drm_amdgpu = 4294836224, hwmon_amdgpu = 4294901762, hwmon_asusec = 4294901766, hwmon_asus = 4294901765, hwmon_eno2 = 4294901769, hwmon_iwlwifi_1 = 4294901770, hwmon_k10temp = 4294901764, hwmon_nct6799 = 4294901763, hwmon_nvme = 4294901760, hwmon_nvme = 4294901761, hwmon_spd5118 = 4294901768, hwmon_spd5118 = 4294901767, ibs_fetch = 10, ibs_op = 11, kprobe = 8, msr = 13, power = 14, power_core = 15, software = 1, tool = 4294967294, tracepoint = 2, uprobe = 9
+# CACHE info available, use -I to display
+# time of first sample : 1981187.523768
+# time of last sample : 1981193.531383
+# sample duration : 6007.615 ms
+# MEM_TOPOLOGY info available, use -I to display
+# bpf_prog_info 24: bpf_prog_31efb7c56239148b_restrict_filesystems addr 0xffffffffc00e3114 size 294
+# bpf_prog_info 41:
+# sub_prog 0: bpf_prog_0b855acee93a0b0b_sysctl_monitor addr 0xffffffffc00edbdc size 688
+# sub_prog 1: bpf_prog_417237dd50306dd0_cut_last addr 0xffffffffc00edef4 size 109
+# bpf_prog_info 199: bpf_prog_772db7720b2728e9_sd_fw_egress addr 0xffffffffc00e7d38 size 64
+# bpf_prog_info 200: bpf_prog_772db7720b2728e9_sd_fw_ingress addr 0xffffffffc00f0c34 size 64
+# bpf_prog_info 220: bpf_prog_772db7720b2728e9_sd_fw_egress addr 0xffffffffc00e29bc size 64
+# bpf_prog_info 221: bpf_prog_772db7720b2728e9_sd_fw_ingress addr 0xffffffffc00e2ce0 size 64
+# bpf_prog_info 222: bpf_prog_71bba91db5466642_sd_devices addr 0xffffffffc00f0ee4 size 490
+# bpf_prog_info 223: bpf_prog_772db7720b2728e9_sd_fw_egress addr 0xffffffffc00ed9b4 size 64
+# bpf_prog_info 224: bpf_prog_772db7720b2728e9_sd_fw_ingress addr 0xffffffffc00eda3c size 64
+# bpf_prog_info 225: bpf_prog_c1591dae5f5bcd9f_sd_devices addr 0xffffffffc00f1114 size 298
+# bpf_prog_info 226: bpf_prog_98b7b6f166b26c8a_sd_devices addr 0xffffffffc00f0cbc size 111
+# bpf_prog_info 227: bpf_prog_a97c143260cd9940_sd_devices addr 0xffffffffc00f1e64 size 268
+# bpf_prog_info 228: bpf_prog_a97c143260cd9940_sd_devices addr 0xffffffffc00f84ac size 268
+# bpf_prog_info 229: bpf_prog_c1591dae5f5bcd9f_sd_devices addr 0xffffffffc00ff908 size 298
+# bpf_prog_info 230: bpf_prog_772db7720b2728e9_sd_fw_egress addr 0xffffffffc00f12b8 size 64
+# bpf_prog_info 231: bpf_prog_772db7720b2728e9_sd_fw_ingress addr 0xffffffffc00f1338 size 64
+# bpf_prog_info 232: bpf_prog_feaab199760324c9_sd_devices addr 0xffffffffc00ffaa0 size 319
+# bpf_prog_info 233: bpf_prog_a97c143260cd9940_sd_devices addr 0xffffffffc00fe8ec size 268
+# bpf_prog_info 234: bpf_prog_a97c143260cd9940_sd_devices addr 0xffffffffc00ffc20 size 268
+# bpf_prog_info 235: bpf_prog_feaab199760324c9_sd_devices addr 0xffffffffc0100ecc size 319
+# bpf_prog_info 236: bpf_prog_772db7720b2728e9_sd_fw_egress addr 0xffffffffc00f64a4 size 64
+# bpf_prog_info 237: bpf_prog_772db7720b2728e9_sd_fw_ingress addr 0xffffffffc00fe1a4 size 64
+# bpf_prog_info 294: bpf_prog_772db7720b2728e9_sd_fw_egress addr 0xffffffffc00e7bc8 size 64
+# bpf_prog_info 295: bpf_prog_772db7720b2728e9_sd_fw_ingress addr 0xffffffffc00e7c60 size 64
+# btf info of id 35
+# btf info of id 142
+# cpu pmu capabilities: branches=16, max_precise=0
+# ibs_fetch pmu capabilities: zen4_ibs_extensions=1
+# ibs_op pmu capabilities: zen4_ibs_extensions=1, ldlat=1, dtlb_pgsize=1
+# AMD systems uses ibs_op// PMU for some precise events, e.g.: cycles:p, see the 'perf list' man page for further details.
+# CPU_DOMAIN_INFO info available, use -I to display
+# e_machine : 62
+# e_flags : 0
+# cacheline size: 64
+# missing features: TRACING_DATA BUILD_ID BRANCH_STACK GROUP_DESC AUXTRACE STAT CLOCKID DIR_FORMAT COMPRESSED CLOCK_DATA HYBRID_TOPOLOGY
+# ========
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 5K of event 'cycles'
+# Event count (approx.): 21150599788
+#
+# Overhead Samples Symbol IPC [IPC Coverage]
+# ........ ............ ............................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................ ....................
+#
+9.89% 505 [k] fdget - -
+5.73% 298 [k] fput - -
+3.71% 191 [k] _raw_spin_lock_irqsave - -
+3.42% 177 [k] _raw_spin_lock_irq - -
+2.72% 139 [k] _raw_spin_lock - -
+2.54% 127 [.] core_scheduler_native::worker::run_loop - -
+2.25% 116 [k] fget - -
+2.24% 115 [k] mutex_lock - -
+2.14% 112 [k] skb_release_data - -
+1.88% 97 [k] entry_SYSCALL_64 - -
+1.84% 95 [k] lock_sock_nested - -
+1.69% 87 [k] finish_task_switch.isra.0 - -
+1.60% 85 [.] <polling::Poller>::wait_impl - -
+1.60% 73 [k] __inet_lookup_established - -
+1.34% 70 [k] __nf_conntrack_find_get - -
+1.31% 65 [k] tcp_rcv_established - -
+1.24% 65 [k] tctx_task_work_run - -
+1.23% 65 [k] mutex_unlock - -
+1.20% 60 [k] skb_attempt_defer_free - -
+1.17% 60 [.] <crossbeam_deque::deque::Injector<async_task::runnable::Runnable<core_scheduler_native::task_service::TaskState>>>::steal_batch_with_limit_and_pop - -
+1.14% 60 [k] skb_defer_free_flush - -
+1.12% 58 [.] core_scheduler_echo_benchmark::server::scheduler_server::<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0} - -
+1.07% 54 [k] fdget_pos - -
+1.07% 55 [k] __copy_skb_header - -
+1.06% 54 [k] _copy_from_user - -
+1.05% 54 [k] _raw_spin_lock_bh - -
+0.99% 52 [k] tcp_sendmsg_locked - -
+0.94% 49 [k] __check_object_size - -
+0.92% 47 [k] task_work_run - -
+0.89% 45 [k] dst_release - -
+0.87% 44 [.] <core_scheduler_iouring::io_uring_selector::IoUringSelector>::wait_ready::{closure#0} - -
+0.86% 44 [.] <std::sync::mpmc::list::Channel<core_scheduler_iouring::io_uring_selector::Command>>::try_recv - -
+0.81% 41 [k] kmem_cache_alloc_node_noprof - -
+0.80% 43 [k] tcp_poll - -
+0.80% 41 [k] sock_rfree - -
+0.79% 42 [.] core::ptr::drop_glue::<futures_channel::oneshot::Sender<core::result::Result<usize, core::io::error::Error>>> - -
+0.78% 40 [k] ep_item_poll.isra.0 - -
+0.76% 40 [k] sock_def_readable - -
+0.71% 36 [k] do_syscall_64 - -
+0.71% 38 [k] native_write_msr - -
+0.70% 35 [k] __dev_queue_xmit - -
+0.70% 36 [k] update_curr - -
+0.65% 34 [k] __schedule - -
+0.65% 35 [k] do_epoll_ctl_file - -
+0.65% 34 [k] __smp_call_single_queue - -
+0.63% 33 [.] <core_scheduler_iouring::io_uring_selector::Capacity>::acquire::{closure#0} - -
+0.62% 32 [k] tcp_v4_rcv - -
+0.60% 31 [.] <core_scheduler_iouring::io_uring_selector::IoUringSelector>::route - -
+0.58% 30 [k] choose_idle_cpu - -
+0.58% 30 [k] ip_send_check - -
+0.57% 30 [k] tcp_wfree - -
+0.57% 30 [k] native_read_msr - -
+0.54% 28 [k] __siphash_unaligned - -
+0.52% 27 [k] ip_finish_output2 - -
+0.52% 28 [.] <core_scheduler_iouring::io_uring_selector::readiness::ReadinessRequest as core::ops::drop::Drop>::drop - -
+0.52% 26 [k] entry_SYSCALL_64_safe_stack - -
+0.51% 26 [.] <core::future::poll_fn::PollFn<<core_scheduler_iouring::io_uring_selector::IoUringSelector>::submit<core::result::Result<usize, core::io::error::Error>>::{closure#0}::{closure#0}> as core::future::future::Future>::poll - -
+0.51% 26 [k] kfree_skbmem - -
+0.50% 26 [k] skb_clone - -
+0.50% 26 [.] <core_scheduler_iouring::io_uring_selector::Reactor>::turn - -
+0.46% 24 [k] psi_group_change - -
+0.44% 22 [k] nf_conntrack_in - -
+0.44% 23 [.] <async_task::raw::RawTask<core_scheduler_native::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0}>, core_scheduler_native::task_service::TaskOutcome<()>, <core_scheduler_native::task_service::TaskService>::spawn<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0}>::{closure#1}, core_scheduler_native::task_service::TaskState>>::run - -
+0.43% 22 [k] native_sched_clock - -
+0.43% 22 [k] ktime_get_with_offset - -
+0.42% 22 [k] tcp_event_new_data_sent - -
+0.42% 22 [.] <event_listener::Inner<()>>::with_inner::<usize, <event_listener::Inner<()>>::notify<event_listener::notify::Notify>::{closure#0}> - -
+0.42% 22 [k] tcp_ack - -
+0.41% 22 [k] get_signal - -
+0.40% 21 [k] call_function_single_prep_ipi - -
+0.38% 20 [k] __skb_datagram_iter - -
+0.38% 18 [k] __pi_memset - -
+0.37% 19 [k] dequeue_entities - -
+0.36% 18 [k] tcp_tso_segs - -
+0.34% 18 [k] tcp_skb_entail - -
+0.31% 16 [k] nf_confirm - -
+0.31% 16 [.] <event_listener::Inner<()>>::with_inner::<usize, <event_listener::Inner<()>>::notify<event_listener::notify::Notify>::{closure#0}> - -
+0.30% 16 [k] skb_page_frag_refill - -
+0.30% 15 [.] <core_scheduler_iouring::io_uring_selector::Controller>::send - -
+0.29% 15 [k] entity_lag.isra.0 - -
+0.27% 14 [k] update_se - -
+0.26% 13 [k] ip_rcv_finish_core - -
+0.26% 13 [k] nf_nat_ipv4_pre_routing - -
+0.24% 13 [.] <crossbeam_deque::deque::Worker<async_task::runnable::Runnable<core_scheduler_native::task_service::TaskState>>>::pop - -
+0.24% 12 [.] futures_channel::oneshot::channel::<core::result::Result<usize, core::io::error::Error>> - -
+0.23% 12 [.] <futures_channel::oneshot::Sender<core::result::Result<usize, core::io::error::Error>>>::send - -
+0.21% 11 [.] <core_scheduler_iouring::io_uring_selector::IoUringSelector>::next_identifier - -
+0.21% 11 [k] __tcp_transmit_skb - -
+0.21% 11 [k] net_rx_action - -
+0.21% 11 [k] tcp_update_pacing_rate - -
+0.19% 10 [k] sk_forced_mem_schedule - -
+0.18% 10 [k] prandom_u32_state - -
+0.17% 9 [k] __virt_addr_valid - -
+0.17% 9 [.] core::ptr::drop_glue::<alloc::boxed::Box<core_scheduler_iouring::io_uring_selector::readiness::ReadinessRequest>> - -
+0.17% 9 [.] <async_task::raw::RawTask<core_scheduler_native::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0}>, core_scheduler_native::task_service::TaskOutcome<()>, <core_scheduler_native::task_service::TaskService>::spawn<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0}>::{closure#1}, core_scheduler_native::task_service::TaskState>>::clone_waker - -
+0.17% 6 [.] <async_task::raw::RawTask<core_scheduler_native::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0}>, core_scheduler_native::task_service::TaskOutcome<()>, <core_scheduler_native::task_service::TaskService>::spawn<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0}>::{closure#1}, core_scheduler_native::task_service::TaskState>>::drop_waker - -
+0.16% 8 [.] <async_task::raw::RawTask<core_scheduler_native::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0}>, core_scheduler_native::task_service::TaskOutcome<()>, <core_scheduler_native::task_service::TaskService>::spawn<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0}>::{closure#1}, core_scheduler_native::task_service::TaskState>>::wake - -
+0.15% 8 [k] io_poll_queue_proc - -
+0.15% 8 [k] nf_nat_inet_fn - -
+0.15% 8 [k] __update_load_avg_cfs_rq - -
+0.15% 8 [.] <core_scheduler_native::task_service::Shared>::wake_idle - -
+0.14% 8 [k] entry_SYSCALL_64_after_hwframe - -
+0.14% 12 [k] ktime_get - -
+0.14% 7 [k] pick_task_fair - -
+0.14% 7 [.] <core_scheduler_iouring::io_uring_worker::IoUringWorker as core_scheduler_selector::selector_worker::SelectorWorker>::turn - -
+0.13% 7 [k] cubictcp_cwnd_event_tx_start - -
+0.13% 7 [k] update_load_avg - -
+0.13% 7 [k] vruntime_eligible - -
+0.13% 7 [k] nft_do_chain - -
+0.13% 6 [k] dequeue_task_fair - -
+0.12% 6 [.] <event_listener::Event>::notify::<usize> - -
+0.12% 6 [k] tcp_queue_rcv - -
+0.12% 6 [k] __io_commit_cqring_flush - -
+0.12% 6 [k] __io_queue_proc - -
+0.12% 6 [k] hash_conntrack_raw - -
+0.12% 6 [.] <core_scheduler_native::task_service::Shared>::retire_runnable - -
+0.11% 6 [k] __rcu_read_lock - -
+0.11% 6 [k] x64_sys_call - -
+0.11% 6 [k] put_prev_task_fair - -
+0.10% 5 [k] __io_submit_flush_completions - -
+0.10% 5 [k] __rcu_read_unlock - -
+0.10% 5 [k] __alloc_skb - -
+
+
+#
+# (Tip: For parallelism histogram, try: perf report --hierarchy --sort latency,parallelism,comm,symbol)
+#

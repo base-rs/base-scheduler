@@ -229,7 +229,8 @@ fn registered_sockets_options_resolution_and_signals_forward_to_the_selector() {
             .unwrap();
         let (result, _) = scheduler.socket_read(&peer, vec![0; 1], &never).await;
         assert_eq!(result.unwrap(), 0);
-        scheduler.socket_close(stream).await.unwrap();
+        // EOF observes shutdown's effect, but the admission-only request may still retain its socket. Scheduler shutdown below drains it.
+        drop(stream);
         scheduler.socket_close(peer).await.unwrap();
         scheduler.socket_close(listener).await.unwrap();
         core_scheduler_conformance::address_resolution::numeric(&scheduler, SocketDomain::Ipv4)

@@ -1,0 +1,212 @@
+{
+  "commit": "5736301fded46c4e5f11d5387950ae2ee0807b94",
+  "server_cpu_policy": "first N of CPUs 0-3",
+  "client_cpus": "4-7",
+  "client_binary": "/tmp/core-scheduler-profile-baseline/release/core-scheduler-echo-benchmark",
+  "samples": [
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 42.527880859375,
+      "requests": 3483884,
+      "requests_per_second": 696776.8,
+      "rtt_max_us": 3131.391,
+      "rtt_mean_us": 45.86065488087439,
+      "rtt_p50_us": 46.911,
+      "rtt_p95_us": 51.391,
+      "rtt_p99_us": 53.855,
+      "seconds": 5.0,
+      "warmup_seconds": 1.0,
+      "variant": "baseline",
+      "backend": "tokio",
+      "workers": 1,
+      "repeat": 1,
+      "mode": "perf",
+      "server_binary": "/tmp/core-scheduler-profile-baseline/release/core-scheduler-echo-benchmark",
+      "client_binary": "/tmp/core-scheduler-profile-baseline/release/core-scheduler-echo-benchmark",
+      "client_cpu": {
+        "user": 2.270979,
+        "system": 5.4748220000000005,
+        "voluntary_switches": 2445523,
+        "involuntary_switches": 1636
+      },
+      "server_cpu": {
+        "user": 0.3991609999999999,
+        "system": 3.4441059999999997,
+        "voluntary_switches": 908,
+        "involuntary_switches": 76
+      },
+      "lifecycle_seconds": 6.033626874908805
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 35.434716796875,
+      "requests": 2902812,
+      "requests_per_second": 580562.4,
+      "rtt_max_us": 238.591,
+      "rtt_mean_us": 55.05724301780481,
+      "rtt_p50_us": 56.287,
+      "rtt_p95_us": 60.447,
+      "rtt_p99_us": 62.687,
+      "seconds": 5.0,
+      "warmup_seconds": 1.0,
+      "variant": "baseline",
+      "backend": "tokio-adapter",
+      "workers": 1,
+      "repeat": 1,
+      "mode": "perf",
+      "server_binary": "/tmp/core-scheduler-profile-baseline/release/core-scheduler-echo-benchmark",
+      "client_binary": "/tmp/core-scheduler-profile-baseline/release/core-scheduler-echo-benchmark",
+      "client_cpu": {
+        "user": 1.6694810000000002,
+        "system": 4.360194,
+        "voluntary_switches": 1653213,
+        "involuntary_switches": 1400
+      },
+      "server_cpu": {
+        "user": 0.8221889999999998,
+        "system": 3.4148960000000006,
+        "voluntary_switches": 1151,
+        "involuntary_switches": 86
+      },
+      "lifecycle_seconds": 6.1155498549342155
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 29.35859375,
+      "requests": 2405056,
+      "requests_per_second": 481011.2,
+      "rtt_max_us": 391.423,
+      "rtt_mean_us": 66.45862920780229,
+      "rtt_p50_us": 65.791,
+      "rtt_p95_us": 72.959,
+      "rtt_p99_us": 75.903,
+      "seconds": 5.0,
+      "warmup_seconds": 1.0,
+      "variant": "baseline",
+      "backend": "iouring",
+      "workers": 1,
+      "repeat": 1,
+      "mode": "perf",
+      "server_binary": "/tmp/core-scheduler-profile-baseline/release/core-scheduler-echo-benchmark",
+      "client_binary": "/tmp/core-scheduler-profile-baseline/release/core-scheduler-echo-benchmark",
+      "client_cpu": {
+        "user": 1.6397469999999998,
+        "system": 3.8505579999999995,
+        "voluntary_switches": 1714642,
+        "involuntary_switches": 806
+      },
+      "server_cpu": {
+        "user": 1.4857140000000006,
+        "system": 3.071480000000001,
+        "voluntary_switches": 862,
+        "involuntary_switches": 113
+      },
+      "lifecycle_seconds": 6.11547470302321
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 103.25511474609375,
+      "requests": 8458659,
+      "requests_per_second": 1691731.8,
+      "rtt_max_us": 3678.207,
+      "rtt_mean_us": 18.871867512687327,
+      "rtt_p50_us": 17.935,
+      "rtt_p95_us": 27.503,
+      "rtt_p99_us": 52.223,
+      "seconds": 5.0,
+      "warmup_seconds": 1.0,
+      "variant": "baseline",
+      "backend": "tokio",
+      "workers": 4,
+      "repeat": 1,
+      "mode": "perf",
+      "server_binary": "/tmp/core-scheduler-profile-baseline/release/core-scheduler-echo-benchmark",
+      "client_binary": "/tmp/core-scheduler-profile-baseline/release/core-scheduler-echo-benchmark",
+      "client_cpu": {
+        "user": 3.1771689999999992,
+        "system": 10.581813,
+        "voluntary_switches": 1757242,
+        "involuntary_switches": 1145
+      },
+      "server_cpu": {
+        "user": 2.248457,
+        "system": 10.71967,
+        "voluntary_switches": 1734459,
+        "involuntary_switches": 2047
+      },
+      "lifecycle_seconds": 6.06579705583863
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 90.323046875,
+      "requests": 7399264,
+      "requests_per_second": 1479852.8,
+      "rtt_max_us": 3526.655,
+      "rtt_mean_us": 21.57824103937906,
+      "rtt_p50_us": 20.351,
+      "rtt_p95_us": 34.047,
+      "rtt_p99_us": 56.351,
+      "seconds": 5.0,
+      "warmup_seconds": 1.0,
+      "variant": "baseline",
+      "backend": "tokio-adapter",
+      "workers": 4,
+      "repeat": 1,
+      "mode": "perf",
+      "server_binary": "/tmp/core-scheduler-profile-baseline/release/core-scheduler-echo-benchmark",
+      "client_binary": "/tmp/core-scheduler-profile-baseline/release/core-scheduler-echo-benchmark",
+      "client_cpu": {
+        "user": 3.4456609999999994,
+        "system": 9.948485999999995,
+        "voluntary_switches": 2269203,
+        "involuntary_switches": 2243
+      },
+      "server_cpu": {
+        "user": 4.012571000000001,
+        "system": 10.585608999999998,
+        "voluntary_switches": 1134948,
+        "involuntary_switches": 1144
+      },
+      "lifecycle_seconds": 6.316269614035264
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 80.78731689453124,
+      "requests": 6618097,
+      "requests_per_second": 1323619.4,
+      "rtt_max_us": 3444.735,
+      "rtt_mean_us": 24.127265385502877,
+      "rtt_p50_us": 23.071,
+      "rtt_p95_us": 37.503,
+      "rtt_p99_us": 56.607,
+      "seconds": 5.0,
+      "warmup_seconds": 1.0,
+      "variant": "baseline",
+      "backend": "iouring",
+      "workers": 4,
+      "repeat": 1,
+      "mode": "perf",
+      "server_binary": "/tmp/core-scheduler-profile-baseline/release/core-scheduler-echo-benchmark",
+      "client_binary": "/tmp/core-scheduler-profile-baseline/release/core-scheduler-echo-benchmark",
+      "client_cpu": {
+        "user": 3.4237070000000003,
+        "system": 9.33546100000001,
+        "voluntary_switches": 2508242,
+        "involuntary_switches": 540
+      },
+      "server_cpu": {
+        "user": 8.212691999999997,
+        "system": 11.792655999999994,
+        "voluntary_switches": 81843,
+        "involuntary_switches": 232
+      },
+      "lifecycle_seconds": 6.315610480029136
+    }
+  ]
+}

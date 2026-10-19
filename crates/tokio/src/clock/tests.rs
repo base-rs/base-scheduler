@@ -65,15 +65,26 @@ mod conformance {
 }
 
 #[test]
-fn close_wakes_pending_timers_and_rejects_new_waits() {
+fn close_preserves_pending_timers_and_rejects_new_waits() {
     run(async |fixture| {
         let scheduler = &fixture.scheduler;
         let never = Cancellation::never();
+        let cancellation = Cancellation::new();
         let mut wait = Box::pin(scheduler.sleep(Duration::from_secs(60), &never));
+        let mut cancellable = Box::pin(scheduler.sleep(Duration::from_secs(60), &cancellation));
+        let unpolled = scheduler.sleep(Duration::from_secs(1), &never);
         assert!(poll_once(&mut wait).await.is_none());
+        assert!(poll_once(&mut cancellable).await.is_none());
         scheduler.close();
+        assert!(poll_once(&mut wait).await.is_none());
+        assert!(poll_once(&mut cancellable).await.is_none());
+        cancellation.cancel();
+        assert!(matches!(
+            cancellable.await,
+            Err(core_scheduler::OperationError::Cancelled(_))
+        ));
         assert_eq!(
-            wait.await.unwrap_err().kind(),
+            unpolled.await.unwrap_err().kind(),
             std::io::ErrorKind::BrokenPipe
         );
         assert_eq!(
@@ -84,6 +95,8 @@ fn close_wakes_pending_timers_and_rejects_new_waits() {
                 .kind(),
             std::io::ErrorKind::BrokenPipe
         );
+        fixture.advance(Duration::from_secs(60));
+        wait.await.unwrap();
     });
 }
 

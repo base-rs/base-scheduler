@@ -6,7 +6,9 @@ use futures_lite::future::{block_on, poll_once};
 use std::{sync::atomic::AtomicUsize, time::Instant};
 
 use std::cell::RefCell;
+type SyscallHook = (&'static str, Box<dyn FnOnce()>);
 thread_local! {
+    static BEFORE_SYSCALL: RefCell<Option<SyscallHook>> = const { RefCell::new(None) };
     static FAILURES: RefCell<VecDeque<(&'static str, Option<io::Error>)>> = const { RefCell::new(VecDeque::new()) };
 }
 
@@ -14,6 +16,17 @@ pub(super) fn syscall<T>(
     name: &'static str,
     operation: impl FnOnce() -> io::Result<T>,
 ) -> io::Result<T> {
+    let hook = BEFORE_SYSCALL.with(|hook| {
+        let mut hook = hook.borrow_mut();
+        if hook.as_ref().is_some_and(|(expected, _)| *expected == name) {
+            hook.take().map(|(_, callback)| callback)
+        } else {
+            None
+        }
+    });
+    if let Some(hook) = hook {
+        hook();
+    }
     let failure = FAILURES.with(|failures| {
         let mut failures = failures.borrow_mut();
         if failures
@@ -46,6 +59,7 @@ impl Failures {
 impl Drop for Failures {
     fn drop(&mut self) {
         FAILURES.with(|failures| failures.borrow_mut().clear());
+        BEFORE_SYSCALL.with(|hook| hook.borrow_mut().take());
     }
 }
 
@@ -120,6 +134,7 @@ fn setup_probes_and_errors_are_explicit() {
         opcode::Send::CODE,
         opcode::RecvMsg::CODE,
         opcode::SendMsg::CODE,
+        opcode::PollAdd::CODE,
         opcode::AsyncCancel::CODE,
     ] {
         assert_eq!(
@@ -383,7 +398,8 @@ fn transient_syscall_errors_preserve_progress_and_fatal_errors_stop_the_driver()
     ] {
         let (selector, mut driver) = pair(1);
         let _failures = Failures::new([(name, error)]);
-        assert!(!driver.turn(Some(Duration::ZERO)).unwrap());
+        assert!(!driver.turn(Some(Duration::from_millis(1))).unwrap());
+        assert!(FAILURES.with(|failures| failures.borrow().is_empty()));
         drain(&selector, &mut driver);
     }
     for name in [
@@ -396,7 +412,10 @@ fn transient_syscall_errors_preserve_progress_and_fatal_errors_stop_the_driver()
         let (selector, mut driver) = pair(1);
         let _failures = Failures::new([(name, io::ErrorKind::PermissionDenied.into())]);
         assert_eq!(
-            driver.turn(Some(Duration::ZERO)).unwrap_err().kind(),
+            driver
+                .turn(Some(Duration::from_millis(1)))
+                .unwrap_err()
+                .kind(),
             io::ErrorKind::PermissionDenied
         );
         assert!(driver.turn(None).unwrap());
@@ -542,9 +561,14 @@ fn driver_failure_retains_submitted_storage_and_wakes_waiters_with_a_panic() {
         driver.turn(Some(Duration::ZERO)).unwrap();
         assert_eq!(driver.reactor.as_ref().unwrap().in_flight.0.len(), 1);
         if fatal_turn {
+            // Consume the submission notification before testing the idle wait failure.
+            driver.turn(Some(Duration::from_millis(1))).unwrap();
             let _failures = Failures::new([("wait", io::ErrorKind::PermissionDenied.into())]);
             assert_eq!(
-                driver.turn(Some(Duration::ZERO)).unwrap_err().kind(),
+                driver
+                    .turn(Some(Duration::from_millis(1)))
+                    .unwrap_err()
+                    .kind(),
                 io::ErrorKind::PermissionDenied
             );
         }
@@ -1116,4 +1140,138 @@ fn external_admission_remains_bounded_under_contention() {
     });
     assert_eq!(capacity.state.load(Ordering::Acquire), 0);
     capacity.close();
+}
+
+#[test]
+fn nonblocking_and_productive_turns_do_not_prepare_an_idle_wait() {
+    let (selector, mut driver) = pair(1);
+    let (_directory, file) = file(&selector);
+    let never = Cancellation::never();
+    {
+        let _failures =
+            Failures::new([("notification-read", io::ErrorKind::PermissionDenied.into())]);
+        // An empty nonblocking turn needs only to inspect the queues.
+        assert!(!driver.turn(Some(Duration::ZERO)).unwrap());
+        let mut operation = Box::pin(selector.file_read_at(&file, vec![0; 6], 0, &never));
+        assert!(block_on(poll_once(&mut operation)).is_none());
+        // Submitting work returns without preparing to sleep, even for an unlimited timeout.
+        assert!(!driver.turn(None).unwrap());
+        // Make the completion ready before the next turn so this also exercises the completion-only fast path.
+        driver
+            .reactor
+            .as_mut()
+            .unwrap()
+            .ring
+            .submit_and_wait(1)
+            .unwrap();
+        assert!(!driver.turn(None).unwrap());
+        let (result, buffer) = block_on(operation);
+        assert_eq!(result.unwrap(), 6);
+        assert_eq!(buffer, b"abcdef");
+        assert_eq!(FAILURES.with(|failures| failures.borrow().len()), 1);
+    }
+    drain(&selector, &mut driver);
+}
+
+#[test]
+fn nonblocking_turn_preserves_notifications_for_the_next_idle_turn() {
+    let (selector, mut driver) = pair(1);
+    driver.waker().wake_by_ref();
+    assert!(!driver.turn(Some(Duration::ZERO)).unwrap());
+    {
+        let _failures = Failures::new([(
+            "modify-notification",
+            io::ErrorKind::PermissionDenied.into(),
+        )]);
+        // The previously published notification must return us to the executor before rearming or waiting.
+        assert!(!driver.turn(None).unwrap());
+        assert_eq!(FAILURES.with(|failures| failures.borrow().len()), 1);
+    }
+    drain(&selector, &mut driver);
+}
+
+#[test]
+fn notifications_racing_idle_preparation_remain_observable() {
+    for name in ["modify-notification", "modify-ring", "wait"] {
+        let (selector, mut driver) = pair(1);
+        {
+            let _failures = Failures;
+            let waker = driver.waker();
+            BEFORE_SYSCALL.with(|hook| {
+                *hook.borrow_mut() = Some((name, Box::new(move || waker.wake_by_ref())));
+            });
+            assert!(!driver.turn(Some(Duration::from_secs(1))).unwrap());
+            assert!(BEFORE_SYSCALL.with(|hook| hook.borrow().is_none()));
+            assert!(
+                driver
+                    .reactor
+                    .as_ref()
+                    .unwrap()
+                    .events
+                    .iter()
+                    .any(|event| event.key == COMMAND_EVENT)
+            );
+            // The next turn consumes the notification without another wait.
+            assert!(!driver.turn(None).unwrap());
+        }
+        drain(&selector, &mut driver);
+    }
+}
+
+#[test]
+fn capacity_wait_observes_retirement_and_closure_before_registration() {
+    let capacity = Arc::new(Capacity {
+        state: AtomicUsize::new(0),
+        available: CompletionEvent::new(),
+        limit: 1,
+    });
+    let never = Cancellation::never();
+    let permit = block_on(capacity.acquire(&never)).unwrap();
+    // Stage retirement after admission observed a full pool but before it started listening.
+    drop(permit);
+    assert!(block_on(poll_once(capacity.wait_for_capacity(&never))).is_some());
+    let permit = block_on(capacity.acquire(&never)).unwrap();
+    let mut waiting = Box::pin(capacity.wait_for_capacity(&never));
+    assert!(block_on(poll_once(&mut waiting)).is_none());
+    drop(permit);
+    assert!(block_on(poll_once(&mut waiting)).is_some());
+    // Closure in the same interval must also bypass waiting, even if the last permit is still held.
+    let permit = block_on(capacity.acquire(&never)).unwrap();
+    capacity.close();
+    assert!(block_on(poll_once(capacity.wait_for_capacity(&never))).is_some());
+    assert_eq!(
+        block_on(capacity.acquire(&never)).err().unwrap().kind(),
+        io::ErrorKind::BrokenPipe
+    );
+    drop(permit);
+}
+
+#[test]
+fn pending_submissions_are_flushed_before_preparing_to_sleep() {
+    let (selector, mut driver) = IoUringSelector::new(IoUringOptions {
+        entries: 1,
+        capacity: 4,
+        ..Default::default()
+    })
+    .unwrap();
+    let (_directory, file) = fifo(&selector);
+    let never = Cancellation::never();
+    let mut operations = Vec::new();
+    for _ in 0..4 {
+        let mut operation = Box::pin(selector.file_read(&file, vec![0], &never));
+        assert!(block_on(poll_once(&mut operation)).is_none());
+        operations.push(operation);
+    }
+    {
+        let _failures =
+            Failures::new([("notification-read", io::ErrorKind::PermissionDenied.into())]);
+        assert!(!driver.turn(None).unwrap());
+        while driver.reactor.as_ref().unwrap().pending.len() > 1 {
+            assert!(!driver.turn(None).unwrap());
+        }
+        assert_eq!(driver.reactor.as_ref().unwrap().in_flight.0.len(), 3);
+        assert_eq!(FAILURES.with(|failures| failures.borrow().len()), 1);
+    }
+    drop(operations);
+    drain(&selector, &mut driver);
 }

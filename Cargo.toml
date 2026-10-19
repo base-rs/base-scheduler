@@ -12,6 +12,7 @@ include = ["src/**", "context/**", "Cargo.toml", "readme.md", "license.md", "rel
 [workspace]
 members = [
     "bake",
+    "benchmarks/echo",
     "crates/conformance",
     "crates/direct",
     "crates/tokio",

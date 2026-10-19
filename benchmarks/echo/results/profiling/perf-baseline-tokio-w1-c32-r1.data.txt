@@ -1,0 +1,29 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 5K of event 'cycles:u'
+# Event count (approx.): 2862888423
+#
+# Overhead Symbol IPC [IPC Coverage]
+# ........ ........................................................................................................................................................................................................................ ....................
+#
+ 16.79% [.] <tokio::runtime::io::scheduled_io::ScheduledIo>::poll_readiness - -
+ 9.30% [k] 0xffffffff9de00080 - -
+ 9.10% [.] tokio::runtime::task::waker::wake_by_val - -
+ 8.15% [.] <tokio::runtime::scheduler::multi_thread::worker::Context>::run - -
+ 7.19% [.] <tokio::runtime::io::scheduled_io::ScheduledIo>::wake - -
+ 6.41% [.] <tokio::runtime::task::state::State>::transition_to_idle - -
+ 5.75% [k] 0xffffffff9e60c656 - -
+ 5.16% [.] <tokio::runtime::task::state::State>::transition_to_running - -
+ 4.21% [.] <tokio::runtime::io::driver::Driver>::turn - -
+ 3.78% [.] tokio::runtime::task::waker::clone_waker - -
+ 3.41% [.] <tokio::runtime::task::state::State>::transition_to_notified_by_val - -
+ 2.96% [.] <tokio::net::tcp::stream::TcpStream>::poll_read_priv - -
+ 1.70% [.] __vdso_clock_gettime - -
+
+
+#
+# (Tip: To show context switches in perf report sample context add --switch-events to perf record.)
+#

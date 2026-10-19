@@ -302,6 +302,16 @@ macro_rules! socket_suites {
                     scheduler.socket_close(receiver).await.unwrap();
                 });
             }
+            fn borrowed_streams(test: impl AsyncFnOnce(&$scheduler, &NativeSocket, &NativeSocket) + Send + 'static) {
+                $run(async move |fixture| {
+                    let scheduler = &fixture.scheduler;
+                    let (sender, receiver) = core_scheduler_conformance::socket::stream_pair(scheduler, $domain).await;
+                    test(scheduler, &sender, &receiver).await;
+                    // Abandonment tests may leave a readiness-only request retiring. Ordinary destruction is safe; fixture shutdown drains those requests before ending the driver.
+                    drop(sender);
+                    drop(receiver);
+                });
+            }
             fn datagrams(test: impl AsyncFnOnce(&$scheduler, &NativeSocket, &NativeSocket) + Send + 'static) {
                 $run(async move |fixture| {
                     let scheduler = &fixture.scheduler;
@@ -322,6 +332,9 @@ macro_rules! socket_suites {
             mod scalar { use super::*; core_scheduler_conformance::socket_tests!(run: streams); }
             mod message { use super::*; core_scheduler_conformance::socket_message_tests!(run: streams); }
             mod datagram { use super::*; core_scheduler_conformance::socket_datagram_tests!(run: datagrams); }
+            mod borrowed_scalar { use super::*; core_scheduler_conformance::socket_poll_tests!(run: borrowed_streams); }
+            mod borrowed_message { use super::*; core_scheduler_conformance::socket_message_poll_tests!(run: borrowed_streams); }
+            mod borrowed_datagram { use super::*; core_scheduler_conformance::socket_datagram_poll_tests!(run: datagrams); }
         }
     };
 }

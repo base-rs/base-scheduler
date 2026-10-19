@@ -1,0 +1,101 @@
+# ========
+# captured on : Mon Oct 19 19:36:35 2026
+# header version : 1
+# data offset : 520
+# data size : 49993824
+# feat offset : 49994344
+# hostname : aiko
+# os release : 7.2.6-arch2-1
+# perf version : 7.2.8-2
+# arch : x86_64
+# nrcpus online : 32
+# nrcpus avail : 32
+# cpudesc : AMD Ryzen 9 9950X3D 16-Core Processor
+# cpuid : AuthenticAMD,26,68,0
+# total memory : 48436160 kB
+# cmdline : /usr/bin/perf
+# event : name = cycles:u, , id = { 2837, 2838, 2839, 2840, 2841, 2842, 2843, 2844, 2845, 2846, 2847, 2848, 2849, 2850, 2851, 2852, 2853, 2854, 2855, 2856, 2857, 2858, 2859, 2860, 2861, 2862, 2863, 2864, 2865, 2866, 2867, 2868 }, type = 0 (PERF_TYPE_HARDWARE), size = 144, config = 0 (PERF_COUNT_HW_CPU_CYCLES), { sample_period, sample_freq } = 999, sample_type = IP|TID|TIME|CALLCHAIN|PERIOD|REGS_USER|STACK_USER, read_format = ID|LOST, disabled = 1, inherit = 1, exclude_kernel = 1, exclude_hv = 1, mmap = 1, comm = 1, freq = 1, enable_on_exec = 1, task = 1, mmap_data = 1, sample_id_all = 1, exclude_callchain_user = 1, mmap2 = 1, comm_exec = 1, ksymbol = 1, bpf_event = 1, build_id = 1, sample_regs_user = 0xff0fff, sample_stack_user = 8192
+# CPU_TOPOLOGY info available, use -I to display
+# NUMA_TOPOLOGY info available, use -I to display
+# pmu mappings: cpu = 4, amd_iommu_0 = 12, breakpoint = 5, drm_amdgpu = 4294836224, hwmon_amdgpu = 4294901762, hwmon_asusec = 4294901766, hwmon_asus = 4294901765, hwmon_eno2 = 4294901769, hwmon_iwlwifi_1 = 4294901770, hwmon_k10temp = 4294901764, hwmon_nct6799 = 4294901763, hwmon_nvme = 4294901760, hwmon_nvme = 4294901761, hwmon_spd5118 = 4294901768, hwmon_spd5118 = 4294901767, ibs_fetch = 10, ibs_op = 11, kprobe = 8, msr = 13, power = 14, power_core = 15, software = 1, tool = 4294967294, tracepoint = 2, uprobe = 9
+# CACHE info available, use -I to display
+# time of first sample : 1980797.270146
+# time of last sample : 1980803.272141
+# sample duration : 6001.995 ms
+# MEM_TOPOLOGY info available, use -I to display
+# bpf_prog_info empty
+# btf info empty
+# cpu pmu capabilities: branches=16, max_precise=0
+# ibs_fetch pmu capabilities: zen4_ibs_extensions=1
+# ibs_op pmu capabilities: zen4_ibs_extensions=1, ldlat=1, dtlb_pgsize=1
+# AMD systems uses ibs_op// PMU for some precise events, e.g.: cycles:p, see the 'perf list' man page for further details.
+# CPU_DOMAIN_INFO info available, use -I to display
+# e_machine : 62
+# e_flags : 0
+# cacheline size: 64
+# missing features: TRACING_DATA BUILD_ID BRANCH_STACK GROUP_DESC AUXTRACE STAT CLOCKID DIR_FORMAT COMPRESSED CLOCK_DATA HYBRID_TOPOLOGY
+# ========
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 5K of event 'cycles:u'
+# Event count (approx.): 2765974161
+#
+# Overhead Samples Symbol IPC [IPC Coverage]
+# ........ ............ ........................................................................................................................................................................................ ....................
+#
+15.15% 903 [.] <tokio::runtime::io::scheduled_io::ScheduledIo>::poll_readiness - -
+10.48% 629 [.] tokio::runtime::task::waker::wake_by_val - -
+8.69% 518 [k] 0xffffffff9de00080 - -
+7.62% 454 [.] <tokio::runtime::io::scheduled_io::ScheduledIo>::wake - -
+7.44% 444 [.] <tokio::runtime::scheduler::multi_thread::worker::Context>::run - -
+6.23% 372 [.] <tokio::runtime::task::state::State>::transition_to_idle - -
+5.45% 325 [k] 0xffffffff9e60c656 - -
+5.03% 299 [.] <tokio::runtime::io::driver::Driver>::turn - -
+4.70% 281 [.] <tokio::runtime::task::state::State>::transition_to_running - -
+4.52% 272 [.] <tokio::runtime::task::state::State>::transition_to_notified_by_val - -
+4.12% 244 [.] tokio::runtime::task::waker::clone_waker - -
+2.79% 166 [.] <tokio::net::tcp::stream::TcpStream>::poll_read_priv - -
+1.65% 99 [.] __vdso_clock_gettime - -
+1.29% 73 [.] <tokio::runtime::time::handle::Handle>::process_at_time - -
+1.10% 65 [.] <tokio::runtime::scheduler::multi_thread::worker::Context>::park_internal - -
+0.79% 47 [.] <tokio::runtime::scheduler::multi_thread::idle::Idle>::worker_to_notify - -
+0.75% 44 [.] <tokio::runtime::scheduler::multi_thread::worker::Context>::run_task - -
+0.57% 34 [.] <tokio::runtime::scheduler::multi_thread::worker::Core>::maintenance - -
+0.56% 34 [k] 0xffffffff9f06eb48 - -
+0.55% 33 [k] 0xffffffff9e60c5d8 - -
+0.55% 33 [k] 0xffffffff9de0008f - -
+0.40% 24 [k] 0xffffffff9e0aae30 - -
+0.40% 24 [k] 0xffffffff9e60c5da - -
+0.37% 22 [k] 0xffffffff9de000ab - -
+0.35% 21 [k] 0xffffffff9f389a79 - -
+0.33% 20 [.] 0x00000000000936a0 - -
+0.32% 19 [.] <tokio::runtime::time::Driver>::park_internal - -
+0.29% 17 [k] 0xffffffff9de00087 - -
+0.28% 17 [k] 0xffffffff9de000ad - -
+0.26% 16 [k] 0xffffffff9f06eb7d - -
+0.25% 15 [k] 0xffffffff9eaa672f - -
+0.22% 13 [.] <std::sys::pal::unix::time::Timespec>::sub_timespec - -
+0.18% 11 [k] 0xffffffff9f389ac1 - -
+0.18% 11 [k] 0xffffffff9f389a85 - -
+0.17% 10 [k] 0xffffffff9e60c5d1 - -
+0.17% 10 [k] 0xffffffff9f06ee86 - -
+0.17% 10 [.] <std::sys::pal::unix::time::Timespec>::now - -
+0.15% 9 [k] 0xffffffff9eaa19c4 - -
+0.14% 8 [k] 0xffffffff9e25cb58 - -
+0.14% 8 [k] 0xffffffff9e60c625 - -
+0.14% 8 [.] <tokio::runtime::scheduler::multi_thread::park::Unparker>::unpark - -
+0.12% 7 [k] 0xffffffff9de000c2 - -
+0.12% 7 [k] 0xffffffff9f06eea4 - -
+0.12% 7 [k] 0xffffffff9e0ab9a8 - -
+0.12% 7 [k] 0xffffffff9f06eeec - -
+0.12% 7 [.] <std::time::Instant>::elapsed - -
+0.11% 7 [.] clock_gettime - -
+0.11% 7 [k] 0xffffffff9e60c5c0 - -
+0.10% 6 [k] 0xffffffff9eaa6729 - -
+
+
+#
+# (Tip: To see how parallelism changes over time, try: perf report -F time,latency,parallelism --time-quantum=1s)
+#

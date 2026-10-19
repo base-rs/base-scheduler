@@ -66,6 +66,7 @@ fn validate_operation_support(supported: impl Fn(u8) -> bool) -> io::Result<()> 
         opcode::Send::CODE,
         opcode::RecvMsg::CODE,
         opcode::SendMsg::CODE,
+        opcode::PollAdd::CODE,
         opcode::AsyncCancel::CODE,
     ] {
         if !supported(operation) {
@@ -334,9 +335,7 @@ impl Capacity {
         self.available.notify(usize::MAX);
     }
     async fn acquire(self: &Arc<Self>, cancellation: &Cancellation) -> io::Result<Permit> {
-        let mut cancelled = pin!(cancellation.cancelled());
         loop {
-            event_listener::listener!(self.available => listener);
             cancellation
                 .check()
                 .map_err(|error| io::Error::new(io::ErrorKind::Interrupted, error))?;
@@ -361,15 +360,26 @@ impl Capacity {
                     continue;
                 }
             }
-            let mut listener = pin!(listener);
-            poll_fn(|cx| {
-                if cancelled.as_mut().poll(cx).is_ready() {
-                    return Poll::Ready(());
-                }
-                listener.as_mut().poll(cx)
-            })
-            .await;
+            self.wait_for_capacity(cancellation).await;
         }
+    }
+
+    async fn wait_for_capacity(&self, cancellation: &Cancellation) {
+        event_listener::listener!(self.available => listener);
+        // A permit can be returned or admission closed between the full check and registration. Recheck after listening so that neither transition loses its wakeup.
+        let state = self.state.load(Ordering::Acquire);
+        if state < self.limit || state & CAPACITY_CLOSED != 0 {
+            return;
+        }
+        let mut cancelled = pin!(cancellation.cancelled());
+        let mut listener = pin!(listener);
+        poll_fn(|cx| {
+            if cancelled.as_mut().poll(cx).is_ready() {
+                return Poll::Ready(());
+            }
+            listener.as_mut().poll(cx)
+        })
+        .await;
     }
 }
 pub(crate) struct DriverGroup {
@@ -392,7 +402,7 @@ impl DriverGroup {
 
 /// Owned I/O admission endpoint, independent of the executor polling its futures.
 ///
-/// Construction returns separate drivers and starts no ring thread. Owned file and socket transfers use io_uring; other capabilities share one readiness fallback. Dropping this endpoint closes admission without blocking.
+/// Construction returns separate drivers and starts no ring thread. Owned file and socket transfers use io_uring; borrowed sockets try nonblocking syscalls and wait for ring readiness. Other capabilities share one readiness fallback. Dropping this endpoint closes admission without blocking.
 pub struct IoUringSelector {
     controllers: Vec<Arc<Controller>>,
     group: Arc<DriverGroup>,
@@ -957,7 +967,16 @@ impl Reactor {
             return Ok(true);
         }
 
-        // Bound notification reads too: continuous producers must not monopolize a turn. Unread bytes remain readable after rearming, and any observed notification makes this turn's wait nonblocking.
+        // The CQ is checked directly above; a zero-timeout poller wait cannot publish any more completions. Return to the executor after progress or a nonblocking turn, and prepare the poller only when we may actually sleep. Requests and cancellations left in the SQ must be retried before sleeping too.
+        if progressed
+            || timeout == Some(Duration::ZERO)
+            || !self.pending.is_empty()
+            || !self.ring.submission().is_empty()
+        {
+            return Ok(false);
+        }
+
+        // Bound notification reads too: continuous producers must not monopolize a turn. A notification may represent executor work or a command arriving after the command batch above. Return before sleeping; a later idle turn will rearm both level-triggered sources, preserving notifications and CQEs which race this check.
         let mut notified = false;
         let mut bytes = [0; 256];
         for _ in 0..16 {
@@ -971,6 +990,9 @@ impl Reactor {
                 Err(error) => return Err(error),
             }
         }
+        if notified {
+            return Ok(false);
+        }
         syscall("modify-notification", || {
             self.poller
                 .modify(&self.notification, Event::readable(COMMAND_EVENT))
@@ -979,21 +1001,7 @@ impl Reactor {
             self.poller.modify(&self.ring, Event::readable(RING_EVENT))
         })?;
         self.events.clear();
-        let result = syscall("wait", || {
-            self.poller.wait(
-                &mut self.events,
-                if progressed
-                    || notified
-                    || command_batch_full
-                    || !self.pending.is_empty()
-                    || !self.ring.submission().is_empty()
-                {
-                    Some(Duration::ZERO)
-                } else {
-                    timeout
-                },
-            )
-        });
+        let result = syscall("wait", || self.poller.wait(&mut self.events, timeout));
         if let Err(error) = result {
             if error.kind() != io::ErrorKind::Interrupted {
                 return Err(error);
@@ -1024,6 +1032,7 @@ impl std::task::Wake for Controller {
 }
 
 mod message;
+mod readiness;
 mod socket;
 
 #[cfg(test)]

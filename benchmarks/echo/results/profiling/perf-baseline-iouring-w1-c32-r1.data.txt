@@ -1,0 +1,48 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 6K of event 'cycles:u'
+# Event count (approx.): 10926722000
+#
+# Overhead Symbol IPC [IPC Coverage]
+# ........ ............................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................ ....................
+#
+ 15.10% [.] <core_scheduler_native::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0}> as core::future::future::Future>::poll - -
+ 4.99% [.] <core_scheduler_iouring::io_uring_selector::Capacity>::acquire::{closure#0} - -
+ 4.77% [.] <futures_channel::oneshot::Sender<(core::result::Result<usize, core::io::error::Error>, core_scheduler::buffer_slice::BufferSlice<alloc::vec::Vec<u8>>)>>::send - -
+ 4.71% [.] <async_task::raw::RawTask<core_scheduler_native::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0}>, core_scheduler_native::task_service::TaskOutcome<()>, <core_scheduler_native::task_service::TaskService>::spawn<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0}>::{closure#1}, core_scheduler_native::task_service::TaskState>>::run - -
+ 4.51% [.] <futures_channel::oneshot::Sender<(core::result::Result<usize, core::io::error::Error>, alloc::vec::Vec<u8>)>>::send - -
+ 4.38% [.] <event_listener::Inner<()>>::with_inner::<(), <event_listener::Inner<()>>::insert::{closure#0}> - -
+ 3.52% [.] <core_scheduler_iouring::io_uring_selector::IoUringSelector>::route - -
+ 3.10% [.] <core_scheduler_iouring::io_uring_selector::Reactor>::turn - -
+ 2.89% [.] <event_listener::Inner<()>>::with_inner::<core::option::Option<event_listener::State<()>>, <event_listener::Inner<()>>::remove::{closure#0}> - -
+ 2.82% [.] <event_listener::Inner<()>>::with_inner::<usize, <event_listener::Inner<()>>::notify<event_listener::notify::Notify>::{closure#0}> - -
+ 2.74% [.] <futures_channel::oneshot::Inner<(core::result::Result<usize, core::io::error::Error>, core_scheduler::buffer_slice::BufferSlice<alloc::vec::Vec<u8>>)>>::recv - -
+ 2.70% [.] <event_listener::Inner<()>>::with_inner::<usize, <event_listener::Inner<()>>::notify<event_listener::notify::Notify>::{closure#0}> - -
+ 2.69% [.] <futures_channel::oneshot::Inner<(core::result::Result<usize, core::io::error::Error>, alloc::vec::Vec<u8>)>>::recv - -
+ 2.65% [.] <async_task::raw::RawTask<core_scheduler_native::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0}>, core_scheduler_native::task_service::TaskOutcome<()>, <core_scheduler_native::task_service::TaskService>::spawn<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0}>::{closure#1}, core_scheduler_native::task_service::TaskState>>::clone_waker - -
+ 2.46% [.] <core_scheduler_iouring::io_uring_selector::Controller>::send - -
+ 2.19% [.] <async_task::raw::RawTask<core_scheduler_native::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0}>, core_scheduler_native::task_service::TaskOutcome<()>, <core_scheduler_native::task_service::TaskService>::spawn<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0}>::{closure#1}, core_scheduler_native::task_service::TaskState>>::wake - -
+ 1.96% [.] <core_scheduler_native::task_service::Shared>::wake_idle - -
+ 1.92% [.] <core_scheduler_iouring::io_uring_selector::IoUringSelector>::next_identifier - -
+ 1.79% [.] <crossbeam_deque::deque::Worker<async_task::runnable::Runnable<core_scheduler_native::task_service::TaskState>>>::pop - -
+ 1.77% [.] <std::thread::local::LocalKey<core::cell::RefCell<core::option::Option<core_scheduler_native::worker::LocalWorker>>>>::with::<core_scheduler_native::worker::run_loop::{closure#3}, ()> - -
+ 1.65% [.] <core_scheduler_iouring::io_uring_selector::Request<core_scheduler::buffer_slice::BufferSlice<alloc::vec::Vec<u8>>> as core::ops::drop::Drop>::drop - -
+ 1.55% [.] <std::sync::mpmc::Receiver<core_scheduler_iouring::io_uring_selector::Command>>::try_recv - -
+ 1.54% [.] <core_scheduler_iouring::io_uring_selector::Permit as core::ops::drop::Drop>::drop - -
+ 1.52% [.] <core_scheduler_iouring::io_uring_selector::Request as core::ops::drop::Drop>::drop - -
+ 1.49% [.] <event_listener::Event>::notify::<usize> - -
+ 1.22% [.] <async_task::raw::RawTask<core_scheduler_native::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0}>, core_scheduler_native::task_service::TaskOutcome<()>, <core_scheduler_native::task_service::TaskService>::spawn<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0}>::{closure#1}, core_scheduler_native::task_service::TaskState>>::drop_waker - -
+ 1.17% [.] 0x00000000000a62ff - -
+ 1.14% [.] <event_listener::Event>::notify::<usize> - -
+ 1.10% [.] 0x00000000000a799d - -
+ 1.07% [.] 0x00000000000a79b9 - -
+ 1.07% [.] <core_scheduler_native::task_service::Shared>::retire_runnable - -
+ 1.03% [.] futures_channel::oneshot::channel::<(core::result::Result<usize, core::io::error::Error>, core_scheduler::buffer_slice::BufferSlice<alloc::vec::Vec<u8>>)> - -
+
+
+#
+# (Tip: To show context switches in perf report sample context add --switch-events to perf record.)
+#

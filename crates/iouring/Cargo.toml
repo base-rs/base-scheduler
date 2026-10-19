@@ -24,3 +24,4 @@ core-scheduler-native = { path = "../native", version = "=0.0.0" }
 core-scheduler-conformance = { path = "../conformance", version = "=0.0.0" }
 futures-lite = "2.6.1"
 tempfile = "3"
+allocation-counter = "0.8.1"
