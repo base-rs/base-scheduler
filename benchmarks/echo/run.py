@@ -90,7 +90,7 @@ def main():
         parser.error("provide at least one server CPU per worker")
     if set(args.server_cpus) & set(args.client_cpus):
         parser.error("server and client CPU sets must be disjoint")
-    binary = ROOT / "target" / "release" / "core-scheduler-echo-benchmark"
+    binary = ROOT / "target" / "release" / ("core-scheduler-echo-benchmark.exe" if sys.platform == "win32" else "core-scheduler-echo-benchmark")
     subprocess.run(["cargo", "build", "--release", "--locked", "-p", "core-scheduler-echo-benchmark"], cwd=ROOT, check=True)
     report = {
         "created_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
@@ -102,7 +102,7 @@ def main():
         "arguments": dict(vars(args), output=str(args.output)),
         "cpu_topology": command_output("lscpu", "-e=CPU,CORE,SOCKET,NODE,CACHE") if sys.platform == "linux" else None,
         "cpu_model": command_output("lscpu") if sys.platform == "linux" else platform.processor(),
-        "load_average_before": os.getloadavg(),
+        "load_average_before": os.getloadavg() if hasattr(os, "getloadavg") else None,
         "samples": [],
     }
     rng = random.Random(20261019)
@@ -118,7 +118,7 @@ def main():
                 args.output.parent.mkdir(parents=True, exist_ok=True)
                 args.output.write_text(json.dumps(report, indent=2) + "\n")
                 print(f"{len(report['samples']):3} {backend:13} workers={workers} conns={connections:3} bytes={size:5}: {data['requests_per_second']:10.0f} req/s  p50={data['rtt_p50_us']:8.2f} us p99={data['rtt_p99_us']:8.2f} us", flush=True)
-    report["load_average_after"] = os.getloadavg()
+    report["load_average_after"] = os.getloadavg() if hasattr(os, "getloadavg") else None
     args.output.write_text(json.dumps(report, indent=2) + "\n")
     print("\nMedian requests/s across repetitions:")
     for workers, connections, size in itertools.product(args.workers, args.connections, args.bytes):
