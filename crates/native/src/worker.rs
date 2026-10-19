@@ -89,9 +89,9 @@ pub(crate) fn schedule(shared: &Arc<Shared>, runnable: Runnable) {
         } else {
             shared.ready.push(runnable);
         }
+        // Remote publication must wake an idle worker. Local work is already owned by this awake worker; its run loop fans out a remaining batch before polling a task.
+        shared.wake_idle(preferred);
     }
-    // Publication precedes the sleeping flag exchange. A worker publishes its sleeping flag before rechecking queues, so a racing wake is retained.
-    shared.wake_idle(preferred);
 }
 
 fn search(shared: &Shared, local: &LocalWorker, iteration: usize) -> Steal<Runnable> {

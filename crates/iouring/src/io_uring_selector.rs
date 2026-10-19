@@ -332,8 +332,10 @@ struct Capacity {
 struct Permit(Arc<Capacity>);
 impl Drop for Permit {
     fn drop(&mut self) {
-        self.0.state.fetch_sub(1, Ordering::AcqRel);
-        self.0.available.notify(usize::MAX);
+        if self.0.state.fetch_sub(1, Ordering::AcqRel) == self.0.limit {
+            // Only the full-to-available transition can release capacity waiters. Closure already wakes every waiter independently.
+            self.0.available.notify(usize::MAX);
+        }
     }
 }
 impl Capacity {

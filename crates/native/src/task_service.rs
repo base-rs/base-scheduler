@@ -148,8 +148,10 @@ impl Shared {
         }
     }
     pub(crate) fn retire_runnable(&self) {
-        self.outstanding.fetch_sub(1, Ordering::AcqRel);
-        self.changed.notify(usize::MAX);
+        if self.outstanding.fetch_sub(1, Ordering::AcqRel) == 1 {
+            // Draining waits for quiescence; intermediate retirements cannot satisfy that condition.
+            self.changed.notify(usize::MAX);
+        }
         if self.finished() {
             self.wake_all();
         }
