@@ -1068,7 +1068,7 @@ impl Reactor {
         ];
         let deadline = timeout.map(|timeout| libc::timespec {
             tv_sec: timeout.as_secs().try_into().unwrap_or(libc::time_t::MAX),
-            tv_nsec: timeout.subsec_nanos().into(),
+            tv_nsec: timeout.subsec_nanos() as libc::c_long,
         });
         syscall("wait", || {
             // SAFETY: The stack array and optional timespec remain valid for
