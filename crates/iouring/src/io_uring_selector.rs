@@ -974,6 +974,7 @@ impl Reactor {
             || timeout == Some(Duration::ZERO)
             || !self.pending.is_empty()
             || !self.ring.submission().is_empty()
+            || !self.ring.completion().is_empty()
         {
             return Ok(false);
         }

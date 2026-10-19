@@ -1413,3 +1413,45 @@ fn pending_submissions_are_flushed_before_preparing_to_sleep() {
     drop(operations);
     drain(&selector, &mut driver);
 }
+
+#[test]
+fn completions_published_during_submission_return_before_idle_preparation() {
+    let (selector, mut driver) = pair(1);
+    let (directory, file) = fifo(&selector);
+    let never = Cancellation::never();
+    let mut operation = Box::pin(selector.file_read(&file, vec![0], &never));
+    assert!(block_on(poll_once(&mut operation)).is_none());
+    driver.turn(Some(Duration::ZERO)).unwrap();
+    driver.turn(Some(Duration::from_millis(1))).unwrap();
+    let mut writer = std::fs::OpenOptions::new()
+        .write(true)
+        .open(directory.path().join("fifo"))
+        .unwrap();
+    let ring = driver.reactor.as_ref().unwrap().ring.as_raw_fd();
+    BEFORE_SYSCALL.with(|hook| {
+        *hook.borrow_mut() = Some((
+            "submit",
+            Box::new(move || {
+                writer.write_all(b"x").unwrap();
+                let mut source = libc::pollfd {
+                    fd: ring,
+                    events: libc::POLLIN,
+                    revents: 0,
+                };
+                // SAFETY: The driver owns this ring descriptor throughout the synchronous hook.
+                assert_eq!(unsafe { libc::poll(&mut source, 1, 1000) }, 1);
+            }),
+        ));
+    });
+    let _failures = Failures::new([("notification-read", io::ErrorKind::PermissionDenied.into())]);
+    // CQ was empty when the turn started; a new completion arrives during submission.
+    assert!(!driver.turn(None).unwrap());
+    assert!(block_on(poll_once(&mut operation)).is_none());
+    assert_eq!(FAILURES.with(|failures| failures.borrow().len()), 1);
+    assert!(!driver.turn(Some(Duration::ZERO)).unwrap());
+    let (result, buffer) = block_on(operation);
+    assert_eq!(result.unwrap(), 1);
+    assert_eq!(buffer, b"x");
+    drop(_failures);
+    drain(&selector, &mut driver);
+}
