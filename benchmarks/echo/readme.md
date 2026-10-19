@@ -8,6 +8,8 @@ The [performance investigation](profiling.md) compares compiler settings, identi
 
 The [io_uring performance improvements](performance.md) describe the implemented fast paths, their relationship to `io-event`, and repeated before/after measurements.
 
+The [borrowed socket comparison](poll-performance.md) measures both adapters' `_poll` paths alongside their owned operations and pure Tokio, and identifies opportunities in the native readiness integration.
+
 Build and run the comparison on Linux:
 
 ```sh

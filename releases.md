@@ -4,7 +4,7 @@
 
 - Avoid io_uring idle-wait setup after useful progress or nonblocking turns, preserve wakeups during sleep preparation, and register capacity listeners only when admission is full.
 
-- Add a reproducible TCP echo benchmark comparing pure Tokio, the Tokio adapter, and Native with io_uring, with repeated throughput and round-trip latency measurements.
+- Add a reproducible TCP echo benchmark comparing pure Tokio, the Tokio adapter, and Native with io_uring, including owned-buffer and borrowed readiness paths, with repeated throughput and round-trip latency measurements.
 
 - Separate native I/O into `core-scheduler-selector` and compose `NativeScheduler<S>` with independently selected capabilities, preserving the default readiness constructor.
 - Add `core-scheduler-iouring` with completion file and owned socket transfers, per-worker rings driven by Native, local submission queues, and independent event-loop or thread driving.
