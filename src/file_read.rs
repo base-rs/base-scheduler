@@ -12,7 +12,7 @@ use std::future::Future;
 /// A read-only consumer needs no creation, writing, metadata, or close capability:
 ///
 /// ```
-/// use protocol_scheduler::{BufferResult, Cancellation, FileRead};
+/// use core_scheduler::{BufferResult, Cancellation, FileRead};
 /// async fn read_chunk<S: FileRead>(scheduler: &S, file: &S::File) -> BufferResult {
 ///     scheduler.file_read(file, vec![0; 16], &Cancellation::never()).await
 /// }
@@ -21,7 +21,7 @@ use std::future::Future;
 /// Writing requires an explicit additional bound, even with the trait in scope:
 ///
 /// ```compile_fail,E0599
-/// use protocol_scheduler::{Cancellation, FileRead, FileWrite};
+/// use core_scheduler::{Cancellation, FileRead, FileWrite};
 /// async fn write<S: FileRead>(scheduler: &S, file: &S::File) {
 ///     scheduler.file_write(file, vec![1], &Cancellation::never()).await;
 /// }

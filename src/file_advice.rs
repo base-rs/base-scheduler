@@ -12,7 +12,7 @@ use std::{future::Future, io};
 /// An advice-only adapter does not need to forward the core file operations:
 ///
 /// ```
-/// use protocol_scheduler::{AdviceMode, FileAdvice, FileOperation};
+/// use core_scheduler::{AdviceMode, FileAdvice, FileOperation};
 /// struct AdviceOnly<S>(S);
 /// impl<S: FileAdvice> FileOperation for AdviceOnly<S> {
 ///     type File = S::File;

@@ -10,7 +10,7 @@ use std::future::Future;
 /// A receive-only adapter need not provide sending or any core socket operations:
 ///
 /// ```
-/// use protocol_scheduler::{Cancellation, IoBufSequenceMut, OperationResult, SocketOperation, SocketRecvFlags, SocketRecvMsg, SocketRecvResult};
+/// use core_scheduler::{Cancellation, IoBufSequenceMut, OperationResult, SocketOperation, SocketRecvFlags, SocketRecvMsg, SocketRecvResult};
 /// struct Receiver<S>(S);
 /// impl<S: SocketRecvMsg> SocketOperation for Receiver<S> {
 ///     type Socket = S::Socket;

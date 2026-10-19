@@ -1,20 +1,22 @@
-# Protocol Scheduler
+# Core Scheduler
 
 Explicit scheduler capabilities for reusable Rust protocol libraries. Applications choose an execution environment; libraries ask for the operations they need.
 
 The root crate defines interfaces and runtime-independent support. It contains no executor, reactor, operating-system I/O implementation, or runtime adapter. The initial API is extracted from [Socketry](https://github.com/core-rs/socketry-rust), and is not yet published to crates.io.
 
-The workspace also contains two companion crates, released together with the interface:
+The workspace also contains three companion crates, released together with the interface:
 
-- [`protocol-scheduler-conformance`](crates/conformance/readme.md): reusable capability-specific assertions for backend development dependencies.
-- [`protocol-scheduler-direct`](crates/direct/readme.md): reference implementations of tasks, clocks, native address resolution, file/socket operations, and platform-supported signals and filesystem extensions, with explicit service ownership and bounded syscall admission.
+- [`core-scheduler-conformance`](crates/conformance/readme.md): reusable capability-specific assertions for backend development dependencies.
+- [`core-scheduler-direct`](crates/direct/readme.md): reference implementations of tasks, clocks, native address resolution, file/socket operations, and platform-supported signals and filesystem extensions, with explicit service ownership and bounded syscall admission.
+
+- [`core-scheduler-tokio`](crates/tokio/readme.md): an adapter for an explicitly selected Tokio runtime, preserving owning task handles, owned I/O, cancellation, and bounded native-work admission.
 
 ## Explicit operation context
 
 Keep resources and protocol state in an object, and pass the scheduler and cancellation to each operation. The resulting future borrows that operation's execution context:
 
 ```rust
-use protocol_scheduler::{BufferResult, Cancellation, SocketRead};
+use core_scheduler::{BufferResult, Cancellation, SocketRead};
 
 struct Body<Socket> {
     socket: Socket,
@@ -73,11 +75,11 @@ Install the launcher with `cargo install bake --locked`. The private `bake/` wor
 cargo bake --locked test:coverage --all-targets true
 ```
 
-The tests cover runtime-independent support, generic composition, reusable conformance assertions, and the direct backend. Socketry, Tokio, and other adapter migrations remain follow-up work.
+The tests cover runtime-independent support, generic composition, reusable conformance assertions, and the Direct and Tokio backends.
 
 ## Contributing
 
-Please open an issue or pull request on [GitHub](https://github.com/core-rs/protocol-scheduler).
+Please open an issue or pull request on [GitHub](https://github.com/core-rs/core-scheduler).
 
 ### Agent Context
 

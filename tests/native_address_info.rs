@@ -3,7 +3,7 @@
 
 #![cfg(unix)]
 
-use protocol_scheduler::{
+use core_scheduler::{
     AddressInfoCollection, AddressInfoView, SocketAddress, SocketProtocol, SocketType,
 };
 use std::future::{Future, pending};

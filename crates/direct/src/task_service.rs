@@ -3,8 +3,8 @@
 
 use crate::{DirectTask, thread};
 use async_task::Runnable;
+use core_scheduler::{SpawnError, TaskError};
 use event_listener::Event;
-use protocol_scheduler::{SpawnError, TaskError};
 use std::{
     collections::{HashSet, VecDeque},
     future::Future,

@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use protocol_scheduler::{FileAllocate, FileOperation};
+use core_scheduler::{FileAllocate, FileOperation};
 
 /// A writable regular file containing `abcdef` with cursor 3, plus a read-only open of that file. Run only on a filesystem/profile supporting real allocation and `KeepSize`; an unsupported operation is not a passing allocation test.
 pub trait FileAllocateFixture {

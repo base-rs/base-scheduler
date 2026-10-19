@@ -4,7 +4,7 @@
 #![allow(clippy::unnecessary_cast)]
 
 use crate::{DirectScheduler, SystemAddresses};
-use protocol_scheduler::{
+use core_scheduler::{
     AddressHints, AddressResolution, AddressService, Cancellation, OperationResult, SocketDomain,
     SocketProtocol, SocketType,
 };

@@ -10,7 +10,7 @@ use std::future::Future;
 /// A consumer can read an existing connection without opening, accepting, writing, or closing sockets:
 ///
 /// ```
-/// use protocol_scheduler::{BufferResult, Cancellation, SocketRead};
+/// use core_scheduler::{BufferResult, Cancellation, SocketRead};
 /// async fn read_chunk<S: SocketRead>(scheduler: &S, socket: &S::Socket) -> BufferResult {
 ///     scheduler.socket_read(socket, vec![0; 16], &Cancellation::never()).await
 /// }
@@ -19,7 +19,7 @@ use std::future::Future;
 /// Writing needs an explicit additional capability, even when its trait is imported:
 ///
 /// ```compile_fail,E0599
-/// use protocol_scheduler::{Cancellation, SocketRead, SocketWrite};
+/// use core_scheduler::{Cancellation, SocketRead, SocketWrite};
 /// async fn write<S: SocketRead>(scheduler: &S, socket: &S::Socket) {
 ///     scheduler.socket_write(socket, vec![1], &Cancellation::never()).await;
 /// }

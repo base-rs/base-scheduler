@@ -1,0 +1,31 @@
+[package]
+name = "core-scheduler-tokio"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT"
+repository = "https://github.com/core-rs/core-scheduler"
+description = "Tokio runtime adapter for explicit scheduler capabilities"
+readme = "readme.md"
+
+[dependencies]
+core-scheduler = { path = "../..", version = "=0.0.0" }
+event-listener = "5.4.2"
+futures-channel = "0.3.31"
+socket2 = { version = "0.6.3", features = ["all"] }
+tokio = { version = "1.53.3", features = ["rt", "net", "time"] }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+signal-hook = "0.4.5"
+
+[target.'cfg(windows)'.dependencies]
+async-io = "2.6.0"
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Networking_WinSock", "Win32_System_IO"] }
+
+[dev-dependencies]
+tokio = { version = "1.53.3", features = ["rt-multi-thread", "test-util", "macros"] }
+core-scheduler-conformance = { path = "../conformance", version = "=0.0.0" }
+futures-lite = "2.6.1"
+tempfile = "3"
+allocation-counter = "0.8.1"

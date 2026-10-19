@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::{DirectScheduler, thread};
-use protocol_scheduler::{Cancellation, Clock, OperationResult};
+use core_scheduler::{Cancellation, Clock, OperationResult};
 use std::{
     collections::BTreeMap,
     future::{Future, poll_fn},
@@ -115,7 +115,7 @@ impl TimerService {
                 return Poll::Ready(Ok(()));
             }
             if cancelled.as_mut().poll(context).is_ready() {
-                return Poll::Ready(Err(protocol_scheduler::Cancelled.into()));
+                return Poll::Ready(Err(core_scheduler::Cancelled.into()));
             }
             let mut state = self.shared.state.lock().unwrap();
             if state.closed {

@@ -4,7 +4,7 @@
 //! Advisory calls, validation, and admission/completion lifecycle assertions.
 
 use crate::FileAdviceFixture;
-use protocol_scheduler::{AdviceMode, FileAdvice};
+use core_scheduler::{AdviceMode, FileAdvice};
 use std::{
     future::{Future, poll_fn},
     pin::pin,

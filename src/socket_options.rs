@@ -12,14 +12,14 @@ use crate::SocketOption;
 ///
 /// Option values are checked at compile time:
 /// ```compile_fail
-/// use protocol_scheduler::{Cancellation, SocketOptions, TcpNoDelay};
+/// use core_scheduler::{Cancellation, SocketOptions, TcpNoDelay};
 /// async fn configure<S: SocketOptions<TcpNoDelay>>(scheduler: &S, socket: &S::Socket) {
 ///     scheduler.socket_set_option(socket, TcpNoDelay, 1_u32, &Cancellation::never()).await;
 /// }
 /// ```
 /// Merely supporting sockets does not imply support for every option:
 /// ```compile_fail
-/// use protocol_scheduler::{Cancellation, SocketScheduler, SocketSetOption, TcpNoDelay};
+/// use core_scheduler::{Cancellation, SocketScheduler, SocketSetOption, TcpNoDelay};
 /// async fn configure<S: SocketScheduler>(scheduler: &S, socket: &S::Socket) {
 ///     scheduler.socket_set_option(socket, TcpNoDelay, true, &Cancellation::never()).await;
 /// }

@@ -2,9 +2,9 @@
 // Copyright, 2026, by Samuel Williams.
 
 mod support;
+use core_scheduler::*;
+use core_scheduler_conformance::{AddressResolutionFixture, address_resolution};
 use futures_lite::future::block_on;
-use protocol_scheduler::*;
-use protocol_scheduler_conformance::{AddressResolutionFixture, address_resolution};
 use std::{
     io,
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddrV6},
@@ -191,13 +191,13 @@ fn run_case(test: impl AsyncFnOnce(&Fixture) + Send + 'static) {
     support::run(move || block_on(test(&Fixture::new(Fault::None))));
 }
 mod generated {
-    protocol_scheduler_conformance::address_resolution_tests!(run: super::run_case);
+    core_scheduler_conformance::address_resolution_tests!(run: super::run_case);
 }
 mod ipv4 {
-    protocol_scheduler_conformance::address_resolution_ip_tests!(run: super::run_case, domain: protocol_scheduler::SocketDomain::Ipv4);
+    core_scheduler_conformance::address_resolution_ip_tests!(run: super::run_case, domain: core_scheduler::SocketDomain::Ipv4);
 }
 mod ipv6 {
-    protocol_scheduler_conformance::address_resolution_ip_tests!(run: super::run_case, domain: protocol_scheduler::SocketDomain::Ipv6);
+    core_scheduler_conformance::address_resolution_ip_tests!(run: super::run_case, domain: core_scheduler::SocketDomain::Ipv6);
 }
 #[test]
 fn empty_successful_results_are_allowed() {

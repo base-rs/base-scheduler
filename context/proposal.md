@@ -2,19 +2,19 @@
 
 ## Status and intent
 
-These notes record the design discussion for a future `protocol-scheduler` crate. This directory is a place to preserve the proposal; no crate, implementation, or migration is being introduced yet. Names and API examples describe the intended boundaries rather than a finalized public API.
+These notes record the design discussion for a future `core-scheduler` crate. This directory is a place to preserve the proposal; no crate, implementation, or migration is being introduced yet. Names and API examples describe the intended boundaries rather than a finalized public API.
 
 The goal is an independent, explicit scheduler interface, similar in purpose to Zig's I/O interface. Protocol libraries should be able to express the operations they need without selecting an executor or event loop. An application selects a concrete implementation at compile time.
 
 ## Package boundaries
 
-- `protocol-scheduler` defines the abstract interface and its behavioral contracts.
+- `core-scheduler` defines the abstract interface and its behavioral contracts.
 - `socketry` provides concrete implementations of that interface.
 - `protocol-http` consumes the abstract interface, directly or through a richer protocol stream abstraction. It may use `socketry` as a development dependency for tests.
 - Applications depend on a protocol library and their chosen scheduler implementation.
 - Other implementation crates can independently provide adapters for existing runtimes or simulated environments.
 
-The normal dependency graph points from both consumers and implementations toward `protocol-scheduler`. The interface crate must not depend on a concrete scheduler. A protocol library's test-only dependency on `socketry` does not make Socketry a dependency of its published library implementation.
+The normal dependency graph points from both consumers and implementations toward `core-scheduler`. The interface crate must not depend on a concrete scheduler. A protocol library's test-only dependency on `socketry` does not make Socketry a dependency of its published library implementation.
 
 ## Interface contents
 

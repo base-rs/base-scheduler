@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use protocol_scheduler::Signals;
+use core_scheduler::Signals;
 use std::{fmt::Debug, sync::Arc};
 
 /// Isolated signal subscriptions and controlled delivery. The fixture owns an `Arc` endpoint so callbacks can safely test reentrant subscription. Signal identifiers used in tests must support equality and debugging; the production capability imposes no such bounds.

@@ -4,7 +4,7 @@
 //! Typed socket options, requiring only the direction under test.
 
 use crate::SocketOptionFixture;
-use protocol_scheduler::{Cancellation, OperationError, SocketGetOption, SocketSetOption};
+use core_scheduler::{Cancellation, OperationError, SocketGetOption, SocketSetOption};
 
 /// Getters observe independent native changes and preserve execution errors.
 pub async fn get<F: SocketOptionFixture>(fixture: &F)

@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use protocol_scheduler::Spawn;
+use core_scheduler::Spawn;
 
 /// An isolated task service. The runner drives its executor and enforces deadlines, including while awaiting task handles.
 pub trait SpawnFixture {

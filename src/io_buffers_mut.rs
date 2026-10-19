@@ -14,7 +14,7 @@ use std::io::IoSliceMut;
 /// Prepared writable vectors cannot escape their exclusive package borrow:
 ///
 /// ```compile_fail
-/// use protocol_scheduler::{IoBuffersMut, IoBufSequenceMut};
+/// use core_scheduler::{IoBuffersMut, IoBufSequenceMut};
 /// let mut buffers = IoBuffersMut::new([vec![0; 4]]);
 /// let vectors = buffers.io_slices_mut().unwrap();
 /// let owner = buffers.into_inner();

@@ -14,7 +14,7 @@
 /// Selecting a socket resource type does not supply reads:
 ///
 /// ```compile_fail,E0599
-/// use protocol_scheduler::{Cancellation, SocketOperation, SocketRead};
+/// use core_scheduler::{Cancellation, SocketOperation, SocketRead};
 /// async fn read<S: SocketOperation>(scheduler: &S, socket: &S::Socket) {
 ///     scheduler.socket_read(socket, vec![0; 16], &Cancellation::never()).await;
 /// }

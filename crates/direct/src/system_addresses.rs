@@ -5,7 +5,7 @@ use crate::{
     SystemAddressInfo,
     resolver::{self, AddrInfo, platform},
 };
-use protocol_scheduler::{AddressInfoCollection, AddressInfoView};
+use core_scheduler::{AddressInfoCollection, AddressInfoView};
 use std::io;
 
 /// Owns an unchanged native resolver list. Borrowed views decode fields on demand; no copied entry array or per-entry allocation is required.

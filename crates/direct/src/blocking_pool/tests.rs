@@ -12,7 +12,7 @@ const TIMEOUT: Duration = Duration::from_secs(10);
 #[test]
 fn prepared_work_allocates_only_jobs_and_completion_channels() {
     use crate::{DirectFile, DirectScheduler};
-    use protocol_scheduler::{Blocking, FileReadAt, FileWriteAt};
+    use core_scheduler::{Blocking, FileReadAt, FileWriteAt};
     use std::task::{Context, Waker};
     use std::time::Instant;
 
@@ -623,5 +623,86 @@ fn shutdown_drain_waits_until_discarded_capture_destructors_finish() {
         closing.join().unwrap();
         block_on(drain);
         assert!(matches!(block_on(queued), Err(TaskError::Cancelled)));
+    });
+}
+
+#[test]
+fn panicking_unobserved_payloads_preserve_native_capacity_and_shutdown() {
+    const CHILD: &str = "PROTOCOL_SCHEDULER_POOL_PANIC_CHILD";
+    if std::env::var_os(CHILD).is_none() {
+        let status = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", "blocking_pool::tests::panicking_unobserved_payloads_preserve_native_capacity_and_shutdown", "--nocapture"])
+            .env(CHILD, "1").status().unwrap();
+        assert!(status.success());
+        return;
+    }
+    struct Payload;
+    impl Drop for Payload {
+        fn drop(&mut self) {
+            panic!("panic payload destructor");
+        }
+    }
+    struct Capture;
+    impl Drop for Capture {
+        fn drop(&mut self) {
+            std::panic::panic_any(Payload);
+        }
+    }
+    crate::test_support::run(|| {
+        // A queued capture is destroyed synchronously during admission close.
+        let pool = BlockingPool::new(DirectOptions {
+            threads: 1,
+            capacity: 2,
+        });
+        let (started, start) = mpsc::channel();
+        let (release, released) = mpsc::channel();
+        let running = block_on(pool.spawn(
+            move || {
+                started.send(()).unwrap();
+                released.recv_timeout(TIMEOUT).unwrap();
+            },
+            &NEVER,
+        ))
+        .unwrap();
+        start.recv_timeout(TIMEOUT).unwrap();
+        let capture = Capture;
+        let queued = block_on(pool.spawn(move || drop(capture), &NEVER)).unwrap();
+        pool.close();
+        assert!(matches!(block_on(queued), Err(TaskError::Cancelled)));
+        release.send(()).unwrap();
+        block_on(running).unwrap();
+        block_on(pool.drain());
+
+        // Both an abandoned result and an abandoned execution panic can create a second panic payload when destroyed on the worker.
+        for panics in [false, true] {
+            let pool = BlockingPool::new(DirectOptions {
+                threads: 1,
+                capacity: 1,
+            });
+            let (started, start) = mpsc::channel();
+            let (release, released) = mpsc::channel();
+            let task = block_on(pool.spawn(
+                move || {
+                    started.send(()).unwrap();
+                    released.recv_timeout(TIMEOUT).unwrap();
+                    if panics {
+                        std::panic::panic_any(Capture);
+                    }
+                    Capture
+                },
+                &NEVER,
+            ))
+            .unwrap();
+            start.recv_timeout(TIMEOUT).unwrap();
+            drop(task);
+            release.send(()).unwrap();
+            block_on(pool.drain());
+            assert_eq!(
+                block_on(block_on(pool.spawn(|| 42, &NEVER)).unwrap()).unwrap(),
+                42
+            );
+            pool.close();
+            block_on(pool.drain());
+        }
     });
 }

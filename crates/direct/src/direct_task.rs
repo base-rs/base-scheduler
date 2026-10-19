@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use protocol_scheduler::TaskError;
+use core_scheduler::TaskError;
 use std::{
     future::Future,
     pin::Pin,

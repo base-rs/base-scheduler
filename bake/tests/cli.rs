@@ -5,7 +5,7 @@ use std::process::Command;
 
 #[test]
 fn executable_lists_discovered_tasks() {
-    let output = Command::new(env!("CARGO_BIN_EXE_protocol-scheduler-bake"))
+    let output = Command::new(env!("CARGO_BIN_EXE_core-scheduler-bake"))
         .arg("--list")
         .output()
         .expect("run Bake task executable");
@@ -17,7 +17,7 @@ fn executable_lists_discovered_tasks() {
 
 #[test]
 fn executable_reports_unknown_tasks_as_failure() {
-    let output = Command::new(env!("CARGO_BIN_EXE_protocol-scheduler-bake"))
+    let output = Command::new(env!("CARGO_BIN_EXE_core-scheduler-bake"))
         .arg("unknown-task")
         .output()
         .expect("run Bake task executable");

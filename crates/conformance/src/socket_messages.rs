@@ -3,8 +3,8 @@
 
 //! Message assertions use both prepared packages and ordinary owned sequences.
 
+use core_scheduler::*;
 use futures_lite::future::poll_once;
-use protocol_scheduler::*;
 use std::pin::pin;
 
 fn cancelled<T>(result: OperationResult<T>) {

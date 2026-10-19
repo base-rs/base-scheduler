@@ -12,7 +12,7 @@ use std::future::Future;
 /// An allocation-only adapter does not need to forward the core file operations:
 ///
 /// ```
-/// use protocol_scheduler::{AllocationMode, Cancellation, FileAllocate, FileOperation, OperationResult};
+/// use core_scheduler::{AllocationMode, Cancellation, FileAllocate, FileOperation, OperationResult};
 /// struct AllocationOnly<S>(S);
 /// impl<S: FileAllocate> FileOperation for AllocationOnly<S> {
 ///     type File = S::File;

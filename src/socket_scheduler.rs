@@ -15,7 +15,7 @@ use super::{
 /// Standard-library resource import remains an explicit optional capability:
 ///
 /// ```compile_fail,E0599
-/// use protocol_scheduler::{SocketRegistration, SocketScheduler};
+/// use core_scheduler::{SocketRegistration, SocketScheduler};
 /// fn register<S: SocketScheduler>(scheduler: &S, socket: std::net::TcpStream) {
 ///     scheduler.register_socket(socket);
 /// }

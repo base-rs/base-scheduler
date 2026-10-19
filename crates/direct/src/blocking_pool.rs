@@ -2,9 +2,9 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::{BlockingTask, DirectOptions};
+use core_scheduler::{BlockingError, Cancellation, OperationError, OperationResult, TaskError};
 use event_listener::Event;
 use futures_channel::oneshot;
-use protocol_scheduler::{BlockingError, Cancellation, OperationError, OperationResult, TaskError};
 use std::collections::VecDeque;
 use std::future::{Future, poll_fn};
 use std::io;
@@ -295,7 +295,7 @@ impl BlockingPool {
         self.shared.work.notify_all();
         // Destroy closures and wake their result waiters outside the queue lock. Destructors may reenter the scheduler or panic.
         for job in queue {
-            let _ = catch_unwind(AssertUnwindSafe(|| drop(job)));
+            crate::panic::discard(job);
             self.shared.state.lock().unwrap().outstanding -= 1;
             self.shared.capacity.notify(usize::MAX);
         }
@@ -323,7 +323,7 @@ fn work(shared: Arc<Shared>) {
             }
         };
         // Catch abandoned-result and capture destructor panics as well as user execution panics, so capacity is always returned and the worker survives.
-        let _ = catch_unwind(AssertUnwindSafe(job.run));
+        crate::panic::contain(job.run);
         {
             let mut state = shared.state.lock().unwrap();
             state.outstanding -= 1;
@@ -337,7 +337,7 @@ mod tests;
 
 pub(crate) fn admission_error(error: BlockingError) -> OperationError {
     match error {
-        BlockingError::Cancelled => protocol_scheduler::Cancelled.into(),
+        BlockingError::Cancelled => core_scheduler::Cancelled.into(),
         BlockingError::SchedulerClosed => {
             io::Error::new(io::ErrorKind::BrokenPipe, "scheduler is closed").into()
         }

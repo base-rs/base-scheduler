@@ -1,6 +1,6 @@
-# Protocol Scheduler Conformance
+# Core Scheduler Conformance
 
-Reusable, capability-specific tests for implementations of `protocol-scheduler`. Add this crate as a **development dependency** of a backend. Generated suites report ordinary named Rust tests, while async assertion helpers remain available for custom fixtures and smaller capability sets.
+Reusable, capability-specific tests for implementations of `core-scheduler`. Add this crate as a **development dependency** of a backend. Generated suites report ordinary named Rust tests, while async assertion helpers remain available for custom fixtures and smaller capability sets.
 
 ## Generated suites
 
@@ -8,11 +8,11 @@ Invoke a suite inside a dedicated module and supply a runner function:
 
 ```rust,ignore
 mod blocking {
-    protocol_scheduler_conformance::blocking_tests!(run: super::run_blocking);
+    core_scheduler_conformance::blocking_tests!(run: super::run_blocking);
 }
 
 mod ipv4 {
-    protocol_scheduler_conformance::socket_tests!(run: super::run_ipv4_stream);
+    core_scheduler_conformance::socket_tests!(run: super::run_ipv4_stream);
 }
 ```
 
@@ -46,19 +46,19 @@ For example, a resolver fixture can select a numeric family independently of its
 
 ```rust,ignore
 mod resolution {
-    protocol_scheduler_conformance::address_resolution_tests!(run: super::run_resolver);
+    core_scheduler_conformance::address_resolution_tests!(run: super::run_resolver);
 }
 mod resolution_ipv4 {
-    protocol_scheduler_conformance::address_resolution_ip_tests!(
+    core_scheduler_conformance::address_resolution_ip_tests!(
         run: super::run_resolver,
-        domain: protocol_scheduler::SocketDomain::Ipv4,
+        domain: core_scheduler::SocketDomain::Ipv4,
     );
 }
 ```
 
 Run socket suites separately for each supported address family and the I/O lifecycle suite for each supported operation/input representation. Use individual assertion helpers for capability combinations smaller than a suite. Unsupported capabilities must not be presented as passing tests.
 
-The runner drives its executor and services, awaits the supplied closure exactly once, enforces a deadline covering setup, assertions, and cleanup, and propagates assertion panics to the generated test. Cleanup must also run after assertion failure: release held execution boundaries, let accepted operations retire, and await backend shutdown before destroying temporary storage. Do not catch and discard a panic. The [direct file/blocking runners](../direct/tests/conformance.rs) and [socket runners](../direct/tests/sockets.rs) provide complete integrations.
+The runner drives its executor and services, awaits the supplied closure exactly once, enforces a deadline covering setup, assertions, and cleanup, and propagates assertion panics to the generated test. Cleanup must also run after assertion failure: release held execution boundaries, let accepted operations retire, and await backend shutdown before destroying temporary storage. Do not catch and discard a panic. The [Direct file/blocking runners](../direct/tests/conformance.rs), [socket runners](../direct/tests/sockets.rs), and [Tokio runtime runners](../tokio/tests/runtime_conformance.rs) provide complete integrations.
 
 ## Assertions and fixtures
 
@@ -82,4 +82,4 @@ Socket-option fixtures independently observe native state and syscall attempts, 
 
 Allocation fixtures start with known contents and cursor state, and must observe real reservation at the allocation boundary. Cases check extending and keeping size, no shrinking or payload/cursor changes, zero-filled exposed bytes, laziness/cancellation, invalid ranges, and read-only failures. Advice fixtures observe actual call arguments because cache residency and eviction are not promised. Cases check all supported modes, zero-length-to-EOF ranges, lazy admission, validation and execution errors, completion versus submission, and accepted work surviving waiter abandonment. Select a filesystem/profile supporting the tested modes; unsupported capabilities are omitted rather than counted as passing.
 
-The conformance crate's integration tests run all generated suites against controlled test implementations and reject deliberately incorrect variants. Socket extensions also exercise native standard-library TCP resources. These tests validate the reusable assertions, not every behavior of a production runtime or filesystem. Direct now runs these suites against its real implementations where each capability is supported, with Unix signal and Linux filesystem suites selected explicitly. Native boundary observations and execution gates supplement the shared assertions; the controlled test implementations remain tests of the conformance library itself. Complete measured source-region coverage is a separate requirement from contract coverage, which grows as further edge cases and backend-specific tests are added.
+The conformance crate's integration tests run all generated suites against controlled test implementations and reject deliberately incorrect variants. Socket extensions also exercise native standard-library TCP resources. These tests validate the reusable assertions, not every behavior of a production runtime or filesystem. Direct and Tokio run these suites against their real implementations where each capability is supported, with Unix signal and Linux filesystem suites selected explicitly. Native boundary observations and execution gates supplement the shared assertions; the controlled test implementations remain tests of the conformance library itself. Complete measured source-region coverage is a separate requirement from contract coverage, which grows as further edge cases and backend-specific tests are added.

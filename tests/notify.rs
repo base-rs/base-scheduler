@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use protocol_scheduler::{Cancellation, Notify};
+use core_scheduler::{Cancellation, Notify};
 use std::sync::{Arc, mpsc};
 
 #[test]
