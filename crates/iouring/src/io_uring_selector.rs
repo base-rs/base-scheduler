@@ -517,7 +517,7 @@ impl IoUringSelector {
             closed: AtomicBool::new(false),
             shutdown: Arc::clone(&shutdown),
         });
-        let reactor = Reactor::new(ring, notification, incoming, Arc::clone(&controller))?;
+        let reactor = Reactor::new(ring, notification, incoming, Arc::clone(&controller));
         Ok(IoUringDriver {
             reactor: Some(reactor),
             controller,
@@ -801,9 +801,9 @@ impl Reactor {
         notification: Arc<StdFile>,
         incoming: mpsc::Receiver<Command>,
         controller: Arc<Controller>,
-    ) -> io::Result<Self> {
+    ) -> Self {
         let extended_wait = ring.params().is_feature_ext_arg();
-        let reactor = Self {
+        Self {
             ring,
             notification,
             incoming,
@@ -814,8 +814,7 @@ impl Reactor {
             closing: false,
             notification_pending: false,
             extended_wait,
-        };
-        Ok(reactor)
+        }
     }
 
     fn cancel(&mut self, identifier: u64) -> bool {
