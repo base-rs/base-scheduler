@@ -7,13 +7,14 @@ use core_scheduler_selector::{NativeFile, NativeSocket, ReadinessSelector, Selec
 use event_listener::Event as CompletionEvent;
 use futures_channel::oneshot;
 use io_uring::{IoUring, opcode, squeue, types};
+use polling::{Event, Events, Poller};
 use std::{
     cell::Cell,
     collections::{HashMap, VecDeque},
     fs::File as StdFile,
     future::{Future, poll_fn},
     io::{self, Read, Write},
-    os::fd::{AsRawFd, FromRawFd},
+    os::{fd::AsRawFd, unix::net::UnixStream},
     pin::pin,
     sync::{
         Arc, OnceLock, Weak,
@@ -24,8 +25,8 @@ use std::{
     time::Duration,
 };
 const CANCEL_TAG: u64 = 1 << 63;
-// The largest request identifier is CANCEL_TAG - 2, so tagged cancellations cannot produce u64::MAX.
-const NOTIFICATION_TAG: u64 = u64::MAX;
+const COMMAND_EVENT: usize = 0;
+const RING_EVENT: usize = 1;
 
 // Keep syscall failures deterministic in unit tests while production calls the OS directly.
 fn syscall<T>(name: &'static str, operation: impl FnOnce() -> io::Result<T>) -> io::Result<T> {
@@ -76,28 +77,6 @@ fn validate_operation_support(supported: impl Fn(u8) -> bool) -> io::Result<()> 
         }
     }
     Ok(())
-}
-
-fn notification() -> io::Result<StdFile> {
-    syscall("notification", || {
-        // SAFETY: eventfd has no pointer arguments. The returned descriptor is
-        // private to this selector, nonblocking, and closed on exec.
-        let descriptor = unsafe { libc::eventfd(0, libc::EFD_CLOEXEC | libc::EFD_NONBLOCK) };
-        if descriptor < 0 {
-            Err(io::Error::last_os_error())
-        } else {
-            // SAFETY: This successful syscall returns a fresh owned descriptor.
-            Ok(unsafe { StdFile::from_raw_fd(descriptor) })
-        }
-    })
-}
-
-fn completion_result(result: i32) -> io::Result<usize> {
-    if result < 0 {
-        Err(io::Error::from_raw_os_error(-result))
-    } else {
-        Ok(result as usize)
-    }
 }
 
 fn discard<T>(value: T) {
@@ -269,7 +248,7 @@ impl Drop for SignalCompletion {
 pub(crate) struct Controller {
     capacity: Arc<Capacity>,
     commands: mpsc::Sender<Command>,
-    notification: Arc<StdFile>,
+    notification: UnixStream,
     next_identifier: AtomicU64,
     closed: AtomicBool,
     shutdown: Arc<Shutdown>,
@@ -293,12 +272,10 @@ impl Controller {
     }
 
     fn notify(&self) {
-        // A saturated event counter already contains a wakeup. Other errors mean the selector
+        // A full pipe already contains a wakeup. Other errors mean the selector
         // has exited; dropping its receivers wakes pending operation futures.
         loop {
-            match syscall("notify", || {
-                (&*self.notification).write(&1_u64.to_ne_bytes())
-            }) {
+            match syscall("notify", || (&self.notification).write(&[1])) {
                 Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
                 _ => break,
             }
@@ -498,7 +475,9 @@ impl IoUringSelector {
         syscall("operation-support", || {
             validate_operation_support(|operation| probe.is_supported(operation))
         })?;
-        let notification = Arc::new(notification()?);
+        let (notification, receiver) = syscall("notification-pair", UnixStream::pair)?;
+        syscall("notification-mode", || notification.set_nonblocking(true))?;
+        syscall("receiver-mode", || receiver.set_nonblocking(true))?;
         let (commands, incoming) = mpsc::channel();
         let shutdown = Arc::new(Shutdown {
             finished: AtomicBool::new(false),
@@ -512,12 +491,12 @@ impl IoUringSelector {
         let controller = Arc::new(Controller {
             capacity,
             commands,
-            notification: Arc::clone(&notification),
+            notification,
             next_identifier: AtomicU64::new(0),
             closed: AtomicBool::new(false),
             shutdown: Arc::clone(&shutdown),
         });
-        let reactor = Reactor::new(ring, notification, incoming, Arc::clone(&controller));
+        let reactor = Reactor::new(ring, receiver, incoming, Arc::clone(&controller))?;
         Ok(IoUringDriver {
             reactor: Some(reactor),
             controller,
@@ -783,27 +762,28 @@ impl Selector for IoUringSelector {
     }
 }
 pub(crate) struct Reactor {
+    // The poller is destroyed before its registered sources on error/unwind.
+    poller: Poller,
     ring: IoUring,
-    notification: Arc<StdFile>,
+    notification: UnixStream,
     incoming: mpsc::Receiver<Command>,
     controller: Arc<Controller>,
     pending: VecDeque<Box<dyn PendingRequest>>,
     in_flight: InFlight,
     cancellations: VecDeque<u64>,
     closing: bool,
-    notification_pending: bool,
-    extended_wait: bool,
+    events: Events,
 }
 
 impl Reactor {
     fn new(
         ring: IoUring,
-        notification: Arc<StdFile>,
+        notification: UnixStream,
         incoming: mpsc::Receiver<Command>,
         controller: Arc<Controller>,
-    ) -> Self {
-        let extended_wait = ring.params().is_feature_ext_arg();
-        Self {
+    ) -> io::Result<Self> {
+        let reactor = Self {
+            poller: syscall("poller", Poller::new)?,
             ring,
             notification,
             incoming,
@@ -812,9 +792,23 @@ impl Reactor {
             in_flight: InFlight::default(),
             cancellations: VecDeque::new(),
             closing: false,
-            notification_pending: false,
-            extended_wait,
+            events: Events::new(),
+        };
+        // SAFETY: Reactor owns both sources and deletes their registrations in
+        // Drop, before the poller and sources are destroyed.
+        unsafe {
+            syscall("add-notification", || {
+                reactor
+                    .poller
+                    .add(&reactor.notification, Event::readable(COMMAND_EVENT))
+            })?;
+            syscall("add-ring", || {
+                reactor
+                    .poller
+                    .add(&reactor.ring, Event::readable(RING_EVENT))
+            })?;
         }
+        Ok(reactor)
     }
 
     fn cancel(&mut self, identifier: u64) -> bool {
@@ -905,18 +899,9 @@ impl Reactor {
         }
 
         // The CQ iterator snapshots the available batch. Finish publishing every completion in that batch before returning to the executor; application futures are polled only from its ready queue.
-        let mut notification_error = None;
         for completion in self.ring.completion() {
             progressed = true;
             let identifier = completion.user_data();
-            if identifier == NOTIFICATION_TAG {
-                self.notification_pending = false;
-                notification_error = syscall("notification-completion", || {
-                    completion_result(completion.result())
-                })
-                .err();
-                continue;
-            }
             if identifier & CANCEL_TAG != 0 {
                 continue;
             }
@@ -927,12 +912,14 @@ impl Reactor {
                 .0
                 .remove(&identifier)
                 .expect("original completion retains its in-flight request");
-            request.finish(completion_result(completion.result()));
+            let result = completion.result();
+            request.finish(if result < 0 {
+                Err(io::Error::from_raw_os_error(-result))
+            } else {
+                Ok(result as usize)
+            });
         }
 
-        if let Some(error) = notification_error {
-            return Err(error);
-        }
         {
             let mut submissions = self.ring.submission();
             while let Some(&identifier) = self.cancellations.front() {
@@ -982,23 +969,23 @@ impl Reactor {
             return Ok(true);
         }
 
-        // The CQ is checked directly above; a zero-timeout readiness wait cannot publish any more completions. Return to the executor after progress or a nonblocking turn, and prepare the wait only when we may actually sleep. Requests and cancellations left in the SQ must be retried before sleeping too.
+        // The CQ is checked directly above; a zero-timeout poller wait cannot publish any more completions. Return to the executor after progress or a nonblocking turn, and prepare the poller only when we may actually sleep. Requests and cancellations left in the SQ must be retried before sleeping too.
         if progressed
             || timeout == Some(Duration::ZERO)
             || !self.pending.is_empty()
             || !self.ring.submission().is_empty()
-            || !self.ring.completion().is_empty()
         {
             return Ok(false);
         }
 
-        // Bound notification reads too: continuous producers must not monopolize a turn. A notification may represent executor work or a command arriving after the command batch above. Return before sleeping; a later idle turn will inspect both level-triggered sources, preserving notifications and CQEs which race this check.
+        // Bound notification reads too: continuous producers must not monopolize a turn. A notification may represent executor work or a command arriving after the command batch above. Return before sleeping; a later idle turn will rearm both level-triggered sources, preserving notifications and CQEs which race this check.
         let mut notified = false;
-        let mut bytes = [0; 8];
+        let mut bytes = [0; 256];
         for _ in 0..16 {
-            match syscall("notification-read", || {
-                (&*self.notification).read(&mut bytes)
-            }) {
+            match syscall("notification-read", || self.notification.read(&mut bytes)) {
+                Ok(0) => unreachable!(
+                    "the driver retains the private notification writer until this reactor is destroyed"
+                ),
                 Ok(_) => notified = true,
                 Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
                 Err(error) if error.kind() == io::ErrorKind::WouldBlock => break,
@@ -1008,91 +995,28 @@ impl Reactor {
         if notified {
             return Ok(false);
         }
-        let result = self.wait(timeout);
+        syscall("modify-notification", || {
+            self.poller
+                .modify(&self.notification, Event::readable(COMMAND_EVENT))
+        })?;
+        syscall("modify-ring", || {
+            self.poller.modify(&self.ring, Event::readable(RING_EVENT))
+        })?;
+        self.events.clear();
+        let result = syscall("wait", || self.poller.wait(&mut self.events, timeout));
         if let Err(error) = result {
-            if error.kind() != io::ErrorKind::Interrupted
-                && !matches!(
-                    error.raw_os_error(),
-                    Some(libc::ETIME | libc::EBUSY | libc::EAGAIN)
-                )
-            {
+            if error.kind() != io::ErrorKind::Interrupted {
                 return Err(error);
             }
         }
         Ok(false)
     }
-
-    fn wait(&mut self, timeout: Option<Duration>) -> io::Result<()> {
-        if timeout.is_none() || self.extended_wait {
-            if !self.notification_pending {
-                let entry = opcode::PollAdd::new(
-                    types::Fd(self.notification.as_raw_fd()),
-                    libc::POLLIN as u32,
-                )
-                .build()
-                .user_data(NOTIFICATION_TAG);
-                // SAFETY: PollAdd retains no userspace pointer. Reactor owns the
-                // notification descriptor, and this worker alone accesses SQ.
-                unsafe { self.ring.submission().push(&entry) }
-                    .expect("an idle wait has an empty submission queue");
-                self.notification_pending = true;
-            }
-            let deadline = timeout.map(|timeout| {
-                types::Timespec::new()
-                    .sec(timeout.as_secs().min(i64::MAX as u64))
-                    .nsec(timeout.subsec_nanos())
-            });
-            return syscall("wait", || match deadline {
-                Some(ref deadline) => self
-                    .ring
-                    .submitter()
-                    .submit_with_args(1, &types::SubmitArgs::new().timespec(deadline)),
-                None => self.ring.submit_and_wait(1),
-            })
-            .map(|_| ());
-        }
-        // Older kernels lack the extended enter timeout. Keep their bounded
-        // waits on these two level-triggered descriptors without epoll setup.
-        let mut sources = [
-            libc::pollfd {
-                fd: self.notification.as_raw_fd(),
-                events: libc::POLLIN,
-                revents: 0,
-            },
-            libc::pollfd {
-                fd: self.ring.as_raw_fd(),
-                events: libc::POLLIN,
-                revents: 0,
-            },
-        ];
-        let deadline = timeout.map(|timeout| libc::timespec {
-            tv_sec: timeout.as_secs().try_into().unwrap_or(libc::time_t::MAX),
-            tv_nsec: timeout.subsec_nanos() as libc::c_long,
-        });
-        syscall("wait", || {
-            // SAFETY: The stack array and optional timespec remain valid for
-            // the synchronous call. Reactor owns both descriptors throughout.
-            let result = unsafe {
-                libc::ppoll(
-                    sources.as_mut_ptr(),
-                    sources.len() as libc::nfds_t,
-                    deadline
-                        .as_ref()
-                        .map_or(std::ptr::null(), |timeout| timeout),
-                    std::ptr::null(),
-                )
-            };
-            if result < 0 {
-                Err(io::Error::last_os_error())
-            } else {
-                Ok(())
-            }
-        })
-    }
 }
 
 impl Drop for Reactor {
     fn drop(&mut self) {
+        let _ = self.poller.delete(&self.notification);
+        let _ = self.poller.delete(&self.ring);
         // Pop without retaining a queue borrow: returning a buffer or waking its owner can reenter local routing.
         while let Some(command) = crate::io_uring_worker::pop(&self.controller) {
             discard(command);

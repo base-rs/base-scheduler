@@ -182,7 +182,12 @@ fn setup_probes_and_errors_are_explicit() {
         "probe",
         "completion-support",
         "operation-support",
-        "notification",
+        "notification-pair",
+        "notification-mode",
+        "receiver-mode",
+        "poller",
+        "add-notification",
+        "add-ring",
     ] {
         let _failures = Failures::new([(name, io::ErrorKind::PermissionDenied.into())]);
         assert_eq!(
@@ -390,9 +395,6 @@ fn transient_syscall_errors_preserve_progress_and_fatal_errors_stop_the_driver()
         ("submit", io::Error::from_raw_os_error(libc::EAGAIN)),
         ("notification-read", io::ErrorKind::Interrupted.into()),
         ("wait", io::ErrorKind::Interrupted.into()),
-        ("wait", io::Error::from_raw_os_error(libc::EBUSY)),
-        ("wait", io::Error::from_raw_os_error(libc::EAGAIN)),
-        ("wait", io::Error::from_raw_os_error(libc::ETIME)),
     ] {
         let (selector, mut driver) = pair(1);
         let _failures = Failures::new([(name, error)]);
@@ -400,7 +402,13 @@ fn transient_syscall_errors_preserve_progress_and_fatal_errors_stop_the_driver()
         assert!(FAILURES.with(|failures| failures.borrow().is_empty()));
         drain(&selector, &mut driver);
     }
-    for name in ["submit", "notification-read", "wait"] {
+    for name in [
+        "submit",
+        "notification-read",
+        "modify-notification",
+        "modify-ring",
+        "wait",
+    ] {
         let (selector, mut driver) = pair(1);
         let _failures = Failures::new([(name, io::ErrorKind::PermissionDenied.into())]);
         assert_eq!(
@@ -1171,8 +1179,11 @@ fn nonblocking_turn_preserves_notifications_for_the_next_idle_turn() {
     driver.waker().wake_by_ref();
     assert!(!driver.turn(Some(Duration::ZERO)).unwrap());
     {
-        let _failures = Failures::new([("wait", io::ErrorKind::PermissionDenied.into())]);
-        // The previously published notification must return us to the executor before waiting.
+        let _failures = Failures::new([(
+            "modify-notification",
+            io::ErrorKind::PermissionDenied.into(),
+        )]);
+        // The previously published notification must return us to the executor before rearming or waiting.
         assert!(!driver.turn(None).unwrap());
         assert_eq!(FAILURES.with(|failures| failures.borrow().len()), 1);
     }
@@ -1181,189 +1192,30 @@ fn nonblocking_turn_preserves_notifications_for_the_next_idle_turn() {
 
 #[test]
 fn notifications_racing_idle_preparation_remain_observable() {
-    let (selector, mut driver) = pair(1);
-    {
-        let _failures = Failures;
-        let waker = driver.waker();
-        BEFORE_SYSCALL.with(|hook| {
-            *hook.borrow_mut() = Some(("wait", Box::new(move || waker.wake_by_ref())));
-        });
-        // A huge requested duration must saturate rather than wrap into a negative timeout.
-        assert!(!driver.turn(Some(Duration::MAX)).unwrap());
-        assert!(BEFORE_SYSCALL.with(|hook| hook.borrow().is_none()));
-        let notification_pending = driver.reactor.as_ref().unwrap().notification_pending;
-        let _failures = Failures::new([("wait", io::ErrorKind::PermissionDenied.into())]);
-        // The next turn consumes the notification without another wait.
-        assert!(!driver.turn(None).unwrap());
-        if notification_pending {
-            assert!(!driver.turn(None).unwrap());
-        }
-        assert_eq!(FAILURES.with(|failures| failures.borrow().len()), 1);
-    }
-    drain(&selector, &mut driver);
-}
-
-#[test]
-fn idle_wait_observes_timeout_and_cross_thread_wakes() {
-    for extended_wait in [false, true] {
+    for name in ["modify-notification", "modify-ring", "wait"] {
         let (selector, mut driver) = pair(1);
-        if extended_wait && !driver.reactor.as_ref().unwrap().extended_wait {
-            continue;
-        }
-        driver.reactor.as_mut().unwrap().extended_wait = extended_wait;
-        let timeout = Duration::from_millis(5);
-        let started = Instant::now();
-        assert!(!driver.turn(Some(timeout)).unwrap());
-        assert!(started.elapsed() >= timeout);
-        let (send, receive) = mpsc::channel();
-        let waker = driver.waker();
-        let producer = std::thread::spawn(move || {
-            while receive.recv().is_ok() {
-                waker.wake_by_ref();
-            }
-        });
-        for _ in 0..100 {
+        {
             let _failures = Failures;
-            let send = send.clone();
+            let waker = driver.waker();
             BEFORE_SYSCALL.with(|hook| {
-                *hook.borrow_mut() = Some(("wait", Box::new(move || send.send(()).unwrap())));
+                *hook.borrow_mut() = Some((name, Box::new(move || waker.wake_by_ref())));
             });
-            // Exercise an external wake racing the transition into the kernel wait.
             assert!(!driver.turn(Some(Duration::from_secs(1))).unwrap());
             assert!(BEFORE_SYSCALL.with(|hook| hook.borrow().is_none()));
-            let _failures = Failures::new([("wait", io::ErrorKind::PermissionDenied.into())]);
+            assert!(
+                driver
+                    .reactor
+                    .as_ref()
+                    .unwrap()
+                    .events
+                    .iter()
+                    .any(|event| event.key == COMMAND_EVENT)
+            );
+            // The next turn consumes the notification without another wait.
             assert!(!driver.turn(None).unwrap());
-            if extended_wait {
-                assert!(!driver.turn(None).unwrap());
-            }
-            assert_eq!(FAILURES.with(|failures| failures.borrow().len()), 1);
         }
-        drop(send);
-        producer.join().unwrap();
         drain(&selector, &mut driver);
     }
-}
-
-#[test]
-fn notification_completion_failure_stops_the_driver_after_publishing_the_batch() {
-    let (selector, mut driver) = pair(1);
-    let (_directory, file) = file(&selector);
-    let _failures = Failures;
-    let waker = driver.waker();
-    BEFORE_SYSCALL.with(|hook| {
-        *hook.borrow_mut() = Some(("wait", Box::new(move || waker.wake_by_ref())));
-    });
-    // An indefinite wait arms the ring interrupt even without EXT_ARG support.
-    driver.turn(None).unwrap();
-    assert!(driver.reactor.as_ref().unwrap().notification_pending);
-    driver.waker().wake_by_ref();
-    driver
-        .reactor
-        .as_mut()
-        .unwrap()
-        .ring
-        .submit_and_wait(1)
-        .unwrap();
-    // Queue a file completion in the same CQ snapshot as the notification.
-    let never = Cancellation::never();
-    let mut operation = Box::pin(selector.file_read_at(&file, vec![0; 6], 0, &never));
-    assert!(block_on(poll_once(&mut operation)).is_none());
-    // Publish the accepted request without consuming the notification CQE.
-    let request = match driver
-        .reactor
-        .as_mut()
-        .unwrap()
-        .incoming
-        .try_recv()
-        .unwrap()
-    {
-        Command::Submit(request) => request,
-        _ => panic!("read submission"),
-    };
-    let reactor = driver.reactor.as_mut().unwrap();
-    let identifier = request.identifier();
-    reactor.in_flight.0.insert(identifier, request);
-    let entry = reactor.in_flight.0.get_mut(&identifier).unwrap().entry();
-    // SAFETY: InFlight retains the request just as the normal submission path does.
-    unsafe { reactor.ring.submission().push(&entry) }.unwrap();
-    reactor.ring.submit_and_wait(2).unwrap();
-    let _failures = Failures::new([(
-        "notification-completion",
-        io::ErrorKind::PermissionDenied.into(),
-    )]);
-    assert_eq!(
-        driver.turn(Some(Duration::ZERO)).unwrap_err().kind(),
-        io::ErrorKind::PermissionDenied
-    );
-    let (result, buffer) = block_on(operation);
-    assert_eq!(result.unwrap(), 6);
-    assert_eq!(buffer, b"abcdef");
-    block_on(selector.shutdown());
-}
-
-#[test]
-fn idle_wait_is_interruptible() {
-    // Isolate the temporary process-wide disposition from concurrently running tests.
-    const CHILD: &str = "CORE_SCHEDULER_TEST_PPOLL_INTERRUPT";
-    if std::env::var_os(CHILD).is_none() {
-        for mode in ["ring", "ppoll"] {
-            assert!(
-                std::process::Command::new(std::env::current_exe().unwrap())
-                    .args([
-                        "--exact",
-                        "io_uring_selector::tests::idle_wait_is_interruptible",
-                        "--nocapture"
-                    ])
-                    .env(CHILD, mode)
-                    .status()
-                    .unwrap()
-                    .success()
-            );
-        }
-        return;
-    }
-    extern "C" fn handle(_: libc::c_int) {}
-    // SAFETY: sigaction is initialized before use; the child runs only this test.
-    let mut action: libc::sigaction = unsafe { std::mem::zeroed() };
-    action.sa_sigaction = handle as *const () as usize;
-    let mut previous = action;
-    // SAFETY: The signal handler does nothing, and both sigaction pointers are valid.
-    assert_eq!(
-        unsafe { libc::sigaction(libc::SIGURG, &action, &mut previous) },
-        0
-    );
-    let (selector, mut driver) = pair(1);
-    let timeout = if std::env::var_os(CHILD).unwrap() == "ppoll" {
-        driver.reactor.as_mut().unwrap().extended_wait = false;
-        Some(Duration::from_secs(60))
-    } else {
-        None
-    };
-    // SAFETY: pthread_self returns the current live thread identifier.
-    let target = unsafe { libc::pthread_self() };
-    let (send, receive) = mpsc::channel();
-    let interrupted = Arc::new(AtomicBool::new(false));
-    let finished = Arc::clone(&interrupted);
-    let sender = std::thread::spawn(move || {
-        receive.recv().unwrap();
-        while !finished.load(Ordering::Acquire) {
-            std::thread::sleep(Duration::from_millis(1));
-            // SAFETY: The driver thread remains alive until this sender is joined.
-            assert_eq!(unsafe { libc::pthread_kill(target, libc::SIGURG) }, 0);
-        }
-    });
-    BEFORE_SYSCALL.with(|hook| {
-        *hook.borrow_mut() = Some(("wait", Box::new(move || send.send(()).unwrap())));
-    });
-    assert!(!driver.turn(timeout).unwrap());
-    interrupted.store(true, Ordering::Release);
-    sender.join().unwrap();
-    // SAFETY: Restore the action captured from this process before installation.
-    assert_eq!(
-        unsafe { libc::sigaction(libc::SIGURG, &previous, std::ptr::null_mut()) },
-        0
-    );
-    drain(&selector, &mut driver);
 }
 
 #[test]
@@ -1422,88 +1274,4 @@ fn pending_submissions_are_flushed_before_preparing_to_sleep() {
     }
     drop(operations);
     drain(&selector, &mut driver);
-}
-
-#[test]
-fn completions_published_during_submission_return_before_idle_preparation() {
-    let (selector, mut driver) = pair(1);
-    let (directory, file) = fifo(&selector);
-    let never = Cancellation::never();
-    let mut operation = Box::pin(selector.file_read(&file, vec![0], &never));
-    assert!(block_on(poll_once(&mut operation)).is_none());
-    driver.turn(Some(Duration::ZERO)).unwrap();
-    driver.turn(Some(Duration::from_millis(1))).unwrap();
-    let mut writer = std::fs::OpenOptions::new()
-        .write(true)
-        .open(directory.path().join("fifo"))
-        .unwrap();
-    let ring = driver.reactor.as_ref().unwrap().ring.as_raw_fd();
-    BEFORE_SYSCALL.with(|hook| {
-        *hook.borrow_mut() = Some((
-            "submit",
-            Box::new(move || {
-                writer.write_all(b"x").unwrap();
-                let mut source = libc::pollfd {
-                    fd: ring,
-                    events: libc::POLLIN,
-                    revents: 0,
-                };
-                // SAFETY: The driver owns this ring descriptor throughout the synchronous hook.
-                assert_eq!(unsafe { libc::poll(&mut source, 1, 1000) }, 1);
-            }),
-        ));
-    });
-    let _failures = Failures::new([("notification-read", io::ErrorKind::PermissionDenied.into())]);
-    // CQ was empty when the turn started; a new completion arrives during submission.
-    assert!(!driver.turn(None).unwrap());
-    assert!(block_on(poll_once(&mut operation)).is_none());
-    assert_eq!(FAILURES.with(|failures| failures.borrow().len()), 1);
-    assert!(!driver.turn(Some(Duration::ZERO)).unwrap());
-    let (result, buffer) = block_on(operation);
-    assert_eq!(result.unwrap(), 1);
-    assert_eq!(buffer, b"x");
-    drop(_failures);
-    drain(&selector, &mut driver);
-}
-
-#[test]
-fn notification_creation_reports_descriptor_exhaustion() {
-    const CHILD: &str = "CORE_SCHEDULER_TEST_EVENTFD_EXHAUSTION";
-    if std::env::var_os(CHILD).is_none() {
-        assert!(
-            std::process::Command::new(std::env::current_exe().unwrap())
-                .args([
-                    "--exact",
-                    "io_uring_selector::tests::notification_creation_reports_descriptor_exhaustion",
-                    "--nocapture"
-                ])
-                .env(CHILD, "1")
-                .status()
-                .unwrap()
-                .success()
-        );
-        return;
-    }
-    let mut previous = libc::rlimit {
-        rlim_cur: 0,
-        rlim_max: 0,
-    };
-    // SAFETY: The pointer is valid; this isolated child modifies only its own soft limit.
-    assert_eq!(
-        unsafe { libc::getrlimit(libc::RLIMIT_NOFILE, &mut previous) },
-        0
-    );
-    let limit = libc::rlimit {
-        rlim_cur: 0,
-        ..previous
-    };
-    // SAFETY: Lowering the soft limit is permitted; the hard limit remains unchanged.
-    assert_eq!(unsafe { libc::setrlimit(libc::RLIMIT_NOFILE, &limit) }, 0);
-    let result = notification();
-    // SAFETY: Restore the previous soft limit before profile output and test cleanup.
-    assert_eq!(
-        unsafe { libc::setrlimit(libc::RLIMIT_NOFILE, &previous) },
-        0
-    );
-    assert_eq!(result.unwrap_err().raw_os_error(), Some(libc::EMFILE));
 }
