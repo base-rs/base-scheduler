@@ -1,0 +1,11 @@
+--- selected/crates/iouring/src/io_uring_selector.rs
++++ no-coop/crates/iouring/src/io_uring_selector.rs
+@@ -828,8 +828,6 @@
+         if !self.started {
+             if let Ok(ring) = syscall("cooperative-ring", || {
+                 IoUring::builder()
+-                    .setup_coop_taskrun()
+-                    .setup_taskrun_flag()
+                     .build(self.ring.params().sq_entries())
+             }) {
+                 // Setup already validated this kernel's operations and completion features. No request or notification has reached the old ring, and queued commands remain on the controller. Failure to obtain this optional replacement leaves the original valid ring intact.

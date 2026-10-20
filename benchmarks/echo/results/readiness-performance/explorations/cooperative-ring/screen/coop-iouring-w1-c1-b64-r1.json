@@ -1,0 +1,33 @@
+{
+  "bytes": 64,
+  "connections": 1,
+  "payload_mib_per_second": 14.39141845703125,
+  "requests": 707367,
+  "requests_per_second": 235789.0,
+  "rtt_max_us": 160.255,
+  "rtt_mean_us": 4.201391908302213,
+  "rtt_p50_us": 3.761,
+  "rtt_p95_us": 5.603,
+  "rtt_p99_us": 6.351,
+  "seconds": 3.0,
+  "warmup_seconds": 1.0,
+  "identifier": "coop-iouring-w1-c1-b64-r1",
+  "mode": "coop",
+  "backend": "iouring",
+  "workers": 1,
+  "repeat": 1,
+  "client_cpu": {
+    "user": 0.37721699999999814,
+    "system": 1.157824000000005,
+    "voluntary_switches": 936585,
+    "involuntary_switches": 17
+  },
+  "server_cpu": {
+    "user": 0.44114000000000075,
+    "system": 1.4051439999999928,
+    "voluntary_switches": 936596,
+    "involuntary_switches": 8
+  },
+  "lifecycle_seconds": 4.001952646067366,
+  "variant": "coop"
+}

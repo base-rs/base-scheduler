@@ -58,9 +58,17 @@ fn watchdog(test: impl FnOnce() + Send + 'static) {
         std::panic::resume_unwind(panic);
     }
 }
+fn options() -> IoUringOptions {
+    // Each case creates independent rings; keep their locked kernel memory small
+    // when the shared conformance suites run many fixtures concurrently.
+    IoUringOptions {
+        entries: 16,
+        ..Default::default()
+    }
+}
 fn run_selector(test: impl AsyncFnOnce(&Fixture<IoUringSelector>) + Send + 'static) {
     watchdog(move || {
-        let (selector, driver) = IoUringSelector::new(IoUringOptions::default()).unwrap();
+        let (selector, driver) = IoUringSelector::new(options()).unwrap();
         let thread = std::thread::spawn(move || driver.run());
         let fixture = fixture(selector);
         let result = catch_unwind(AssertUnwindSafe(|| block_on(test(&fixture))));
@@ -73,7 +81,7 @@ fn run_selector(test: impl AsyncFnOnce(&Fixture<IoUringSelector>) + Send + 'stat
 }
 fn run_native(test: impl AsyncFnOnce(&Fixture<NativeScheduler<IoUringSelector>>) + Send + 'static) {
     watchdog(move || {
-        let (selector, driver) = IoUringSelector::new(IoUringOptions::default()).unwrap();
+        let (selector, driver) = IoUringSelector::new(options()).unwrap();
         let thread = std::thread::spawn(move || driver.run());
         let scheduler = NativeScheduler::with_selector(
             selector,
@@ -98,8 +106,7 @@ fn run_native_workers(
     test: impl AsyncFnOnce(&Fixture<NativeScheduler<IoUringSelector>>) + Send + 'static,
 ) {
     watchdog(move || {
-        let (selector, drivers) =
-            IoUringSelector::with_workers(IoUringOptions::default(), 2).unwrap();
+        let (selector, drivers) = IoUringSelector::with_workers(options(), 2).unwrap();
         let scheduler = NativeScheduler::with_drivers(
             selector,
             drivers,

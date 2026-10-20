@@ -1,0 +1,221 @@
+diff --git a/crates/tokio/src/socket_operations.rs b/crates/tokio/src/socket_operations.rs
+index 506baa9..b198cd4 100644
+--- a/crates/tokio/src/socket_operations.rs
++++ b/crates/tokio/src/socket_operations.rs
+@@ -6,7 +6,6 @@ use crate::{
+     blocking_pool::admission_error,
+     socket_io::{self, IoVectors},
+     tokio_scheduler::wait_close,
+-    tokio_socket::ReadReady,
+ };
+ use core_scheduler::*;
+ use socket2::Socket;
+@@ -22,18 +21,8 @@ impl TokioScheduler {
+         interest: Interest,
+         operation: impl FnMut(&Socket, &mut Input) -> io::Result<Output> + Send,
+     ) -> (OperationResult<Output>, Input) {
+-        self.socket_operation_with(
+-            socket,
+-            input,
+-            cancellation,
+-            interest,
+-            operation,
+-            ReadReady {
+-                nonempty: false,
+-                clear: |_: &Output| false,
+-            },
+-        )
+-        .await
++        self.socket_operation_with(socket, input, cancellation, interest, operation, false)
++            .await
+     }
+ 
+     async fn socket_operation_with<Input: Send, Output: Send>(
+@@ -43,7 +32,7 @@ impl TokioScheduler {
+         cancellation: &Cancellation,
+         interest: Interest,
+         mut operation: impl FnMut(&Socket, &mut Input) -> io::Result<Output> + Send,
+-        read_ready: ReadReady<impl Fn(&Output) -> bool + Send>,
++        read_nonempty: bool,
+     ) -> (OperationResult<Output>, Input) {
+         use std::{
+             future::{Future, poll_fn},
+@@ -53,8 +42,11 @@ impl TokioScheduler {
+         let result = async {
+             cancellation.check()?;
+             self.check_socket(socket)?;
+-            let mut operation =
+-                pin!(socket.io_with(interest, |socket| operation(socket, &mut input), read_ready));
++            let mut operation = pin!(socket.io_with(
++                interest,
++                |socket| operation(socket, &mut input),
++                read_nonempty
++            ));
+             let mut cancelled = pin!(cancellation.cancelled());
+             poll_fn(|context| {
+                 match operation.as_mut().poll(context) {
+@@ -194,10 +186,7 @@ impl SocketRead for TokioScheduler {
+             cancellation,
+             Interest::Readable,
+             |socket, buffer| socket_io::recv(socket, buffer.as_mut()),
+-            ReadReady {
+-                nonempty: length > 0,
+-                clear: move |count: &usize| 0 < *count && *count < length,
+-            },
++            length > 0,
+         )
+         .await
+     }
+@@ -236,10 +225,7 @@ impl SocketRecvPoll for TokioScheduler {
+             cancellation,
+             Interest::Readable,
+             |socket, buffer| socket_io::recv_poll(socket, buffer, flags),
+-            ReadReady {
+-                nonempty: length > 0,
+-                clear: move |count: &usize| !flags.peek && 0 < *count && *count < length,
+-            },
++            length > 0,
+         )
+         .await
+         .0
+diff --git a/crates/tokio/src/tokio_socket.rs b/crates/tokio/src/tokio_socket.rs
+index 7968370..835e0ca 100644
+--- a/crates/tokio/src/tokio_socket.rs
++++ b/crates/tokio/src/tokio_socket.rs
+@@ -25,7 +25,7 @@ impl RegisteredSocket {
+         let stream = socket
+             .r#type()
+             .is_ok_and(|kind| kind == socket2::Type::STREAM);
+-        // SOCK_STREAM alone does not imply TCP byte-stream semantics: SCTP preserves messages. Unknown protocols conservatively retain direct syscall behavior.
++        // Keep readiness-first reads conservative: only recognized TCP sockets opt in; unknown protocols retain direct syscall behavior.
+         #[cfg(target_os = "linux")]
+         let stream = stream
+             && socket
+@@ -84,11 +84,6 @@ pub struct TokioSocket {
+     runtime: Id,
+ }
+ 
+-pub(super) struct ReadReady<Clear> {
+-    pub nonempty: bool,
+-    pub clear: Clear,
+-}
+-
+ impl TokioSocket {
+     pub(super) fn new(runtime: &Handle, socket: socket2::Socket) -> io::Result<Self> {
+         Self::new_with(
+@@ -172,34 +167,18 @@ impl TokioSocket {
+     where
+         Operation: FnMut(&socket2::Socket) -> io::Result<Output> + Send,
+     {
+-        self.io_with(
+-            interest,
+-            operation,
+-            ReadReady {
+-                nonempty: false,
+-                clear: |_: &Output| false,
+-            },
+-        )
+-        .await
++        self.io_with(interest, operation, false).await
+     }
+ 
+     pub(super) async fn io_with<Output, Operation>(
+         &self,
+         interest: Interest,
+         mut operation: Operation,
+-        read_ready: ReadReady<impl Fn(&Output) -> bool + Send>,
++        read_nonempty: bool,
+     ) -> io::Result<Output>
+     where
+         Operation: FnMut(&socket2::Socket) -> io::Result<Output> + Send,
+     {
+-        let ReadReady {
+-            nonempty: read_nonempty,
+-            clear: clear_read_ready,
+-        } = read_ready;
+-        #[cfg(unix)]
+-        let clear_read_ready = |result: &Output| {
+-            cfg!(target_os = "linux") && self.inner.stream && clear_read_ready(result)
+-        };
+         #[cfg(unix)]
+         let known_connected = read_nonempty && self.inner.connected_stream.load(Ordering::Relaxed);
+         #[cfg(unix)]
+@@ -210,7 +189,7 @@ impl TokioSocket {
+         #[cfg(windows)]
+         let ready_first = false;
+         #[cfg(windows)]
+-        let _ = (read_nonempty, clear_read_ready);
++        let _ = read_nonempty;
+         // Only nonempty reads on a stream that already completed a read may skip the speculative syscall. Lifecycle operations, unknown socket states, and empty reads retain immediate OS results.
+         if !ready_first {
+             let result = operation(self.get_ref());
+@@ -249,9 +228,6 @@ impl TokioSocket {
+                         if mark_connected && result.is_ok() {
+                             self.inner.connected_stream.store(true, Ordering::Relaxed);
+                         }
+-                        if result.as_ref().is_ok_and(clear_read_ready) {
+-                            ready.clear_ready_matching(tokio::io::Ready::READABLE);
+-                        }
+                         return result;
+                     }
+                 }
+@@ -269,9 +245,6 @@ impl TokioSocket {
+                         if mark_connected && result.is_ok() {
+                             self.inner.connected_stream.store(true, Ordering::Relaxed);
+                         }
+-                        if result.as_ref().is_ok_and(clear_read_ready) {
+-                            ready.clear_ready_matching(tokio::io::Ready::READABLE);
+-                        }
+                         return std::task::Poll::Ready(result);
+                     }
+                 }
+diff --git a/crates/tokio/src/tokio_socket/tests.rs b/crates/tokio/src/tokio_socket/tests.rs
+index f1409aa..940a92d 100644
+--- a/crates/tokio/src/tokio_socket/tests.rs
++++ b/crates/tokio/src/tokio_socket/tests.rs
+@@ -367,7 +367,7 @@ fn runtime_shutdown_wakes_both_reserved_and_concurrent_waiters() {
+ 
+ #[cfg(target_os = "linux")]
+ #[test]
+-fn short_stream_reads_do_not_retry_stale_readiness() {
++fn established_stream_reads_only_retry_stale_readiness_once() {
+     use core_scheduler::*;
+     use futures_lite::future::{block_on, poll_once};
+     use std::io::Write;
+@@ -380,8 +380,9 @@ fn short_stream_reads_do_not_retry_stale_readiness() {
+                     let (native, mut peer) = tcp_pair();
+                     let socket = TokioSocket::new(&scheduler.runtime, native.into()).unwrap();
+                     // A real pending operation reserves the single-waker slot. The second reader must use the independent waiter path.
+-                    let mut reserved = Box::pin(socket.io(Interest::Readable, |_| {
+-                        Err::<(), _>(io::ErrorKind::WouldBlock.into())
++                    let mut reserved_buffer = [0; 8];
++                    let mut reserved = Box::pin(socket.io(Interest::Readable, |socket| {
++                        crate::socket_io::recv(socket, &mut reserved_buffer)
+                     }));
+                     if concurrent {
+                         assert!(poll_once(&mut reserved).await.is_none());
+@@ -410,15 +411,19 @@ fn short_stream_reads_do_not_retry_stale_readiness() {
+                     assert_eq!(receiving.await, 1);
+                     assert_eq!(buffer[0], b'x');
+                     let mut attempts = 0;
+-                    let mut next = Box::pin(socket.io(Interest::Readable, |socket| {
+-                        attempts += 1;
+-                        crate::socket_io::recv(socket, &mut buffer)
+-                    }));
++                    let mut next = Box::pin(socket.io_with(
++                        Interest::Readable,
++                        |socket| {
++                            attempts += 1;
++                            crate::socket_io::recv(socket, &mut buffer)
++                        },
++                        true,
++                    ));
+                     assert!(poll_once(&mut next).await.is_none());
+                     drop(next);
+                     assert_eq!(
+                         attempts, 1,
+-                        "a drained stream must not retry a stale readable event"
++                        "the next read should clear stale readiness without an extra speculative syscall"
+                     );
+                     peer.write_all(b"y").unwrap();
+                     assert_eq!(

@@ -1,0 +1,13 @@
+diff --git a/crates/iouring/src/io_uring_selector.rs b/crates/iouring/src/io_uring_selector.rs
+index 1e91d07..5de02cc 100644
+--- a/crates/iouring/src/io_uring_selector.rs
++++ b/crates/iouring/src/io_uring_selector.rs
+@@ -482,7 +482,7 @@ impl IoUringSelector {
+     }
+ 
+     fn driver(options: IoUringOptions, group: Arc<DriverGroup>) -> io::Result<IoUringDriver> {
+-        let ring = syscall("ring", || IoUring::new(options.entries))?;
++        let ring = syscall("ring", || IoUring::builder().setup_coop_taskrun().setup_taskrun_flag().build(options.entries))?;
+         syscall("completion-support", || {
+             validate_completion_support(
+                 ring.params().is_feature_nodrop(),

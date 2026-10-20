@@ -1,0 +1,76 @@
+{
+  "summary": [
+    {
+      "variant": "after",
+      "backend": "tokio",
+      "samples": [
+        696293.3333333334,
+        700304.0,
+        693435.3333333334
+      ],
+      "median": 696293.3333333334,
+      "minimum": 693435.3333333334,
+      "maximum": 700304.0,
+      "ratio_to_async_read": 1.0,
+      "ratio_to_poll_ready": 1.0526703027621458
+    },
+    {
+      "variant": "readable",
+      "backend": "tokio",
+      "samples": [
+        648112.6666666666,
+        652898.0,
+        649123.0
+      ],
+      "median": 649123.0,
+      "minimum": 648112.6666666666,
+      "maximum": 652898.0,
+      "ratio_to_async_read": 0.9322550840641874,
+      "ratio_to_poll_ready": 0.9813572415933979
+    },
+    {
+      "variant": "poll-ready",
+      "backend": "tokio",
+      "samples": [
+        660271.3333333334,
+        661454.3333333334,
+        663028.6666666666
+      ],
+      "median": 661454.3333333334,
+      "minimum": 660271.3333333334,
+      "maximum": 663028.6666666666,
+      "ratio_to_async_read": 0.9499650530427789,
+      "ratio_to_poll_ready": 1.0
+    },
+    {
+      "variant": "after",
+      "backend": "tokio-adapter",
+      "samples": [
+        641954.6666666666,
+        638557.6666666666,
+        643395.3333333334
+      ],
+      "median": 641954.6666666666,
+      "minimum": 638557.6666666666,
+      "maximum": 643395.3333333334,
+      "ratio_to_async_read": 0.9219600934472061,
+      "ratio_to_poll_ready": 0.9705200107036867
+    },
+    {
+      "variant": "after",
+      "backend": "tokio-adapter-poll",
+      "samples": [
+        646208.6666666666,
+        638219.0,
+        644560.0
+      ],
+      "median": 644560.0,
+      "minimum": 638219.0,
+      "maximum": 646208.6666666666,
+      "ratio_to_async_read": 0.9257018114970702,
+      "ratio_to_poll_ready": 0.9744588061760877
+    }
+  ],
+  "stderr_errors": [],
+  "aggregate_sha256": "0275e18123f57765cd517a877d3dfaca0163d624d97c9b88be593e325f8bd38b"
+}

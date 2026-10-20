@@ -1,0 +1,75 @@
+{
+  "variants": {
+    "before": {
+      "rates": [
+        227469.0,
+        235639.0,
+        224197.0,
+        233158.0,
+        235865.33333333334
+      ],
+      "median": 233158.0,
+      "mean": 231265.66666666666,
+      "minimum": 224197.0,
+      "maximum": 235865.33333333334,
+      "standard_deviation": 5202.033966525873,
+      "median_rtt_mean_us": 4.249503627011155,
+      "median_rtt_p50_us": 3.761,
+      "median_server_user_cpu": 0.44436100000000067,
+      "median_server_system_cpu": 1.3561539999999965,
+      "median_lifecycle_voluntary_switches": 940637
+    },
+    "selected": {
+      "rates": [
+        231268.66666666666,
+        224423.0,
+        227074.0,
+        233437.0,
+        223232.0
+      ],
+      "median": 227074.0,
+      "mean": 227886.93333333332,
+      "minimum": 223232.0,
+      "maximum": 233437.0,
+      "standard_deviation": 4375.141695483192,
+      "median_rtt_mean_us": 4.358630270308351,
+      "median_rtt_p50_us": 4.123,
+      "median_server_user_cpu": 0.43918800000000013,
+      "median_server_system_cpu": 1.337535,
+      "median_lifecycle_voluntary_switches": 915762
+    },
+    "no-coop": {
+      "rates": [
+        224393.66666666666,
+        230783.0,
+        224658.33333333334,
+        232609.33333333334,
+        230621.33333333334
+      ],
+      "median": 230621.33333333334,
+      "mean": 228613.13333333333,
+      "minimum": 224393.66666666666,
+      "maximum": 232609.33333333334,
+      "standard_deviation": 3812.976036582919,
+      "median_rtt_mean_us": 4.295955567857263,
+      "median_rtt_p50_us": 3.781,
+      "median_server_user_cpu": 0.45696000000000003,
+      "median_server_system_cpu": 1.3535129999999995,
+      "median_lifecycle_voluntary_switches": 923475
+    }
+  },
+  "changes_percent": {
+    "selected/before": {
+      "median": -2.6093893411334834,
+      "mean": -1.4609748961151525
+    },
+    "no-coop/before": {
+      "median": -1.087960381658215,
+      "mean": -1.1469637372314878
+    },
+    "no-coop/selected": {
+      "median": 1.5621926479180148,
+      "mean": 0.31866680084626786
+    }
+  }
+}

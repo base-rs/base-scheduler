@@ -1,0 +1,26 @@
+{
+  "tokio": "1.53.3",
+  "worktree_base": "427be5d",
+  "method": "Direct tokio::net::TcpStream AsyncRead::poll_read via poll_fn and ReadBuf; no adapter I/O invoked. Independent readable()+try_read control on second TCP pair.",
+  "platform": "Linux-7.2.6-arch2-1-x86_64-with-glibc2.44",
+  "rustc": "rustc 1.99.0 (b940084d7 2026-09-28) (Arch Linux rust 1:1.99.0-1)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+  "locking": "shared /tmp/core-scheduler-perf.lock during build and correctness test; no performance timings",
+  "test_command": "cargo test --locked -p core-scheduler-tokio raw_tokio_urgent_boundary_comparison -- --nocapture",
+  "results": "AsyncRead returned before, then timed out after100ms despite direct libc recv immediately returning after; readable()+try_read returned both ordinary payloads without timeout.",
+  "artifacts": {
+    "test.rs": {
+      "sha256": "36ff98c7b039da0c6d03f71a96cb8c2f8d4f2f50ede0bd3770b11c59c33df5c2"
+    },
+    "test.log": {
+      "sha256": "aa6b645877ac3112e49b19e18c4e662552a73344562ff434b6ac558a5b465683"
+    },
+    "poll_evented.rs": {
+      "sha256": "334619a06d840de8d5d7037bee6d6f48accf5e8e1252460841637a512fa233f8"
+    }
+  },
+  "test_executable": {
+    "path": "/home/samuel/.cache/core-scheduler-tasks-next/raw-tokio-urgent/test-executable",
+    "sha256": "dcddd775d285ce0a822a1cb2204e0a700439dcaf56de5663c868a5ca904adb85",
+    "exact_test": "tokio_socket::tests::raw_tokio_urgent_boundary_comparison"
+  }
+}

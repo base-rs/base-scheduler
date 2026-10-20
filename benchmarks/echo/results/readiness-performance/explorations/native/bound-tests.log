@@ -1,0 +1,83 @@
+   Compiling core-scheduler-iouring v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-native-next/crates/iouring)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.53s
+     Running unittests src/lib.rs (/home/samuel/.cache/core-scheduler-native-next/tests/debug/deps/core_scheduler_iouring-be1f28e24cdd286f)
+
+running 75 tests
+test io_uring_selector::message::tests::empty_receive_consumes_one_datagram_without_replacing_the_sequence ... ok
+test io_uring_selector::message::tests::inline_prepared_vectors_survive_submission_and_are_used_without_copying ... ok
+test io_uring_selector::message::tests::message_admission_is_lazy_cancellable_and_reports_closure_or_exhaustion ... ok
+test io_uring_selector::message::tests::message_cancellation_and_abandonment_retain_payload_until_original_completion ... ok
+test io_uring_selector::message::tests::message_length_validation_rejects_overflow_without_truncating_datagrams ... ok
+test io_uring_selector::message::tests::ordinary_sequences_preserve_datagram_addresses_flags_and_payloads ... ok
+test io_uring_selector::message::tests::queued_or_disconnected_message_requests_return_owners_and_unknown_completion_panics ... ok
+test io_uring_selector::message::tests::submitted_message_keeps_payload_alive_after_waiter_drop_until_driver_retirement ... ok
+test io_uring_selector::readiness::tests::admission_cancellation_exhaustion_and_closure_are_reported ... ok
+test io_uring_selector::readiness::tests::blocked_scalar_and_vector_sends_wait_on_the_ring_and_cancel_safely ... ok
+test io_uring_selector::readiness::tests::failed_driver_disconnects_readiness_waiters_without_accessing_borrowed_bytes ... ok
+test io_uring_selector::readiness::tests::interrupted_syscalls_retry_but_check_cancellation_and_closure ... ok
+test io_uring_selector::readiness::tests::pending_read_uses_polladd_and_observes_data_arriving_before_submission ... ok
+test io_uring_selector::readiness::tests::readiness_errors_and_unpublished_shutdown_release_the_socket ... ok
+test io_uring_selector::readiness::tests::ready_scalar_and_vector_io_allocate_nothing_even_when_ring_capacity_is_full ... ok
+test io_uring_selector::readiness::tests::ready_waits_and_cancelled_waits_retire_before_returning ... ok
+test io_uring_selector::readiness::tests::spurious_readiness_retries_on_the_original_ring_after_thread_migration ... ok
+test io_uring_selector::socket::tests::empty_owned_write_sends_one_udp_datagram_and_returns_the_owner ... ok
+test io_uring_selector::socket::tests::owned_write_checks_precancellation_and_closure_before_sending ... ok
+test io_uring_selector::socket::tests::owned_write_fast_path_errors_and_ring_fallbacks_preserve_the_owner ... ok
+test io_uring_selector::socket::tests::ready_owned_writes_preserve_the_owner_without_consuming_ring_capacity ... ok
+test io_uring_selector::socket::tests::scalar_socket_requests_use_ring_opcodes_and_release_before_notification ... ok
+test io_uring_selector::socket::tests::socket_retries_keep_the_original_ring_across_threads_and_nested_workers ... ok
+test io_uring_selector::socket::tests::socket_retry_readiness_cancels_and_closes_after_kernel_submission ... ok
+test io_uring_selector::socket::tests::transient_socket_failures_retry_and_preserve_the_owner ... ok
+test io_uring_selector::tests::a_retired_driver_can_enter_a_worker_without_recreating_its_ring ... ok
+test io_uring_selector::tests::abandoned_buffer_destructor_panics_do_not_stop_other_operations ... ok
+test io_uring_selector::tests::abandoning_submitted_io_keeps_storage_until_original_retirement ... ok
+test io_uring_selector::tests::binding_an_already_driven_ring_preserves_inflight_io_without_upgrade ... ok
+test io_uring_selector::tests::bounded_admission_wakes_for_cancellation_and_closure ... ok
+test io_uring_selector::tests::capacity_wait_observes_retirement_and_closure_before_registration ... ok
+test io_uring_selector::tests::close_returns_pending_owners_and_cancellation_tolerates_retired_requests ... ok
+test io_uring_selector::tests::closing_a_full_local_batch_drains_all_accepted_owners ... ok
+test io_uring_selector::tests::convenience_driver_loop_reports_the_original_failure ... ok
+test io_uring_selector::tests::cooperative_cancellation_waits_for_original_completion_and_returns_the_owner ... ok
+test io_uring_selector::tests::deferred_cancellations_prevent_waiting_while_originals_fill_the_submission_queue ... ok
+test io_uring_selector::tests::driver_failure_retains_submitted_storage_and_wakes_waiters_with_a_panic ... ok
+test io_uring_selector::tests::dropping_an_undriven_driver_returns_queued_buffers_and_closes_fallback ... ok
+test io_uring_selector::tests::dropping_local_driver_returns_queued_owners_before_shutdown_and_allows_reentrant_wakes ... ok
+test io_uring_selector::tests::empty_operations_keep_native_access_mode_errors ... ok
+test io_uring_selector::tests::event_loop_wakers_and_notification_errors_do_not_lose_work ... ok
+test io_uring_selector::tests::eventfd_creation_reports_descriptor_exhaustion ... ok
+test io_uring_selector::tests::external_admission_remains_bounded_under_contention ... ok
+test io_uring_selector::tests::failed_notification_completion_still_retires_original_completions_in_the_batch ... ok
+test io_uring_selector::tests::fresh_bound_worker_attempts_optional_upgrade_without_losing_queued_io ... ok
+test io_uring_selector::tests::full_eventfd_preserves_existing_notifications_without_failing_the_waker ... ok
+test io_uring_selector::tests::full_submission_queue_defers_cancellations_and_shutdown_tolerates_duplicate_requests ... ok
+test io_uring_selector::tests::full_submission_queue_defers_waiting_until_the_notification_can_be_armed ... ok
+test io_uring_selector::tests::idle_ring_waits_honor_finite_timeouts_and_rearm_after_notifications ... ok
+test io_uring_selector::tests::idle_turn_consumes_local_and_remote_notifications_together ... ok
+test io_uring_selector::tests::lazy_precancelled_empty_invalid_and_closed_operations_preserve_the_buffer ... ok
+test io_uring_selector::tests::local_notifications_match_the_ring_controller_including_nested_workers ... ok
+test io_uring_selector::tests::migrated_cancellation_cannot_overtake_a_queued_submission ... ok
+test io_uring_selector::tests::movable_driver_never_upgrades_and_completes_inflight_io_after_thread_migration ... ok
+test io_uring_selector::tests::moving_a_waiter_to_another_thread_keeps_cancellation_on_the_original_ring ... ok
+test io_uring_selector::tests::native_workers_use_distinct_rings_without_external_submission_routing ... ok
+test io_uring_selector::tests::nested_selectors_restore_routes_and_never_use_another_selectors_ring ... ok
+test io_uring_selector::tests::nonblocking_and_productive_turns_do_not_prepare_an_idle_wait ... ok
+test io_uring_selector::tests::nonblocking_turn_preserves_notifications_for_the_next_idle_turn ... ok
+test io_uring_selector::tests::notification_completion_read_failure_stops_the_driver ... ok
+test io_uring_selector::tests::notifications_racing_idle_preparation_remain_observable ... ok
+test io_uring_selector::tests::one_entry_ring_submits_payload_and_cancellation_before_notification ... ok
+test io_uring_selector::tests::optional_worker_upgrade_failures_preserve_the_valid_ring_and_queued_io ... ok
+test io_uring_selector::tests::owner_wakes_coalesce_without_writes_and_survive_productive_turns ... ok
+test io_uring_selector::tests::partial_ring_construction_releases_previously_created_drivers ... ok
+test io_uring_selector::tests::pending_submissions_are_flushed_before_preparing_to_sleep ... ok
+test io_uring_selector::tests::remote_notification_retires_before_waiting_with_a_socket_read_pending ... ok
+test io_uring_selector::tests::remote_wakes_interrupt_entered_workers_during_idle_preparation ... ok
+test io_uring_selector::tests::repeated_external_notifications_cannot_starve_a_one_entry_ring_payload ... ok
+test io_uring_selector::tests::setup_probes_and_errors_are_explicit ... ok
+test io_uring_selector::tests::stopping_one_ring_closes_the_group_and_shared_fallback ... ok
+test io_uring_selector::tests::submission_racing_shutdown_or_driver_exit_returns_unpublished_storage ... ok
+test io_uring_selector::tests::successful_completion_wins_cancellation_and_releases_the_file_before_waking ... ok
+test io_uring_selector::tests::transient_syscall_errors_preserve_progress_and_fatal_errors_stop_the_driver ... ok
+test io_uring_selector::tests::workers_route_locally_and_external_operations_share_ring_capacity_fairly ... ok
+
+test result: ok. 75 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+

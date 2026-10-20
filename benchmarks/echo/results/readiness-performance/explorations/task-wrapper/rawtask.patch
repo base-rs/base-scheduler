@@ -1,0 +1,79 @@
+diff --git a/benchmarks/echo/src/server.rs b/benchmarks/echo/src/server.rs
+index 6e19ea4..27d5c6e 100644
+--- a/benchmarks/echo/src/server.rs
++++ b/benchmarks/echo/src/server.rs
+@@ -147,6 +147,51 @@ async fn scheduler_server<S>(
+     }
+ }
+ 
++async fn scheduler_server_raw<S>(
++    scheduler: Arc<S>,
++    listener: TcpListener,
++    connections: usize,
++    poll: bool,
++) where
++    S: SocketRegistration
++        + SocketAccept
++        + SocketRead
++        + SocketWrite
++        + SocketRecvPoll
++        + SocketSendPoll
++        + SocketSetOption<TcpNoDelay>
++        + Spawn
++        + Send
++        + Sync
++        + 'static,
++{
++    let listener = scheduler
++        .register_listener(listener)
++        .expect("scheduler listener registration");
++    let mut tasks = Vec::with_capacity(connections);
++    let never = Cancellation::never();
++    for _ in 0..connections {
++        let (socket, _) = scheduler
++            .socket_accept(&listener, &never)
++            .await
++            .expect("accept connection");
++        scheduler
++            .socket_set_option(&socket, TcpNoDelay, true, &never)
++            .await
++            .expect("TCP_NODELAY");
++        let shared = Arc::clone(&scheduler);
++        let task = if poll {
++            tokio::spawn(async move { echo_poll(shared.as_ref(), socket).await })
++        } else {
++            tokio::spawn(async move { echo(shared.as_ref(), socket).await })
++        };
++        tasks.push(task);
++    }
++    for task in tasks {
++        task.await.expect("echo task failed");
++    }
++}
++
+ pub(crate) fn run(backend: &str, workers: usize, connections: usize) -> Result<()> {
+     let listener = TcpListener::bind("127.0.0.1:0").expect("bind echo listener");
+     match backend {
+@@ -155,16 +200,15 @@ pub(crate) fn run(backend: &str, workers: usize, connections: usize) -> Result<(
+             ready(&listener);
+             runtime.block_on(tokio_server(listener, connections));
+         }
+-        "tokio-adapter" | "tokio-adapter-poll" => {
++        "tokio-adapter" | "tokio-adapter-poll" | "tokio-adapter-rawtask" | "tokio-adapter-rawtask-poll" => {
+             let runtime = crate::runtime(workers);
+             let scheduler = Arc::new(TokioScheduler::new(runtime.handle().clone()));
+             ready(&listener);
+-            runtime.block_on(scheduler_server(
+-                Arc::clone(&scheduler),
+-                listener,
+-                connections,
+-                backend == "tokio-adapter-poll",
+-            ));
++            if backend.contains("rawtask") {
++                runtime.block_on(scheduler_server_raw(Arc::clone(&scheduler), listener, connections, backend.ends_with("-poll")));
++            } else {
++                runtime.block_on(scheduler_server(Arc::clone(&scheduler), listener, connections, backend.ends_with("-poll")));
++            }
+             runtime.block_on(scheduler.shutdown());
+         }
+         #[cfg(target_os = "linux")]

@@ -1,0 +1,177 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 5K of event 'cycles:u'
+# Event count (approx.): 5811751149
+#
+# Children      Self  Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        IPC   [IPC Coverage]
+# ........  ........  ............................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................  ....................
+#
+    12.55%     0.00%  [.] 0x00007f3f470a08f2                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        -      -            
+            |          
+            |--9.39%--0xffffffff9de0012f
+            |          |          
+            |          |--5.89%--0xffffffff9f389afa
+            |          |          |          
+            |          |          |--3.29%--0xffffffff9f06f034
+            |          |          |          |          
+            |          |          |           --2.55%--0xffffffff9f06ef2b
+            |          |          |                     |          
+            |          |          |                      --2.17%--0xffffffff9e60c656
+            |          |          |          
+            |          |           --1.57%--0xffffffff9f06ed64
+            |          |                     |          
+            |          |                      --1.12%--0xffffffff9f06ebbe
+            |          |                                |          
+            |          |                                 --1.00%--0xffffffff9e60c656
+            |          |          
+            |          |--1.55%--0xffffffff9f389aaf
+            |          |          
+            |           --1.28%--0xffffffff9f389ac1
+            |          
+             --1.59%--0xffffffff9de00080
+
+     9.99%     9.99%  [.] <core_scheduler_iouring::io_uring_selector::IoUringSelector>::wait_ready::{closure#0}                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     -      -            
+     9.54%     0.00%  [.] 0xffffffff9de0012f                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        -      -            
+            |          
+            |--6.04%--0xffffffff9f389afa
+            |          |          
+            |          |--3.29%--0xffffffff9f06f034
+            |          |          |          
+            |          |           --2.55%--0xffffffff9f06ef2b
+            |          |                     |          
+            |          |                      --2.17%--0xffffffff9e60c656
+            |          |          
+            |           --1.57%--0xffffffff9f06ed64
+            |                     |          
+            |                      --1.12%--0xffffffff9f06ebbe
+            |                                |          
+            |                                 --1.00%--0xffffffff9e60c656
+            |          
+            |--1.55%--0xffffffff9f389aaf
+            |          
+             --1.28%--0xffffffff9f389ac1
+
+     8.33%     0.02%  [.] recv                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      -      -            
+            |          
+             --8.21%--0x7f3f470a08f2
+                       |          
+                       |--6.24%--0xffffffff9de0012f
+                       |          |          
+                       |          |--3.50%--0xffffffff9f389afa
+                       |          |          |          
+                       |          |           --3.25%--0xffffffff9f06f034
+                       |          |                     |          
+                       |          |                      --2.52%--0xffffffff9f06ef2b
+                       |          |                                |          
+                       |          |                                 --2.14%--0xffffffff9e60c656
+                       |          |          
+                       |           --1.15%--0xffffffff9f389aaf
+                       |          
+                        --1.03%--0xffffffff9de00080
+
+     7.52%     7.52%  [.] core::ptr::drop_glue::<futures_channel::oneshot::Sender<core::result::Result<usize, core::io::error::Error>>>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             -      -            
+     7.14%     7.14%  [.] <core_scheduler_native::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0}> as core::future::future::Future>::poll                                                                                                                                                                                                                                                                                                                                                                                          -      -            
+     6.18%     6.18%  [.] <async_task::raw::RawTask<core_scheduler_native::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0}>, core_scheduler_native::task_service::TaskOutcome<()>, <core_scheduler_native::task_service::TaskService>::spawn<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0}>::{closure#1}, core_scheduler_native::task_service::TaskState>>::run          -      -            
+     6.12%     6.12%  [.] <core::future::poll_fn::PollFn<<core_scheduler_iouring::io_uring_selector::IoUringSelector>::submit<core::result::Result<usize, core::io::error::Error>>::{closure#0}::{closure#0}> as core::future::future::Future>::poll                                                                                                                                                                                                                                                                                                                                                                                                                                                                -      -            
+     6.04%     0.00%  [.] 0xffffffff9f389afa                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        -      -            
+            |          
+            |--3.29%--0xffffffff9f06f034
+            |          |          
+            |           --2.55%--0xffffffff9f06ef2b
+            |                     |          
+            |                      --2.17%--0xffffffff9e60c656
+            |          
+             --1.57%--0xffffffff9f06ed64
+                       |          
+                        --1.12%--0xffffffff9f06ebbe
+                                  |          
+                                   --1.00%--0xffffffff9e60c656
+
+     5.94%     5.94%  [.] <core_scheduler_iouring::io_uring_selector::Capacity>::acquire::{closure#0}                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               -      -            
+     5.42%     5.42%  [.] <core_scheduler_iouring::io_uring_selector::IoUringSelector>::route                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       -      -            
+     4.09%     0.00%  [.] send                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      -      -            
+            |          
+             --4.07%--0x7f3f470a08f2
+                       |          
+                        --3.12%--0xffffffff9de0012f
+                                  |          
+                                   --2.35%--0xffffffff9f389afa
+                                             |          
+                                              --1.57%--0xffffffff9f06ed64
+                                                        |          
+                                                         --1.12%--0xffffffff9f06ebbe
+                                                                   |          
+                                                                    --1.00%--0xffffffff9e60c656
+
+     3.70%     3.70%  [.] <core_scheduler_iouring::io_uring_selector::Reactor>::turn                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                -      -            
+     3.64%     3.64%  [.] <core_scheduler_native::task_service::Shared>::wake_idle                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  -      -            
+     3.35%     3.35%  [.] <core_scheduler_iouring::io_uring_selector::readiness::ReadinessRequest as core::ops::drop::Drop>::drop                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   -      -            
+     3.29%     0.00%  [.] 0xffffffff9f06f034                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        -      -            
+            |          
+             --2.55%--0xffffffff9f06ef2b
+                       |          
+                        --2.17%--0xffffffff9e60c656
+
+     3.17%     3.17%  [k] 0xffffffff9e60c656                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        -      -            
+            |          
+            |--2.14%--recv
+            |          0x7f3f470a08f2
+            |          0xffffffff9de0012f
+            |          0xffffffff9f389afa
+            |          0xffffffff9f06f034
+            |          0xffffffff9f06ef2b
+            |          0xffffffff9e60c656
+            |          
+             --1.00%--send
+                       0x7f3f470a08f2
+                       0xffffffff9de0012f
+                       0xffffffff9f389afa
+                       0xffffffff9f06ed64
+                       0xffffffff9f06ebbe
+                       0xffffffff9e60c656
+
+     2.69%     2.69%  [.] <futures_channel::oneshot::Sender<core::result::Result<usize, core::io::error::Error>>>::send                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             -      -            
+     2.55%     0.00%  [.] 0xffffffff9f06ef2b                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        -      -            
+            |          
+             --2.17%--0xffffffff9e60c656
+
+     2.50%     2.50%  [.] <async_task::raw::RawTask<core_scheduler_native::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0}>, core_scheduler_native::task_service::TaskOutcome<()>, <core_scheduler_native::task_service::TaskService>::spawn<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0}>::{closure#1}, core_scheduler_native::task_service::TaskState>>::wake         -      -            
+     2.40%     2.40%  [.] futures_channel::oneshot::channel::<core::result::Result<usize, core::io::error::Error>>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  -      -            
+     2.35%     2.35%  [.] core::ptr::drop_glue::<alloc::boxed::Box<core_scheduler_iouring::io_uring_selector::readiness::ReadinessRequest>>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         -      -            
+     2.34%     2.34%  [.] <async_task::raw::RawTask<core_scheduler_native::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0}>, core_scheduler_native::task_service::TaskOutcome<()>, <core_scheduler_native::task_service::TaskService>::spawn<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0}>::{closure#1}, core_scheduler_native::task_service::TaskState>>::clone_waker  -      -            
+     2.25%     2.25%  [.] <core_scheduler_iouring::io_uring_selector::Controller>::send                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             -      -            
+     1.75%     1.75%  [.] <core_scheduler_iouring::io_uring_selector::IoUringSelector>::next_identifier                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             -      -            
+     1.67%     1.67%  [.] <crossbeam_deque::deque::Worker<async_task::runnable::Runnable<core_scheduler_native::task_service::TaskState>>>::pop                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     -      -            
+     1.61%     1.61%  [k] 0xffffffff9de00080                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        -      -            
+            |          
+             --1.03%--recv
+                       0x7f3f470a08f2
+                       0xffffffff9de00080
+
+     1.57%     0.00%  [.] 0xffffffff9f06ed64                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        -      -            
+            |          
+             --1.12%--0xffffffff9f06ebbe
+                       |          
+                        --1.00%--0xffffffff9e60c656
+
+     1.55%     0.03%  [.] 0xffffffff9f389aaf                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        -      -            
+            |          
+             --1.52%--0xffffffff9f389aaf
+
+     1.53%     1.53%  [.] <std::sync::mpmc::list::Channel<core_scheduler_iouring::io_uring_selector::Command>>::try_recv                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            -      -            
+     1.45%     1.45%  [.] <alloc::sync::Arc<futures_channel::oneshot::Inner<core::result::Result<usize, core::io::error::Error>>>>::drop_slow                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       -      -            
+     1.28%     1.28%  [k] 0xffffffff9f389ac1                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        -      -            
+     1.18%     1.18%  [.] <async_task::raw::RawTask<core_scheduler_native::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0}>, core_scheduler_native::task_service::TaskOutcome<()>, <core_scheduler_native::task_service::TaskService>::spawn<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_native::native_scheduler::NativeScheduler<core_scheduler_iouring::io_uring_selector::IoUringSelector>>::{closure#0}::{closure#0}>::{closure#1}, core_scheduler_native::task_service::TaskState>>::drop_waker   -      -            
+     1.12%     1.12%  [.] <core_scheduler_native::task_service::Shared>::retire_runnable                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            -      -            
+     1.12%     0.00%  [.] 0xffffffff9f06ebbe                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        -      -            
+            |          
+             --1.00%--0xffffffff9e60c656
+
+
+
+#
+# (Tip: For tracepoint events, try: perf report -s trace_fields)
+#

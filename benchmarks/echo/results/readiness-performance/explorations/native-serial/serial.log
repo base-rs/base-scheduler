@@ -1,0 +1,20 @@
+Waiting for exclusive benchmark lock.
+1 15 selected iouring-poll 1 1 64 1 231269
+2 15 no-coop iouring-poll 1 1 64 1 224394
+3 15 selected iouring-poll 1 1 64 2 224423
+4 15 no-coop iouring-poll 1 1 64 4 230783
+5 15 no-coop iouring-poll 1 1 64 5 224658
+6 15 before iouring-poll 1 1 64 5 227469
+7 15 selected iouring-poll 1 1 64 3 227074
+8 15 before iouring-poll 1 1 64 2 235639
+9 15 no-coop iouring-poll 1 1 64 2 232609
+10 15 selected iouring-poll 1 1 64 4 233437
+11 15 selected iouring-poll 1 1 64 5 223232
+12 15 before iouring-poll 1 1 64 1 224197
+13 15 before iouring-poll 1 1 64 4 233158
+14 15 before iouring-poll 1 1 64 3 235865
+15 15 no-coop iouring-poll 1 1 64 3 230621
+RESULT 1 1 64
+before iouring-poll median 233158 range 224197 235865
+selected iouring-poll median 227074 range 223232 233437
+no-coop iouring-poll median 230621 range 224394 232609

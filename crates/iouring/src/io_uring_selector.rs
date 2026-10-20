@@ -791,6 +791,7 @@ impl Selector for IoUringSelector {
 }
 pub(crate) struct Reactor {
     ring: IoUring,
+    started: bool,
     notification: Arc<OwnedFd>,
     incoming: mpsc::Receiver<Command>,
     controller: Arc<Controller>,
@@ -810,6 +811,7 @@ impl Reactor {
     ) -> Self {
         Self {
             ring,
+            started: false,
             notification,
             incoming,
             controller,
@@ -818,6 +820,21 @@ impl Reactor {
             cancellations: VecDeque::new(),
             closing: false,
             notification_armed: false,
+        }
+    }
+
+    pub(crate) fn bind_worker(&mut self) {
+        // Cooperative task work belongs to its submitting thread. Enable it only for a never-driven ring after its owner becomes thread-bound; a movable driver must keep the default interrupt behavior.
+        if !self.started {
+            if let Ok(ring) = syscall("cooperative-ring", || {
+                IoUring::builder()
+                    .setup_coop_taskrun()
+                    .setup_taskrun_flag()
+                    .build(self.ring.params().sq_entries())
+            }) {
+                // Setup already validated this kernel's operations and completion features. No request or notification has reached the old ring, and queued commands remain on the controller. Failure to obtain this optional replacement leaves the original valid ring intact.
+                self.ring = ring;
+            }
         }
     }
 
@@ -876,6 +893,7 @@ impl Reactor {
     }
 
     pub(crate) fn turn(&mut self, timeout: Option<Duration>) -> io::Result<bool> {
+        self.started = true;
         let mut progressed = false;
         // Bound command processing so a busy producer cannot starve completions.
         let mut command_batch_full = true;

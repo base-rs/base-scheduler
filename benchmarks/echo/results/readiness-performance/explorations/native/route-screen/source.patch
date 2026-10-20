@@ -1,0 +1,14 @@
+diff --git a/crates/iouring/src/io_uring_selector.rs b/crates/iouring/src/io_uring_selector.rs
+index 1e91d07..a1fb108 100644
+--- a/crates/iouring/src/io_uring_selector.rs
++++ b/crates/iouring/src/io_uring_selector.rs
+@@ -564,6 +564,9 @@ impl IoUringSelector {
+     }
+ 
+     fn route(&self) -> Arc<Controller> {
++        if self.controllers.len() == 1 {
++            return Arc::clone(&self.controllers[0]);
++        }
+         crate::io_uring_worker::route(&self.group).unwrap_or_else(|| {
+             let index = self.external_next.fetch_add(1, Ordering::Relaxed) % self.controllers.len();
+             Arc::clone(&self.controllers[index])

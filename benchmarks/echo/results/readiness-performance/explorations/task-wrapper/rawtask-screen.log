@@ -1,0 +1,37 @@
+1 15 tokio-adapter-poll 614866
+2 15 tokio-adapter 620277
+3 15 tokio-adapter-rawtask-poll 621700
+4 15 tokio-adapter 621289
+5 15 tokio-adapter-rawtask 623076
+6 15 tokio-adapter-rawtask-poll 624114
+7 15 tokio-adapter-rawtask-poll 624466
+8 15 tokio 706266
+9 15 tokio-adapter-rawtask 624816
+10 15 tokio-adapter-rawtask 620248
+11 15 tokio 695682
+12 15 tokio 699326
+13 15 tokio-adapter 622731
+14 15 tokio-adapter-poll 620991
+15 15 tokio-adapter-poll 620152
+{
+  "tokio": {
+    "median": 699326.3333333334,
+    "pct_tokio": 100.0
+  },
+  "tokio-adapter": {
+    "median": 621288.6666666666,
+    "pct_tokio": 88.84102271757723
+  },
+  "tokio-adapter-poll": {
+    "median": 620152.0,
+    "pct_tokio": 88.6784853423223
+  },
+  "tokio-adapter-rawtask": {
+    "median": 623076.3333333334,
+    "pct_tokio": 89.09664968047821
+  },
+  "tokio-adapter-rawtask-poll": {
+    "median": 624114.0,
+    "pct_tokio": 89.24503057466256
+  }
+}

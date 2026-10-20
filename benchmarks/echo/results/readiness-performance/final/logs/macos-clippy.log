@@ -1,0 +1,3 @@
+    Checking core-scheduler-tokio v0.0.0 (/Users/samuel/Developer/core-rs/core-scheduler/crates/tokio)
+    Checking core-scheduler-echo-benchmark v0.0.0 (/Users/samuel/Developer/core-rs/core-scheduler/benchmarks/echo)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.62s

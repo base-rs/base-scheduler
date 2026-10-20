@@ -1,0 +1,35 @@
+{
+  "baseline": "427be5d2ef6c610a5d5de5b10570c938b65d6c2d",
+  "worktree": "/home/samuel/Developer/core-rs/core-scheduler-perf-tasks-next",
+  "diagnostic_only": true,
+  "candidate": "Duplicate scheduler echo loop, replacing scheduler.spawn with tokio::spawn; identical adapter I/O. All backends are in same server executable. No runtime code changed.",
+  "build": "flock -s /tmp/core-scheduler-perf.lock env CARGO_TARGET_DIR=/home/samuel/.cache/core-scheduler-tasks-next/target cargo build --release --locked -p core-scheduler-echo-benchmark",
+  "rustc": "rustc 1.99.0 (b940084d7 2026-09-28) (Arch Linux rust 1:1.99.0-1)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+  "lock": "exclusive /tmp/core-scheduler-perf.lock for entire screen",
+  "server_cpus": "0",
+  "client_cpus": "4-7",
+  "warmup_seconds": 1,
+  "measurement_seconds": 3,
+  "artifacts": {
+    "binary": {
+      "path": "/home/samuel/.cache/core-scheduler-tasks-next/rawtask",
+      "sha256": "f27b87661dda2e9cf22444642d8028569c11eecc3edba6f9c41b83d5ced1fe95"
+    },
+    "patch": {
+      "path": "/home/samuel/.cache/core-scheduler-tasks-next/rawtask.patch",
+      "sha256": "7437190d48ae3ea3a7522f2459eb285240b6030b8896c5552ad2dd5277e95883"
+    },
+    "runner": {
+      "path": "/home/samuel/.cache/core-scheduler-tasks-next/screen.py",
+      "sha256": "9e95b6fef53e4ff6f49e51cf03b3ac67dd49b6d3f2a91d0613d8c3f2a1453aaf"
+    },
+    "client": {
+      "path": "/home/samuel/.cache/core-scheduler-owner-wake-final/client",
+      "sha256": "db6c914ab75011477ec6232e681046b1e75532cbaa1c81663bac984591675cf3"
+    },
+    "helper": {
+      "path": "/home/samuel/.cache/core-scheduler-owner-wake-final/sample-runner.py",
+      "sha256": "31e6ad715214fcadfda358362100a21cb94cc41a79e23733191eb8e61b740909"
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "bytes": 64,
+  "connections": 32,
+  "payload_mib_per_second": 40.468058268229164,
+  "requests": 1989086,
+  "requests_per_second": 663028.6666666666,
+  "rtt_max_us": 3141.631,
+  "rtt_mean_us": 48.194514854561355,
+  "rtt_p50_us": 49.343,
+  "rtt_p95_us": 53.599,
+  "rtt_p99_us": 56.095,
+  "seconds": 3.0,
+  "warmup_seconds": 1.0,
+  "identifier": "poll-ready-tokio-w1-c32-b64-r2",
+  "mode": "poll-ready",
+  "backend": "tokio",
+  "workers": 1,
+  "repeat": 2,
+  "client_cpu": {
+    "user": 1.3729110000000002,
+    "system": 3.5225870000000015,
+    "voluntary_switches": 1516937,
+    "involuntary_switches": 771
+  },
+  "server_cpu": {
+    "user": 0.3054059999999996,
+    "system": 2.3049999999999997,
+    "voluntary_switches": 122,
+    "involuntary_switches": 43
+  },
+  "lifecycle_seconds": 4.003019695868716,
+  "variant": "poll-ready"
+}

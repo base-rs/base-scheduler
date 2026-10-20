@@ -1,4 +1,6 @@
-# Current comparison with pure Tokio
+# Owner-wake comparison with pure Tokio
+
+The [subsequent readiness comparison](readiness-performance.md) measures later changes. The figures below remain the historical owner-wake measurements.
 
 This comparison measures the native owner-wake improvements against pure Tokio and both Tokio adapter paths using the same frozen optimized server executable for all five backends. Production runtime source is `3af77be0f8b8a9303c8680a7f8aab49b1c3d304c`; server SHA-256 is `4b4a6dd7f90ee5549738abff476d94b7c52bd098c1f133811fff13fdf57b63ad`. The [raw report](results/socket-performance/owner-wake-vs-tokio/aiko.json) records its source/build provenance, fixed client, runner hashes, and all samples.
 

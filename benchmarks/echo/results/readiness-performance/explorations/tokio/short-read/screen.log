@@ -1,0 +1,20 @@
+baseline-tokio-adapter-poll-w1-c32-b64-r2 629842
+baseline-tokio-adapter-poll-w1-c32-b64-r3 624307
+short-read-tokio-adapter-w1-c32-b64-r3 638298
+short-read-tokio-adapter-w1-c32-b64-r2 648803
+short-read-tokio-w1-c32-b64-r3 698487
+baseline-tokio-adapter-w1-c32-b64-r2 609943
+short-read-tokio-w1-c32-b64-r2 702859
+short-read-tokio-adapter-poll-w1-c32-b64-r3 646905
+baseline-tokio-adapter-poll-w1-c32-b64-r1 623254
+short-read-tokio-w1-c32-b64-r1 696775
+short-read-tokio-adapter-poll-w1-c32-b64-r1 649896
+baseline-tokio-adapter-w1-c32-b64-r1 613642
+baseline-tokio-adapter-w1-c32-b64-r3 622468
+short-read-tokio-adapter-w1-c32-b64-r1 648106
+short-read-tokio-adapter-poll-w1-c32-b64-r2 645131
+baseline tokio-adapter 613642
+baseline tokio-adapter-poll 624307
+short-read tokio 698487
+short-read tokio-adapter 648106
+short-read tokio-adapter-poll 646905

@@ -18,7 +18,9 @@ The [Tokio admission-only comparison](tokio-admission-performance.md) measures r
 
 The [socket readiness comparison](socket-performance.md) measures reserved Tokio polling waiters and capacity/drain notification reductions with matching before/after benchmark code. It also links the rejected direct-ring interrupt experiments and io-event source review.
 
-The [current comparison with pure Tokio](tokio-comparison.md) measures the integrated owner-wake changes against pure Tokio and both adapter buffer paths using the same optimized executable for all five backends.
+The [owner-wake comparison with pure Tokio](tokio-comparison.md) measures the integrated owner-wake changes against pure Tokio and both adapter buffer paths using the same optimized executable for all five backends.
+
+The [current readiness and completion comparison](readiness-performance.md) measures cached Tokio readiness and cooperative io_uring task work with matched optimized before/after builds. It also records the rejected short-read shortcut and TCP urgent-data regression.
 
 Build and run the comparison on Linux:
 

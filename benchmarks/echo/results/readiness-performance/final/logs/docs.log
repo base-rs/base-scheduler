@@ -1,0 +1,51 @@
+    Checking core-scheduler v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-next-final)
+    Checking regex-automata v0.4.18
+    Checking log v0.4.34
+ Documenting core-scheduler v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-next-final)
+    Checking core-scheduler-timers v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-next-final/crates/timers)
+    Checking tokio v1.53.3
+ Documenting core-scheduler-timers v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-next-final/crates/timers)
+    Checking serde v1.0.229
+    Checking linkme v0.3.37
+    Checking zerofrom v0.1.8
+    Checking yoke v0.8.3
+    Checking rustls v0.23.46
+    Checking zerovec v0.11.8
+    Checking zerotrie v0.2.5
+    Checking core-scheduler-selector v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-next-final/crates/selector)
+ Documenting core-scheduler-selector v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-next-final/crates/selector)
+ Documenting core-scheduler-direct v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-next-final/crates/direct)
+ Documenting core-scheduler-conformance v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-next-final/crates/conformance)
+    Checking bake v0.20.0
+    Checking serde_yaml_ng v0.10.0
+    Checking bake-test v0.3.3
+    Checking tinystr v0.8.4
+    Checking potential_utf v0.1.6
+    Checking icu_collections v2.1.1
+    Checking icu_locale_core v2.1.1
+    Checking core-scheduler-iouring v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-next-final/crates/iouring)
+    Checking core-scheduler-native v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-next-final/crates/native)
+ Documenting core-scheduler-native v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-next-final/crates/native)
+ Documenting core-scheduler-iouring v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-next-final/crates/iouring)
+    Checking icu_provider v2.1.1
+    Checking icu_properties v2.1.2
+    Checking icu_normalizer v2.1.1
+    Checking regex v1.13.1
+    Checking core-markdown v0.1.0
+    Checking idna_adapter v1.2.1
+    Checking idna v1.1.0
+    Checking url v2.5.8
+    Checking ureq v2.12.1
+    Checking core-scheduler-tokio v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-next-final/crates/tokio)
+ Documenting core-scheduler-tokio v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-next-final/crates/tokio)
+    Checking bake-releases v0.3.5
+    Checking bake-license v0.2.3
+    Checking bake-markdown v0.4.0
+    Checking bake-agent-context v0.4.0
+    Checking bake-readme v0.2.5
+    Checking bake-cargo v0.5.1
+ Documenting core-scheduler-echo-benchmark v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-next-final/benchmarks/echo)
+    Checking core-project v0.2.0
+ Documenting core-scheduler-bake v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-next-final/bake)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.53s
+   Generated /home/samuel/.cache/core-scheduler-next-final-coverage/build/doc/core_scheduler/index.html and 9 other files

@@ -1,0 +1,98 @@
+[
+  {
+    "candidate": "completion",
+    "workers": 1,
+    "connections": 32,
+    "baseline_median": 566142.6666666666,
+    "candidate_median": 572647.3333333334,
+    "percent": 1.148944788946027,
+    "baseline_range": [
+      562287.6666666666,
+      567408.3333333334
+    ],
+    "candidate_range": [
+      571324.3333333334,
+      575151.6666666666
+    ]
+  },
+  {
+    "candidate": "completion",
+    "workers": 4,
+    "connections": 128,
+    "baseline_median": 1959167.3333333333,
+    "candidate_median": 1987163.0,
+    "percent": 1.4289574040127873,
+    "baseline_range": [
+      1946122.0,
+      1961101.6666666667
+    ],
+    "candidate_range": [
+      1968753.3333333333,
+      1987987.6666666667
+    ]
+  },
+  {
+    "candidate": "route",
+    "workers": 1,
+    "connections": 1,
+    "baseline_median": 229742.33333333334,
+    "candidate_median": 225198.0,
+    "percent": -1.9780130494017278,
+    "baseline_range": [
+      220139.33333333334,
+      230259.0
+    ],
+    "candidate_range": [
+      220008.66666666666,
+      226548.66666666666
+    ]
+  },
+  {
+    "candidate": "route",
+    "workers": 1,
+    "connections": 32,
+    "baseline_median": 564979.6666666666,
+    "candidate_median": 566948.3333333334,
+    "percent": 0.34844911822786706,
+    "baseline_range": [
+      563442.6666666666,
+      566319.0
+    ],
+    "candidate_range": [
+      563312.0,
+      568502.0
+    ]
+  },
+  {
+    "candidate": "worker",
+    "workers": 1,
+    "connections": 1,
+    "baseline_median": 228476.0,
+    "candidate_median": 220037.33333333334,
+    "percent": -3.6934586856679275,
+    "baseline_range": [
+      223067.66666666666,
+      230286.0
+    ],
+    "candidate_range": [
+      211425.0,
+      225272.66666666666
+    ]
+  },
+  {
+    "candidate": "worker",
+    "workers": 1,
+    "connections": 32,
+    "baseline_median": 566309.0,
+    "candidate_median": 567577.0,
+    "percent": 0.22390603010018495,
+    "baseline_range": [
+      560771.3333333334,
+      570761.0
+    ],
+    "candidate_range": [
+      567332.3333333334,
+      569060.0
+    ]
+  }
+]

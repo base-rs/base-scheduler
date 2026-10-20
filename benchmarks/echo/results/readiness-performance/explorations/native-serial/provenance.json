@@ -1,0 +1,65 @@
+{
+  "base": "427be5d2ef6c610a5d5de5b10570c938b65d6c2d",
+  "selected_source": "958ac6cf9862fdce2fc8de18c8864c4f971b6abc",
+  "candidate_delta": "Remove only setup_coop_taskrun and setup_taskrun_flag from the replacement-ring builder; retain started tracking and original replacement lifecycle.",
+  "source_patch": {
+    "path": "/home/samuel/.cache/core-scheduler-native-serial-next/selected-source.patch",
+    "sha256": "ef1452680548b8b86af0e00b0c491248b54e9591cc4bcab959333d6b04b33abe"
+  },
+  "candidate_patch": {
+    "path": "/home/samuel/.cache/core-scheduler-native-serial-next/no-coop-source.patch",
+    "sha256": "24b6e0f526ad8c2b275d158768374fa83b6b0b82f68c2a28fcbb87ed5e0bf864"
+  },
+  "disabled_flags_patch": {
+    "path": "/home/samuel/.cache/core-scheduler-native-serial-next/disabled-flags.patch",
+    "sha256": "7cab02ebab2a5088e44f179fff84f6056e8a35264e5d9106674baa9ca0b4f0be"
+  },
+  "candidate_selector_source_sha256": "718ec998126660fc85d5316ce4acc9fbb78bf6a7cc9652cb5c27ffa651c98581",
+  "selected_selector_source_sha256": "d2ab0f88004613a47dc0c243616e3679a9951cca8f83bccb4de8d45a782d03de",
+  "binaries": {
+    "before": {
+      "path": "/home/samuel/.cache/core-scheduler-next-final/before",
+      "sha256": "433d0b95e121c9004fb04125a576dbd1a94e4ad2890cfdfb86a161d903fa1d18"
+    },
+    "selected": {
+      "path": "/home/samuel/.cache/core-scheduler-next-final/after",
+      "sha256": "ffdc990a73117213078535040762d38a2e45ffb1789b8d60cddad582eb7d1bde"
+    },
+    "no-coop": {
+      "path": "/home/samuel/.cache/core-scheduler-native-serial-next/no-coop",
+      "sha256": "f03c66b4a628f57b097b4cb596926647af8cddee49ed4abe6b13dfb52cd481d8"
+    }
+  },
+  "runner": {
+    "path": "/home/samuel/.cache/core-scheduler-native-serial-next/run.py",
+    "sha256": "4dcb2f95087cc39998803fa7f3555512059b42991af3972679633ec7204205e2"
+  },
+  "helper": {
+    "path": "/home/samuel/.cache/core-scheduler-native-serial-next/sample-runner.py",
+    "sha256": "31e6ad715214fcadfda358362100a21cb94cc41a79e23733191eb8e61b740909"
+  },
+  "client": {
+    "path": "/home/samuel/.cache/core-scheduler-owner-wake-final/client",
+    "sha256": "db6c914ab75011477ec6232e681046b1e75532cbaa1c81663bac984591675cf3"
+  },
+  "cargo_lock": {
+    "path": "/home/samuel/Developer/core-rs/core-scheduler-native-serial-next/Cargo.lock",
+    "sha256": "21c665672062545c4801bfaf434aa5d2195673890cd920c05d81630847754644"
+  },
+  "build_command": "CARGO_TARGET_DIR=/home/samuel/.cache/core-scheduler-native-serial-next/target cargo build --release --locked -p core-scheduler-echo-benchmark",
+  "profile": "Default optimized Cargo release; no release-profile, RUSTFLAGS, LTO, target-cpu, or dependency changes.",
+  "build_environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "CARGO_PROFILE_RELEASE_DEBUG": null,
+    "CARGO_PROFILE_RELEASE_OPT_LEVEL": null,
+    "CARGO_PROFILE_RELEASE_LTO": null,
+    "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": null
+  },
+  "rustc": "rustc 1.99.0 (b940084d7 2026-09-28) (Arch Linux rust 1:1.99.0-1)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.0\nLLVM version: 23.1.1",
+  "cargo": "cargo 1.99.0 (5f94df478 2026-08-27) (Arch Linux rust 1:1.99.0-1)",
+  "machine": "Linux aiko 7.2.6-arch2-1 #1 SMP PREEMPT_DYNAMIC Mon, 14 Sep 2026 22:41:30 +0000 x86_64 GNU/Linux",
+  "topology": "CPU CORE SOCKET NODE L1d:L1i:L2:L3\n  0    0      0    0 0:0:0:0\n  1    1      0    0 1:1:1:0\n  2    2      0    0 2:2:2:0\n  3    3      0    0 3:3:3:0\n  4    4      0    0 4:4:4:0\n  5    5      0    0 5:5:5:0\n  6    6      0    0 6:6:6:0\n  7    7      0    0 7:7:7:0\n  8    8      0    0 8:8:8:1\n  9    9      0    0 9:9:9:1\n 10   10      0    0 10:10:10:1\n 11   11      0    0 11:11:11:1\n 12   12      0    0 12:12:12:1\n 13   13      0    0 13:13:13:1\n 14   14      0    0 14:14:14:1\n 15   15      0    0 15:15:15:1\n 16    0      0    0 0:0:0:0\n 17    1      0    0 1:1:1:0\n 18    2      0    0 2:2:2:0\n 19    3      0    0 3:3:3:0\n 20    4      0    0 4:4:4:0\n 21    5      0    0 5:5:5:0\n 22    6      0    0 6:6:6:0\n 23    7      0    0 7:7:7:0\n 24    8      0    0 8:8:8:1\n 25    9      0    0 9:9:9:1\n 26   10      0    0 10:10:10:1\n 27   11      0    0 11:11:11:1\n 28   12      0    0 12:12:12:1\n 29   13      0    0 13:13:13:1\n 30   14      0    0 14:14:14:1\n 31   15      0    0 15:15:15:1",
+  "timing_lock": "Exclusive /tmp/core-scheduler-perf.lock; builds use shared mode.",
+  "scope": "Borrowed iouring-poll server, one worker, one TCP connection,64-byte validated payload; five randomized repetitions for each binary,1s warmup3s measurement; serverCPU0,clientCPUs4-7,four client workers."
+}

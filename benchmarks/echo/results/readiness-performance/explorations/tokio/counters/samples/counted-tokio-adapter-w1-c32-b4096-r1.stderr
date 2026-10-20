@@ -1,0 +1,2 @@
+SOCKET_COUNTERS {"first_read_ok":43,"first_read_wouldblock":2213904,"retry_read_ok":2213904,"retry_read_wouldblock":2213863,"first_write_ok":2213915,"first_write_wouldblock":0,"retry_write_ok":0,"retry_write_wouldblock":0}
+SOCKET_COUNTERS {"first_read_ok":1,"first_read_wouldblock":31,"retry_read_ok":31,"retry_read_wouldblock":30,"first_write_ok":0,"first_write_wouldblock":0,"retry_write_ok":0,"retry_write_wouldblock":0}

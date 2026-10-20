@@ -1,0 +1,165 @@
+diff --git a/crates/tokio/src/socket_operations.rs b/crates/tokio/src/socket_operations.rs
+index c447746..acac713 100644
+--- a/crates/tokio/src/socket_operations.rs
++++ b/crates/tokio/src/socket_operations.rs
+@@ -14,12 +14,25 @@ use std::{io, net::Shutdown};
+ impl TokioScheduler {
+     // All payload access happens synchronously inside the readiness callback. Pending futures retain their owners; the reactor retains no payload pointers.
+     async fn socket_operation<Input: Send, Output: Send>(
++        &self,
++        socket: &TokioSocket,
++        input: Input,
++        cancellation: &Cancellation,
++        interest: Interest,
++        operation: impl FnMut(&Socket, &mut Input) -> io::Result<Output> + Send,
++    ) -> (OperationResult<Output>, Input) {
++        self.socket_operation_with(socket, input, cancellation, interest, operation, |_| false)
++            .await
++    }
++
++    async fn socket_operation_with<Input: Send, Output: Send>(
+         &self,
+         socket: &TokioSocket,
+         mut input: Input,
+         cancellation: &Cancellation,
+         interest: Interest,
+         mut operation: impl FnMut(&Socket, &mut Input) -> io::Result<Output> + Send,
++        clear_read_ready: impl Fn(&Output) -> bool + Send,
+     ) -> (OperationResult<Output>, Input) {
+         use std::{
+             future::{Future, poll_fn},
+@@ -29,7 +42,11 @@ impl TokioScheduler {
+         let result = async {
+             cancellation.check()?;
+             self.check_socket(socket)?;
+-            let mut operation = pin!(socket.io(interest, |socket| operation(socket, &mut input)));
++            let mut operation = pin!(socket.io_with(
++                interest,
++                |socket| operation(socket, &mut input),
++                clear_read_ready
++            ));
+             let mut cancelled = pin!(cancellation.cancelled());
+             poll_fn(|context| {
+                 match operation.as_mut().poll(context) {
+@@ -159,15 +176,17 @@ impl SocketRead for TokioScheduler {
+     async fn socket_read<B: IoBufMut>(
+         &self,
+         socket: &TokioSocket,
+-        buffer: B,
++        mut buffer: B,
+         cancellation: &Cancellation,
+     ) -> BufferResult<B> {
+-        self.socket_operation(
++        let length = buffer.as_mut().len();
++        self.socket_operation_with(
+             socket,
+             buffer,
+             cancellation,
+             Interest::Readable,
+             |socket, buffer| socket_io::recv(socket, buffer.as_mut()),
++            move |count| 0 < *count && *count < length,
+         )
+         .await
+     }
+@@ -199,12 +218,14 @@ impl SocketRecvPoll for TokioScheduler {
+         flags: SocketRecvFlags,
+         cancellation: &Cancellation,
+     ) -> OperationResult<usize> {
+-        self.socket_operation(
++        let length = buffer.len();
++        self.socket_operation_with(
+             socket,
+             buffer,
+             cancellation,
+             Interest::Readable,
+             |socket, buffer| socket_io::recv_poll(socket, buffer, flags),
++            move |count| !flags.peek && 0 < *count && *count < length,
+         )
+         .await
+         .0
+diff --git a/crates/tokio/src/tokio_socket.rs b/crates/tokio/src/tokio_socket.rs
+index a2635d7..25007ba 100644
+--- a/crates/tokio/src/tokio_socket.rs
++++ b/crates/tokio/src/tokio_socket.rs
+@@ -12,6 +12,7 @@ use tokio::runtime::{Handle, Id};
+ pub(crate) struct RegisteredSocket {
+     socket: Arc<socket2::Socket>,
+     runtime: Handle,
++    stream: bool,
+     read_waiting: AtomicBool,
+     write_waiting: AtomicBool,
+     registration: tokio::sync::OnceCell<tokio::io::unix::AsyncFd<Arc<socket2::Socket>>>,
+@@ -20,8 +21,12 @@ pub(crate) struct RegisteredSocket {
+ #[cfg(unix)]
+ impl RegisteredSocket {
+     fn new(runtime: &Handle, socket: socket2::Socket) -> Self {
++        let stream = socket
++            .r#type()
++            .is_ok_and(|kind| kind == socket2::Type::STREAM);
+         Self {
+             socket: Arc::new(socket),
++            stream,
+             runtime: runtime.clone(),
+             read_waiting: AtomicBool::new(false),
+             write_waiting: AtomicBool::new(false),
+@@ -146,13 +151,31 @@ impl TokioSocket {
+     }
+ 
+     pub(super) async fn io<Output, Operation>(
++        &self,
++        interest: Interest,
++        operation: Operation,
++    ) -> io::Result<Output>
++    where
++        Operation: FnMut(&socket2::Socket) -> io::Result<Output> + Send,
++    {
++        self.io_with(interest, operation, |_| false).await
++    }
++
++    pub(super) async fn io_with<Output, Operation>(
+         &self,
+         interest: Interest,
+         mut operation: Operation,
++        clear_read_ready: impl Fn(&Output) -> bool + Send,
+     ) -> io::Result<Output>
+     where
+         Operation: FnMut(&socket2::Socket) -> io::Result<Output> + Send,
+     {
++        #[cfg(unix)]
++        let clear_read_ready = |result: &Output| {
++            cfg!(target_os = "linux") && self.inner.stream && clear_read_ready(result)
++        };
++        #[cfg(windows)]
++        let _ = clear_read_ready;
+         // Try every operation before gating on readiness: lifecycle calls, invalid arguments, and state errors can complete even when a previous operation cleared the cached readiness.
+         let result = operation(self.get_ref());
+         if !matches!(&result, Err(error) if error.kind() == io::ErrorKind::WouldBlock) {
+@@ -179,9 +202,15 @@ impl TokioSocket {
+                 .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+                 .is_err()
+             {
+-                return registration
+-                    .async_io(interest, |_| operation(self.inner.get_ref()))
+-                    .await;
++                loop {
++                    let mut ready = registration.ready(interest).await?;
++                    if let Ok(result) = ready.try_io(|_| operation(self.inner.get_ref())) {
++                        if result.as_ref().is_ok_and(&clear_read_ready) {
++                            ready.clear_ready_matching(tokio::io::Ready::READABLE);
++                        }
++                        return result;
++                    }
++                }
+             }
+             let _waiter = PollWaiter(waiting);
+             std::future::poll_fn(|context| {
+@@ -193,6 +222,9 @@ impl TokioSocket {
+                             registration.poll_write_ready(context)
+                         })?;
+                     if let Ok(result) = ready.try_io(|_| operation(self.inner.get_ref())) {
++                        if result.as_ref().is_ok_and(&clear_read_ready) {
++                            ready.clear_ready_matching(tokio::io::Ready::READABLE);
++                        }
+                         return std::task::Poll::Ready(result);
+                     }
+                 }

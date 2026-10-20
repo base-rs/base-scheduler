@@ -1,0 +1,22 @@
+Waiting for exclusive benchmark lock.
+1 12 poll-first iouring 4 128 64 2 1974806
+2 12 poll-first iouring 4 128 64 1 1976769
+3 12 poll-first iouring 1 32 64 1 570914
+4 12 before iouring 1 32 64 2 624168
+5 12 before iouring 1 32 64 1 625442
+6 12 before iouring 4 128 64 1 1969697
+7 12 poll-first iouring 1 1 64 1 233074
+8 12 poll-first iouring 1 32 64 2 577153
+9 12 before iouring 1 1 64 1 233805
+10 12 poll-first iouring 1 1 64 2 234001
+11 12 before iouring 1 1 64 2 231293
+12 12 before iouring 4 128 64 2 1977632
+RESULT 1 1 64
+before iouring median 232549 range 231293 233805
+poll-first iouring median 233537 range 233074 234001
+RESULT 1 32 64
+before iouring median 624805 range 624168 625442
+poll-first iouring median 574034 range 570914 577153
+RESULT 4 128 64
+before iouring median 1973664 range 1969697 1977632
+poll-first iouring median 1975787 range 1974806 1976769

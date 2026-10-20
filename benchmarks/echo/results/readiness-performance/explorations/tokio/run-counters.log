@@ -1,0 +1,4 @@
+tokio-adapter 64 {'first_read_ok': 43, 'first_read_wouldblock': 2443306, 'retry_read_ok': 2443306, 'retry_read_wouldblock': 2443265, 'first_write_ok': 2443285, 'first_write_wouldblock': 0, 'retry_write_ok': 0, 'retry_write_wouldblock': 0}
+tokio-adapter-poll 64 {'first_read_ok': 62, 'first_read_wouldblock': 2475443, 'retry_read_ok': 2475443, 'retry_read_wouldblock': 2475397, 'first_write_ok': 2475441, 'first_write_wouldblock': 0, 'retry_write_ok': 0, 'retry_write_wouldblock': 0}
+tokio-adapter 4096 {'first_read_ok': 44, 'first_read_wouldblock': 2213935, 'retry_read_ok': 2213935, 'retry_read_wouldblock': 2213893, 'first_write_ok': 2213915, 'first_write_wouldblock': 0, 'retry_write_ok': 0, 'retry_write_wouldblock': 0}
+tokio-adapter-poll 4096 {'first_read_ok': 32, 'first_read_wouldblock': 2218141, 'retry_read_ok': 2218141, 'retry_read_wouldblock': 2218094, 'first_write_ok': 2218109, 'first_write_wouldblock': 0, 'retry_write_ok': 0, 'retry_write_wouldblock': 0}

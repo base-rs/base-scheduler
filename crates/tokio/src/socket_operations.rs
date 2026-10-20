@@ -16,10 +16,23 @@ impl TokioScheduler {
     async fn socket_operation<Input: Send, Output: Send>(
         &self,
         socket: &TokioSocket,
+        input: Input,
+        cancellation: &Cancellation,
+        interest: Interest,
+        operation: impl FnMut(&Socket, &mut Input) -> io::Result<Output> + Send,
+    ) -> (OperationResult<Output>, Input) {
+        self.socket_operation_with(socket, input, cancellation, interest, operation, false)
+            .await
+    }
+
+    async fn socket_operation_with<Input: Send, Output: Send>(
+        &self,
+        socket: &TokioSocket,
         mut input: Input,
         cancellation: &Cancellation,
         interest: Interest,
         mut operation: impl FnMut(&Socket, &mut Input) -> io::Result<Output> + Send,
+        read_nonempty: bool,
     ) -> (OperationResult<Output>, Input) {
         use std::{
             future::{Future, poll_fn},
@@ -29,7 +42,11 @@ impl TokioScheduler {
         let result = async {
             cancellation.check()?;
             self.check_socket(socket)?;
-            let mut operation = pin!(socket.io(interest, |socket| operation(socket, &mut input)));
+            let mut operation = pin!(socket.io_with(
+                interest,
+                |socket| operation(socket, &mut input),
+                read_nonempty
+            ));
             let mut cancelled = pin!(cancellation.cancelled());
             poll_fn(|context| {
                 match operation.as_mut().poll(context) {
@@ -159,15 +176,17 @@ impl SocketRead for TokioScheduler {
     async fn socket_read<B: IoBufMut>(
         &self,
         socket: &TokioSocket,
-        buffer: B,
+        mut buffer: B,
         cancellation: &Cancellation,
     ) -> BufferResult<B> {
-        self.socket_operation(
+        let length = buffer.as_mut().len();
+        self.socket_operation_with(
             socket,
             buffer,
             cancellation,
             Interest::Readable,
             |socket, buffer| socket_io::recv(socket, buffer.as_mut()),
+            length > 0,
         )
         .await
     }
@@ -199,12 +218,14 @@ impl SocketRecvPoll for TokioScheduler {
         flags: SocketRecvFlags,
         cancellation: &Cancellation,
     ) -> OperationResult<usize> {
-        self.socket_operation(
+        let length = buffer.len();
+        self.socket_operation_with(
             socket,
             buffer,
             cancellation,
             Interest::Readable,
             |socket, buffer| socket_io::recv_poll(socket, buffer, flags),
+            length > 0,
         )
         .await
         .0

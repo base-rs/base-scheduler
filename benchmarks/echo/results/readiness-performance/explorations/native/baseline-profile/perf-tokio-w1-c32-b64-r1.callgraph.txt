@@ -1,0 +1,319 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 5K of event 'cycles:u'
+# Event count (approx.): 2836605126
+#
+# Children      Self  Symbol                                                                                                                                                                                                                    IPC   [IPC Coverage]
+# ........  ........  ........................................................................................................................................................................................................................  ....................
+#
+    24.50%     0.00%  [.] 0x00007f79346a08f2                                                                                                                                                                                                    -      -            
+            |          
+            |--12.83%--0xffffffff9de0012f
+            |          |          
+            |           --11.10%--0xffffffff9f389afa
+            |                     |          
+            |                     |--5.74%--0xffffffff9f06ed64
+            |                     |          |          
+            |                     |           --3.69%--0xffffffff9f06ebbe
+            |                     |                     |          
+            |                     |                      --2.92%--0xffffffff9e60c656
+            |                     |          
+            |                      --4.21%--0xffffffff9f06f034
+            |                                |          
+            |                                 --3.04%--0xffffffff9f06ef2b
+            |                                           |          
+            |                                            --2.28%--0xffffffff9e60c656
+            |          
+             --10.17%--0xffffffff9de00080
+
+    16.34%    16.34%  [.] <tokio::runtime::io::scheduled_io::ScheduledIo>::poll_readiness                                                                                                                                                       -      -            
+            |          
+            |--12.40%--<tokio::runtime::io::scheduled_io::ScheduledIo>::poll_readiness
+            |          
+             --3.94%--0x7f797e012d57
+                       <tokio::runtime::io::scheduled_io::ScheduledIo>::poll_readiness
+
+    12.83%     0.00%  [.] 0xffffffff9de0012f                                                                                                                                                                                                    -      -            
+            |          
+             --11.10%--0xffffffff9f389afa
+                       |          
+                       |--5.74%--0xffffffff9f06ed64
+                       |          |          
+                       |           --3.69%--0xffffffff9f06ebbe
+                       |                     |          
+                       |                      --2.92%--0xffffffff9e60c656
+                       |          
+                        --4.21%--0xffffffff9f06f034
+                                  |          
+                                   --3.04%--0xffffffff9f06ef2b
+                                             |          
+                                              --2.28%--0xffffffff9e60c656
+
+    11.10%     0.00%  [.] 0xffffffff9f389afa                                                                                                                                                                                                    -      -            
+            |          
+            |--5.74%--0xffffffff9f06ed64
+            |          |          
+            |           --3.69%--0xffffffff9f06ebbe
+            |                     |          
+            |                      --2.92%--0xffffffff9e60c656
+            |          
+             --4.21%--0xffffffff9f06f034
+                       |          
+                        --3.04%--0xffffffff9f06ef2b
+                                  |          
+                                   --2.28%--0xffffffff9e60c656
+
+    10.52%     7.88%  [.] <tokio::runtime::scheduler::multi_thread::worker::Context>::run                                                                                                                                                       -      -            
+            |          
+             --10.02%--<tokio::runtime::scheduler::multi_thread::worker::Context>::run
+                       |          
+                        --1.22%--<std::sys::pal::unix::time::Timespec>::now
+                                  |          
+                                   --1.16%--clock_gettime
+
+    10.17%    10.17%  [k] 0xffffffff9de00080                                                                                                                                                                                                    -      -            
+            |          
+             --9.87%--0x7f79346a08f2
+                       0xffffffff9de00080
+
+     9.45%     9.42%  [.] tokio::runtime::task::waker::wake_by_val                                                                                                                                                                              -      -            
+     8.82%     2.99%  [.] <tokio::net::tcp::stream::TcpStream>::poll_read_priv                                                                                                                                                                  -      -            
+            |          
+            |--5.83%--<tokio::net::tcp::stream::TcpStream>::poll_read_priv
+            |          <&mio::net::tcp::stream::TcpStream as alloc::io::read::Read>::read
+            |          |          
+            |           --5.82%--<&std::net::tcp::TcpStream as alloc::io::read::Read>::read
+            |                     |          
+            |                      --5.76%--recv
+            |                                |          
+            |                                 --5.61%--0x7f79346a08f2
+            |                                           |          
+            |                                            --5.53%--0xffffffff9de0012f
+            |                                                      |          
+            |                                                       --4.45%--0xffffffff9f389afa
+            |                                                                 |          
+            |                                                                  --4.21%--0xffffffff9f06f034
+            |                                                                            |          
+            |                                                                             --3.04%--0xffffffff9f06ef2b
+            |                                                                                       |          
+            |                                                                                        --2.28%--0xffffffff9e60c656
+            |          
+             --2.97%--0xffff
+                       <tokio::net::tcp::stream::TcpStream>::poll_read_priv
+
+     8.80%     0.00%  [k] 0x000000000000ffff                                                                                                                                                                                                    -      -            
+            |
+            ---<tokio::net::tcp::stream::TcpStream>::poll_read_priv
+               |          
+                --5.83%--<&mio::net::tcp::stream::TcpStream as alloc::io::read::Read>::read
+                          |          
+                           --5.82%--<&std::net::tcp::TcpStream as alloc::io::read::Read>::read
+                                     |          
+                                      --5.76%--recv
+                                                |          
+                                                 --5.61%--0x7f79346a08f2
+                                                           |          
+                                                            --5.53%--0xffffffff9de0012f
+                                                                      |          
+                                                                       --4.45%--0xffffffff9f389afa
+                                                                                 |          
+                                                                                  --4.21%--0xffffffff9f06f034
+                                                                                            |          
+                                                                                             --3.04%--0xffffffff9f06ef2b
+                                                                                                       |          
+                                                                                                        --2.28%--0xffffffff9e60c656
+
+     7.35%     0.00%  [.] <&mio::net::tcp::stream::TcpStream as core::io::write::Write>::write                                                                                                                                                  -      -            
+            |
+            ---<&std::os::unix::net::stream::UnixStream as core::io::write::Write>::write
+               send
+               |          
+                --7.24%--0x7f79346a08f2
+                          |          
+                           --7.12%--0xffffffff9de0012f
+                                     |          
+                                      --6.47%--0xffffffff9f389afa
+                                                |          
+                                                 --5.74%--0xffffffff9f06ed64
+                                                           |          
+                                                            --3.69%--0xffffffff9f06ebbe
+                                                                      |          
+                                                                       --2.92%--0xffffffff9e60c656
+
+     7.35%     0.00%  [.] <&std::os::unix::net::stream::UnixStream as core::io::write::Write>::write                                                                                                                                            -      -            
+            |
+            ---send
+               |          
+                --7.24%--0x7f79346a08f2
+                          |          
+                           --7.12%--0xffffffff9de0012f
+                                     |          
+                                      --6.47%--0xffffffff9f389afa
+                                                |          
+                                                 --5.74%--0xffffffff9f06ed64
+                                                           |          
+                                                            --3.69%--0xffffffff9f06ebbe
+                                                                      |          
+                                                                       --2.92%--0xffffffff9e60c656
+
+     7.35%     0.07%  [.] send                                                                                                                                                                                                                  -      -            
+            |          
+             --7.29%--send
+                       |          
+                        --7.24%--0x7f79346a08f2
+                                  |          
+                                   --7.12%--0xffffffff9de0012f
+                                             |          
+                                              --6.47%--0xffffffff9f389afa
+                                                        |          
+                                                         --5.74%--0xffffffff9f06ed64
+                                                                   |          
+                                                                    --3.69%--0xffffffff9f06ebbe
+                                                                              |          
+                                                                               --2.92%--0xffffffff9e60c656
+
+     6.38%     6.38%  [.] <tokio::runtime::io::scheduled_io::ScheduledIo>::wake                                                                                                                                                                 -      -            
+     6.08%     6.08%  [.] <tokio::runtime::task::state::State>::transition_to_idle                                                                                                                                                              -      -            
+            |          
+             --5.90%--0xc7
+                       <tokio::runtime::task::state::State>::transition_to_idle
+
+     5.90%     0.00%  [.] 0x00000000000000c7                                                                                                                                                                                                    -      -            
+            |
+            ---<tokio::runtime::task::state::State>::transition_to_idle
+
+     5.85%     0.03%  [.] <&mio::net::tcp::stream::TcpStream as alloc::io::read::Read>::read                                                                                                                                                    -      -            
+            |          
+             --5.83%--<&mio::net::tcp::stream::TcpStream as alloc::io::read::Read>::read
+                       |          
+                        --5.82%--<&std::net::tcp::TcpStream as alloc::io::read::Read>::read
+                                  |          
+                                   --5.76%--recv
+                                             |          
+                                              --5.61%--0x7f79346a08f2
+                                                        |          
+                                                         --5.53%--0xffffffff9de0012f
+                                                                   |          
+                                                                    --4.45%--0xffffffff9f389afa
+                                                                              |          
+                                                                               --4.21%--0xffffffff9f06f034
+                                                                                         |          
+                                                                                          --3.04%--0xffffffff9f06ef2b
+                                                                                                    |          
+                                                                                                     --2.28%--0xffffffff9e60c656
+
+     5.84%     0.08%  [.] <&std::net::tcp::TcpStream as alloc::io::read::Read>::read                                                                                                                                                            -      -            
+            |          
+             --5.79%--<&std::net::tcp::TcpStream as alloc::io::read::Read>::read
+                       |          
+                        --5.76%--recv
+                                  |          
+                                   --5.61%--0x7f79346a08f2
+                                             |          
+                                              --5.53%--0xffffffff9de0012f
+                                                        |          
+                                                         --4.45%--0xffffffff9f389afa
+                                                                   |          
+                                                                    --4.21%--0xffffffff9f06f034
+                                                                              |          
+                                                                               --3.04%--0xffffffff9f06ef2b
+                                                                                         |          
+                                                                                          --2.28%--0xffffffff9e60c656
+
+     5.76%     0.10%  [.] recv                                                                                                                                                                                                                  -      -            
+            |          
+             --5.66%--recv
+                       |          
+                        --5.61%--0x7f79346a08f2
+                                  |          
+                                   --5.53%--0xffffffff9de0012f
+                                             |          
+                                              --4.45%--0xffffffff9f389afa
+                                                        |          
+                                                         --4.21%--0xffffffff9f06f034
+                                                                   |          
+                                                                    --3.04%--0xffffffff9f06ef2b
+                                                                              |          
+                                                                               --2.28%--0xffffffff9e60c656
+
+     5.74%     0.00%  [.] 0xffffffff9f06ed64                                                                                                                                                                                                    -      -            
+            |          
+             --3.69%--0xffffffff9f06ebbe
+                       |          
+                        --2.92%--0xffffffff9e60c656
+
+     5.25%     5.25%  [k] 0xffffffff9e60c656                                                                                                                                                                                                    -      -            
+            |          
+            |--2.92%--<&mio::net::tcp::stream::TcpStream as core::io::write::Write>::write
+            |          <&std::os::unix::net::stream::UnixStream as core::io::write::Write>::write
+            |          send
+            |          0x7f79346a08f2
+            |          0xffffffff9de0012f
+            |          0xffffffff9f389afa
+            |          0xffffffff9f06ed64
+            |          0xffffffff9f06ebbe
+            |          0xffffffff9e60c656
+            |          
+             --2.28%--0xffff
+                       <tokio::net::tcp::stream::TcpStream>::poll_read_priv
+                       <&mio::net::tcp::stream::TcpStream as alloc::io::read::Read>::read
+                       <&std::net::tcp::TcpStream as alloc::io::read::Read>::read
+                       recv
+                       0x7f79346a08f2
+                       0xffffffff9de0012f
+                       0xffffffff9f389afa
+                       0xffffffff9f06f034
+                       0xffffffff9f06ef2b
+                       0xffffffff9e60c656
+
+     5.09%     5.09%  [.] <tokio::runtime::task::state::State>::transition_to_running                                                                                                                                                           -      -            
+            |          
+             --4.75%--<tokio::runtime::task::state::State>::transition_to_running
+
+     4.68%     4.43%  [.] <tokio::runtime::io::driver::Driver>::turn                                                                                                                                                                            -      -            
+     4.21%     0.00%  [.] 0xffffffff9f06f034                                                                                                                                                                                                    -      -            
+            |          
+             --3.04%--0xffffffff9f06ef2b
+                       |          
+                        --2.28%--0xffffffff9e60c656
+
+     4.05%     4.02%  [.] tokio::runtime::task::waker::clone_waker                                                                                                                                                                              -      -            
+     3.99%     0.00%  [.] 0x00007f797e012d57                                                                                                                                                                                                    -      -            
+            |          
+             --3.94%--<tokio::runtime::io::scheduled_io::ScheduledIo>::poll_readiness
+
+     3.97%     3.97%  [.] <tokio::runtime::task::state::State>::transition_to_notified_by_val                                                                                                                                                   -      -            
+     3.69%     0.00%  [.] 0xffffffff9f06ebbe                                                                                                                                                                                                    -      -            
+            |          
+             --2.92%--0xffffffff9e60c656
+
+     3.04%     0.00%  [.] 0xffffffff9f06ef2b                                                                                                                                                                                                    -      -            
+            |          
+             --2.28%--0xffffffff9e60c656
+
+     1.85%     0.09%  [.] <std::sys::pal::unix::time::Timespec>::now                                                                                                                                                                            -      -            
+            |          
+             --1.76%--<std::sys::pal::unix::time::Timespec>::now
+                       clock_gettime
+                       |          
+                        --1.47%--__vdso_clock_gettime
+
+     1.76%     0.29%  [.] clock_gettime                                                                                                                                                                                                         -      -            
+            |          
+             --1.47%--clock_gettime
+                       __vdso_clock_gettime
+
+     1.47%     1.47%  [.] __vdso_clock_gettime                                                                                                                                                                                                  -      -            
+            |          
+             --1.22%--<tokio::runtime::scheduler::multi_thread::worker::Context>::run
+
+     1.21%     1.21%  [.] <tokio::runtime::time::handle::Handle>::process_at_time                                                                                                                                                               -      -            
+     1.17%     0.00%  [.] 0x0000563e00010000                                                                                                                                                                                                    -      -            
+
+
+#
+# (Tip: Print event counts in machine readable CSV format with: perf stat -x\;)
+#

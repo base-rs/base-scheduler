@@ -1,0 +1,40 @@
+Waiting for exclusive benchmark lock.
+1 24 after iouring 4 128 64 1 1961713
+2 24 before iouring 4 128 64 1 1977878
+3 24 after iouring 1 32 64 2 592266
+4 24 after iouring 1 32 64 1 588642
+5 24 before tokio 4 128 64 1 2128477
+6 24 before iouring 1 32 64 2 620081
+7 24 after tokio 4 128 64 1 2113478
+8 24 before iouring 1 32 64 1 630283
+9 24 after tokio 1 1 64 1 273925
+10 24 after tokio 4 128 64 2 2105303
+11 24 after tokio 1 1 64 2 268804
+12 24 after iouring 1 1 64 1 209664
+13 24 before tokio 4 128 64 2 2109316
+14 24 before iouring 4 128 64 2 1972306
+15 24 before tokio 1 1 64 1 267127
+16 24 after iouring 1 1 64 2 217834
+17 24 before tokio 1 32 64 1 703790
+18 24 after tokio 1 32 64 1 697008
+19 24 before tokio 1 32 64 2 698031
+20 24 after tokio 1 32 64 2 697563
+21 24 before iouring 1 1 64 1 236831
+22 24 before tokio 1 1 64 2 268168
+23 24 before iouring 1 1 64 2 237598
+24 24 after iouring 4 128 64 2 1955214
+RESULT 1 1 64
+before iouring median 237214 range 236831 237598
+after iouring median 213749 range 209664 217834
+before tokio median 267647 range 267127 268168
+after tokio median 271364 range 268804 273925
+RESULT 1 32 64
+before iouring median 625182 range 620081 630283
+after iouring median 590454 range 588642 592266
+before tokio median 700910 range 698031 703790
+after tokio median 697285 range 697008 697563
+RESULT 4 128 64
+before iouring median 1975092 range 1972306 1977878
+after iouring median 1958464 range 1955214 1961713
+before tokio median 2118896 range 2109316 2128477
+after tokio median 2109391 range 2105303 2113478

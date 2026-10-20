@@ -1,0 +1,7 @@
+Waiting for exclusive benchmark lock.
+1 150 after iouring 1 32 64 1 632861
+2 150 after iouring 4 128 4096 1 1811687
+3 150 after tokio-adapter 1 32 4096 1 598350
+4 150 before tokio 4 128 64 2 2116749
+5 150 before iouring 1 32 64 1 625127
+6 150 before iouring-poll 4 128 64 1 1958482

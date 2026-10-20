@@ -1,0 +1,64 @@
+diff --git a/crates/tokio/src/socket_operations.rs b/crates/tokio/src/socket_operations.rs
+index b198cd4..96ca9a1 100644
+--- a/crates/tokio/src/socket_operations.rs
++++ b/crates/tokio/src/socket_operations.rs
+@@ -13,6 +13,7 @@ use std::{io, net::Shutdown};
+ 
+ impl TokioScheduler {
+     // All payload access happens synchronously inside the readiness callback. Pending futures retain their owners; the reactor retains no payload pointers.
++    #[inline]
+     async fn socket_operation<Input: Send, Output: Send>(
+         &self,
+         socket: &TokioSocket,
+@@ -25,6 +26,7 @@ impl TokioScheduler {
+             .await
+     }
+ 
++    #[inline]
+     async fn socket_operation_with<Input: Send, Output: Send>(
+         &self,
+         socket: &TokioSocket,
+@@ -173,6 +175,7 @@ impl SocketAccept for TokioScheduler {
+ }
+ 
+ impl SocketRead for TokioScheduler {
++    #[inline]
+     async fn socket_read<B: IoBufMut>(
+         &self,
+         socket: &TokioSocket,
+@@ -193,6 +196,7 @@ impl SocketRead for TokioScheduler {
+ }
+ 
+ impl SocketWrite for TokioScheduler {
++    #[inline]
+     async fn socket_write<B: IoBuf>(
+         &self,
+         socket: &TokioSocket,
+@@ -211,6 +215,7 @@ impl SocketWrite for TokioScheduler {
+ }
+ 
+ impl SocketRecvPoll for TokioScheduler {
++    #[inline]
+     async fn socket_recv_poll(
+         &self,
+         socket: &TokioSocket,
+@@ -233,6 +238,7 @@ impl SocketRecvPoll for TokioScheduler {
+ }
+ 
+ impl SocketSendPoll for TokioScheduler {
++    #[inline]
+     async fn socket_send_poll(
+         &self,
+         socket: &TokioSocket,
+diff --git a/crates/tokio/src/tokio_socket.rs b/crates/tokio/src/tokio_socket.rs
+index 18fd9ae..e932cf7 100644
+--- a/crates/tokio/src/tokio_socket.rs
++++ b/crates/tokio/src/tokio_socket.rs
+@@ -164,6 +164,7 @@ impl TokioSocket {
+         self.io_with(interest, operation, false).await
+     }
+ 
++    #[inline]
+     pub(super) async fn io_with<Output, Operation>(
+         &self,
+         interest: Interest,

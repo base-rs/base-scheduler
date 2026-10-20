@@ -1,0 +1,902 @@
+diff --git a/benchmarks/echo/src/server.rs b/benchmarks/echo/src/server.rs
+index 6e19ea4..014ddd9 100644
+--- a/benchmarks/echo/src/server.rs
++++ b/benchmarks/echo/src/server.rs
+@@ -13,7 +13,7 @@ use std::{
+     net::TcpListener,
+     sync::Arc,
+ };
+-use tokio::io::{AsyncReadExt, AsyncWriteExt};
++use tokio::io::AsyncWriteExt;
+ 
+ const BUFFER_SIZE: usize = 65536;
+ 
+@@ -35,7 +35,13 @@ async fn tokio_server(listener: TcpListener, connections: usize) {
+         tasks.push(tokio::spawn(async move {
+             let mut buffer = vec![0; BUFFER_SIZE];
+             loop {
+-                let count = socket.read(&mut buffer).await.expect("echo read");
++                let count = loop {
++                    socket.readable().await.expect("echo readiness");
++                    match socket.try_read(&mut buffer) {
++                        Err(error) if error.kind() == io::ErrorKind::WouldBlock => continue,
++                        result => break result.expect("echo read"),
++                    }
++                };
+                 if count == 0 {
+                     return;
+                 }
+diff --git a/context/design.md b/context/design.md
+index 135e7d2..0b57f80 100644
+--- a/context/design.md
++++ b/context/design.md
+@@ -118,7 +118,7 @@ Direct task polling uses its own queue and workers backed by `async-task`, with
+ 
+ Adapter close preserves live task owners rather than aborting every task as Socketry's owning scheduler did. It stops new work and signal delivery without cancelling accepted socket or clock operations. These operations wait only on the explicit caller token, avoiding a scheduler-shutdown listener for every pending operation. With `Cancellation::never()`, no cancellation listener is registered. Closure uses an admission flag; operations first polled after closure are rejected, including futures constructed earlier. Applications coordinate explicit cancellation and await operations and tasks before graceful shutdown, which drains adapter-owned tasks, native work, and accepted cleanup without shutting down the host runtime. Socket and clock futures polled by external tasks are not separately tracked, so their owners must finish them; an adapter-owned task blocked on uncancelled I/O can prevent shutdown indefinitely. The host must remain alive and driven during this sequence. Abrupt host destruction retires task futures through Tokio while independently admitted native work retains its owned inputs until retirement.
+ 
+-Unix sockets retain the selected runtime identity and initialize their Tokio `AsyncFd` registration only when a native attempt returns `WouldBlock`; incompatible runtime pairings fail before submission. Registering an unconnected TCP socket eagerly can cache Linux hangup readiness which Tokio intentionally never clears, causing later connected I/O to spin within one poll. Deferred registration avoids that stale readiness while preserving one shared registration for concurrent operations and reporting registration failures through the waiting operation. Every operation first attempts its nonblocking syscall, even after registration: lifecycle calls and errors can complete independently of cached readiness. After `WouldBlock`, one operation per direction reserves Tokio's lightweight polling waker; concurrent operations use Tokio's independent waiter list. Drop releases a reservation, and forgetting it leaves subsequent callers on the independent waiter path. The native descriptor stays owned and unchanged for the entire registration lifetime, including if forgotten, satisfying Tokio's explicit unsafe registration contract. Windows retains Socketry's `async-io` bridge for generic nonblocking sockets; this uses its own readiness reactor while task execution and timers remain on Tokio. Socket I/O makes synchronous readiness-driven calls, so a pending future owns its buffers with no outstanding kernel payload pointers. Prepared vector packages reach native syscalls directly. File, resolver, blocking, and cleanup work retain the bounded native-worker design and owned-input retirement contracts; files have no runtime affinity. Unix signals and Linux allocation/advice retain their platform-specific support.
++Unix sockets retain the selected runtime identity and initialize their Tokio `AsyncFd` registration only when a native attempt returns `WouldBlock`; incompatible runtime pairings fail before submission. Registering an unconnected TCP socket eagerly can cache Linux hangup readiness which Tokio intentionally never clears, causing later connected I/O to spin within one poll. Deferred registration avoids that stale readiness while preserving one shared registration for concurrent operations and reporting registration failures through the waiting operation. Lifecycle operations, empty reads, and sockets without a successful stream read first attempt their nonblocking syscall, preserving immediate OS results independently of cached readiness. Nonempty scalar reads on a known-connected stream with an existing registration may wait on cached readiness first. Readiness is cleared only when the syscall returns `WouldBlock`; a short read alone does not prove that a TCP receive queue is drained, for example at an urgent-data boundary. After `WouldBlock`, one operation per direction reserves Tokio's lightweight polling waker; concurrent operations use Tokio's independent waiter list. Drop releases a reservation, and forgetting it leaves subsequent callers on the independent waiter path. The native descriptor stays owned and unchanged for the entire registration lifetime, including if forgotten, satisfying Tokio's explicit unsafe registration contract. Windows retains Socketry's `async-io` bridge for generic nonblocking sockets; this uses its own readiness reactor while task execution and timers remain on Tokio. Socket I/O makes synchronous readiness-driven calls, so a pending future owns its buffers with no outstanding kernel payload pointers. Prepared vector packages reach native syscalls directly. File, resolver, blocking, and cleanup work retain the bounded native-worker design and owned-input retirement contracts; files have no runtime affinity. Unix signals and Linux allocation/advice retain their platform-specific support.
+ 
+ 
+ ## Native backend and reusable timers
+@@ -141,7 +141,7 @@ The initial `core-scheduler-iouring` selector ports Socketry's owned request and
+ 
+ Owned scalar socket writes first attempt `NativeSocket::try_send` after checking cancellation and selector closure. Successful attempts and terminal errors return the original buffer immediately, without a ring request or capacity permit. `WouldBlock` and `Interrupted` fall through to the completion path; scalar reads submit directly to the ring. Capacity bounds queued and in-flight ring requests, rather than completed synchronous attempts. Socket requests submit `Recv`, `Send`, `RecvMsg`, and `SendMsg`. A nonblocking `EAGAIN` completion retires the attempt before a readiness wait; retries retain the operation's original ring. Message requests derive pointers only after being boxed and retain the header, address, iovec array, and whole sequence until original completion. Prepared vectors are used directly, including inline vector arrays whose containing request stays immobile. Ordinary sequences build request-owned vectors. Kernel-accessible message storage uses `UnsafeCell` so shared cancellation bookkeeping cannot freeze writable output. Borrowed `_poll` operations call synchronous `NativeSocket::try_recv`, `try_send`, `try_recvmsg`, and `try_sendmsg` with enforced nonblocking flags. Ready operations bypass routing, admission, and request allocation. After `WouldBlock`, they submit a one-shot `PollAdd` readiness request on the current worker's ring and retry after completion; `socket_wait` uses the same ring wait. The first wait selects the ring, which remains fixed across spurious readiness and task migration. Readiness requests retain only the socket and never borrow payloads or vectors. Cancellation awaits readiness retirement before returning; dropping requests cancellation, while a forgotten future may leave its readiness request pending until an event or shutdown. Ordinary socket destruction is safe during retirement; exclusive close requires completion or draining first. Socket lifecycle operations still use the shared readiness fallback. Nonblocking owned-transfer retries wait on their original ring after the preceding attempt retires.
+ 
+-`IoUringSelector::new` returns a selector and a separate `IoUringDriver`, starting no ring thread. The driver exposes bounded `turn(timeout)` processing and a waker for caller-owned event loops; `run` is a convenience loop for a dedicated thread. Processing that wakes a caller prevents a subsequent blocking wait in the same turn. External submissions and wakeups signal a nonblocking eventfd watched by one outstanding ring poll. Idle turns publish submissions and wait in one io_uring entry; productive turns skip empty submissions unless CQ overflow or deferred task work requires kernel progress. Timed waits require extended wait arguments, which ring setup probes explicitly. The eventfd poll retains only a descriptor and no userspace destination buffer, including across timeouts and teardown. A notification CQE drains the counter before rearming, so the same readable counter cannot repeatedly complete new polls; notification errors are propagated only after publishing the whole CQ snapshot. Cancellation and payload SQ entries precede notification rearming so a repeatedly signalled eventfd cannot monopolize a one-entry queue. If no slot remains to arm the interrupt, the driver submits the queued work and returns before parking. Futures may move between polling threads while one driver exclusively owns the ring. Dropping an operation requests cancellation without reclaiming in-flight storage. Orderly closure keeps driving until original requests retire. Dropping or failing a driver with unknown kernel access is exceptional: queued requests return errors, in-flight storage is deliberately leaked, and polling its waiting future panics because its buffer cannot safely be returned. Native executor composition and caller-owned event-loop tests exercise the same selector implementation.
++`IoUringSelector::new` returns a selector and a separate `IoUringDriver`, starting no ring thread. The driver exposes bounded `turn(timeout)` processing and a waker for caller-owned event loops; `run` is a convenience loop for a dedicated thread. Processing that wakes a caller prevents a subsequent blocking wait in the same turn. External submissions and wakeups signal a nonblocking eventfd watched by one outstanding ring poll. Idle turns publish submissions and wait in one io_uring entry; productive turns skip empty submissions unless CQ overflow or deferred task work requires kernel progress. A fresh driver entering a thread-bound `IoUringWorker` attempts to replace its unused ring with one configured for cooperative task running and the taskrun flag, avoiding forced userspace interruptions for completions while retaining explicit progress checks. If that optional setup fails, the original validated ring remains in use. Movable drivers and drivers that have already processed a turn retain their original ring: cooperative task work remains associated with the submitting thread and cannot safely follow a moving driver. Timed waits require extended wait arguments, which ring setup probes explicitly. The eventfd poll retains only a descriptor and no userspace destination buffer, including across timeouts and teardown. A notification CQE drains the counter before rearming, so the same readable counter cannot repeatedly complete new polls; notification errors are propagated only after publishing the whole CQ snapshot. Cancellation and payload SQ entries precede notification rearming so a repeatedly signalled eventfd cannot monopolize a one-entry queue. If no slot remains to arm the interrupt, the driver submits the queued work and returns before parking. Futures may move between polling threads while one driver exclusively owns the ring. Dropping an operation requests cancellation without reclaiming in-flight storage. Orderly closure keeps driving until original requests retire. Dropping or failing a driver with unknown kernel access is exceptional: queued requests return errors, in-flight storage is deliberately leaked, and polling its waiting future panics because its buffer cannot safely be returned. Native executor composition and caller-owned event-loop tests exercise the same selector implementation.
+ 
+ ### Worker ownership and contention
+ 
+diff --git a/crates/iouring/src/io_uring_selector.rs b/crates/iouring/src/io_uring_selector.rs
+index 1e91d07..665009a 100644
+--- a/crates/iouring/src/io_uring_selector.rs
++++ b/crates/iouring/src/io_uring_selector.rs
+@@ -791,6 +791,7 @@ impl Selector for IoUringSelector {
+ }
+ pub(crate) struct Reactor {
+     ring: IoUring,
++    started: bool,
+     notification: Arc<OwnedFd>,
+     incoming: mpsc::Receiver<Command>,
+     controller: Arc<Controller>,
+@@ -810,6 +811,7 @@ impl Reactor {
+     ) -> Self {
+         Self {
+             ring,
++            started: false,
+             notification,
+             incoming,
+             controller,
+@@ -821,6 +823,21 @@ impl Reactor {
+         }
+     }
+ 
++    pub(crate) fn bind_worker(&mut self) {
++        // Cooperative task work belongs to its submitting thread. Enable it only for a never-driven ring after its owner becomes thread-bound; a movable driver must keep the default interrupt behavior.
++        if !self.started {
++            if let Ok(ring) = syscall("cooperative-ring", || {
++                IoUring::builder()
++                    .setup_coop_taskrun()
++                    .setup_taskrun_flag()
++                    .build(self.ring.params().sq_entries())
++            }) {
++                // Setup already validated this kernel's operations and completion features. No request or notification has reached the old ring, and queued commands remain on the controller. Failure to obtain this optional replacement leaves the original valid ring intact.
++                self.ring = ring;
++            }
++        }
++    }
++
+     fn drain_notification(&self) -> io::Result<bool> {
+         let mut notified = false;
+         let mut value = 0u64;
+@@ -876,6 +893,7 @@ impl Reactor {
+     }
+ 
+     pub(crate) fn turn(&mut self, timeout: Option<Duration>) -> io::Result<bool> {
++        self.started = true;
+         let mut progressed = false;
+         // Bound command processing so a busy producer cannot starve completions.
+         let mut command_batch_full = true;
+diff --git a/crates/iouring/src/io_uring_selector/tests.rs b/crates/iouring/src/io_uring_selector/tests.rs
+index d4190d1..2b27c4a 100644
+--- a/crates/iouring/src/io_uring_selector/tests.rs
++++ b/crates/iouring/src/io_uring_selector/tests.rs
+@@ -1840,3 +1840,161 @@ fn deferred_cancellations_prevent_waiting_while_originals_fill_the_submission_qu
+         drain(&selector, &mut driver);
+     }
+ }
++
++fn drive_bound_worker<F: Future>(
++    worker: &mut impl core_scheduler_selector::SelectorWorker,
++    future: F,
++) -> F::Output {
++    let mut future = pin!(future);
++    let deadline = Instant::now() + Duration::from_secs(10);
++    loop {
++        if let Some(output) = block_on(poll_once(&mut future)) {
++            return output;
++        }
++        worker.turn(Some(Duration::from_millis(10))).unwrap();
++        assert!(
++            Instant::now() < deadline,
++            "bound worker did not complete accepted I/O"
++        );
++    }
++}
++
++#[test]
++fn movable_driver_never_upgrades_and_completes_inflight_io_after_thread_migration() {
++    let _failures = Failures::new([]);
++    BEFORE_SYSCALL.with(|hook| {
++        *hook.borrow_mut() = Some((
++            "cooperative-ring",
++            Box::new(|| {
++                panic!("a movable driver must preserve cross-thread ring progress");
++            }),
++        ));
++    });
++    let (selector, mut driver) = pair(1);
++    let (directory, file) = fifo(&selector);
++    let never = Cancellation::never();
++    let mut reading = Box::pin(selector.file_read(&file, vec![0], &never));
++    assert!(block_on(poll_once(&mut reading)).is_none());
++    driver.turn(Some(Duration::ZERO)).unwrap();
++    assert_eq!(driver.reactor.as_ref().unwrap().in_flight.0.len(), 1);
++    assert!(block_on(poll_once(&mut reading)).is_none());
++    std::fs::write(directory.path().join("fifo"), b"x").unwrap();
++    let selector_ref = &selector;
++    let (mut driver, (result, buffer)) = std::thread::scope(|scope| {
++        scope
++            .spawn(move || {
++                let output = drive(&mut driver, reading);
++                // Keep the issuing thread alive through retirement: thread exit can independently cancel that thread's pending kernel requests.
++                drain(selector_ref, &mut driver);
++                (driver, output)
++            })
++            .join()
++            .unwrap()
++    });
++    assert_eq!(result.unwrap(), 1);
++    assert_eq!(buffer, b"x");
++    drop(file);
++    assert!(driver.turn(None).unwrap());
++    block_on(selector.shutdown());
++    BEFORE_SYSCALL.with(|hook| assert!(hook.borrow().is_some()));
++}
++
++#[test]
++fn fresh_bound_worker_attempts_optional_upgrade_without_losing_queued_io() {
++    use core_scheduler_selector::SelectorDriver;
++    let (selector, driver) = pair(1);
++    let (_directory, file) = file(&selector);
++    let never = Cancellation::never();
++    let mut reading = Box::pin(selector.file_read_at(&file, vec![0; 3], 1, &never));
++    assert!(block_on(poll_once(&mut reading)).is_none());
++    let _failures = Failures::new([]);
++    let attempted = Arc::new(AtomicBool::new(false));
++    BEFORE_SYSCALL.with(|hook| {
++        let attempted = Arc::clone(&attempted);
++        *hook.borrow_mut() = Some((
++            "cooperative-ring",
++            Box::new(move || {
++                attempted.store(true, Ordering::SeqCst);
++            }),
++        ));
++    });
++    let mut worker = driver.enter();
++    assert!(attempted.load(Ordering::SeqCst));
++    let (result, buffer) = drive_bound_worker(&mut worker, reading);
++    assert_eq!(result.unwrap(), 3);
++    assert_eq!(buffer, b"bcd");
++    block_on(selector.file_close(file)).unwrap();
++    drive_bound_worker(&mut worker, selector.shutdown());
++}
++
++#[test]
++fn optional_worker_upgrade_failures_preserve_the_valid_ring_and_queued_io() {
++    use core_scheduler_selector::SelectorDriver;
++    for code in [libc::EINVAL, libc::EPERM] {
++        let (selector, driver) = pair(1);
++        let (_directory, file) = file(&selector);
++        let never = Cancellation::never();
++        let mut reading = Box::pin(selector.file_read(&file, vec![0; 6], &never));
++        assert!(block_on(poll_once(&mut reading)).is_none());
++        let _failures = Failures::new([("cooperative-ring", io::Error::from_raw_os_error(code))]);
++        let mut worker = driver.enter();
++        FAILURES.with(|failures| assert!(failures.borrow().is_empty()));
++        let (result, buffer) = drive_bound_worker(&mut worker, reading);
++        assert_eq!(result.unwrap(), 6);
++        assert_eq!(buffer, b"abcdef");
++        block_on(selector.file_close(file)).unwrap();
++        drive_bound_worker(&mut worker, selector.shutdown());
++    }
++}
++
++#[test]
++fn binding_an_already_driven_ring_preserves_inflight_io_without_upgrade() {
++    use core_scheduler_selector::SelectorDriver;
++    let (selector, mut driver) = pair(1);
++    let (directory, file) = fifo(&selector);
++    let never = Cancellation::never();
++    let mut reading = Box::pin(selector.file_read(&file, vec![0], &never));
++    assert!(block_on(poll_once(&mut reading)).is_none());
++    driver.turn(Some(Duration::ZERO)).unwrap();
++    assert_eq!(driver.reactor.as_ref().unwrap().in_flight.0.len(), 1);
++    assert!(block_on(poll_once(&mut reading)).is_none());
++    let _failures = Failures::new([]);
++    BEFORE_SYSCALL.with(|hook| {
++        *hook.borrow_mut() = Some((
++            "cooperative-ring",
++            Box::new(|| {
++                panic!("an already-driven ring must retain its accepted work");
++            }),
++        ));
++    });
++    let mut worker = driver.enter();
++    BEFORE_SYSCALL.with(|hook| assert!(hook.borrow().is_some()));
++    std::fs::write(directory.path().join("fifo"), b"x").unwrap();
++    let (result, buffer) = drive_bound_worker(&mut worker, reading);
++    assert_eq!(result.unwrap(), 1);
++    assert_eq!(buffer, b"x");
++    block_on(selector.file_close(file)).unwrap();
++    drive_bound_worker(&mut worker, selector.shutdown());
++}
++
++#[test]
++fn a_retired_driver_can_enter_a_worker_without_recreating_its_ring() {
++    use core_scheduler_selector::{SelectorDriver, SelectorWorker};
++    let (selector, mut driver) = pair(1);
++    drain(&selector, &mut driver);
++    assert!(driver.reactor.is_none());
++    let _failures = Failures::new([]);
++    BEFORE_SYSCALL.with(|hook| {
++        *hook.borrow_mut() = Some((
++            "cooperative-ring",
++            Box::new(|| {
++                panic!("a retired driver must not create another ring");
++            }),
++        ));
++    });
++    let mut worker = driver.enter();
++    assert!(worker.turn(None).unwrap());
++    BEFORE_SYSCALL.with(|hook| assert!(hook.borrow().is_some()));
++    drop(worker);
++    block_on(selector.shutdown());
++}
+diff --git a/crates/iouring/src/io_uring_worker.rs b/crates/iouring/src/io_uring_worker.rs
+index a057f83..50c0ba8 100644
+--- a/crates/iouring/src/io_uring_worker.rs
++++ b/crates/iouring/src/io_uring_worker.rs
+@@ -34,7 +34,10 @@ pub struct IoUringWorker {
+     route: Rc<LocalRoute>,
+ }
+ impl IoUringWorker {
+-    pub(crate) fn new(driver: IoUringDriver) -> Self {
++    pub(crate) fn new(mut driver: IoUringDriver) -> Self {
++        if let Some(reactor) = driver.reactor.as_mut() {
++            reactor.bind_worker();
++        }
+         let route = Rc::new(LocalRoute {
+             group: Arc::clone(&driver.group),
+             controller: Arc::clone(&driver.controller),
+diff --git a/crates/tokio/readme.md b/crates/tokio/readme.md
+index 253ca28..4c85d03 100644
+--- a/crates/tokio/readme.md
++++ b/crates/tokio/readme.md
+@@ -27,7 +27,7 @@ The application owns the Tokio runtime and keeps it alive and driven, with I/O a
+ 
+ Socket syscalls execute synchronously in readiness callbacks and retain no payload pointers after returning. Pending futures own their buffers. Prepared `IoBuffers` and `IoBuffersMut` supply native I/O vectors directly; other sequences reuse scratch capacity across attempts. Completion wins concurrent cancellation. Dropping a pending readiness operation safely releases its input because no outstanding kernel operation retains it. Socket shutdown and explicit close use independent bounded cleanup admission; accepted cleanup survives waiter abandonment.
+ 
+-Each operation first attempts its nonblocking syscall, preserving immediate lifecycle results and OS errors independently of cached readiness. On Unix, after `WouldBlock`, one waiting operation per direction reserves Tokio's polling waker, and concurrent operations use independent readiness waiters. Dropping the reserving future releases its slot; forgetting it leaves later operations on the independent waiter path.
++Lifecycle operations, empty reads, and sockets without a successful stream read first attempt their nonblocking syscall, preserving immediate OS results independently of cached readiness. Nonempty scalar reads on a known-connected stream with an existing registration may wait on cached readiness first. Readiness is cleared only after `WouldBlock`, since even a short TCP read can stop at an urgent-data boundary while ordinary bytes remain queued. On Unix, after `WouldBlock`, one waiting operation per direction reserves Tokio's polling waker, and concurrent operations use independent readiness waiters. Dropping the reserving future releases its slot; forgetting it leaves later operations on the independent waiter path.
+ 
+ `TokioFile` privately retains a native file during worker execution, with no runtime affinity. All adapter instances accept the same file type. Native file import and access are unavailable so append flags and descriptor aliases cannot bypass positioned-write and exclusive-close guarantees. File and resolver calls use dedicated bounded workers, rather than copying owned buffers into Tokio file storage. Bounds include queued and running work. Started calls retain their inputs and actual results through retirement, including after waiter abandonment. Await all outstanding uses before explicit close; close requires exclusive ownership and reports one native close attempt without retrying.
+ 
+diff --git a/crates/tokio/src/socket_operations.rs b/crates/tokio/src/socket_operations.rs
+index c447746..b198cd4 100644
+--- a/crates/tokio/src/socket_operations.rs
++++ b/crates/tokio/src/socket_operations.rs
+@@ -14,12 +14,25 @@ use std::{io, net::Shutdown};
+ impl TokioScheduler {
+     // All payload access happens synchronously inside the readiness callback. Pending futures retain their owners; the reactor retains no payload pointers.
+     async fn socket_operation<Input: Send, Output: Send>(
++        &self,
++        socket: &TokioSocket,
++        input: Input,
++        cancellation: &Cancellation,
++        interest: Interest,
++        operation: impl FnMut(&Socket, &mut Input) -> io::Result<Output> + Send,
++    ) -> (OperationResult<Output>, Input) {
++        self.socket_operation_with(socket, input, cancellation, interest, operation, false)
++            .await
++    }
++
++    async fn socket_operation_with<Input: Send, Output: Send>(
+         &self,
+         socket: &TokioSocket,
+         mut input: Input,
+         cancellation: &Cancellation,
+         interest: Interest,
+         mut operation: impl FnMut(&Socket, &mut Input) -> io::Result<Output> + Send,
++        read_nonempty: bool,
+     ) -> (OperationResult<Output>, Input) {
+         use std::{
+             future::{Future, poll_fn},
+@@ -29,7 +42,11 @@ impl TokioScheduler {
+         let result = async {
+             cancellation.check()?;
+             self.check_socket(socket)?;
+-            let mut operation = pin!(socket.io(interest, |socket| operation(socket, &mut input)));
++            let mut operation = pin!(socket.io_with(
++                interest,
++                |socket| operation(socket, &mut input),
++                read_nonempty
++            ));
+             let mut cancelled = pin!(cancellation.cancelled());
+             poll_fn(|context| {
+                 match operation.as_mut().poll(context) {
+@@ -159,15 +176,17 @@ impl SocketRead for TokioScheduler {
+     async fn socket_read<B: IoBufMut>(
+         &self,
+         socket: &TokioSocket,
+-        buffer: B,
++        mut buffer: B,
+         cancellation: &Cancellation,
+     ) -> BufferResult<B> {
+-        self.socket_operation(
++        let length = buffer.as_mut().len();
++        self.socket_operation_with(
+             socket,
+             buffer,
+             cancellation,
+             Interest::Readable,
+             |socket, buffer| socket_io::recv(socket, buffer.as_mut()),
++            length > 0,
+         )
+         .await
+     }
+@@ -199,12 +218,14 @@ impl SocketRecvPoll for TokioScheduler {
+         flags: SocketRecvFlags,
+         cancellation: &Cancellation,
+     ) -> OperationResult<usize> {
+-        self.socket_operation(
++        let length = buffer.len();
++        self.socket_operation_with(
+             socket,
+             buffer,
+             cancellation,
+             Interest::Readable,
+             |socket, buffer| socket_io::recv_poll(socket, buffer, flags),
++            length > 0,
+         )
+         .await
+         .0
+diff --git a/crates/tokio/src/tokio_socket.rs b/crates/tokio/src/tokio_socket.rs
+index a2635d7..18fd9ae 100644
+--- a/crates/tokio/src/tokio_socket.rs
++++ b/crates/tokio/src/tokio_socket.rs
+@@ -12,6 +12,8 @@ use tokio::runtime::{Handle, Id};
+ pub(crate) struct RegisteredSocket {
+     socket: Arc<socket2::Socket>,
+     runtime: Handle,
++    stream: bool,
++    connected_stream: AtomicBool,
+     read_waiting: AtomicBool,
+     write_waiting: AtomicBool,
+     registration: tokio::sync::OnceCell<tokio::io::unix::AsyncFd<Arc<socket2::Socket>>>,
+@@ -20,8 +22,13 @@ pub(crate) struct RegisteredSocket {
+ #[cfg(unix)]
+ impl RegisteredSocket {
+     fn new(runtime: &Handle, socket: socket2::Socket) -> Self {
++        let stream = socket
++            .r#type()
++            .is_ok_and(|kind| kind == socket2::Type::STREAM);
+         Self {
+             socket: Arc::new(socket),
++            stream,
++            connected_stream: AtomicBool::new(false),
+             runtime: runtime.clone(),
+             read_waiting: AtomicBool::new(false),
+             write_waiting: AtomicBool::new(false),
+@@ -145,18 +152,48 @@ impl TokioSocket {
+         }
+     }
+ 
++    #[cfg(test)]
+     pub(super) async fn io<Output, Operation>(
++        &self,
++        interest: Interest,
++        operation: Operation,
++    ) -> io::Result<Output>
++    where
++        Operation: FnMut(&socket2::Socket) -> io::Result<Output> + Send,
++    {
++        self.io_with(interest, operation, false).await
++    }
++
++    pub(super) async fn io_with<Output, Operation>(
+         &self,
+         interest: Interest,
+         mut operation: Operation,
++        read_nonempty: bool,
+     ) -> io::Result<Output>
+     where
+         Operation: FnMut(&socket2::Socket) -> io::Result<Output> + Send,
+     {
+-        // Try every operation before gating on readiness: lifecycle calls, invalid arguments, and state errors can complete even when a previous operation cleared the cached readiness.
+-        let result = operation(self.get_ref());
+-        if !matches!(&result, Err(error) if error.kind() == io::ErrorKind::WouldBlock) {
+-            return result;
++        #[cfg(unix)]
++        let known_connected = read_nonempty && self.inner.connected_stream.load(Ordering::Relaxed);
++        #[cfg(unix)]
++        let mark_connected = read_nonempty && self.inner.stream && !known_connected;
++        #[cfg(unix)]
++        let ready_first =
++            read_nonempty && known_connected && self.inner.registration.get().is_some();
++        #[cfg(windows)]
++        let ready_first = false;
++        #[cfg(windows)]
++        let _ = read_nonempty;
++        // Only nonempty reads on a stream that already completed a read may skip the speculative syscall. Lifecycle operations, unknown socket states, and empty reads retain immediate OS results.
++        if !ready_first {
++            let result = operation(self.get_ref());
++            #[cfg(unix)]
++            if mark_connected && result.is_ok() {
++                self.inner.connected_stream.store(true, Ordering::Relaxed);
++            }
++            if !matches!(&result, Err(error) if error.kind() == io::ErrorKind::WouldBlock) {
++                return result;
++            }
+         }
+         #[cfg(unix)]
+         {
+@@ -179,9 +216,15 @@ impl TokioSocket {
+                 .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+                 .is_err()
+             {
+-                return registration
+-                    .async_io(interest, |_| operation(self.inner.get_ref()))
+-                    .await;
++                loop {
++                    let mut ready = registration.ready(interest).await?;
++                    if let Ok(result) = ready.try_io(|_| operation(self.inner.get_ref())) {
++                        if mark_connected && result.is_ok() {
++                            self.inner.connected_stream.store(true, Ordering::Relaxed);
++                        }
++                        return result;
++                    }
++                }
+             }
+             let _waiter = PollWaiter(waiting);
+             std::future::poll_fn(|context| {
+@@ -193,6 +236,9 @@ impl TokioSocket {
+                             registration.poll_write_ready(context)
+                         })?;
+                     if let Ok(result) = ready.try_io(|_| operation(self.inner.get_ref())) {
++                        if mark_connected && result.is_ok() {
++                            self.inner.connected_stream.store(true, Ordering::Relaxed);
++                        }
+                         return std::task::Poll::Ready(result);
+                     }
+                 }
+diff --git a/crates/tokio/src/tokio_socket/tests.rs b/crates/tokio/src/tokio_socket/tests.rs
+index 6cc067b..28bee58 100644
+--- a/crates/tokio/src/tokio_socket/tests.rs
++++ b/crates/tokio/src/tokio_socket/tests.rs
+@@ -364,3 +364,399 @@ fn runtime_shutdown_wakes_both_reserved_and_concurrent_waiters() {
+     assert!(block_on(second).is_err());
+     assert!(!descriptor.inner.read_waiting.load(Ordering::Acquire));
+ }
++
++#[cfg(unix)]
++#[test]
++fn established_stream_reads_only_retry_stale_readiness_once() {
++    use core_scheduler::*;
++    use futures_lite::future::{block_on, poll_once};
++    use std::io::Write;
++    crate::test_support::run(|| {
++        block_on(async {
++            for borrowed in [false, true] {
++                for concurrent in [false, true] {
++                    let scheduler = crate::test_support::scheduler();
++                    let never = Cancellation::never();
++                    let (native, mut peer) = tcp_pair();
++                    let socket = TokioSocket::new(&scheduler.runtime, native.into()).unwrap();
++                    // A real pending operation reserves the single-waker slot. The second reader must use the independent waiter path.
++                    let mut reserved_buffer = [0; 8];
++                    let mut reserved = Box::pin(socket.io(Interest::Readable, |socket| {
++                        crate::socket_io::recv(socket, &mut reserved_buffer)
++                    }));
++                    if concurrent {
++                        assert!(poll_once(&mut reserved).await.is_none());
++                    }
++                    let mut buffer = [0; 8];
++                    let mut receiving = Box::pin(async {
++                        if borrowed {
++                            scheduler
++                                .socket_recv_poll(
++                                    &socket,
++                                    &mut buffer,
++                                    SocketRecvFlags::default(),
++                                    &never,
++                                )
++                                .await
++                                .unwrap()
++                        } else {
++                            let (result, received) =
++                                scheduler.socket_read(&socket, vec![0; 8], &never).await;
++                            buffer.copy_from_slice(&received);
++                            result.unwrap()
++                        }
++                    });
++                    assert!(poll_once(&mut receiving).await.is_none());
++                    peer.write_all(b"x").unwrap();
++                    assert_eq!(receiving.await, 1);
++                    assert_eq!(buffer[0], b'x');
++                    let mut attempts = 0;
++                    let mut next = Box::pin(socket.io_with(
++                        Interest::Readable,
++                        |socket| {
++                            attempts += 1;
++                            crate::socket_io::recv(socket, &mut buffer)
++                        },
++                        true,
++                    ));
++                    assert!(poll_once(&mut next).await.is_none());
++                    drop(next);
++                    assert_eq!(
++                        attempts, 1,
++                        "the next read should clear stale readiness without an extra speculative syscall"
++                    );
++                    peer.write_all(b"y").unwrap();
++                    assert_eq!(
++                        scheduler
++                            .socket_recv_poll(
++                                &socket,
++                                &mut buffer,
++                                SocketRecvFlags::default(),
++                                &never
++                            )
++                            .await
++                            .unwrap(),
++                        1
++                    );
++                    assert_eq!(buffer[0], b'y');
++                    drop(reserved);
++                    scheduler.socket_close(socket).await.unwrap();
++                    scheduler.shutdown().await;
++                }
++            }
++        });
++    });
++}
++
++#[cfg(unix)]
++#[test]
++fn full_peeking_and_datagram_reads_retain_readability() {
++    use core_scheduler::*;
++    use futures_lite::future::{block_on, poll_once};
++    use std::io::Write;
++    crate::test_support::run(|| {
++        block_on(async {
++            let scheduler = crate::test_support::scheduler();
++            let never = Cancellation::never();
++            for peek in [false, true] {
++                let (native, mut peer) = tcp_pair();
++                let socket = TokioSocket::new(&scheduler.runtime, native.into()).unwrap();
++                // A full read leaves bytes queued; a short peek leaves all bytes queued.
++                let mut buffer = vec![0; if peek { 8 } else { 1 }];
++                let mut receiving = Box::pin(scheduler.socket_recv_poll(
++                    &socket,
++                    &mut buffer,
++                    SocketRecvFlags { peek },
++                    &never,
++                ));
++                assert!(poll_once(&mut receiving).await.is_none());
++                peer.write_all(b"xy").unwrap();
++                assert_eq!(receiving.await.unwrap(), if peek { 2 } else { 1 });
++                assert!(
++                    poll_once(socket.inner.registration.get().unwrap().readable())
++                        .await
++                        .is_some()
++                );
++                let mut rest = [0; 8];
++                assert_eq!(
++                    scheduler
++                        .socket_recv_poll(&socket, &mut rest, SocketRecvFlags::default(), &never)
++                        .await
++                        .unwrap(),
++                    if peek { 2 } else { 1 }
++                );
++                assert_eq!(rest[0], if peek { b'x' } else { b'y' });
++                scheduler.socket_close(socket).await.unwrap();
++            }
++            let native = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
++            let address = native.local_addr().unwrap();
++            let peer = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
++            let socket = TokioSocket::new(&scheduler.runtime, native.into()).unwrap();
++            let mut buffer = [0; 8];
++            let mut receiving = Box::pin(scheduler.socket_recv_poll(
++                &socket,
++                &mut buffer,
++                SocketRecvFlags::default(),
++                &never,
++            ));
++            assert!(poll_once(&mut receiving).await.is_none());
++            peer.send_to(b"x", address).unwrap();
++            peer.send_to(b"y", address).unwrap();
++            assert_eq!(receiving.await.unwrap(), 1);
++            assert!(
++                poll_once(socket.inner.registration.get().unwrap().readable())
++                    .await
++                    .is_some()
++            );
++            assert_eq!(
++                scheduler
++                    .socket_recv_poll(&socket, &mut buffer, SocketRecvFlags::default(), &never)
++                    .await
++                    .unwrap(),
++                1
++            );
++            assert_eq!(buffer[0], b'y');
++            scheduler.socket_close(socket).await.unwrap();
++            scheduler.shutdown().await;
++        });
++    });
++}
++
++#[cfg(target_os = "linux")]
++#[test]
++fn registered_listeners_still_report_invalid_read_errors_immediately() {
++    use core_scheduler::*;
++    use futures_lite::future::{block_on, poll_once};
++    crate::test_support::run(|| {
++        block_on(async {
++            let scheduler = crate::test_support::scheduler();
++            let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
++            let socket = TokioSocket::new(&scheduler.runtime, listener.into()).unwrap();
++            let cancel = Cancellation::new();
++            let mut accepting = Box::pin(scheduler.socket_accept(&socket, &cancel));
++            assert!(poll_once(&mut accepting).await.is_none());
++            cancel.cancel();
++            assert!(matches!(accepting.await, Err(OperationError::Cancelled(_))));
++            assert!(socket.inner.registration.get().is_some());
++            let never = Cancellation::never();
++            for length in [0, 8] {
++                let mut buffer = vec![0; length];
++                let result = poll_once(scheduler.socket_recv_poll(
++                    &socket,
++                    &mut buffer,
++                    SocketRecvFlags::default(),
++                    &never,
++                ))
++                .await;
++                assert!(matches!(result, Some(Err(OperationError::Io(_)))));
++                let (result, _) =
++                    poll_once(scheduler.socket_read(&socket, vec![0; length], &never))
++                        .await
++                        .expect("invalid read must not wait for listener readability");
++                assert!(matches!(result, Err(OperationError::Io(_))));
++            }
++            scheduler.socket_close(socket).await.unwrap();
++            scheduler.shutdown().await;
++        });
++    });
++}
++
++#[cfg(unix)]
++#[test]
++fn established_stream_empty_reads_do_not_require_reactor_progress() {
++    use core_scheduler::*;
++    use futures_lite::future::{block_on, poll_once};
++    use std::io::Write;
++    let runtime = runtime();
++    let scheduler = crate::TokioScheduler::with_options(
++        runtime.handle().clone(),
++        crate::TokioOptions {
++            threads: 1,
++            capacity: 4,
++        },
++    )
++    .unwrap();
++    let never = Cancellation::never();
++    let (native, mut peer) = tcp_pair();
++    let socket = TokioSocket::new(runtime.handle(), native.into()).unwrap();
++    let registration = block_on(socket.inner.registration()).unwrap();
++    assert!(block_on(poll_once(registration.readable())).is_none());
++    peer.write_all(b"x").unwrap();
++    wait_for_readable(&socket);
++    let mut byte = [0];
++    assert_eq!(
++        block_on(scheduler.socket_recv_poll(
++            &socket,
++            &mut byte,
++            SocketRecvFlags::default(),
++            &never
++        ))
++        .unwrap(),
++        1
++    );
++    assert!(socket.inner.connected_stream.load(Ordering::Relaxed));
++    // The current-thread reactor is deliberately stopped, so the next peer write cannot update cached readiness. Empty reads must still return the syscall result immediately.
++    peer.write_all(b"y").unwrap();
++    wait_for_readable(&socket);
++    assert!(matches!(
++        block_on(poll_once(scheduler.socket_recv_poll(
++            &socket,
++            &mut [],
++            SocketRecvFlags::default(),
++            &never
++        ))),
++        Some(Ok(0))
++    ));
++    let (result, buffer) = block_on(poll_once(scheduler.socket_read(
++        &socket,
++        Vec::new(),
++        &never,
++    )))
++    .expect("empty owned read must not await reactor progress");
++    assert_eq!(result.unwrap(), 0);
++    assert!(buffer.is_empty());
++    // A nonempty established read uses the reactor and resumes when its selected runtime is driven again.
++    let mut reading = Box::pin(scheduler.socket_recv_poll(
++        &socket,
++        &mut byte,
++        SocketRecvFlags::default(),
++        &never,
++    ));
++    assert!(block_on(poll_once(&mut reading)).is_none());
++    assert_eq!(runtime.block_on(reading).unwrap(), 1);
++    assert_eq!(&byte, b"y");
++    block_on(scheduler.socket_close(socket)).unwrap();
++    block_on(scheduler.shutdown());
++}
++
++#[cfg(unix)]
++fn tcp_pair() -> (std::net::TcpStream, std::net::TcpStream) {
++    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
++    let client = std::net::TcpStream::connect(listener.local_addr().unwrap()).unwrap();
++    let (server, _) = listener.accept().unwrap();
++    client.set_nodelay(true).unwrap();
++    server.set_nodelay(true).unwrap();
++    (client, server)
++}
++
++#[cfg(unix)]
++fn wait_for_readable(socket: &TokioSocket) {
++    use std::os::fd::AsRawFd;
++    let mut descriptor = libc::pollfd {
++        fd: socket.get_ref().as_raw_fd(),
++        events: libc::POLLIN,
++        revents: 0,
++    };
++    // SAFETY: One initialized descriptor remains live through this bounded synchronous wait. This observes packet arrival without driving Tokio's deliberately stopped reactor.
++    assert_eq!(unsafe { libc::poll(&mut descriptor, 1, 5000) }, 1);
++}
++
++#[cfg(unix)]
++#[test]
++fn datagrams_preserve_direct_syscall_behavior() {
++    use core_scheduler::*;
++    use futures_lite::future::block_on;
++    let runtime = runtime();
++    let scheduler = crate::TokioScheduler::with_options(
++        runtime.handle().clone(),
++        crate::TokioOptions {
++            threads: 1,
++            capacity: 4,
++        },
++    )
++    .unwrap();
++    let never = Cancellation::never();
++    let native = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
++    let address = native.local_addr().unwrap();
++    let peer = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
++    let socket = TokioSocket::new(runtime.handle(), native.into()).unwrap();
++    assert!(!socket.inner.stream);
++    block_on(socket.inner.registration()).unwrap();
++    let mut buffer = [0; 8];
++    for byte in *b"xy" {
++        peer.send_to(&[byte], address).unwrap();
++        wait_for_readable(&socket);
++        assert_eq!(
++            block_on(scheduler.socket_recv_poll(
++                &socket,
++                &mut buffer,
++                SocketRecvFlags::default(),
++                &never
++            ))
++            .unwrap(),
++            1
++        );
++        assert_eq!(buffer[0], byte);
++        assert!(!socket.inner.connected_stream.load(Ordering::Relaxed));
++    }
++    block_on(scheduler.socket_close(socket)).unwrap();
++    block_on(scheduler.shutdown());
++}
++
++#[cfg(target_os = "linux")]
++#[test]
++fn urgent_tcp_boundary_keeps_trailing_bytes_readable() {
++    use core_scheduler::*;
++    use futures_lite::future::block_on;
++    use std::io::Write;
++    let runtime = runtime();
++    let scheduler = crate::TokioScheduler::with_options(
++        runtime.handle().clone(),
++        crate::TokioOptions {
++            threads: 1,
++            capacity: 4,
++        },
++    )
++    .unwrap();
++    let never = Cancellation::never();
++    let (native, mut peer) = tcp_pair();
++    let socket = TokioSocket::new(runtime.handle(), native.into()).unwrap();
++    let registration = block_on(socket.inner.registration()).unwrap();
++    let mut buffer = [0; 64];
++    peer.write_all(b"seed").unwrap();
++    assert_eq!(
++        block_on(scheduler.socket_recv_poll(
++            &socket,
++            &mut buffer,
++            SocketRecvFlags::default(),
++            &never
++        ))
++        .unwrap(),
++        4
++    );
++    assert!(socket.inner.connected_stream.load(Ordering::Relaxed));
++    peer.write_all(b"before").unwrap();
++    let peer_socket = socket2::SockRef::from(&peer);
++    assert_eq!(peer_socket.send_with_flags(b"!", libc::MSG_OOB).unwrap(), 1);
++    peer.write_all(b"after").unwrap();
++    // Let every loopback segment arrive before the current-thread reactor captures its edge.
++    std::thread::sleep(Duration::from_millis(10));
++    runtime.block_on(async {
++        registration.readable().await.unwrap().retain_ready();
++    });
++    let count = runtime
++        .block_on(scheduler.socket_recv_poll(
++            &socket,
++            &mut buffer,
++            SocketRecvFlags::default(),
++            &never,
++        ))
++        .unwrap();
++    assert_eq!(&buffer[..count], b"before");
++    let result = runtime.block_on(async {
++        tokio::time::timeout(
++            Duration::from_millis(100),
++            scheduler.socket_recv_poll(&socket, &mut buffer, SocketRecvFlags::default(), &never),
++        )
++        .await
++    });
++    // The first read stops at the urgent mark. The following ordinary bytes are already queued; another peer write must not be necessary.
++    assert!(
++        result.is_ok(),
++        "trailing normal TCP bytes stalled after a short read at an urgent mark"
++    );
++    let count = result.unwrap().unwrap();
++    assert_eq!(&buffer[..count], b"after");
++    block_on(scheduler.socket_close(socket)).unwrap();
++    block_on(scheduler.shutdown());
++}
+diff --git a/releases.md b/releases.md
+index 7cc0876..9b2a344 100644
+--- a/releases.md
++++ b/releases.md
+@@ -2,6 +2,10 @@
+ 
+ ## Unreleased
+ 
++- Avoid redundant speculative Tokio receive attempts by waiting on cached readiness for established nonempty scalar stream reads. Lifecycle operations, empty reads, and datagrams retain syscall-first behavior; short reads preserve readiness until `WouldBlock`.
++
++- Use cooperative io_uring completion processing for fresh thread-bound workers where supported, retaining the original ring for movable drivers and when the optional setup fails.
++
+ - Wait directly on io_uring with eventfd interrupts, retaining owner-thread wakes in memory to avoid kernel self-interrupts. Complete ready scalar socket writes synchronously and combine idle submission with waiting. Ring setup now requires extended wait arguments for timed driver turns, available since Linux 5.11.
+ 
+ - Reserve Tokio's lightweight socket readiness polling path per direction, retaining concurrent waiter and cancellation support.

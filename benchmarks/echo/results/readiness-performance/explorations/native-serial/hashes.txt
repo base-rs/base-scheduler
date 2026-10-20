@@ -1,0 +1,3 @@
+f03c66b4a628f57b097b4cb596926647af8cddee49ed4abe6b13dfb52cd481d8  /home/samuel/.cache/core-scheduler-native-serial-next/no-coop
+ef1452680548b8b86af0e00b0c491248b54e9591cc4bcab959333d6b04b33abe  /home/samuel/.cache/core-scheduler-native-serial-next/selected-source.patch
+24b6e0f526ad8c2b275d158768374fa83b6b0b82f68c2a28fcbb87ed5e0bf864  /home/samuel/.cache/core-scheduler-native-serial-next/no-coop-source.patch

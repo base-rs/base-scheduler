@@ -1,0 +1,22 @@
+Waiting for exclusive benchmark lock.
+1 15 readable tokio 1 32 64 1 648113
+2 15 poll-ready tokio 1 32 64 1 660271
+3 15 after tokio-adapter-poll 1 32 64 1 646209
+4 15 readable tokio 1 32 64 3 652898
+5 15 after tokio-adapter-poll 1 32 64 3 638219
+6 15 poll-ready tokio 1 32 64 3 661454
+7 15 poll-ready tokio 1 32 64 2 663029
+8 15 after tokio-adapter 1 32 64 1 641955
+9 15 after tokio 1 32 64 2 696293
+10 15 after tokio 1 32 64 3 700304
+11 15 after tokio-adapter 1 32 64 3 638558
+12 15 after tokio 1 32 64 1 693435
+13 15 after tokio-adapter-poll 1 32 64 2 644560
+14 15 readable tokio 1 32 64 2 649123
+15 15 after tokio-adapter 1 32 64 2 643395
+RESULT 1 32 64
+after tokio median 696293 range 693435 700304
+readable tokio median 649123 range 648113 652898
+poll-ready tokio median 661454 range 660271 663029
+after tokio-adapter median 641955 range 638558 643395
+after tokio-adapter-poll median 644560 range 638219 646209
