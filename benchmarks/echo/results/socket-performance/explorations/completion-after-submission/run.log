@@ -1,0 +1,16 @@
+selected-local-notify selected-local-notify-iouring-w1-c1-b64-r2 180595 722789 None
+selected-local-cq-after-submit selected-local-cq-after-submit-iouring-w1-c1-b64-r3 176324 709272 None
+selected-frozen selected-frozen-iouring-w1-c1-b64-r2 236056 135143 None
+selected-local-notify selected-local-notify-iouring-w1-c1-b64-r1 179465 715891 None
+selected-local-cq-after-submit selected-local-cq-after-submit-iouring-w1-c1-b64-r1 176412 710176 None
+selected-frozen selected-frozen-iouring-w1-c1-b64-r3 228219 175576 None
+selected-frozen selected-frozen-iouring-w1-c1-b64-r1 228350 183765 None
+selected-local-cq-after-submit-level selected-local-cq-after-submit-level-iouring-w1-c1-b64-r2 174932 705267 None
+selected-local-notify selected-local-notify-iouring-w1-c1-b64-r3 177414 698527 None
+selected-local-cq-after-submit-level selected-local-cq-after-submit-level-iouring-w1-c1-b64-r1 175029 695825 None
+selected-local-cq-after-submit-level selected-local-cq-after-submit-level-iouring-w1-c1-b64-r3 174437 703404 None
+selected-local-cq-after-submit selected-local-cq-after-submit-iouring-w1-c1-b64-r2 176255 706113 None
+selected-frozen median-rps 228350 rps [236056, 228219, 228350] voluntary-csw [135143, 175576, 183765]
+selected-local-notify median-rps 179465 rps [180595, 179465, 177414] voluntary-csw [722789, 715891, 698527]
+selected-local-cq-after-submit median-rps 176324 rps [176324, 176412, 176255] voluntary-csw [709272, 710176, 706113]
+selected-local-cq-after-submit-level median-rps 174932 rps [174932, 175029, 174437] voluntary-csw [705267, 695825, 703404]

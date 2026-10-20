@@ -1,0 +1,310 @@
+{
+  "purpose": "Mechanism confirmation only; do not compare instrumented throughput to plain timing samples",
+  "binary_hashes": {
+    "server": "a30b1b5f5372ef24f9effcc428f60ddae60b728a2ab005d661e2de073bf657a0",
+    "client": "db6c914ab75011477ec6232e681046b1e75532cbaa1c81663bac984591675cf3"
+  },
+  "instrumentation_sha256": "7d3b74bb1394ed7db09d71ce42c4d1c87098178d468e4a0ee27fdf783ab120b0",
+  "started_utc": "2026-10-20T03:21:33Z",
+  "samples": [
+    {
+      "bytes": 64,
+      "connections": 1,
+      "payload_mib_per_second": 13.898152669270834,
+      "requests": 683122,
+      "requests_per_second": 227707.33333333334,
+      "rtt_max_us": 79.743,
+      "rtt_mean_us": 4.353398414924406,
+      "rtt_p50_us": 4.171,
+      "rtt_p95_us": 5.563,
+      "rtt_p99_us": 5.943,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "counted-iouring-w1-c1-b64-r1",
+      "mode": "counted",
+      "backend": "iouring",
+      "workers": 1,
+      "repeat": 1,
+      "client_cpu": {
+        "user": 0.353765,
+        "system": 1.128784,
+        "voluntary_switches": 910670,
+        "involuntary_switches": 13
+      },
+      "server_cpu": {
+        "user": 0.42359199999999997,
+        "system": 1.332646,
+        "voluntary_switches": 910683,
+        "involuntary_switches": 7
+      },
+      "lifecycle_seconds": 4.0018014090601355,
+      "counter_threads": [
+        {
+          "owner_write_attempt": 0,
+          "remote_write_attempt": 0,
+          "owner_write_success": 0,
+          "remote_write_success": 0,
+          "owner_wake_avoided": 39,
+          "payload_cqe": 910725,
+          "notification_cqe": 2
+        },
+        {
+          "owner_write_attempt": 0,
+          "remote_write_attempt": 2,
+          "owner_write_success": 0,
+          "remote_write_success": 2,
+          "owner_wake_avoided": 0,
+          "payload_cqe": 0,
+          "notification_cqe": 0
+        }
+      ],
+      "counters": {
+        "owner_write_attempt": 0,
+        "remote_write_attempt": 2,
+        "owner_write_success": 0,
+        "remote_write_success": 2,
+        "owner_wake_avoided": 39,
+        "payload_cqe": 910725,
+        "notification_cqe": 2
+      }
+    },
+    {
+      "bytes": 64,
+      "connections": 1,
+      "payload_mib_per_second": 13.479349772135416,
+      "requests": 662537,
+      "requests_per_second": 220845.66666666666,
+      "rtt_max_us": 165.119,
+      "rtt_mean_us": 4.486388049271201,
+      "rtt_p50_us": 4.331,
+      "rtt_p95_us": 5.611,
+      "rtt_p99_us": 5.991,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "counted-iouring-poll-w1-c1-b64-r1",
+      "mode": "counted",
+      "backend": "iouring-poll",
+      "workers": 1,
+      "repeat": 1,
+      "client_cpu": {
+        "user": 0.34948100000000004,
+        "system": 1.103555,
+        "voluntary_switches": 883649,
+        "involuntary_switches": 20
+      },
+      "server_cpu": {
+        "user": 0.42276,
+        "system": 1.3119139999999998,
+        "voluntary_switches": 883679,
+        "involuntary_switches": 6
+      },
+      "lifecycle_seconds": 4.001987043069676,
+      "counter_threads": [
+        {
+          "owner_write_attempt": 0,
+          "remote_write_attempt": 0,
+          "owner_write_success": 0,
+          "remote_write_success": 0,
+          "owner_wake_avoided": 12,
+          "payload_cqe": 883687,
+          "notification_cqe": 2
+        },
+        {
+          "owner_write_attempt": 0,
+          "remote_write_attempt": 2,
+          "owner_write_success": 0,
+          "remote_write_success": 2,
+          "owner_wake_avoided": 0,
+          "payload_cqe": 0,
+          "notification_cqe": 0
+        }
+      ],
+      "counters": {
+        "owner_write_attempt": 0,
+        "remote_write_attempt": 2,
+        "owner_write_success": 0,
+        "remote_write_success": 2,
+        "owner_wake_avoided": 12,
+        "payload_cqe": 883687,
+        "notification_cqe": 2
+      }
+    },
+    {
+      "bytes": 64,
+      "connections": 128,
+      "payload_mib_per_second": 121.25868733723958,
+      "requests": 5960107,
+      "requests_per_second": 1986702.3333333333,
+      "rtt_max_us": 899.071,
+      "rtt_mean_us": 64.38528465999022,
+      "rtt_p50_us": 63.103,
+      "rtt_p95_us": 97.855,
+      "rtt_p99_us": 114.623,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "counted-iouring-w4-c128-b64-r1",
+      "mode": "counted",
+      "backend": "iouring",
+      "workers": 4,
+      "repeat": 1,
+      "client_cpu": {
+        "user": 1.3568319999999998,
+        "system": 7.372806000000001,
+        "voluntary_switches": 236854,
+        "involuntary_switches": 589
+      },
+      "server_cpu": {
+        "user": 2.577588,
+        "system": 8.837272999999998,
+        "voluntary_switches": 20152,
+        "involuntary_switches": 220
+      },
+      "lifecycle_seconds": 4.021192688029259,
+      "counter_threads": [
+        {
+          "owner_write_attempt": 0,
+          "remote_write_attempt": 9673,
+          "owner_write_success": 0,
+          "remote_write_success": 9673,
+          "owner_wake_avoided": 3783,
+          "payload_cqe": 1981682,
+          "notification_cqe": 12389
+        },
+        {
+          "owner_write_attempt": 0,
+          "remote_write_attempt": 9398,
+          "owner_write_success": 0,
+          "remote_write_success": 9398,
+          "owner_wake_avoided": 3346,
+          "payload_cqe": 2002125,
+          "notification_cqe": 6663
+        },
+        {
+          "owner_write_attempt": 0,
+          "remote_write_attempt": 9427,
+          "owner_write_success": 0,
+          "remote_write_success": 9427,
+          "owner_wake_avoided": 3527,
+          "payload_cqe": 1997711,
+          "notification_cqe": 8220
+        },
+        {
+          "owner_write_attempt": 0,
+          "remote_write_attempt": 9424,
+          "owner_write_success": 0,
+          "remote_write_success": 9424,
+          "owner_wake_avoided": 3483,
+          "payload_cqe": 2006603,
+          "notification_cqe": 10599
+        },
+        {
+          "owner_write_attempt": 0,
+          "remote_write_attempt": 130,
+          "owner_write_success": 0,
+          "remote_write_success": 130,
+          "owner_wake_avoided": 0,
+          "payload_cqe": 0,
+          "notification_cqe": 0
+        }
+      ],
+      "counters": {
+        "owner_write_attempt": 0,
+        "remote_write_attempt": 38052,
+        "owner_write_success": 0,
+        "remote_write_success": 38052,
+        "owner_wake_avoided": 14139,
+        "payload_cqe": 7988121,
+        "notification_cqe": 37871
+      }
+    },
+    {
+      "bytes": 64,
+      "connections": 128,
+      "payload_mib_per_second": 120.92110188802083,
+      "requests": 5943514,
+      "requests_per_second": 1981171.3333333333,
+      "rtt_max_us": 1785.855,
+      "rtt_mean_us": 64.56473616584388,
+      "rtt_p50_us": 61.791,
+      "rtt_p95_us": 104.767,
+      "rtt_p99_us": 123.583,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "counted-iouring-poll-w4-c128-b64-r1",
+      "mode": "counted",
+      "backend": "iouring-poll",
+      "workers": 4,
+      "repeat": 1,
+      "client_cpu": {
+        "user": 1.5164410000000004,
+        "system": 7.397922000000001,
+        "voluntary_switches": 356891,
+        "involuntary_switches": 839
+      },
+      "server_cpu": {
+        "user": 2.6069179999999994,
+        "system": 8.921035999999997,
+        "voluntary_switches": 20795,
+        "involuntary_switches": 225
+      },
+      "lifecycle_seconds": 4.025691779097542,
+      "counter_threads": [
+        {
+          "owner_write_attempt": 0,
+          "remote_write_attempt": 7363,
+          "owner_write_success": 0,
+          "remote_write_success": 7363,
+          "owner_wake_avoided": 1781,
+          "payload_cqe": 1967509,
+          "notification_cqe": 8521
+        },
+        {
+          "owner_write_attempt": 0,
+          "remote_write_attempt": 6187,
+          "owner_write_success": 0,
+          "remote_write_success": 6187,
+          "owner_wake_avoided": 1475,
+          "payload_cqe": 1991151,
+          "notification_cqe": 5930
+        },
+        {
+          "owner_write_attempt": 0,
+          "remote_write_attempt": 5588,
+          "owner_write_success": 0,
+          "remote_write_success": 5588,
+          "owner_wake_avoided": 1296,
+          "payload_cqe": 1995674,
+          "notification_cqe": 4305
+        },
+        {
+          "owner_write_attempt": 0,
+          "remote_write_attempt": 6932,
+          "owner_write_success": 0,
+          "remote_write_success": 6932,
+          "owner_wake_avoided": 1590,
+          "payload_cqe": 1980778,
+          "notification_cqe": 7378
+        },
+        {
+          "owner_write_attempt": 0,
+          "remote_write_attempt": 131,
+          "owner_write_success": 0,
+          "remote_write_success": 131,
+          "owner_wake_avoided": 0,
+          "payload_cqe": 0,
+          "notification_cqe": 0
+        }
+      ],
+      "counters": {
+        "owner_write_attempt": 0,
+        "remote_write_attempt": 26201,
+        "owner_write_success": 0,
+        "remote_write_success": 26201,
+        "owner_wake_avoided": 6142,
+        "payload_cqe": 7935112,
+        "notification_cqe": 26134
+      }
+    }
+  ],
+  "finished_utc": "2026-10-20T03:21:49Z"
+}

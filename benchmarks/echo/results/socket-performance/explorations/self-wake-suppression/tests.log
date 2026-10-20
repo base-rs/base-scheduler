@@ -1,0 +1,647 @@
+   Compiling libc v0.2.191
+   Compiling crossbeam-utils v0.8.23
+   Compiling rustix v1.1.5
+   Compiling bitflags v2.13.2
+   Compiling pin-project-lite v0.2.17
+   Compiling parking v2.2.1
+   Compiling cfg-if v1.0.5
+   Compiling linux-raw-sys v0.12.1
+   Compiling futures-core v0.3.34
+   Compiling fastrand v2.5.0
+   Compiling futures-io v0.3.34
+   Compiling autocfg v1.5.1
+   Compiling signal-hook v0.4.5
+   Compiling crossbeam-epoch v0.9.21
+   Compiling slab v0.4.12
+   Compiling getrandom v0.4.3
+   Compiling crossbeam-deque v0.8.8
+   Compiling async-task v4.7.1
+   Compiling core-scheduler-timers v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-interrupt-counters/crates/timers)
+   Compiling once_cell v1.21.4
+   Compiling allocation-counter v0.8.1
+   Compiling io-uring v0.7.15
+   Compiling futures-channel v0.3.34
+   Compiling event-listener v5.4.2
+   Compiling futures-lite v2.6.1
+   Compiling async-io v2.6.0
+   Compiling core-scheduler v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-interrupt-counters)
+   Compiling concurrent-queue v2.5.0
+   Compiling core-scheduler-conformance v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-interrupt-counters/crates/conformance)
+   Compiling errno v0.3.14
+   Compiling socket2 v0.6.5
+   Compiling signal-hook-registry v1.4.8
+   Compiling polling v3.11.0
+   Compiling tempfile v3.27.0
+   Compiling core-scheduler-selector v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-interrupt-counters/crates/selector)
+   Compiling core-scheduler-native v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-interrupt-counters/crates/native)
+   Compiling core-scheduler-iouring v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-interrupt-counters/crates/iouring)
+warning: constant `NOTIFY_LOCAL_SUCCESS` is never used
+  --> crates/iouring/src/interrupt_counters.rs:24:18
+   |
+24 | pub(crate) const NOTIFY_LOCAL_SUCCESS: usize = 1;
+   |                  ^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: constant `NOTIFY_LOCAL_EAGAIN` is never used
+  --> crates/iouring/src/interrupt_counters.rs:25:18
+   |
+25 | pub(crate) const NOTIFY_LOCAL_EAGAIN: usize = 2;
+   |                  ^^^^^^^^^^^^^^^^^^^
+
+warning: constant `NOTIFY_LOCAL_ERROR` is never used
+  --> crates/iouring/src/interrupt_counters.rs:26:18
+   |
+26 | pub(crate) const NOTIFY_LOCAL_ERROR: usize = 3;
+   |                  ^^^^^^^^^^^^^^^^^^
+
+warning: constant `NOTIFY_REMOTE_SUCCESS` is never used
+  --> crates/iouring/src/interrupt_counters.rs:28:18
+   |
+28 | pub(crate) const NOTIFY_REMOTE_SUCCESS: usize = 5;
+   |                  ^^^^^^^^^^^^^^^^^^^^^
+
+warning: constant `NOTIFY_REMOTE_EAGAIN` is never used
+  --> crates/iouring/src/interrupt_counters.rs:29:18
+   |
+29 | pub(crate) const NOTIFY_REMOTE_EAGAIN: usize = 6;
+   |                  ^^^^^^^^^^^^^^^^^^^^
+
+warning: constant `NOTIFY_REMOTE_ERROR` is never used
+  --> crates/iouring/src/interrupt_counters.rs:30:18
+   |
+30 | pub(crate) const NOTIFY_REMOTE_ERROR: usize = 7;
+   |                  ^^^^^^^^^^^^^^^^^^^
+
+warning: constant `WAIT_FUNCTION` is never used
+  --> crates/iouring/src/interrupt_counters.rs:31:18
+   |
+31 | pub(crate) const WAIT_FUNCTION: usize = 8;
+   |                  ^^^^^^^^^^^^^
+
+warning: constant `NOTIFICATION_ARMED` is never used
+  --> crates/iouring/src/interrupt_counters.rs:34:18
+   |
+34 | pub(crate) const NOTIFICATION_ARMED: usize = 11;
+   |                  ^^^^^^^^^^^^^^^^^^
+
+warning: constant `NOTIFICATION_CQE` is never used
+  --> crates/iouring/src/interrupt_counters.rs:35:18
+   |
+35 | pub(crate) const NOTIFICATION_CQE: usize = 12;
+   |                  ^^^^^^^^^^^^^^^^
+
+warning: `core-scheduler-iouring` (lib) generated 9 warnings
+warning: constant `NOTIFY_LOCAL_ATTEMPT` is never used
+  --> crates/iouring/src/interrupt_counters.rs:23:18
+   |
+23 | pub(crate) const NOTIFY_LOCAL_ATTEMPT: usize = 0;
+   |                  ^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: constant `NOTIFY_LOCAL_SUCCESS` is never used
+  --> crates/iouring/src/interrupt_counters.rs:24:18
+   |
+24 | pub(crate) const NOTIFY_LOCAL_SUCCESS: usize = 1;
+   |                  ^^^^^^^^^^^^^^^^^^^^
+
+warning: constant `NOTIFY_REMOTE_ATTEMPT` is never used
+  --> crates/iouring/src/interrupt_counters.rs:27:18
+   |
+27 | pub(crate) const NOTIFY_REMOTE_ATTEMPT: usize = 4;
+   |                  ^^^^^^^^^^^^^^^^^^^^^
+
+warning: constant `WAIT_SYSCALL` is never used
+  --> crates/iouring/src/interrupt_counters.rs:32:18
+   |
+32 | pub(crate) const WAIT_SYSCALL: usize = 9;
+   |                  ^^^^^^^^^^^^
+
+warning: constant `SUBMIT_SYSCALL` is never used
+  --> crates/iouring/src/interrupt_counters.rs:33:18
+   |
+33 | pub(crate) const SUBMIT_SYSCALL: usize = 10;
+   |                  ^^^^^^^^^^^^^^
+
+warning: constant `NOTIFICATION_CQE_SUCCESS` is never used
+  --> crates/iouring/src/interrupt_counters.rs:36:18
+   |
+36 | pub(crate) const NOTIFICATION_CQE_SUCCESS: usize = 13;
+   |                  ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: constant `NOTIFICATION_CQE_ERROR` is never used
+  --> crates/iouring/src/interrupt_counters.rs:37:18
+   |
+37 | pub(crate) const NOTIFICATION_CQE_ERROR: usize = 14;
+   |                  ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: constant `SYNC_READ_ATTEMPT` is never used
+  --> crates/iouring/src/interrupt_counters.rs:38:18
+   |
+38 | pub(crate) const SYNC_READ_ATTEMPT: usize = 15;
+   |                  ^^^^^^^^^^^^^^^^^
+
+warning: constant `SYNC_READ_SUCCESS` is never used
+  --> crates/iouring/src/interrupt_counters.rs:39:18
+   |
+39 | pub(crate) const SYNC_READ_SUCCESS: usize = 16;
+   |                  ^^^^^^^^^^^^^^^^^
+
+warning: constant `SYNC_READ_EAGAIN` is never used
+  --> crates/iouring/src/interrupt_counters.rs:40:18
+   |
+40 | pub(crate) const SYNC_READ_EAGAIN: usize = 17;
+   |                  ^^^^^^^^^^^^^^^^
+
+warning: constant `SYNC_READ_ERROR` is never used
+  --> crates/iouring/src/interrupt_counters.rs:41:18
+   |
+41 | pub(crate) const SYNC_READ_ERROR: usize = 18;
+   |                  ^^^^^^^^^^^^^^^
+
+warning: function `syscall` is never used
+  --> crates/iouring/src/interrupt_counters.rs:57:15
+   |
+57 | pub(crate) fn syscall<T>(name: &'static str, result: &io::Result<T>) {
+   |               ^^^^^^^
+
+warning: `core-scheduler-iouring` (lib test) generated 20 warnings (8 duplicates)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.00s
+     Running unittests src/lib.rs (/home/samuel/.cache/core-scheduler-interrupt-counters/build/debug/deps/core_scheduler_iouring-dca30fbeda8e4a24)
+
+running 50 tests
+INTERRUPT_COUNTERS {"worker":false,"notify_local_attempt":0,"notify_local_success":0,"notify_local_eagain":0,"notify_local_error":0,"notify_remote_attempt":0,"notify_remote_success":0,"notify_remote_eagain":0,"notify_remote_error":0,"wait_function":0,"wait_syscall":0,"submit_syscall":0,"notification_armed":0,"notification_cqe":0,"notification_cqe_success":0,"notification_cqe_error":0,"sync_read_attempt":0,"sync_read_success":0,"sync_read_eagain":0,"sync_read_error":0,"payload_cqe":2,"turn":5}
+INTERRUPT_COUNTERS {"worker":false,"notify_local_attempt":0,"notify_local_success":0,"notify_local_eagain":0,"notify_local_error":0,"notify_remote_attempt":0,"notify_remote_success":0,"notify_remote_eagain":0,"notify_remote_error":0,"wait_function":0,"wait_syscall":0,"submit_syscall":0,"notification_armed":0,"notification_cqe":0,"notification_cqe_success":0,"notification_cqe_error":0,"sync_read_attempt":0,"sync_read_success":0,"sync_read_eagain":0,"sync_read_error":0,"payload_cqe":1,"turn":3}
+INTERRUPT_COUNTERS {"worker":false,"notify_local_attempt":0,"notify_local_success":0,"notify_local_eagain":0,"notify_local_error":0,"notify_remote_attempt":0,"notify_remote_success":0,"notify_remote_eagain":0,"notify_remote_error":0,"wait_function":0,"wait_syscall":0,"submit_syscall":0,"notification_armed":0,"notification_cqe":0,"notification_cqe_success":0,"notification_cqe_error":0,"sync_read_attempt":0,"sync_read_success":0,"sync_read_eagain":0,"sync_read_error":0,"payload_cqe":0,"turn":2}
+INTERRUPT_COUNTERS {"worker":false,"notify_local_attempt":0,"notify_local_success":0,"notify_local_eagain":0,"notify_local_error":0,"notify_remote_attempt":0,"notify_remote_success":0,"notify_remote_eagain":0,"notify_remote_error":0,"wait_function":0,"wait_syscall":0,"submit_syscall":0,"notification_armed":0,"notification_cqe":0,"notification_cqe_success":0,"notification_cqe_error":0,"sync_read_attempt":0,"sync_read_success":0,"sync_read_eagain":0,"sync_read_error":0,"payload_cqe":2,"turn":5}
+test io_uring_selector::message::tests::message_length_validation_rejects_overflow_without_truncating_datagrams ... ok
+test io_uring_selector::message::tests::empty_receive_consumes_one_datagram_without_replacing_the_sequence ... ok
+test io_uring_selector::message::tests::submitted_message_keeps_payload_alive_after_waiter_drop_until_driver_retirement ... ok
+test io_uring_selector::message::tests::message_admission_is_lazy_cancellable_and_reports_closure_or_exhaustion ... ok
+test io_uring_selector::message::tests::inline_prepared_vectors_survive_submission_and_are_used_without_copying ... ok
+test io_uring_selector::tests::capacity_wait_observes_retirement_and_closure_before_registration ... ok
+INTERRUPT_COUNTERS {"worker":false,"notify_local_attempt":0,"notify_local_success":0,"notify_local_eagain":0,"notify_local_error":0,"notify_remote_attempt":0,"notify_remote_success":0,"notify_remote_eagain":0,"notify_remote_error":0,"wait_function":0,"wait_syscall":0,"submit_syscall":0,"notification_armed":0,"notification_cqe":0,"notification_cqe_success":0,"notification_cqe_error":0,"sync_read_attempt":0,"sync_read_success":0,"sync_read_eagain":0,"sync_read_error":0,"payload_cqe":0,"turn":1}
+test io_uring_selector::readiness::tests::failed_driver_disconnects_readiness_waiters_without_accessing_borrowed_bytes ... ok
+INTERRUPT_COUNTERS {"worker":false,"notify_local_attempt":0,"notify_local_success":0,"notify_local_eagain":0,"notify_local_error":0,"notify_remote_attempt":0,"notify_remote_success":0,"notify_remote_eagain":0,"notify_remote_error":0,"wait_function":0,"wait_syscall":0,"submit_syscall":0,"notification_armed":0,"notification_cqe":0,"notification_cqe_success":0,"notification_cqe_error":0,"sync_read_attempt":0,"sync_read_success":0,"sync_read_eagain":0,"sync_read_error":0,"payload_cqe":5,"turn":11}
+test io_uring_selector::message::tests::ordinary_sequences_preserve_datagram_addresses_flags_and_payloads ... ok
+INTERRUPT_COUNTERS {"worker":false,"notify_local_attempt":0,"notify_local_success":0,"notify_local_eagain":0,"notify_local_error":0,"notify_remote_attempt":0,"notify_remote_success":0,"notify_remote_eagain":0,"notify_remote_error":0,"wait_function":0,"wait_syscall":0,"submit_syscall":0,"notification_armed":0,"notification_cqe":0,"notification_cqe_success":0,"notification_cqe_error":0,"sync_read_attempt":0,"sync_read_success":0,"sync_read_eagain":0,"sync_read_error":0,"payload_cqe":0,"turn":1}
+test io_uring_selector::readiness::tests::ready_scalar_and_vector_io_allocate_nothing_even_when_ring_capacity_is_full ... ok
+test io_uring_selector::tests::external_admission_remains_bounded_under_contention ... ok
+INTERRUPT_COUNTERS {"worker":false,"notify_local_attempt":0,"notify_local_success":0,"notify_local_eagain":0,"notify_local_error":0,"notify_remote_attempt":0,"notify_remote_success":0,"notify_remote_eagain":0,"notify_remote_error":0,"wait_function":0,"wait_syscall":0,"submit_syscall":0,"notification_armed":0,"notification_cqe":0,"notification_cqe_success":0,"notification_cqe_error":0,"sync_read_attempt":0,"sync_read_success":0,"sync_read_eagain":0,"sync_read_error":0,"payload_cqe":0,"turn":1}
+INTERRUPT_COUNTERS {"worker":false,"notify_local_attempt":0,"notify_local_success":0,"notify_local_eagain":0,"notify_local_error":0,"notify_remote_attempt":0,"notify_remote_success":0,"notify_remote_eagain":0,"notify_remote_error":0,"wait_function":0,"wait_syscall":0,"submit_syscall":0,"notification_armed":0,"notification_cqe":0,"notification_cqe_success":0,"notification_cqe_error":0,"sync_read_attempt":0,"sync_read_success":0,"sync_read_eagain":0,"sync_read_error":0,"payload_cqe":0,"turn":2}
+INTERRUPT_COUNTERS {"worker":false,"notify_local_attempt":0,"notify_local_success":0,"notify_local_eagain":0,"notify_local_error":0,"notify_remote_attempt":0,"notify_remote_success":0,"notify_remote_eagain":0,"notify_remote_error":0,"wait_function":0,"wait_syscall":0,"submit_syscall":0,"notification_armed":0,"notification_cqe":0,"notification_cqe_success":0,"notification_cqe_error":0,"sync_read_attempt":0,"sync_read_success":0,"sync_read_eagain":0,"sync_read_error":0,"payload_cqe":1,"turn":3}
+INTERRUPT_COUNTERS {"worker":false,"notify_local_attempt":0,"notify_local_success":0,"notify_local_eagain":0,"notify_local_error":0,"notify_remote_attempt":0,"notify_remote_success":0,"notify_remote_eagain":0,"notify_remote_error":0,"wait_function":0,"wait_syscall":0,"submit_syscall":0,"notification_armed":0,"notification_cqe":0,"notification_cqe_success":0,"notification_cqe_error":0,"sync_read_attempt":0,"sync_read_success":0,"sync_read_eagain":0,"sync_read_error":0,"payload_cqe":0,"turn":3}
+INTERRUPT_COUNTERS {"worker":false,"notify_local_attempt":0,"notify_local_success":0,"notify_local_eagain":0,"notify_local_error":0,"notify_remote_attempt":0,"notify_remote_success":0,"notify_remote_eagain":0,"notify_remote_error":0,"wait_function":0,"wait_syscall":0,"submit_syscall":0,"notification_armed":0,"notification_cqe":0,"notification_cqe_success":0,"notification_cqe_error":0,"sync_read_attempt":0,"sync_read_success":0,"sync_read_eagain":0,"sync_read_error":0,"payload_cqe":1,"turn":3}
+INTERRUPT_COUNTERS {"worker":false,"notify_local_attempt":0,"notify_local_success":0,"notify_local_eagain":0,"notify_local_error":0,"notify_remote_attempt":0,"notify_remote_success":0,"notify_remote_eagain":0,"notify_remote_error":0,"wait_function":0,"wait_syscall":0,"submit_syscall":0,"notification_armed":0,"notification_cqe":0,"notification_cqe_success":0,"notification_cqe_error":0,"sync_read_attempt":0,"sync_read_success":0,"sync_read_eagain":0,"sync_read_error":0,"payload_cqe":2,"turn":6}
+INTERRUPT_COUNTERS test io_uring_selector::readiness::tests::ready_waits_and_cancelled_waits_retire_before_returning ... {"worker":false,"notify_local_attempt":0,"notify_local_success":0,"notify_local_eagain":0,"notify_local_error":0,"notify_remote_attempt":0,"notify_remote_success":0,"notify_remote_eagain":0,"notify_remote_error":0,"wait_function":0,"wait_syscall":0,"submit_syscall":0,"notification_armed":0,"notification_cqe":0,"notification_cqe_success":0,"notification_cqe_error":0,"sync_read_attempt":0,"sync_read_success":0,"sync_read_eagain":0,"sync_read_error":0,"payload_cqe":1,"turn":3}ok
+
+test io_uring_selector::tests::bounded_admission_wakes_for_cancellation_and_closure ... ok
+test io_uring_selector::tests::dropping_an_undriven_driver_returns_queued_buffers_and_closes_fallback ... ok
+test io_uring_selector::tests::abandoning_submitted_io_keeps_storage_until_original_retirement ... ok
+test io_uring_selector::tests::convenience_driver_loop_reports_the_original_failure ... ok
+test io_uring_selector::readiness::tests::admission_cancellation_exhaustion_and_closure_are_reported ... ok
+test io_uring_selector::readiness::tests::pending_read_uses_polladd_and_observes_data_arriving_before_submission ... ok
+INTERRUPT_COUNTERS {"worker":false,"notify_local_attempt":0,"notify_local_success":0,"notify_local_eagain":0,"notify_local_error":0,"notify_remote_attempt":0,"notify_remote_success":0,"notify_remote_eagain":0,"notify_remote_error":0,"wait_function":0,"wait_syscall":0,"submit_syscall":0,"notification_armed":0,"notification_cqe":0,"notification_cqe_success":0,"notification_cqe_error":0,"sync_read_attempt":0,"sync_read_success":0,"sync_read_eagain":0,"sync_read_error":0,"payload_cqe":0,"turn":4}
+test io_uring_selector::tests::driver_failure_retains_submitted_storage_and_wakes_waiters_with_a_panic ... ok
+test io_uring_selector::tests::nonblocking_turn_preserves_notifications_for_the_next_idle_turn ... ok
+test io_uring_selector::tests::dropping_local_driver_returns_queued_owners_before_shutdown_and_allows_reentrant_wakes ... ok
+INTERRUPT_COUNTERS {"worker":false,"notify_local_attempt":0,"notify_local_success":0,"notify_local_eagain":0,"notify_local_error":0,"notify_remote_attempt":0,"notify_remote_success":0,"notify_remote_eagain":0,"notify_remote_error":0,"wait_function":0,"wait_syscall":0,"submit_syscall":0,"notification_armed":0,"notification_cqe":0,"notification_cqe_success":0,"notification_cqe_error":0,"sync_read_attempt":0,"sync_read_success":0,"sync_read_eagain":0,"sync_read_error":0,"payload_cqe":1,"turn":4}
+test io_uring_selector::tests::nonblocking_and_productive_turns_do_not_prepare_an_idle_wait ... ok
+INTERRUPT_COUNTERS {"worker":false,"notify_local_attempt":0,"notify_local_success":0,"notify_local_eagain":0,"notify_local_error":0,"notify_remote_attempt":0,"notify_remote_success":0,"notify_remote_eagain":0,"notify_remote_error":0,"wait_function":0,"wait_syscall":0,"submit_syscall":0,"notification_armed":0,"notification_cqe":0,"notification_cqe_success":0,"notification_cqe_error":0,"sync_read_attempt":0,"sync_read_success":0,"sync_read_eagain":0,"sync_read_error":0,"payload_cqe":0,"turn":5}
+test io_uring_selector::tests::event_loop_wakers_and_notification_errors_do_not_lose_work ... ok
+INTERRUPT_COUNTERS {"worker":false,"notify_local_attempt":0,"notify_local_success":0,"notify_local_eagain":0,"notify_local_error":0,"notify_remote_attempt":0,"notify_remote_success":0,"notify_remote_eagain":0,"notify_remote_error":0,"wait_function":0,"wait_syscall":0,"submit_syscall":0,"notification_armed":0,"notification_cqe":0,"notification_cqe_success":0,"notification_cqe_error":0,"sync_read_attempt":0,"sync_read_success":0,"sync_read_eagain":0,"sync_read_error":0,"payload_cqe":1,"turn":4}
+test io_uring_selector::tests::cooperative_cancellation_waits_for_original_completion_and_returns_the_owner ... ok
+INTERRUPT_COUNTERS {"worker":false,"notify_local_attempt":0,"notify_local_success":0,"notify_local_eagain":0,"notify_local_error":0,"notify_remote_attempt":0,"notify_remote_success":0,"notify_remote_eagain":0,"notify_remote_error":0,"wait_function":0,"wait_syscall":0,"submit_syscall":0,"notification_armed":0,"notification_cqe":0,"notification_cqe_success":0,"notification_cqe_error":0,"sync_read_attempt":0,"sync_read_success":0,"sync_read_eagain":0,"sync_read_error":0,"payload_cqe":2,"turn":5}
+test io_uring_selector::socket::tests::scalar_socket_requests_use_ring_opcodes_and_release_before_notification ... ok
+INTERRUPT_COUNTERS {"worker":false,"notify_local_attempt":0,"notify_local_success":0,"notify_local_eagain":0,"notify_local_error":0,"notify_remote_attempt":0,"notify_remote_success":0,"notify_remote_eagain":0,"notify_remote_error":0,"wait_function":0,"wait_syscall":0,"submit_syscall":0,"notification_armed":0,"notification_cqe":0,"notification_cqe_success":0,"notification_cqe_error":0,"sync_read_attempt":0,"sync_read_success":0,"sync_read_eagain":0,"sync_read_error":0,"payload_cqe":3,"turn":7}
+test io_uring_selector::tests::pending_submissions_are_flushed_before_preparing_to_sleep ... ok
+INTERRUPT_COUNTERS {"worker":false,"notify_local_attempt":0,"notify_local_success":0,"notify_local_eagain":0,"notify_local_error":0,"notify_remote_attempt":0,"notify_remote_success":0,"notify_remote_eagain":0,"notify_remote_error":0,"wait_function":0,"wait_syscall":0,"submit_syscall":0,"notification_armed":0,"notification_cqe":0,"notification_cqe_success":0,"notification_cqe_error":0,"sync_read_attempt":0,"sync_read_success":0,"sync_read_eagain":0,"sync_read_error":0,"payload_cqe":0,"turn":4}
+test io_uring_selector::readiness::tests::blocked_scalar_and_vector_sends_wait_on_the_ring_and_cancel_safely ... ok
+test io_uring_selector::tests::native_workers_use_distinct_rings_without_external_submission_routing ... ok
+INTERRUPT_COUNTERS {"worker":false,"notify_local_attempt":0,"notify_local_success":0,"notify_local_eagain":0,"notify_local_error":0,"notify_remote_attempt":0,"notify_remote_success":0,"notify_remote_eagain":0,"notify_remote_error":0,"wait_function":0,"wait_syscall":0,"submit_syscall":0,"notification_armed":0,"notification_cqe":0,"notification_cqe_success":0,"notification_cqe_error":0,"sync_read_attempt":0,"sync_read_success":0,"sync_read_eagain":0,"sync_read_error":0,"payload_cqe":0,"turn":9}
+test io_uring_selector::tests::notifications_racing_idle_preparation_remain_observable ... ok
+INTERRUPT_COUNTERS {"worker":false,"notify_local_attempt":0,"notify_local_success":0,"notify_local_eagain":0,"notify_local_error":0,"notify_remote_attempt":0,"notify_remote_success":0,"notify_remote_eagain":0,"notify_remote_error":0,"wait_function":0,"wait_syscall":0,"submit_syscall":0,"notification_armed":0,"notification_cqe":0,"notification_cqe_success":0,"notification_cqe_error":0,"sync_read_attempt":0,"sync_read_success":0,"sync_read_eagain":0,"sync_read_error":0,"payload_cqe":4,"turn":12}
+INTERRUPT_COUNTERS {"worker":false,"notify_local_attempt":0,"notify_local_success":0,"notify_local_eagain":0,"notify_local_error":0,"notify_remote_attempt":0,"notify_remote_success":0,"notify_remote_eagain":0,"notify_remote_error":0,"wait_function":0,"wait_syscall":0,"submit_syscall":0,"notification_armed":0,"notification_cqe":0,"notification_cqe_success":0,"notification_cqe_error":0,"sync_read_attempt":0,"sync_read_success":0,"sync_read_eagain":0,"sync_read_error":0,"payload_cqe":4,"turn":9}
+test io_uring_selector::tests::empty_operations_keep_native_access_mode_errors ... ok
+test io_uring_selector::tests::full_submission_queue_defers_cancellations_and_shutdown_tolerates_duplicate_requests ... ok
+INTERRUPT_COUNTERS {"worker":false,"notify_local_attempt":0,"notify_local_success":0,"notify_local_eagain":0,"notify_local_error":0,"notify_remote_attempt":0,"notify_remote_success":0,"notify_remote_eagain":0,"notify_remote_error":0,"wait_function":0,"wait_syscall":0,"submit_syscall":0,"notification_armed":0,"notification_cqe":0,"notification_cqe_success":0,"notification_cqe_error":0,"sync_read_attempt":0,"sync_read_success":0,"sync_read_eagain":0,"sync_read_error":0,"payload_cqe":0,"turn":1}
+test io_uring_selector::tests::stopping_one_ring_closes_the_group_and_shared_fallback ... ok
+INTERRUPT_COUNTERS {"worker":true,"notify_local_attempt":0,"notify_local_success":0,"notify_local_eagain":0,"notify_local_error":0,"notify_remote_attempt":0,"notify_remote_success":0,"notify_remote_eagain":0,"notify_remote_error":0,"wait_function":0,"wait_syscall":0,"submit_syscall":0,"notification_armed":0,"notification_cqe":0,"notification_cqe_success":0,"notification_cqe_error":0,"sync_read_attempt":0,"sync_read_success":0,"sync_read_eagain":0,"sync_read_error":0,"payload_cqe":1,"turn":4}
+INTERRUPT_COUNTERS {"worker":false,"notify_local_attempt":0,"notify_local_success":0,"notify_local_eagain":0,"notify_local_error":0,"notify_remote_attempt":0,"notify_remote_success":0,"notify_remote_eagain":0,"notify_remote_error":0,"wait_function":0,"wait_syscall":0,"submit_syscall":0,"notification_armed":0,"notification_cqe":0,"notification_cqe_success":0,"notification_cqe_error":0,"sync_read_attempt":0,"sync_read_success":0,"sync_read_eagain":0,"sync_read_error":0,"payload_cqe":0,"turn":2}
+test io_uring_selector::tests::nested_selectors_restore_routes_and_never_use_another_selectors_ring ... ok
+test io_uring_selector::tests::partial_ring_construction_releases_previously_created_drivers ... ok
+INTERRUPT_COUNTERS test io_uring_selector::readiness::tests::readiness_errors_and_unpublished_shutdown_release_the_socket ... {"worker":false,"notify_local_attempt":0,"notify_local_success":0,"notify_local_eagain":0,"notify_local_error":0,"notify_remote_attempt":0,"notify_remote_success":0,"notify_remote_eagain":0,"notify_remote_error":0,"wait_function":0,"wait_syscall":0,"submit_syscall":0,"notification_armed":0,"notification_cqe":0,"notification_cqe_success":0,"notification_cqe_error":0,"sync_read_attempt":0,"sync_read_success":0,"sync_read_eagain":0,"sync_read_error":0,"payload_cqe":0,"turn":1}ok
+
+test io_uring_selector::socket::tests::transient_socket_failures_retry_and_preserve_the_owner ... ok
+INTERRUPT_COUNTERS {"worker":false,"notify_local_attempt":0,"notify_local_success":0,"notify_local_eagain":0,"notify_local_error":0,"notify_remote_attempt":0,"notify_remote_success":0,"notify_remote_eagain":0,"notify_remote_error":0,"wait_function":0,"wait_syscall":0,"submit_syscall":0,"notification_armed":0,"notification_cqe":0,"notification_cqe_success":0,"notification_cqe_error":0,"sync_read_attempt":0,"sync_read_success":0,"sync_read_eagain":0,"sync_read_error":0,"payload_cqe":0,"turn":1}
+INTERRUPT_COUNTERS {"worker":false,"notify_local_attempt":0,"notify_local_success":0,"notify_local_eagain":0,"notify_local_error":0,"notify_remote_attempt":0,"notify_remote_success":0,"notify_remote_eagain":0,"notify_remote_error":0,"wait_function":0,"wait_syscall":0,"submit_syscall":0,"notification_armed":0,"notification_cqe":0,"notification_cqe_success":0,"notification_cqe_error":0,"sync_read_attempt":0,"sync_read_success":0,"sync_read_eagain":0,"sync_read_error":0,"payload_cqe":0,"turn":2}
+test io_uring_selector::readiness::tests::spurious_readiness_retries_on_the_original_ring_after_thread_migration ... ok
+test io_uring_selector::tests::lazy_precancelled_empty_invalid_and_closed_operations_preserve_the_buffer ... ok
+INTERRUPT_COUNTERS {"worker":false,"notify_local_attempt":0,"notify_local_success":0,"notify_local_eagain":0,"notify_local_error":0,"notify_remote_attempt":0,"notify_remote_success":0,"notify_remote_eagain":0,"notify_remote_error":0,"wait_function":0,"wait_syscall":0,"submit_syscall":0,"notification_armed":0,"notification_cqe":0,"notification_cqe_success":0,"notification_cqe_error":0,"sync_read_attempt":0,"sync_read_success":0,"sync_read_eagain":0,"sync_read_error":0,"payload_cqe":0,"turn":1}
+test io_uring_selector::readiness::tests::interrupted_syscalls_retry_but_check_cancellation_and_closure ... ok
+INTERRUPT_COUNTERS {"worker":false,"notify_local_attempt":0,"notify_local_success":0,"notify_local_eagain":0,"notify_local_error":0,"notify_remote_attempt":0,"notify_remote_success":0,"notify_remote_eagain":0,"notify_remote_error":0,"wait_function":0,"wait_syscall":0,"submit_syscall":0,"notification_armed":0,"notification_cqe":0,"notification_cqe_success":0,"notification_cqe_error":0,"sync_read_attempt":0,"sync_read_success":0,"sync_read_eagain":0,"sync_read_error":0,"payload_cqe":1,"turn":6}
+INTERRUPT_COUNTERS {"worker":false,"notify_local_attempt":0,"notify_local_success":0,"notify_local_eagain":0,"notify_local_error":0,"notify_remote_attempt":0,"notify_remote_success":0,"notify_remote_eagain":0,"notify_remote_error":0,"wait_function":0,"wait_syscall":0,"submit_syscall":0,"notification_armed":0,"notification_cqe":0,"notification_cqe_success":0,"notification_cqe_error":0,"sync_read_attempt":0,"sync_read_success":0,"sync_read_eagain":0,"sync_read_error":0,"payload_cqe":3,"turn":10}
+INTERRUPT_COUNTERS {"worker":true,"notify_local_attempt":0,"notify_local_success":0,"notify_local_eagain":0,"notify_local_error":0,"notify_remote_attempt":0,"notify_remote_success":0,"notify_remote_eagain":0,"notify_remote_error":0,"wait_function":0,"wait_syscall":0,"submit_syscall":0,"notification_armed":0,"notification_cqe":0,"notification_cqe_success":0,"notification_cqe_error":0,"sync_read_attempt":0,"sync_read_success":0,"sync_read_eagain":0,"sync_read_error":0,"payload_cqe":3,"turn":10}
+INTERRUPT_COUNTERS {"worker":true,"notify_local_attempt":0,"notify_local_success":0,"notify_local_eagain":0,"notify_local_error":0,"notify_remote_attempt":0,"notify_remote_success":0,"notify_remote_eagain":0,"notify_remote_error":0,"wait_function":0,"wait_syscall":0,"submit_syscall":0,"notification_armed":0,"notification_cqe":0,"notification_cqe_success":0,"notification_cqe_error":0,"sync_read_attempt":0,"sync_read_success":0,"sync_read_eagain":0,"sync_read_error":0,"payload_cqe":2,"turn":6}
+test io_uring_selector::tests::close_returns_pending_owners_and_cancellation_tolerates_retired_requests ... ok
+INTERRUPT_COUNTERS {"worker":false,"notify_local_attempt":0,"notify_local_success":0,"notify_local_eagain":0,"notify_local_error":0,"notify_remote_attempt":0,"notify_remote_success":0,"notify_remote_eagain":0,"notify_remote_error":0,"wait_function":0,"wait_syscall":0,"submit_syscall":0,"notification_armed":0,"notification_cqe":0,"notification_cqe_success":0,"notification_cqe_error":0,"sync_read_attempt":0,"sync_read_success":0,"sync_read_eagain":0,"sync_read_error":0,"payload_cqe":1,"turn":4}
+INTERRUPT_COUNTERS {"worker":true,"notify_local_attempt":0,"notify_local_success":0,"notify_local_eagain":0,"notify_local_error":0,"notify_remote_attempt":0,"notify_remote_success":0,"notify_remote_eagain":0,"notify_remote_error":0,"wait_function":0,"wait_syscall":0,"submit_syscall":0,"notification_armed":0,"notification_cqe":0,"notification_cqe_success":0,"notification_cqe_error":0,"sync_read_attempt":0,"sync_read_success":0,"sync_read_eagain":0,"sync_read_error":0,"payload_cqe":1,"turn":5}
+test io_uring_selector::tests::abandoned_buffer_destructor_panics_do_not_stop_other_operations ... ok
+test io_uring_selector::tests::workers_route_locally_and_external_operations_share_ring_capacity_fairly ... ok
+test io_uring_selector::tests::migrated_cancellation_cannot_overtake_a_queued_submission ... ok
+test io_uring_selector::tests::successful_completion_wins_cancellation_and_releases_the_file_before_waking ... ok
+test io_uring_selector::tests::moving_a_waiter_to_another_thread_keeps_cancellation_on_the_original_ring ... ok
+test io_uring_selector::tests::setup_probes_and_errors_are_explicit ... ok
+INTERRUPT_COUNTERS {"worker":false,"notify_local_attempt":0,"notify_local_success":0,"notify_local_eagain":0,"notify_local_error":0,"notify_remote_attempt":0,"notify_remote_success":0,"notify_remote_eagain":0,"notify_remote_error":0,"wait_function":0,"wait_syscall":0,"submit_syscall":0,"notification_armed":0,"notification_cqe":0,"notification_cqe_success":0,"notification_cqe_error":0,"sync_read_attempt":0,"sync_read_success":0,"sync_read_eagain":0,"sync_read_error":0,"payload_cqe":0,"turn":4}
+INTERRUPT_COUNTERS {"worker":false,"notify_local_attempt":0,"notify_local_success":0,"notify_local_eagain":0,"notify_local_error":0,"notify_remote_attempt":0,"notify_remote_success":0,"notify_remote_eagain":0,"notify_remote_error":0,"wait_function":0,"wait_syscall":0,"submit_syscall":0,"notification_armed":0,"notification_cqe":0,"notification_cqe_success":0,"notification_cqe_error":0,"sync_read_attempt":0,"sync_read_success":0,"sync_read_eagain":0,"sync_read_error":0,"payload_cqe":0,"turn":1}
+test io_uring_selector::message::tests::queued_or_disconnected_message_requests_return_owners_and_unknown_completion_panics ... ok
+test io_uring_selector::tests::submission_racing_shutdown_or_driver_exit_returns_unpublished_storage ... ok
+INTERRUPT_COUNTERS {"worker":false,"notify_local_attempt":0,"notify_local_success":0,"notify_local_eagain":0,"notify_local_error":0,"notify_remote_attempt":0,"notify_remote_success":0,"notify_remote_eagain":0,"notify_remote_error":0,"wait_function":0,"wait_syscall":0,"submit_syscall":0,"notification_armed":0,"notification_cqe":0,"notification_cqe_success":0,"notification_cqe_error":0,"sync_read_attempt":0,"sync_read_success":0,"sync_read_eagain":0,"sync_read_error":0,"payload_cqe":0,"turn":8}
+test io_uring_selector::message::tests::message_cancellation_and_abandonment_retain_payload_until_original_completion ... ok
+INTERRUPT_COUNTERS {"worker":false,"notify_local_attempt":0,"notify_local_success":0,"notify_local_eagain":0,"notify_local_error":0,"notify_remote_attempt":0,"notify_remote_success":0,"notify_remote_eagain":0,"notify_remote_error":0,"wait_function":0,"wait_syscall":0,"submit_syscall":0,"notification_armed":0,"notification_cqe":0,"notification_cqe_success":0,"notification_cqe_error":0,"sync_read_attempt":0,"sync_read_success":0,"sync_read_eagain":0,"sync_read_error":0,"payload_cqe":0,"turn":15}
+test io_uring_selector::tests::transient_syscall_errors_preserve_progress_and_fatal_errors_stop_the_driver ... ok
+INTERRUPT_COUNTERS {"worker":true,"notify_local_attempt":0,"notify_local_success":0,"notify_local_eagain":0,"notify_local_error":0,"notify_remote_attempt":0,"notify_remote_success":0,"notify_remote_eagain":0,"notify_remote_error":0,"wait_function":0,"wait_syscall":0,"submit_syscall":0,"notification_armed":0,"notification_cqe":0,"notification_cqe_success":0,"notification_cqe_error":0,"sync_read_attempt":0,"sync_read_success":0,"sync_read_eagain":0,"sync_read_error":0,"payload_cqe":256,"turn":5}
+test io_uring_selector::tests::closing_a_full_local_batch_drains_all_accepted_owners ... ok
+
+test result: ok. 50 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/conformance.rs (/home/samuel/.cache/core-scheduler-interrupt-counters/build/debug/deps/conformance-28445b42751f9f8c)
+
+running 180 tests
+test independent_selector::create ... ok
+test independent_selector::metadata ... ok
+test independent_selector::write_error ... ok
+test native_composition::truncate_shrink ... ok
+test native_composition::metadata ... ok
+test independent_selector::write_at ... ok
+test native_ipv4::borrowed_datagram::empty_messages ... ok
+test composed_tasks_clocks_and_socket_completions_share_one_explicit_scheduler ... ok
+test native_composition::truncate_grow ... ok
+test native_ipv4::borrowed_message::abandoned_receives ... ok
+test independent_selector::read_at ... ok
+test independent_selector::truncate_shrink ... ok
+test native_ipv4::borrowed_message::pre_cancelled ... ok
+test native_composition::read ... ok
+test native_ipv4::borrowed_datagram::pending_cancellation ... ok
+test native_composition::read_at ... ok
+test independent_selector::write ... ok
+test independent_selector::sync ... ok
+test independent_selector::seek ... ok
+test native_composition::seek ... ok
+test independent_selector::read ... ok
+test independent_selector::truncate_grow ... ok
+test native_composition::write ... ok
+test native_ipv4::borrowed_message::readiness ... ok
+test native_composition::write_error ... ok
+test native_composition::write_at ... ok
+test native_composition::create ... ok
+test native_ipv4::borrowed_datagram::addresses_peek_and_truncation ... ok
+test native_ipv4::borrowed_message::pending_cancellation ... ok
+test native_ipv4::borrowed_message::stack_transfers ... ok
+test native_ipv4::borrowed_scalar::abandoned_receives ... ok
+test native_ipv4::borrowed_scalar::pending_cancellation ... ok
+test fallback_capabilities_compose_with_completion_io ... ok
+test native_ipv4::borrowed_scalar::pre_cancelled ... ok
+test native_ipv4::scalar::pending_read_cancellation ... ok
+test native_composition::sync ... ok
+test native_ipv4::datagram::empty_messages_and_boundaries ... ok
+test native_ipv4::borrowed_scalar::readiness_and_eof ... ok
+test native_ipv6::borrowed_datagram::addresses_peek_and_truncation ... ok
+test native_ipv4::datagram::pending_receive_cancellation ... ok
+test native_ipv6::borrowed_message::stack_transfers ... ok
+test native_ipv6::borrowed_scalar::pre_cancelled ... ok
+test native_ipv4::borrowed_scalar::stack_transfers ... ok
+test native_ipv6::borrowed_datagram::pending_cancellation ... ok
+test native_ipv6::borrowed_datagram::empty_messages ... ok
+test native_ipv4::message::pre_cancelled ... ok
+test native_ipv6::datagram::empty_messages_and_boundaries ... ok
+test native_ipv6::borrowed_message::abandoned_receives ... ok
+test native_ipv6::scalar::transfer ... ok
+test native_ipv4::scalar::pre_cancelled ... ok
+test native_ipv4::scalar::transfer ... ok
+test native_ipv6::borrowed_message::pre_cancelled ... ok
+test native_ipv4::scalar::pending_readiness_cancellation ... ok
+test native_ipv6::message::pending_receive_cancellation ... ok
+test native_ipv6::message::pre_cancelled ... ok
+test native_ipv4::message::prepared_transfers ... ok
+test native_ipv6::message::prepared_transfers ... ok
+test native_ipv4::message::pending_receive_cancellation ... ok
+test native_ipv6::borrowed_scalar::pending_cancellation ... ok
+test native_ipv6::borrowed_message::pending_cancellation ... ok
+test native_ipv6::datagram::addresses_peek_and_truncation ... ok
+test native_ipv4::scalar::shutdown_and_eof ... ok
+test native_ipv4::datagram::addresses_peek_and_truncation ... ok
+test native_ipv6::borrowed_scalar::readiness_and_eof ... ok
+test native_ipv6::scalar::shutdown_and_eof ... ok
+test native_ipv6::scalar::pre_cancelled ... ok
+test native_ipv6::borrowed_message::readiness ... ok
+test native_ipv6::scalar::pending_readiness_cancellation ... ok
+test native_ipv6::borrowed_scalar::stack_transfers ... ok
+test selector_ipv4::borrowed_scalar::pre_cancelled ... ok
+test native_worker_rings::create ... ok
+test selector_ipv4::borrowed_message::readiness ... ok
+test native_ipv6::datagram::pending_receive_cancellation ... ok
+test native_ipv6::borrowed_scalar::abandoned_receives ... ok
+test one_thread_can_poll_a_borrowing_future_and_drive_the_ring ... ok
+test native_ipv6::scalar::pending_read_cancellation ... ok
+test selector_ipv4::borrowed_scalar::stack_transfers ... ok
+test selector_ipv4::datagram::addresses_peek_and_truncation ... ok
+test selector_ipv4::borrowed_datagram::addresses_peek_and_truncation ... ok
+test native_worker_rings::read ... ok
+test native_worker_rings::metadata ... ok
+test selector_ipv4::borrowed_scalar::abandoned_receives ... ok
+test selector_ipv4::borrowed_message::stack_transfers ... ok
+test selector_ipv4::borrowed_datagram::pending_cancellation ... ok
+test native_worker_rings::truncate_shrink ... ok
+test selector_ipv4::borrowed_datagram::empty_messages ... ok
+test selector_ipv4::borrowed_message::pre_cancelled ... ok
+test native_worker_rings::truncate_grow ... ok
+test native_worker_rings::read_at ... ok
+test selector_ipv4::datagram::empty_messages_and_boundaries ... ok
+test native_worker_rings::write ... ok
+test selector_ipv4::borrowed_scalar::pending_cancellation ... ok
+test native_worker_rings::write_error ... ok
+test selector_ipv4::message::pre_cancelled ... ok
+test native_worker_rings::sync ... ok
+test selector_ipv6::borrowed_message::pending_cancellation ... ok
+test selector_ipv4::message::prepared_transfers ... ok
+test selector_ipv6::borrowed_scalar::abandoned_receives ... ok
+test selector_ipv4::borrowed_message::pending_cancellation ... ok
+test selector_ipv4::borrowed_scalar::readiness_and_eof ... ok
+test selector_ipv4::scalar::pre_cancelled ... ok
+test selector_ipv4::scalar::transfer ... ok
+test selector_ipv4::datagram::pending_receive_cancellation ... ok
+test selector_ipv6::borrowed_datagram::empty_messages ... ok
+test selector_ipv6::borrowed_message::abandoned_receives ... ok
+test selector_ipv4::message::pending_receive_cancellation ... ok
+test selector_ipv6::borrowed_message::pre_cancelled ... ok
+test selector_ipv6::borrowed_scalar::stack_transfers ... ok
+test native_worker_rings::write_at ... ok
+test selector_ipv6::borrowed_message::stack_transfers ... ok
+test selector_ipv4::scalar::pending_readiness_cancellation ... ok
+test selector_ipv4::scalar::pending_read_cancellation ... ok
+test selector_ipv4::scalar::shutdown_and_eof ... ok
+test native_worker_rings::seek ... ok
+test selector_ipv6::borrowed_datagram::addresses_peek_and_truncation ... ok
+test selector_ipv6::borrowed_scalar::pending_cancellation ... ok
+test selector_ipv6::datagram::addresses_peek_and_truncation ... ok
+test selector_ipv6::scalar::pending_readiness_cancellation ... ok
+test selector_ipv6::borrowed_message::readiness ... ok
+test selector_ipv6::borrowed_scalar::pre_cancelled ... ok
+test selector_ipv6::datagram::pending_receive_cancellation ... ok
+test selector_ipv6::borrowed_scalar::readiness_and_eof ... ok
+test selector_ipv6::scalar::pending_read_cancellation ... ok
+test selector_ipv6::borrowed_datagram::pending_cancellation ... ok
+test selector_ipv4::borrowed_message::abandoned_receives ... ok
+test selector_ipv6::message::pre_cancelled ... ok
+test selector_ipv6::message::prepared_transfers ... ok
+test selector_ipv6::datagram::empty_messages_and_boundaries ... ok
+test selector_ipv6::scalar::pre_cancelled ... ok
+test selector_ipv6::message::pending_receive_cancellation ... ok
+test selector_ipv6::scalar::shutdown_and_eof ... ok
+test workers_ipv4::borrowed_message::stack_transfers ... ok
+test workers_ipv4::borrowed_message::abandoned_receives ... ok
+test workers_ipv4::borrowed_datagram::empty_messages ... ok
+test workers_ipv4::datagram::pending_receive_cancellation ... ok
+test workers_ipv4::borrowed_message::readiness ... ok
+test selector_ipv6::scalar::transfer ... ok
+test workers_ipv4::borrowed_scalar::pending_cancellation ... ok
+test workers_ipv4::borrowed_message::pre_cancelled ... ok
+test workers_ipv6::borrowed_message::abandoned_receives ... ok
+test workers_ipv4::datagram::empty_messages_and_boundaries ... ok
+test workers_ipv4::borrowed_datagram::addresses_peek_and_truncation ... ok
+test workers_ipv4::borrowed_message::pending_cancellation ... ok
+test workers_ipv4::borrowed_scalar::readiness_and_eof ... ok
+test workers_ipv6::borrowed_scalar::readiness_and_eof ... ok
+test workers_ipv4::borrowed_scalar::pre_cancelled ... ok
+test workers_ipv6::borrowed_scalar::pre_cancelled ... ok
+test workers_ipv6::borrowed_message::pending_cancellation ... ok
+test workers_ipv4::message::pending_receive_cancellation ... ok
+test workers_ipv6::borrowed_scalar::pending_cancellation ... ok
+test workers_ipv6::borrowed_datagram::empty_messages ... ok
+test workers_ipv4::datagram::addresses_peek_and_truncation ... ok
+test workers_ipv6::datagram::pending_receive_cancellation ... ok
+test workers_ipv6::borrowed_datagram::pending_cancellation ... ok
+test workers_ipv6::borrowed_message::readiness ... ok
+test workers_ipv6::borrowed_message::pre_cancelled ... ok
+test workers_ipv6::datagram::empty_messages_and_boundaries ... ok
+test workers_ipv4::scalar::pending_read_cancellation ... ok
+test workers_ipv6::message::pre_cancelled ... ok
+test workers_ipv4::borrowed_scalar::stack_transfers ... ok
+test workers_ipv6::scalar::pending_readiness_cancellation ... ok
+test workers_ipv6::scalar::pending_read_cancellation ... ok
+test workers_ipv4::scalar::shutdown_and_eof ... ok
+test workers_ipv6::message::prepared_transfers ... ok
+test workers_ipv6::scalar::shutdown_and_eof ... ok
+test workers_ipv4::message::pre_cancelled ... ok
+test workers_ipv4::scalar::pre_cancelled ... ok
+test workers_ipv6::borrowed_scalar::abandoned_receives ... ok
+test workers_ipv4::scalar::pending_readiness_cancellation ... ok
+test workers_ipv4::scalar::transfer ... ok
+test workers_ipv4::borrowed_datagram::pending_cancellation ... ok
+test workers_ipv6::datagram::addresses_peek_and_truncation ... ok
+test workers_ipv6::borrowed_datagram::addresses_peek_and_truncation ... ok
+test workers_ipv4::borrowed_scalar::abandoned_receives ... ok
+test workers_ipv6::borrowed_scalar::stack_transfers ... ok
+test workers_ipv6::scalar::pre_cancelled ... ok
+test workers_ipv4::message::prepared_transfers ... ok
+test workers_ipv6::message::pending_receive_cancellation ... ok
+test workers_ipv6::borrowed_message::stack_transfers ... ok
+test workers_ipv6::scalar::transfer ... ok
+
+test result: ok. 180 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running unittests src/lib.rs (/home/samuel/.cache/core-scheduler-interrupt-counters/build/debug/deps/core_scheduler_native-c7a75c1da1b5f6e9)
+
+running 49 tests
+
+running 1 test
+
+thread 'core-native-task' (1029572) panicked at crates/native/src/task_service/tests.rs:149:13:
+Box<dyn Any>
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread '<unnamed>' (1029554) panicked at crates/native/src/task_service/tests.rs:136:13:
+abandoned destructor
+
+thread 'core-native-task' (1029572) panicked at crates/native/src/task_service/tests.rs:175:28:
+Box<dyn Any>
+
+thread '<unnamed>' (1029554) panicked at crates/native/src/task_service/tests.rs:136:13:
+abandoned destructor
+
+thread 'core-native-task' (1029572) panicked at crates/native/src/task_service/tests.rs:161:13:
+completed future destructor
+
+thread 'core-native-task' (1029572) panicked at crates/native/src/task_service/tests.rs:136:13:
+abandoned destructor
+test task_service::tests::abandoned_task_destructor_panics_do_not_abort_or_stop_workers ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 48 filtered out; finished in 0.00s
+
+test native_scheduler::tests::zero_executor_workers_and_timer_slots_are_rejected ... ok
+test task_service::tests::conformance::abandoned_handle_releases_completed_output ... ok
+test native_scheduler::driver_tests::completion_batch_is_published_before_any_local_task_resumes ... ok
+test native_scheduler::driver_tests::busy_tasks_do_not_starve_driver_turns ... ok
+test native_scheduler::driver_tests::closed_workers_keep_driving_abandoned_operations_until_retirement ... ok
+test native_scheduler::tests::block_on_inside_a_worker_is_rejected_without_stopping_execution ... ok
+test native_scheduler::driver_tests::invalid_configuration_and_partial_startup_drop_every_driver ... ok
+test task_service::tests::intermediate_runnable_retirement_does_not_wake_drain_waiters ... ok
+test task_service::tests::conformance::abandonment_destroys_task ... ok
+test task_service::tests::conformance::output_and_handle_transfer ... ok
+test task_service::tests::conformance::closed_service_rejects_unpolled_input ... ok
+test task_service::tests::conformance::registers_before_first_poll ... ok
+test task_service::tests::busy_local_queue_regularly_services_external_submissions ... ok
+test task_service::tests::dispatch::handle_drop_defers_destruction_until_active_poll_returns ... ok
+test task_service::tests::conformance::cooperative_cancellation ... ok
+test task_service::tests::conformance::preserves_panic_payload ... ok
+test task_service::tests::abandoned_task_destructor_panics_do_not_abort_or_stop_workers ... ok
+test native_scheduler::driver_tests::tasks_keep_running_after_driver_retirement_or_failure ... ok
+test task_service::tests::future_destructor_panic_is_reported_and_worker_stays_available ... ok
+test test_support::watchdog_propagates_assertion_panics ... ok
+test timer_service::tests::conformance::lazy_registration_and_drop ... ok
+test timer_service::tests::reserved_sleep_registration_repoll_and_cancellation_allocate_nothing ... ok
+test task_service::tests::startup_and_identifier_exhaustion_are_reported_without_polling_inputs ... ok
+test task_service::tests::local_work_can_be_stolen_while_its_worker_is_busy ... ok
+test timer_service::tests::conformance::absolute_deadline_and_wakeup ... ok
+test timer_service::tests::conformance::expiry_wins_concurrent_cancellation ... ok
+test task_service::tests::submissions_from_another_native_worker_use_the_selected_scheduler ... ok
+test timer_service::tests::conformance::pending_cancellation_and_wakeup ... ok
+test timer_service::tests::conformance::relative_wait_starts_on_poll ... ok
+test timer_service::tests::conformance::overflow_registers_no_timer ... ok
+test worker::tests::idle_success_restores_worker_state_and_returns_the_runnable ... ok
+test worker::tests::idle_wake_falls_back_when_the_preferred_worker_is_busy ... ok
+test worker::tests::idle_wake_prefers_the_requested_sleeping_worker ... ok
+test worker::tests::records_retry_separately_from_empty_and_success ... ok
+test worker::tests::periodic_search_checks_both_external_queues_before_local_work ... ok
+test worker::tests::idle_worker_steals_remote_wakes_when_preferred_worker_is_busy ... ok
+test worker::tests::search_reports_retry_only_when_a_queue_raced ... ok
+test worker::tests::worker_yields_after_a_concurrent_steal_retry ... ok
+test timer_service::tests::startup_failure_exhaustion_and_shutdown_release_waiters ... ok
+test timer_service::tests::conformance::pre_cancelled_waits ... ok
+test worker::tests::idle_empty_search_skips_park_after_shutdown ... ok
+test worker::tests::idle_empty_search_parks_while_scheduler_is_running ... ok
+test worker::tests::idle_retry_restores_worker_sleep_state ... ok
+test timer_service::tests::full_capacity_can_be_reclaimed_and_closed_clocks_reject_new_waits ... ok
+test task_service::tests::tasks_progress_without_occupying_syscall_workers_and_survive_admission_close ... ok
+test native_scheduler::tests::default_scheduler_and_borrowed_non_send_root_future_work ... ok
+test timer_service::tests::concurrent_shutdown_waits_for_close_wakeup_delivery ... ok
+test timer_service::tests::shutdown_waits_for_timer_delivery_outside_queue_locks ... ok
+test timer_service::tests::native_timer_driver_wakes_and_retires_deadlines ... ok
+
+test result: ok. 49 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests/conformance.rs (/home/samuel/.cache/core-scheduler-interrupt-counters/build/debug/deps/conformance-b190ef14d683e458)
+
+running 20 tests
+test blocking_work::pre_cancelled_submission ... ok
+test blocking_work::lazy_submission ... ok
+test blocking_queue::queued_cancellation_and_admission ... ok
+test blocking_queue::abandoned_handle_does_not_execute ... ok
+test files::metadata ... ok
+test blocking_work::preserves_panic_payload ... ok
+test files::seek ... ok
+test blocking_work::returns_output ... ok
+test files::write_error ... ok
+test files::read ... ok
+test files::read_at ... ok
+test files::write ... ok
+test files::create ... ok
+test files::write_at ... ok
+test files::sync ... ok
+test unix_positioned_operations_preserve_the_shared_cursor ... ok
+test files::truncate_grow ... ok
+test files::truncate_shrink ... ok
+test files_move_between_threads_and_compatible_scheduler_instances ... ok
+test queue_conformance_rejects_cancellation_capacity_and_handle_ownership_violations ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/selector.rs (/home/samuel/.cache/core-scheduler-interrupt-counters/build/debug/deps/selector-b3b9d21905570a31)
+
+running 6 tests
+test failed_composition_closes_the_supplied_selector ... ok
+test optional_file_capabilities_preserve_custom_resources_arguments_and_errors ... ok
+test custom_signal_capability_preserves_the_selectors_signal_and_subscription_types ... ok
+test a_partial_selector_keeps_its_own_resource_type_and_needs_no_executor ... ok
+test readiness_is_usable_without_native_task_workers ... ok
+test registered_sockets_options_resolution_and_signals_forward_to_the_selector ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/sockets.rs (/home/samuel/.cache/core-scheduler-interrupt-counters/build/debug/deps/sockets-ebdbc0b64e3e1759)
+
+running 52 tests
+test ipv4::borrowed_datagrams::pending_cancellation ... ok
+test ipv4::borrowed_datagrams::addresses_peek_and_truncation ... ok
+test failed_writes_return_the_original_buffer ... ok
+test ipv4::borrowed_messages::pending_cancellation ... ok
+test ipv4::borrowed_datagrams::empty_messages ... ok
+test ipv4::borrowed_scalar::stack_transfers ... ok
+test ipv4::borrowed_scalar::abandoned_receives ... ok
+test ipv4::borrowed_messages::readiness ... ok
+test ipv4::borrowed_messages::abandoned_receives ... ok
+test ipv4::borrowed_messages::pre_cancelled ... ok
+test ipv4::borrowed_messages::stack_transfers ... ok
+test ipv4::borrowed_scalar::pre_cancelled ... ok
+test ipv4::datagrams::addresses_peek_and_truncation ... ok
+test ipv4::scalar::pending_read_cancellation ... ok
+test ipv4::scalar::shutdown_and_eof ... ok
+test ipv4::messages::pre_cancelled ... ok
+test ipv6::borrowed_messages::pending_cancellation ... ok
+test ipv6::borrowed_messages::pre_cancelled ... ok
+test ipv4::datagrams::empty_messages_and_boundaries ... ok
+test ipv6::borrowed_messages::abandoned_receives ... ok
+test ipv6::borrowed_scalar::pending_cancellation ... ok
+test ipv4::datagrams::pending_receive_cancellation ... ok
+test ipv4::borrowed_scalar::pending_cancellation ... ok
+test ipv4::borrowed_scalar::readiness_and_eof ... ok
+test ipv6::datagrams::addresses_peek_and_truncation ... ok
+test ipv6::borrowed_scalar::readiness_and_eof ... ok
+test ipv6::borrowed_scalar::stack_transfers ... ok
+test ipv6::datagrams::empty_messages_and_boundaries ... ok
+test ipv4::messages::prepared_transfers ... ok
+test ipv4::scalar::pre_cancelled ... ok
+test readiness_conformance_allows_spurious_notifications_while_preserving_cancellation ... ok
+test ipv6::scalar::pre_cancelled ... ok
+test ipv6::scalar::pending_readiness_cancellation ... ok
+test ipv6::borrowed_messages::readiness ... ok
+test ipv6::borrowed_messages::stack_transfers ... ok
+test ipv6::borrowed_scalar::abandoned_receives ... ok
+test ipv6::borrowed_datagrams::empty_messages ... ok
+test ipv6::messages::prepared_transfers ... ok
+test ipv4::messages::pending_receive_cancellation ... ok
+test ipv6::borrowed_datagrams::addresses_peek_and_truncation ... ok
+test ipv6::scalar::transfer ... ok
+test ipv6::scalar::shutdown_and_eof ... ok
+test ipv6::messages::pending_receive_cancellation ... ok
+test ipv6::borrowed_scalar::pre_cancelled ... ok
+test ipv6::borrowed_datagrams::pending_cancellation ... ok
+test ipv6::scalar::pending_read_cancellation ... ok
+test ipv4::scalar::pending_readiness_cancellation ... ok
+test ipv4::scalar::transfer ... ok
+test ipv6::messages::pre_cancelled ... ok
+test ipv6::datagrams::pending_receive_cancellation ... ok
+test sockets_move_between_threads_and_compatible_scheduler_instances ... ok
+test aggregate_socket_helpers_remain_compatible ... ok
+
+test result: ok. 52 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests core_scheduler_iouring
+
+running 1 test
+test crates/iouring/src/../readme.md - (line 19) ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.13s; merged doctests compilation took 0.13s
+   Doc-tests core_scheduler_native
+
+running 2 tests
+test crates/native/src/../readme.md - (line 32) ... ok
+test crates/native/src/../readme.md - (line 7) ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.16s; merged doctests compilation took 0.15s

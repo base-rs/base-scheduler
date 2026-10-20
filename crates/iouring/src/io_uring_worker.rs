@@ -7,13 +7,20 @@ use crate::{
 };
 use core_scheduler_selector::SelectorWorker;
 use std::{
-    cell::RefCell, collections::VecDeque, io, rc::Rc, sync::Arc, task::Waker, time::Duration,
+    cell::{Cell, RefCell},
+    collections::VecDeque,
+    io,
+    rc::Rc,
+    sync::Arc,
+    task::Waker,
+    time::Duration,
 };
 
 struct LocalRoute {
     group: Arc<DriverGroup>,
     controller: Arc<Controller>,
     commands: RefCell<VecDeque<Command>>,
+    notified: Cell<bool>,
 }
 thread_local! {
     static ROUTES: RefCell<Vec<Rc<LocalRoute>>> = const { RefCell::new(Vec::new()) };
@@ -32,6 +39,7 @@ impl IoUringWorker {
             group: Arc::clone(&driver.group),
             controller: Arc::clone(&driver.controller),
             commands: RefCell::new(VecDeque::new()),
+            notified: Cell::new(false),
         });
         ROUTES.with(|routes| routes.borrow_mut().push(Rc::clone(&route)));
         Self { driver, route }
@@ -93,5 +101,31 @@ pub(crate) fn pop(controller: &Controller) -> Option<Command> {
             .rev()
             .find(|route| std::ptr::eq(Arc::as_ptr(&route.controller), controller))
             .and_then(|route| route.commands.borrow_mut().pop_front())
+    })
+}
+
+pub(crate) fn notify(controller: &Controller) -> bool {
+    ROUTES.with(|routes| {
+        let routes = routes.borrow();
+        if let Some(route) = routes
+            .iter()
+            .rev()
+            .find(|route| std::ptr::eq(Arc::as_ptr(&route.controller), controller))
+        {
+            route.notified.set(true);
+            true
+        } else {
+            false
+        }
+    })
+}
+pub(crate) fn take_notification(controller: &Controller) -> bool {
+    ROUTES.with(|routes| {
+        routes
+            .borrow()
+            .iter()
+            .rev()
+            .find(|route| std::ptr::eq(Arc::as_ptr(&route.controller), controller))
+            .is_some_and(|route| route.notified.replace(false))
     })
 }

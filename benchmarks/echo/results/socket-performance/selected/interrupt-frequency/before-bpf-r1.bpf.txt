@@ -1,0 +1,48 @@
+/home/samuel/.cache/core-scheduler-interrupt-frequency/before-bpf-r1.bt:15:10-23: WARNING: Expression of type: uint64 being cast to type: int64. This may cause unexpected results. Use an explicit cast to suppress this warning.
+ @writes[@writefd[tid]-1, args->ret] = count(); delete(@writefd[tid]);
+         ~~~~~~~~~~~~~
+/home/samuel/.cache/core-scheduler-interrupt-frequency/before-bpf-r1.bt:19:9-21: WARNING: Expression of type: uint64 being cast to type: int64. This may cause unexpected results. Use an explicit cast to suppress this warning.
+ @reads[@readfd[tid]-1, args->ret] = count(); delete(@readfd[tid]);
+        ~~~~~~~~~~~~
+/home/samuel/.cache/core-scheduler-interrupt-frequency/before-bpf-r1.bt:13:71-83: WARNING: Addrspace mismatch
+tracepoint:syscalls:sys_enter_write /pid == 973699/ { @writefd[tid] = args->fd + 1; }
+                                                                      ~~~~~~~~~~~~
+/home/samuel/.cache/core-scheduler-interrupt-frequency/before-bpf-r1.bt:17:69-81: WARNING: Addrspace mismatch
+tracepoint:syscalls:sys_enter_read /pid == 973699/ { @readfd[tid] = args->fd + 1; }
+                                                                    ~~~~~~~~~~~~
+/home/samuel/.cache/core-scheduler-interrupt-frequency/before-bpf-r1.bt:14:37-67: WARNING: Addrspace mismatch
+tracepoint:syscalls:sys_exit_write /pid == 973699 && @writefd[tid]/ {
+                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/samuel/.cache/core-scheduler-interrupt-frequency/before-bpf-r1.bt:18:36-65: WARNING: Addrspace mismatch
+tracepoint:syscalls:sys_exit_read /pid == 973699 && @readfd[tid]/ {
+                                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/samuel/.cache/core-scheduler-interrupt-frequency/before-bpf-r1.bt:15:10-25: WARNING: Addrspace mismatch
+ @writes[@writefd[tid]-1, args->ret] = count(); delete(@writefd[tid]);
+         ~~~~~~~~~~~~~~~
+/home/samuel/.cache/core-scheduler-interrupt-frequency/before-bpf-r1.bt:19:9-23: WARNING: Addrspace mismatch
+ @reads[@readfd[tid]-1, args->ret] = count(); delete(@readfd[tid]);
+        ~~~~~~~~~~~~~~
+/home/samuel/.cache/core-scheduler-interrupt-frequency/before-bpf-r1.bt:15:49-70: WARNING: Return value discarded.
+ @writes[@writefd[tid]-1, args->ret] = count(); delete(@writefd[tid]);
+                                                ~~~~~~~~~~~~~~~~~~~~~
+/home/samuel/.cache/core-scheduler-interrupt-frequency/before-bpf-r1.bt:19:47-67: WARNING: Return value discarded.
+ @reads[@readfd[tid]-1, args->ret] = count(); delete(@readfd[tid]);
+                                              ~~~~~~~~~~~~~~~~~~~~
+READY
+
+
+@cqes[false, 0]: 1
+@cqes[false, 64]: 1709096
+@enter[1, 0, 0]: 1709097
+@enter[0, 0, 0]: 3607755
+@epoll[973703]: 1
+@epoll[973702]: 229993
+@reads[11, -11]: 1
+@reads[8, -11]: 221201
+@sends[5]: 1406037
+@sqes[26, false]: 854548
+@sqes[27, false]: 854549
+@switches[973702, 16]: 1
+@switches[973702, 0]: 9
+@switches[973702, 256]: 41
+@switches[973702, 1]: 7092

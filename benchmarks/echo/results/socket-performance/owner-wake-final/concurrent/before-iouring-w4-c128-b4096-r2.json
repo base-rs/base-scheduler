@@ -1,0 +1,33 @@
+{
+  "bytes": 4096,
+  "connections": 128,
+  "payload_mib_per_second": 6279.072916666667,
+  "requests": 4822328,
+  "requests_per_second": 1607442.6666666667,
+  "rtt_max_us": 3665.919,
+  "rtt_mean_us": 79.53615653601301,
+  "rtt_p50_us": 76.031,
+  "rtt_p95_us": 119.551,
+  "rtt_p99_us": 249.983,
+  "seconds": 3.0,
+  "warmup_seconds": 1.0,
+  "identifier": "before-iouring-w4-c128-b4096-r2",
+  "mode": "before",
+  "backend": "iouring",
+  "workers": 4,
+  "repeat": 2,
+  "client_cpu": {
+    "user": 2.032242,
+    "system": 7.590078000000002,
+    "voluntary_switches": 736019,
+    "involuntary_switches": 397
+  },
+  "server_cpu": {
+    "user": 4.239777999999999,
+    "system": 7.889856999999999,
+    "voluntary_switches": 71216,
+    "involuntary_switches": 117
+  },
+  "lifecycle_seconds": 4.018607735866681,
+  "variant": "before"
+}

@@ -1,0 +1,32 @@
+{
+  "bytes": 4096,
+  "connections": 32,
+  "payload_mib_per_second": 1992.3958333333333,
+  "requests": 1530160,
+  "requests_per_second": 510053.3333333333,
+  "rtt_max_us": 234.367,
+  "rtt_mean_us": 62.63605381201971,
+  "rtt_p50_us": 62.495,
+  "rtt_p95_us": 66.431,
+  "rtt_p99_us": 68.927,
+  "seconds": 3.0,
+  "warmup_seconds": 1.0,
+  "identifier": "matched-iouring-poll-w1-c32-b4096-r3",
+  "mode": "matched",
+  "backend": "iouring-poll",
+  "workers": 1,
+  "repeat": 3,
+  "client_cpu": {
+    "user": 1.112922000000026,
+    "system": 2.9922300000000632,
+    "voluntary_switches": 1011622,
+    "involuntary_switches": 1293
+  },
+  "server_cpu": {
+    "user": 0.4830739999999878,
+    "system": 2.3335639999999103,
+    "voluntary_switches": 114,
+    "involuntary_switches": 92
+  },
+  "lifecycle_seconds": 4.003122498979792
+}

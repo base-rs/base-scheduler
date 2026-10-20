@@ -1,0 +1,36 @@
+/home/samuel/.cache/core-scheduler-interrupt-counters/patches/prototype.patch:11: indent with spaces.
+    active_worker: Cell<bool>,
+/home/samuel/.cache/core-scheduler-interrupt-counters/patches/prototype.patch:12: indent with spaces.
+    ever_worker: Cell<bool>,
+/home/samuel/.cache/core-scheduler-interrupt-counters/patches/prototype.patch:13: indent with spaces.
+    values: [Cell<u64>; 21],
+/home/samuel/.cache/core-scheduler-interrupt-counters/patches/prototype.patch:16: indent with spaces.
+    const fn new() -> Self {
+/home/samuel/.cache/core-scheduler-interrupt-counters/patches/prototype.patch:17: indent with spaces.
+        Self {
+warning: squelched 174 whitespace errors
+warning: 179 lines add whitespace errors.
+prototype-fixed-counted 43131d4e151a438d30ec0f3cc7bccfa6df4c4101
+Switched to a new branch 'perf/self-wake-selected'
+/home/samuel/.cache/core-scheduler-self-wake/patches/self-wake.patch:10: indent with spaces.
+            let target = self
+/home/samuel/.cache/core-scheduler-self-wake/patches/self-wake.patch:11: indent with spaces.
+                .thread
+/home/samuel/.cache/core-scheduler-self-wake/patches/self-wake.patch:17: indent with spaces.
+                .expect("sleeping worker has registered its thread");
+/home/samuel/.cache/core-scheduler-self-wake/patches/self-wake.patch:18: indent with spaces.
+            // A completion can wake its task while this worker is collecting
+/home/samuel/.cache/core-scheduler-self-wake/patches/self-wake.patch:19: indent with spaces.
+            // reactor events. Clearing sleeping is sufficient on this thread;
+warning: squelched 6 whitespace errors
+warning: 11 lines add whitespace errors.
+selected-fixed c4f7eef1a57fc21d6f231960967a9f432c0d69d2
+selected-fixed-counted bb7afa5e1981c589dbcb4922953e082c474cd4bf
+{
+  "prototype-fixed": "7accb792dc5940433c65cb527e5acef7824c9603",
+  "prototype-frozen": "4a061fbc4355738f39f5eb6ea1db1520db6a753e",
+  "selected-frozen": "63da7551abbd777ac0f746ae2530eb7968009fe4",
+  "prototype-fixed-counted": "43131d4e151a438d30ec0f3cc7bccfa6df4c4101",
+  "selected-fixed": "c4f7eef1a57fc21d6f231960967a9f432c0d69d2",
+  "selected-fixed-counted": "bb7afa5e1981c589dbcb4922953e082c474cd4bf"
+}

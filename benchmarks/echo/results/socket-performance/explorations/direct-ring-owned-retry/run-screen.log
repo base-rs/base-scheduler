@@ -1,0 +1,24 @@
+before iouring-poll 1 183282
+after iouring 3 194809
+corrected iouring 3 193797
+corrected iouring-poll 1 207161
+after iouring-poll 1 206432
+corrected iouring 1 197030
+before iouring 3 240362
+corrected iouring-poll 3 210920
+after iouring 1 196251
+corrected iouring-poll 2 212042
+corrected iouring 2 195533
+after iouring-poll 2 215235
+before iouring 1 238435
+before iouring 2 225542
+before iouring-poll 3 184020
+after iouring 2 196603
+before iouring-poll 2 178221
+after iouring-poll 3 205816
+after iouring median 196251.0 switches 780024
+after iouring-poll median 206432.33333333334 switches 821741
+before iouring median 238434.66666666666 switches 143344
+before iouring-poll median 183281.66666666666 switches 731341
+corrected iouring median 195532.66666666666 switches 778712
+corrected iouring-poll median 210920.0 switches 838619

@@ -1,0 +1,23 @@
+{
+  "retrospective_provenance": true,
+  "note": "Written after collection, using preserved executable and known build/source sequence; not a contemporaneous build manifest.",
+  "base": "6690045baf43409466b5418a1c464b5ef9559329",
+  "after_source": "Production changes exactly181dc8a7a217a3aabb950d091f42fa705db9aca0: local wake suppression, capacity full-transition notification and runnable zero-transition notification. Socket source restored from6690045 before build; no ready owned-send or owned-receive syscall fast path.",
+  "confound": "This compares all three wake/notification changes to original, not localwake alone. Later notification-only-r2 comparison checks the notification changes with original localwake separately.",
+  "build": "CARGO_PROFILE_RELEASE_DEBUG=1 cargo build --release --locked -p core-scheduler-echo-benchmark; Rust1.99.0 LLVM23.1.1; no LTO/targetCPU additions",
+  "runner": "/tmp/core-perf-requests-compare.py at collection time imported sample() from readiness profiling runner;2 randomizedrepeats, seed20261025;1secondwarmup3secondmeasurement; serverCPU0 or0-3, clientCPU4-7; exclusiveflock duringcollection",
+  "binaries": {
+    "before": {
+      "path": "/tmp/core-tokio-admission/release/core-scheduler-echo-benchmark",
+      "sha256": "ae485daa8ad173c43fa18b6eaa3c3f9342fbad19d30258ae8a365d20ba7b0fc1"
+    },
+    "after": {
+      "path": "/tmp/core-perf-requests-wake-only",
+      "sha256": "cdedb8dea6776bb74036bc08745319139373610dd4ece21c31860785600bb240"
+    },
+    "client": {
+      "path": "/tmp/core-scheduler-profile-baseline/release/core-scheduler-echo-benchmark",
+      "sha256": "db6c914ab75011477ec6232e681046b1e75532cbaa1c81663bac984591675cf3"
+    }
+  }
+}

@@ -1,0 +1,157 @@
+# ========
+# captured on    : Tue Oct 20 13:02:20 2026
+# header version : 1
+# data offset    : 520
+# data size      : 50295304
+# feat offset    : 50295824
+# hostname : aiko
+# os release : 7.2.6-arch2-1
+# perf version : 7.2.8-2
+# arch : x86_64
+# nrcpus online : 32
+# nrcpus avail : 32
+# cpudesc : AMD Ryzen 9 9950X3D 16-Core Processor
+# cpuid : AuthenticAMD,26,68,0
+# total memory : 48436160 kB
+# cmdline : /usr/bin/perf 
+# event : name = cycles:u, , id = { 13859, 13860, 13861, 13862, 13863, 13864, 13865, 13866, 13867, 13868, 13869, 13870, 13871, 13872, 13873, 13874, 13875, 13876, 13877, 13878, 13879, 13880, 13881, 13882, 13883, 13884, 13885, 13886, 13887, 13888, 13889, 13890 }, type = 0 (PERF_TYPE_HARDWARE), size = 144, config = 0 (PERF_COUNT_HW_CPU_CYCLES), { sample_period, sample_freq } = 999, sample_type = IP|TID|TIME|CALLCHAIN|PERIOD|REGS_USER|STACK_USER, read_format = ID|LOST, disabled = 1, inherit = 1, exclude_kernel = 1, exclude_hv = 1, mmap = 1, comm = 1, freq = 1, enable_on_exec = 1, task = 1, mmap_data = 1, sample_id_all = 1, exclude_callchain_user = 1, mmap2 = 1, comm_exec = 1, ksymbol = 1, bpf_event = 1, build_id = 1, sample_regs_user = 0xff0fff, sample_stack_user = 8192
+# CPU_TOPOLOGY info available, use -I to display
+# NUMA_TOPOLOGY info available, use -I to display
+# pmu mappings: cpu = 4, amd_iommu_0 = 12, breakpoint = 5, drm_amdgpu = 4294836224, hwmon_amdgpu = 4294901762, hwmon_asusec = 4294901766, hwmon_asus = 4294901765, hwmon_eno2 = 4294901769, hwmon_iwlwifi_1 = 4294901770, hwmon_k10temp = 4294901764, hwmon_nct6799 = 4294901763, hwmon_nvme = 4294901760, hwmon_nvme = 4294901761, hwmon_spd5118 = 4294901768, hwmon_spd5118 = 4294901767, ibs_fetch = 10, ibs_op = 11, kprobe = 8, msr = 13, power = 14, power_core = 15, software = 1, tool = 4294967294, tracepoint = 2, uprobe = 9
+# CACHE info available, use -I to display
+# time of first sample : 2043540.001858
+# time of last sample : 2043546.005804
+# sample duration :   6003.946 ms
+# MEM_TOPOLOGY info available, use -I to display
+# bpf_prog_info empty
+# btf info empty
+# cpu pmu capabilities: branches=16, max_precise=0
+# ibs_fetch pmu capabilities: zen4_ibs_extensions=1
+# ibs_op pmu capabilities: zen4_ibs_extensions=1, ldlat=1, dtlb_pgsize=1
+# AMD systems uses ibs_op// PMU for some precise events, e.g.: cycles:p, see the 'perf list' man page for further details.
+# CPU_DOMAIN_INFO info available, use -I to display
+# e_machine : 62
+#   e_flags : 0
+# cacheline size: 64
+# missing features: TRACING_DATA BUILD_ID BRANCH_STACK GROUP_DESC AUXTRACE STAT CLOCKID DIR_FORMAT COMPRESSED CLOCK_DATA HYBRID_TOPOLOGY 
+# ========
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 6K of event 'cycles:u'
+# Event count (approx.): 5172866697
+#
+# Children      Self  Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              IPC   [IPC Coverage]
+# ........  ........  ..................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................  ....................
+#
+    22.94%     0.00%  [.] 0x00007f2574ea08f2                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              -      -            
+            |          
+            |--14.22%--0xffffffff9de0012f
+            |          |          
+            |           --12.22%--0xffffffff9f389afa
+            |                     |          
+            |                     |--9.01%--0xffffffff9f06f034
+            |                     |          |          
+            |                     |           --4.98%--0xffffffff9f06ef2b
+            |                     |                     |          
+            |                     |                      --3.55%--0xffffffff9e60c656
+            |                     |          
+            |                      --2.32%--0xffffffff9f06ed64
+            |          
+             --7.65%--0xffffffff9de00080
+
+    14.94%     0.07%  [.] recv                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            -      -            
+            |          
+             --14.77%--0x7f2574ea08f2
+                       |          
+                       |--11.05%--0xffffffff9de0012f
+                       |          |          
+                       |           --9.83%--0xffffffff9f389afa
+                       |                     |          
+                       |                      --9.01%--0xffffffff9f06f034
+                       |                                |          
+                       |                                 --4.98%--0xffffffff9f06ef2b
+                       |                                           |          
+                       |                                            --3.55%--0xffffffff9e60c656
+                       |          
+                        --3.11%--0xffffffff9de00080
+
+    14.22%     0.00%  [.] 0xffffffff9de0012f                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              -      -            
+            |          
+             --12.22%--0xffffffff9f389afa
+                       |          
+                       |--9.01%--0xffffffff9f06f034
+                       |          |          
+                       |           --4.98%--0xffffffff9f06ef2b
+                       |                     |          
+                       |                      --3.55%--0xffffffff9e60c656
+                       |          
+                        --2.32%--0xffffffff9f06ed64
+
+    13.71%    13.71%  [.] <tokio::runtime::io::scheduled_io::Readiness as core::ops::drop::Drop>::drop                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    -      -            
+    13.61%    13.61%  [.] <tokio::runtime::io::scheduled_io::Readiness as core::future::future::Future>::poll                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             -      -            
+    13.07%    13.07%  [.] <core_scheduler_tokio::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0}::{closure#1}> as core::future::future::Future>::poll                                                                                                                                                                                                                                                                                                                                                                                                                                -      -            
+    12.22%     0.00%  [.] 0xffffffff9f389afa                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              -      -            
+            |          
+            |--9.01%--0xffffffff9f06f034
+            |          |          
+            |           --4.98%--0xffffffff9f06ef2b
+            |                     |          
+            |                      --3.55%--0xffffffff9e60c656
+            |          
+             --2.32%--0xffffffff9f06ed64
+
+     9.01%     0.00%  [.] 0xffffffff9f06f034                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              -      -            
+            |          
+             --4.98%--0xffffffff9f06ef2b
+                       |          
+                        --3.55%--0xffffffff9e60c656
+
+     7.65%     7.65%  [k] 0xffffffff9de00080                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              -      -            
+            |          
+            |--4.55%--0x7f2574ea08f2
+            |          0xffffffff9de00080
+            |          
+             --3.11%--recv
+                       0x7f2574ea08f2
+                       0xffffffff9de00080
+
+     4.98%     0.00%  [.] 0xffffffff9f06ef2b                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              -      -            
+            |          
+             --3.55%--0xffffffff9e60c656
+
+     4.74%     4.74%  [k] 0xffffffff9e60c656                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              -      -            
+            |          
+             --3.55%--recv
+                       0x7f2574ea08f2
+                       0xffffffff9de0012f
+                       0xffffffff9f389afa
+                       0xffffffff9f06f034
+                       0xffffffff9f06ef2b
+                       0xffffffff9e60c656
+
+     4.10%     4.10%  [.] tokio::runtime::task::waker::wake_by_val                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        -      -            
+     3.52%     3.52%  [.] <tokio::runtime::io::scheduled_io::ScheduledIo>::wake                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           -      -            
+     3.22%     0.02%  [.] send                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            -      -            
+            |          
+             --3.15%--0x7f2574ea08f2
+                       |          
+                        --3.10%--0xffffffff9de0012f
+                                  |          
+                                   --2.32%--0xffffffff9f389afa
+                                             0xffffffff9f06ed64
+
+     3.20%     3.20%  [.] <tokio::runtime::task::state::State>::transition_to_idle                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        -      -            
+     2.64%     2.64%  [.] <tokio::runtime::task::state::State>::transition_to_running                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     -      -            
+     2.51%     2.51%  [.] <tokio::runtime::io::registration::Registration>::clear_readiness                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               -      -            
+     2.47%     2.47%  [.] <tokio::runtime::scheduler::multi_thread::worker::Context>::run                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 -      -            
+     2.37%     2.37%  [.] 0x000000000018f393                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              -      -            
+     2.37%     0.00%  [.] 0x00007f2574f8f393                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              -      -            
+     2.32%     0.00%  [.] 0xffffffff9f06ed64                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              -      -            
+     2.30%     2.30%  [.] tokio::runtime::task::waker::clone_waker                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        -      -            
+
+
+#
+# (Tip: To show information about system the samples were collected on use perf report --header)
+#

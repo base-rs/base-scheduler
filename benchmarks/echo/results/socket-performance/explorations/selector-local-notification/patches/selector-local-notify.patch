@@ -1,0 +1,89 @@
+diff --git a/crates/iouring/src/io_uring_selector.rs b/crates/iouring/src/io_uring_selector.rs
+index 6201115..96f0d5d 100644
+--- a/crates/iouring/src/io_uring_selector.rs
++++ b/crates/iouring/src/io_uring_selector.rs
+@@ -979,7 +979,7 @@ impl Reactor {
+         }
+ 
+         // Bound notification reads too: continuous producers must not monopolize a turn. A notification may represent executor work or a command arriving after the command batch above. Return before sleeping; a later idle turn will rearm both level-triggered sources, preserving notifications and CQEs which race this check.
+-        let mut notified = false;
++        let mut notified = crate::io_uring_worker::take_notification(&self.controller);
+         let mut bytes = [0; 256];
+         for _ in 0..16 {
+             match syscall("notification-read", || self.notification.read(&mut bytes)) {
+@@ -1026,10 +1026,14 @@ impl Drop for Reactor {
+ 
+ impl std::task::Wake for Controller {
+     fn wake(self: Arc<Self>) {
+-        self.notify();
++        if !crate::io_uring_worker::notify_local(&self) {
++            self.notify();
++        }
+     }
+     fn wake_by_ref(self: &Arc<Self>) {
+-        self.notify();
++        if !crate::io_uring_worker::notify_local(self) {
++            self.notify();
++        }
+     }
+ }
+ 
+diff --git a/crates/iouring/src/io_uring_worker.rs b/crates/iouring/src/io_uring_worker.rs
+index fcd34b4..567e494 100644
+--- a/crates/iouring/src/io_uring_worker.rs
++++ b/crates/iouring/src/io_uring_worker.rs
+@@ -7,13 +7,14 @@ use crate::{
+ };
+ use core_scheduler_selector::SelectorWorker;
+ use std::{
+-    cell::RefCell, collections::VecDeque, io, rc::Rc, sync::Arc, task::Waker, time::Duration,
++    cell::{Cell, RefCell}, collections::VecDeque, io, rc::Rc, sync::Arc, task::Waker, time::Duration,
+ };
+ 
+ struct LocalRoute {
+     group: Arc<DriverGroup>,
+     controller: Arc<Controller>,
+     commands: RefCell<VecDeque<Command>>,
++    notified: Cell<bool>,
+ }
+ thread_local! {
+     static ROUTES: RefCell<Vec<Rc<LocalRoute>>> = const { RefCell::new(Vec::new()) };
+@@ -32,6 +33,7 @@ impl IoUringWorker {
+             group: Arc::clone(&driver.group),
+             controller: Arc::clone(&driver.controller),
+             commands: RefCell::new(VecDeque::new()),
++            notified: Cell::new(false),
+         });
+         ROUTES.with(|routes| routes.borrow_mut().push(Rc::clone(&route)));
+         Self { driver, route }
+@@ -95,3 +97,30 @@ pub(crate) fn pop(controller: &Controller) -> Option<Command> {
+             .and_then(|route| route.commands.borrow_mut().pop_front())
+     })
+ }
++
++pub(crate) fn notify_local(controller: &Controller) -> bool {
++    ROUTES.with(|routes| {
++        let routes = routes.borrow();
++        if let Some(route) = routes
++            .iter()
++            .rev()
++            .find(|route| std::ptr::eq(Arc::as_ptr(&route.controller), controller))
++        {
++            route.notified.set(true);
++            true
++        } else {
++            false
++        }
++    })
++}
++
++pub(crate) fn take_notification(controller: &Controller) -> bool {
++    ROUTES.with(|routes| {
++        routes
++            .borrow()
++            .iter()
++            .rev()
++            .find(|route| std::ptr::eq(Arc::as_ptr(&route.controller), controller))
++            .is_some_and(|route| route.notified.replace(false))
++    })
++}

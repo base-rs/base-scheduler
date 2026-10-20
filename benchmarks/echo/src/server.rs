@@ -135,17 +135,12 @@ async fn scheduler_server<S>(
             .await
             .expect("TCP_NODELAY");
         let shared = Arc::clone(&scheduler);
-        tasks.push(
-            scheduler
-                .spawn(async move {
-                    if poll {
-                        echo_poll(shared.as_ref(), socket).await;
-                    } else {
-                        echo(shared.as_ref(), socket).await;
-                    }
-                })
-                .expect("spawn echo task"),
-        );
+        let task = if poll {
+            scheduler.spawn(async move { echo_poll(shared.as_ref(), socket).await })
+        } else {
+            scheduler.spawn(async move { echo(shared.as_ref(), socket).await })
+        };
+        tasks.push(task.expect("spawn echo task"));
     }
     for task in tasks {
         task.await.expect("echo task failed");

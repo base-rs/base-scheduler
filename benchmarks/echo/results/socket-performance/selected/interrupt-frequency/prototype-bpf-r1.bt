@@ -1,0 +1,26 @@
+BEGIN { printf("READY\n"); }
+tracepoint:io_uring:io_uring_submit_req /pid == 974094/ {
+ @rings[(uint64)args->ctx] = 1;
+ @sqes[args->opcode, args->user_data == 0xffffffffffffffff] = count();
+}
+tracepoint:io_uring:io_uring_complete /@rings[(uint64)args->ctx]/ {
+ @cqes[args->user_data == 0xffffffffffffffff, args->res] = count();
+}
+tracepoint:syscalls:sys_enter_io_uring_enter /pid == 974094/ {
+ @threads[tid] = 1;
+ @enter[args->to_submit, args->min_complete, args->flags] = count();
+}
+tracepoint:syscalls:sys_enter_write /pid == 974094/ { @writefd[tid] = args->fd + 1; }
+tracepoint:syscalls:sys_exit_write /pid == 974094 && @writefd[tid]/ {
+ @writes[@writefd[tid]-1, args->ret] = count(); delete(@writefd[tid]);
+}
+tracepoint:syscalls:sys_enter_read /pid == 974094/ { @readfd[tid] = args->fd + 1; }
+tracepoint:syscalls:sys_exit_read /pid == 974094 && @readfd[tid]/ {
+ @reads[@readfd[tid]-1, args->ret] = count(); delete(@readfd[tid]);
+}
+tracepoint:syscalls:sys_enter_sendto /pid == 974094/ { @sends[args->fd] = count(); }
+tracepoint:syscalls:sys_enter_epoll_pwait /pid == 974094/ { @epoll[tid] = count(); }
+tracepoint:syscalls:sys_enter_epoll_wait /pid == 974094/ { @epoll[tid] = count(); }
+tracepoint:sched:sched_switch /@threads[args->prev_pid]/ { @switches[args->prev_pid,args->prev_state] = count(); }
+tracepoint:sched:sched_process_exit /pid == 974094 && tid == 974094/ { exit(); }
+END { clear(@rings); clear(@threads); clear(@readfd); clear(@writefd); }

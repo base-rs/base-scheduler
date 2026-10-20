@@ -2,6 +2,8 @@
 // Copyright, 2026, by Samuel Williams.
 
 use core_scheduler::Interest;
+#[cfg(unix)]
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::{io, net::SocketAddr, sync::Arc};
 use tokio::runtime::{Handle, Id};
 
@@ -10,6 +12,8 @@ use tokio::runtime::{Handle, Id};
 pub(crate) struct RegisteredSocket {
     socket: Arc<socket2::Socket>,
     runtime: Handle,
+    read_waiting: AtomicBool,
+    write_waiting: AtomicBool,
     registration: tokio::sync::OnceCell<tokio::io::unix::AsyncFd<Arc<socket2::Socket>>>,
 }
 
@@ -19,6 +23,8 @@ impl RegisteredSocket {
         Self {
             socket: Arc::new(socket),
             runtime: runtime.clone(),
+            read_waiting: AtomicBool::new(false),
+            write_waiting: AtomicBool::new(false),
             registration: tokio::sync::OnceCell::new(),
         }
     }
@@ -41,6 +47,16 @@ impl RegisteredSocket {
                     .map_err(io::Error::from)
             })
             .await
+    }
+}
+
+#[cfg(unix)]
+struct PollWaiter<'a>(&'a AtomicBool);
+
+#[cfg(unix)]
+impl Drop for PollWaiter<'_> {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::Release);
     }
 }
 
@@ -137,23 +153,51 @@ impl TokioSocket {
     where
         Operation: FnMut(&socket2::Socket) -> io::Result<Output> + Send,
     {
-        // Try the syscall before registration or waiting. In particular, Linux can report EPOLLHUP for an unconnected TCP socket; Tokio retains closed readiness permanently, which would spin after the socket later connects and a syscall returns WouldBlock.
+        // Try every operation before gating on readiness: lifecycle calls, invalid arguments, and state errors can complete even when a previous operation cleared the cached readiness.
         let result = operation(self.get_ref());
         if !matches!(&result, Err(error) if error.kind() == io::ErrorKind::WouldBlock) {
             return result;
         }
-
         #[cfg(unix)]
         {
+            // Linux can report EPOLLHUP for an unconnected TCP socket; Tokio retains closed readiness permanently, which would spin after the socket later connects and a syscall returns WouldBlock. Register only after a syscall needs to wait, then reuse the registration on subsequent waits.
+            let registration = match self.inner.registration.get() {
+                Some(registration) => registration,
+                None => self.inner.registration().await?,
+            };
             let interest = match interest {
                 Interest::Readable => tokio::io::Interest::READABLE,
                 Interest::Writable => tokio::io::Interest::WRITABLE,
             };
-            self.inner
-                .registration()
-                .await?
-                .async_io(interest, |_| operation(self.inner.get_ref()))
-                .await
+            // Tokio's poll methods keep one waker per direction. Reserve that slot for one operation until completion or drop; concurrent operations use Tokio's independent multi-waiter list. Forgetting a reservation only leaves later operations on the multi-waiter path.
+            let waiting = if interest == tokio::io::Interest::READABLE {
+                &self.inner.read_waiting
+            } else {
+                &self.inner.write_waiting
+            };
+            if waiting
+                .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+                .is_err()
+            {
+                return registration
+                    .async_io(interest, |_| operation(self.inner.get_ref()))
+                    .await;
+            }
+            let _waiter = PollWaiter(waiting);
+            std::future::poll_fn(|context| {
+                loop {
+                    let mut ready =
+                        std::task::ready!(if interest == tokio::io::Interest::READABLE {
+                            registration.poll_read_ready(context)
+                        } else {
+                            registration.poll_write_ready(context)
+                        })?;
+                    if let Ok(result) = ready.try_io(|_| operation(self.inner.get_ref())) {
+                        return std::task::Poll::Ready(result);
+                    }
+                }
+            })
+            .await
         }
 
         #[cfg(windows)]

@@ -1,0 +1,8 @@
+before 1 iouring {'user_ticks': 0.0, 'system_ticks': 0.0}
+before 1 iouring-poll {'user_ticks': 0.0, 'system_ticks': 0.0}
+before 4 iouring {'user_ticks': 0.0, 'system_ticks': 0.0}
+before 4 iouring-poll {'user_ticks': 0.0, 'system_ticks': 0.0}
+after 1 iouring {'user_ticks': 0.65, 'system_ticks': 1.35}
+after 1 iouring-poll {'user_ticks': 0.64, 'system_ticks': 1.36}
+after 4 iouring {'user_ticks': 4.5, 'system_ticks': 3.5}
+after 4 iouring-poll {'user_ticks': 3.2, 'system_ticks': 2.8}

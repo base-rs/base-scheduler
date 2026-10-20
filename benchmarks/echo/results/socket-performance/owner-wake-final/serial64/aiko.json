@@ -1,0 +1,462 @@
+{
+  "phase": "serial64",
+  "provenance": {
+    "source_base": "63da7551abbd777ac0f746ae2530eb7968009fe4",
+    "source_patch": {
+      "path": "/home/samuel/.cache/core-scheduler-owner-wake-final/source.patch",
+      "sha256": "325f061c333381555fc100df4f720cc4a51294c99f90d3acf8e8177da4029535"
+    },
+    "binaries": {
+      "control": {
+        "path": "/home/samuel/.cache/core-scheduler-owner-wake-final/control",
+        "sha256": "abc161cde925e54c6f3fb3d7e70d4d77f4f21e055877e293c27eb2a532e4834f"
+      },
+      "benchmark": {
+        "path": "/home/samuel/.cache/core-scheduler-owner-wake-final/benchmark",
+        "sha256": "4b4a6dd7f90ee5549738abff476d94b7c52bd098c1f133811fff13fdf57b63ad"
+      },
+      "client": {
+        "path": "/home/samuel/.cache/core-scheduler-owner-wake-final/client",
+        "sha256": "db6c914ab75011477ec6232e681046b1e75532cbaa1c81663bac984591675cf3"
+      }
+    },
+    "runner": {
+      "path": "/home/samuel/.cache/core-scheduler-owner-wake-final/run-final.py",
+      "sha256": "92917a4bb3dec5d10eaf0184c5e6a68863c6ee90045e6f56f0bb94292d7d700a"
+    },
+    "sample_runner": {
+      "path": "/home/samuel/.cache/core-scheduler-owner-wake-final/sample-runner.py",
+      "sha256": "31e6ad715214fcadfda358362100a21cb94cc41a79e23733191eb8e61b740909"
+    },
+    "build_command": "cargo build --release --locked -p core-scheduler-echo-benchmark",
+    "build_target_dir": "/home/samuel/.cache/core-scheduler-perf-tokio",
+    "release_manifest": {
+      "path": "/home/samuel/.cache/core-scheduler-owner-wake-final/Cargo.toml.build",
+      "sha256": "5797829cebfaef6ea219268ccb15830cdea372ff38596f94d827c56a63dc6674"
+    },
+    "build_overrides": {
+      "RUSTFLAGS": null,
+      "CARGO_ENCODED_RUSTFLAGS": null,
+      "CARGO_PROFILE_RELEASE_OPT_LEVEL": null,
+      "CARGO_PROFILE_RELEASE_LTO": null,
+      "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": null,
+      "CARGO_PROFILE_RELEASE_DEBUG": null
+    },
+    "rustc": "rustc 1.99.0 (b940084d7 2026-09-28) (Arch Linux rust 1:1.99.0-1)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.0\nLLVM version: 23.1.1",
+    "cargo": "cargo 1.99.0 (5f94df478 2026-08-27) (Arch Linux rust 1:1.99.0-1)",
+    "platform": "Linux-7.2.6-arch2-1-x86_64-with-glibc2.44",
+    "hostname": "aiko",
+    "cpu": "Architecture:                            x86_64\nCPU op-mode(s):                          32-bit, 64-bit\nAddress sizes:                           48 bits physical, 48 bits virtual\nByte Order:                              Little Endian\nCPU(s):                                  32\nOn-line CPU(s) list:                     0-31\nVendor ID:                               AuthenticAMD\nModel name:                              AMD Ryzen 9 9950X3D 16-Core Processor\nCPU family:                              26\nModel:                                   68\nThread(s) per core:                      2\nCore(s) per socket:                      16\nSocket(s):                               1\nStepping:                                0\nMicrocode version:                       0xb404035\nFrequency boost:                         enabled\nCPU(s) scaling MHz:                      37%\nCPU max MHz:                             5756.4521\nCPU min MHz:                             624.1940\nBogoMIPS:                                8599.98\nFlags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good amd_lbr_v2 nopl xtopology nonstop_tsc cpuid extd_apicid aperfmperf rapl pni pclmulqdq monitor ssse3 fma cx16 sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand lahf_lm cmp_legacy svm extapic cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw ibs skinit wdt tce topoext perfctr_core perfctr_nb bpext perfctr_llc mwaitx cpuid_fault cpb cat_l3 cdp_l3 hw_pstate ssbd mba perfmon_v2 ibrs ibpb stibp ibrs_enhanced vmmcall fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid cqm rdt_a avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local user_shstk avx_vnni avx512_bf16 clzero irperf xsaveerptr rdpru wbnoinvd cppc arat npt lbrv svm_lock nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold avic v_vmsave_vmload vgif x2avic v_spec_ctrl vnmi avx512vbmi umip pku ospke avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid bus_lock_detect movdiri movdir64b overflow_recov succor smca fsrm avx512_vp2intersect flush_l1d amd_lbr_pmc_freeze\nVirtualization:                          AMD-V\nL1d cache:                               768 KiB (16 instances)\nL1i cache:                               512 KiB (16 instances)\nL2 cache:                                16 MiB (16 instances)\nL3 cache:                                128 MiB (2 instances)\nNUMA node(s):                            1\nNUMA node0 CPU(s):                       0-31\nVulnerability Gather data sampling:      Not affected\nVulnerability Ghostwrite:                Not affected\nVulnerability Indirect target selection: Not affected\nVulnerability Itlb multihit:             Not affected\nVulnerability L1tf:                      Not affected\nVulnerability Mds:                       Not affected\nVulnerability Meltdown:                  Not affected\nVulnerability Mmio stale data:           Not affected\nVulnerability Old microcode:             Not affected\nVulnerability Reg file data sampling:    Not affected\nVulnerability Retbleed:                  Not affected\nVulnerability Spec rstack overflow:      Mitigation; IBPB on VMEXIT only\nVulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl\nVulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization\nVulnerability Spectre v2:                Mitigation; Enhanced / Automatic IBRS; IBPB conditional; STIBP always-on; PBRSB-eIBRS Not affected; BHI Not affected\nVulnerability Srbds:                     Not affected\nVulnerability Tsa:                       Not affected\nVulnerability Tsx async abort:           Not affected\nVulnerability Vmscape:                   Mitigation; IBPB on VMEXIT",
+    "server_cpus": "0 through workers-1",
+    "client_cpus": "4-7",
+    "client_workers": 4,
+    "warmup_seconds": 1,
+    "measurement_seconds": 3,
+    "lock": "exclusive /tmp/core-scheduler-perf.lock",
+    "started_utc": "2026-10-20T03:23:25Z",
+    "production_source_commit": "3af77be0f8b8a9303c8680a7f8aab49b1c3d304c",
+    "production_source_commit_url": "https://github.com/core-rs/core-scheduler/commit/3af77be0f8b8a9303c8680a7f8aab49b1c3d304c",
+    "build_worktree_baseline": "63da7551abbd777ac0f746ae2530eb7968009fe4",
+    "production_patch_sha256": "325f061c333381555fc100df4f720cc4a51294c99f90d3acf8e8177da4029535",
+    "verification": "Worktree git diff is byte-for-byte equal to root final-production.patch. Root confirms these production files match the production_source_commit; benchmark worktree intentionally does not import its additional test/docs changes."
+  },
+  "samples": [
+    {
+      "bytes": 64,
+      "connections": 1,
+      "payload_mib_per_second": 14.243754069010416,
+      "requests": 700109,
+      "requests_per_second": 233369.66666666666,
+      "rtt_max_us": 163.839,
+      "rtt_mean_us": 4.24501322936856,
+      "rtt_p50_us": 3.761,
+      "rtt_p95_us": 5.651,
+      "rtt_p99_us": 7.323,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "after-iouring-poll-w1-c1-b64-r2",
+      "mode": "after",
+      "backend": "iouring-poll",
+      "workers": 1,
+      "repeat": 2,
+      "client_cpu": {
+        "user": 0.39587900000000786,
+        "system": 1.1402100000000246,
+        "voluntary_switches": 934508,
+        "involuntary_switches": 14
+      },
+      "server_cpu": {
+        "user": 0.43536899999998013,
+        "system": 1.3851610000000392,
+        "voluntary_switches": 934351,
+        "involuntary_switches": 8
+      },
+      "lifecycle_seconds": 4.002009694930166,
+      "variant": "after"
+    },
+    {
+      "bytes": 64,
+      "connections": 1,
+      "payload_mib_per_second": 11.271036783854166,
+      "requests": 553994,
+      "requests_per_second": 184664.66666666666,
+      "rtt_max_us": 168.831,
+      "rtt_mean_us": 5.369169393531337,
+      "rtt_p50_us": 5.311,
+      "rtt_p95_us": 6.083,
+      "rtt_p99_us": 10.567,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "before-iouring-poll-w1-c1-b64-r2",
+      "mode": "before",
+      "backend": "iouring-poll",
+      "workers": 1,
+      "repeat": 2,
+      "client_cpu": {
+        "user": 0.2605819999999994,
+        "system": 0.9788760000000138,
+        "voluntary_switches": 741637,
+        "involuntary_switches": 17
+      },
+      "server_cpu": {
+        "user": 0.4384540000000072,
+        "system": 1.6830159999999523,
+        "voluntary_switches": 741292,
+        "involuntary_switches": 11
+      },
+      "lifecycle_seconds": 4.002130978973582,
+      "variant": "before"
+    },
+    {
+      "bytes": 64,
+      "connections": 1,
+      "payload_mib_per_second": 14.316996256510416,
+      "requests": 703709,
+      "requests_per_second": 234569.66666666666,
+      "rtt_max_us": 169.599,
+      "rtt_mean_us": 4.228251368108119,
+      "rtt_p50_us": 4.001,
+      "rtt_p95_us": 5.323,
+      "rtt_p99_us": 6.283,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "before-iouring-w1-c1-b64-r3",
+      "mode": "before",
+      "backend": "iouring",
+      "workers": 1,
+      "repeat": 3,
+      "client_cpu": {
+        "user": 0.3182390000000055,
+        "system": 1.2123119999999972,
+        "voluntary_switches": 937662,
+        "involuntary_switches": 15
+      },
+      "server_cpu": {
+        "user": 0.8835980000000063,
+        "system": 2.4536920000000464,
+        "voluntary_switches": 145368,
+        "involuntary_switches": 30
+      },
+      "lifecycle_seconds": 4.00192681606859,
+      "variant": "before"
+    },
+    {
+      "bytes": 64,
+      "connections": 1,
+      "payload_mib_per_second": 13.96337890625,
+      "requests": 686328,
+      "requests_per_second": 228776.0,
+      "rtt_max_us": 166.911,
+      "rtt_mean_us": 4.333079217225587,
+      "rtt_p50_us": 4.041,
+      "rtt_p95_us": 5.371,
+      "rtt_p99_us": 6.591,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "before-iouring-w1-c1-b64-r1",
+      "mode": "before",
+      "backend": "iouring",
+      "workers": 1,
+      "repeat": 1,
+      "client_cpu": {
+        "user": 0.29412499999997976,
+        "system": 1.20813899999996,
+        "voluntary_switches": 911965,
+        "involuntary_switches": 16
+      },
+      "server_cpu": {
+        "user": 0.8506080000000225,
+        "system": 2.450474999999983,
+        "voluntary_switches": 192946,
+        "involuntary_switches": 30
+      },
+      "lifecycle_seconds": 4.002293075900525,
+      "variant": "before"
+    },
+    {
+      "bytes": 64,
+      "connections": 1,
+      "payload_mib_per_second": 13.76593017578125,
+      "requests": 676623,
+      "requests_per_second": 225541.0,
+      "rtt_max_us": 170.495,
+      "rtt_mean_us": 4.397034635240022,
+      "rtt_p50_us": 4.223,
+      "rtt_p95_us": 5.571,
+      "rtt_p99_us": 9.287,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "after-iouring-poll-w1-c1-b64-r3",
+      "mode": "after",
+      "backend": "iouring-poll",
+      "workers": 1,
+      "repeat": 3,
+      "client_cpu": {
+        "user": 0.3719559999999831,
+        "system": 1.1113050000000158,
+        "voluntary_switches": 905648,
+        "involuntary_switches": 13
+      },
+      "server_cpu": {
+        "user": 0.44876500000000874,
+        "system": 1.298746000000051,
+        "voluntary_switches": 905474,
+        "involuntary_switches": 10
+      },
+      "lifecycle_seconds": 4.002113505033776,
+      "variant": "after"
+    },
+    {
+      "bytes": 64,
+      "connections": 1,
+      "payload_mib_per_second": 13.99835205078125,
+      "requests": 688047,
+      "requests_per_second": 229349.0,
+      "rtt_max_us": 169.215,
+      "rtt_mean_us": 4.324048925436785,
+      "rtt_p50_us": 4.143,
+      "rtt_p95_us": 5.511,
+      "rtt_p99_us": 6.071,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "after-iouring-w1-c1-b64-r2",
+      "mode": "after",
+      "backend": "iouring",
+      "workers": 1,
+      "repeat": 2,
+      "client_cpu": {
+        "user": 0.3487169999999935,
+        "system": 1.1532909999999674,
+        "voluntary_switches": 929130,
+        "involuntary_switches": 13
+      },
+      "server_cpu": {
+        "user": 0.4728460000000041,
+        "system": 1.2955779999999777,
+        "voluntary_switches": 928958,
+        "involuntary_switches": 10
+      },
+      "lifecycle_seconds": 4.001995705068111,
+      "variant": "after"
+    },
+    {
+      "bytes": 64,
+      "connections": 1,
+      "payload_mib_per_second": 14.306783040364584,
+      "requests": 703207,
+      "requests_per_second": 234402.33333333334,
+      "rtt_max_us": 178.431,
+      "rtt_mean_us": 4.231158095695859,
+      "rtt_p50_us": 4.021,
+      "rtt_p95_us": 5.243,
+      "rtt_p99_us": 6.183,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "before-iouring-w1-c1-b64-r2",
+      "mode": "before",
+      "backend": "iouring",
+      "workers": 1,
+      "repeat": 2,
+      "client_cpu": {
+        "user": 0.3288780000000031,
+        "system": 1.1904180000000224,
+        "voluntary_switches": 935576,
+        "involuntary_switches": 11
+      },
+      "server_cpu": {
+        "user": 0.848273000000006,
+        "system": 2.5029479999999467,
+        "voluntary_switches": 135046,
+        "involuntary_switches": 52
+      },
+      "lifecycle_seconds": 4.002025387017056,
+      "variant": "before"
+    },
+    {
+      "bytes": 64,
+      "connections": 1,
+      "payload_mib_per_second": 14.052164713541666,
+      "requests": 690692,
+      "requests_per_second": 230230.66666666666,
+      "rtt_max_us": 168.447,
+      "rtt_mean_us": 4.304215147996499,
+      "rtt_p50_us": 4.061,
+      "rtt_p95_us": 5.623,
+      "rtt_p99_us": 6.283,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "after-iouring-poll-w1-c1-b64-r1",
+      "mode": "after",
+      "backend": "iouring-poll",
+      "workers": 1,
+      "repeat": 1,
+      "client_cpu": {
+        "user": 0.3716999999999757,
+        "system": 1.1216020000000526,
+        "voluntary_switches": 915799,
+        "involuntary_switches": 18
+      },
+      "server_cpu": {
+        "user": 0.45625400000000127,
+        "system": 1.3246259999999666,
+        "voluntary_switches": 915624,
+        "involuntary_switches": 21
+      },
+      "lifecycle_seconds": 4.00184997706674,
+      "variant": "after"
+    },
+    {
+      "bytes": 64,
+      "connections": 1,
+      "payload_mib_per_second": 11.274007161458334,
+      "requests": 554140,
+      "requests_per_second": 184713.33333333334,
+      "rtt_max_us": 172.159,
+      "rtt_mean_us": 5.364794151297508,
+      "rtt_p50_us": 5.311,
+      "rtt_p95_us": 6.171,
+      "rtt_p99_us": 10.575,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "before-iouring-poll-w1-c1-b64-r3",
+      "mode": "before",
+      "backend": "iouring-poll",
+      "workers": 1,
+      "repeat": 3,
+      "client_cpu": {
+        "user": 0.27532100000001947,
+        "system": 0.9714030000000093,
+        "voluntary_switches": 742220,
+        "involuntary_switches": 12
+      },
+      "server_cpu": {
+        "user": 0.4018350000000055,
+        "system": 1.737451999999962,
+        "voluntary_switches": 741872,
+        "involuntary_switches": 15
+      },
+      "lifecycle_seconds": 4.001928781857714,
+      "variant": "before"
+    },
+    {
+      "bytes": 64,
+      "connections": 1,
+      "payload_mib_per_second": 14.368245442708334,
+      "requests": 706228,
+      "requests_per_second": 235409.33333333334,
+      "rtt_max_us": 172.927,
+      "rtt_mean_us": 4.212212717422703,
+      "rtt_p50_us": 3.771,
+      "rtt_p95_us": 5.423,
+      "rtt_p99_us": 5.691,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "after-iouring-w1-c1-b64-r3",
+      "mode": "after",
+      "backend": "iouring",
+      "workers": 1,
+      "repeat": 3,
+      "client_cpu": {
+        "user": 0.4223609999999951,
+        "system": 1.111705000000029,
+        "voluntary_switches": 944912,
+        "involuntary_switches": 9
+      },
+      "server_cpu": {
+        "user": 0.40906499999999824,
+        "system": 1.410353999999984,
+        "voluntary_switches": 944743,
+        "involuntary_switches": 9
+      },
+      "lifecycle_seconds": 4.002082898980007,
+      "variant": "after"
+    },
+    {
+      "bytes": 64,
+      "connections": 1,
+      "payload_mib_per_second": 14.305867513020834,
+      "requests": 703162,
+      "requests_per_second": 234387.33333333334,
+      "rtt_max_us": 168.575,
+      "rtt_mean_us": 4.229706985019099,
+      "rtt_p50_us": 3.761,
+      "rtt_p95_us": 5.543,
+      "rtt_p99_us": 5.823,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "after-iouring-w1-c1-b64-r1",
+      "mode": "after",
+      "backend": "iouring",
+      "workers": 1,
+      "repeat": 1,
+      "client_cpu": {
+        "user": 0.37672000000000594,
+        "system": 1.1553069999999934,
+        "voluntary_switches": 939920,
+        "involuntary_switches": 14
+      },
+      "server_cpu": {
+        "user": 0.42062500000000114,
+        "system": 1.3816269999999804,
+        "voluntary_switches": 939753,
+        "involuntary_switches": 6
+      },
+      "lifecycle_seconds": 4.001881696982309,
+      "variant": "after"
+    },
+    {
+      "bytes": 64,
+      "connections": 1,
+      "payload_mib_per_second": 10.945576985677084,
+      "requests": 537997,
+      "requests_per_second": 179332.33333333334,
+      "rtt_max_us": 170.751,
+      "rtt_mean_us": 5.517123628942181,
+      "rtt_p50_us": 5.371,
+      "rtt_p95_us": 6.131,
+      "rtt_p99_us": 10.583,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "before-iouring-poll-w1-c1-b64-r1",
+      "mode": "before",
+      "backend": "iouring-poll",
+      "workers": 1,
+      "repeat": 1,
+      "client_cpu": {
+        "user": 0.27728700000000117,
+        "system": 0.9481450000000677,
+        "voluntary_switches": 725534,
+        "involuntary_switches": 19
+      },
+      "server_cpu": {
+        "user": 0.41480699999999615,
+        "system": 1.693096999999966,
+        "voluntary_switches": 725189,
+        "involuntary_switches": 8
+      },
+      "lifecycle_seconds": 4.00221751909703,
+      "variant": "before"
+    }
+  ],
+  "finished_utc": "2026-10-20T03:27:43Z"
+}

@@ -1,0 +1,24 @@
+before iouring-poll 1 184927
+after iouring 3 191283
+ring-retry iouring 3 189577
+ring-retry iouring-poll 1 216935
+after iouring-poll 1 226915
+ring-retry iouring 1 189846
+before iouring 3 235713
+ring-retry iouring-poll 3 214119
+after iouring 1 184501
+ring-retry iouring-poll 2 213299
+ring-retry iouring 2 190732
+after iouring-poll 2 218921
+before iouring 1 229118
+before iouring 2 237205
+before iouring-poll 3 180477
+after iouring 2 185792
+before iouring-poll 2 181635
+after iouring-poll 3 232173
+after iouring median 185792.0 switches 745962
+after iouring-poll median 226915.33333333334 switches 920399
+before iouring median 235713.0 switches 114181
+before iouring-poll median 181635.33333333334 switches 727442
+ring-retry iouring median 189846.33333333334 switches 761901
+ring-retry iouring-poll median 214119.0 switches 863367

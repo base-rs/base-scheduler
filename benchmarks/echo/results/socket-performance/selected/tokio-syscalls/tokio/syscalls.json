@@ -1,0 +1,121 @@
+{
+  "accepted_socket_count": 32,
+  "accepted_socket_descriptors": [
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38
+  ],
+  "accepted_socket_io": {
+    "recvfrom": {
+      "calls": 28466,
+      "eagain": 0,
+      "other_errors": 0,
+      "zero_returns": 32,
+      "positive_returns": 28434,
+      "bytes": 1819776
+    },
+    "sendto": {
+      "calls": 28434,
+      "eagain": 0,
+      "other_errors": 0,
+      "zero_returns": 0,
+      "positive_returns": 28434,
+      "bytes": 1819776
+    }
+  },
+  "accepted_socket_groups": {
+    "receive": {
+      "calls": 28466,
+      "eagain": 0,
+      "other_errors": 0,
+      "zero_returns": 32,
+      "positive_returns": 28434,
+      "bytes": 1819776,
+      "calls_per_completed_request": 1.0022533624392649,
+      "eagain_per_completed_request": 0.0
+    },
+    "send": {
+      "calls": 28434,
+      "eagain": 0,
+      "other_errors": 0,
+      "zero_returns": 0,
+      "positive_returns": 28434,
+      "bytes": 1819776,
+      "calls_per_completed_request": 1.0011266812196324,
+      "eagain_per_completed_request": 0.0
+    }
+  },
+  "whole_process_io": {
+    "read": {
+      "calls": 8,
+      "eagain": 0,
+      "other_errors": 0,
+      "zero_returns": 0,
+      "positive_returns": 8,
+      "bytes": 7169
+    },
+    "write": {
+      "calls": 10,
+      "eagain": 0,
+      "other_errors": 0,
+      "zero_returns": 0,
+      "positive_returns": 10,
+      "bytes": 88
+    },
+    "recvfrom": {
+      "calls": 28466,
+      "eagain": 0,
+      "other_errors": 0,
+      "zero_returns": 32,
+      "positive_returns": 28434,
+      "bytes": 1819776
+    },
+    "sendto": {
+      "calls": 28434,
+      "eagain": 0,
+      "other_errors": 0,
+      "zero_returns": 0,
+      "positive_returns": 28434,
+      "bytes": 1819776
+    }
+  },
+  "pending_at_end": {},
+  "normalization_completed_client_requests": 28402,
+  "notes": [
+    "Counts are whole-process-lifecycle totals; accepted-socket filtering excludes loader, stdout, notifier and other unrelated I/O.",
+    "Terminal EOF receives and any partial I/O remain included and are reported separately.",
+    "Strace changes scheduling and readiness timing. These counts describe the traced workload and cannot establish uninstrumented throughput or the fraction of the remaining throughput gap.",
+    "The client excludes round trips crossing the measurement end. Each connection completes one such final request: positive socket receives and sends are exactly measured requests + 32, with exactly 64 bytes per successful data syscall."
+  ],
+  "all_lifecycle_echo_roundtrips": 28434,
+  "outside_measurement_window_completed_roundtrips": 32
+}

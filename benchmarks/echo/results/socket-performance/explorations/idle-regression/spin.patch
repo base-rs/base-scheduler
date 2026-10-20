@@ -1,0 +1,21 @@
+diff --git a/crates/iouring/src/io_uring_selector.rs b/crates/iouring/src/io_uring_selector.rs
+index 27671fd..8dece79 100644
+--- a/crates/iouring/src/io_uring_selector.rs
++++ b/crates/iouring/src/io_uring_selector.rs
+@@ -1008,6 +1008,16 @@ impl Reactor {
+         if notified {
+             return Ok(false);
+         }
++        // Briefly recheck work already submitted before paying the parking
++        // transition. Bound the check so idle operation still sleeps normally.
++        if !self.in_flight.0.is_empty() {
++            for _ in 0..16 {
++                if !self.ring.completion().is_empty() {
++                    return Ok(false);
++                }
++                std::hint::spin_loop();
++            }
++        }
+         let result = self.wait(timeout);
+         if let Err(error) = result {
+             if error.kind() != io::ErrorKind::Interrupted

@@ -1,0 +1,32 @@
+{
+  "bytes": 4096,
+  "connections": 128,
+  "payload_mib_per_second": 6937.463541666667,
+  "requests": 5327972,
+  "requests_per_second": 1775990.6666666667,
+  "rtt_max_us": 1254.399,
+  "rtt_mean_us": 71.9802318805355,
+  "rtt_p50_us": 70.655,
+  "rtt_p95_us": 101.055,
+  "rtt_p99_us": 123.007,
+  "seconds": 3.0,
+  "warmup_seconds": 1.0,
+  "identifier": "matched-tokio-adapter-w4-c128-b4096-r2",
+  "mode": "matched",
+  "backend": "tokio-adapter",
+  "workers": 4,
+  "repeat": 2,
+  "client_cpu": {
+    "user": 1.7434089999999998,
+    "system": 8.024663999999973,
+    "voluntary_switches": 301940,
+    "involuntary_switches": 848
+  },
+  "server_cpu": {
+    "user": 1.6606880000000075,
+    "system": 8.214118999999982,
+    "voluntary_switches": 232318,
+    "involuntary_switches": 682
+  },
+  "lifecycle_seconds": 4.019805313088
+}

@@ -1,0 +1,60 @@
+   Compiling core-scheduler-iouring v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-interrupt-counters/crates/iouring)
+warning: constant `NOTIFY_LOCAL_SUCCESS` is never used
+  --> crates/iouring/src/interrupt_counters.rs:24:18
+   |
+24 | pub(crate) const NOTIFY_LOCAL_SUCCESS: usize = 1;
+   |                  ^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: constant `NOTIFY_LOCAL_EAGAIN` is never used
+  --> crates/iouring/src/interrupt_counters.rs:25:18
+   |
+25 | pub(crate) const NOTIFY_LOCAL_EAGAIN: usize = 2;
+   |                  ^^^^^^^^^^^^^^^^^^^
+
+warning: constant `NOTIFY_LOCAL_ERROR` is never used
+  --> crates/iouring/src/interrupt_counters.rs:26:18
+   |
+26 | pub(crate) const NOTIFY_LOCAL_ERROR: usize = 3;
+   |                  ^^^^^^^^^^^^^^^^^^
+
+warning: constant `NOTIFY_REMOTE_SUCCESS` is never used
+  --> crates/iouring/src/interrupt_counters.rs:28:18
+   |
+28 | pub(crate) const NOTIFY_REMOTE_SUCCESS: usize = 5;
+   |                  ^^^^^^^^^^^^^^^^^^^^^
+
+warning: constant `NOTIFY_REMOTE_EAGAIN` is never used
+  --> crates/iouring/src/interrupt_counters.rs:29:18
+   |
+29 | pub(crate) const NOTIFY_REMOTE_EAGAIN: usize = 6;
+   |                  ^^^^^^^^^^^^^^^^^^^^
+
+warning: constant `NOTIFY_REMOTE_ERROR` is never used
+  --> crates/iouring/src/interrupt_counters.rs:30:18
+   |
+30 | pub(crate) const NOTIFY_REMOTE_ERROR: usize = 7;
+   |                  ^^^^^^^^^^^^^^^^^^^
+
+warning: constant `WAIT_FUNCTION` is never used
+  --> crates/iouring/src/interrupt_counters.rs:31:18
+   |
+31 | pub(crate) const WAIT_FUNCTION: usize = 8;
+   |                  ^^^^^^^^^^^^^
+
+warning: constant `NOTIFICATION_ARMED` is never used
+  --> crates/iouring/src/interrupt_counters.rs:34:18
+   |
+34 | pub(crate) const NOTIFICATION_ARMED: usize = 11;
+   |                  ^^^^^^^^^^^^^^^^^^
+
+warning: constant `NOTIFICATION_CQE` is never used
+  --> crates/iouring/src/interrupt_counters.rs:35:18
+   |
+35 | pub(crate) const NOTIFICATION_CQE: usize = 12;
+   |                  ^^^^^^^^^^^^^^^^
+
+   Compiling core-scheduler-echo-benchmark v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-interrupt-counters/benchmarks/echo)
+warning: `core-scheduler-iouring` (lib) generated 9 warnings
+    Finished `release` profile [optimized + debuginfo] target(s) in 1.48s

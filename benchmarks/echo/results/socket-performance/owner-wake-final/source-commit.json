@@ -1,0 +1,7 @@
+{
+  "production_source_commit": "3af77be0f8b8a9303c8680a7f8aab49b1c3d304c",
+  "production_source_commit_url": "https://github.com/core-rs/core-scheduler/commit/3af77be0f8b8a9303c8680a7f8aab49b1c3d304c",
+  "build_worktree_baseline": "63da7551abbd777ac0f746ae2530eb7968009fe4",
+  "production_patch_sha256": "325f061c333381555fc100df4f720cc4a51294c99f90d3acf8e8177da4029535",
+  "verification": "Worktree git diff is byte-for-byte equal to root final-production.patch. Root confirms these production files match the production_source_commit; benchmark worktree intentionally does not import its additional test/docs changes."
+}

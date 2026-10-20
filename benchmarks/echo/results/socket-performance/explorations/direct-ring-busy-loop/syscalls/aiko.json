@@ -1,0 +1,55 @@
+{
+  "source_before": "63da755",
+  "source_after": "63da755 + source.patch (uncommitted)",
+  "binaries": {
+    "before": {
+      "path": "/home/samuel/.cache/core-scheduler-ring-notification-results/control",
+      "sha256": "abc161cde925e54c6f3fb3d7e70d4d77f4f21e055877e293c27eb2a532e4834f"
+    },
+    "after": {
+      "path": "/home/samuel/.cache/core-scheduler-ring-notification-results/benchmark",
+      "sha256": "19e11b1b8e9309fcf6f04117fd62294e8f309d7fd0abe8d620595bccde8c18b5"
+    },
+    "client": {
+      "path": "/tmp/core-scheduler-profile-baseline/release/core-scheduler-echo-benchmark",
+      "sha256": "db6c914ab75011477ec6232e681046b1e75532cbaa1c81663bac984591675cf3"
+    }
+  },
+  "started_utc": "2026-10-20T02:52:06Z",
+  "samples": [
+    {
+      "bytes": 64,
+      "connections": 1,
+      "payload_mib_per_second": 2.463623046875,
+      "requests": 20182,
+      "requests_per_second": 40364.0,
+      "rtt_max_us": 2170.879,
+      "rtt_mean_us": 24.689404023387155,
+      "rtt_p50_us": 23.647,
+      "rtt_p95_us": 30.303,
+      "rtt_p99_us": 30.911,
+      "seconds": 0.5,
+      "warmup_seconds": 0.0,
+      "identifier": "strace-iouring-w1-c1-b64-r1",
+      "mode": "strace",
+      "backend": "iouring",
+      "workers": 1,
+      "repeat": 1,
+      "client_cpu": {
+        "user": 0.009975999999999999,
+        "system": 0.027937,
+        "voluntary_switches": 20203,
+        "involuntary_switches": 10
+      },
+      "server_cpu": {
+        "user": 0.049725,
+        "system": 0.299673,
+        "voluntary_switches": 323904,
+        "involuntary_switches": 33
+      },
+      "lifecycle_seconds": 0.5081833091098815,
+      "variant": "after"
+    }
+  ],
+  "finished_utc": "2026-10-20T02:52:06Z"
+}

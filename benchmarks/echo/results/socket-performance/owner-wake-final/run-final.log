@@ -1,0 +1,78 @@
+before 1 iouring {'user_ticks': 0.0, 'system_ticks': 0.0}
+before 1 iouring-poll {'user_ticks': 0.0, 'system_ticks': 0.0}
+before 4 iouring {'user_ticks': 0.0, 'system_ticks': 0.0}
+before 4 iouring-poll {'user_ticks': 0.0, 'system_ticks': 0.0}
+after 1 iouring {'user_ticks': 0.0, 'system_ticks': 0.0}
+after 1 iouring-poll {'user_ticks': 0.0, 'system_ticks': 0.0}
+after 4 iouring {'user_ticks': 0.0, 'system_ticks': 0.0}
+after 4 iouring-poll {'user_ticks': 0.0, 'system_ticks': 0.0}
+concurrent 1 48 after iouring-poll 1 4 128 64 1940076 61375
+concurrent 2 48 before iouring 2 4 128 4096 1607443 71216
+concurrent 3 48 after iouring-poll 3 4 128 4096 1733965 53777
+concurrent 4 48 after iouring-poll 1 4 128 4096 1743991 32177
+concurrent 5 48 before iouring 3 4 128 64 1790049 62942
+concurrent 6 48 after iouring-poll 3 4 128 64 1960252 39215
+concurrent 7 48 after iouring-poll 1 1 32 4096 509652 111
+concurrent 8 48 before iouring-poll 2 4 128 64 1968757 17393
+concurrent 9 48 before iouring 3 4 128 4096 1585623 85819
+concurrent 10 48 after iouring 2 4 128 4096 1742377 16476
+concurrent 11 48 before iouring-poll 2 4 128 4096 1759292 11060
+concurrent 12 48 after iouring 1 1 32 64 628437 109
+concurrent 13 48 after iouring 1 1 32 4096 556065 104
+concurrent 14 48 before iouring-poll 1 1 32 4096 506598 108
+concurrent 15 48 after iouring 3 4 128 4096 1746889 19405
+concurrent 16 48 after iouring-poll 2 4 128 64 1981302 22797
+concurrent 17 48 before iouring 1 1 32 64 535082 101
+concurrent 18 48 before iouring 3 1 32 64 537922 99
+concurrent 19 48 after iouring-poll 3 1 32 4096 509279 126
+concurrent 20 48 after iouring-poll 2 4 128 4096 1758428 30863
+concurrent 21 48 before iouring 1 4 128 4096 1580459 83395
+concurrent 22 48 before iouring-poll 3 4 128 4096 1746540 15114
+concurrent 23 48 before iouring-poll 2 1 32 64 562772 98
+concurrent 24 48 before iouring 1 1 32 4096 486961 96
+concurrent 25 48 before iouring 2 1 32 64 533988 107
+concurrent 26 48 before iouring-poll 2 1 32 4096 512053 114
+concurrent 27 48 before iouring 2 1 32 4096 485437 103
+concurrent 28 48 before iouring-poll 1 4 128 64 1944457 34340
+concurrent 29 48 before iouring-poll 3 1 32 4096 513248 98
+concurrent 30 48 after iouring 3 4 128 64 1961115 29867
+concurrent 31 48 before iouring 2 4 128 64 1807648 54754
+concurrent 32 48 after iouring-poll 2 1 32 64 566248 105
+concurrent 33 48 after iouring-poll 3 1 32 64 565627 86
+concurrent 34 48 after iouring 1 4 128 4096 1753655 14601
+concurrent 35 48 before iouring-poll 3 4 128 64 1970042 10691
+concurrent 36 48 after iouring-poll 2 1 32 4096 501189 116
+concurrent 37 48 before iouring 3 1 32 4096 483877 103
+concurrent 38 48 after iouring 2 1 32 4096 555065 102
+concurrent 39 48 after iouring-poll 1 1 32 64 563979 173
+concurrent 40 48 before iouring 1 4 128 64 1791794 59357
+concurrent 41 48 after iouring 2 4 128 64 1975848 28443
+concurrent 42 48 before iouring-poll 1 4 128 4096 1740828 12879
+concurrent 43 48 after iouring 1 4 128 64 1982102 22920
+concurrent 44 48 after iouring 3 1 32 4096 561742 102
+concurrent 45 48 after iouring 3 1 32 64 633291 113
+concurrent 46 48 after iouring 2 1 32 64 629140 92
+concurrent 47 48 before iouring-poll 1 1 32 64 565291 91
+concurrent 48 48 before iouring-poll 3 1 32 64 565031 115
+concurrent 1 32 64 iouring {'before': 535082.0, 'after': 629140.0} delta 17.578240344470576
+concurrent 1 32 64 iouring-poll {'before': 565031.0, 'after': 565626.6666666666} delta 0.10542194440068542
+concurrent 1 32 4096 iouring {'before': 485437.3333333333, 'after': 556065.0} delta 14.549286141980566
+concurrent 1 32 4096 iouring-poll {'before': 512052.6666666667, 'after': 509278.6666666667} delta -0.5417411490224344
+concurrent 4 128 64 iouring {'before': 1791794.0, 'after': 1975847.6666666667} delta 10.272032759718286
+concurrent 4 128 64 iouring-poll {'before': 1968757.0, 'after': 1960252.0} delta -0.4319984640054564
+concurrent 4 128 4096 iouring {'before': 1585623.0, 'after': 1746888.6666666667} delta 10.170492397415188
+concurrent 4 128 4096 iouring-poll {'before': 1746540.0, 'after': 1743991.0} delta -0.14594569835216786
+serial64 1 12 after iouring-poll 2 1 1 64 233370 934351
+serial64 2 12 before iouring-poll 2 1 1 64 184665 741292
+serial64 3 12 before iouring 3 1 1 64 234570 145368
+serial64 4 12 before iouring 1 1 1 64 228776 192946
+serial64 5 12 after iouring-poll 3 1 1 64 225541 905474
+serial64 6 12 after iouring 2 1 1 64 229349 928958
+serial64 7 12 before iouring 2 1 1 64 234402 135046
+serial64 8 12 after iouring-poll 1 1 1 64 230231 915624
+serial64 9 12 before iouring-poll 3 1 1 64 184713 741872
+serial64 10 12 after iouring 3 1 1 64 235409 944743
+serial64 11 12 after iouring 1 1 1 64 234387 939753
+serial64 12 12 before iouring-poll 1 1 1 64 179332 725189
+serial64 1 1 64 iouring {'before': 234402.33333333334, 'after': 234387.33333333334} delta -0.00639925370481409
+serial64 1 1 64 iouring-poll {'before': 184664.66666666666, 'after': 230230.66666666666} delta 24.674996480106294

@@ -1,0 +1,16 @@
+selected-pipe-level selected-pipe-level-iouring-w1-c1-b64-r1 215522 317607 None
+selected-local-level selected-local-level-iouring-w1-c1-b64-r3 177823 709284 None
+selected-local-level selected-local-level-iouring-w1-c1-b64-r2 187586 748048 None
+selected-local-notify selected-local-notify-iouring-w1-c1-b64-r2 178130 713702 None
+selected-pipe-level selected-pipe-level-iouring-w1-c1-b64-r2 204127 345556 None
+selected-frozen selected-frozen-iouring-w1-c1-b64-r3 230126 175756 None
+selected-pipe-level selected-pipe-level-iouring-w1-c1-b64-r3 218372 253990 None
+selected-frozen selected-frozen-iouring-w1-c1-b64-r1 237038 147250 None
+selected-frozen selected-frozen-iouring-w1-c1-b64-r2 232386 156138 None
+selected-local-notify selected-local-notify-iouring-w1-c1-b64-r1 175883 698228 None
+selected-local-level selected-local-level-iouring-w1-c1-b64-r1 186063 753715 None
+selected-local-notify selected-local-notify-iouring-w1-c1-b64-r3 173903 700229 None
+selected-frozen median-rps 232386 rps [230126, 237038, 232386] voluntary-csw [175756, 147250, 156138]
+selected-local-notify median-rps 175883 rps [178130, 175883, 173903] voluntary-csw [713702, 698228, 700229]
+selected-local-level median-rps 186063 rps [177823, 187586, 186063] voluntary-csw [709284, 748048, 753715]
+selected-pipe-level median-rps 215522 rps [215522, 204127, 218372] voluntary-csw [317607, 345556, 253990]

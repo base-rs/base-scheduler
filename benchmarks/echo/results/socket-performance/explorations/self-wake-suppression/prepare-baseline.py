@@ -1,0 +1,11 @@
+exec((__import__('pathlib').Path('/home/samuel/.cache/core-scheduler-self-wake/prepare.py')).read_text().split("sources={'prototype-fixed'")[0])
+sources=json.loads((base/'sources.json').read_text())
+git('switch','-c','perf/self-wake-selected-counted-baseline')
+git('apply','-R',str(base/'patches/self-wake.patch'))
+sources['selected-frozen-counted']=commit('Count original selected worker activity without suppressing interrupts.')
+build('selected-frozen-counted')
+(base/'sources.json').write_text(json.dumps(sources,indent=2)+'\n')
+git('switch','perf/self-wake-selected')
+with (base/'tests.log').open('w') as log:
+ subprocess.run(['flock','-s','/tmp/core-scheduler-perf.lock','cargo','test','--locked','-p','core-scheduler-native','-p','core-scheduler-iouring'],cwd=root,env=env,stdout=log,stderr=subprocess.STDOUT,check=True)
+print('tests completed',flush=True)

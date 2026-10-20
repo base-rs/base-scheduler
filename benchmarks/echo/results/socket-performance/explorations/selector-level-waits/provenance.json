@@ -1,0 +1,46 @@
+{
+  "sources": {
+    "selected-local-level": "c9d039d29850b6ad3c4cc598c87765a1f0033ef3",
+    "selected-pipe-level": "7837d5450036c00f0cbc90e0e29aee0f6a1b4d72",
+    "selected-frozen": "938e7e641f8d186991a0f46f211f4ce3d19c929e",
+    "selected-local-notify": "46f11468be79f4bf46ff8171f7b66498d8405e56"
+  },
+  "frozen_selected_build_source": "938e7e641f8d186991a0f46f211f4ce3d19c929e",
+  "binaries": {
+    "selected-frozen": {
+      "path": "/home/samuel/.cache/core-scheduler-selector-level/binaries/selected-frozen",
+      "sha256": "f5f0336a61e7ccfbf6db35b1ac10cf04845137465ef4250c0420691b1173908e"
+    },
+    "selected-local-notify": {
+      "path": "/home/samuel/.cache/core-scheduler-selector-level/binaries/selected-local-notify",
+      "sha256": "3a4531ecc738752dbc45d14c1a71ad821d2e7939725a687296e89ba7ebfd509d"
+    },
+    "selected-local-level": {
+      "path": "/home/samuel/.cache/core-scheduler-selector-level/binaries/selected-local-level",
+      "sha256": "6d02d28bf8dfb7cc4fe94ef7770ba3701b611289a0d282fe293007ce73a65d4c"
+    },
+    "selected-pipe-level": {
+      "path": "/home/samuel/.cache/core-scheduler-selector-level/binaries/selected-pipe-level",
+      "sha256": "f3e92180a448eb464e8b77ff56ea31c0f3aad1982ebd390bb149ca509323f938"
+    }
+  },
+  "client": {
+    "path": "/home/samuel/.cache/core-scheduler-selector-level/binaries/client",
+    "sha256": "db6c914ab75011477ec6232e681046b1e75532cbaa1c81663bac984591675cf3"
+  },
+  "build": "cargo build --release --locked -p core-scheduler-echo-benchmark; CARGO_PROFILE_RELEASE_DEBUG=1; RUSTFLAGS unset",
+  "seed": 20261024,
+  "hostname": "aiko",
+  "platform": "Linux-7.2.6-arch2-1-x86_64-with-glibc2.44",
+  "server_cpus": "0",
+  "client_cpus": "4-7",
+  "client_workers": 4,
+  "warmup_seconds": 1,
+  "measurement_seconds": 3,
+  "load_before": [
+    1.646484375,
+    1.1357421875,
+    0.6953125
+  ],
+  "samples": []
+}

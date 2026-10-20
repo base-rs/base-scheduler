@@ -1,0 +1,12 @@
+before iouring 3 236525
+write iouring 1 236596
+after iouring 2 205640
+before iouring 1 237911
+write iouring 3 229215
+after iouring 1 205630
+write iouring 2 226881
+before iouring 2 236223
+after iouring 3 202218
+after iouring median 205629.66666666666 switches 818423
+before iouring median 236525.33333333334 switches 135987
+write iouring median 229214.66666666666 switches 926317

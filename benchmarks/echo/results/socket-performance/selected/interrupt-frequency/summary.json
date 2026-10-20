@@ -1,0 +1,89 @@
+{
+  "before_source": "14c509acc1c8d8775aa802cbd5c84accd6d5fd3e",
+  "prototype_source": "4a061fbc4355738f39f5eb6ea1db1520db6a753e",
+  "read_source": "6bd87198787b489950766ca52f34a6f8589d5ddc",
+  "read_patch": "../../explorations/idle-regression/read.patch",
+  "bpftrace": "v0.27.0-872e7a56a",
+  "kernel": "Linux aiko 7.2.6-arch2-1 x86_64",
+  "runner_sha256": "524b3f2da319670d5d6cb606ab505bb112c775b8c02497153be73a3643851437",
+  "samples": [
+    {
+      "variant": "before",
+      "repeat": 1,
+      "lifecycle_payload_pairs": 854548,
+      "notification_cqes": 0,
+      "notification_cqes_per_pair": 0.0,
+      "writes": [],
+      "notification_sqes": 0
+    },
+    {
+      "variant": "prototype",
+      "repeat": 2,
+      "lifecycle_payload_pairs": 904531,
+      "notification_cqes": 118072,
+      "notification_cqes_per_pair": 0.13053394521580797,
+      "writes": [
+        {
+          "fd": 5,
+          "return": 8,
+          "calls": 1533422
+        }
+      ],
+      "notification_sqes": 118072
+    },
+    {
+      "variant": "read",
+      "repeat": 2,
+      "lifecycle_payload_pairs": 819585,
+      "notification_cqes": 801635,
+      "notification_cqes_per_pair": 0.9780986718888218,
+      "writes": [
+        {
+          "fd": 5,
+          "return": 8,
+          "calls": 803620
+        }
+      ],
+      "notification_sqes": 801635
+    },
+    {
+      "variant": "prototype",
+      "repeat": 1,
+      "lifecycle_payload_pairs": 922339,
+      "notification_cqes": 97532,
+      "notification_cqes_per_pair": 0.10574420034282406,
+      "writes": [
+        {
+          "fd": 5,
+          "return": 8,
+          "calls": 1428766
+        }
+      ],
+      "notification_sqes": 97532
+    },
+    {
+      "variant": "read",
+      "repeat": 1,
+      "lifecycle_payload_pairs": 797605,
+      "notification_cqes": 780406,
+      "notification_cqes_per_pair": 0.9784366948552228,
+      "writes": [
+        {
+          "fd": 5,
+          "return": 8,
+          "calls": 781337
+        }
+      ],
+      "notification_sqes": 780406
+    },
+    {
+      "variant": "before",
+      "repeat": 2,
+      "lifecycle_payload_pairs": 867900,
+      "notification_cqes": 0,
+      "notification_cqes_per_pair": 0.0,
+      "writes": [],
+      "notification_sqes": 0
+    }
+  ]
+}

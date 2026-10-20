@@ -1,0 +1,72 @@
+{
+  "sources": {
+    "prototype-fixed": "7accb792dc5940433c65cb527e5acef7824c9603",
+    "prototype-frozen": "4a061fbc4355738f39f5eb6ea1db1520db6a753e",
+    "selected-frozen": "63da7551abbd777ac0f746ae2530eb7968009fe4",
+    "prototype-fixed-counted": "43131d4e151a438d30ec0f3cc7bccfa6df4c4101",
+    "selected-fixed": "c4f7eef1a57fc21d6f231960967a9f432c0d69d2",
+    "selected-fixed-counted": "bb7afa5e1981c589dbcb4922953e082c474cd4bf",
+    "selected-frozen-counted": "0550c647789d79b488aa32872d602685798c4124",
+    "prototype-frozen-counted": "65297d6469f1df23cc08ef1a94f6a11ad6fa29ed"
+  },
+  "frozen_selected_build_source": "938e7e641f8d186991a0f46f211f4ce3d19c929e",
+  "binaries": {
+    "prototype-frozen": {
+      "path": "/home/samuel/.cache/core-scheduler-self-wake/binaries/prototype-frozen",
+      "sha256": "2387876a4f7cab272524f62cd79aa5302931016b1d4f010ef9406d94f7eb35f5"
+    },
+    "prototype-frozen-counted": {
+      "path": "/home/samuel/.cache/core-scheduler-self-wake/binaries/prototype-frozen-counted",
+      "sha256": "b6659680d1226cf5aef49778c8e5a30c70ce5862ed9c15a79c40ae96f33048b9"
+    },
+    "selected-frozen": {
+      "path": "/home/samuel/.cache/core-scheduler-self-wake/binaries/selected-frozen",
+      "sha256": "f5f0336a61e7ccfbf6db35b1ac10cf04845137465ef4250c0420691b1173908e"
+    },
+    "prototype-fixed": {
+      "path": "/home/samuel/.cache/core-scheduler-self-wake/binaries/prototype-fixed",
+      "sha256": "285a06a43f6e50bb2670b74b6ebf6c17282b54e598c11cfa298ad098168cb77e"
+    },
+    "prototype-fixed-counted": {
+      "path": "/home/samuel/.cache/core-scheduler-self-wake/binaries/prototype-fixed-counted",
+      "sha256": "1972d74e2d5688cadcfbb2acdb41b2dbf286b935a9cfb8ca466a3f212373503a"
+    },
+    "selected-fixed": {
+      "path": "/home/samuel/.cache/core-scheduler-self-wake/binaries/selected-fixed",
+      "sha256": "5554c06eb07593c95ea3535d0159beb659ee785e1e5f137abb957c746debb1e1"
+    },
+    "selected-fixed-counted": {
+      "path": "/home/samuel/.cache/core-scheduler-self-wake/binaries/selected-fixed-counted",
+      "sha256": "0116d266872a5aac0c42fffefb2c661181f9fde76029616cf503cbb6e22f7c88"
+    },
+    "selected-frozen-counted": {
+      "path": "/home/samuel/.cache/core-scheduler-self-wake/binaries/selected-frozen-counted",
+      "sha256": "cef8fc1668496ee36a825bb6de7c96c94d967b148dc081aaa6bdf8e6866d9203"
+    }
+  },
+  "client": {
+    "path": "/home/samuel/.cache/core-scheduler-self-wake/binaries/client",
+    "sha256": "db6c914ab75011477ec6232e681046b1e75532cbaa1c81663bac984591675cf3"
+  },
+  "build": "cargo build --release --locked -p core-scheduler-echo-benchmark; CARGO_PROFILE_RELEASE_DEBUG=1; RUSTFLAGS unset",
+  "seed": 20261020,
+  "hostname": "aiko",
+  "platform": "Linux-7.2.6-arch2-1-x86_64-with-glibc2.44",
+  "server_cpus": "0",
+  "client_cpus": "4-7",
+  "client_workers": 4,
+  "warmup_seconds": 1,
+  "measurement_seconds": 3,
+  "load_before": [
+    0.83837890625,
+    0.33154296875,
+    0.10595703125
+  ],
+  "load_after": [
+    1.14697265625,
+    0.5751953125,
+    0.2177734375
+  ],
+  "runner_sha256": "01188ffdba385ba5ab80e32e3632fc8bafe2f30f39fd22beeb95f1ea473a47c9",
+  "sample_runner_sha256": "31e6ad715214fcadfda358362100a21cb94cc41a79e23733191eb8e61b740909"
+}

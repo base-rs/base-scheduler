@@ -1,0 +1,5 @@
+   Compiling core-scheduler-tokio v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-interrupt-counters/crates/tokio)
+   Compiling core-scheduler-iouring v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-interrupt-counters/crates/iouring)
+   Compiling core-scheduler-native v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-interrupt-counters/crates/native)
+   Compiling core-scheduler-echo-benchmark v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-interrupt-counters/benchmarks/echo)
+    Finished `release` profile [optimized + debuginfo] target(s) in 1.54s

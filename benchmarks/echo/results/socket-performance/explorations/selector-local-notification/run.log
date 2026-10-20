@@ -1,0 +1,8 @@
+selected-local-notify selected-local-notify-iouring-w1-c1-b64-r1 179175 715628 None
+selected-local-notify selected-local-notify-iouring-w1-c1-b64-r2 179447 719886 None
+selected-frozen selected-frozen-iouring-w1-c1-b64-r1 240279 89000 None
+selected-frozen selected-frozen-iouring-w1-c1-b64-r3 237924 56433 None
+selected-frozen selected-frozen-iouring-w1-c1-b64-r2 234969 139339 None
+selected-local-notify selected-local-notify-iouring-w1-c1-b64-r3 180713 725814 None
+selected-frozen median-rps 237924 rps [240279, 237924, 234969] voluntary-csw [89000, 56433, 139339]
+selected-local-notify median-rps 179447 rps [179175, 179447, 180713] voluntary-csw [715628, 719886, 725814]
