@@ -101,7 +101,9 @@ fn search(shared: &Shared, local: &LocalWorker, iteration: usize) -> Steal<Runna
     let mut retry = false;
     // Admit external wakes at each batch boundary, even while local tasks keep waking themselves.
     for queue in [&shared.ready, incoming] {
-        let _ = take_stolen(queue.steal_batch(&local.ready), &mut retry);
+        if !queue.is_empty() {
+            let _ = take_stolen(queue.steal_batch(&local.ready), &mut retry);
+        }
     }
     if let Some(runnable) = local.ready.pop() {
         return Steal::Success(runnable);
