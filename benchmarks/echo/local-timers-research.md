@@ -6,6 +6,8 @@ The prototype gives each Native task worker its own unsynchronized timer queue, 
 
 The implementation and measurements are preserved in [the research evidence](results/local-timers/readme.md). The [candidate patch](results/local-timers/candidate.patch) is archived, not applied to production source.
 
+A [follow-up experiment](timer-ready-research.md) compares immediate wake delivery with publishing expired timer wakers as stealable ready actions, including batched publication and local task routing. Immediate delivery already makes the resulting tasks stealable; the extra delivery stage adds measurable cost in synchronized-expiry workloads.
+
 ## Timer results
 
 Optimized Aiko builds, matching 1 ns Linux timer slack, and medians of three randomized repetitions give:

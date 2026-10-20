@@ -1,0 +1,737 @@
+diff --git a/crates/iouring/src/io_uring_selector.rs b/crates/iouring/src/io_uring_selector.rs
+index 9898ef1..4019d61 100644
+--- a/crates/iouring/src/io_uring_selector.rs
++++ b/crates/iouring/src/io_uring_selector.rs
+@@ -8,7 +8,7 @@ use event_listener::Event as CompletionEvent;
+ use futures_channel::oneshot;
+ use io_uring::{IoUring, opcode, squeue, types};
+ use std::{
+-    cell::Cell,
++    cell::{Cell, UnsafeCell},
+     collections::{HashMap, VecDeque},
+     fs::File as StdFile,
+     future::{Future, poll_fn},
+@@ -104,18 +104,22 @@ struct Request<B: IoBuf = Vec<u8>> {
+     identifier: u64,
+     _permit: Permit,
+     resource: Option<Resource>,
+-    buffer: Option<B>,
+-    pointer: fn(&mut B) -> *mut u8,
++    // Shared bookkeeping must not freeze a Box-backed mutable payload while the
++    // kernel owns its pointer. Exclusive access resumes only after retirement.
++    buffer: UnsafeCell<Option<B>>,
++    // io_uring transmits userspace addresses as integers. Expose the buffer's
++    // provenance before enqueueing; its owner keeps this stable allocation alive.
++    pointer: usize,
++    length: u32,
+     write: bool,
+     reply: Cell<Option<oneshot::Sender<RawBufferResult<B>>>>,
+     cancelling: Cell<bool>,
+ }
+ 
+ impl<B: IoBuf> Request<B> {
+-    fn entry(&mut self) -> squeue::Entry {
+-        let buffer = self.buffer.as_mut().expect("request retains its buffer");
+-        let length = buffer.as_ref().len().min(i32::MAX as usize) as u32;
+-        let pointer = (self.pointer)(buffer);
++    fn entry(&self) -> squeue::Entry {
++        let pointer = self.pointer as *mut u8;
++        let length = self.length;
+         let entry = match self
+             .resource
+             .as_ref()
+@@ -152,7 +156,11 @@ impl<B: IoBuf> Request<B> {
+             .reply
+             .take()
+             .expect("unfinished requests retain their completion sender");
+-        let buffer = self.buffer.take().expect("request returns its buffer once");
++        let buffer = self
++            .buffer
++            .get_mut()
++            .take()
++            .expect("request returns its buffer once");
+         // Release the retained descriptor before waking a caller that may immediately close it.
+         drop(self);
+         discard(reply.send((result, buffer)));
+@@ -167,13 +175,18 @@ impl<B: IoBuf> Drop for Request<B> {
+         // can return their buffers normally. InFlight deliberately suppresses
+         // this destructor for requests whose completion is unknown.
+         if let Some(reply) = self.reply.take() {
+-            discard(reply.send((
+-                Err(io::Error::new(
+-                    io::ErrorKind::BrokenPipe,
+-                    "selector closed before submission",
++            discard(
++                reply.send((
++                    Err(io::Error::new(
++                        io::ErrorKind::BrokenPipe,
++                        "selector closed before submission",
++                    )),
++                    self.buffer
++                        .get_mut()
++                        .take()
++                        .expect("request returns its buffer once"),
+                 )),
+-                self.buffer.take().expect("request returns its buffer once"),
+-            )));
++            );
+         }
+     }
+ }
+@@ -182,7 +195,8 @@ impl<B: IoBuf> Drop for Request<B> {
+ // Only entry preparation (before publication) and original completion may access the request exclusively. In-flight bookkeeping uses shared access so inline UnsafeCell output can remain kernel-accessible without creating an aliasing mutable reference.
+ pub(crate) trait PendingRequest: Send {
+     fn identifier(&self) -> u64;
+-    fn entry(&mut self) -> squeue::Entry;
++    // No user callbacks: an idle turn may wait after publishing this entry.
++    fn entry(&self) -> squeue::Entry;
+     fn finish(self: Box<Self>, result: io::Result<usize>);
+     fn cancelling(&self) -> bool;
+     fn set_cancelling(&self);
+@@ -192,7 +206,7 @@ impl<B: IoBuf> PendingRequest for Request<B> {
+     fn identifier(&self) -> u64 {
+         self.identifier
+     }
+-    fn entry(&mut self) -> squeue::Entry {
++    fn entry(&self) -> squeue::Entry {
+         Request::entry(self)
+     }
+     fn finish(self: Box<Self>, result: io::Result<usize>) {
+@@ -609,17 +623,24 @@ impl IoUringSelector {
+             Err(error) => return (Err(error), buffer),
+         };
+         let (reply, result) = oneshot::channel();
+-        let request = Request {
++        let mut request = Box::new(Request {
+             identifier,
+             _permit: permit,
+             resource: Some(resource),
+-            buffer: Some(buffer),
+-            pointer,
++            buffer: UnsafeCell::new(Some(buffer)),
++            pointer: 0,
++            length: 0,
+             write,
+             reply: Cell::new(Some(reply)),
+             cancelling: Cell::new(false),
+-        };
+-        Self::submit(controller, Box::new(request), result, cancellation).await
++        });
++        // User buffer access can wake other tasks. Prepare while polling the
++        // caller, before enqueueing. Box-backed owners must already be in their
++        // final location when deriving the pointer, not moved into the request later.
++        let buffer = request.buffer.get_mut().as_mut().unwrap();
++        request.length = buffer.as_ref().len().min(i32::MAX as usize) as u32;
++        request.pointer = pointer(buffer) as usize;
++        Self::submit(controller, request, result, cancellation).await
+     }
+ 
+     // `try_update` is not available on the supported Rust 1.85 toolchain.
+@@ -916,7 +937,9 @@ impl Reactor {
+                 command_batch_full = false;
+                 break;
+             };
+-            progressed = true;
++            // Accepted submissions do not wake tasks. An idle turn can publish
++            // them with its wait; cancellation and closure may finish requests.
++            progressed |= !matches!(&command, Command::Submit(_) if !self.closing);
+             match command {
+                 Command::Submit(request) if !self.closing => self.pending.push_back(request),
+                 Command::Submit(request) => request.finish(Err(io::ErrorKind::Interrupted.into())),
+@@ -1038,6 +1061,7 @@ impl Reactor {
+         // Publish queued work before returning to the executor; skip empty enters unless CQ overflow or deferred task work requires kernel progress. At a genuine idle wait, the wait enter also publishes the SQ.
+         // Short-circuiting preserves the local permit through productive turns. At the actual wait decision, consume it; the armed poll retains remote notifications until their CQE drains the counter.
+         let return_to_executor = progressed
++            || command_batch_full
+             || timeout == Some(Duration::ZERO)
+             || !self.pending.is_empty()
+             || !self.cancellations.is_empty()
+diff --git a/crates/iouring/src/io_uring_selector/message.rs b/crates/iouring/src/io_uring_selector/message.rs
+index 4f6f05d..0592e10 100644
+--- a/crates/iouring/src/io_uring_selector/message.rs
++++ b/crates/iouring/src/io_uring_selector/message.rs
+@@ -14,7 +14,7 @@ enum MessageOperation {
+     Receive(SocketRecvFlags),
+ }
+ 
+-// The request is boxed before entry() derives any pointers. It stays at that address until the original CQE. UnsafeCell permits kernel-written metadata and inline prepared vectors to coexist with the driver's shared bookkeeping references; exclusive access resumes only after retirement.
++// The request is boxed before prepare() derives any pointers, then stays at that address until the original CQE. User buffer methods run before enqueueing. UnsafeCell permits kernel-written metadata and inline prepared vectors to coexist with the driver's shared bookkeeping references; exclusive access resumes only after retirement.
+ struct MessageRequest<B: IoBufSequence> {
+     identifier: u64,
+     _permit: Permit,
+@@ -23,7 +23,6 @@ struct MessageRequest<B: IoBufSequence> {
+     vectors: Vec<libc::iovec>,
+     header: UnsafeCell<libc::msghdr>,
+     address: UnsafeCell<libc::sockaddr_storage>,
+-    prepare: Prepare<B>,
+     operation: MessageOperation,
+     reply: Cell<Option<oneshot::Sender<MessageResult<B>>>>,
+     cancelling: Cell<bool>,
+@@ -37,7 +36,7 @@ impl<B: IoBufSequence> PendingRequest for MessageRequest<B> {
+         self.identifier
+     }
+ 
+-    fn entry(&mut self) -> squeue::Entry {
++    fn entry(&self) -> squeue::Entry {
+         let descriptor = types::Fd(
+             self.socket
+                 .as_ref()
+@@ -45,49 +44,20 @@ impl<B: IoBufSequence> PendingRequest for MessageRequest<B> {
+                 .get_ref()
+                 .as_raw_fd(),
+         );
+-        let buffers = self
+-            .buffers
+-            .as_mut()
+-            .expect("request retains its buffers")
+-            .get_mut();
+-        let (vectors, count) = (self.prepare)(buffers, &mut self.vectors);
+-        let header = self.header.get_mut();
+-        header.msg_iov = vectors;
+-        header.msg_iovlen = count;
+-        let address = self.address.get();
+         match self.operation {
+-            MessageOperation::Send(flags, destination) => {
+-                if let Some(destination) = destination {
+-                    let destination = socket2::SockAddr::from(destination);
+-                    // SAFETY: A native IP address fits the initialized, aligned storage in this request. The box cannot move until retirement.
+-                    unsafe {
+-                        std::ptr::copy_nonoverlapping(
+-                            destination.as_ptr().cast::<u8>(),
+-                            address.cast(),
+-                            destination.len() as usize,
+-                        );
+-                    }
+-                    header.msg_name = address.cast();
+-                    header.msg_namelen = destination.len();
+-                }
+-                opcode::SendMsg::new(descriptor, self.header.get())
+-                    .flags(
+-                        (libc::MSG_NOSIGNAL
+-                            | if flags.dont_route {
+-                                libc::MSG_DONTROUTE
+-                            } else {
+-                                0
+-                            }) as _,
+-                    )
+-                    .build()
+-            }
+-            MessageOperation::Receive(flags) => {
+-                header.msg_name = address.cast();
+-                header.msg_namelen = std::mem::size_of::<libc::sockaddr_storage>() as _;
+-                opcode::RecvMsg::new(descriptor, self.header.get())
+-                    .flags(if flags.peek { libc::MSG_PEEK as _ } else { 0 })
+-                    .build()
+-            }
++            MessageOperation::Send(flags, _) => opcode::SendMsg::new(descriptor, self.header.get())
++                .flags(
++                    (libc::MSG_NOSIGNAL
++                        | if flags.dont_route {
++                            libc::MSG_DONTROUTE
++                        } else {
++                            0
++                        }) as _,
++                )
++                .build(),
++            MessageOperation::Receive(flags) => opcode::RecvMsg::new(descriptor, self.header.get())
++                .flags(if flags.peek { libc::MSG_PEEK as _ } else { 0 })
++                .build(),
+         }
+         .user_data(self.identifier)
+     }
+@@ -122,6 +92,42 @@ impl<B: IoBufSequence> PendingRequest for MessageRequest<B> {
+ }
+ 
+ impl<B: IoBufSequence> MessageRequest<B> {
++    // Called once after boxing and before enqueueing. The driver can subsequently
++    // prepare its SQE without invoking arbitrary buffer accessors while idle.
++    fn prepare(&mut self, prepare: Prepare<B>) {
++        let buffers = self
++            .buffers
++            .as_mut()
++            .expect("request retains its buffers")
++            .get_mut();
++        let (vectors, count) = prepare(buffers, &mut self.vectors);
++        let header = self.header.get_mut();
++        header.msg_iov = vectors;
++        header.msg_iovlen = count;
++        let address = self.address.get();
++        match self.operation {
++            MessageOperation::Send(_, Some(destination)) => {
++                let destination = socket2::SockAddr::from(destination);
++                // SAFETY: A native IP address fits the initialized, aligned storage in
++                // this request. The containing box stays immobile until retirement.
++                unsafe {
++                    std::ptr::copy_nonoverlapping(
++                        destination.as_ptr().cast::<u8>(),
++                        address.cast(),
++                        destination.len() as usize,
++                    );
++                }
++                header.msg_name = address.cast();
++                header.msg_namelen = destination.len();
++            }
++            MessageOperation::Send(_, None) => {}
++            MessageOperation::Receive(_) => {
++                header.msg_name = address.cast();
++                header.msg_namelen = std::mem::size_of::<libc::sockaddr_storage>() as _;
++            }
++        }
++    }
++
+     fn received(&mut self, bytes: usize) -> SocketRecvResult {
+         let header = self.header.get_mut();
+         let address = if header.msg_namelen == 0 {
+@@ -264,21 +270,21 @@ impl IoUringSelector {
+             Err(error) => return (Err(error), buffers),
+         };
+         let (reply, result) = oneshot::channel();
+-        let request = Box::new(MessageRequest {
++        let mut request = Box::new(MessageRequest {
+             identifier,
+             _permit: permit,
+             socket: Some(retain_socket(socket)),
+             buffers: Some(UnsafeCell::new(buffers)),
+             vectors: Vec::new(),
+-            // SAFETY: Zero is a valid initial representation for native message and address storage. entry() fills pointers before publication.
++            // SAFETY: Zero is a valid initial representation for native message and address storage. prepare() fills pointers before enqueueing.
+             header: UnsafeCell::new(unsafe { std::mem::zeroed() }),
+             // SAFETY: sockaddr_storage is an integer-only C structure.
+             address: UnsafeCell::new(unsafe { std::mem::zeroed() }),
+             operation,
+-            prepare,
+             reply: Cell::new(Some(reply)),
+             cancelling: Cell::new(false),
+         });
++        request.prepare(prepare);
+         Self::submit(controller, request, result, cancellation).await
+     }
+ }
+diff --git a/crates/iouring/src/io_uring_selector/message/tests.rs b/crates/iouring/src/io_uring_selector/message/tests.rs
+index b5c5814..ea5f090 100644
+--- a/crates/iouring/src/io_uring_selector/message/tests.rs
++++ b/crates/iouring/src/io_uring_selector/message/tests.rs
+@@ -1,7 +1,7 @@
+ // Released under the MIT License.
+ // Copyright, 2026, by Samuel Williams.
+ 
+-use super::super::tests::{drain, drive, pair};
++use super::super::tests::{Failures, drain, drive, pair};
+ use super::*;
+ use futures_lite::future::{block_on, poll_once};
+ use std::sync::atomic::AtomicUsize;
+@@ -88,7 +88,7 @@ fn message_cancellation_and_abandonment_retain_payload_until_original_completion
+                     let token = Cancellation::new();
+                     let mut future = Box::pin(operation(&selector, &socket, buffers, send, &token));
+                     assert!(poll_once(&mut future).await.is_none());
+-                    let Command::Submit(mut request) = driver
++                    let Command::Submit(request) = driver
+                         .reactor
+                         .as_ref()
+                         .unwrap()
+@@ -414,6 +414,104 @@ unsafe impl IoBufSequenceMut for InlineBuffers {
+     }
+ }
+ 
++struct WakeOnVectors {
++    buffers: InlineBuffers,
++    accesses: Arc<AtomicUsize>,
++    wake: std::task::Waker,
++}
++// SAFETY: The wrapper retains InlineBuffers' unchanged byte range and prepared
++// vectors. Notifying a waker neither changes nor shares their storage.
++unsafe impl IoBufSequence for WakeOnVectors {
++    fn buffer_count(&self) -> usize {
++        self.buffers.buffer_count()
++    }
++    fn buffer(&self, index: usize) -> &[u8] {
++        self.buffers.buffer(index)
++    }
++    fn io_slices(&self) -> Option<&[std::io::IoSlice<'_>]> {
++        self.accesses.fetch_add(1, Ordering::SeqCst);
++        self.wake.wake_by_ref();
++        self.buffers.io_slices()
++    }
++}
++// SAFETY: Writable storage is exclusively retained by InlineBuffers.
++unsafe impl IoBufSequenceMut for WakeOnVectors {
++    fn buffer_mut(&mut self, index: usize) -> &mut [u8] {
++        self.buffers.buffer_mut(index)
++    }
++    fn io_slices_mut(&mut self) -> Option<&[std::io::IoSliceMut<'_>]> {
++        self.accesses.fetch_add(1, Ordering::SeqCst);
++        self.wake.wake_by_ref();
++        self.buffers.io_slices_mut()
++    }
++}
++
++#[test]
++fn message_vector_callbacks_run_before_enqueue_with_stable_inline_vectors() {
++    use core_scheduler_selector::{SelectorDriver, SelectorWorker};
++    use std::time::{Duration, Instant};
++    for send in [false, true] {
++        let (selector, driver) = pair(2);
++        let socket = block_on(socket(&selector));
++        if !send {
++            std::net::UdpSocket::bind("127.0.0.1:0")
++                .unwrap()
++                .send_to(b"vector", socket.local_addr().unwrap())
++                .unwrap();
++        }
++        let mut worker = driver.enter();
++        let accesses = Arc::new(AtomicUsize::new(0));
++        let buffers = WakeOnVectors {
++            buffers: InlineBuffers::new(b"vector".to_vec()),
++            accesses: Arc::clone(&accesses),
++            wake: worker.waker(),
++        };
++        let never = Cancellation::never();
++        let mut future = Box::pin(operation(&selector, &socket, buffers, send, &never));
++        assert!(block_on(poll_once(&mut future)).is_none());
++        assert_eq!(accesses.load(Ordering::SeqCst), 1);
++        let Command::Submit(request) =
++            crate::io_uring_worker::pop(&selector.controllers[0]).unwrap()
++        else {
++            panic!("expected local submission")
++        };
++        assert_eq!(
++            request.entry().get_opcode() as u8,
++            if send {
++                opcode::SendMsg::CODE
++            } else {
++                opcode::RecvMsg::CODE
++            }
++        );
++        assert_eq!(accesses.load(Ordering::SeqCst), 1);
++        assert!(
++            selector.controllers[0]
++                .send(Command::Submit(request))
++                .is_ok()
++        );
++        {
++            let _failure = Failures::new([("wait", io::ErrorKind::PermissionDenied.into())]);
++            assert!(!worker.turn(None).unwrap());
++            // The vector callback's explicit local wake prevents an idle wait.
++            // A fatal injected wait error would have made turn() fail above.
++        }
++        let deadline = Instant::now() + Duration::from_secs(10);
++        let (result, buffers) = loop {
++            if let Some(result) = block_on(poll_once(&mut future)) {
++                break result;
++            }
++            assert!(!worker.turn(Some(Duration::ZERO)).unwrap());
++            assert!(Instant::now() < deadline);
++        };
++        assert_eq!(result.unwrap(), 6);
++        assert_eq!(buffers.buffers.bytes.len(), 6);
++        assert_eq!(accesses.load(Ordering::SeqCst), 1);
++        selector.close();
++        while !worker.turn(Some(Duration::from_millis(10))).unwrap() {}
++        block_on(selector.shutdown());
++    }
++}
++
+ #[test]
+ fn inline_prepared_vectors_survive_submission_and_are_used_without_copying() {
+     let (selector, mut driver) = pair(2);
+diff --git a/crates/iouring/src/io_uring_selector/readiness.rs b/crates/iouring/src/io_uring_selector/readiness.rs
+index 59edcd3..76f6e05 100644
+--- a/crates/iouring/src/io_uring_selector/readiness.rs
++++ b/crates/iouring/src/io_uring_selector/readiness.rs
+@@ -20,7 +20,7 @@ impl PendingRequest for ReadinessRequest {
+         self.identifier
+     }
+ 
+-    fn entry(&mut self) -> squeue::Entry {
++    fn entry(&self) -> squeue::Entry {
+         let socket = self.socket.as_ref().expect("request retains its socket");
+         let events = match self.interest {
+             Interest::Readable => libc::POLLIN,
+diff --git a/crates/iouring/src/io_uring_selector/readiness/tests.rs b/crates/iouring/src/io_uring_selector/readiness/tests.rs
+index e222ab7..9c30d5b 100644
+--- a/crates/iouring/src/io_uring_selector/readiness/tests.rs
++++ b/crates/iouring/src/io_uring_selector/readiness/tests.rs
+@@ -100,7 +100,7 @@ fn pending_read_uses_polladd_and_observes_data_arriving_before_submission() {
+         &never,
+     ));
+     assert!(block_on(poll_once(&mut receiving)).is_none());
+-    let mut request = submitted(&driver);
++    let request = submitted(&driver);
+     assert_eq!(request.entry().get_opcode() as u8, opcode::PollAdd::CODE);
+     // Data can arrive between the failed syscall and publication of PollAdd. Its level readiness must still complete the wait.
+     assert_eq!(
+@@ -352,7 +352,7 @@ fn blocked_scalar_and_vector_sends_wait_on_the_ring_and_cancel_safely() {
+                 "peer did not apply backpressure"
+             );
+         };
+-        let mut request = submitted(&driver);
++        let request = submitted(&driver);
+         assert_eq!(request.entry().get_opcode() as u8, opcode::PollAdd::CODE);
+         selector.controllers[0]
+             .send(Command::Submit(request))
+diff --git a/crates/iouring/src/io_uring_selector/socket/tests.rs b/crates/iouring/src/io_uring_selector/socket/tests.rs
+index 79bfe7c..f246112 100644
+--- a/crates/iouring/src/io_uring_selector/socket/tests.rs
++++ b/crates/iouring/src/io_uring_selector/socket/tests.rs
+@@ -107,7 +107,7 @@ fn scalar_socket_requests_use_ring_opcodes_and_release_before_notification() {
+                 "peer did not apply backpressure"
+             );
+         };
+-        let Command::Submit(mut request) = driver
++        let Command::Submit(request) = driver
+             .reactor
+             .as_ref()
+             .unwrap()
+diff --git a/crates/iouring/src/io_uring_selector/tests.rs b/crates/iouring/src/io_uring_selector/tests.rs
+index 80799f8..2b113a7 100644
+--- a/crates/iouring/src/io_uring_selector/tests.rs
++++ b/crates/iouring/src/io_uring_selector/tests.rs
+@@ -732,12 +732,15 @@ fn submission_racing_shutdown_or_driver_exit_returns_unpublished_storage() {
+         // Stage the legitimate interval after admission and request preparation but before publication, so shutdown can deterministically win that race.
+         let permit = block_on(selector.controllers[0].capacity.acquire(&never)).unwrap();
+         let (reply, result) = oneshot::channel();
++        let mut buffer = vec![3];
++        let pointer = buffer.as_mut_ptr() as usize;
+         let request = Box::new(Request {
+             identifier: IoUringSelector::next_identifier(&selector.controllers[0]).unwrap(),
+             _permit: permit,
+             resource: Some(Resource::File(retain_file(&file), None)),
+-            buffer: Some(vec![3]),
+-            pointer: |buffer| buffer.as_mut_ptr(),
++            buffer: UnsafeCell::new(Some(buffer)),
++            pointer,
++            length: 1,
+             write: false,
+             reply: Cell::new(Some(reply)),
+             cancelling: Cell::new(false),
+@@ -1156,7 +1159,7 @@ fn external_admission_remains_bounded_under_contention() {
+ }
+ 
+ #[test]
+-fn nonblocking_and_productive_turns_do_not_prepare_an_idle_wait() {
++fn nonblocking_and_completion_turns_do_not_prepare_an_idle_wait() {
+     let (selector, mut driver) = pair(1);
+     let (_directory, file) = file(&selector);
+     let never = Cancellation::never();
+@@ -1165,7 +1168,16 @@ fn nonblocking_and_productive_turns_do_not_prepare_an_idle_wait() {
+         assert!(!driver.turn(Some(Duration::ZERO)).unwrap());
+         let mut operation = Box::pin(selector.file_read_at(&file, vec![0; 6], 0, &never));
+         assert!(block_on(poll_once(&mut operation)).is_none());
+-        // Submission and completion both return to the executor without an idle wait. Nonblocking turns may also retire the internal notification CQE.
++        // A nonblocking turn publishes submissions. Once a CQE is available, a
++        // completion turn also returns without an idle wait.
++        assert!(!driver.turn(Some(Duration::ZERO)).unwrap());
++        driver
++            .reactor
++            .as_mut()
++            .unwrap()
++            .ring
++            .submit_and_wait(1)
++            .unwrap();
+         assert!(!driver.turn(None).unwrap());
+         let deadline = Instant::now() + Duration::from_secs(10);
+         let (result, buffer) = loop {
+@@ -1290,7 +1302,7 @@ fn pending_submissions_are_flushed_before_preparing_to_sleep() {
+ }
+ 
+ #[test]
+-fn owner_wakes_coalesce_without_writes_and_survive_productive_turns() {
++fn owner_wakes_coalesce_without_writes_and_survive_nonblocking_turns() {
+     use core_scheduler_selector::{SelectorDriver, SelectorWorker};
+     let (selector, driver) = pair(1);
+     let (_directory, file) = file(&selector);
+@@ -1308,8 +1320,9 @@ fn owner_wakes_coalesce_without_writes_and_survive_productive_turns() {
+     let never = Cancellation::never();
+     let mut operation = Box::pin(selector.file_read_at(&file, vec![0; 6], 0, &never));
+     assert!(block_on(poll_once(&mut operation)).is_none());
+-    // This productive idle turn must retain the local permit, just like the nonblocking turn above.
+-    assert!(!worker.turn(None).unwrap());
++    // Nonblocking turns publish and collect the operation while retaining the
++    // explicit permit until an actual idle decision.
++    assert!(!worker.turn(Some(Duration::ZERO)).unwrap());
+     let deadline = Instant::now() + Duration::from_secs(10);
+     while active(&selector.controllers[0]) != 0 {
+         assert!(!worker.turn(Some(Duration::ZERO)).unwrap());
+@@ -1331,6 +1344,110 @@ fn owner_wakes_coalesce_without_writes_and_survive_productive_turns() {
+     block_on(selector.shutdown());
+ }
+ 
++struct WakeOnBufferAccess {
++    bytes: Vec<u8>,
++    accesses: Arc<AtomicUsize>,
++    wake: std::task::Waker,
++}
++impl AsRef<[u8]> for WakeOnBufferAccess {
++    fn as_ref(&self) -> &[u8] {
++        self.accesses.fetch_add(1, Ordering::SeqCst);
++        self.wake.wake_by_ref();
++        &self.bytes
++    }
++}
++impl AsMut<[u8]> for WakeOnBufferAccess {
++    fn as_mut(&mut self) -> &mut [u8] {
++        self.accesses.fetch_add(1, Ordering::SeqCst);
++        self.wake.wake_by_ref();
++        &mut self.bytes
++    }
++}
++// SAFETY: Vec retains the same initialized allocation across moves; accessors
++// only notify a waker, without changing its storage or exposing another owner.
++unsafe impl IoBuf for WakeOnBufferAccess {}
++// SAFETY: The owner exclusively retains the initialized writable allocation.
++unsafe impl IoBufMut for WakeOnBufferAccess {}
++
++#[test]
++fn scalar_buffer_callbacks_run_before_enqueue_and_never_during_driver_preparation() {
++    use core_scheduler_selector::{SelectorDriver, SelectorWorker};
++    let (selector, driver) = pair(1);
++    let (_directory, file) = file(&selector);
++    let mut worker = driver.enter();
++    let accesses = Arc::new(AtomicUsize::new(0));
++    let buffer = WakeOnBufferAccess {
++        bytes: vec![0; 6],
++        accesses: Arc::clone(&accesses),
++        wake: worker.waker(),
++    };
++    let never = Cancellation::never();
++    let mut operation = Box::pin(selector.file_read_at(&file, buffer, 0, &never));
++    assert!(block_on(poll_once(&mut operation)).is_none());
++    assert_eq!(accesses.load(Ordering::SeqCst), 2);
++    let Command::Submit(request) = crate::io_uring_worker::pop(&selector.controllers[0]).unwrap()
++    else {
++        panic!("expected local submission")
++    };
++    assert_eq!(request.entry().get_opcode() as u8, opcode::Read::CODE);
++    assert_eq!(accesses.load(Ordering::SeqCst), 2);
++    assert!(
++        selector.controllers[0]
++            .send(Command::Submit(request))
++            .is_ok()
++    );
++    {
++        let _failure = Failures::new([("wait", io::ErrorKind::Interrupted.into())]);
++        // Preparation recorded an explicit local wake before enqueueing. It
++        // prevents this first idle decision from waiting after accepting work.
++        assert!(!worker.turn(None).unwrap());
++        assert_eq!(FAILURES.with(|failures| failures.borrow().len()), 1);
++    }
++    let deadline = Instant::now() + Duration::from_secs(10);
++    while active(&selector.controllers[0]) != 0 {
++        assert!(!worker.turn(Some(Duration::ZERO)).unwrap());
++        assert!(Instant::now() < deadline);
++    }
++    let (result, buffer) = block_on(operation);
++    assert_eq!(result.unwrap(), 6);
++    assert_eq!(buffer.bytes, b"abcdef");
++    assert_eq!(accesses.load(Ordering::SeqCst), 2);
++    selector.close();
++    while !worker.turn(Some(Duration::from_millis(10))).unwrap() {}
++    block_on(selector.shutdown());
++}
++
++#[test]
++fn completion_turn_preserves_an_explicit_owner_wake_for_the_next_idle_decision() {
++    use core_scheduler_selector::{SelectorDriver, SelectorWorker};
++    let (selector, driver) = pair(1);
++    let (_directory, file) = file(&selector);
++    let mut worker = driver.enter();
++    assert!(!worker.turn(Some(Duration::ZERO)).unwrap());
++    let never = Cancellation::never();
++    let mut operation = Box::pin(selector.file_read_at(&file, vec![0; 6], 0, &never));
++    assert!(block_on(poll_once(&mut operation)).is_none());
++    // This turn accepts the local submission and waits for its CQE in one enter.
++    // The CQ snapshot was taken before publication, so collection is next turn.
++    assert!(!worker.turn(None).unwrap());
++    worker.waker().wake_by_ref();
++    {
++        let _failure = Failures::new([("wait", io::ErrorKind::Interrupted.into())]);
++        assert!(!worker.turn(None).unwrap());
++        let (result, buffer) = block_on(poll_once(&mut operation)).unwrap();
++        assert_eq!(result.unwrap(), 6);
++        assert_eq!(buffer, b"abcdef");
++        // Completion delivery returned without consuming the explicit permit.
++        assert!(!worker.turn(None).unwrap());
++        assert_eq!(FAILURES.with(|failures| failures.borrow().len()), 1);
++        assert!(!worker.turn(None).unwrap());
++        assert!(FAILURES.with(|failures| failures.borrow().is_empty()));
++    }
++    selector.close();
++    while !worker.turn(Some(Duration::from_millis(10))).unwrap() {}
++    block_on(selector.shutdown());
++}
++
+ #[test]
+ fn idle_turn_consumes_local_and_remote_notifications_together() {
+     use core_scheduler_selector::{SelectorDriver, SelectorWorker};
+@@ -1523,7 +1640,7 @@ fn failed_notification_completion_still_retires_original_completions_in_the_batc
+         let mut operation = Box::pin(selector.file_read_at(&file, vec![0; 6], 0, &never));
+         assert!(block_on(poll_once(&mut operation)).is_none());
+         let reactor = driver.reactor.as_mut().unwrap();
+-        let mut request = match reactor.incoming.try_recv().unwrap() {
++        let request = match reactor.incoming.try_recv().unwrap() {
+             Command::Submit(request) => request,
+             _ => panic!("expected queued read"),
+         };
+diff --git a/crates/native/src/native_scheduler/driver_tests.rs b/crates/native/src/native_scheduler/driver_tests.rs
+index 40a340f..f2c331c 100644
+--- a/crates/native/src/native_scheduler/driver_tests.rs
++++ b/crates/native/src/native_scheduler/driver_tests.rs
+@@ -30,6 +30,7 @@ struct State {
+     dropped: AtomicUsize,
+     retired: AtomicBool,
+     only_idle_completions: AtomicBool,
++    nonblocking_pending_turns: AtomicUsize,
+     interrupts: AtomicUsize,
+     completion_interrupts: AtomicUsize,
+ }
+@@ -74,6 +75,11 @@ impl SelectorWorker for Driver {
+     }
+     fn turn(&mut self, timeout: Option<Duration>) -> io::Result<bool> {
+         self.0.turns.fetch_add(1, Ordering::SeqCst);
++        if timeout == Some(Duration::ZERO) && !self.0.queued.lock().unwrap().is_empty() {
++            self.0
++                .nonblocking_pending_turns
++                .fetch_add(1, Ordering::SeqCst);
++        }
+         if self.0.failed.load(Ordering::SeqCst) {
+             self.0.retired.store(true, Ordering::SeqCst);
+             return Err(io::Error::other("driver failure"));
+@@ -150,6 +156,7 @@ fn idle_completions_resume_tasks_without_interrupting_their_own_worker() {
+             .unwrap();
+         assert_eq!(block_on(task).unwrap(), 42);
+         assert_eq!(state.batches.load(Ordering::SeqCst), 32);
++        assert_eq!(state.nonblocking_pending_turns.load(Ordering::SeqCst), 0);
+         assert_eq!(state.completion_interrupts.load(Ordering::SeqCst), 0);
+         block_on(scheduler.shutdown());
+         wait(|| state.dropped.load(Ordering::SeqCst) == 1);
+@@ -214,6 +221,7 @@ fn busy_tasks_do_not_starve_driver_turns() {
+             })
+             .unwrap();
+         block_on(task).unwrap();
++        assert!(state.nonblocking_pending_turns.load(Ordering::SeqCst) > 0);
+         block_on(scheduler.shutdown());
+         wait(|| state.retired.load(Ordering::SeqCst));
+     });
+diff --git a/crates/native/src/worker.rs b/crates/native/src/worker.rs
+index 85a1130..d43a2c4 100644
+--- a/crates/native/src/worker.rs
++++ b/crates/native/src/worker.rs
+@@ -275,6 +275,9 @@ fn run_loop(
+         let Some(runnable) = runnable else {
+             continue;
+         };
++        // Collect completions before another ready batch. If no tasks are ready,
++        // the idle turn above submits pending I/O and waits in one operation.
++        drive(&mut driver, Some(Duration::ZERO));
+         // Freeze the batch. Wakes during task polling go into the now-empty next queue.
+         let has_more = CURRENT_WORKER.with(|current| {
+             let mut current = current.borrow_mut();
+@@ -302,8 +305,6 @@ fn run_loop(
+                     .pop()
+             });
+         }
+-        // Publish the available completion batch before starting the next task batch.
+-        drive(&mut driver, Some(Duration::ZERO));
+     }
+     CURRENT_WORKER.with(|current| current.take());
+ }

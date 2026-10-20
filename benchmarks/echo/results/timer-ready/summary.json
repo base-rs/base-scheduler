@@ -1,0 +1,785 @@
+{
+  "timers": {
+    "samples": 45,
+    "rows": [
+      {
+        "variant": "immediate",
+        "workload": [
+          1,
+          1,
+          10,
+          false,
+          0
+        ],
+        "rate": 87433.0,
+        "cpu": 0.34314299999999953,
+        "p50": 1.301,
+        "p99": 1.91
+      },
+      {
+        "variant": "ready",
+        "workload": [
+          1,
+          1,
+          10,
+          false,
+          0
+        ],
+        "rate": 86409.66666666667,
+        "cpu": 0.38025099999999945,
+        "p50": 1.43,
+        "p99": 10.615
+      },
+      {
+        "variant": "batch",
+        "workload": [
+          1,
+          1,
+          10,
+          false,
+          0
+        ],
+        "rate": 87810.0,
+        "cpu": 0.325954,
+        "p50": 1.25,
+        "p99": 2.02
+      },
+      {
+        "variant": "immediate",
+        "workload": [
+          1,
+          32,
+          1000,
+          false,
+          0
+        ],
+        "rate": 31944.666666666668,
+        "cpu": 0.039798,
+        "p50": 1.44,
+        "p99": 11.063
+      },
+      {
+        "variant": "ready",
+        "workload": [
+          1,
+          32,
+          1000,
+          false,
+          0
+        ],
+        "rate": 31933.333333333332,
+        "cpu": 0.05195599999999523,
+        "p50": 1.86,
+        "p99": 12.127
+      },
+      {
+        "variant": "batch",
+        "workload": [
+          1,
+          32,
+          1000,
+          false,
+          0
+        ],
+        "rate": 31942.666666666668,
+        "cpu": 0.04235600000000339,
+        "p50": 1.49,
+        "p99": 10.991
+      },
+      {
+        "variant": "immediate",
+        "workload": [
+          4,
+          1024,
+          1000,
+          false,
+          0
+        ],
+        "rate": 1021506.6666666666,
+        "cpu": 1.5767119999999988,
+        "p50": 2.101,
+        "p99": 11.495
+      },
+      {
+        "variant": "ready",
+        "workload": [
+          4,
+          1024,
+          1000,
+          false,
+          0
+        ],
+        "rate": 1020245.6666666666,
+        "cpu": 1.8858569999999943,
+        "p50": 3.361,
+        "p99": 14.055
+      },
+      {
+        "variant": "batch",
+        "workload": [
+          4,
+          1024,
+          1000,
+          false,
+          0
+        ],
+        "rate": 1021563.6666666666,
+        "cpu": 1.47768199999999,
+        "p50": 2.061,
+        "p99": 12.431
+      },
+      {
+        "variant": "immediate",
+        "workload": [
+          4,
+          1024,
+          1000,
+          true,
+          0
+        ],
+        "rate": 1024000.0,
+        "cpu": 1.3037420000000002,
+        "p50": 49.663,
+        "p99": 80.447
+      },
+      {
+        "variant": "ready",
+        "workload": [
+          4,
+          1024,
+          1000,
+          true,
+          0
+        ],
+        "rate": 1024000.0,
+        "cpu": 2.0094659999999838,
+        "p50": 92.799,
+        "p99": 126.143
+      },
+      {
+        "variant": "batch",
+        "workload": [
+          4,
+          1024,
+          1000,
+          true,
+          0
+        ],
+        "rate": 1024000.0,
+        "cpu": 1.4589630000000096,
+        "p50": 60.543,
+        "p99": 89.663
+      },
+      {
+        "variant": "immediate",
+        "workload": [
+          4,
+          1024,
+          1000,
+          true,
+          10000
+        ],
+        "rate": 530245.0,
+        "cpu": 16.002586000000008,
+        "p50": 1420.287,
+        "p99": 1917.951
+      },
+      {
+        "variant": "ready",
+        "workload": [
+          4,
+          1024,
+          1000,
+          true,
+          10000
+        ],
+        "rate": 528263.0,
+        "cpu": 16.001884,
+        "p50": 1424.383,
+        "p99": 1923.071
+      },
+      {
+        "variant": "batch",
+        "workload": [
+          4,
+          1024,
+          1000,
+          true,
+          10000
+        ],
+        "rate": 532230.3333333334,
+        "cpu": 16.000173,
+        "p50": 1413.119,
+        "p99": 1909.759
+      }
+    ]
+  },
+  "optimized-timers": {
+    "samples": 36,
+    "rows": [
+      {
+        "variant": "immediate",
+        "workload": [
+          1,
+          1,
+          10,
+          false,
+          0
+        ],
+        "rate": 87506.66666666667,
+        "cpu": 0.33649999999999913,
+        "p50": 1.29,
+        "p99": 1.87
+      },
+      {
+        "variant": "ready-batch",
+        "workload": [
+          1,
+          1,
+          10,
+          false,
+          0
+        ],
+        "rate": 86709.33333333333,
+        "cpu": 0.3724319999999999,
+        "p50": 1.4,
+        "p99": 2.241
+      },
+      {
+        "variant": "ready-local",
+        "workload": [
+          1,
+          1,
+          10,
+          false,
+          0
+        ],
+        "rate": 86552.0,
+        "cpu": 0.37358399999999997,
+        "p50": 1.42,
+        "p99": 10.447
+      },
+      {
+        "variant": "immediate",
+        "workload": [
+          1,
+          32,
+          1000,
+          false,
+          0
+        ],
+        "rate": 31925.333333333332,
+        "cpu": 0.04515800000000003,
+        "p50": 1.47,
+        "p99": 11.407
+      },
+      {
+        "variant": "ready-batch",
+        "workload": [
+          1,
+          32,
+          1000,
+          false,
+          0
+        ],
+        "rate": 31928.333333333332,
+        "cpu": 0.051475999999999855,
+        "p50": 1.83,
+        "p99": 11.871
+      },
+      {
+        "variant": "ready-local",
+        "workload": [
+          1,
+          32,
+          1000,
+          false,
+          0
+        ],
+        "rate": 31928.0,
+        "cpu": 0.052727999999999886,
+        "p50": 1.74,
+        "p99": 11.215
+      },
+      {
+        "variant": "immediate",
+        "workload": [
+          4,
+          1024,
+          1000,
+          false,
+          0
+        ],
+        "rate": 1021595.6666666666,
+        "cpu": 1.6245130000000012,
+        "p50": 2.091,
+        "p99": 9.975
+      },
+      {
+        "variant": "ready-batch",
+        "workload": [
+          4,
+          1024,
+          1000,
+          false,
+          0
+        ],
+        "rate": 1020964.0,
+        "cpu": 1.6609539999999985,
+        "p50": 2.741,
+        "p99": 12.591
+      },
+      {
+        "variant": "ready-local",
+        "workload": [
+          4,
+          1024,
+          1000,
+          false,
+          0
+        ],
+        "rate": 1020928.0,
+        "cpu": 1.688148,
+        "p50": 2.721,
+        "p99": 11.935
+      },
+      {
+        "variant": "immediate",
+        "workload": [
+          4,
+          1024,
+          1000,
+          true,
+          0
+        ],
+        "rate": 1024000.0,
+        "cpu": 1.2914920000000008,
+        "p50": 49.663,
+        "p99": 79.679
+      },
+      {
+        "variant": "ready-batch",
+        "workload": [
+          4,
+          1024,
+          1000,
+          true,
+          0
+        ],
+        "rate": 1024000.0,
+        "cpu": 1.6813920000000007,
+        "p50": 73.663,
+        "p99": 104.703
+      },
+      {
+        "variant": "ready-local",
+        "workload": [
+          4,
+          1024,
+          1000,
+          true,
+          0
+        ],
+        "rate": 1024000.0,
+        "cpu": 1.619712,
+        "p50": 68.415,
+        "p99": 98.623
+      }
+    ]
+  },
+  "echo": {
+    "samples": 24,
+    "rows": [
+      {
+        "variant": "immediate",
+        "workload": [
+          1,
+          1,
+          64
+        ],
+        "rate": 236611.66666666666,
+        "minimum": 226144.33333333334,
+        "maximum": 237620.0,
+        "timer_p99": null
+      },
+      {
+        "variant": "ready",
+        "workload": [
+          1,
+          1,
+          64
+        ],
+        "rate": 227453.33333333334,
+        "minimum": 226229.33333333334,
+        "maximum": 234094.0,
+        "timer_p99": null
+      },
+      {
+        "variant": "batch",
+        "workload": [
+          1,
+          1,
+          64
+        ],
+        "rate": 236197.66666666666,
+        "minimum": 228565.66666666666,
+        "maximum": 237888.33333333334,
+        "timer_p99": null
+      },
+      {
+        "variant": "control",
+        "workload": [
+          1,
+          1,
+          64
+        ],
+        "rate": 269446.0,
+        "minimum": 267410.0,
+        "maximum": 273918.3333333333,
+        "timer_p99": null
+      },
+      {
+        "variant": "immediate",
+        "workload": [
+          4,
+          128,
+          64
+        ],
+        "rate": 2110799.3333333335,
+        "minimum": 2090610.0,
+        "maximum": 2125759.6666666665,
+        "timer_p99": null
+      },
+      {
+        "variant": "ready",
+        "workload": [
+          4,
+          128,
+          64
+        ],
+        "rate": 2130247.6666666665,
+        "minimum": 2126981.6666666665,
+        "maximum": 2133244.6666666665,
+        "timer_p99": null
+      },
+      {
+        "variant": "batch",
+        "workload": [
+          4,
+          128,
+          64
+        ],
+        "rate": 2120387.0,
+        "minimum": 2108563.0,
+        "maximum": 2126544.0,
+        "timer_p99": null
+      },
+      {
+        "variant": "control",
+        "workload": [
+          4,
+          128,
+          64
+        ],
+        "rate": 2113783.0,
+        "minimum": 2106496.3333333335,
+        "maximum": 2120238.0,
+        "timer_p99": null
+      }
+    ]
+  },
+  "mixed": {
+    "samples": 18,
+    "rows": [
+      {
+        "variant": "immediate",
+        "workload": [
+          1,
+          32,
+          64
+        ],
+        "rate": 565868.0,
+        "minimum": 565317.3333333334,
+        "maximum": 567483.6666666666,
+        "timer_p99": 53.023
+      },
+      {
+        "variant": "ready",
+        "workload": [
+          1,
+          32,
+          64
+        ],
+        "rate": 563121.3333333334,
+        "minimum": 558669.6666666666,
+        "maximum": 566389.3333333334,
+        "timer_p99": 55.679
+      },
+      {
+        "variant": "batch",
+        "workload": [
+          1,
+          32,
+          64
+        ],
+        "rate": 565707.3333333334,
+        "minimum": 565513.6666666666,
+        "maximum": 567682.3333333334,
+        "timer_p99": 51.007
+      },
+      {
+        "variant": "immediate",
+        "workload": [
+          4,
+          128,
+          64
+        ],
+        "rate": 2122404.0,
+        "minimum": 2118869.3333333335,
+        "maximum": 2138490.3333333335,
+        "timer_p99": 38.495
+      },
+      {
+        "variant": "ready",
+        "workload": [
+          4,
+          128,
+          64
+        ],
+        "rate": 2114318.0,
+        "minimum": 2094359.3333333333,
+        "maximum": 2120722.3333333335,
+        "timer_p99": 44.575
+      },
+      {
+        "variant": "batch",
+        "workload": [
+          4,
+          128,
+          64
+        ],
+        "rate": 2117987.6666666665,
+        "minimum": 2096581.6666666667,
+        "maximum": 2127600.3333333335,
+        "timer_p99": 37.503
+      }
+    ]
+  },
+  "optimized-echo": {
+    "samples": 24,
+    "rows": [
+      {
+        "variant": "immediate",
+        "workload": [
+          1,
+          1,
+          64
+        ],
+        "rate": 236569.66666666666,
+        "minimum": 230427.66666666666,
+        "maximum": 237205.66666666666,
+        "timer_p99": null
+      },
+      {
+        "variant": "ready-batch",
+        "workload": [
+          1,
+          1,
+          64
+        ],
+        "rate": 232254.66666666666,
+        "minimum": 230334.33333333334,
+        "maximum": 237452.33333333334,
+        "timer_p99": null
+      },
+      {
+        "variant": "ready-local",
+        "workload": [
+          1,
+          1,
+          64
+        ],
+        "rate": 237038.33333333334,
+        "minimum": 232050.66666666666,
+        "maximum": 239683.33333333334,
+        "timer_p99": null
+      },
+      {
+        "variant": "control",
+        "workload": [
+          1,
+          1,
+          64
+        ],
+        "rate": 270771.3333333333,
+        "minimum": 269534.6666666667,
+        "maximum": 273753.6666666667,
+        "timer_p99": null
+      },
+      {
+        "variant": "immediate",
+        "workload": [
+          4,
+          128,
+          64
+        ],
+        "rate": 2129348.6666666665,
+        "minimum": 2117267.3333333335,
+        "maximum": 2130634.0,
+        "timer_p99": null
+      },
+      {
+        "variant": "ready-batch",
+        "workload": [
+          4,
+          128,
+          64
+        ],
+        "rate": 2131366.0,
+        "minimum": 2125582.0,
+        "maximum": 2138809.3333333335,
+        "timer_p99": null
+      },
+      {
+        "variant": "ready-local",
+        "workload": [
+          4,
+          128,
+          64
+        ],
+        "rate": 2119439.6666666665,
+        "minimum": 2115721.6666666665,
+        "maximum": 2125483.0,
+        "timer_p99": null
+      },
+      {
+        "variant": "control",
+        "workload": [
+          4,
+          128,
+          64
+        ],
+        "rate": 2126783.6666666665,
+        "minimum": 2108516.6666666665,
+        "maximum": 2126944.6666666665,
+        "timer_p99": null
+      }
+    ]
+  },
+  "optimized-mixed": {
+    "samples": 18,
+    "rows": [
+      {
+        "variant": "immediate",
+        "workload": [
+          1,
+          32,
+          64
+        ],
+        "rate": 561099.3333333334,
+        "minimum": 558597.0,
+        "maximum": 564852.6666666666,
+        "timer_p99": 46.111
+      },
+      {
+        "variant": "ready-batch",
+        "workload": [
+          1,
+          32,
+          64
+        ],
+        "rate": 562094.6666666666,
+        "minimum": 561975.0,
+        "maximum": 562759.6666666666,
+        "timer_p99": 58.143
+      },
+      {
+        "variant": "ready-local",
+        "workload": [
+          1,
+          32,
+          64
+        ],
+        "rate": 564775.3333333334,
+        "minimum": 563683.0,
+        "maximum": 566871.6666666666,
+        "timer_p99": 57.471
+      },
+      {
+        "variant": "immediate",
+        "workload": [
+          4,
+          128,
+          64
+        ],
+        "rate": 2107712.0,
+        "minimum": 2106111.6666666665,
+        "maximum": 2115692.0,
+        "timer_p99": 37.151
+      },
+      {
+        "variant": "ready-batch",
+        "workload": [
+          4,
+          128,
+          64
+        ],
+        "rate": 2106114.0,
+        "minimum": 2104695.3333333335,
+        "maximum": 2114419.0,
+        "timer_p99": 41.215
+      },
+      {
+        "variant": "ready-local",
+        "workload": [
+          4,
+          128,
+          64
+        ],
+        "rate": 2112495.3333333335,
+        "minimum": 2104411.3333333335,
+        "maximum": 2127623.3333333335,
+        "timer_p99": 42.303
+      }
+    ]
+  },
+  "stat": {
+    "samples": 6,
+    "rows": [
+      {
+        "variant": "immediate",
+        "task-clock": 1599.31,
+        "cycles": 8256907858.5,
+        "instructions": 13153857530.5,
+        "context-switches": 124392.0,
+        "syscalls:sys_enter_io_uring_enter": 207260.5,
+        "syscalls:sys_enter_futex": 742.5,
+        "syscalls:sys_enter_read": 76386.5,
+        "syscalls:sys_enter_write": 76572.0
+      },
+      {
+        "variant": "ready",
+        "task-clock": 1988.245,
+        "cycles": 10537886466.5,
+        "instructions": 14002700623.5,
+        "context-switches": 105962.0,
+        "syscalls:sys_enter_io_uring_enter": 176070.0,
+        "syscalls:sys_enter_futex": 677.5,
+        "syscalls:sys_enter_read": 63443.0,
+        "syscalls:sys_enter_write": 63484.5
+      },
+      {
+        "variant": "batch",
+        "task-clock": 1497.48,
+        "cycles": 7722265225.5,
+        "instructions": 12272589215.5,
+        "context-switches": 112288.5,
+        "syscalls:sys_enter_io_uring_enter": 186564.0,
+        "syscalls:sys_enter_futex": 803.5,
+        "syscalls:sys_enter_read": 70517.0,
+        "syscalls:sys_enter_write": 70779.0
+      }
+    ]
+  },
+  "total_samples": 171
+}

@@ -1,0 +1,27 @@
+{
+  "started_utc": "2026-10-20T20:22:16Z",
+  "compiler": "rustc 1.99.0 (b940084d7 2026-09-28) (Arch Linux rust 1:1.99.0-1)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+  "source_revision": "0d2c4f1c3fa0c2e502531880dab0acba18f097c0",
+  "profile": "release (default optimized Cargo profile), --locked",
+  "patch": {
+    "path": "/home/samuel/.cache/core-scheduler-hotpath/single-local.patch",
+    "sha256": "00bb19c6825849d4bc37fdba5628ee5428e7cd29c51ff92362387e2ec4f464b6"
+  },
+  "binaries": {
+    "before": {
+      "path": "/home/samuel/.cache/core-scheduler-hotpath/before-echo",
+      "sha256": "a7e4bc768a8ebcf373723081440835117a1bc226efb961bc3defac933a70d9da"
+    },
+    "single-local": {
+      "path": "/home/samuel/.cache/core-scheduler-hotpath/single-local-echo",
+      "sha256": "75b5bf8c43e1d8f718e4ff105149b882050a89bb3d89b81df9fa7dc813419487"
+    }
+  },
+  "finished_utc": "2026-10-20T20:22:25Z",
+  "variant": "injector-empty",
+  "variant_patch_sha256": "7499f2b537a4ace5f25a2b6cb0ba8c8ddeaab8831fa556fdcf1733b57c3660c4",
+  "variant_binary_sha256": "3c5b23535f6527f6ee8850070fa592defea96e132cd91ba3d5a70ba6d5fc57a5",
+  "variant_source_path": "/home/samuel/Developer/core-rs/core-scheduler-hotpath-injector",
+  "variant_utc": "2026-10-20T20:28:31Z",
+  "compiler_profile_environment": {}
+}

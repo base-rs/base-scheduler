@@ -1,0 +1,557 @@
+{
+  "single-local": {
+    "sample_count": 54,
+    "rows": [
+      {
+        "workers": 1,
+        "connections": 1,
+        "bytes": 64,
+        "backends": {
+          "iouring": {
+            "before": {
+              "median": 236459.66666666666,
+              "minimum": 235394.33333333334,
+              "maximum": 245750.33333333334,
+              "server_cpu_seconds": 1.789043999999997,
+              "rtt_p99_us": 9.351
+            },
+            "single-local": {
+              "median": 235402.66666666666,
+              "minimum": 235212.66666666666,
+              "maximum": 246160.33333333334,
+              "server_cpu_seconds": 1.7699429999999836,
+              "rtt_p99_us": 6.211
+            },
+            "change_percent": -0.4470106952700892
+          },
+          "iouring-poll": {
+            "before": {
+              "median": 234531.0,
+              "minimum": 228506.0,
+              "maximum": 234767.0,
+              "server_cpu_seconds": 1.7595900000000029,
+              "rtt_p99_us": 7.383
+            },
+            "single-local": {
+              "median": 239947.0,
+              "minimum": 234455.0,
+              "maximum": 244172.0,
+              "server_cpu_seconds": 1.7836360000000155,
+              "rtt_p99_us": 5.783
+            },
+            "change_percent": 2.3092896035065813
+          },
+          "tokio": {
+            "before": {
+              "median": 272149.6666666667,
+              "minimum": 270843.6666666667,
+              "maximum": 272624.0,
+              "server_cpu_seconds": 1.6162649999999985,
+              "rtt_p99_us": 4.363
+            },
+            "single-local": {
+              "median": 270567.3333333333,
+              "minimum": 269241.0,
+              "maximum": 271394.0,
+              "server_cpu_seconds": 1.6092879999999923,
+              "rtt_p99_us": 4.363
+            },
+            "change_percent": -0.5814202724236384
+          }
+        }
+      },
+      {
+        "workers": 1,
+        "connections": 32,
+        "bytes": 64,
+        "backends": {
+          "iouring": {
+            "before": {
+              "median": 637530.0,
+              "minimum": 634588.3333333334,
+              "maximum": 639080.6666666666,
+              "server_cpu_seconds": 2.62782100000004,
+              "rtt_p99_us": 54.079
+            },
+            "single-local": {
+              "median": 636126.0,
+              "minimum": 634215.6666666666,
+              "maximum": 639038.6666666666,
+              "server_cpu_seconds": 2.6234849999999597,
+              "rtt_p99_us": 54.207
+            },
+            "change_percent": -0.22022493059150605
+          },
+          "iouring-poll": {
+            "before": {
+              "median": 571654.0,
+              "minimum": 570074.6666666666,
+              "maximum": 572053.0,
+              "server_cpu_seconds": 2.7796269999999907,
+              "rtt_p99_us": 60.223
+            },
+            "single-local": {
+              "median": 572691.0,
+              "minimum": 572408.3333333334,
+              "maximum": 573229.6666666666,
+              "server_cpu_seconds": 2.775972999999997,
+              "rtt_p99_us": 60.031
+            },
+            "change_percent": 0.18140343634436285
+          },
+          "tokio": {
+            "before": {
+              "median": 702999.6666666666,
+              "minimum": 698751.6666666666,
+              "maximum": 706871.6666666666,
+              "server_cpu_seconds": 2.538479999999999,
+              "rtt_p99_us": 53.503
+            },
+            "single-local": {
+              "median": 704510.3333333334,
+              "minimum": 702255.3333333334,
+              "maximum": 706650.6666666666,
+              "server_cpu_seconds": 2.536151999999973,
+              "rtt_p99_us": 53.183
+            },
+            "change_percent": 0.21488867467458483
+          }
+        }
+      },
+      {
+        "workers": 4,
+        "connections": 128,
+        "bytes": 64,
+        "backends": {
+          "iouring": {
+            "before": {
+              "median": 2095170.6666666667,
+              "minimum": 2094527.6666666667,
+              "maximum": 2114673.3333333335,
+              "server_cpu_seconds": 11.106648999999962,
+              "rtt_p99_us": 107.007
+            },
+            "single-local": {
+              "median": 2087808.3333333333,
+              "minimum": 2081043.0,
+              "maximum": 2108649.6666666665,
+              "server_cpu_seconds": 11.144989999999979,
+              "rtt_p99_us": 107.711
+            },
+            "change_percent": -0.3513953994519481
+          },
+          "iouring-poll": {
+            "before": {
+              "median": 2119760.0,
+              "minimum": 2114213.3333333335,
+              "maximum": 2128824.6666666665,
+              "server_cpu_seconds": 11.382495000000034,
+              "rtt_p99_us": 106.367
+            },
+            "single-local": {
+              "median": 2116993.0,
+              "minimum": 2108812.6666666665,
+              "maximum": 2134568.0,
+              "server_cpu_seconds": 11.409082999999995,
+              "rtt_p99_us": 106.111
+            },
+            "change_percent": -0.13053364531834255
+          },
+          "tokio": {
+            "before": {
+              "median": 2109504.6666666665,
+              "minimum": 2106390.6666666665,
+              "maximum": 2130819.6666666665,
+              "server_cpu_seconds": 8.823099,
+              "rtt_p99_us": 102.399
+            },
+            "single-local": {
+              "median": 2122913.6666666665,
+              "minimum": 2117342.3333333335,
+              "maximum": 2126028.3333333335,
+              "server_cpu_seconds": 8.759493,
+              "rtt_p99_us": 100.735
+            },
+            "change_percent": 0.6356468516937719
+          }
+        }
+      }
+    ],
+    "cases": [
+      {
+        "label": "before",
+        "backend": "iouring",
+        "binary": {
+          "path": ".cache/core-scheduler-hotpath/before-echo",
+          "sha256": "a7e4bc768a8ebcf373723081440835117a1bc226efb961bc3defac933a70d9da"
+        }
+      },
+      {
+        "label": "single-local",
+        "backend": "iouring",
+        "binary": {
+          "path": ".cache/core-scheduler-hotpath/single-local-echo",
+          "sha256": "75b5bf8c43e1d8f718e4ff105149b882050a89bb3d89b81df9fa7dc813419487"
+        }
+      },
+      {
+        "label": "before",
+        "backend": "iouring-poll",
+        "binary": {
+          "path": ".cache/core-scheduler-hotpath/before-echo",
+          "sha256": "a7e4bc768a8ebcf373723081440835117a1bc226efb961bc3defac933a70d9da"
+        }
+      },
+      {
+        "label": "single-local",
+        "backend": "iouring-poll",
+        "binary": {
+          "path": ".cache/core-scheduler-hotpath/single-local-echo",
+          "sha256": "75b5bf8c43e1d8f718e4ff105149b882050a89bb3d89b81df9fa7dc813419487"
+        }
+      },
+      {
+        "label": "before",
+        "backend": "tokio",
+        "binary": {
+          "path": ".cache/core-scheduler-hotpath/before-echo",
+          "sha256": "a7e4bc768a8ebcf373723081440835117a1bc226efb961bc3defac933a70d9da"
+        }
+      },
+      {
+        "label": "single-local",
+        "backend": "tokio",
+        "binary": {
+          "path": ".cache/core-scheduler-hotpath/single-local-echo",
+          "sha256": "75b5bf8c43e1d8f718e4ff105149b882050a89bb3d89b81df9fa7dc813419487"
+        }
+      }
+    ]
+  },
+  "injector-empty": {
+    "sample_count": 54,
+    "rows": [
+      {
+        "workers": 1,
+        "connections": 1,
+        "bytes": 64,
+        "backends": {
+          "iouring": {
+            "before": {
+              "median": 239196.66666666666,
+              "minimum": 235135.66666666666,
+              "maximum": 239847.66666666666,
+              "server_cpu_seconds": 1.796494999999993,
+              "rtt_p99_us": 7.491
+            },
+            "injector-empty": {
+              "median": 245841.33333333334,
+              "minimum": 243157.33333333334,
+              "maximum": 250421.33333333334,
+              "server_cpu_seconds": 1.7929760000000101,
+              "rtt_p99_us": 5.751
+            },
+            "change_percent": 2.777909391156519
+          },
+          "iouring-poll": {
+            "before": {
+              "median": 238737.33333333334,
+              "minimum": 236471.66666666666,
+              "maximum": 238900.66666666666,
+              "server_cpu_seconds": 1.8184830000000147,
+              "rtt_p99_us": 7.431
+            },
+            "injector-empty": {
+              "median": 244481.33333333334,
+              "minimum": 235338.0,
+              "maximum": 253997.33333333334,
+              "server_cpu_seconds": 1.8162049999999894,
+              "rtt_p99_us": 5.743
+            },
+            "change_percent": 2.405991522063289
+          },
+          "tokio": {
+            "before": {
+              "median": 274191.3333333333,
+              "minimum": 270616.0,
+              "maximum": 277474.3333333333,
+              "server_cpu_seconds": 1.616724000000005,
+              "rtt_p99_us": 4.331
+            },
+            "injector-empty": {
+              "median": 271897.0,
+              "minimum": 271415.0,
+              "maximum": 275780.6666666667,
+              "server_cpu_seconds": 1.6071090000000368,
+              "rtt_p99_us": 4.331
+            },
+            "change_percent": -0.8367636224825947
+          }
+        }
+      },
+      {
+        "workers": 1,
+        "connections": 32,
+        "bytes": 64,
+        "backends": {
+          "iouring": {
+            "before": {
+              "median": 635654.0,
+              "minimum": 632917.3333333334,
+              "maximum": 640507.6666666666,
+              "server_cpu_seconds": 2.626574999999974,
+              "rtt_p99_us": 54.143
+            },
+            "injector-empty": {
+              "median": 637337.3333333334,
+              "minimum": 634572.3333333334,
+              "maximum": 639338.6666666666,
+              "server_cpu_seconds": 2.6374160000000035,
+              "rtt_p99_us": 54.175
+            },
+            "change_percent": 0.2648191206746642
+          },
+          "iouring-poll": {
+            "before": {
+              "median": 572076.0,
+              "minimum": 567254.0,
+              "maximum": 574979.3333333334,
+              "server_cpu_seconds": 2.780692999999996,
+              "rtt_p99_us": 60.159
+            },
+            "injector-empty": {
+              "median": 572863.6666666666,
+              "minimum": 572434.0,
+              "maximum": 573891.6666666666,
+              "server_cpu_seconds": 2.7775599999999985,
+              "rtt_p99_us": 60.127
+            },
+            "change_percent": 0.13768566880389965
+          },
+          "tokio": {
+            "before": {
+              "median": 702600.3333333334,
+              "minimum": 697448.3333333334,
+              "maximum": 702985.0,
+              "server_cpu_seconds": 2.5404849999999968,
+              "rtt_p99_us": 53.343
+            },
+            "injector-empty": {
+              "median": 698706.6666666666,
+              "minimum": 697459.0,
+              "maximum": 698849.6666666666,
+              "server_cpu_seconds": 2.539229000000013,
+              "rtt_p99_us": 53.599
+            },
+            "change_percent": -0.5541794505268927
+          }
+        }
+      },
+      {
+        "workers": 4,
+        "connections": 128,
+        "bytes": 64,
+        "backends": {
+          "iouring": {
+            "before": {
+              "median": 2088534.0,
+              "minimum": 2082299.3333333333,
+              "maximum": 2090231.3333333333,
+              "server_cpu_seconds": 10.966951,
+              "rtt_p99_us": 108.287
+            },
+            "injector-empty": {
+              "median": 2100424.0,
+              "minimum": 2041741.0,
+              "maximum": 2107880.6666666665,
+              "server_cpu_seconds": 11.102041999999997,
+              "rtt_p99_us": 107.647
+            },
+            "change_percent": 0.5692988479000016
+          },
+          "iouring-poll": {
+            "before": {
+              "median": 2118763.3333333335,
+              "minimum": 2116974.0,
+              "maximum": 2134428.6666666665,
+              "server_cpu_seconds": 11.450024999999968,
+              "rtt_p99_us": 105.471
+            },
+            "injector-empty": {
+              "median": 2123483.0,
+              "minimum": 2117526.3333333335,
+              "maximum": 2134220.3333333335,
+              "server_cpu_seconds": 11.406888000000016,
+              "rtt_p99_us": 105.983
+            },
+            "change_percent": 0.2227557270042757
+          },
+          "tokio": {
+            "before": {
+              "median": 2137806.3333333335,
+              "minimum": 2115584.3333333335,
+              "maximum": 2138860.3333333335,
+              "server_cpu_seconds": 8.857548000000037,
+              "rtt_p99_us": 99.711
+            },
+            "injector-empty": {
+              "median": 2135389.6666666665,
+              "minimum": 2133231.0,
+              "maximum": 2138799.0,
+              "server_cpu_seconds": 8.805729000000001,
+              "rtt_p99_us": 99.199
+            },
+            "change_percent": -0.11304422804748748
+          }
+        }
+      }
+    ],
+    "cases": [
+      {
+        "label": "before",
+        "backend": "iouring",
+        "binary": {
+          "path": ".cache/core-scheduler-hotpath/before-echo",
+          "sha256": "a7e4bc768a8ebcf373723081440835117a1bc226efb961bc3defac933a70d9da"
+        }
+      },
+      {
+        "label": "injector-empty",
+        "backend": "iouring",
+        "binary": {
+          "path": ".cache/core-scheduler-hotpath/injector-empty-echo",
+          "sha256": "3c5b23535f6527f6ee8850070fa592defea96e132cd91ba3d5a70ba6d5fc57a5"
+        }
+      },
+      {
+        "label": "before",
+        "backend": "iouring-poll",
+        "binary": {
+          "path": ".cache/core-scheduler-hotpath/before-echo",
+          "sha256": "a7e4bc768a8ebcf373723081440835117a1bc226efb961bc3defac933a70d9da"
+        }
+      },
+      {
+        "label": "injector-empty",
+        "backend": "iouring-poll",
+        "binary": {
+          "path": ".cache/core-scheduler-hotpath/injector-empty-echo",
+          "sha256": "3c5b23535f6527f6ee8850070fa592defea96e132cd91ba3d5a70ba6d5fc57a5"
+        }
+      },
+      {
+        "label": "before",
+        "backend": "tokio",
+        "binary": {
+          "path": ".cache/core-scheduler-hotpath/before-echo",
+          "sha256": "a7e4bc768a8ebcf373723081440835117a1bc226efb961bc3defac933a70d9da"
+        }
+      },
+      {
+        "label": "injector-empty",
+        "backend": "tokio",
+        "binary": {
+          "path": ".cache/core-scheduler-hotpath/injector-empty-echo",
+          "sha256": "3c5b23535f6527f6ee8850070fa592defea96e132cd91ba3d5a70ba6d5fc57a5"
+        }
+      }
+    ]
+  },
+  "injector-confirmation": {
+    "sample_count": 25,
+    "rows": [
+      {
+        "workers": 1,
+        "connections": 1,
+        "bytes": 64,
+        "backends": {
+          "iouring": {
+            "before": {
+              "median": 238138.66666666666,
+              "minimum": 234469.0,
+              "maximum": 242254.66666666666,
+              "server_cpu_seconds": 1.7991679999999963,
+              "rtt_p99_us": 5.851
+            },
+            "injector-empty": {
+              "median": 245560.33333333334,
+              "minimum": 237867.66666666666,
+              "maximum": 254273.0,
+              "server_cpu_seconds": 1.8086499999999992,
+              "rtt_p99_us": 5.743
+            },
+            "change_percent": 3.1165315446462616
+          },
+          "iouring-poll": {
+            "before": {
+              "median": 231411.33333333334,
+              "minimum": 229469.0,
+              "maximum": 243737.66666666666,
+              "server_cpu_seconds": 1.7738110000000002,
+              "rtt_p99_us": 7.523
+            },
+            "injector-empty": {
+              "median": 236820.33333333334,
+              "minimum": 231680.33333333334,
+              "maximum": 246687.33333333334,
+              "server_cpu_seconds": 1.757237,
+              "rtt_p99_us": 5.871
+            },
+            "change_percent": 2.3373963245822083
+          },
+          "tokio": {
+            "before": {
+              "median": 271753.6666666667,
+              "minimum": 270552.0,
+              "maximum": 275081.0,
+              "server_cpu_seconds": 1.6204040000000006,
+              "rtt_p99_us": 4.323
+            }
+          }
+        }
+      }
+    ],
+    "cases": [
+      {
+        "label": "before",
+        "backend": "iouring",
+        "binary": {
+          "path": ".cache/core-scheduler-hotpath/before-echo",
+          "sha256": "a7e4bc768a8ebcf373723081440835117a1bc226efb961bc3defac933a70d9da"
+        }
+      },
+      {
+        "label": "injector-empty",
+        "backend": "iouring",
+        "binary": {
+          "path": ".cache/core-scheduler-hotpath/injector-empty-echo",
+          "sha256": "3c5b23535f6527f6ee8850070fa592defea96e132cd91ba3d5a70ba6d5fc57a5"
+        }
+      },
+      {
+        "label": "before",
+        "backend": "iouring-poll",
+        "binary": {
+          "path": ".cache/core-scheduler-hotpath/before-echo",
+          "sha256": "a7e4bc768a8ebcf373723081440835117a1bc226efb961bc3defac933a70d9da"
+        }
+      },
+      {
+        "label": "injector-empty",
+        "backend": "iouring-poll",
+        "binary": {
+          "path": ".cache/core-scheduler-hotpath/injector-empty-echo",
+          "sha256": "3c5b23535f6527f6ee8850070fa592defea96e132cd91ba3d5a70ba6d5fc57a5"
+        }
+      },
+      {
+        "label": "before",
+        "backend": "tokio",
+        "binary": {
+          "path": ".cache/core-scheduler-hotpath/before-echo",
+          "sha256": "a7e4bc768a8ebcf373723081440835117a1bc226efb961bc3defac933a70d9da"
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,138 @@
+diff --git a/crates/timers/src/timers.rs b/crates/timers/src/timers.rs
+index 46d1d87..e2417d6 100644
+--- a/crates/timers/src/timers.rs
++++ b/crates/timers/src/timers.rs
+@@ -263,6 +263,10 @@ impl<Value> State<Value> {
+     }
+ 
+     fn flush(&mut self) {
++        self.flush_with_pressure(false);
++    }
++
++    fn flush_with_pressure(&mut self, reclaim: bool) {
+         // Nothing changed since the previous flush. This also avoids moving the pending
+         // buffer for each individual expiry in a populated queue.
+         if self.scheduled.is_empty() && self.cancelled == 0 {
+@@ -282,8 +286,10 @@ impl<Value> State<Value> {
+             }
+         });
+ 
+-        let compact =
+-            self.cancelled >= COMPACT_MINIMUM_COUNT && self.cancelled > self.heap.len() / 2;
++        let compact = self.cancelled > 0
++            && (reclaim
++                || (self.cancelled >= COMPACT_MINIMUM_COUNT
++                    && self.cancelled > self.heap.len() / 2));
+         #[cfg(feature = "sharded")]
+         let compact = compact
+             || (self.publication.is_some() && self.cancelled > 0 && self.occupied() == capacity);
+@@ -650,7 +656,15 @@ pub mod local {
+         }
+ 
+         pub fn try_schedule(&mut self, deadline: Instant, value: Value) -> Result<TimerKey, Value> {
+-            self.0.try_insert(deadline, value).map(TimerKey)
++            match self.0.try_insert(deadline, value) {
++                Ok(key) => Ok(TimerKey(key)),
++                Err(value) => {
++                    // Released registrations must not permanently exhaust a small queue
++                    // while another, earlier timer remains live.
++                    self.0.flush_with_pressure(true);
++                    self.0.try_insert(deadline, value).map(TimerKey)
++                }
++            }
+         }
+ 
+         /// Update a pending value. Delayed updates for released or expired registrations are rejected.
+diff --git a/crates/timers/src/timers/tests.rs b/crates/timers/src/timers/tests.rs
+index a3ff602..fb7b190 100644
+--- a/crates/timers/src/timers/tests.rs
++++ b/crates/timers/src/timers/tests.rs
+@@ -5,6 +5,41 @@ use super::*;
+ use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
+ use std::sync::{Barrier, Mutex};
+ 
++#[cfg(feature = "local")]
++#[test]
++fn local_capacity_pressure_reclaims_non_earliest_released_registrations() {
++    let now = Instant::now();
++    let mut timers = local::TimerQueue::with_capacity(4);
++    let capacity = timers.capacity();
++    let first = timers.try_schedule(now, 0).unwrap();
++    let keys: Vec<_> = (1..capacity)
++        .map(|value| {
++            timers
++                .try_schedule(now + Duration::from_secs(60), value)
++                .unwrap()
++        })
++        .collect();
++    assert_eq!(timers.next_deadline(), Some(now));
++    for (index, key) in keys.into_iter().enumerate() {
++        assert_eq!(timers.release(key), Some(index + 1));
++    }
++    let replacements: Vec<_> = (1..capacity)
++        .map(|value| {
++            timers
++                .try_schedule(now + Duration::from_secs(1), value + capacity)
++                .unwrap()
++        })
++        .collect();
++    assert_eq!(timers.capacity(), capacity);
++    assert_eq!(timers.try_schedule(now, 999), Err(999));
++    assert_eq!(timers.pop_expired(now), Some(0));
++    assert_eq!(timers.release(first), None);
++    for key in replacements {
++        assert!(timers.release(key).is_some());
++    }
++    assert_eq!(timers.next_deadline(), None);
++}
++
+ #[cfg(feature = "local")]
+ #[test]
+ fn local_expiry_preserves_deadline_order_and_observes_changes_between_pops() {
+diff --git a/crates/timers/tests/allocations.rs b/crates/timers/tests/allocations.rs
+index b15dd0c..0972d5c 100644
+--- a/crates/timers/tests/allocations.rs
++++ b/crates/timers/tests/allocations.rs
+@@ -61,6 +61,42 @@ fn allocations(operation: impl FnOnce()) -> usize {
+     CALLS.with(Cell::get)
+ }
+ 
++#[cfg(feature = "local")]
++#[test]
++fn local_capacity_reclamation_and_expiry_allocate_nothing() {
++    use core_scheduler_timers::local::TimerQueue;
++    let now = Instant::now();
++    let mut timers = TimerQueue::with_capacity(64);
++    let capacity = timers.capacity();
++    let mut keys = Vec::with_capacity(capacity);
++    let calls = allocations(|| {
++        for _ in 0..3 {
++            for index in 0..capacity {
++                keys.push(
++                    timers
++                        .try_schedule(now + Duration::from_nanos(index as u64), index)
++                        .unwrap(),
++                );
++            }
++            timers.next_deadline();
++            // Keep the root alive while all later registrations are released.
++            for key in keys.drain(1..) {
++                assert!(timers.release(key).is_some());
++            }
++            for index in 1..capacity {
++                keys.push(timers.try_schedule(now, index).unwrap());
++            }
++            assert_eq!(timers.try_schedule(now, 999), Err(999));
++            while timers.pop_expired(now + Duration::from_secs(1)).is_some() {}
++            for key in keys.drain(..) {
++                assert_eq!(timers.release(key), None);
++            }
++        }
++    });
++    assert_eq!(calls, 0);
++    assert_eq!(timers.capacity(), capacity);
++}
++
+ #[test]
+ fn reserved_timer_lifecycles_and_reuse_allocate_nothing() {
+     let now = Instant::now();

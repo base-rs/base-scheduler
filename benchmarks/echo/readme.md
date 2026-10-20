@@ -28,6 +28,10 @@ The [single-worker research](single-worker-research.md) profiles the merged alte
 
 The [worker timer research](worker-timers-research.md) tests using timer deadlines in worker I/O waits, distinguishes timer precision from integration costs, and measures the CPU cost of sharing one queue between workers.
 
+The [timer wake-delivery research](timer-ready-research.md) compares immediate delivery with an additional stealable ready action, using the archived [worker-local timer prototype](local-timers-research.md).
+
+The [worker hot-path measurements](worker-hotpath-research.md) and [worker-loop follow-up](worker-loop-followup.md) record the empty admission-queue and unchanged timer-flush improvements, plus the rejected combined-wait and completion-collection experiments.
+
 Build and run the comparison on Linux:
 
 ```sh

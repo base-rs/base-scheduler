@@ -1,0 +1,16 @@
+diff --git a/crates/timers/src/timers.rs b/crates/timers/src/timers.rs
+index 951cf69..2b56cbe 100644
+--- a/crates/timers/src/timers.rs
++++ b/crates/timers/src/timers.rs
+@@ -247,6 +247,11 @@ impl<Value> State<Value> {
+     }
+ 
+     fn flush(&mut self) {
++        // Nothing changed since the previous flush. This also avoids moving the pending
++        // buffer for each individual expiry in a populated queue.
++        if self.scheduled.is_empty() && self.cancelled == 0 {
++            return;
++        }
+         #[cfg(feature = "sharded")]
+         let capacity = self.capacity();
+         // Temporarily split field borrows to filter without allocating or taking a lock for each registration. No user data is dropped here.

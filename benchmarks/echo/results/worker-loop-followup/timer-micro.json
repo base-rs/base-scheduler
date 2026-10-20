@@ -1,0 +1,590 @@
+{
+  "source": "64eb1548e1371b067f0e7c8b85d5a37c2f745768",
+  "harness_sha256": "7ad298b9b7a2f4340f71a3949033ec480418003a0b3a9942349dfd57fdaf659f",
+  "seed": 20261030,
+  "black_box": "mutable queue reference and returned value",
+  "builds": {
+    "production": {
+      "path": "/home/samuel/.cache/core-scheduler-perf-followup/production-queue-perf",
+      "sha256": "48ffd6c6f6fd38e75220ce035308a027d3db79e8bfa4dd885abae8dbe46135e9",
+      "command": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "-p",
+        "core-scheduler-timers",
+        "--features",
+        "driver",
+        "--example",
+        "queue_perf"
+      ],
+      "patches": []
+    },
+    "flush": {
+      "path": "/home/samuel/.cache/core-scheduler-perf-followup/flush-queue-perf",
+      "sha256": "abe4396a38bb4f6943db5c9d322e5a29461f4321130bf07832bc1b3e85ccc90b",
+      "command": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "-p",
+        "core-scheduler-timers",
+        "--features",
+        "driver",
+        "--example",
+        "queue_perf"
+      ],
+      "patches": [
+        "flush"
+      ]
+    },
+    "local": {
+      "path": "/home/samuel/.cache/core-scheduler-perf-followup/local-queue-perf",
+      "sha256": "f0370291ec17c754fa4c2c81be8342e88106be4739be42940cefd1434d98619a",
+      "command": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "-p",
+        "core-scheduler-timers",
+        "--features",
+        "driver,local",
+        "--example",
+        "queue_perf"
+      ],
+      "patches": [
+        "local"
+      ]
+    },
+    "local-fast": {
+      "path": "/home/samuel/.cache/core-scheduler-perf-followup/local-fast-queue-perf",
+      "sha256": "4b9f522f87ff747de0b37b130aeb2598b33ba50077076e13cececc5433ab8a53",
+      "command": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "-p",
+        "core-scheduler-timers",
+        "--features",
+        "driver,local",
+        "--example",
+        "queue_perf"
+      ],
+      "patches": [
+        "local",
+        "flush",
+        "pop"
+      ]
+    }
+  },
+  "samples": [
+    {
+      "queue": "local",
+      "workload": "expiry",
+      "elapsed_ns": 75455190,
+      "repeat": 2,
+      "variant": "local"
+    },
+    {
+      "queue": "local",
+      "workload": "deadline",
+      "elapsed_ns": 9320695,
+      "repeat": 2,
+      "variant": "local-fast"
+    },
+    {
+      "queue": "shared",
+      "workload": "deadline",
+      "elapsed_ns": 39742360,
+      "repeat": 7,
+      "variant": "flush"
+    },
+    {
+      "queue": "shared",
+      "workload": "expiry",
+      "elapsed_ns": 119567628,
+      "repeat": 9,
+      "variant": "production"
+    },
+    {
+      "queue": "shared",
+      "workload": "deadline",
+      "elapsed_ns": 41967875,
+      "repeat": 8,
+      "variant": "production"
+    },
+    {
+      "queue": "shared",
+      "workload": "deadline",
+      "elapsed_ns": 41968425,
+      "repeat": 7,
+      "variant": "production"
+    },
+    {
+      "queue": "local",
+      "workload": "deadline",
+      "elapsed_ns": 20374755,
+      "repeat": 2,
+      "variant": "local"
+    },
+    {
+      "queue": "local",
+      "workload": "deadline",
+      "elapsed_ns": 9332176,
+      "repeat": 6,
+      "variant": "local-fast"
+    },
+    {
+      "queue": "local",
+      "workload": "deadline",
+      "elapsed_ns": 9368726,
+      "repeat": 7,
+      "variant": "local-fast"
+    },
+    {
+      "queue": "local",
+      "workload": "deadline",
+      "elapsed_ns": 20475127,
+      "repeat": 5,
+      "variant": "local"
+    },
+    {
+      "queue": "shared",
+      "workload": "deadline",
+      "elapsed_ns": 42597567,
+      "repeat": 3,
+      "variant": "production"
+    },
+    {
+      "queue": "shared",
+      "workload": "deadline",
+      "elapsed_ns": 42196420,
+      "repeat": 5,
+      "variant": "production"
+    },
+    {
+      "queue": "shared",
+      "workload": "expiry",
+      "elapsed_ns": 120349123,
+      "repeat": 7,
+      "variant": "production"
+    },
+    {
+      "queue": "shared",
+      "workload": "expiry",
+      "elapsed_ns": 120111449,
+      "repeat": 3,
+      "variant": "production"
+    },
+    {
+      "queue": "shared",
+      "workload": "expiry",
+      "elapsed_ns": 117926385,
+      "repeat": 4,
+      "variant": "flush"
+    },
+    {
+      "queue": "shared",
+      "workload": "expiry",
+      "elapsed_ns": 119474326,
+      "repeat": 6,
+      "variant": "production"
+    },
+    {
+      "queue": "local",
+      "workload": "expiry",
+      "elapsed_ns": 75580494,
+      "repeat": 6,
+      "variant": "local"
+    },
+    {
+      "queue": "local",
+      "workload": "expiry",
+      "elapsed_ns": 58177557,
+      "repeat": 1,
+      "variant": "local-fast"
+    },
+    {
+      "queue": "shared",
+      "workload": "deadline",
+      "elapsed_ns": 42100598,
+      "repeat": 6,
+      "variant": "production"
+    },
+    {
+      "queue": "shared",
+      "workload": "expiry",
+      "elapsed_ns": 118873914,
+      "repeat": 7,
+      "variant": "flush"
+    },
+    {
+      "queue": "shared",
+      "workload": "deadline",
+      "elapsed_ns": 39462095,
+      "repeat": 8,
+      "variant": "flush"
+    },
+    {
+      "queue": "shared",
+      "workload": "expiry",
+      "elapsed_ns": 117603278,
+      "repeat": 5,
+      "variant": "flush"
+    },
+    {
+      "queue": "shared",
+      "workload": "expiry",
+      "elapsed_ns": 117623460,
+      "repeat": 9,
+      "variant": "flush"
+    },
+    {
+      "queue": "local",
+      "workload": "deadline",
+      "elapsed_ns": 9266734,
+      "repeat": 1,
+      "variant": "local-fast"
+    },
+    {
+      "queue": "local",
+      "workload": "expiry",
+      "elapsed_ns": 75487901,
+      "repeat": 7,
+      "variant": "local"
+    },
+    {
+      "queue": "local",
+      "workload": "expiry",
+      "elapsed_ns": 75603553,
+      "repeat": 5,
+      "variant": "local"
+    },
+    {
+      "queue": "shared",
+      "workload": "deadline",
+      "elapsed_ns": 42033896,
+      "repeat": 2,
+      "variant": "production"
+    },
+    {
+      "queue": "local",
+      "workload": "expiry",
+      "elapsed_ns": 58359190,
+      "repeat": 3,
+      "variant": "local-fast"
+    },
+    {
+      "queue": "local",
+      "workload": "deadline",
+      "elapsed_ns": 20412437,
+      "repeat": 6,
+      "variant": "local"
+    },
+    {
+      "queue": "shared",
+      "workload": "deadline",
+      "elapsed_ns": 39625488,
+      "repeat": 1,
+      "variant": "flush"
+    },
+    {
+      "queue": "local",
+      "workload": "expiry",
+      "elapsed_ns": 58396481,
+      "repeat": 5,
+      "variant": "local-fast"
+    },
+    {
+      "queue": "local",
+      "workload": "expiry",
+      "elapsed_ns": 75631784,
+      "repeat": 4,
+      "variant": "local"
+    },
+    {
+      "queue": "shared",
+      "workload": "deadline",
+      "elapsed_ns": 42102087,
+      "repeat": 1,
+      "variant": "production"
+    },
+    {
+      "queue": "local",
+      "workload": "deadline",
+      "elapsed_ns": 9280954,
+      "repeat": 5,
+      "variant": "local-fast"
+    },
+    {
+      "queue": "local",
+      "workload": "deadline",
+      "elapsed_ns": 20425796,
+      "repeat": 9,
+      "variant": "local"
+    },
+    {
+      "queue": "shared",
+      "workload": "deadline",
+      "elapsed_ns": 42113968,
+      "repeat": 4,
+      "variant": "production"
+    },
+    {
+      "queue": "shared",
+      "workload": "expiry",
+      "elapsed_ns": 117766182,
+      "repeat": 3,
+      "variant": "flush"
+    },
+    {
+      "queue": "local",
+      "workload": "expiry",
+      "elapsed_ns": 58148377,
+      "repeat": 8,
+      "variant": "local-fast"
+    },
+    {
+      "queue": "shared",
+      "workload": "expiry",
+      "elapsed_ns": 117932385,
+      "repeat": 2,
+      "variant": "flush"
+    },
+    {
+      "queue": "local",
+      "workload": "expiry",
+      "elapsed_ns": 58302380,
+      "repeat": 4,
+      "variant": "local-fast"
+    },
+    {
+      "queue": "shared",
+      "workload": "expiry",
+      "elapsed_ns": 119525707,
+      "repeat": 4,
+      "variant": "production"
+    },
+    {
+      "queue": "local",
+      "workload": "deadline",
+      "elapsed_ns": 9277265,
+      "repeat": 8,
+      "variant": "local-fast"
+    },
+    {
+      "queue": "local",
+      "workload": "deadline",
+      "elapsed_ns": 9346706,
+      "repeat": 4,
+      "variant": "local-fast"
+    },
+    {
+      "queue": "shared",
+      "workload": "expiry",
+      "elapsed_ns": 117882995,
+      "repeat": 1,
+      "variant": "flush"
+    },
+    {
+      "queue": "local",
+      "workload": "expiry",
+      "elapsed_ns": 58170637,
+      "repeat": 7,
+      "variant": "local-fast"
+    },
+    {
+      "queue": "local",
+      "workload": "deadline",
+      "elapsed_ns": 20381715,
+      "repeat": 3,
+      "variant": "local"
+    },
+    {
+      "queue": "local",
+      "workload": "deadline",
+      "elapsed_ns": 20406136,
+      "repeat": 8,
+      "variant": "local"
+    },
+    {
+      "queue": "shared",
+      "workload": "deadline",
+      "elapsed_ns": 42171139,
+      "repeat": 9,
+      "variant": "production"
+    },
+    {
+      "queue": "local",
+      "workload": "deadline",
+      "elapsed_ns": 9270224,
+      "repeat": 9,
+      "variant": "local-fast"
+    },
+    {
+      "queue": "local",
+      "workload": "expiry",
+      "elapsed_ns": 60113726,
+      "repeat": 6,
+      "variant": "local-fast"
+    },
+    {
+      "queue": "local",
+      "workload": "deadline",
+      "elapsed_ns": 9302395,
+      "repeat": 3,
+      "variant": "local-fast"
+    },
+    {
+      "queue": "shared",
+      "workload": "expiry",
+      "elapsed_ns": 118506647,
+      "repeat": 6,
+      "variant": "flush"
+    },
+    {
+      "queue": "shared",
+      "workload": "expiry",
+      "elapsed_ns": 119820723,
+      "repeat": 8,
+      "variant": "production"
+    },
+    {
+      "queue": "local",
+      "workload": "expiry",
+      "elapsed_ns": 75525352,
+      "repeat": 8,
+      "variant": "local"
+    },
+    {
+      "queue": "shared",
+      "workload": "expiry",
+      "elapsed_ns": 119935605,
+      "repeat": 1,
+      "variant": "production"
+    },
+    {
+      "queue": "local",
+      "workload": "expiry",
+      "elapsed_ns": 78552592,
+      "repeat": 1,
+      "variant": "local"
+    },
+    {
+      "queue": "shared",
+      "workload": "deadline",
+      "elapsed_ns": 39622088,
+      "repeat": 2,
+      "variant": "flush"
+    },
+    {
+      "queue": "shared",
+      "workload": "expiry",
+      "elapsed_ns": 119311893,
+      "repeat": 8,
+      "variant": "flush"
+    },
+    {
+      "queue": "local",
+      "workload": "expiry",
+      "elapsed_ns": 58433022,
+      "repeat": 9,
+      "variant": "local-fast"
+    },
+    {
+      "queue": "shared",
+      "workload": "expiry",
+      "elapsed_ns": 119895164,
+      "repeat": 2,
+      "variant": "production"
+    },
+    {
+      "queue": "shared",
+      "workload": "deadline",
+      "elapsed_ns": 39463185,
+      "repeat": 4,
+      "variant": "flush"
+    },
+    {
+      "queue": "shared",
+      "workload": "deadline",
+      "elapsed_ns": 39410534,
+      "repeat": 3,
+      "variant": "flush"
+    },
+    {
+      "queue": "local",
+      "workload": "expiry",
+      "elapsed_ns": 75551503,
+      "repeat": 3,
+      "variant": "local"
+    },
+    {
+      "queue": "local",
+      "workload": "expiry",
+      "elapsed_ns": 58278619,
+      "repeat": 2,
+      "variant": "local-fast"
+    },
+    {
+      "queue": "shared",
+      "workload": "deadline",
+      "elapsed_ns": 39607238,
+      "repeat": 5,
+      "variant": "flush"
+    },
+    {
+      "queue": "shared",
+      "workload": "expiry",
+      "elapsed_ns": 122512606,
+      "repeat": 5,
+      "variant": "production"
+    },
+    {
+      "queue": "shared",
+      "workload": "deadline",
+      "elapsed_ns": 39456465,
+      "repeat": 9,
+      "variant": "flush"
+    },
+    {
+      "queue": "local",
+      "workload": "deadline",
+      "elapsed_ns": 20357435,
+      "repeat": 1,
+      "variant": "local"
+    },
+    {
+      "queue": "local",
+      "workload": "deadline",
+      "elapsed_ns": 20409536,
+      "repeat": 7,
+      "variant": "local"
+    },
+    {
+      "queue": "shared",
+      "workload": "deadline",
+      "elapsed_ns": 39603618,
+      "repeat": 6,
+      "variant": "flush"
+    },
+    {
+      "queue": "local",
+      "workload": "deadline",
+      "elapsed_ns": 20329664,
+      "repeat": 4,
+      "variant": "local"
+    },
+    {
+      "queue": "local",
+      "workload": "expiry",
+      "elapsed_ns": 75412050,
+      "repeat": 9,
+      "variant": "local"
+    }
+  ]
+}

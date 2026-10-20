@@ -1,0 +1,55 @@
+{
+  "initial_build": {
+    "source": "64eb1548e1371b067f0e7c8b85d5a37c2f745768",
+    "patch_sha256": "99e59419194ceda13b682431cb1fec0fe11309f6f5449f37eec7274feffec0bd",
+    "common_patch_sha256": "fb7faa0010c061596064b1b36c19ee7e45f27f8df962211a3f6e29d60253b333",
+    "rustc": "rustc 1.99.0 (b940084d7 2026-09-28) (Arch Linux rust 1:1.99.0-1)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+    "environment_overrides": {},
+    "binaries": {
+      "before": {
+        "path": "/home/samuel/.cache/core-scheduler-perf-followup/before-driver-echo",
+        "sha256": "3f22166e2d1a5b6fad19f9d8bc4bb48ad342e2fbce292f2cb1baaaac1a9e2e5c",
+        "command": [
+          "cargo",
+          "build",
+          "--release",
+          "--locked",
+          "-p",
+          "core-scheduler-echo-benchmark"
+        ]
+      },
+      "driver-turn": {
+        "path": "/home/samuel/.cache/core-scheduler-perf-followup/driver-turn-driver-echo",
+        "sha256": "5862670ebbcfa78a10792d5be1e13f1142528351b9fefc94a986be05573a5ac7",
+        "command": [
+          "cargo",
+          "build",
+          "--release",
+          "--locked",
+          "-p",
+          "core-scheduler-echo-benchmark"
+        ]
+      }
+    },
+    "tests": "Linux Native and io_uring all features passed",
+    "finished_utc": "2026-10-20T20:40:18Z"
+  },
+  "variant_patch_sha256": "13f04abf3f566e4857fed966652b80ea72eca08c51f26852004f39df427c2e30",
+  "source_diff_sha256": "b78d2db8ea2577012ef164ebd0bc1952e75c20c21f5eb8214137aaea0c281746",
+  "binaries": {
+    "wait-drain-only": {
+      "path": "/home/samuel/.cache/core-scheduler-perf-followup/wait-drain-only-echo",
+      "sha256": "f61d19bfa59ab03bc0a40d4ea07062c6e75f4a68776f2db37b0e274d50403bf0",
+      "command": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "-p",
+        "core-scheduler-echo-benchmark"
+      ]
+    }
+  },
+  "tests": "Linux Native and io_uring all features coverage and Clippy passed",
+  "finished_utc": "2026-10-20T20:56:52Z"
+}
