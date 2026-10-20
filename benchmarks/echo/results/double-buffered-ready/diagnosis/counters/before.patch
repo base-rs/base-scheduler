@@ -1,0 +1,142 @@
+diff --git a/crates/iouring/src/io_uring_selector.rs b/crates/iouring/src/io_uring_selector.rs
+index 9898ef1..7919736 100644
+--- a/crates/iouring/src/io_uring_selector.rs
++++ b/crates/iouring/src/io_uring_selector.rs
+@@ -790,6 +790,7 @@ impl Selector for IoUringSelector {
+     }
+ }
+ pub(crate) struct Reactor {
++    diagnostics: [usize; 8],
+     ring: IoUring,
+     started: bool,
+     notification: Arc<OwnedFd>,
+@@ -811,6 +812,7 @@ impl Reactor {
+     ) -> Self {
+         Self {
+             ring,
++            diagnostics: [0; 8],
+             started: false,
+             notification,
+             incoming,
+@@ -893,6 +895,7 @@ impl Reactor {
+     }
+ 
+     pub(crate) fn turn(&mut self, timeout: Option<Duration>) -> io::Result<bool> {
++        self.diagnostics[0] += 1;
+         self.started = true;
+         let mut progressed = false;
+         // Bound command processing so a busy producer cannot starve completions.
+@@ -917,6 +920,7 @@ impl Reactor {
+                 break;
+             };
+             progressed = true;
++            self.diagnostics[1] += 1;
+             match command {
+                 Command::Submit(request) if !self.closing => self.pending.push_back(request),
+                 Command::Submit(request) => request.finish(Err(io::ErrorKind::Interrupted.into())),
+@@ -953,8 +957,10 @@ impl Reactor {
+         let mut notification_result = None;
+         for completion in self.ring.completion() {
+             progressed = true;
++            self.diagnostics[2] += 1;
+             let identifier = completion.user_data();
+             if identifier == NOTIFICATION_TAG {
++                self.diagnostics[3] += 1;
+                 self.notification_armed = false;
+                 notification_result = Some(completion.result());
+                 continue;
+@@ -1049,6 +1055,7 @@ impl Reactor {
+                 !submissions.is_empty() || submissions.cq_overflow() || submissions.taskrun()
+             };
+             if needs_submit {
++                self.diagnostics[4] += 1;
+                 match syscall("submit", || self.ring.submit()) {
+                     Err(error)
+                         if error.kind() == io::ErrorKind::Interrupted
+@@ -1063,6 +1070,7 @@ impl Reactor {
+             }
+             return Ok(false);
+         }
++        self.diagnostics[5] += 1;
+         let result = syscall("wait", || match timeout {
+             None => self.ring.submit_and_wait(1),
+             Some(duration) => {
+@@ -1091,6 +1099,7 @@ impl Reactor {
+ 
+ impl Drop for Reactor {
+     fn drop(&mut self) {
++        eprintln!("REACTOR_COUNTS {:?}", self.diagnostics);
+         // Pop without retaining a queue borrow: returning a buffer or waking its owner can reenter local routing.
+         while let Some(command) = crate::io_uring_worker::pop(&self.controller) {
+             discard(command);
+diff --git a/crates/native/src/worker.rs b/crates/native/src/worker.rs
+index 1dc964f..ba113d8 100644
+--- a/crates/native/src/worker.rs
++++ b/crates/native/src/worker.rs
+@@ -34,6 +34,7 @@ impl WorkerState {
+ 
+     pub(crate) fn wake(&self) -> bool {
+         if self.sleeping.swap(false, Ordering::SeqCst) {
++            count(7);
+             self.thread
+                 .get()
+                 .expect("sleeping worker has registered its thread")
+@@ -55,6 +56,7 @@ struct LocalWorker {
+ }
+ 
+ thread_local! {
++    static DIAGNOSTICS: [std::cell::Cell<usize>; 8] = const { [const { std::cell::Cell::new(0) }; 8] };
+     static CURRENT_WORKER: RefCell<Option<LocalWorker>> = const { RefCell::new(None) };
+ }
+ 
+@@ -95,6 +97,7 @@ pub(crate) fn schedule(shared: &Arc<Shared>, runnable: Runnable) {
+ }
+ 
+ fn search(shared: &Shared, local: &LocalWorker, iteration: usize) -> Steal<Runnable> {
++    count(0);
+     let incoming = &shared.workers[local.identifier].incoming;
+     let mut retry = false;
+     if iteration % EXTERNAL_INTERVAL == 0 {
+@@ -106,6 +109,7 @@ fn search(shared: &Shared, local: &LocalWorker, iteration: usize) -> Steal<Runna
+         }
+     }
+     if let Some(runnable) = local.ready.pop() {
++        count(1);
+         return Steal::Success(runnable);
+     }
+     for queue in [incoming, &shared.ready] {
+@@ -201,6 +205,7 @@ fn drive(
+     driver: &mut Option<&mut dyn core_scheduler_selector::SelectorWorker>,
+     timeout: Option<Duration>,
+ ) {
++    count(if timeout == Some(Duration::ZERO) { 2 } else { 3 });
+     if let Some(active) = driver.as_mut() {
+         if !matches!(active.turn(timeout), Ok(false)) {
+             *driver = None;
+@@ -265,6 +270,7 @@ fn run_loop(
+         let runnable = match find_work(&shared, iteration) {
+             Steal::Empty => {
+                 drive(&mut driver, Some(Duration::ZERO));
++                count(4);
+                 worker.sleeping.store(true, Ordering::SeqCst);
+                 shared.idle_workers.fetch_add(1, Ordering::SeqCst);
+                 // Pair with the enqueuer's fence: either this search observes its queued work, or the enqueuer observes an idle worker.
+@@ -301,12 +307,18 @@ fn run_loop(
+         });
+         // Future panics become TaskError in TaskFuture. Also contain a panic propagated by task machinery so that it does not remove a worker.
+         crate::panic::contain(|| {
++            count(5);
+             runnable.run();
+         });
+         shared.retire_runnable();
+     }
++    DIAGNOSTICS.with(|counts| eprintln!("WORKER_COUNTS {:?}", counts.each_ref().map(|count| count.get())));
+     CURRENT_WORKER.with(|current| current.take());
+ }
+ 
+ #[cfg(test)]
+ mod tests;
++
++fn count(index: usize) {
++    DIAGNOSTICS.with(|counts| counts[index].set(counts[index].get() + 1));
++}

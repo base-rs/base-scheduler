@@ -47,7 +47,7 @@ Owned serial throughput declines by 4.21% in the initial prototype matrix and 2.
 | 1/1/64 | tokio | 271,245 [268,799–274,415] | 269,906 [268,534–270,656] | -0.49% | 4.351 → 4.371 |
 | 1/1/64 | iouring | 236,126 [231,542–241,883] | 230,357 [226,842–234,925] | -2.44% | 6.311 → 9.543 |
 
-The repeated owned serial decline is a concern despite overlapping throughput ranges. Tail latency is also variable and worsens in this confirmation; the evidence does not support claiming no serial regression. The measurements do not identify whether queue swapping, more frequent external-queue checks, changed event-turn timing, or another cost dominates. Avoiding queue swaps for singleton batches would be a reasonable next experiment, but is not implemented or measured here.
+The repeated owned serial decline is a concern despite overlapping throughput ranges. Tail latency is also variable and worsens in this confirmation; the evidence does not support claiming no serial regression. This matrix alone does not identify which executor cost dominates. A [subsequent targeted diagnosis](results/double-buffered-ready/diagnosis/readme.md) finds redundant worker self-notifications during idle completion publication: approximately four driver turns and seven queue searches per echo, versus three and four in the original loop. Suppressing that self-notification recovers the loss in a separate selected serial experiment. Skipping singleton queue swaps or reducing external-queue checks did not recover it in their screen. These diagnostic variants have not been applied as a production fix or tested across this concurrent matrix.
 
 ## Initial prototype and idle checks
 

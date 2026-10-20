@@ -1,0 +1,12 @@
+diff --git a/crates/native/src/worker.rs b/crates/native/src/worker.rs
+index 99a5031..9c40b7d 100644
+--- a/crates/native/src/worker.rs
++++ b/crates/native/src/worker.rs
+@@ -253,6 +253,7 @@ fn run_loop(
+         }
+         let runnable = match find_work(&shared, iteration) {
+             Steal::Empty => {
++                drive(&mut driver, Some(Duration::ZERO));
+                 worker.sleeping.store(true, Ordering::SeqCst);
+                 shared.idle_workers.fetch_add(1, Ordering::SeqCst);
+                 // Pair with the enqueuer's fence: either this search observes its queued work, or the enqueuer observes an idle worker.
