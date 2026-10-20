@@ -8,7 +8,7 @@ use core_scheduler_selector::SelectorOptions;
 pub struct IoUringOptions {
     /// Requested submission queue entries. Must be nonzero.
     pub entries: u32,
-    /// Maximum accepted original operations, including queued and in-flight requests. Must be nonzero.
+    /// Maximum accepted original ring requests, including queued and in-flight requests. Synchronous socket attempts do not consume capacity. Must be nonzero.
     pub capacity: usize,
     /// Limits for synchronous fallback operations and cleanup.
     pub fallback: SelectorOptions,

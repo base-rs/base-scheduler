@@ -311,7 +311,6 @@ dependencies = [
  "futures-lite",
  "io-uring",
  "libc",
- "polling",
  "socket2",
  "tempfile",
 ]

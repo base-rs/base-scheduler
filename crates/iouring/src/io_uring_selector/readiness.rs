@@ -70,7 +70,7 @@ impl Drop for ReadinessRequest {
 }
 
 impl IoUringSelector {
-    async fn wait_ready(
+    pub(super) async fn wait_ready(
         &self,
         controller: Arc<Controller>,
         socket: &NativeSocket,

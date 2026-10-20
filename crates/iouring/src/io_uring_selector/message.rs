@@ -302,6 +302,7 @@ impl SocketSendMsg for IoUringSelector {
         let address = message.address;
         let (result, buffers) = retry_operation(
             self,
+            &controller,
             socket,
             message.buffers,
             |buffers| {
@@ -343,6 +344,7 @@ impl SocketRecvMsg for IoUringSelector {
         let controller = self.route();
         let (result, buffers) = retry_operation(
             self,
+            &controller,
             socket,
             buffers,
             |buffers| {

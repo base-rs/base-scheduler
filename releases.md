@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Wait directly on io_uring with eventfd interrupts, retaining owner-thread wakes in memory to avoid kernel self-interrupts. Complete ready scalar socket writes synchronously and combine idle submission with waiting. Ring setup now requires extended wait arguments for timed driver turns, available since Linux 5.11.
+
 - Reserve Tokio's lightweight socket readiness polling path per direction, retaining concurrent waiter and cancellation support.
 
 - Notify io_uring capacity waiters only when capacity becomes available, and native task-drain waiters only when outstanding runnables reach zero.

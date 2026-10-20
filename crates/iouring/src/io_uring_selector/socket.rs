@@ -11,6 +11,7 @@ pub(super) fn retain_socket(socket: &NativeSocket) -> RegisteredSocket {
 // O_NONBLOCK sockets can complete with EAGAIN. Retire that attempt before waiting for readiness and retrying on the operation's original ring. No borrowed payload reaches the readiness service.
 pub(super) async fn retry_operation<B, T, O, F>(
     selector: &IoUringSelector,
+    controller: &Arc<Controller>,
     socket: &NativeSocket,
     mut buffers: B,
     mut operation: O,
@@ -33,8 +34,7 @@ where
         match result {
             Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
                 if let Err(error) = selector
-                    .fallback
-                    .socket_wait(socket, interest, cancellation)
+                    .wait_ready(Arc::clone(controller), socket, interest, cancellation)
                     .await
                 {
                     return (Err(error.into()), buffers);
@@ -56,6 +56,7 @@ impl SocketRead for IoUringSelector {
         let controller = self.route();
         let (result, buffer) = retry_operation(
             self,
+            &controller,
             socket,
             buffer,
             |buffer| {
@@ -83,9 +84,24 @@ impl SocketWrite for IoUringSelector {
         buffer: B,
         cancellation: &Cancellation,
     ) -> BufferResult<B> {
+        if let Err(error) = cancellation.check() {
+            return (Err(error.into()), buffer);
+        }
+        if let Err(error) = self.check_open() {
+            return (Err(error.into()), buffer);
+        }
+        // A ready socket can finish synchronously without publishing a request. No access to the owned buffer survives this nonblocking syscall.
+        match syscall("socket-write", || {
+            socket.try_send(buffer.as_ref(), SocketSendFlags::default())
+        }) {
+            Err(error) if error.kind() == io::ErrorKind::WouldBlock => {}
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
+            result => return (operation_result(result, cancellation), buffer),
+        }
         let controller = self.route();
         let (result, buffer) = retry_operation(
             self,
+            &controller,
             socket,
             buffer,
             |buffer| {

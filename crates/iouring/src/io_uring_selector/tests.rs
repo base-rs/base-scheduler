@@ -44,9 +44,9 @@ pub(super) fn syscall<T>(
     }
 }
 
-struct Failures;
+pub(super) struct Failures;
 impl Failures {
-    fn new(failures: impl IntoIterator<Item = (&'static str, io::Error)>) -> Self {
+    pub(super) fn new(failures: impl IntoIterator<Item = (&'static str, io::Error)>) -> Self {
         FAILURES.with(|state| {
             *state.borrow_mut() = failures
                 .into_iter()
@@ -117,13 +117,23 @@ pub(super) fn drain(selector: &IoUringSelector, driver: &mut IoUringDriver) {
 
 #[test]
 fn setup_probes_and_errors_are_explicit() {
-    assert!(validate_completion_support(true, true).is_ok());
+    assert!(validate_completion_support(true, true, true).is_ok());
     assert_eq!(
-        validate_completion_support(false, true).unwrap_err().kind(),
+        validate_completion_support(false, true, true)
+            .unwrap_err()
+            .kind(),
         io::ErrorKind::Unsupported
     );
     assert_eq!(
-        validate_completion_support(true, false).unwrap_err().kind(),
+        validate_completion_support(true, false, true)
+            .unwrap_err()
+            .kind(),
+        io::ErrorKind::Unsupported
+    );
+    assert_eq!(
+        validate_completion_support(true, true, false)
+            .unwrap_err()
+            .kind(),
         io::ErrorKind::Unsupported
     );
     assert!(validate_operation_support(|_| true).is_ok());
@@ -183,11 +193,6 @@ fn setup_probes_and_errors_are_explicit() {
         "completion-support",
         "operation-support",
         "notification-pair",
-        "notification-mode",
-        "receiver-mode",
-        "poller",
-        "add-notification",
-        "add-ring",
     ] {
         let _failures = Failures::new([(name, io::ErrorKind::PermissionDenied.into())]);
         assert_eq!(
@@ -395,27 +400,32 @@ fn transient_syscall_errors_preserve_progress_and_fatal_errors_stop_the_driver()
         ("submit", io::Error::from_raw_os_error(libc::EAGAIN)),
         ("notification-read", io::ErrorKind::Interrupted.into()),
         ("wait", io::ErrorKind::Interrupted.into()),
+        ("wait", io::Error::from_raw_os_error(libc::ETIME)),
+        ("wait", io::Error::from_raw_os_error(libc::EBUSY)),
+        ("wait", io::Error::from_raw_os_error(libc::EAGAIN)),
     ] {
         let (selector, mut driver) = pair(1);
         let _failures = Failures::new([(name, error)]);
-        assert!(!driver.turn(Some(Duration::from_millis(1))).unwrap());
+        // A productive/nonblocking turn publishes without waiting; an idle turn combines publication and waiting in the wait syscall.
+        let timeout = if name == "submit" {
+            Duration::ZERO
+        } else {
+            Duration::from_millis(1)
+        };
+        assert!(!driver.turn(Some(timeout)).unwrap());
         assert!(FAILURES.with(|failures| failures.borrow().is_empty()));
         drain(&selector, &mut driver);
     }
-    for name in [
-        "submit",
-        "notification-read",
-        "modify-notification",
-        "modify-ring",
-        "wait",
-    ] {
+    for name in ["submit", "notification-read", "wait"] {
         let (selector, mut driver) = pair(1);
         let _failures = Failures::new([(name, io::ErrorKind::PermissionDenied.into())]);
+        let timeout = if name == "submit" {
+            Duration::ZERO
+        } else {
+            Duration::from_millis(1)
+        };
         assert_eq!(
-            driver
-                .turn(Some(Duration::from_millis(1)))
-                .unwrap_err()
-                .kind(),
+            driver.turn(Some(timeout)).unwrap_err().kind(),
             io::ErrorKind::PermissionDenied
         );
         assert!(driver.turn(None).unwrap());
@@ -437,7 +447,7 @@ fn event_loop_wakers_and_notification_errors_do_not_lose_work() {
         waker.wake_by_ref();
     }
     assert!(!driver.turn(None).unwrap());
-    // A full notification pipe already holds a wakeup.
+    // A full notification eventfd already holds a wakeup.
     waker.wake_by_ref();
     {
         let _failures = Failures::new([("notify", io::ErrorKind::WouldBlock.into())]);
@@ -561,16 +571,16 @@ fn driver_failure_retains_submitted_storage_and_wakes_waiters_with_a_panic() {
         driver.turn(Some(Duration::ZERO)).unwrap();
         assert_eq!(driver.reactor.as_ref().unwrap().in_flight.0.len(), 1);
         if fatal_turn {
-            // Consume the submission notification before testing the idle wait failure.
-            driver.turn(Some(Duration::from_millis(1))).unwrap();
             let _failures = Failures::new([("wait", io::ErrorKind::PermissionDenied.into())]);
-            assert_eq!(
-                driver
-                    .turn(Some(Duration::from_millis(1)))
-                    .unwrap_err()
-                    .kind(),
-                io::ErrorKind::PermissionDenied
-            );
+            // Retire the submission notification and its CQE before the idle wait failure.
+            let mut error = None;
+            for _ in 0..8 {
+                if let Err(failure) = driver.turn(Some(Duration::from_millis(1))) {
+                    error = Some(failure);
+                    break;
+                }
+            }
+            assert_eq!(error.unwrap().kind(), io::ErrorKind::PermissionDenied);
         }
         drop(driver);
         assert!(
@@ -695,7 +705,11 @@ fn full_submission_queue_defers_cancellations_and_shutdown_tolerates_duplicate_r
         driver.turn(Some(Duration::ZERO)).unwrap();
         operations.push(operation);
     }
-    assert_eq!(driver.reactor.as_ref().unwrap().in_flight.0.len(), 4);
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while driver.reactor.as_ref().unwrap().in_flight.0.len() < 4 {
+        assert!(!driver.turn(Some(Duration::ZERO)).unwrap());
+        assert!(Instant::now() < deadline);
+    }
     selector.close();
     // Shutdown marks each request as cancelling; dropping each future also sends its own cancellation to the same owner.
     drop(operations);
@@ -767,7 +781,7 @@ fn submission_racing_shutdown_or_driver_exit_returns_unpublished_storage() {
 #[test]
 fn convenience_driver_loop_reports_the_original_failure() {
     let (selector, driver) = pair(1);
-    let _failures = Failures::new([("submit", io::ErrorKind::PermissionDenied.into())]);
+    let _failures = Failures::new([("wait", io::ErrorKind::PermissionDenied.into())]);
     assert_eq!(
         driver.run().unwrap_err().kind(),
         io::ErrorKind::PermissionDenied
@@ -813,7 +827,7 @@ fn workers_route_locally_and_external_operations_share_ring_capacity_fairly() {
     assert_eq!(block_on(first).1, b"a");
     assert_eq!(block_on(second).1, b"b");
     assert_eq!(selector.external_next.load(Ordering::Relaxed), 2);
-    // The latest entered worker belongs to ring one. Local submission must neither advance external routing nor write the notification pipe.
+    // The latest entered worker belongs to ring one. Local submission must neither advance external routing nor write the notification eventfd.
     let _failures = Failures::new([("notify", io::ErrorKind::PermissionDenied.into())]);
     let mut local = Box::pin(selector.file_read_at(&file, vec![0], 2, &never));
     assert!(block_on(poll_once(&mut local)).is_none());
@@ -1148,24 +1162,20 @@ fn nonblocking_and_productive_turns_do_not_prepare_an_idle_wait() {
     let (_directory, file) = file(&selector);
     let never = Cancellation::never();
     {
-        let _failures =
-            Failures::new([("notification-read", io::ErrorKind::PermissionDenied.into())]);
-        // An empty nonblocking turn needs only to inspect the queues.
+        let _failures = Failures::new([("wait", io::ErrorKind::PermissionDenied.into())]);
         assert!(!driver.turn(Some(Duration::ZERO)).unwrap());
         let mut operation = Box::pin(selector.file_read_at(&file, vec![0; 6], 0, &never));
         assert!(block_on(poll_once(&mut operation)).is_none());
-        // Submitting work returns without preparing to sleep, even for an unlimited timeout.
+        // Submission and completion both return to the executor without an idle wait. Nonblocking turns may also retire the internal notification CQE.
         assert!(!driver.turn(None).unwrap());
-        // Make the completion ready before the next turn so this also exercises the completion-only fast path.
-        driver
-            .reactor
-            .as_mut()
-            .unwrap()
-            .ring
-            .submit_and_wait(1)
-            .unwrap();
-        assert!(!driver.turn(None).unwrap());
-        let (result, buffer) = block_on(operation);
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let (result, buffer) = loop {
+            if let Some(output) = block_on(poll_once(&mut operation)) {
+                break output;
+            }
+            assert!(!driver.turn(Some(Duration::ZERO)).unwrap());
+            assert!(Instant::now() < deadline);
+        };
         assert_eq!(result.unwrap(), 6);
         assert_eq!(buffer, b"abcdef");
         assert_eq!(FAILURES.with(|failures| failures.borrow().len()), 1);
@@ -1179,10 +1189,7 @@ fn nonblocking_turn_preserves_notifications_for_the_next_idle_turn() {
     driver.waker().wake_by_ref();
     assert!(!driver.turn(Some(Duration::ZERO)).unwrap());
     {
-        let _failures = Failures::new([(
-            "modify-notification",
-            io::ErrorKind::PermissionDenied.into(),
-        )]);
+        let _failures = Failures::new([("wait", io::ErrorKind::PermissionDenied.into())]);
         // The previously published notification must return us to the executor before rearming or waiting.
         assert!(!driver.turn(None).unwrap());
         assert_eq!(FAILURES.with(|failures| failures.borrow().len()), 1);
@@ -1192,7 +1199,7 @@ fn nonblocking_turn_preserves_notifications_for_the_next_idle_turn() {
 
 #[test]
 fn notifications_racing_idle_preparation_remain_observable() {
-    for name in ["modify-notification", "modify-ring", "wait"] {
+    for name in ["notification-read", "wait"] {
         let (selector, mut driver) = pair(1);
         {
             let _failures = Failures;
@@ -1202,17 +1209,15 @@ fn notifications_racing_idle_preparation_remain_observable() {
             });
             assert!(!driver.turn(Some(Duration::from_secs(1))).unwrap());
             assert!(BEFORE_SYSCALL.with(|hook| hook.borrow().is_none()));
-            assert!(
-                driver
-                    .reactor
-                    .as_ref()
-                    .unwrap()
-                    .events
-                    .iter()
-                    .any(|event| event.key == COMMAND_EVENT)
-            );
-            // The next turn consumes the notification without another wait.
-            assert!(!driver.turn(None).unwrap());
+            // The notification can yield its own CQE as well as its eventfd value. Both must be retired before sleeping again.
+            let _wait_failure = Failures::new([("wait", io::ErrorKind::Interrupted.into())]);
+            for _ in 0..4 {
+                assert!(!driver.turn(Some(Duration::from_millis(1))).unwrap());
+                if FAILURES.with(|failures| failures.borrow().is_empty()) {
+                    break;
+                }
+            }
+            assert!(FAILURES.with(|failures| failures.borrow().is_empty()));
         }
         drain(&selector, &mut driver);
     }
@@ -1263,8 +1268,7 @@ fn pending_submissions_are_flushed_before_preparing_to_sleep() {
         operations.push(operation);
     }
     {
-        let _failures =
-            Failures::new([("notification-read", io::ErrorKind::PermissionDenied.into())]);
+        let _failures = Failures::new([("wait", io::ErrorKind::PermissionDenied.into())]);
         assert!(!driver.turn(None).unwrap());
         while driver.reactor.as_ref().unwrap().pending.len() > 1 {
             assert!(!driver.turn(None).unwrap());
@@ -1274,4 +1278,565 @@ fn pending_submissions_are_flushed_before_preparing_to_sleep() {
     }
     drop(operations);
     drain(&selector, &mut driver);
+}
+
+#[test]
+fn owner_wakes_coalesce_without_writes_and_survive_productive_turns() {
+    use core_scheduler_selector::{SelectorDriver, SelectorWorker};
+    let (selector, driver) = pair(1);
+    let (_directory, file) = file(&selector);
+    let mut worker = driver.enter();
+    let waker = worker.waker();
+    {
+        let _failures = Failures::new([("notify", io::ErrorKind::PermissionDenied.into())]);
+        waker.wake_by_ref();
+        waker.wake_by_ref();
+        #[allow(clippy::waker_clone_wake)]
+        waker.clone().wake();
+        assert_eq!(FAILURES.with(|failures| failures.borrow().len()), 1);
+    }
+    assert!(!worker.turn(Some(Duration::ZERO)).unwrap());
+    let never = Cancellation::never();
+    let mut operation = Box::pin(selector.file_read_at(&file, vec![0; 6], 0, &never));
+    assert!(block_on(poll_once(&mut operation)).is_none());
+    // This productive idle turn must retain the local permit, just like the nonblocking turn above.
+    assert!(!worker.turn(None).unwrap());
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while active(&selector.controllers[0]) != 0 {
+        assert!(!worker.turn(Some(Duration::ZERO)).unwrap());
+        assert!(Instant::now() < deadline);
+    }
+    let (result, buffer) = block_on(operation);
+    assert_eq!(result.unwrap(), 6);
+    assert_eq!(buffer, b"abcdef");
+    {
+        let _failures = Failures::new([("wait", io::ErrorKind::Interrupted.into())]);
+        // All three local wakes coalesced into one idle-turn permit.
+        assert!(!worker.turn(None).unwrap());
+        assert_eq!(FAILURES.with(|failures| failures.borrow().len()), 1);
+        assert!(!worker.turn(Some(Duration::from_millis(1))).unwrap());
+        assert!(FAILURES.with(|failures| failures.borrow().is_empty()));
+    }
+    selector.close();
+    while !worker.turn(Some(Duration::from_millis(10))).unwrap() {}
+    block_on(selector.shutdown());
+}
+
+#[test]
+fn idle_turn_consumes_local_and_remote_notifications_together() {
+    use core_scheduler_selector::{SelectorDriver, SelectorWorker};
+    let (selector, driver) = pair(1);
+    let mut worker = driver.enter();
+    let waker = worker.waker();
+    waker.wake_by_ref();
+    std::thread::spawn(move || waker.wake()).join().unwrap();
+    {
+        let _failures = Failures::new([("wait", io::ErrorKind::Interrupted.into())]);
+        assert!(!worker.turn(None).unwrap());
+        assert_eq!(FAILURES.with(|failures| failures.borrow().len()), 1);
+        // A completed eventfd polling request may need one further CQ turn before the wait.
+        for _ in 0..4 {
+            assert!(!worker.turn(Some(Duration::from_millis(1))).unwrap());
+            if FAILURES.with(|failures| failures.borrow().is_empty()) {
+                break;
+            }
+        }
+        assert!(FAILURES.with(|failures| failures.borrow().is_empty()));
+    }
+    selector.close();
+    while !worker.turn(Some(Duration::from_millis(10))).unwrap() {}
+    block_on(selector.shutdown());
+}
+
+#[test]
+fn local_notifications_match_the_ring_controller_including_nested_workers() {
+    use core_scheduler_selector::{SelectorDriver, SelectorWorker};
+    let (selector, drivers) = IoUringSelector::with_workers(IoUringOptions::default(), 2).unwrap();
+    let mut workers: Vec<_> = drivers.into_iter().map(SelectorDriver::enter).collect();
+    for target in [0, 1] {
+        workers[target].waker().wake_by_ref();
+        let _failures = Failures::new([("wait", io::ErrorKind::Interrupted.into())]);
+        assert!(
+            !workers[1 - target]
+                .turn(Some(Duration::from_millis(1)))
+                .unwrap()
+        );
+        assert!(FAILURES.with(|failures| failures.borrow().is_empty()));
+        let _target_failure = Failures::new([("wait", io::ErrorKind::Interrupted.into())]);
+        assert!(!workers[target].turn(None).unwrap());
+        assert_eq!(FAILURES.with(|failures| failures.borrow().len()), 1);
+    }
+    selector.close();
+    for worker in &mut workers {
+        while !worker.turn(Some(Duration::from_millis(10))).unwrap() {}
+    }
+    block_on(selector.shutdown());
+}
+
+#[test]
+fn remote_wakes_interrupt_entered_workers_during_idle_preparation() {
+    use core_scheduler_selector::{SelectorDriver, SelectorWorker};
+    for name in ["notification-read", "wait"] {
+        let (selector, driver) = pair(1);
+        let mut worker = driver.enter();
+        {
+            let _failures = Failures;
+            let waker = worker.waker();
+            BEFORE_SYSCALL.with(|hook| {
+                *hook.borrow_mut() = Some((
+                    name,
+                    Box::new(move || {
+                        std::thread::spawn(move || waker.wake()).join().unwrap();
+                    }),
+                ));
+            });
+            assert!(!worker.turn(Some(Duration::from_secs(1))).unwrap());
+            assert!(BEFORE_SYSCALL.with(|hook| hook.borrow().is_none()));
+            // The eventfd polling completion and counter both retire without losing a wake or leaving the next wait permanently ready.
+            let _wait_failure = Failures::new([("wait", io::ErrorKind::Interrupted.into())]);
+            for _ in 0..4 {
+                assert!(!worker.turn(Some(Duration::from_millis(1))).unwrap());
+                if FAILURES.with(|failures| failures.borrow().is_empty()) {
+                    break;
+                }
+            }
+            assert!(FAILURES.with(|failures| failures.borrow().is_empty()));
+        }
+        selector.close();
+        while !worker.turn(Some(Duration::from_millis(10))).unwrap() {}
+        block_on(selector.shutdown());
+    }
+}
+
+#[test]
+fn idle_ring_waits_honor_finite_timeouts_and_rearm_after_notifications() {
+    let (selector, mut driver) = pair(1);
+    // No request or notification is ready: the kernel times out the direct ring wait.
+    let timeout = Duration::from_millis(2);
+    let started = Instant::now();
+    assert!(!driver.turn(Some(timeout)).unwrap());
+    assert!(started.elapsed() >= timeout);
+    assert!(driver.reactor.as_ref().unwrap().notification_armed);
+    for _ in 0..3 {
+        // A wake immediately before entering the kernel must interrupt an unlimited wait.
+        {
+            let _hooks = Failures;
+            let waker = driver.waker();
+            BEFORE_SYSCALL.with(|hook| {
+                *hook.borrow_mut() = Some((
+                    "wait",
+                    Box::new(move || {
+                        std::thread::spawn(move || waker.wake()).join().unwrap();
+                    }),
+                ));
+            });
+            assert!(!driver.turn(None).unwrap());
+            assert!(BEFORE_SYSCALL.with(|hook| hook.borrow().is_none()));
+        }
+        // Collect and rearm PollAdd, then drain the eventfd counter.
+        assert!(!driver.turn(Some(Duration::ZERO)).unwrap());
+        let _failure = Failures::new([("wait", io::ErrorKind::Interrupted.into())]);
+        for _ in 0..4 {
+            assert!(!driver.turn(Some(timeout)).unwrap());
+            if FAILURES.with(|failures| failures.borrow().is_empty()) {
+                break;
+            }
+        }
+        assert!(FAILURES.with(|failures| failures.borrow().is_empty()));
+        assert!(driver.reactor.as_ref().unwrap().notification_armed);
+    }
+    // Exercise the signed-kernel-ABI clamp without waiting for that duration.
+    {
+        let _hooks = Failures;
+        let waker = driver.waker();
+        BEFORE_SYSCALL.with(|hook| {
+            *hook.borrow_mut() = Some((
+                "wait",
+                Box::new(move || {
+                    std::thread::spawn(move || waker.wake()).join().unwrap();
+                }),
+            ));
+        });
+        assert!(!driver.turn(Some(Duration::MAX)).unwrap());
+        assert!(BEFORE_SYSCALL.with(|hook| hook.borrow().is_none()));
+    }
+    drain(&selector, &mut driver);
+}
+
+#[test]
+fn remote_notification_retires_before_waiting_with_a_socket_read_pending() {
+    let (selector, mut driver) = pair(1);
+    let (sender, receiver) = block_on(core_scheduler_conformance::socket::stream_pair(
+        &selector,
+        SocketDomain::Ipv4,
+    ));
+    let never = Cancellation::never();
+    let mut receiving = Box::pin(selector.socket_wait(&receiver, Interest::Readable, &never));
+    assert!(block_on(poll_once(&mut receiving)).is_none());
+    let waker = driver.waker();
+    std::thread::spawn(move || waker.wake()).join().unwrap();
+    {
+        let _failures = Failures::new([("wait", io::ErrorKind::Interrupted.into())]);
+        // The pending socket never becomes readable. An interrupt CQE must consume its eventfd value before rearming, otherwise every turn creates another immediately-ready interrupt CQE.
+        for _ in 0..16 {
+            assert!(!driver.turn(Some(Duration::from_millis(1))).unwrap());
+            if FAILURES.with(|failures| failures.borrow().is_empty()) {
+                break;
+            }
+        }
+        assert!(
+            FAILURES.with(|failures| failures.borrow().is_empty()),
+            "remote notification kept the driver runnable indefinitely"
+        );
+        assert_eq!(driver.reactor.as_ref().unwrap().in_flight.0.len(), 1);
+        assert!(block_on(poll_once(&mut receiving)).is_none());
+    }
+    drop(receiving);
+    drain(&selector, &mut driver);
+    drop(sender);
+    drop(receiver);
+}
+
+#[test]
+fn failed_notification_completion_still_retires_original_completions_in_the_batch() {
+    for notification_first in [false, true] {
+        let (selector, mut driver) = pair(1);
+        let (_directory, file) = file(&selector);
+        let never = Cancellation::never();
+        let mut operation = Box::pin(selector.file_read_at(&file, vec![0; 6], 0, &never));
+        assert!(block_on(poll_once(&mut operation)).is_none());
+        let reactor = driver.reactor.as_mut().unwrap();
+        let mut request = match reactor.incoming.try_recv().unwrap() {
+            Command::Submit(request) => request,
+            _ => panic!("expected queued read"),
+        };
+        let entry = request.entry();
+        reactor.in_flight.0.insert(request.identifier(), request);
+        // A real invalid PollAdd yields an error CQE. Place it on either side of an original completion to verify that neither CQ ordering strands the owned request.
+        let notification = opcode::PollAdd::new(types::Fd(-1), libc::POLLIN as u32)
+            .build()
+            .user_data(NOTIFICATION_TAG);
+        let entries = if notification_first {
+            [notification, entry]
+        } else {
+            [entry, notification]
+        };
+        for entry in entries {
+            // SAFETY: InFlight retains the original request and its storage. The invalid descriptor references no userspace memory.
+            unsafe { reactor.ring.submission().push(&entry) }.unwrap();
+        }
+        reactor.ring.submit_and_wait(2).unwrap();
+        assert_eq!(
+            driver
+                .turn(Some(Duration::ZERO))
+                .unwrap_err()
+                .raw_os_error(),
+            Some(libc::EBADF)
+        );
+        let (result, buffer) = block_on(operation);
+        assert_eq!(result.unwrap(), 6);
+        assert_eq!(buffer, b"abcdef");
+        assert_eq!(active(&selector.controllers[0]), 0);
+        assert!(driver.turn(None).unwrap());
+        block_on(selector.shutdown());
+    }
+}
+
+#[test]
+fn full_eventfd_preserves_existing_notifications_without_failing_the_waker() {
+    let (selector, mut driver) = pair(1);
+    let value = u64::MAX - 1;
+    // SAFETY: the controller owns the eventfd and value supplies its required eight-byte input.
+    assert_eq!(
+        unsafe {
+            libc::write(
+                selector.controllers[0].notification.as_raw_fd(),
+                (&value as *const u64).cast(),
+                8,
+            )
+        },
+        8
+    );
+    // Adding one would exceed the eventfd counter's limit; the existing counter already wakes the worker.
+    driver.waker().wake_by_ref();
+    assert!(!driver.turn(Some(Duration::ZERO)).unwrap());
+    driver
+        .reactor
+        .as_mut()
+        .unwrap()
+        .ring
+        .submit_and_wait(1)
+        .unwrap();
+    assert!(!driver.turn(Some(Duration::ZERO)).unwrap());
+    assert!(!driver.turn(Some(Duration::from_millis(1))).unwrap());
+    drain(&selector, &mut driver);
+}
+
+#[test]
+fn notification_completion_read_failure_stops_the_driver() {
+    let (selector, mut driver) = pair(1);
+    driver.waker().wake_by_ref();
+    assert!(!driver.turn(Some(Duration::ZERO)).unwrap());
+    driver
+        .reactor
+        .as_mut()
+        .unwrap()
+        .ring
+        .submit_and_wait(1)
+        .unwrap();
+    {
+        let _failure =
+            Failures::new([("notification-read", io::ErrorKind::PermissionDenied.into())]);
+        assert_eq!(
+            driver.turn(Some(Duration::ZERO)).unwrap_err().kind(),
+            io::ErrorKind::PermissionDenied
+        );
+        assert!(FAILURES.with(|failures| failures.borrow().is_empty()));
+    }
+    assert!(driver.turn(None).unwrap());
+    block_on(selector.shutdown());
+}
+
+#[test]
+fn full_submission_queue_defers_waiting_until_the_notification_can_be_armed() {
+    let (selector, mut driver) = IoUringSelector::new(IoUringOptions {
+        entries: 1,
+        ..Default::default()
+    })
+    .unwrap();
+    // Keep one entry waiting for submission, as after a transient submission failure. Its cancellation tag requires no owned request.
+    let entry = opcode::Nop::new().build().user_data(CANCEL_TAG);
+    // SAFETY: Nop references no storage or descriptor.
+    unsafe {
+        driver
+            .reactor
+            .as_mut()
+            .unwrap()
+            .ring
+            .submission()
+            .push(&entry)
+    }
+    .unwrap();
+    {
+        let _failure = Failures::new([("wait", io::ErrorKind::PermissionDenied.into())]);
+        assert!(!driver.turn(None).unwrap());
+        assert!(!driver.reactor.as_ref().unwrap().notification_armed);
+        assert_eq!(FAILURES.with(|failures| failures.borrow().len()), 1);
+    }
+    drain(&selector, &mut driver);
+}
+
+#[test]
+fn eventfd_creation_reports_descriptor_exhaustion() {
+    const CHILD: &str = "CORE_SCHEDULER_EVENTFD_EXHAUSTION_CHILD";
+    if std::env::var_os(CHILD).is_some() {
+        let _hooks = Failures;
+        let mut previous: libc::rlimit = unsafe { std::mem::zeroed() };
+        // SAFETY: the pointer supplies a valid rlimit output. This fixture runs in a separate process so other tests retain their descriptor limits.
+        assert_eq!(
+            unsafe { libc::getrlimit(libc::RLIMIT_NOFILE, &mut previous) },
+            0
+        );
+        BEFORE_SYSCALL.with(|hook| {
+            *hook.borrow_mut() = Some((
+                "notification-pair",
+                Box::new(move || {
+                    let limit = libc::rlimit {
+                        rlim_cur: 0,
+                        rlim_max: previous.rlim_max,
+                    };
+                    // SAFETY: the pointer supplies a valid resource limit; only this child process's soft limit changes.
+                    assert_eq!(unsafe { libc::setrlimit(libc::RLIMIT_NOFILE, &limit) }, 0);
+                }),
+            ));
+        });
+        let error = IoUringSelector::new(IoUringOptions::default())
+            .err()
+            .unwrap();
+        // SAFETY: restore the original valid limit before finishing the fixture.
+        assert_eq!(
+            unsafe { libc::setrlimit(libc::RLIMIT_NOFILE, &previous) },
+            0
+        );
+        assert_eq!(error.raw_os_error(), Some(libc::EMFILE));
+        return;
+    }
+    let output = std::process::Command::new(std::env::current_exe().unwrap())
+        .args([
+            "--exact",
+            "io_uring_selector::tests::eventfd_creation_reports_descriptor_exhaustion",
+            "--nocapture",
+        ])
+        .env(CHILD, "1")
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "child failed: {}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn one_entry_ring_submits_payload_and_cancellation_before_notification() {
+    let (selector, mut driver) = IoUringSelector::new(IoUringOptions {
+        entries: 1,
+        capacity: 1,
+        ..Default::default()
+    })
+    .unwrap();
+    let (_directory, file) = fifo(&selector);
+    let token = Cancellation::new();
+    let mut operation = Box::pin(selector.file_read(&file, vec![0], &token));
+    assert!(block_on(poll_once(&mut operation)).is_none());
+    assert!(!driver.turn(Some(Duration::ZERO)).unwrap());
+    {
+        let reactor = driver.reactor.as_ref().unwrap();
+        assert_eq!(
+            reactor.in_flight.0.len(),
+            1,
+            "payload must own the sole SQ slot on its first turn"
+        );
+        assert!(reactor.pending.is_empty());
+        assert!(!reactor.notification_armed);
+    }
+    token.cancel();
+    assert!(block_on(poll_once(&mut operation)).is_none());
+    assert!(!driver.turn(Some(Duration::ZERO)).unwrap());
+    {
+        let reactor = driver.reactor.as_ref().unwrap();
+        assert!(
+            reactor.cancellations.is_empty(),
+            "cancellation must own the next available SQ slot"
+        );
+        assert!(!reactor.notification_armed);
+    }
+    let (result, buffer) = drive(&mut driver, operation);
+    assert_eq!(result.unwrap_err().kind(), io::ErrorKind::Interrupted);
+    assert_eq!(buffer, [0]);
+    drain(&selector, &mut driver);
+}
+
+#[test]
+fn repeated_external_notifications_cannot_starve_a_one_entry_ring_payload() {
+    let (selector, mut driver) = IoUringSelector::new(IoUringOptions {
+        entries: 1,
+        capacity: 1,
+        ..Default::default()
+    })
+    .unwrap();
+    let (_directory, file) = file(&selector);
+    let never = Cancellation::never();
+    let mut operation = Box::pin(selector.file_read_at(&file, vec![0; 6], 0, &never));
+    assert!(block_on(poll_once(&mut operation)).is_none());
+    assert!(!driver.turn(Some(Duration::ZERO)).unwrap());
+    let (wake, requests) = mpsc::channel();
+    let (completed, acknowledgements) = mpsc::channel();
+    let waker = driver.waker();
+    let result = std::thread::scope(|scope| {
+        let external = scope.spawn(move || {
+            while requests.recv().is_ok() {
+                waker.wake_by_ref();
+                completed.send(()).unwrap();
+            }
+        });
+        let deadline = Instant::now() + Duration::from_secs(2);
+        let mut result = None;
+        for _ in 0..64 {
+            wake.send(()).unwrap();
+            acknowledgements.recv().unwrap();
+            // Make each preceding polling request observably ready before the next turn. With notification-first insertion this repeats the interrupt CQ indefinitely while the payload remains pending.
+            driver
+                .reactor
+                .as_mut()
+                .unwrap()
+                .ring
+                .submit_and_wait(1)
+                .unwrap();
+            assert!(!driver.turn(Some(Duration::ZERO)).unwrap());
+            result = block_on(poll_once(&mut operation));
+            if result.is_some() || Instant::now() >= deadline {
+                break;
+            }
+        }
+        drop(wake);
+        external.join().unwrap();
+        result.expect("external notifications starved the payload past its completion deadline")
+    });
+    assert_eq!(result.0.unwrap(), 6);
+    assert_eq!(result.1, b"abcdef");
+    drain(&selector, &mut driver);
+}
+
+#[test]
+fn deferred_cancellations_prevent_waiting_while_originals_fill_the_submission_queue() {
+    for error in [
+        io::ErrorKind::Interrupted.into(),
+        io::Error::from_raw_os_error(libc::EBUSY),
+    ] {
+        let (selector, mut driver) = IoUringSelector::new(IoUringOptions {
+            entries: 1,
+            ..Default::default()
+        })
+        .unwrap();
+        let (_directory, file) = fifo(&selector);
+        let never = Cancellation::never();
+        let mut operation = Box::pin(selector.file_read(&file, vec![7], &never));
+        assert!(block_on(poll_once(&mut operation)).is_none());
+        let request = match driver
+            .reactor
+            .as_ref()
+            .unwrap()
+            .incoming
+            .try_recv()
+            .unwrap()
+        {
+            Command::Submit(request) => request,
+            _ => panic!("expected queued read"),
+        };
+        // Stage an idle armed notification before inserting the original. Removing this initial remote wake keeps a notification CQ from masking the deferred-cancellation wait decision.
+        assert!(
+            driver
+                .reactor
+                .as_ref()
+                .unwrap()
+                .drain_notification()
+                .unwrap()
+        );
+        assert!(!driver.turn(Some(Duration::from_millis(1))).unwrap());
+        assert!(driver.reactor.as_ref().unwrap().notification_armed);
+        let identifier = request.identifier();
+        driver.reactor.as_mut().unwrap().pending.push_back(request);
+        {
+            let _failures = Failures::new([
+                ("submit", error),
+                ("wait", io::ErrorKind::PermissionDenied.into()),
+            ]);
+            assert!(!driver.turn(Some(Duration::ZERO)).unwrap());
+            assert!(driver.reactor.as_mut().unwrap().ring.submission().is_full());
+            assert!(driver.reactor.as_mut().unwrap().cancel(identifier));
+            assert_eq!(driver.reactor.as_ref().unwrap().cancellations.len(), 1);
+            // The sole SQ entry is still the original read, which cannot complete without a writer. Submit it and return so a later turn can publish its cancellation; blocking here would strand the cancellation indefinitely.
+            assert!(!driver.turn(Some(Duration::from_millis(1))).unwrap());
+            assert_eq!(
+                FAILURES.with(|failures| failures.borrow().len()),
+                1,
+                "deferred cancellation must prevent the wait syscall"
+            );
+            assert!(
+                driver
+                    .reactor
+                    .as_mut()
+                    .unwrap()
+                    .ring
+                    .submission()
+                    .is_empty()
+            );
+        }
+        let (result, buffer) = drive(&mut driver, operation);
+        assert_eq!(result.unwrap_err().raw_os_error(), Some(libc::ECANCELED));
+        assert_eq!(buffer, [7]);
+        drain(&selector, &mut driver);
+    }
 }
