@@ -180,14 +180,10 @@ impl TokioSocket {
         #[cfg(unix)]
         let ready_first =
             read_nonempty && known_connected && self.inner.registration.get().is_some();
-        #[cfg(windows)]
-        let ready_first = false;
-        #[cfg(windows)]
-        let _ = read_nonempty;
         // Only nonempty reads on a stream that already completed a read may skip the speculative syscall. Lifecycle operations, unknown socket states, and empty reads retain immediate OS results.
+        #[cfg(unix)]
         if !ready_first {
             let result = operation(self.get_ref());
-            #[cfg(unix)]
             if mark_connected && result.is_ok() {
                 self.inner.connected_stream.store(true, Ordering::Relaxed);
             }
@@ -248,6 +244,11 @@ impl TokioSocket {
 
         #[cfg(windows)]
         {
+            let _ = read_nonempty;
+            let result = operation(self.get_ref());
+            if !matches!(&result, Err(error) if error.kind() == io::ErrorKind::WouldBlock) {
+                return result;
+            }
             match interest {
                 Interest::Readable => self.inner.read_with(|socket| operation(socket)).await,
                 Interest::Writable => self.inner.write_with(|socket| operation(socket)).await,
