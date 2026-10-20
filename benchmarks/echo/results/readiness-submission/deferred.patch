@@ -1,0 +1,289 @@
+diff --git a/crates/iouring/src/io_uring_selector.rs b/crates/iouring/src/io_uring_selector.rs
+index 9898ef1..2f7c11c 100644
+--- a/crates/iouring/src/io_uring_selector.rs
++++ b/crates/iouring/src/io_uring_selector.rs
+@@ -183,6 +183,11 @@ impl<B: IoBuf> Drop for Request<B> {
+ pub(crate) trait PendingRequest: Send {
+     fn identifier(&self) -> u64;
+     fn entry(&mut self) -> squeue::Entry;
++    // Buffer accessors may run arbitrary user code, including waking tasks. Such
++    // requests must return to the executor after preparation instead of waiting.
++    fn entry_may_wake(&self) -> bool {
++        true
++    }
+     fn finish(self: Box<Self>, result: io::Result<usize>);
+     fn cancelling(&self) -> bool;
+     fn set_cancelling(&self);
+@@ -916,7 +921,9 @@ impl Reactor {
+                 command_batch_full = false;
+                 break;
+             };
+-            progressed = true;
++            // Accepted submissions alone do not wake tasks. Entry preparation
++            // below retains the yield for requests which invoke user callbacks.
++            progressed |= !matches!(&command, Command::Submit(_) if !self.closing);
+             match command {
+                 Command::Submit(request) if !self.closing => self.pending.push_back(request),
+                 Command::Submit(request) => request.finish(Err(io::ErrorKind::Interrupted.into())),
+@@ -985,8 +992,11 @@ impl Reactor {
+             self.drain_notification()?;
+         }
+ 
++        let defer_submission;
+         {
+             let mut submissions = self.ring.submission();
++            let had_submissions = !submissions.is_empty();
++            let mut prepared = false;
+             while let Some(&identifier) = self.cancellations.front() {
+                 let entry = opcode::AsyncCancel::new(identifier)
+                     .build()
+@@ -1005,6 +1015,8 @@ impl Reactor {
+                 let identifier = request.identifier();
+                 let request = self.in_flight.0.entry(identifier).or_insert(request);
+                 let entry = request.entry();
++                progressed |= request.entry_may_wake();
++                prepared = true;
+                 // SAFETY: InFlight owns the buffer allocation and descriptor
+                 // before publication. Neither is released or accessed until
+                 // the original CQE, even when cancellation completes first.
+@@ -1025,6 +1037,13 @@ impl Reactor {
+                     .expect("submission capacity was checked and the local queue has not changed");
+                 self.notification_armed = true;
+             }
++            // A readiness-only batch can join the next idle wait. Existing SQ
++            // entries must be submitted on this turn, even if tasks stay busy.
++            defer_submission = prepared
++                && !progressed
++                && !command_batch_full
++                && !had_submissions
++                && timeout == Some(Duration::ZERO);
+         }
+ 
+         if self.closing
+@@ -1038,6 +1057,7 @@ impl Reactor {
+         // Publish queued work before returning to the executor; skip empty enters unless CQ overflow or deferred task work requires kernel progress. At a genuine idle wait, the wait enter also publishes the SQ.
+         // Short-circuiting preserves the local permit through productive turns. At the actual wait decision, consume it; the armed poll retains remote notifications until their CQE drains the counter.
+         let return_to_executor = progressed
++            || command_batch_full
+             || timeout == Some(Duration::ZERO)
+             || !self.pending.is_empty()
+             || !self.cancellations.is_empty()
+@@ -1046,7 +1066,9 @@ impl Reactor {
+         if return_to_executor {
+             let needs_submit = {
+                 let submissions = self.ring.submission();
+-                !submissions.is_empty() || submissions.cq_overflow() || submissions.taskrun()
++                (!submissions.is_empty() && !defer_submission)
++                    || submissions.cq_overflow()
++                    || submissions.taskrun()
+             };
+             if needs_submit {
+                 match syscall("submit", || self.ring.submit()) {
+diff --git a/crates/iouring/src/io_uring_selector/readiness.rs b/crates/iouring/src/io_uring_selector/readiness.rs
+index 59edcd3..6793eca 100644
+--- a/crates/iouring/src/io_uring_selector/readiness.rs
++++ b/crates/iouring/src/io_uring_selector/readiness.rs
+@@ -31,6 +31,11 @@ impl PendingRequest for ReadinessRequest {
+             .user_data(self.identifier)
+     }
+ 
++    fn entry_may_wake(&self) -> bool {
++        // Only fixed native socket metadata is accessed; no buffer callbacks.
++        false
++    }
++
+     fn finish(self: Box<Self>, result: io::Result<usize>) {
+         let reply = self
+             .reply
+diff --git a/crates/iouring/src/io_uring_selector/tests.rs b/crates/iouring/src/io_uring_selector/tests.rs
+index 80799f8..f1c87d9 100644
+--- a/crates/iouring/src/io_uring_selector/tests.rs
++++ b/crates/iouring/src/io_uring_selector/tests.rs
+@@ -1331,6 +1331,187 @@ fn owner_wakes_coalesce_without_writes_and_survive_productive_turns() {
+     block_on(selector.shutdown());
+ }
+ 
++#[test]
++fn local_readiness_submission_can_submit_and_wait_in_one_turn() {
++    use core_scheduler_selector::{SelectorDriver, SelectorWorker};
++    let _hooks = Failures;
++    let (selector, driver) = pair(1);
++    let (sender, receiver) = block_on(core_scheduler_conformance::socket::stream_pair(
++        &selector,
++        SocketDomain::Ipv4,
++    ));
++    let mut worker = driver.enter();
++    assert!(!worker.turn(Some(Duration::ZERO)).unwrap());
++    let never = Cancellation::never();
++    let mut waiting = Box::pin(selector.socket_wait(&receiver, Interest::Readable, &never));
++    assert!(block_on(poll_once(&mut waiting)).is_none());
++    BEFORE_SYSCALL.with(|hook| {
++        *hook.borrow_mut() = Some((
++            "wait",
++            Box::new(move || {
++                assert_eq!(
++                    sender.try_send(b"x", SocketSendFlags::default()).unwrap(),
++                    1
++                );
++            }),
++        ));
++    });
++    // No callback or completion has made a task runnable. This turn publishes
++    // the queued PollAdd through the wait itself, without a submit-only enter.
++    assert!(!worker.turn(None).unwrap());
++    assert!(BEFORE_SYSCALL.with(|hook| hook.borrow().is_none()));
++    let deadline = Instant::now() + Duration::from_secs(10);
++    loop {
++        worker.turn(Some(Duration::ZERO)).unwrap();
++        if let Some(result) = block_on(poll_once(&mut waiting)) {
++            result.unwrap();
++            break;
++        }
++        assert!(Instant::now() < deadline);
++    }
++    selector.close();
++    while !worker.turn(Some(Duration::from_millis(10))).unwrap() {}
++    block_on(selector.shutdown());
++}
++
++#[test]
++fn a_full_local_readiness_batch_returns_before_waiting() {
++    use core_scheduler_selector::{SelectorDriver, SelectorWorker};
++    let (selector, driver) = IoUringSelector::new(IoUringOptions {
++        entries: 512,
++        capacity: 300,
++        ..Default::default()
++    })
++    .unwrap();
++    let (_sender, receiver) = block_on(core_scheduler_conformance::socket::stream_pair(
++        &selector,
++        SocketDomain::Ipv4,
++    ));
++    let mut worker = driver.enter();
++    worker.turn(Some(Duration::ZERO)).unwrap();
++    let never = Cancellation::never();
++    let mut waiting = Vec::new();
++    for _ in 0..300 {
++        let mut operation = Box::pin(selector.socket_wait(&receiver, Interest::Readable, &never));
++        assert!(block_on(poll_once(&mut operation)).is_none());
++        waiting.push(operation);
++    }
++    {
++        let _failure = Failures::new([("wait", io::ErrorKind::Interrupted.into())]);
++        // The first 256 commands fit in the SQ, but 44 local commands remain.
++        // Local submissions have no interrupt, so a full batch must not sleep.
++        worker.turn(None).unwrap();
++        assert_eq!(FAILURES.with(|failures| failures.borrow().len()), 1);
++    }
++    selector.close();
++    let deadline = Instant::now() + Duration::from_secs(10);
++    while !worker.turn(Some(Duration::from_millis(10))).unwrap() {
++        assert!(Instant::now() < deadline);
++    }
++    for operation in waiting {
++        assert!(block_on(operation).is_err());
++    }
++    block_on(selector.shutdown());
++}
++
++#[test]
++fn readiness_submission_is_deferred_for_at_most_one_nonblocking_turn() {
++    use core_scheduler_selector::{SelectorDriver, SelectorWorker};
++    let (selector, driver) = pair(1);
++    let (_sender, receiver) = block_on(core_scheduler_conformance::socket::stream_pair(
++        &selector,
++        SocketDomain::Ipv4,
++    ));
++    let mut worker = driver.enter();
++    worker.turn(Some(Duration::ZERO)).unwrap();
++    let never = Cancellation::never();
++    let mut waiting = Box::pin(selector.socket_wait(&receiver, Interest::Readable, &never));
++    assert!(block_on(poll_once(&mut waiting)).is_none());
++    {
++        let _failure = Failures::new([("submit", io::ErrorKind::Interrupted.into())]);
++        worker.turn(Some(Duration::ZERO)).unwrap();
++        assert_eq!(FAILURES.with(|failures| failures.borrow().len()), 1);
++        // Busy workers still publish readiness on their next nonblocking turn.
++        worker.turn(Some(Duration::ZERO)).unwrap();
++        assert!(FAILURES.with(|failures| failures.borrow().is_empty()));
++    }
++    selector.close();
++    let deadline = Instant::now() + Duration::from_secs(10);
++    while !worker.turn(Some(Duration::from_millis(10))).unwrap() {
++        assert!(Instant::now() < deadline);
++    }
++    assert!(block_on(waiting).is_err());
++    block_on(selector.shutdown());
++}
++
++struct WakeOnBufferAccess {
++    bytes: Vec<u8>,
++    wake: std::task::Waker,
++}
++impl AsRef<[u8]> for WakeOnBufferAccess {
++    fn as_ref(&self) -> &[u8] {
++        self.wake.wake_by_ref();
++        &self.bytes
++    }
++}
++impl AsMut<[u8]> for WakeOnBufferAccess {
++    fn as_mut(&mut self) -> &mut [u8] {
++        self.wake.wake_by_ref();
++        &mut self.bytes
++    }
++}
++// SAFETY: The buffer exclusively owns one stable initialized Vec allocation.
++unsafe impl IoBuf for WakeOnBufferAccess {}
++// SAFETY: Mutable access cannot change the allocation or initialized range.
++unsafe impl IoBufMut for WakeOnBufferAccess {}
++
++#[test]
++fn preparing_user_buffers_returns_to_the_executor_before_waiting() {
++    use core_scheduler_selector::{SelectorDriver, SelectorWorker};
++    struct CountWake(AtomicUsize);
++    impl std::task::Wake for CountWake {
++        fn wake(self: Arc<Self>) {
++            self.0.fetch_add(1, Ordering::SeqCst);
++        }
++        fn wake_by_ref(self: &Arc<Self>) {
++            self.0.fetch_add(1, Ordering::SeqCst);
++        }
++    }
++    let (selector, driver) = pair(1);
++    let (_directory, file) = file(&selector);
++    let mut worker = driver.enter();
++    worker.turn(Some(Duration::ZERO)).unwrap();
++    let wakes = Arc::new(CountWake(AtomicUsize::new(0)));
++    let buffer = WakeOnBufferAccess {
++        bytes: vec![0; 6],
++        wake: std::task::Waker::from(Arc::clone(&wakes)),
++    };
++    let never = Cancellation::never();
++    let mut reading = Box::pin(selector.file_read_at(&file, buffer, 0, &never));
++    assert!(block_on(poll_once(&mut reading)).is_none());
++    {
++        let _failure = Failures::new([("wait", io::ErrorKind::Interrupted.into())]);
++        // This arbitrary waker need not be the driver's own interrupt. Preparing
++        // a payload must give the executor another turn before it can sleep.
++        worker.turn(None).unwrap();
++        assert_eq!(wakes.0.load(Ordering::SeqCst), 2);
++        assert_eq!(FAILURES.with(|failures| failures.borrow().len()), 1);
++    }
++    let deadline = Instant::now() + Duration::from_secs(10);
++    let (result, buffer) = loop {
++        if let Some(result) = block_on(poll_once(&mut reading)) {
++            break result;
++        }
++        worker.turn(Some(Duration::ZERO)).unwrap();
++        assert!(Instant::now() < deadline);
++    };
++    assert_eq!(result.unwrap(), 6);
++    assert_eq!(buffer.bytes, b"abcdef");
++    selector.close();
++    while !worker.turn(Some(Duration::from_millis(10))).unwrap() {}
++    block_on(selector.shutdown());
++}
++
+ #[test]
+ fn idle_turn_consumes_local_and_remote_notifications_together() {
+     use core_scheduler_selector::{SelectorDriver, SelectorWorker};

@@ -183,6 +183,10 @@ impl<B: IoBuf> Drop for Request<B> {
 pub(crate) trait PendingRequest: Send {
     fn identifier(&self) -> u64;
     fn entry(&mut self) -> squeue::Entry;
+    // Buffer accessors may run arbitrary user code, including waking tasks. Such requests must return to the executor after preparation instead of waiting.
+    fn entry_may_wake(&self) -> bool {
+        true
+    }
     fn finish(self: Box<Self>, result: io::Result<usize>);
     fn cancelling(&self) -> bool;
     fn set_cancelling(&self);
@@ -869,6 +873,46 @@ impl Reactor {
         Ok(())
     }
 
+    fn collect_completions(&mut self) -> io::Result<bool> {
+        let mut completed = false;
+        // The CQ iterator snapshots the available batch. Finish publishing every completion in that batch before returning to the executor; application futures are polled only from its ready queue.
+        let mut notification_result = None;
+        for completion in self.ring.completion() {
+            completed = true;
+            let identifier = completion.user_data();
+            if identifier == NOTIFICATION_TAG {
+                self.notification_armed = false;
+                notification_result = Some(completion.result());
+                continue;
+            }
+            if identifier & CANCEL_TAG != 0 {
+                continue;
+            }
+            // Every untagged CQE is the single original completion of a published request. Only this path removes it from InFlight.
+            let request = self
+                .in_flight
+                .0
+                .remove(&identifier)
+                .expect("original completion retains its in-flight request");
+            let result = completion.result();
+            request.finish(if result < 0 {
+                Err(io::Error::from_raw_os_error(-result))
+            } else {
+                Ok(result as usize)
+            });
+        }
+
+        if let Some(result) = notification_result {
+            if result < 0 {
+                return Err(io::Error::from_raw_os_error(-result));
+            }
+            // Drain before rearming; otherwise the readable counter immediately completes each replacement poll.
+            self.drain_notification()?;
+        }
+
+        Ok(completed)
+    }
+
     fn cancel(&mut self, identifier: u64) -> bool {
         if let Some(position) = self
             .pending
@@ -916,7 +960,8 @@ impl Reactor {
                 command_batch_full = false;
                 break;
             };
-            progressed = true;
+            // Accepted submissions alone do not wake tasks. Entry preparation below retains the yield for requests which invoke user callbacks.
+            progressed |= !matches!(&command, Command::Submit(_) if !self.closing);
             match command {
                 Command::Submit(request) if !self.closing => self.pending.push_back(request),
                 Command::Submit(request) => request.finish(Err(io::ErrorKind::Interrupted.into())),
@@ -949,44 +994,13 @@ impl Reactor {
             }
         }
 
-        // The CQ iterator snapshots the available batch. Finish publishing every completion in that batch before returning to the executor; application futures are polled only from its ready queue.
-        let mut notification_result = None;
-        for completion in self.ring.completion() {
-            progressed = true;
-            let identifier = completion.user_data();
-            if identifier == NOTIFICATION_TAG {
-                self.notification_armed = false;
-                notification_result = Some(completion.result());
-                continue;
-            }
-            if identifier & CANCEL_TAG != 0 {
-                continue;
-            }
-            // Every untagged CQE is the single original completion of a
-            // published request. Only this path removes it from InFlight.
-            let request = self
-                .in_flight
-                .0
-                .remove(&identifier)
-                .expect("original completion retains its in-flight request");
-            let result = completion.result();
-            request.finish(if result < 0 {
-                Err(io::Error::from_raw_os_error(-result))
-            } else {
-                Ok(result as usize)
-            });
-        }
+        progressed |= self.collect_completions()?;
 
-        if let Some(result) = notification_result {
-            if result < 0 {
-                return Err(io::Error::from_raw_os_error(-result));
-            }
-            // Drain before rearming; otherwise the readable counter immediately completes each replacement poll.
-            self.drain_notification()?;
-        }
-
+        let defer_submission;
         {
             let mut submissions = self.ring.submission();
+            let had_submissions = !submissions.is_empty();
+            let mut prepared = false;
             while let Some(&identifier) = self.cancellations.front() {
                 let entry = opcode::AsyncCancel::new(identifier)
                     .build()
@@ -1005,6 +1019,8 @@ impl Reactor {
                 let identifier = request.identifier();
                 let request = self.in_flight.0.entry(identifier).or_insert(request);
                 let entry = request.entry();
+                progressed |= request.entry_may_wake();
+                prepared = true;
                 // SAFETY: InFlight owns the buffer allocation and descriptor
                 // before publication. Neither is released or accessed until
                 // the original CQE, even when cancellation completes first.
@@ -1025,6 +1041,12 @@ impl Reactor {
                     .expect("submission capacity was checked and the local queue has not changed");
                 self.notification_armed = true;
             }
+            // A readiness-only batch can join the next idle wait. Existing SQ entries must be submitted on this turn, even if tasks stay busy.
+            defer_submission = prepared
+                && !progressed
+                && !command_batch_full
+                && !had_submissions
+                && timeout == Some(Duration::ZERO);
         }
 
         if self.closing
@@ -1035,9 +1057,10 @@ impl Reactor {
             return Ok(true);
         }
 
-        // Publish queued work before returning to the executor; skip empty enters unless CQ overflow or deferred task work requires kernel progress. At a genuine idle wait, the wait enter also publishes the SQ.
+        // Nonblocking turns may stage one readiness-only batch for the next turn. An idle wait submits it and waits in one entry; a busy worker submits it on its next nonblocking turn. Overflow and task work always enter.
         // Short-circuiting preserves the local permit through productive turns. At the actual wait decision, consume it; the armed poll retains remote notifications until their CQE drains the counter.
         let return_to_executor = progressed
+            || command_batch_full
             || timeout == Some(Duration::ZERO)
             || !self.pending.is_empty()
             || !self.cancellations.is_empty()
@@ -1046,7 +1069,9 @@ impl Reactor {
         if return_to_executor {
             let needs_submit = {
                 let submissions = self.ring.submission();
-                !submissions.is_empty() || submissions.cq_overflow() || submissions.taskrun()
+                (!submissions.is_empty() && !defer_submission)
+                    || submissions.cq_overflow()
+                    || submissions.taskrun()
             };
             if needs_submit {
                 match syscall("submit", || self.ring.submit()) {
@@ -1085,6 +1110,8 @@ impl Reactor {
                 return Err(error);
             }
         }
+        // Publish the completion snapshot produced by this wait before returning. Its wakeups enter the executor's ready queue without another idle turn.
+        self.collect_completions()?;
         Ok(false)
     }
 }

@@ -1,0 +1,82 @@
+diff --git a/crates/iouring/src/io_uring_selector.rs b/crates/iouring/src/io_uring_selector.rs
+index 9898ef1..f5d6db6 100644
+--- a/crates/iouring/src/io_uring_selector.rs
++++ b/crates/iouring/src/io_uring_selector.rs
+@@ -183,6 +183,11 @@ impl<B: IoBuf> Drop for Request<B> {
+ pub(crate) trait PendingRequest: Send {
+     fn identifier(&self) -> u64;
+     fn entry(&mut self) -> squeue::Entry;
++    // Buffer accessors may run arbitrary user code, including waking tasks. Such
++    // requests must return to the executor after preparation instead of waiting.
++    fn entry_may_wake(&self) -> bool {
++        true
++    }
+     fn finish(self: Box<Self>, result: io::Result<usize>);
+     fn cancelling(&self) -> bool;
+     fn set_cancelling(&self);
+@@ -916,7 +921,9 @@ impl Reactor {
+                 command_batch_full = false;
+                 break;
+             };
+-            progressed = true;
++            // Accepted submissions alone do not wake tasks. Entry preparation
++            // below retains the yield for requests which invoke user callbacks.
++            progressed |= !matches!(&command, Command::Submit(_) if !self.closing);
+             match command {
+                 Command::Submit(request) if !self.closing => self.pending.push_back(request),
+                 Command::Submit(request) => request.finish(Err(io::ErrorKind::Interrupted.into())),
+@@ -1005,6 +1012,7 @@ impl Reactor {
+                 let identifier = request.identifier();
+                 let request = self.in_flight.0.entry(identifier).or_insert(request);
+                 let entry = request.entry();
++                progressed |= request.entry_may_wake();
+                 // SAFETY: InFlight owns the buffer allocation and descriptor
+                 // before publication. Neither is released or accessed until
+                 // the original CQE, even when cancellation completes first.
+@@ -1038,6 +1046,7 @@ impl Reactor {
+         // Publish queued work before returning to the executor; skip empty enters unless CQ overflow or deferred task work requires kernel progress. At a genuine idle wait, the wait enter also publishes the SQ.
+         // Short-circuiting preserves the local permit through productive turns. At the actual wait decision, consume it; the armed poll retains remote notifications until their CQE drains the counter.
+         let return_to_executor = progressed
++            || command_batch_full
+             || timeout == Some(Duration::ZERO)
+             || !self.pending.is_empty()
+             || !self.cancellations.is_empty()
+diff --git a/crates/iouring/src/io_uring_selector/readiness.rs b/crates/iouring/src/io_uring_selector/readiness.rs
+index 59edcd3..6793eca 100644
+--- a/crates/iouring/src/io_uring_selector/readiness.rs
++++ b/crates/iouring/src/io_uring_selector/readiness.rs
+@@ -31,6 +31,11 @@ impl PendingRequest for ReadinessRequest {
+             .user_data(self.identifier)
+     }
+ 
++    fn entry_may_wake(&self) -> bool {
++        // Only fixed native socket metadata is accessed; no buffer callbacks.
++        false
++    }
++
+     fn finish(self: Box<Self>, result: io::Result<usize>) {
+         let reply = self
+             .reply
+diff --git a/crates/native/src/worker.rs b/crates/native/src/worker.rs
+index f025199..c606c31 100644
+--- a/crates/native/src/worker.rs
++++ b/crates/native/src/worker.rs
+@@ -277,6 +277,9 @@ fn run_loop(
+         let Some(runnable) = runnable else {
+             continue;
+         };
++        // Collect completions before the next ready batch. With no runnable
++        // tasks, the idle turn above can submit readiness waits and block once.
++        drive(&mut driver, Some(Duration::ZERO));
+         // Freeze the batch. Wakes during task polling go into the now-empty next queue.
+         let has_more = CURRENT_WORKER.with(|current| {
+             let mut current = current.borrow_mut();
+@@ -304,8 +307,6 @@ fn run_loop(
+                     .pop()
+             });
+         }
+-        // Publish the available completion batch before starting the next task batch.
+-        drive(&mut driver, Some(Duration::ZERO));
+     }
+     CURRENT_WORKER.with(|current| current.take());
+ }

@@ -1,0 +1,122 @@
+{
+  "deferred": {
+    "log_path": "~/.cache/core-scheduler-readiness-research/defer-verification.log",
+    "log_sha256": "24346b05fcf110882e6da714f441209f62d633346d53a50f7eb14b95e84df383",
+    "source_patch_sha256": "03d0cd73d3e8205ceca41628db273d35688f3595f226fc58d3868d88d15446c1",
+    "commands": [
+      {
+        "command": [
+          "cargo",
+          "bake",
+          "--locked",
+          "test:coverage",
+          "--package",
+          "core-scheduler-iouring",
+          "--all-features",
+          "true"
+        ],
+        "exit_code": 0
+      },
+      {
+        "command": [
+          "cargo",
+          "fmt",
+          "--all",
+          "--",
+          "--check"
+        ],
+        "exit_code": 0
+      },
+      {
+        "command": [
+          "cargo",
+          "clippy",
+          "--locked",
+          "-p",
+          "core-scheduler-iouring",
+          "--all-targets",
+          "--all-features",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "exit_code": 0
+      }
+    ],
+    "coverage": {
+      "covered_regions": 2141,
+      "measured_regions": 2141,
+      "excluded_unreachable_regions": 1
+    },
+    "test_results": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 82 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+      "test result: ok. 180 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s"
+    ]
+  },
+  "combined": {
+    "log_path": "~/.cache/core-scheduler-readiness-research/drain-verification.log",
+    "log_sha256": "0bf780439f78c1486c82e79c7dfb276b39b5e133344d4e42816d1a11c8687dd6",
+    "source_patch_sha256": "a41cb02ad4c675570e32d5028948faf1c30cbb91edb2e6e5b3c5069a737206e4",
+    "commands": [
+      {
+        "command": [
+          "cargo",
+          "bake",
+          "--locked",
+          "test:coverage",
+          "--package",
+          "core-scheduler-iouring",
+          "--all-features",
+          "true"
+        ],
+        "exit_code": 0
+      },
+      {
+        "command": [
+          "cargo",
+          "fmt",
+          "--all",
+          "--",
+          "--check"
+        ],
+        "exit_code": 0
+      },
+      {
+        "command": [
+          "cargo",
+          "clippy",
+          "--locked",
+          "-p",
+          "core-scheduler-iouring",
+          "--all-targets",
+          "--all-features",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "exit_code": 0
+      }
+    ],
+    "coverage": {
+      "covered_regions": 2152,
+      "measured_regions": 2152,
+      "excluded_unreachable_regions": 1
+    },
+    "test_results": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 84 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+      "test result: ok. 180 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s"
+    ]
+  },
+  "adopted": {
+    "patch": "combined-reviewed.patch",
+    "patch_sha256": "d114b42c4c9db391bb313cadc6676179b040303afd4fc1b4e7ea11acb4b0d98b",
+    "difference_from_measured": "Unwrap added full-line prose comments to follow Core conventions; all non-comment source lines are byte-identical.",
+    "non_comment_source_sha256": {
+      "crates/iouring/src/io_uring_selector.rs": "6dcddd8b2143336b4c17dba030ea9ad347f3a7bbf8b5f06ad15bd86372cc2e25",
+      "crates/iouring/src/io_uring_selector/readiness.rs": "ca765dfa48260bd0aa1304b393b719806b002fd39d56450edc983e764c5bd3cd",
+      "crates/iouring/src/io_uring_selector/tests.rs": "e6dbbfbc4593a89b0a1759d64292f4c07414265acbfccd688b5c2dcdd7eb8a6e"
+    }
+  }
+}

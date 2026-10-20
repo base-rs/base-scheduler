@@ -1,0 +1,23 @@
+diff --git a/crates/native/src/worker.rs b/crates/native/src/worker.rs
+index f025199..c606c31 100644
+--- a/crates/native/src/worker.rs
++++ b/crates/native/src/worker.rs
+@@ -277,6 +277,9 @@ fn run_loop(
+         let Some(runnable) = runnable else {
+             continue;
+         };
++        // Collect completions before the next ready batch. With no runnable
++        // tasks, the idle turn above can submit readiness waits and block once.
++        drive(&mut driver, Some(Duration::ZERO));
+         // Freeze the batch. Wakes during task polling go into the now-empty next queue.
+         let has_more = CURRENT_WORKER.with(|current| {
+             let mut current = current.borrow_mut();
+@@ -304,8 +307,6 @@ fn run_loop(
+                     .pop()
+             });
+         }
+-        // Publish the available completion batch before starting the next task batch.
+-        drive(&mut driver, Some(Duration::ZERO));
+     }
+     CURRENT_WORKER.with(|current| current.take());
+ }
