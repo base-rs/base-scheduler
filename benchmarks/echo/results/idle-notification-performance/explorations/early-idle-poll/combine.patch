@@ -1,0 +1,32 @@
+diff --git a/crates/iouring/src/io_uring_selector.rs b/crates/iouring/src/io_uring_selector.rs
+index 665009a..5c247d4 100644
+--- a/crates/iouring/src/io_uring_selector.rs
++++ b/crates/iouring/src/io_uring_selector.rs
+@@ -914,7 +914,6 @@ impl Reactor {
+             };
+             match command {
+                 Some((Command::Submit(request), _)) if !self.closing => {
+-                    progressed = true;
+                     self.pending.push_back(request)
+                 }
+                 Some((Command::Submit(request), _)) => {
+@@ -1049,6 +1048,7 @@ impl Reactor {
+ 
+         // Publish queued work before returning to the executor; skip empty enters unless CQ overflow or deferred task work requires kernel progress. At a genuine idle wait, the wait enter also publishes the SQ.
+         let mut return_to_executor = progressed
++            || command_batch_full
+             || timeout == Some(Duration::ZERO)
+             || !self.pending.is_empty()
+             || !self.cancellations.is_empty()
+diff --git a/crates/native/src/worker.rs b/crates/native/src/worker.rs
+index 2958751..b213c4a 100644
+--- a/crates/native/src/worker.rs
++++ b/crates/native/src/worker.rs
+@@ -299,7 +299,6 @@ fn run_loop(
+             SearchResult::Retry | SearchResult::Empty => None,
+         };
+         let runnable = if should_park {
+-            drive(&mut driver, Some(Duration::ZERO));
+             worker.sleeping.store(true, Ordering::SeqCst);
+             shared.idle_workers.fetch_add(1, Ordering::SeqCst);
+             // Pair with the enqueuer's fence: either this search observes its queued work, or the enqueuer observes an idle worker.

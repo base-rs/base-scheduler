@@ -1,0 +1,40 @@
+{
+  "base": "a98f172f8b06f23b34a354a4b6f6c294aa5859ab",
+  "branch": "perf/readiness-followup",
+  "build_command": "flock -s /tmp/core-scheduler-perf.lock env CARGO_TARGET_DIR=/home/samuel/.cache/core-scheduler-readiness-followup/build cargo build --release --locked -p core-scheduler-echo-benchmark",
+  "profile": "default release",
+  "rustflags": null,
+  "cargo_profile_release_overrides": {},
+  "rustc": "rustc 1.99.0 (b940084d7 2026-09-28) (Arch Linux rust 1:1.99.0-1)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+  "cargo": "cargo 1.99.0 (5f94df478 2026-08-27) (Arch Linux rust 1:1.99.0-1)",
+  "test_command": "flock -s /tmp/core-scheduler-perf.lock env RUST_TEST_THREADS=1 CARGO_TARGET_DIR=/home/samuel/.cache/core-scheduler-readiness-followup/build cargo test --locked -p core-scheduler-iouring",
+  "method": "fixed client; frozen-seed randomized 3 repeats per variant/workload; 1 s warmup; 3 s measured; 64-byte validated payload; server pinned to CPU 0..workers-1, client to CPUs 4..7; exclusive benchmark lock",
+  "runner": {
+    "path": "/home/samuel/.cache/core-scheduler-next-final/run.py",
+    "sha256": "4dcb2f95087cc39998803fa7f3555512059b42991af3972679633ec7204205e2"
+  },
+  "helper": {
+    "path": "/home/samuel/.cache/core-scheduler-next-final/sample-runner.py",
+    "sha256": "31e6ad715214fcadfda358362100a21cb94cc41a79e23733191eb8e61b740909"
+  },
+  "client": {
+    "path": "/home/samuel/.cache/core-scheduler-owner-wake-final/client",
+    "sha256": "db6c914ab75011477ec6232e681046b1e75532cbaa1c81663bac984591675cf3"
+  },
+  "baseline_binary": {
+    "path": "/home/samuel/.cache/core-scheduler-readiness-followup/before",
+    "sha256": "c461c4a6c690f83823148970badfdf3cc4a30a06157c4edfeea66f8777c61f59"
+  },
+  "candidate_binary": {
+    "path": "/home/samuel/.cache/core-scheduler-readiness-followup/inline-readiness",
+    "sha256": "b5acbfcb610e102285372d50a1966c8fc540b091997c42782efc47e16741731d"
+  },
+  "source_patch_sha256": "f2217275b81c3fd536f2045d1fc468d91c4ceb7b7cbf1d84d56d90b383ef24fe",
+  "test_results": [
+    "test result: ok. 75 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s",
+    "test result: ok. 180 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s",
+    "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  ],
+  "decision": "rejected",
+  "binary_retention": "binary SHA256 captured before deletion; build directories and binaries deliberately removed after measurements"
+}

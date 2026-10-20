@@ -1,0 +1,33 @@
+{
+  "bytes": 64,
+  "connections": 32,
+  "payload_mib_per_second": 39.621134440104164,
+  "requests": 1947458,
+  "requests_per_second": 649152.6666666666,
+  "rtt_max_us": 245.631,
+  "rtt_mean_us": 49.22524709030958,
+  "rtt_p50_us": 50.367,
+  "rtt_p95_us": 54.751,
+  "rtt_p99_us": 57.247,
+  "seconds": 3.0,
+  "warmup_seconds": 1.0,
+  "identifier": "thin-lto-tokio-adapter-poll-w1-c32-b64-r3",
+  "mode": "thin-lto",
+  "backend": "tokio-adapter-poll",
+  "workers": 1,
+  "repeat": 3,
+  "client_cpu": {
+    "user": 1.3410870000000017,
+    "system": 3.3715449999999976,
+    "voluntary_switches": 1415928,
+    "involuntary_switches": 872
+  },
+  "server_cpu": {
+    "user": 0.35868599999999873,
+    "system": 2.268513999999982,
+    "voluntary_switches": 102,
+    "involuntary_switches": 53
+  },
+  "lifecycle_seconds": 4.00277793686837,
+  "variant": "thin-lto"
+}

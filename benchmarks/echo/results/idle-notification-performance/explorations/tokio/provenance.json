@@ -1,0 +1,50 @@
+{
+  "source": "a98f172f8b06f23b34a354a4b6f6c294aa5859ab",
+  "build": "cargo build --release --locked -p core-scheduler-echo-benchmark; no profile overrides",
+  "rustc": "rustc 1.99.0 (b940084d7 2026-09-28) (Arch Linux rust 1:1.99.0-1)",
+  "variants": {
+    "baseline": {
+      "binary": "/home/samuel/.cache/core-scheduler-tokio-followup/baseline/benchmark",
+      "sha256": "c461c4a6c690f83823148970badfdf3cc4a30a06157c4edfeea66f8777c61f59",
+      "patch": null,
+      "bytes": 2194000
+    },
+    "waiter-swap": {
+      "binary": "/home/samuel/.cache/core-scheduler-tokio-followup/waiter-swap/benchmark",
+      "sha256": "8708216cbaf15d9a68f20045e67bab63fb60a411ffd3fece39cd02404009c6b2",
+      "patch": "/home/samuel/.cache/core-scheduler-tokio-followup/waiter-swap/source.patch"
+    },
+    "flat-state": {
+      "binary": "/home/samuel/.cache/core-scheduler-tokio-followup/flat-state/benchmark",
+      "sha256": "67be9367d663d68b895428c0c826d681359b764db9d3c12b65e9718dccea167d",
+      "patch": "/home/samuel/.cache/core-scheduler-tokio-followup/flat-state/source.patch"
+    },
+    "cancellation-inline": {
+      "binary": "/home/samuel/.cache/core-scheduler-tokio-followup/cancellation-inline/benchmark",
+      "sha256": "b45a878ec8c10877cdd5ccee8377eff1944f44153870db25bfc414623dea10ae",
+      "patch": "/home/samuel/.cache/core-scheduler-tokio-followup/cancellation-inline/source.patch"
+    },
+    "wrappers-inline": {
+      "binary": "/home/samuel/.cache/core-scheduler-tokio-followup/wrappers-inline/benchmark",
+      "sha256": "4fb595b6c5e0c444385e432ba297696d52259dbec591aede4aa005cb9ad43f94",
+      "patch": "/home/samuel/.cache/core-scheduler-tokio-followup/wrappers-inline/source.patch"
+    },
+    "thin-lto": {
+      "binary": "/home/samuel/.cache/core-scheduler-tokio-followup/thin-lto/benchmark",
+      "sha256": "21af5d1e4ff8774150f550eaea5744031ca49b4906b1fd0198c383854b175e32",
+      "patch": null,
+      "build": "CARGO_TARGET_DIR=~/.cache/core-scheduler-tokio-followup/build-thin-lto CARGO_PROFILE_RELEASE_LTO=thin cargo build --release --locked -p core-scheduler-echo-benchmark; all other profile settings default",
+      "source": "a98f172f8b06f23b34a354a4b6f6c294aa5859ab, clean worktree",
+      "bytes": 2098112
+    }
+  },
+  "thin_lto_shell_environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "RUSTC_WRAPPER": null,
+    "CARGO_PROFILE_RELEASE_OPT_LEVEL": null,
+    "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": null,
+    "CARGO_PROFILE_RELEASE_DEBUG": null,
+    "CARGO_PROFILE_RELEASE_LTO": null
+  }
+}

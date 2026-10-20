@@ -1,0 +1,91 @@
+diff --git a/crates/iouring/src/io_uring_selector.rs b/crates/iouring/src/io_uring_selector.rs
+index 665009a..2bd640c 100644
+--- a/crates/iouring/src/io_uring_selector.rs
++++ b/crates/iouring/src/io_uring_selector.rs
+@@ -894,13 +894,18 @@ impl Reactor {
+ 
+     pub(crate) fn turn(&mut self, timeout: Option<Duration>) -> io::Result<bool> {
+         self.started = true;
++        let local_queue = crate::io_uring_worker::queue(&self.controller);
+         let mut progressed = false;
+         // Bound command processing so a busy producer cannot starve completions.
+         let mut command_batch_full = true;
+         for index in 0..256 {
+             // Alternate local and remote preference so neither producer can starve the other.
+-            let local =
+-                || crate::io_uring_worker::pop(&self.controller).map(|command| (command, true));
++            let local = || {
++                local_queue
++                    .as_ref()
++                    .and_then(|queue| queue.pop())
++                    .map(|command| (command, true))
++            };
+             let remote = || {
+                 self.incoming
+                     .try_recv()
+@@ -1055,7 +1060,9 @@ impl Reactor {
+             || !self.notification_armed;
+         if !return_to_executor {
+             // Keep the local permit through productive turns, then consume it with remote notifications at the wait boundary. The armed eventfd poll retains notifications racing this check.
+-            let mut notified = crate::io_uring_worker::take_notification(&self.controller);
++            let mut notified = local_queue
++                .as_ref()
++                .is_some_and(|queue| queue.take_notification());
+             notified |= self.drain_notification()?;
+             return_to_executor = notified;
+         }
+diff --git a/crates/iouring/src/io_uring_worker.rs b/crates/iouring/src/io_uring_worker.rs
+index 50c0ba8..9d502d1 100644
+--- a/crates/iouring/src/io_uring_worker.rs
++++ b/crates/iouring/src/io_uring_worker.rs
+@@ -96,17 +96,34 @@ pub(crate) fn enqueue(controller: &Controller, command: Command) -> Result<(), C
+         }
+     })
+ }
+-pub(crate) fn pop(controller: &Controller) -> Option<Command> {
++// Retain the matching route for one driver turn. Queue borrows end before callbacks can reenter routing.
++pub(crate) struct LocalQueue(Rc<LocalRoute>);
++
++impl LocalQueue {
++    pub(crate) fn pop(&self) -> Option<Command> {
++        self.0.commands.borrow_mut().pop_front()
++    }
++
++    pub(crate) fn take_notification(&self) -> bool {
++        self.0.notified.replace(false)
++    }
++}
++
++pub(crate) fn queue(controller: &Controller) -> Option<LocalQueue> {
+     ROUTES.with(|routes| {
+         routes
+             .borrow()
+             .iter()
+             .rev()
+             .find(|route| std::ptr::eq(Arc::as_ptr(&route.controller), controller))
+-            .and_then(|route| route.commands.borrow_mut().pop_front())
++            .map(|route| LocalQueue(Rc::clone(route)))
+     })
+ }
+ 
++pub(crate) fn pop(controller: &Controller) -> Option<Command> {
++    queue(controller).and_then(|queue| queue.pop())
++}
++
+ pub(crate) fn notify(controller: &Controller) -> bool {
+     ROUTES.with(|routes| {
+         let routes = routes.borrow();
+@@ -122,13 +139,3 @@ pub(crate) fn notify(controller: &Controller) -> bool {
+         }
+     })
+ }
+-pub(crate) fn take_notification(controller: &Controller) -> bool {
+-    ROUTES.with(|routes| {
+-        routes
+-            .borrow()
+-            .iter()
+-            .rev()
+-            .find(|route| std::ptr::eq(Arc::as_ptr(&route.controller), controller))
+-            .is_some_and(|route| route.notified.replace(false))
+-    })
+-}

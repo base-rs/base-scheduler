@@ -1,0 +1,72 @@
+diff --git a/crates/tokio/src/socket_operations.rs b/crates/tokio/src/socket_operations.rs
+index b198cd4..a296739 100644
+--- a/crates/tokio/src/socket_operations.rs
++++ b/crates/tokio/src/socket_operations.rs
+@@ -39,9 +39,13 @@ impl TokioScheduler {
+             pin::pin,
+             task::Poll,
+         };
+-        let result = async {
+-            cancellation.check()?;
+-            self.check_socket(socket)?;
++        if let Err(error) = cancellation.check() {
++            return (Err(error.into()), input);
++        }
++        if let Err(error) = self.check_socket(socket) {
++            return (Err(error.into()), input);
++        }
++        let result = {
+             let mut operation = pin!(socket.io_with(
+                 interest,
+                 |socket| operation(socket, &mut input),
+@@ -59,8 +63,7 @@ impl TokioScheduler {
+                 Poll::Pending
+             })
+             .await
+-        }
+-        .await;
++        };
+         (result, input)
+     }
+ }
+diff --git a/crates/tokio/src/tokio_socket.rs b/crates/tokio/src/tokio_socket.rs
+index 8463cfc..17882df 100644
+--- a/crates/tokio/src/tokio_socket.rs
++++ b/crates/tokio/src/tokio_socket.rs
+@@ -178,8 +178,13 @@ impl TokioSocket {
+         #[cfg(unix)]
+         let mark_connected = read_nonempty && self.inner.stream && !known_connected;
+         #[cfg(unix)]
+-        let ready_first =
+-            read_nonempty && known_connected && self.inner.registration.get().is_some();
++        let registered = if known_connected {
++            self.inner.registration.get()
++        } else {
++            None
++        };
++        #[cfg(unix)]
++        let ready_first = registered.is_some();
+         // Only nonempty reads on a stream that already completed a read may skip the speculative syscall. Lifecycle operations, unknown socket states, and empty reads retain immediate OS results.
+         #[cfg(unix)]
+         if !ready_first {
+@@ -194,7 +199,7 @@ impl TokioSocket {
+         #[cfg(unix)]
+         {
+             // Linux can report EPOLLHUP for an unconnected TCP socket; Tokio retains closed readiness permanently, which would spin after the socket later connects and a syscall returns WouldBlock. Register only after a syscall needs to wait, then reuse the registration on subsequent waits.
+-            let registration = match self.inner.registration.get() {
++            let registration = match registered.or_else(|| self.inner.registration.get()) {
+                 Some(registration) => registration,
+                 None => self.inner.registration().await?,
+             };
+@@ -208,10 +213,7 @@ impl TokioSocket {
+             } else {
+                 &self.inner.write_waiting
+             };
+-            if waiting
+-                .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+-                .is_err()
+-            {
++            if waiting.swap(true, Ordering::Acquire) {
+                 loop {
+                     let mut ready = registration.ready(interest).await?;
+                     if let Ok(result) = ready.try_io(|_| operation(self.inner.get_ref())) {

@@ -1,0 +1,47 @@
+{
+  "base_commit": "a98f172f8b06f23b34a354a4b6f6c294aa5859ab",
+  "candidate_patch": {
+    "path": "/home/samuel/.cache/core-scheduler-localqueue-followup/source.patch",
+    "sha256": "38f4ba33607f65cae615819ac51ad4317e04af67c08f63034ed42348c663be0a"
+  },
+  "binaries": {
+    "before": {
+      "path": "/home/samuel/.cache/core-scheduler-localqueue-followup/before",
+      "sha256": "c461c4a6c690f83823148970badfdf3cc4a30a06157c4edfeea66f8777c61f59"
+    },
+    "after": {
+      "path": "/home/samuel/.cache/core-scheduler-localqueue-followup/after",
+      "sha256": "c9741be53974c312ed78982505330b9ebdae8081cc794f53094ea2c39feb34f3"
+    }
+  },
+  "baseline_provenance": "/home/samuel/.cache/core-scheduler-hash-followup/provenance.json",
+  "candidate_build_log": {
+    "path": "/home/samuel/.cache/core-scheduler-localqueue-followup/build.log",
+    "sha256": "bb5274239ed3e9edcbbe4c1734541e82e018b5399e14f2d251c7f2ac9592f0ab"
+  },
+  "candidate_build_command": "CARGO_TARGET_DIR=/home/samuel/.cache/core-scheduler-hash-followup/target cargo build --release --locked -p core-scheduler-echo-benchmark",
+  "rustc": "rustc 1.99.0 (b940084d7 2026-09-28) (Arch Linux rust 1:1.99.0-1)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+  "flags": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "CARGO_PROFILE_RELEASE_LTO": null,
+    "CARGO_PROFILE_RELEASE_OPT_LEVEL": null
+  },
+  "candidate": "Capture matching Rc-backed local route once per Reactor::turn; pop commands and consume notification directly with short RefCell borrows. No route lookup/borrow retained through callbacks.",
+  "evidence_archive": {
+    "directory": "/home/samuel/.cache/core-scheduler-localqueue-followup/evidence",
+    "runner": {
+      "path": "run.py",
+      "sha256": "4dcb2f95087cc39998803fa7f3555512059b42991af3972679633ec7204205e2"
+    },
+    "sample_helper": {
+      "path": "sample-runner.py",
+      "sha256": "31e6ad715214fcadfda358362100a21cb94cc41a79e23733191eb8e61b740909"
+    },
+    "raw_matrix": {
+      "path": "aiko.json",
+      "sha256": "a499a9ff1acf239e01db5526513c08a2576b94ad825a4611fc4c10c138e17501"
+    },
+    "disposition": "rejected; source restored; isolated worktree clean; no retained implementation and no commit"
+  }
+}

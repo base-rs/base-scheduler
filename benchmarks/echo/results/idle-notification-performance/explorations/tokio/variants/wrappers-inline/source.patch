@@ -1,0 +1,55 @@
+diff --git a/crates/tokio/src/socket_io.rs b/crates/tokio/src/socket_io.rs
+index 5e428d7..62aa85b 100644
+--- a/crates/tokio/src/socket_io.rs
++++ b/crates/tokio/src/socket_io.rs
+@@ -63,12 +63,14 @@ pub(crate) fn close(socket: Socket) -> io::Result<()> {
+     result_count(result as isize).map(drop)
+ }
+ 
++#[inline]
+ pub(crate) fn recv(socket: &Socket, bytes: &mut [u8]) -> io::Result<usize> {
+     // SAFETY: The exclusive initialized byte range lives through this synchronous call. Socket::recv only writes initialized bytes and never extends the range.
+     let bytes = unsafe { std::slice::from_raw_parts_mut(bytes.as_mut_ptr().cast(), bytes.len()) };
+     socket.recv(bytes)
+ }
+ 
++#[inline]
+ pub(crate) fn send(socket: &Socket, bytes: &[u8]) -> io::Result<usize> {
+     socket.send_with_flags(bytes, send_flags(SocketSendFlags::default()))
+ }
+@@ -378,6 +380,7 @@ fn poll_nonblocking(socket: &Socket) -> io::Result<()> {
+     }
+ }
+ 
++#[inline]
+ pub(crate) fn recv_poll(
+     socket: &Socket,
+     bytes: &mut [u8],
+@@ -391,6 +394,7 @@ pub(crate) fn recv_poll(
+     socket.recv_with_flags(bytes, flags)
+ }
+ 
++#[inline]
+ pub(crate) fn send_poll(
+     socket: &Socket,
+     bytes: &[u8],
+diff --git a/crates/tokio/src/tokio_scheduler.rs b/crates/tokio/src/tokio_scheduler.rs
+index 31e1499..1f4bf11 100644
+--- a/crates/tokio/src/tokio_scheduler.rs
++++ b/crates/tokio/src/tokio_scheduler.rs
+@@ -75,6 +75,7 @@ impl TokioScheduler {
+             signals: crate::signal_service::SignalService::new(),
+         })
+     }
++    #[inline]
+     pub(crate) fn check_open(&self) -> io::Result<()> {
+         if self.closed.load(Ordering::Acquire) {
+             Err(io::Error::new(
+@@ -85,6 +86,7 @@ impl TokioScheduler {
+             Ok(())
+         }
+     }
++    #[inline]
+     pub(crate) fn check_socket(&self, socket: &crate::TokioSocket) -> io::Result<()> {
+         self.check_open()?;
+         if socket.runtime() != self.runtime.id() {

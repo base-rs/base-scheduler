@@ -1,0 +1,60 @@
+diff --git a/crates/native/src/task_service.rs b/crates/native/src/task_service.rs
+index 4d42dcd..8927798 100644
+--- a/crates/native/src/task_service.rs
++++ b/crates/native/src/task_service.rs
+@@ -132,17 +132,23 @@ impl Shared {
+         }
+     }
+     pub(crate) fn wake_idle(&self, preferred: usize) {
++        self.wake_idle_except(preferred, UNASSIGNED_WORKER);
++    }
++    pub(crate) fn wake_idle_except(&self, preferred: usize, source: usize) {
++        if source == 0 && self.workers.len() == 1 {
++            return;
++        }
+         std::sync::atomic::fence(Ordering::SeqCst);
+         if self.idle_workers.load(Ordering::SeqCst) == 0 {
+             return;
+         }
+-        if let Some(worker) = self.workers.get(preferred) {
++        if let Some(worker) = self.workers.get(preferred).filter(|_| preferred != source) {
+             if worker.wake() {
+                 return;
+             }
+         }
+-        for worker in &self.workers {
+-            if worker.wake() {
++        for (identifier, worker) in self.workers.iter().enumerate() {
++            if identifier != source && worker.wake() {
+                 return;
+             }
+         }
+diff --git a/crates/native/src/worker.rs b/crates/native/src/worker.rs
+index 2958751..1a0b83d 100644
+--- a/crates/native/src/worker.rs
++++ b/crates/native/src/worker.rs
+@@ -71,6 +71,7 @@ pub(crate) fn assert_outside_worker() {
+ 
+ pub(crate) fn schedule(shared: &Arc<Shared>, runnable: Runnable) {
+     let preferred = runnable.metadata().worker.load(Ordering::Relaxed);
++    let mut source = UNASSIGNED_WORKER;
+     let remote = CURRENT_WORKER.with(|current| {
+         let current = current.borrow();
+         if let Some(worker) = current.as_ref() {
+@@ -78,6 +79,7 @@ pub(crate) fn schedule(shared: &Arc<Shared>, runnable: Runnable) {
+                 && (preferred == UNASSIGNED_WORKER || preferred == worker.identifier)
+             {
+                 worker.ready.push(runnable);
++                source = worker.identifier;
+                 return None;
+             }
+         }
+@@ -91,7 +93,7 @@ pub(crate) fn schedule(shared: &Arc<Shared>, runnable: Runnable) {
+         }
+     }
+     // Publication precedes the sleeping flag exchange. A worker publishes its sleeping flag before rechecking queues, so a racing wake is retained.
+-    shared.wake_idle(preferred);
++    shared.wake_idle_except(preferred, source);
+ }
+ 
+ fn search(shared: &Shared, local: &LocalWorker, iteration: usize) -> Steal<Runnable> {

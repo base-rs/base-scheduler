@@ -1,0 +1,33 @@
+{
+  "bytes": 64,
+  "connections": 32,
+  "payload_mib_per_second": 39.434733072916664,
+  "requests": 1938296,
+  "requests_per_second": 646098.6666666666,
+  "rtt_max_us": 3059.711,
+  "rtt_mean_us": 49.4568555819131,
+  "rtt_p50_us": 50.591,
+  "rtt_p95_us": 54.975,
+  "rtt_p99_us": 57.471,
+  "seconds": 3.0,
+  "warmup_seconds": 1.0,
+  "identifier": "swap-tokio-adapter-poll-w1-c32-b64-r3",
+  "mode": "swap",
+  "backend": "tokio-adapter-poll",
+  "workers": 1,
+  "repeat": 3,
+  "client_cpu": {
+    "user": 1.3305979999999984,
+    "system": 3.3881860000000046,
+    "voluntary_switches": 1417567,
+    "involuntary_switches": 943
+  },
+  "server_cpu": {
+    "user": 0.36650800000000316,
+    "system": 2.261653999999993,
+    "voluntary_switches": 102,
+    "involuntary_switches": 61
+  },
+  "lifecycle_seconds": 4.002699954900891,
+  "variant": "swap"
+}

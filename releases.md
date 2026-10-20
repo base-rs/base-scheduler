@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Avoid speculative eventfd reads before io_uring idle waits; the armed ring poll preserves remote wakeups, and notification completions drain the counter before rearming.
+
 - Avoid redundant speculative Tokio receive attempts by waiting on cached readiness for established nonempty scalar stream reads. Lifecycle operations, empty reads, and datagrams retain syscall-first behavior; short reads preserve readiness until `WouldBlock`.
 
 - Use cooperative io_uring completion processing for fresh thread-bound workers where supported, retaining the original ring for movable drivers and when the optional setup fails.

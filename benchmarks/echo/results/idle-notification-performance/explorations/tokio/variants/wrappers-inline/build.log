@@ -1,0 +1,11 @@
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+   Compiling core-scheduler v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-tokio-followup)
+   Compiling core-scheduler-selector v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-tokio-followup/crates/selector)
+   Compiling core-scheduler-tokio v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-tokio-followup/crates/tokio)
+   Compiling core-scheduler-iouring v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-tokio-followup/crates/iouring)
+   Compiling core-scheduler-native v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-tokio-followup/crates/native)
+   Compiling core-scheduler-echo-benchmark v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-tokio-followup/benchmarks/echo)
+    Finished `release` profile [optimized] target(s) in 2.34s

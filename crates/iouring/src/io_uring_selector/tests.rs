@@ -398,7 +398,6 @@ fn transient_syscall_errors_preserve_progress_and_fatal_errors_stop_the_driver()
         ("submit", io::ErrorKind::Interrupted.into()),
         ("submit", io::Error::from_raw_os_error(libc::EBUSY)),
         ("submit", io::Error::from_raw_os_error(libc::EAGAIN)),
-        ("notification-read", io::ErrorKind::Interrupted.into()),
         ("wait", io::ErrorKind::Interrupted.into()),
         ("wait", io::Error::from_raw_os_error(libc::ETIME)),
         ("wait", io::Error::from_raw_os_error(libc::EBUSY)),
@@ -416,7 +415,7 @@ fn transient_syscall_errors_preserve_progress_and_fatal_errors_stop_the_driver()
         assert!(FAILURES.with(|failures| failures.borrow().is_empty()));
         drain(&selector, &mut driver);
     }
-    for name in ["submit", "notification-read", "wait"] {
+    for name in ["submit", "wait"] {
         let (selector, mut driver) = pair(1);
         let _failures = Failures::new([(name, io::ErrorKind::PermissionDenied.into())]);
         let timeout = if name == "submit" {
@@ -1199,15 +1198,25 @@ fn nonblocking_turn_preserves_notifications_for_the_next_idle_turn() {
 
 #[test]
 fn notifications_racing_idle_preparation_remain_observable() {
-    for name in ["notification-read", "wait"] {
+    // Cover notification before initial publication, initial blocking
+    // publication, and a wait whose notification poll is already armed.
+    for (name, already_armed) in [("submit", false), ("wait", false), ("wait", true)] {
         let (selector, mut driver) = pair(1);
+        if already_armed {
+            driver.turn(Some(Duration::ZERO)).unwrap();
+        }
         {
             let _failures = Failures;
             let waker = driver.waker();
             BEFORE_SYSCALL.with(|hook| {
                 *hook.borrow_mut() = Some((name, Box::new(move || waker.wake_by_ref())));
             });
-            assert!(!driver.turn(Some(Duration::from_secs(1))).unwrap());
+            let timeout = if name == "submit" {
+                Duration::ZERO
+            } else {
+                Duration::from_secs(1)
+            };
+            assert!(!driver.turn(Some(timeout)).unwrap());
             assert!(BEFORE_SYSCALL.with(|hook| hook.borrow().is_none()));
             // The notification can yield its own CQE as well as its eventfd value. Both must be retired before sleeping again.
             let _wait_failure = Failures::new([("wait", io::ErrorKind::Interrupted.into())]);
@@ -1376,9 +1385,12 @@ fn local_notifications_match_the_ring_controller_including_nested_workers() {
 #[test]
 fn remote_wakes_interrupt_entered_workers_during_idle_preparation() {
     use core_scheduler_selector::{SelectorDriver, SelectorWorker};
-    for name in ["notification-read", "wait"] {
+    for (name, already_armed) in [("submit", false), ("wait", false), ("wait", true)] {
         let (selector, driver) = pair(1);
         let mut worker = driver.enter();
+        if already_armed {
+            worker.turn(Some(Duration::ZERO)).unwrap();
+        }
         {
             let _failures = Failures;
             let waker = worker.waker();
@@ -1390,7 +1402,12 @@ fn remote_wakes_interrupt_entered_workers_during_idle_preparation() {
                     }),
                 ));
             });
-            assert!(!worker.turn(Some(Duration::from_secs(1))).unwrap());
+            let timeout = if name == "submit" {
+                Duration::ZERO
+            } else {
+                Duration::from_secs(1)
+            };
+            assert!(!worker.turn(Some(timeout)).unwrap());
             assert!(BEFORE_SYSCALL.with(|hook| hook.borrow().is_none()));
             // The eventfd polling completion and counter both retire without losing a wake or leaving the next wait permanently ready.
             let _wait_failure = Failures::new([("wait", io::ErrorKind::Interrupted.into())]);
@@ -1569,6 +1586,29 @@ fn full_eventfd_preserves_existing_notifications_without_failing_the_waker() {
         .unwrap();
     assert!(!driver.turn(Some(Duration::ZERO)).unwrap());
     assert!(!driver.turn(Some(Duration::from_millis(1))).unwrap());
+    drain(&selector, &mut driver);
+}
+
+#[test]
+fn idle_waits_do_not_read_the_eventfd_without_a_notification_completion() {
+    let (selector, mut driver) = pair(1);
+    let _failures = Failures::new([("notification-read", io::ErrorKind::Interrupted.into())]);
+    for _ in 0..3 {
+        assert!(!driver.turn(Some(Duration::from_millis(1))).unwrap());
+        assert_eq!(FAILURES.with(|failures| failures.borrow().len()), 1);
+    }
+    driver.waker().wake_by_ref();
+    // The armed poll now reports the remote notification. Its CQE, rather
+    // than an idle-boundary read, drains the counter and retries interruption.
+    driver
+        .reactor
+        .as_mut()
+        .unwrap()
+        .ring
+        .submit_and_wait(1)
+        .unwrap();
+    assert!(!driver.turn(Some(Duration::ZERO)).unwrap());
+    assert!(FAILURES.with(|failures| failures.borrow().is_empty()));
     drain(&selector, &mut driver);
 }
 

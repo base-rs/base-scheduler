@@ -1,0 +1,33 @@
+{
+  "bytes": 64,
+  "connections": 32,
+  "payload_mib_per_second": 42.973531087239586,
+  "requests": 2112235,
+  "requests_per_second": 704078.3333333334,
+  "rtt_max_us": 222.719,
+  "rtt_mean_us": 45.3820103970439,
+  "rtt_p50_us": 46.431,
+  "rtt_p95_us": 50.815,
+  "rtt_p99_us": 53.279,
+  "seconds": 3.0,
+  "warmup_seconds": 1.0,
+  "identifier": "thin-lto-tokio-w1-c32-b64-r1",
+  "mode": "thin-lto",
+  "backend": "tokio",
+  "workers": 1,
+  "repeat": 1,
+  "client_cpu": {
+    "user": 1.4814220000000002,
+    "system": 3.7415340000000015,
+    "voluntary_switches": 1647312,
+    "involuntary_switches": 662
+  },
+  "server_cpu": {
+    "user": 0.22570799999999913,
+    "system": 2.301464000000003,
+    "voluntary_switches": 187,
+    "involuntary_switches": 42
+  },
+  "lifecycle_seconds": 4.002807239070535,
+  "variant": "thin-lto"
+}

@@ -1,0 +1,16 @@
+diff --git a/crates/tokio/src/tokio_socket.rs b/crates/tokio/src/tokio_socket.rs
+index 8463cfc..050e00f 100644
+--- a/crates/tokio/src/tokio_socket.rs
++++ b/crates/tokio/src/tokio_socket.rs
+@@ -208,10 +208,7 @@ impl TokioSocket {
+             } else {
+                 &self.inner.write_waiting
+             };
+-            if waiting
+-                .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+-                .is_err()
+-            {
++            if waiting.swap(true, Ordering::Acquire) {
+                 loop {
+                     let mut ready = registration.ready(interest).await?;
+                     if let Ok(result) = ready.try_io(|_| operation(self.inner.get_ref())) {

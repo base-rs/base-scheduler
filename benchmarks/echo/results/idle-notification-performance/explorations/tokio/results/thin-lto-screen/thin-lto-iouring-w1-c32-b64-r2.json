@@ -1,0 +1,33 @@
+{
+  "bytes": 64,
+  "connections": 32,
+  "payload_mib_per_second": 38.748311360677086,
+  "requests": 1904557,
+  "requests_per_second": 634852.3333333334,
+  "rtt_max_us": 215.167,
+  "rtt_mean_us": 50.33402081848946,
+  "rtt_p50_us": 50.143,
+  "rtt_p95_us": 53.951,
+  "rtt_p99_us": 57.471,
+  "seconds": 3.0,
+  "warmup_seconds": 1.0,
+  "identifier": "thin-lto-iouring-w1-c32-b64-r2",
+  "mode": "thin-lto",
+  "backend": "iouring",
+  "workers": 1,
+  "repeat": 2,
+  "client_cpu": {
+    "user": 1.3849000000000018,
+    "system": 3.4598299999999824,
+    "voluntary_switches": 1569308,
+    "involuntary_switches": 727
+  },
+  "server_cpu": {
+    "user": 0.5086739999999992,
+    "system": 2.119926000000021,
+    "voluntary_switches": 113,
+    "involuntary_switches": 89
+  },
+  "lifecycle_seconds": 4.002864019945264,
+  "variant": "thin-lto"
+}
