@@ -1,0 +1,95 @@
+[
+  {
+    "workers": 1,
+    "connections": 1,
+    "bytes": 64,
+    "backend": "iouring",
+    "variants": {
+      "original": {
+        "requests_per_second": {
+          "median": 241449.33333333334,
+          "min": 240152.66666666666,
+          "max": 245762.66666666666,
+          "runs": 5
+        },
+        "rtt_p99_us": {
+          "median": 5.791,
+          "min": 5.751,
+          "max": 5.891,
+          "runs": 5
+        }
+      },
+      "uncorrected": {
+        "requests_per_second": {
+          "median": 234952.66666666666,
+          "min": 230089.33333333334,
+          "max": 241055.33333333334,
+          "runs": 5
+        },
+        "rtt_p99_us": {
+          "median": 6.071,
+          "min": 5.783,
+          "max": 9.423,
+          "runs": 5
+        }
+      },
+      "fixed": {
+        "requests_per_second": {
+          "median": 240316.66666666666,
+          "min": 233690.0,
+          "max": 247359.33333333334,
+          "runs": 5
+        },
+        "rtt_p99_us": {
+          "median": 5.771,
+          "min": 5.651,
+          "max": 9.415,
+          "runs": 5
+        }
+      }
+    },
+    "fixed_throughput_change_percent": {
+      "original": -0.4691115320260453,
+      "uncorrected": 2.2830130324122067
+    }
+  },
+  {
+    "workers": 1,
+    "connections": 1,
+    "bytes": 64,
+    "backend": "tokio",
+    "variants": {
+      "original": {
+        "requests_per_second": {
+          "median": 272142.6666666667,
+          "min": 268167.6666666667,
+          "max": 275617.3333333333,
+          "runs": 5
+        },
+        "rtt_p99_us": {
+          "median": 4.331,
+          "min": 4.303,
+          "max": 4.363,
+          "runs": 5
+        }
+      },
+      "fixed": {
+        "requests_per_second": {
+          "median": 269357.3333333333,
+          "min": 269209.3333333333,
+          "max": 272167.0,
+          "runs": 5
+        },
+        "rtt_p99_us": {
+          "median": 4.343,
+          "min": 4.331,
+          "max": 4.371,
+          "runs": 5
+        }
+      }
+    },
+    "fixed_throughput_change_percent": {
+      "original": -1.0234827810903235
+    }
+  }
+]

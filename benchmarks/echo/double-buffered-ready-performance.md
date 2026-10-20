@@ -1,6 +1,6 @@
 # Alternating native ready queues
 
-The experiment improves throughput and tail latency in the tested concurrent echo workloads, especially with four workers, but repeats a small owned-I/O serial throughput regression. Keep it experimental rather than treating it as a regression-free replacement for the existing loop.
+The [validated wakeup fix](results/double-buffered-ready/wake-validation/readme.md) recovers the observed serial slowdown while retaining the alternating queues' concurrent gains in these echo measurements. Two new timing blocks put fixed owned serial throughput within 0.5% of the original loop; four-worker throughput remains 1.4–3.2% higher. Linux, macOS, and Windows pass full region coverage, and no idle spin is observed. The historical uncorrected prototype measurements below remain separate; the new evidence does not prove statistical equivalence or general application performance.
 
 ## Worker policy
 
@@ -10,9 +10,9 @@ Both physical queues retain stable stealers while their local roles swap. Anothe
 
 The experiment removes the 61-task event interval. A task waking itself cannot extend this worker's current batch, but there is no maximum batch size: a very large batch can delay I/O checks. A single future poll that never returns still occupies its worker. This experiment adds no cooperative operation budget.
 
-## Final source comparison
+## Uncorrected source comparison
 
-Baseline source is `ddc994d2f1f3f10df53e46241a730d38a7c37531` (the scheduler simplicity PR), not an older main-branch baseline. Final measured candidate source is `d1306dfc7ccde4502d4e966cc4e070bc32d2e101`, tree `16befc49202178cbe2bd5473968fc0c4ba2b7aba`. Subsequent commits add documentation and evidence only. The remote staged source tree was checked against the local committed tree before measurement. The [source patch](results/double-buffered-ready/candidate.patch) contains the five changed Native source/test files.
+Baseline source is `ddc994d2f1f3f10df53e46241a730d38a7c37531` (the scheduler simplicity PR), not an older main-branch baseline. The measured uncorrected candidate source is `d1306dfc7ccde4502d4e966cc4e070bc32d2e101`, tree `16befc49202178cbe2bd5473968fc0c4ba2b7aba`. The remote staged source tree was checked against the local committed tree before measurement. The [source patch](results/double-buffered-ready/candidate.patch) contains the five changed Native source/test files. The linked follow-up measures the wakeup fix separately.
 
 The [final 90 samples](results/double-buffered-ready/final/aiko.json) contain three interleaved repetitions per build/backend/workload. Throughput cells show median requests/s and the observed minimum–maximum. The latency column shows the median of each run's p99 RTT, not a pooled p99.
 
@@ -47,7 +47,7 @@ Owned serial throughput declines by 4.21% in the initial prototype matrix and 2.
 | 1/1/64 | tokio | 271,245 [268,799–274,415] | 269,906 [268,534–270,656] | -0.49% | 4.351 → 4.371 |
 | 1/1/64 | iouring | 236,126 [231,542–241,883] | 230,357 [226,842–234,925] | -2.44% | 6.311 → 9.543 |
 
-The repeated owned serial decline is a concern despite overlapping throughput ranges. Tail latency is also variable and worsens in this confirmation; the evidence does not support claiming no serial regression. This matrix alone does not identify which executor cost dominates. A [subsequent targeted diagnosis](results/double-buffered-ready/diagnosis/readme.md) finds redundant worker self-notifications during idle completion publication: approximately four driver turns and seven queue searches per echo, versus three and four in the original loop. Suppressing that self-notification recovers the loss in a separate selected serial experiment. Skipping singleton queue swaps or reducing external-queue checks did not recover it in their screen. These diagnostic variants have not been applied as a production fix or tested across this concurrent matrix.
+The repeated owned serial decline is a concern despite overlapping throughput ranges. Tail latency is also variable and worsens in this confirmation; this uncorrected candidate's evidence does not support claiming no serial regression. A [subsequent targeted diagnosis](results/double-buffered-ready/diagnosis/readme.md) finds redundant worker self-notifications during idle completion publication: approximately four driver turns and seven queue searches per echo, versus three and four in the original loop. Suppressing that self-notification recovers the loss in a separate selected serial experiment. Skipping singleton queue swaps or reducing external-queue checks did not recover it in their screen. The [wakeup-fix validation](results/double-buffered-ready/wake-validation/readme.md) adds regression tests, full cross-platform coverage, and a new concurrent comparison; those results are not pooled into these earlier tables.
 
 ## Initial prototype and idle checks
 
@@ -57,9 +57,9 @@ The initial concurrent results broadly agree with the final direction: four-work
 
 The [idle check](results/double-buffered-ready/idle.json) starts twelve servers: baseline/candidate, one/four workers, and raw Tokio/owned Native/borrowed Native. Each warms for half a second and is observed without clients for two seconds. Every sample records zero process CPU ticks during that interval, so no idle spin was observed at that measurement resolution.
 
-## Validation
+## Uncorrected source validation
 
-The [validation record](results/double-buffered-ready/validation.json) covers the final measured source:
+The [validation record](results/double-buffered-ready/validation.json) covers the uncorrected measured source:
 
 - macOS workspace tests, all targets/features: 15,853/15,853 measured source regions covered.
 - Linux Native tests, all targets/features in an isolated coverage directory: 1,329/1,329 regions covered.
@@ -67,7 +67,7 @@ The [validation record](results/double-buffered-ready/validation.json) covers th
 - Workspace Clippy with all targets/features and warnings denied passed on macOS; formatting passed.
 - New regression tests verify that a self-wake waits for the next driver turn on a single worker and that both ready generations remain stealable. Existing tests cover completion-batch publication, busy-task I/O progress, incoming wakes, driver failure/retirement, cancellation, and shutdown.
 
-Windows was not run for this experiment. No platform-specific source or public capability signature changed. A first Linux coverage invocation reused artifacts from other checkouts and included unrelated binaries; it was discarded and rerun with an isolated coverage directory. The successful isolated result above is the reported check.
+Windows was not run for this original experiment; it passes the subsequent wakeup-fix validation. No platform-specific source or public capability signature changed. A first Linux coverage invocation reused artifacts from other checkouts and included unrelated binaries; it was discarded and rerun with an isolated coverage directory. The successful isolated result above is the reported check.
 
 ## Reproduction and limits
 
