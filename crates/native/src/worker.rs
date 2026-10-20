@@ -273,14 +273,15 @@ fn run_loop(
             continue;
         };
         // Freeze the batch. Wakes during task polling go into the now-empty next queue.
-        CURRENT_WORKER.with(|current| {
+        let has_more = CURRENT_WORKER.with(|current| {
             let mut current = current.borrow_mut();
             let local = current.as_mut().expect("worker context is installed");
             std::mem::swap(&mut local.ready, &mut local.current);
-            if !local.current.is_empty() {
-                shared.wake_idle(UNASSIGNED_WORKER);
-            }
+            !local.current.is_empty()
         });
+        if has_more {
+            shared.wake_idle(UNASSIGNED_WORKER);
+        }
         let mut runnable = Some(runnable);
         while let Some(task) = runnable {
             task.metadata().worker.store(identifier, Ordering::Relaxed);
