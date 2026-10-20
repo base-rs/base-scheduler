@@ -1,0 +1,159 @@
+{
+  "before_source": "427be5d2ef6c610a5d5de5b10570c938b65d6c2d",
+  "after_source": "958ac6cf9862fdce2fc8de18c8864c4f971b6abc",
+  "after_checkout": "Before source plus archived source.patch, matching the after source commit; canonical user checkout left untouched.",
+  "build_command": "CARGO_TARGET_DIR=/home/samuel/.cache/core-scheduler-next-final/target cargo build --release --locked -p core-scheduler-echo-benchmark",
+  "profile": "Default Cargo release (optimized); no Cargo.toml profile overrides, explicit LTO, target-cpu overrides, or dependency changes.",
+  "build_environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "CARGO_PROFILE_RELEASE_OPT_LEVEL": null,
+    "CARGO_PROFILE_RELEASE_LTO": null,
+    "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": null
+  },
+  "rustc": "rustc 1.99.0 (b940084d7 2026-09-28) (Arch Linux rust 1:1.99.0-1)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.0\nLLVM version: 23.1.1",
+  "cargo": "cargo 1.99.0 (5f94df478 2026-08-27) (Arch Linux rust 1:1.99.0-1)",
+  "kernel": "Linux aiko 7.2.6-arch2-1 #1 SMP PREEMPT_DYNAMIC Mon, 14 Sep 2026 22:41:30 +0000 x86_64 GNU/Linux",
+  "cpu": "Architecture:                            x86_64\nCPU op-mode(s):                          32-bit, 64-bit\nAddress sizes:                           48 bits physical, 48 bits virtual\nByte Order:                              Little Endian\nCPU(s):                                  32\nOn-line CPU(s) list:                     0-31\nVendor ID:                               AuthenticAMD\nModel name:                              AMD Ryzen 9 9950X3D 16-Core Processor\nCPU family:                              26\nModel:                                   68\nThread(s) per core:                      2\nCore(s) per socket:                      16\nSocket(s):                               1\nStepping:                                0\nMicrocode version:                       0xb404035\nFrequency boost:                         enabled\nCPU(s) scaling MHz:                      60%\nCPU max MHz:                             5756.4521\nCPU min MHz:                             624.1940\nBogoMIPS:                                8599.98\nFlags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good amd_lbr_v2 nopl xtopology nonstop_tsc cpuid extd_apicid aperfmperf rapl pni pclmulqdq monitor ssse3 fma cx16 sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand lahf_lm cmp_legacy svm extapic cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw ibs skinit wdt tce topoext perfctr_core perfctr_nb bpext perfctr_llc mwaitx cpuid_fault cpb cat_l3 cdp_l3 hw_pstate ssbd mba perfmon_v2 ibrs ibpb stibp ibrs_enhanced vmmcall fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid cqm rdt_a avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local user_shstk avx_vnni avx512_bf16 clzero irperf xsaveerptr rdpru wbnoinvd cppc arat npt lbrv svm_lock nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold avic v_vmsave_vmload vgif x2avic v_spec_ctrl vnmi avx512vbmi umip pku ospke avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid bus_lock_detect movdiri movdir64b overflow_recov succor smca fsrm avx512_vp2intersect flush_l1d amd_lbr_pmc_freeze\nVirtualization:                          AMD-V\nL1d cache:                               768 KiB (16 instances)\nL1i cache:                               512 KiB (16 instances)\nL2 cache:                                16 MiB (16 instances)\nL3 cache:                                128 MiB (2 instances)\nNUMA node(s):                            1\nNUMA node0 CPU(s):                       0-31\nVulnerability Gather data sampling:      Not affected\nVulnerability Ghostwrite:                Not affected\nVulnerability Indirect target selection: Not affected\nVulnerability Itlb multihit:             Not affected\nVulnerability L1tf:                      Not affected\nVulnerability Mds:                       Not affected\nVulnerability Meltdown:                  Not affected\nVulnerability Mmio stale data:           Not affected\nVulnerability Old microcode:             Not affected\nVulnerability Reg file data sampling:    Not affected\nVulnerability Retbleed:                  Not affected\nVulnerability Spec rstack overflow:      Mitigation; IBPB on VMEXIT only\nVulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl\nVulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization\nVulnerability Spectre v2:                Mitigation; Enhanced / Automatic IBRS; IBPB conditional; STIBP always-on; PBRSB-eIBRS Not affected; BHI Not affected\nVulnerability Srbds:                     Not affected\nVulnerability Tsa:                       Not affected\nVulnerability Tsx async abort:           Not affected\nVulnerability Vmscape:                   Mitigation; IBPB on VMEXIT",
+  "topology": "CPU CORE SOCKET NODE L1d:L1i:L2:L3\n  0    0      0    0 0:0:0:0\n  1    1      0    0 1:1:1:0\n  2    2      0    0 2:2:2:0\n  3    3      0    0 3:3:3:0\n  4    4      0    0 4:4:4:0\n  5    5      0    0 5:5:5:0\n  6    6      0    0 6:6:6:0\n  7    7      0    0 7:7:7:0\n  8    8      0    0 8:8:8:1\n  9    9      0    0 9:9:9:1\n 10   10      0    0 10:10:10:1\n 11   11      0    0 11:11:11:1\n 12   12      0    0 12:12:12:1\n 13   13      0    0 13:13:13:1\n 14   14      0    0 14:14:14:1\n 15   15      0    0 15:15:15:1\n 16    0      0    0 0:0:0:0\n 17    1      0    0 1:1:1:0\n 18    2      0    0 2:2:2:0\n 19    3      0    0 3:3:3:0\n 20    4      0    0 4:4:4:0\n 21    5      0    0 5:5:5:0\n 22    6      0    0 6:6:6:0\n 23    7      0    0 7:7:7:0\n 24    8      0    0 8:8:8:1\n 25    9      0    0 9:9:9:1\n 26   10      0    0 10:10:10:1\n 27   11      0    0 11:11:11:1\n 28   12      0    0 12:12:12:1\n 29   13      0    0 13:13:13:1\n 30   14      0    0 14:14:14:1\n 31   15      0    0 15:15:15:1",
+  "frequency_policy": {
+    "/sys/devices/system/cpu/cpufreq/policy11/scaling_governor": "powersave",
+    "/sys/devices/system/cpu/cpufreq/policy8/scaling_governor": "powersave",
+    "/sys/devices/system/cpu/cpufreq/policy6/scaling_governor": "powersave",
+    "/sys/devices/system/cpu/cpufreq/policy28/scaling_governor": "powersave",
+    "/sys/devices/system/cpu/cpufreq/policy18/scaling_governor": "powersave",
+    "/sys/devices/system/cpu/cpufreq/policy4/scaling_governor": "powersave",
+    "/sys/devices/system/cpu/cpufreq/policy26/scaling_governor": "powersave",
+    "/sys/devices/system/cpu/cpufreq/policy16/scaling_governor": "powersave",
+    "/sys/devices/system/cpu/cpufreq/policy2/scaling_governor": "powersave",
+    "/sys/devices/system/cpu/cpufreq/policy24/scaling_governor": "powersave",
+    "/sys/devices/system/cpu/cpufreq/policy14/scaling_governor": "powersave",
+    "/sys/devices/system/cpu/cpufreq/policy0/scaling_governor": "powersave",
+    "/sys/devices/system/cpu/cpufreq/policy22/scaling_governor": "powersave",
+    "/sys/devices/system/cpu/cpufreq/policy12/scaling_governor": "powersave",
+    "/sys/devices/system/cpu/cpufreq/policy9/scaling_governor": "powersave",
+    "/sys/devices/system/cpu/cpufreq/policy30/scaling_governor": "powersave",
+    "/sys/devices/system/cpu/cpufreq/policy20/scaling_governor": "powersave",
+    "/sys/devices/system/cpu/cpufreq/policy10/scaling_governor": "powersave",
+    "/sys/devices/system/cpu/cpufreq/policy7/scaling_governor": "powersave",
+    "/sys/devices/system/cpu/cpufreq/policy29/scaling_governor": "powersave",
+    "/sys/devices/system/cpu/cpufreq/policy19/scaling_governor": "powersave",
+    "/sys/devices/system/cpu/cpufreq/policy5/scaling_governor": "powersave",
+    "/sys/devices/system/cpu/cpufreq/policy27/scaling_governor": "powersave",
+    "/sys/devices/system/cpu/cpufreq/policy17/scaling_governor": "powersave",
+    "/sys/devices/system/cpu/cpufreq/policy3/scaling_governor": "powersave",
+    "/sys/devices/system/cpu/cpufreq/policy25/scaling_governor": "powersave",
+    "/sys/devices/system/cpu/cpufreq/policy15/scaling_governor": "powersave",
+    "/sys/devices/system/cpu/cpufreq/policy1/scaling_governor": "powersave",
+    "/sys/devices/system/cpu/cpufreq/policy23/scaling_governor": "powersave",
+    "/sys/devices/system/cpu/cpufreq/policy13/scaling_governor": "powersave",
+    "/sys/devices/system/cpu/cpufreq/policy31/scaling_governor": "powersave",
+    "/sys/devices/system/cpu/cpufreq/policy21/scaling_governor": "powersave"
+  },
+  "exclusive_timing_lock": "/tmp/core-scheduler-perf.lock; builds and tests use shared lock.",
+  "source_patch": {
+    "path": "/tmp/core-scheduler-next-final.patch",
+    "sha256": "ef1452680548b8b86af0e00b0c491248b54e9591cc4bcab959333d6b04b33abe"
+  },
+  "cargo_lock": {
+    "path": "Cargo.lock",
+    "sha256": "21c665672062545c4801bfaf434aa5d2195673890cd920c05d81630847754644"
+  },
+  "binaries": {
+    "before": {
+      "path": "/home/samuel/.cache/core-scheduler-next-final/before",
+      "sha256": "433d0b95e121c9004fb04125a576dbd1a94e4ad2890cfdfb86a161d903fa1d18"
+    },
+    "after": {
+      "path": "/home/samuel/.cache/core-scheduler-next-final/after",
+      "sha256": "ffdc990a73117213078535040762d38a2e45ffb1789b8d60cddad582eb7d1bde"
+    }
+  },
+  "client": {
+    "path": "/home/samuel/.cache/core-scheduler-owner-wake-final/client",
+    "sha256": "db6c914ab75011477ec6232e681046b1e75532cbaa1c81663bac984591675cf3"
+  },
+  "runner": {
+    "path": "/home/samuel/.cache/core-scheduler-next-final/run.py",
+    "sha256": "4dcb2f95087cc39998803fa7f3555512059b42991af3972679633ec7204205e2"
+  },
+  "helper": {
+    "path": "/home/samuel/.cache/core-scheduler-next-final/sample-runner.py",
+    "sha256": "31e6ad715214fcadfda358362100a21cb94cc41a79e23733191eb8e61b740909"
+  },
+  "server_affinity": "CPU0 for one worker; CPUs0\u20133 for four workers, separate physical cores in one last-level cache.",
+  "client_affinity": "CPUs4\u20137; four workers, separate physical cores sharing the server last-level cache.",
+  "matrix": "Five workloads x five backends x before/after x three repeats; 150 complete samples. 1s warmup, 3s measurement; fixed-seed randomized order.",
+  "scope": "Closed-loop persistent IPv4 loopback TCP echo; one outstanding request per connection, TCP_NODELAY, 64KiB server buffers. Payload validated by fixed client. Setup/warmup excluded from throughput and RTT, included in lifecycle CPU.",
+  "release_fingerprints": [
+    {
+      "rustc": 13444744534853132663,
+      "features": "[]",
+      "declared_features": "[]",
+      "target": 3105875697246673247,
+      "profile": 854319013279132213,
+      "path": 11024657843973448407,
+      "deps": [
+        [
+          6128861683254529859,
+          "tokio",
+          false,
+          1762352725990240157
+        ],
+        [
+          6525882365040435308,
+          "core_scheduler_native",
+          false,
+          280704799387267012
+        ],
+        [
+          7510388801471148258,
+          "core_scheduler",
+          false,
+          1812987457367506088
+        ],
+        [
+          8153389937262086537,
+          "hdrhistogram",
+          false,
+          10131754361414451305
+        ],
+        [
+          8160210889872729633,
+          "serde_json",
+          false,
+          1329740091643834083
+        ],
+        [
+          8411870186617420040,
+          "core_scheduler_tokio",
+          false,
+          15894304137069633660
+        ],
+        [
+          10688722282492412766,
+          "core_scheduler_echo_benchmark",
+          false,
+          3500032031788480408
+        ],
+        [
+          11204394504696660880,
+          "core_scheduler_iouring",
+          false,
+          17657209074572811392
+        ]
+      ],
+      "local": [
+        {
+          "CheckDepInfo": {
+            "dep_info": "release/.fingerprint/core-scheduler-echo-benchmark-460d60454cd06879/dep-bin-core-scheduler-echo-benchmark",
+            "checksum": false
+          }
+        }
+      ],
+      "rustflags": [],
+      "config": 9396254390672932401,
+      "compile_kind": 0
+    }
+  ]
+}

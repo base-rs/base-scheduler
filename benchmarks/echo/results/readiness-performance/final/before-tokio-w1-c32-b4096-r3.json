@@ -1,0 +1,33 @@
+{
+  "bytes": 4096,
+  "connections": 32,
+  "payload_mib_per_second": 2419.1328125,
+  "requests": 1857894,
+  "requests_per_second": 619298.0,
+  "rtt_max_us": 227.711,
+  "rtt_mean_us": 51.57042301606008,
+  "rtt_p50_us": 52.799,
+  "rtt_p95_us": 57.567,
+  "rtt_p99_us": 60.191,
+  "seconds": 3.0,
+  "warmup_seconds": 1.0,
+  "identifier": "before-tokio-w1-c32-b4096-r3",
+  "mode": "before",
+  "backend": "tokio",
+  "workers": 1,
+  "repeat": 3,
+  "client_cpu": {
+    "user": 1.4068149999999946,
+    "system": 3.7362719999998717,
+    "voluntary_switches": 1402873,
+    "involuntary_switches": 851
+  },
+  "server_cpu": {
+    "user": 0.2254670000000374,
+    "system": 2.3491070000000036,
+    "voluntary_switches": 161,
+    "involuntary_switches": 41
+  },
+  "lifecycle_seconds": 4.002760953968391,
+  "variant": "before"
+}

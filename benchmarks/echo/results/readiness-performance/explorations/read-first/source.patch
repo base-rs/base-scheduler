@@ -1,0 +1,29 @@
+diff --git a/crates/iouring/src/io_uring_selector/socket.rs b/crates/iouring/src/io_uring_selector/socket.rs
+index 851a0da..9fe81ed 100644
+--- a/crates/iouring/src/io_uring_selector/socket.rs
++++ b/crates/iouring/src/io_uring_selector/socket.rs
+@@ -50,9 +50,23 @@ impl SocketRead for IoUringSelector {
+     async fn socket_read<B: IoBufMut>(
+         &self,
+         socket: &Self::Socket,
+-        buffer: B,
++        mut buffer: B,
+         cancellation: &Cancellation,
+     ) -> BufferResult<B> {
++        if let Err(error) = cancellation.check() {
++            return (Err(error.into()), buffer);
++        }
++        if let Err(error) = self.check_open() {
++            return (Err(error.into()), buffer);
++        }
++        // Ready reads retain no payload pointer beyond this synchronous nonblocking attempt.
++        match syscall("socket-read", || {
++            socket.try_recv(buffer.as_mut(), SocketRecvFlags::default())
++        }) {
++            Err(error) if error.kind() == io::ErrorKind::WouldBlock => {}
++            Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
++            result => return (operation_result(result, cancellation), buffer),
++        }
+         let controller = self.route();
+         let (result, buffer) = retry_operation(
+             self,

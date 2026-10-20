@@ -1,0 +1,94 @@
+{
+  "production_source_commit": "958ac6c",
+  "base_commit": "427be5d2ef6c610a5d5de5b10570c938b65d6c2d",
+  "worktree": "/home/samuel/Developer/core-rs/core-scheduler-perf-readiness-policy-next",
+  "artifacts": [
+    {
+      "path": "/home/samuel/.cache/core-scheduler-readiness-policy-next/production.patch",
+      "sha256": "ef1452680548b8b86af0e00b0c491248b54e9591cc4bcab959333d6b04b33abe"
+    },
+    {
+      "path": "/home/samuel/.cache/core-scheduler-readiness-policy-next/readable-source.patch",
+      "sha256": "75a47227eee2223720ca5c4c4a888905ef6454ecd0f1c100affef49c0c8b8c31"
+    },
+    {
+      "path": "/home/samuel/.cache/core-scheduler-readiness-policy-next/poll-source.patch",
+      "sha256": "8d79ead9ecc2e8b2a7072890d6f789dcdea0c9446e0fdb12395e88ec1ea0ee90"
+    },
+    {
+      "path": "/home/samuel/.cache/core-scheduler-readiness-policy-next/readable-diagnostic.patch",
+      "sha256": "596197c239bac52b9c47d99a01eb222c104a1fc01c7b535fd0ae200979eed138"
+    },
+    {
+      "path": "/home/samuel/.cache/core-scheduler-readiness-policy-next/poll-diagnostic.patch",
+      "sha256": "7622833802f2cbc431284fa394d2f502417b08dae99728583c4340fcc478f34e"
+    },
+    {
+      "path": "/home/samuel/.cache/core-scheduler-readiness-policy-next/readable-server.rs",
+      "sha256": "f2b9ab6efe7c088d0699ef46df3ab8823b22459b4778e2d812d5ba515af4b250"
+    },
+    {
+      "path": "/home/samuel/.cache/core-scheduler-readiness-policy-next/poll-server.rs",
+      "sha256": "b4d9eccd63e0d0ad9f9d64aaed1253ef79744483fad10c7fa8989eaa43425d9b"
+    },
+    {
+      "path": "/home/samuel/.cache/core-scheduler-readiness-policy-next/diagnostic",
+      "sha256": "a5be94fc62cb15e969738d695695a7af3010098503011c8a7896750b03011430"
+    },
+    {
+      "path": "/home/samuel/.cache/core-scheduler-readiness-policy-next/diagnostic-poll",
+      "sha256": "d15686cc4fb56cb6993cb5b7b582d726c4d2037de9b1dd07129c67c044eded30"
+    },
+    {
+      "path": "/home/samuel/.cache/core-scheduler-readiness-policy-next/run.py",
+      "sha256": "4dcb2f95087cc39998803fa7f3555512059b42991af3972679633ec7204205e2"
+    },
+    {
+      "path": "/home/samuel/.cache/core-scheduler-readiness-policy-next/run-screen.sh",
+      "sha256": "47984e913da6e4f7bff10635a96ac4318a0c2d255741155ef07829d0c5c90b45"
+    },
+    {
+      "path": "/home/samuel/.cache/core-scheduler-readiness-policy-next/build-poll-and-run.sh",
+      "sha256": "80ca2c31a96758077b7c05d3fc2993b127eca95c3dbccd440474e71f9b56c5af"
+    },
+    {
+      "path": "/home/samuel/.cache/core-scheduler-readiness-policy-next/compiler.txt",
+      "sha256": "e9e4ced8161a774af62ef1d599e5c84c25735205d052feaf97e7d480c29d135e"
+    },
+    {
+      "path": "/home/samuel/.cache/core-scheduler-readiness-policy-next/cargo.txt",
+      "sha256": "6a59b0c227397137eae1f0c19d44fc81df1a26052535a78a72094f53c34e8826"
+    }
+  ],
+  "build_command": "CARGO_TARGET_DIR=/home/samuel/.cache/core-scheduler-readiness-policy-next/target cargo build --release --locked -p core-scheduler-echo-benchmark",
+  "relevant_environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "CARGO_PROFILE_RELEASE_OPT_LEVEL": null,
+    "CARGO_PROFILE_RELEASE_LTO": null,
+    "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": null
+  },
+  "manifests": [
+    {
+      "path": "/home/samuel/Developer/core-rs/core-scheduler-perf-readiness-policy-next/Cargo.toml",
+      "sha256": "5797829cebfaef6ea219268ccb15830cdea372ff38596f94d827c56a63dc6674"
+    },
+    {
+      "path": "/home/samuel/Developer/core-rs/core-scheduler-perf-readiness-policy-next/Cargo.lock",
+      "sha256": "21c665672062545c4801bfaf434aa5d2195673890cd920c05d81630847754644"
+    },
+    {
+      "path": "/home/samuel/Developer/core-rs/core-scheduler-perf-readiness-policy-next/benchmarks/echo/Cargo.toml",
+      "sha256": "9c6ad49addc9c66f70381188059a5e30394bf616f71592380d844fd1f2e1daf1"
+    }
+  ],
+  "compiler": "rustc 1.99.0 (b940084d7 2026-09-28) (Arch Linux rust 1:1.99.0-1)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+  "cargo": "cargo 1.99.0 (5f94df478 2026-08-27) (Arch Linux rust 1:1.99.0-1)\n",
+  "limits": [
+    "Three randomized repeats for one workload only; this is a diagnostic and is not evidence of universal performance parity.",
+    "Only raw Tokio receive loop changes; write_all and every client, helper, CPU pinning, payload size, and server worker count remain identical.",
+    "readable().await and poll_read_ready have different waiter and cooperative-budget paths. Neither difference against AsyncReadExt can be attributed exclusively to EAGAIN counts without counters.",
+    "Core retains readiness until WouldBlock for urgent-TCP correctness; the diagnostic likewise deliberately avoids short-read readiness clearing.",
+    "Exclusive benchmark lock prevents concurrent agent builds/tests/benchmarks under the same lock; it does not guarantee an otherwise idle host."
+  ]
+}

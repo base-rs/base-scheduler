@@ -1,0 +1,20 @@
+baseline-tokio-adapter-poll-w1-c32-b64-r2 627064
+baseline-tokio-adapter-poll-w1-c32-b64-r3 624301
+readiness-only-tokio-adapter-w1-c32-b64-r3 638531
+readiness-only-tokio-adapter-w1-c32-b64-r2 646443
+readiness-only-tokio-w1-c32-b64-r3 702112
+baseline-tokio-adapter-w1-c32-b64-r2 614858
+readiness-only-tokio-w1-c32-b64-r2 695661
+readiness-only-tokio-adapter-poll-w1-c32-b64-r3 648095
+baseline-tokio-adapter-poll-w1-c32-b64-r1 621652
+readiness-only-tokio-w1-c32-b64-r1 703452
+readiness-only-tokio-adapter-poll-w1-c32-b64-r1 644298
+baseline-tokio-adapter-w1-c32-b64-r1 609988
+baseline-tokio-adapter-w1-c32-b64-r3 613153
+readiness-only-tokio-adapter-w1-c32-b64-r1 642370
+readiness-only-tokio-adapter-poll-w1-c32-b64-r2 646682
+baseline tokio-adapter 613153
+baseline tokio-adapter-poll 624301
+readiness-only tokio 702112
+readiness-only tokio-adapter 642370
+readiness-only tokio-adapter-poll 646682

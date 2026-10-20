@@ -1,0 +1,40 @@
+Waiting for exclusive benchmark lock.
+1 24 coop iouring 4 128 64 1 2053780
+2 24 before iouring 4 128 64 1 1963035
+3 24 coop iouring 1 32 64 2 620567
+4 24 coop iouring 1 32 64 1 623956
+5 24 before iouring-poll 4 128 64 1 1952057
+6 24 before iouring 1 32 64 2 626186
+7 24 coop iouring-poll 4 128 64 1 2047247
+8 24 before iouring 1 32 64 1 628271
+9 24 coop iouring-poll 1 1 64 1 226956
+10 24 coop iouring-poll 4 128 64 2 2044066
+11 24 coop iouring-poll 1 1 64 2 221551
+12 24 coop iouring 1 1 64 1 235789
+13 24 before iouring-poll 4 128 64 2 1980892
+14 24 before iouring 4 128 64 2 1951388
+15 24 before iouring-poll 1 1 64 1 228958
+16 24 coop iouring 1 1 64 2 231190
+17 24 before iouring-poll 1 32 64 1 564710
+18 24 coop iouring-poll 1 32 64 1 563203
+19 24 before iouring-poll 1 32 64 2 561555
+20 24 coop iouring-poll 1 32 64 2 560157
+21 24 before iouring 1 1 64 1 233667
+22 24 before iouring-poll 1 1 64 2 229524
+23 24 before iouring 1 1 64 2 239378
+24 24 coop iouring 4 128 64 2 2050901
+RESULT 1 1 64
+before iouring median 236522 range 233667 239378
+coop iouring median 233490 range 231190 235789
+before iouring-poll median 229241 range 228958 229524
+coop iouring-poll median 224254 range 221551 226956
+RESULT 1 32 64
+before iouring median 627228 range 626186 628271
+coop iouring median 622262 range 620567 623956
+before iouring-poll median 563132 range 561555 564710
+coop iouring-poll median 561680 range 560157 563203
+RESULT 4 128 64
+before iouring median 1957212 range 1951388 1963035
+coop iouring median 2052340 range 2050901 2053780
+before iouring-poll median 1966475 range 1952057 1980892
+coop iouring-poll median 2045657 range 2044066 2047247

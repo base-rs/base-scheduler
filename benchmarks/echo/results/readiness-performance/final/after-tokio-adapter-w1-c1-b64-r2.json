@@ -1,0 +1,33 @@
+{
+  "bytes": 64,
+  "connections": 1,
+  "payload_mib_per_second": 16.7691650390625,
+  "requests": 824238,
+  "requests_per_second": 274746.0,
+  "rtt_max_us": 179.199,
+  "rtt_mean_us": 3.608682066344917,
+  "rtt_p50_us": 3.551,
+  "rtt_p95_us": 4.051,
+  "rtt_p99_us": 4.311,
+  "seconds": 3.0,
+  "warmup_seconds": 1.0,
+  "identifier": "after-tokio-adapter-w1-c1-b64-r2",
+  "mode": "after",
+  "backend": "tokio-adapter",
+  "workers": 1,
+  "repeat": 2,
+  "client_cpu": {
+    "user": 0.3423000000000087,
+    "system": 1.434603999999979,
+    "voluntary_switches": 1092002,
+    "involuntary_switches": 8
+  },
+  "server_cpu": {
+    "user": 0.3405089999999973,
+    "system": 1.40921400000002,
+    "voluntary_switches": 1091981,
+    "involuntary_switches": 5
+  },
+  "lifecycle_seconds": 4.0018964658956975,
+  "variant": "after"
+}

@@ -1,0 +1,217 @@
+   Compiling core-scheduler-tokio v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-tokio-next/crates/tokio)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.68s
+     Running unittests src/lib.rs (/home/samuel/.cache/core-scheduler-tokio-next/debug/deps/core_scheduler_tokio-a84128f8ca9ba1c1)
+
+running 155 tests
+
+running 1 test
+test blocking_pool::tests::capacity_wait_rechecks_available_or_closed_state_before_sleeping ... ok
+test blocking_pool::tests::admission_reports_worker_startup_failure ... ok
+test blocking_pool::tests::draining_waits_for_running_work_and_releases_capacity ... ok
+
+thread '<unnamed>' (1222740) panicked at crates/tokio/src/blocking_pool/tests.rs:648:13:
+Box<dyn Any>
+test blocking_pool::tests::abandoned_result_panics_release_capacity_and_preserve_the_worker ... note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+ok
+test blocking_pool::tests::pending_capacity_and_drain_waits_do_not_allocate_and_unregister_on_drop ... ok
+test blocking_pool::tests::immediate_admission_and_empty_drain_need_no_listeners_or_allocations ... ok
+test blocking_pool::tests::shutdown_during_startup_cannot_admit_work ... ok
+test blocking_pool::tests::io_cancellation_returns_owned_input_and_worker_panics_resume_in_the_waiter ... ok
+test blocking_pool::tests::partial_startup_failure_closes_admission_and_releases_started_workers ... ok
+test clock::tests::conformance::pending_cancellation_and_wakeup ... ok
+test blocking_pool::tests::shutdown_catches_capture_destructor_panics_and_cancels_other_queued_jobs ... ok
+test clock::tests::close_preserves_pending_timers_and_rejects_new_waits ... ok
+test clock::tests::conformance::overflow_registers_no_timer ... ok
+
+thread 'protocol-tokio-0' (1222759) panicked at crates/tokio/src/blocking_pool/tests.rs:648:13:
+Box<dyn Any>
+test blocking_pool::tests::skipped_jobs_release_captures_before_reporting_completion ... ok
+test clock::tests::conformance::absolute_deadline_and_wakeup ... ok
+test clock::tests::conformance::lazy_registration_and_drop ... ok
+test clock::tests::conformance::pre_cancelled_waits ... ok
+test clock::tests::another_ambient_clock_does_not_replace_the_selected_host_clock ... ok
+test blocking_pool::tests::prepared_work_allocates_only_jobs_and_completion_channels ... ok
+test blocking_pool::tests::concurrent_first_admissions_share_one_startup ... ok
+test blocking_pool::tests::submitted_jobs_survive_abandonment_and_shutdown_with_bounded_admission ... ok
+test blocking_pool::tests::shutdown_drain_waits_until_discarded_capture_destructors_finish ... ok
+test blocking_pool::tests::dropping_a_queued_handle_on_another_thread_skips_execution_and_preserves_the_worker ... 
+thread 'protocol-tokio-0' (1222776) panicked at crates/tokio/src/blocking_pool/tests.rs:689:25:
+Box<dyn Any>
+ok
+test clock::tests::conformance::relative_wait_starts_on_poll ... ok
+
+thread 'protocol-tokio-0' (1222776) panicked at crates/tokio/src/blocking_pool/tests.rs:648:13:
+Box<dyn Any>
+test clock::tests::conformance::expiry_wins_concurrent_cancellation ... ok
+test file_io::tests::close_consumes_the_handle_and_preserves_system_errors ... test blocking_pool::tests::panicking_unobserved_payloads_preserve_native_capacity_and_shutdown ... okok
+
+test result: ok
+. 1 passed; 0 failed; 0 ignored; 0 measured; 154 filtered out; finished in 0.00s
+
+test file_extensions::tests::advice::lazy_admission ... ok
+test file_io::tests::file_io_operations_read_and_write_at_the_requested_offset ... ok
+test file_extensions::tests::allocation::keep_size_reserves_beyond_eof ... ok
+test resolver::tests::conformance::input_validation ... ok
+test file_io::tests::retries_interrupted_file_operations ... ok
+test file_extensions::tests::advice_waiting_for_capacity_can_be_abandoned_and_closed_admission_reports_errors ... ok
+test resolver::tests::conformance::lazy_and_pre_cancelled ... ok
+test file_extensions::tests::advice::validation_and_execution_errors ... ok
+test file_extensions::tests::allocation::lazy_and_pre_cancelled ... ok
+test file_io::tests::read_and_write_reject_offsets_outside_the_platform_range ... ok
+test file_extensions::tests::advice::accepted_work_survives_abandonment ... ok
+test signal_service::tests::conformance::multiple_targets_and_signals ... ok
+test blocking_pool::tests::panicking_unobserved_payloads_preserve_native_capacity_and_shutdown ... ok
+test file_extensions::tests::allocation::validation_and_execution_errors ... ok
+test resolver::tests::native_address_validation_and_unusual_socket_parameters_are_preserved ... ok
+test file_extensions::tests::advice::modes_ranges_and_completion ... ok
+test resolver::tests::conformance::ordered_owned_results ... ok
+test resolver::tests::conformance::forwards_all_hints ... ok
+test resolver::tests::ipv6::absent_name_and_passive_hints ... ok
+test resolver::tests::ipv4::absent_name_and_passive_hints ... ok
+test resolver::tests::conformance::numeric_host_prevents_name_lookup ... ok
+test resolver::tests::running_lookup_retains_bounded_capacity_after_cancellation_and_abandonment ... ok
+test resolver::tests::conformance::configured_named_service ... ok
+test resolver::tests::conformance::preserves_resolver_errors ... ok
+test signal_service::tests::conformance::setup_errors_release_target ... ok
+test resolver::tests::started_lookup_preserves_success_and_native_owner_moves_without_allocating_views ... ok
+test resolver::tests::native_resolver_error_codes_keep_categories_and_system_errors ... ok
+test socket_io::tests::borrowed_message_lengths_are_validated_before_native_access ... ok
+test resolver::tests::ipv6::numeric_hosts_and_transport_hints ... ok
+test socket_io::tests::message_validation_rejects_oversized_counts_lengths_and_overflow ... ok
+test socket_io::tests::invalid_vector_counts_fail_before_iterating_or_performing_native_io ... ok
+test signal_service::tests::panicking_targets_do_not_poison_dispatch_or_prevent_other_targets ... ok
+test socket_io::tests::borrowed_native_io_enforces_nonblocking_without_allocating_vectors ... ok
+test socket_io::tests::native_parameters_addresses_and_errors_are_preserved ... ok
+test signal_service::tests::rejects_empty_forbidden_native_and_closed_registrations_and_startup_failure ... ok
+test socket_io::tests::missing_control_storage_reports_discarded_packet_metadata ... ok
+test socket_io::tests::zero_capacity_message_receives_use_a_real_native_vector_and_report_os_results ... ok
+test socket_io::tests::native_connect_preserves_immediate_and_deferred_results ... ok
+test socket_io::tests::prepared_messages_bypass_scratch_and_native_attempts_need_no_vector_allocation ... ok
+test resolver::tests::ipv4::numeric_hosts_and_transport_hints ... ok
+test signal_service::tests::dispatch::unsubscribe_retains_in_progress_target_without_joining ... ok
+test socket_operations::tests::borrowed_operations_reject_closed_schedulers_and_preserve_storage_on_errors ... ok
+test signal_service::tests::conformance::independent_subscriptions ... ok
+test signal_service::tests::conformance::reentrant_subscription ... ok
+test socket_operations::tests::exclusive_close_rejects_retained_access_and_unpolled_close_drops_normally ... ok
+test socket_operations::tests::immediate_cancellation_and_closure_prevent_readiness_submission ... ok
+test socket_options::tests::imported_resources_are_nonblocking_and_closed_admission_is_rejected ... ok
+test socket_options::tests::actual_option_syscall_errors_are_preserved ... ok
+test socket_operations::tests::stopped_runtime_socket_registration_reports_an_error ... ok
+
+running 1 test
+test socket_operations::tests::cached_readiness_does_not_delay_lifecycle_calls_or_invalid_operations ... ok
+test socket_options::tests::ipv4::imports_established_stream ... ok
+test socket_operations::tests::accepted_shutdown_and_close_survive_abandonment_and_drain_during_shutdown ... ok
+test socket_operations::tests::socket_registration_uses_the_selected_runtime_under_another_ambient_host ... ok
+test socket_operations::tests::incompatible_runtime_rejects_operations_and_returns_original_owners ... ok
+test socket_operations::tests::prepared_message_io_reuses_vectors_and_payload_without_fresh_allocations ... ok
+test socket_operations::tests::socket_cleanup_is_independent_bounded_and_preserves_closed_admission_errors ... ok
+test socket_operations::tests::closure_preserves_pending_io_and_rejects_new_operations ... ok
+test socket_options::tests::keepalive_get::native_values_and_errors ... ok
+
+thread 'protocol-tokio-signal' (1222935) panicked at crates/tokio/src/signal_service/tests.rs:159:13:
+signal target destructor
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test socket_options::tests::nodelay_set::lazy_and_pre_cancelled ... ok
+test socket_options::tests::ipv4::imports_listening_socket ... ok
+test task_service::tests::completed_poll_waits_for_registration_retirement_and_join_notification ... ok
+test socket_options::tests::keepalive_set::lazy_and_pre_cancelled ... ok
+test system_file_metadata::tests::preserves_native_metadata_and_exposes_portable_observations ... ok
+test system_file_metadata::tests::classifies_real_symlinks_and_special_files ... ok
+test socket_operations::tests::shutdown_drains_task_owned_io_after_explicit_cancellation ... ok
+test signal_service::tests::os_signal_bridge_delivers_outside_the_raw_handler ... ok
+test socket_options::tests::nodelay_get::native_values_and_errors ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 154 filtered out; finished in 0.00s
+
+test socket_options::tests::keepalive_get::lazy_and_pre_cancelled ... ok
+test task_service::tests::conformance::closed_service_rejects_unpolled_input ... ok
+test socket_operations::tests::native_cleanup_failure_is_reported_by_each_cleanup_operation ... ok
+test task_service::tests::conformance::abandoned_handle_releases_completed_output ... ok
+test socket_options::tests::ipv6::imports_listening_socket ... ok
+test socket_options::tests::nodelay_get::lazy_and_pre_cancelled ... ok
+test task_service::tests::conformance::abandonment_destroys_task ... ok
+test socket_options::tests::keepalive_set::native_values_and_errors ... ok
+test task_service::tests::conformance::cooperative_cancellation ... ok
+test task_service::tests::conformance::output_and_handle_transfer ... ok
+test socket_options::tests::ipv6::imports_established_stream ... ok
+test system_file_metadata::tests::classification_preserves_special_and_unknown_file_kinds ... ok
+test socket_options::tests::reuse_get::lazy_and_pre_cancelled ... ok
+test socket_options::tests::reuse_set::native_values_and_errors ... ok
+test task_service::tests::conformance::registers_before_first_poll ... ok
+test task_service::tests::conformance::preserves_panic_payload ... ok
+test signal_service::tests::os_signal_bridge_delivers_outside_the_raw_handler ... ok
+
+running 1 test
+test socket_options::tests::reuse_get::native_values_and_errors ... ok
+test socket_options::tests::nodelay_set::native_values_and_errors ... ok
+test test_support::watchdog_propagates_assertion_panics ... ok
+test task_service::tests::current_thread::abandoned_handle_releases_completed_output ... ok
+test tokio_scheduler::tests::cancellation_after_io_dispatch_preserves_the_actual_result ... ok
+test task_service::tests::current_thread::closed_service_rejects_unpolled_input ... ok
+test task_service::tests::current_thread::preserves_panic_payload ... ok
+test task_service::tests::current_thread::abandonment_destroys_task ... ok
+test tokio_scheduler::tests::file_errors_and_exclusive_close_are_observable ... ok
+test tokio_scheduler::tests::invalid_options_and_closed_services_return_errors_and_buffers ... ok
+test task_service::tests::current_thread::cooperative_cancellation ... ok
+test tokio_scheduler::tests::startup_failures_preserve_io_ownership_and_report_cleanup_errors ... ok
+test tokio_scheduler::tests::running_cancellation_preserves_results_and_abandonment_keeps_capacity_occupied ... ok
+test tokio_scheduler::tests::cleanup_makes_progress_independently_and_accepted_close_survives_abandonment ... ok
+test task_service::tests::identifier_exhaustion_rejects_without_polling ... ok
+test task_service::tests::dispatch::handle_drop_defers_destruction_until_active_poll_returns ... ok
+test task_service::tests::current_thread::registers_before_first_poll ... ok
+
+thread 'tokio-rt-worker' (1223015) panicked at crates/tokio/src/task_service/tests.rs:282:13:
+Box<dyn Any>
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread '<unnamed>' (1223002) panicked at crates/tokio/src/task_service/tests.rs:269:13:
+abandoned destructor
+
+thread 'tokio-rt-worker' (1223012) panicked at crates/tokio/src/task_service/tests.rs:308:28:
+Box<dyn Any>
+
+thread '<unnamed>' (1223002) panicked at crates/tokio/src/task_service/tests.rs:269:13:
+abandoned destructor
+
+thread 'tokio-rt-worker' (1223012) panicked at crates/tokio/src/task_service/tests.rs:294:13:
+completed future destructor
+
+thread 'tokio-rt-worker' (1223012) panicked at crates/tokio/src/task_service/tests.rs:269:13:
+abandoned destructor
+test tokio_socket::tests::dropping_or_forgetting_a_reserved_waiter_preserves_other_waiters ... ok
+test task_service::tests::future_destructor_panic_is_reported_and_worker_stays_available ... ok
+test task_service::tests::abandoned_task_destructor_panics_do_not_abort_or_stop_workers ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 154 filtered out; finished in 0.00s
+
+test task_service::tests::stopped_host_destroys_submissions_without_retaining_the_registry_lock ... ok
+test socket_operations::tests::invalid_socket_protocol_is_reported ... ok
+test socket_operations::tests::vectored_sends_preserve_short_counts_without_implicitly_advancing_the_owner ... ok
+test tokio_task::tests::host_panic_payload_is_preserved_by_the_join_boundary ... ok
+test tokio_scheduler::tests::cleanup_completion_preserves_os_and_worker_errors ... ok
+test socket_options::tests::reuse_set::lazy_and_pre_cancelled ... ok
+test tokio_scheduler::tests::abandoned_io_and_scheduler_drop_retain_worker_access_until_retirement ... ok
+test tokio_socket::tests::explicit_close_rejects_retained_socket_ownership ... ok
+test task_service::tests::shutdown_waits_for_cooperative_task_exit_and_leaves_host_running ... ok
+test tokio_socket::tests::invalid_accept_returns_without_waiting_for_readiness ... ok
+test tokio_socket::tests::nonblocking_configuration_errors_are_returned ... ok
+test tokio_socket::tests::registration_errors_are_returned ... ok
+test task_service::tests::abandoned_task_destructor_panics_do_not_abort_or_stop_workers ... ok
+test task_service::tests::tasks_progress_without_occupying_syscall_workers_and_survive_admission_close ... ok
+test tokio_socket::tests::non_tcp_streams_preserve_direct_syscall_behavior ... ok
+test tokio_socket::tests::registered_listeners_still_report_invalid_read_errors_immediately ... ok
+test task_service::tests::current_thread::output_and_handle_transfer ... ok
+test tokio_socket::tests::established_stream_empty_reads_do_not_require_reactor_progress ... ok
+test file_extensions::tests::allocation::extend_preserves_data_and_cursor ... ok
+test tokio_socket::tests::registration_is_deferred_until_waiting_and_reused_after_cancellation ... ok
+test tokio_socket::tests::runtime_shutdown_wakes_both_reserved_and_concurrent_waiters ... ok
+test tokio_socket::tests::full_peeking_and_datagram_reads_retain_readability ... ok
+test tokio_socket::tests::reserved_and_concurrent_waiters_both_receive_readiness_wakeups ... ok
+test tokio_socket::tests::transient_would_block_retries_with_the_requested_readiness_direction ... ok
+test tokio_socket::tests::short_stream_reads_do_not_retry_stale_readiness ... ok
+test clock::tests::real_timers_use_the_selected_host_on_both_runtime_types ... ok
+test socket_operations::tests::borrowed_sends_preserve_short_counts_and_cancel_when_the_send_queue_is_full ... ok
+
+test result: ok. 155 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

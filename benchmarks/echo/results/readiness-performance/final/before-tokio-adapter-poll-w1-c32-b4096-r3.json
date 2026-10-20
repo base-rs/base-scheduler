@@ -1,0 +1,33 @@
+{
+  "bytes": 4096,
+  "connections": 32,
+  "payload_mib_per_second": 2156.2200520833335,
+  "requests": 1655977,
+  "requests_per_second": 551992.3333333334,
+  "rtt_max_us": 1050.623,
+  "rtt_mean_us": 57.86780462772128,
+  "rtt_p50_us": 59.295,
+  "rtt_p95_us": 63.871,
+  "rtt_p99_us": 66.495,
+  "seconds": 3.0,
+  "warmup_seconds": 1.0,
+  "identifier": "before-tokio-adapter-poll-w1-c32-b4096-r3",
+  "mode": "before",
+  "backend": "tokio-adapter-poll",
+  "workers": 1,
+  "repeat": 3,
+  "client_cpu": {
+    "user": 1.1845879999999909,
+    "system": 3.260415999999964,
+    "voluntary_switches": 1095238,
+    "involuntary_switches": 728
+  },
+  "server_cpu": {
+    "user": 0.29394999999999527,
+    "system": 2.4290899999999738,
+    "voluntary_switches": 102,
+    "involuntary_switches": 51
+  },
+  "lifecycle_seconds": 4.003260507015511,
+  "variant": "before"
+}

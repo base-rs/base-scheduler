@@ -1,0 +1,64 @@
+{
+  "bytes": 4096,
+  "connections": 32,
+  "payload_mib_per_second": 2260.375,
+  "requests": 1735968,
+  "requests_per_second": 578656.0,
+  "rtt_max_us": 228.735,
+  "rtt_mean_us": 55.20109216932573,
+  "rtt_p50_us": 56.543,
+  "rtt_p95_us": 61.119,
+  "rtt_p99_us": 63.679,
+  "seconds": 3.0,
+  "warmup_seconds": 1.0,
+  "identifier": "counted-tokio-adapter-poll-w1-c32-b4096-r1",
+  "mode": "counted",
+  "backend": "tokio-adapter-poll",
+  "workers": 1,
+  "repeat": 1,
+  "client_cpu": {
+    "user": 1.279897,
+    "system": 3.4091120000000004,
+    "voluntary_switches": 1212284,
+    "involuntary_switches": 937
+  },
+  "server_cpu": {
+    "user": 0.2964880000000001,
+    "system": 2.3700270000000003,
+    "voluntary_switches": 97,
+    "involuntary_switches": 51
+  },
+  "lifecycle_seconds": 4.00278610503301,
+  "counter_threads": [
+    {
+      "first_read_ok": 33,
+      "first_read_wouldblock": 2312636,
+      "retry_read_ok": 2312636,
+      "retry_read_wouldblock": 0,
+      "first_write_ok": 2312637,
+      "first_write_wouldblock": 0,
+      "retry_write_ok": 0,
+      "retry_write_wouldblock": 0
+    },
+    {
+      "first_read_ok": 2,
+      "first_read_wouldblock": 30,
+      "retry_read_ok": 30,
+      "retry_read_wouldblock": 29,
+      "first_write_ok": 0,
+      "first_write_wouldblock": 0,
+      "retry_write_ok": 0,
+      "retry_write_wouldblock": 0
+    }
+  ],
+  "counters": {
+    "first_read_ok": 35,
+    "first_read_wouldblock": 2312666,
+    "retry_read_ok": 2312666,
+    "retry_read_wouldblock": 29,
+    "first_write_ok": 2312637,
+    "first_write_wouldblock": 0,
+    "retry_write_ok": 0,
+    "retry_write_wouldblock": 0
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "bytes": 4096,
+  "connections": 32,
+  "payload_mib_per_second": 2252.4583333333335,
+  "requests": 1729888,
+  "requests_per_second": 576629.3333333334,
+  "rtt_max_us": 3137.535,
+  "rtt_mean_us": 55.39454059453556,
+  "rtt_p50_us": 56.735,
+  "rtt_p95_us": 61.311,
+  "rtt_p99_us": 63.871,
+  "seconds": 3.0,
+  "warmup_seconds": 1.0,
+  "identifier": "after-tokio-adapter-poll-w1-c32-b4096-r3",
+  "mode": "after",
+  "backend": "tokio-adapter-poll",
+  "workers": 1,
+  "repeat": 3,
+  "client_cpu": {
+    "user": 1.2911550000000034,
+    "system": 3.3605960000001005,
+    "voluntary_switches": 1197498,
+    "involuntary_switches": 895
+  },
+  "server_cpu": {
+    "user": 0.31384999999997376,
+    "system": 2.336753999999928,
+    "voluntary_switches": 99,
+    "involuntary_switches": 48
+  },
+  "lifecycle_seconds": 4.003134227823466,
+  "variant": "after"
+}

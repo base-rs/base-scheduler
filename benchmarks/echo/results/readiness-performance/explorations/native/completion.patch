@@ -1,0 +1,145 @@
+diff --git a/crates/iouring/src/io_uring_selector.rs b/crates/iouring/src/io_uring_selector.rs
+index 1e91d07..928719d 100644
+--- a/crates/iouring/src/io_uring_selector.rs
++++ b/crates/iouring/src/io_uring_selector.rs
+@@ -633,10 +633,10 @@ impl IoUringSelector {
+             .map_err(|_| io::Error::other("io_uring operation identifiers exhausted"))
+     }
+ 
+-    async fn submit<T>(
++    async fn submit<T, E: std::fmt::Debug>(
+         controller: Arc<Controller>,
+         request: Box<dyn PendingRequest>,
+-        result: oneshot::Receiver<T>,
++        result: impl Future<Output = Result<T, E>>,
+         cancellation: &Cancellation,
+     ) -> T {
+         let identifier = request.identifier();
+diff --git a/crates/iouring/src/io_uring_selector/readiness.rs b/crates/iouring/src/io_uring_selector/readiness.rs
+index 59edcd3..fbeb2fc 100644
+--- a/crates/iouring/src/io_uring_selector/readiness.rs
++++ b/crates/iouring/src/io_uring_selector/readiness.rs
+@@ -4,6 +4,83 @@
+ use super::socket::retain_socket;
+ use super::*;
+ use std::io::{IoSlice, IoSliceMut};
++use std::pin::Pin;
++use std::sync::Mutex;
++use std::task::{Context, Waker};
++
++enum CompletionState {
++    Pending(Option<Waker>),
++    Ready(io::Result<usize>),
++    Disconnected,
++}
++
++struct ReadinessSender(Option<Arc<Mutex<CompletionState>>>);
++struct ReadinessReceiver(Arc<Mutex<CompletionState>>);
++
++fn completion() -> (ReadinessSender, ReadinessReceiver) {
++    let state = Arc::new(Mutex::new(CompletionState::Pending(None)));
++    (
++        ReadinessSender(Some(Arc::clone(&state))),
++        ReadinessReceiver(state),
++    )
++}
++
++impl ReadinessSender {
++    fn send(mut self, result: io::Result<usize>) {
++        let state = self.0.take().expect("sender completes once");
++        let previous =
++            std::mem::replace(&mut *state.lock().unwrap(), CompletionState::Ready(result));
++        if let CompletionState::Pending(Some(waker)) = previous {
++            waker.wake();
++        }
++    }
++}
++
++impl Drop for ReadinessSender {
++    fn drop(&mut self) {
++        if let Some(state) = self.0.take() {
++            let previous =
++                std::mem::replace(&mut *state.lock().unwrap(), CompletionState::Disconnected);
++            if let CompletionState::Pending(Some(waker)) = previous {
++                waker.wake();
++            }
++        }
++    }
++}
++
++impl Future for ReadinessReceiver {
++    type Output = Result<io::Result<usize>, &'static str>;
++
++    fn poll(self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Self::Output> {
++        let mut state = self.0.lock().unwrap();
++        match &mut *state {
++            CompletionState::Pending(waker) => {
++                match waker {
++                    Some(waker) => waker.clone_from(context.waker()),
++                    None => *waker = Some(context.waker().clone()),
++                }
++                Poll::Pending
++            }
++            CompletionState::Ready(_) => {
++                let CompletionState::Ready(result) =
++                    std::mem::replace(&mut *state, CompletionState::Disconnected)
++                else {
++                    unreachable!()
++                };
++                Poll::Ready(Ok(result))
++            }
++            CompletionState::Disconnected => Poll::Ready(Err("readiness sender disconnected")),
++        }
++    }
++}
++
++impl Drop for ReadinessReceiver {
++    fn drop(&mut self) {
++        if let CompletionState::Pending(waker) = &mut *self.0.lock().unwrap() {
++            *waker = None;
++        }
++    }
++}
+ 
+ // Readiness requests retain only the socket. Borrowed payloads and I/O vectors never enter the ring or its request bookkeeping.
+ struct ReadinessRequest {
+@@ -11,7 +88,7 @@ struct ReadinessRequest {
+     _permit: Permit,
+     socket: Option<RegisteredSocket>,
+     interest: Interest,
+-    reply: Cell<Option<oneshot::Sender<io::Result<usize>>>>,
++    reply: Cell<Option<ReadinessSender>>,
+     cancelling: Cell<bool>,
+ }
+ 
+@@ -38,7 +115,7 @@ impl PendingRequest for ReadinessRequest {
+             .expect("unfinished request retains its sender");
+         // Release the socket and capacity before waking a caller that may close the socket or start another wait.
+         drop(self);
+-        discard(reply.send(result));
++        reply.send(result);
+     }
+ 
+     fn cancelling(&self) -> bool {
+@@ -61,10 +138,10 @@ impl Drop for ReadinessRequest {
+         drop(self.socket.take());
+         // An unpublished request may be discarded during shutdown. Unknown in-flight requests follow the driver's existing retention policy.
+         if let Some(reply) = self.reply.take() {
+-            discard(reply.send(Err(io::Error::new(
++            reply.send(Err(io::Error::new(
+                 io::ErrorKind::BrokenPipe,
+                 "selector closed before readiness submission",
+-            ))));
++            )));
+         }
+     }
+ }
+@@ -84,7 +161,7 @@ impl IoUringSelector {
+             cancellation,
+         )?;
+         let identifier = Self::next_identifier(&controller)?;
+-        let (reply, result) = oneshot::channel();
++        let (reply, result) = completion();
+         let request = ReadinessRequest {
+             identifier,
+             _permit: permit,

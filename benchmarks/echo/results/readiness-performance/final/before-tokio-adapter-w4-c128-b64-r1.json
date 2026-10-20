@@ -1,0 +1,33 @@
+{
+  "bytes": 64,
+  "connections": 128,
+  "payload_mib_per_second": 120.76177978515625,
+  "requests": 5935683,
+  "requests_per_second": 1978561.0,
+  "rtt_max_us": 3846.143,
+  "rtt_mean_us": 64.64996761400509,
+  "rtt_p50_us": 63.423,
+  "rtt_p95_us": 91.199,
+  "rtt_p99_us": 111.167,
+  "seconds": 3.0,
+  "warmup_seconds": 1.0,
+  "identifier": "before-tokio-adapter-w4-c128-b64-r1",
+  "mode": "before",
+  "backend": "tokio-adapter",
+  "workers": 4,
+  "repeat": 1,
+  "client_cpu": {
+    "user": 1.7566269999999804,
+    "system": 7.482430000000022,
+    "voluntary_switches": 393265,
+    "involuntary_switches": 1388
+  },
+  "server_cpu": {
+    "user": 1.8135500000000206,
+    "system": 7.729839000000084,
+    "voluntary_switches": 244411,
+    "involuntary_switches": 1120
+  },
+  "lifecycle_seconds": 4.017970306100324,
+  "variant": "before"
+}

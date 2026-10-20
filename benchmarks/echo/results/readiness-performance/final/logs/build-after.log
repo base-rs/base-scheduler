@@ -1,0 +1,4 @@
+   Compiling core-scheduler-tokio v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-next-final/crates/tokio)
+   Compiling core-scheduler-iouring v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-next-final/crates/iouring)
+   Compiling core-scheduler-echo-benchmark v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-next-final/benchmarks/echo)
+    Finished `release` profile [optimized] target(s) in 1.30s

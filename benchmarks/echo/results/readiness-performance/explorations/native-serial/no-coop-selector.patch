@@ -1,0 +1,48 @@
+diff --git a/crates/iouring/src/io_uring_selector.rs b/crates/iouring/src/io_uring_selector.rs
+index 1e91d07..f573d1d 100644
+--- a/crates/iouring/src/io_uring_selector.rs
++++ b/crates/iouring/src/io_uring_selector.rs
+@@ -791,6 +791,7 @@ impl Selector for IoUringSelector {
+ }
+ pub(crate) struct Reactor {
+     ring: IoUring,
++    started: bool,
+     notification: Arc<OwnedFd>,
+     incoming: mpsc::Receiver<Command>,
+     controller: Arc<Controller>,
+@@ -810,6 +811,7 @@ impl Reactor {
+     ) -> Self {
+         Self {
+             ring,
++            started: false,
+             notification,
+             incoming,
+             controller,
+@@ -821,6 +823,19 @@ impl Reactor {
+         }
+     }
+ 
++    pub(crate) fn bind_worker(&mut self) {
++        // Cooperative task work belongs to its submitting thread. Enable it only for a never-driven ring after its owner becomes thread-bound; a movable driver must keep the default interrupt behavior.
++        if !self.started {
++            if let Ok(ring) = syscall("cooperative-ring", || {
++                IoUring::builder()
++                    .build(self.ring.params().sq_entries())
++            }) {
++                // Setup already validated this kernel's operations and completion features. No request or notification has reached the old ring, and queued commands remain on the controller. Failure to obtain this optional replacement leaves the original valid ring intact.
++                self.ring = ring;
++            }
++        }
++    }
++
+     fn drain_notification(&self) -> io::Result<bool> {
+         let mut notified = false;
+         let mut value = 0u64;
+@@ -876,6 +891,7 @@ impl Reactor {
+     }
+ 
+     pub(crate) fn turn(&mut self, timeout: Option<Duration>) -> io::Result<bool> {
++        self.started = true;
+         let mut progressed = false;
+         // Bound command processing so a busy producer cannot starve completions.
+         let mut command_batch_full = true;

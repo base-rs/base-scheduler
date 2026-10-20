@@ -1,0 +1,6 @@
+    Checking core-scheduler-tokio v0.0.0 (/Users/samuel/Developer/core-rs/core-scheduler/crates/tokio)
+ Documenting core-scheduler-tokio v0.0.0 (/Users/samuel/Developer/core-rs/core-scheduler/crates/tokio)
+ Documenting core-scheduler v0.0.0 (/Users/samuel/Developer/core-rs/core-scheduler)
+ Documenting core-scheduler-echo-benchmark v0.0.0 (/Users/samuel/Developer/core-rs/core-scheduler/benchmarks/echo)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.50s
+   Generated /Users/samuel/Developer/core-rs/core-scheduler/target/doc/core_scheduler/index.html and 9 other files

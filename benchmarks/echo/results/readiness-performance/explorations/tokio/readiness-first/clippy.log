@@ -1,0 +1,317 @@
+    Checking libc v0.2.191
+    Checking pin-project-lite v0.2.17
+    Checking parking v2.2.1
+    Checking futures-core v0.3.34
+    Checking fastrand v2.5.0
+    Checking cfg-if v1.0.5
+    Checking linux-raw-sys v0.12.1
+    Checking bitflags v2.13.2
+    Checking futures-io v0.3.34
+    Checking once_cell v1.21.4
+    Checking allocation-counter v0.8.1
+    Checking event-listener v5.4.2
+    Checking futures-channel v0.3.34
+    Checking futures-lite v2.6.1
+    Checking core-scheduler v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-tokio-next)
+    Checking rustix v1.1.5
+    Checking core-scheduler-conformance v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-tokio-next/crates/conformance)
+    Checking errno v0.3.14
+    Checking socket2 v0.6.5
+    Checking mio v1.2.4
+    Checking getrandom v0.4.3
+    Checking signal-hook-registry v1.4.8
+    Checking signal-hook v0.4.5
+    Checking tokio v1.53.3
+    Checking tempfile v3.27.0
+    Checking core-scheduler-tokio v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-tokio-next/crates/tokio)
+error: implementation of `std::ops::Fn` is not general enough
+  --> crates/tokio/src/socket_operations.rs:25:9
+   |
+25 | /         self.socket_operation_with(
+26 | |             socket,
+27 | |             input,
+28 | |             cancellation,
+...  |
+34 | |             },
+35 | |         )
+   | |_________^ implementation of `std::ops::Fn` is not general enough
+   |
+   = note: closure with signature `fn(&'2 Output) -> bool` must implement `std::ops::Fn<(&'1 Output,)>`, for any lifetime `'1`...
+   = note: ...but it actually implements `std::ops::Fn<(&'2 Output,)>`, for some specific lifetime `'2`
+help: consider adding an explicit type annotation to the closure's argument
+   |
+33 |                 clear: |_: &Output| false,
+   |                          +++++++++
+
+error: implementation of `std::ops::FnOnce` is not general enough
+  --> crates/tokio/src/socket_operations.rs:25:9
+   |
+25 | /         self.socket_operation_with(
+26 | |             socket,
+27 | |             input,
+28 | |             cancellation,
+...  |
+34 | |             },
+35 | |         )
+   | |_________^ implementation of `std::ops::FnOnce` is not general enough
+   |
+   = note: closure with signature `fn(&'2 Output) -> bool` must implement `std::ops::FnOnce<(&'1 Output,)>`, for any lifetime `'1`...
+   = note: ...but it actually implements `std::ops::FnOnce<(&'2 Output,)>`, for some specific lifetime `'2`
+help: consider adding an explicit type annotation to the closure's argument
+   |
+33 |                 clear: |_: &Output| false,
+   |                          +++++++++
+
+error: implementation of `std::ops::Fn` is not general enough
+  --> crates/tokio/src/socket_operations.rs:25:9
+   |
+25 | /         self.socket_operation_with(
+26 | |             socket,
+27 | |             input,
+28 | |             cancellation,
+...  |
+34 | |             },
+35 | |         )
+   | |_________^
+...
+39 | /     async fn socket_operation_with<Input: Send, Output: Send>(
+40 | |         &self,
+41 | |         socket: &TokioSocket,
+42 | |         mut input: Input,
+...  |
+46 | |         read_ready: ReadReady<impl Fn(&Output) -> bool + Send>,
+   | |                                    ------------------- doesn't satisfy where-clause
+47 | |     ) -> (OperationResult<Output>, Input) {
+   | |_________________________________________- due to a where-clause on `socket_operations::<impl tokio_scheduler::TokioScheduler>::socket_operation_with`...
+   |
+   = note: ...closure with signature `fn(&'2 Output) -> bool` must implement `std::ops::Fn<(&'1 Output,)>`, for any lifetime `'1`...
+   = note: ...but it actually implements `std::ops::Fn<(&'2 Output,)>`, for some specific lifetime `'2`
+help: consider adding an explicit type annotation to the closure's argument
+   |
+33 |                 clear: |_: &Output| false,
+   |                          +++++++++
+
+error: implementation of `std::ops::FnOnce` is not general enough
+  --> crates/tokio/src/socket_operations.rs:25:9
+   |
+25 | /         self.socket_operation_with(
+26 | |             socket,
+27 | |             input,
+28 | |             cancellation,
+...  |
+34 | |             },
+35 | |         )
+   | |_________^
+...
+39 | /     async fn socket_operation_with<Input: Send, Output: Send>(
+40 | |         &self,
+41 | |         socket: &TokioSocket,
+42 | |         mut input: Input,
+...  |
+46 | |         read_ready: ReadReady<impl Fn(&Output) -> bool + Send>,
+   | |                                                   ---- doesn't satisfy where-clause
+47 | |     ) -> (OperationResult<Output>, Input) {
+   | |_________________________________________- due to a where-clause on `socket_operations::<impl tokio_scheduler::TokioScheduler>::socket_operation_with`...
+   |
+   = note: ...closure with signature `fn(&'2 Output) -> bool` must implement `std::ops::FnOnce<(&'1 Output,)>`, for any lifetime `'1`...
+   = note: ...but it actually implements `std::ops::FnOnce<(&'2 Output,)>`, for some specific lifetime `'2`
+help: consider adding an explicit type annotation to the closure's argument
+   |
+33 |                 clear: |_: &Output| false,
+   |                          +++++++++
+
+error: implementation of `std::ops::Fn` is not general enough
+  --> crates/tokio/src/socket_operations.rs:36:10
+   |
+36 |           .await
+   |            ^^^^^
+...
+39 | /     async fn socket_operation_with<Input: Send, Output: Send>(
+40 | |         &self,
+41 | |         socket: &TokioSocket,
+42 | |         mut input: Input,
+...  |
+46 | |         read_ready: ReadReady<impl Fn(&Output) -> bool + Send>,
+   | |                                    ------------------- doesn't satisfy where-clause
+47 | |     ) -> (OperationResult<Output>, Input) {
+   | |_________________________________________- due to a where-clause on `socket_operations::<impl tokio_scheduler::TokioScheduler>::socket_operation_with`...
+   |
+   = note: ...closure with signature `fn(&'2 Output) -> bool` must implement `std::ops::Fn<(&'1 Output,)>`, for any lifetime `'1`...
+   = note: ...but it actually implements `std::ops::Fn<(&'2 Output,)>`, for some specific lifetime `'2`
+help: consider adding an explicit type annotation to the closure's argument
+   |
+33 |                 clear: |_: &Output| false,
+   |                          +++++++++
+
+error: implementation of `std::ops::FnOnce` is not general enough
+  --> crates/tokio/src/socket_operations.rs:36:10
+   |
+36 |           .await
+   |            ^^^^^
+...
+39 | /     async fn socket_operation_with<Input: Send, Output: Send>(
+40 | |         &self,
+41 | |         socket: &TokioSocket,
+42 | |         mut input: Input,
+...  |
+46 | |         read_ready: ReadReady<impl Fn(&Output) -> bool + Send>,
+   | |                                                   ---- doesn't satisfy where-clause
+47 | |     ) -> (OperationResult<Output>, Input) {
+   | |_________________________________________- due to a where-clause on `socket_operations::<impl tokio_scheduler::TokioScheduler>::socket_operation_with`...
+   |
+   = note: ...closure with signature `fn(&'2 Output) -> bool` must implement `std::ops::FnOnce<(&'1 Output,)>`, for any lifetime `'1`...
+   = note: ...but it actually implements `std::ops::FnOnce<(&'2 Output,)>`, for some specific lifetime `'2`
+help: consider adding an explicit type annotation to the closure's argument
+   |
+33 |                 clear: |_: &Output| false,
+   |                          +++++++++
+
+error: implementation of `std::ops::Fn` is not general enough
+   --> crates/tokio/src/tokio_socket.rs:169:9
+    |
+169 | /         self.io_with(
+170 | |             interest,
+171 | |             operation,
+172 | |             ReadReady {
+...   |
+175 | |             },
+176 | |         )
+    | |_________^ implementation of `std::ops::Fn` is not general enough
+    |
+    = note: closure with signature `fn(&'2 Output) -> bool` must implement `std::ops::Fn<(&'1 Output,)>`, for any lifetime `'1`...
+    = note: ...but it actually implements `std::ops::Fn<(&'2 Output,)>`, for some specific lifetime `'2`
+help: consider adding an explicit type annotation to the closure's argument
+    |
+174 |                 clear: |_: &Output| false,
+    |                          +++++++++
+
+error: implementation of `std::ops::FnOnce` is not general enough
+   --> crates/tokio/src/tokio_socket.rs:169:9
+    |
+169 | /         self.io_with(
+170 | |             interest,
+171 | |             operation,
+172 | |             ReadReady {
+...   |
+175 | |             },
+176 | |         )
+    | |_________^ implementation of `std::ops::FnOnce` is not general enough
+    |
+    = note: closure with signature `fn(&'2 Output) -> bool` must implement `std::ops::FnOnce<(&'1 Output,)>`, for any lifetime `'1`...
+    = note: ...but it actually implements `std::ops::FnOnce<(&'2 Output,)>`, for some specific lifetime `'2`
+help: consider adding an explicit type annotation to the closure's argument
+    |
+174 |                 clear: |_: &Output| false,
+    |                          +++++++++
+
+error: implementation of `std::ops::Fn` is not general enough
+   --> crates/tokio/src/tokio_socket.rs:169:9
+    |
+169 | /         self.io_with(
+170 | |             interest,
+171 | |             operation,
+172 | |             ReadReady {
+...   |
+175 | |             },
+176 | |         )
+    | |_________^
+...
+180 | /     pub(super) async fn io_with<Output, Operation>(
+181 | |         &self,
+182 | |         interest: Interest,
+183 | |         mut operation: Operation,
+184 | |         read_ready: ReadReady<impl Fn(&Output) -> bool + Send>,
+    | |                                    ------------------- doesn't satisfy where-clause
+185 | |     ) -> io::Result<Output>
+186 | |     where
+187 | |         Operation: FnMut(&socket2::Socket) -> io::Result<Output> + Send,
+    | |________________________________________________________________________- due to a where-clause on `tokio_socket::TokioSocket::io_with`...
+    |
+    = note: ...closure with signature `fn(&'2 Output) -> bool` must implement `std::ops::Fn<(&'1 Output,)>`, for any lifetime `'1`...
+    = note: ...but it actually implements `std::ops::Fn<(&'2 Output,)>`, for some specific lifetime `'2`
+help: consider adding an explicit type annotation to the closure's argument
+    |
+174 |                 clear: |_: &Output| false,
+    |                          +++++++++
+
+error: implementation of `std::ops::FnOnce` is not general enough
+   --> crates/tokio/src/tokio_socket.rs:169:9
+    |
+169 | /         self.io_with(
+170 | |             interest,
+171 | |             operation,
+172 | |             ReadReady {
+...   |
+175 | |             },
+176 | |         )
+    | |_________^
+...
+180 | /     pub(super) async fn io_with<Output, Operation>(
+181 | |         &self,
+182 | |         interest: Interest,
+183 | |         mut operation: Operation,
+184 | |         read_ready: ReadReady<impl Fn(&Output) -> bool + Send>,
+    | |                                                   ---- doesn't satisfy where-clause
+185 | |     ) -> io::Result<Output>
+186 | |     where
+187 | |         Operation: FnMut(&socket2::Socket) -> io::Result<Output> + Send,
+    | |________________________________________________________________________- due to a where-clause on `tokio_socket::TokioSocket::io_with`...
+    |
+    = note: ...closure with signature `fn(&'2 Output) -> bool` must implement `std::ops::FnOnce<(&'1 Output,)>`, for any lifetime `'1`...
+    = note: ...but it actually implements `std::ops::FnOnce<(&'2 Output,)>`, for some specific lifetime `'2`
+help: consider adding an explicit type annotation to the closure's argument
+    |
+174 |                 clear: |_: &Output| false,
+    |                          +++++++++
+
+error: implementation of `std::ops::Fn` is not general enough
+   --> crates/tokio/src/tokio_socket.rs:177:10
+    |
+177 |           .await
+    |            ^^^^^
+...
+180 | /     pub(super) async fn io_with<Output, Operation>(
+181 | |         &self,
+182 | |         interest: Interest,
+183 | |         mut operation: Operation,
+184 | |         read_ready: ReadReady<impl Fn(&Output) -> bool + Send>,
+    | |                                    ------------------- doesn't satisfy where-clause
+185 | |     ) -> io::Result<Output>
+186 | |     where
+187 | |         Operation: FnMut(&socket2::Socket) -> io::Result<Output> + Send,
+    | |________________________________________________________________________- due to a where-clause on `tokio_socket::TokioSocket::io_with`...
+    |
+    = note: ...closure with signature `fn(&'2 Output) -> bool` must implement `std::ops::Fn<(&'1 Output,)>`, for any lifetime `'1`...
+    = note: ...but it actually implements `std::ops::Fn<(&'2 Output,)>`, for some specific lifetime `'2`
+help: consider adding an explicit type annotation to the closure's argument
+    |
+174 |                 clear: |_: &Output| false,
+    |                          +++++++++
+
+error: implementation of `std::ops::FnOnce` is not general enough
+   --> crates/tokio/src/tokio_socket.rs:177:10
+    |
+177 |           .await
+    |            ^^^^^
+...
+180 | /     pub(super) async fn io_with<Output, Operation>(
+181 | |         &self,
+182 | |         interest: Interest,
+183 | |         mut operation: Operation,
+184 | |         read_ready: ReadReady<impl Fn(&Output) -> bool + Send>,
+    | |                                                   ---- doesn't satisfy where-clause
+185 | |     ) -> io::Result<Output>
+186 | |     where
+187 | |         Operation: FnMut(&socket2::Socket) -> io::Result<Output> + Send,
+    | |________________________________________________________________________- due to a where-clause on `tokio_socket::TokioSocket::io_with`...
+    |
+    = note: ...closure with signature `fn(&'2 Output) -> bool` must implement `std::ops::FnOnce<(&'1 Output,)>`, for any lifetime `'1`...
+    = note: ...but it actually implements `std::ops::FnOnce<(&'2 Output,)>`, for some specific lifetime `'2`
+help: consider adding an explicit type annotation to the closure's argument
+    |
+174 |                 clear: |_: &Output| false,
+    |                          +++++++++
+
+error: could not compile `core-scheduler-tokio` (lib) due to 6 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `core-scheduler-tokio` (lib test) due to 12 previous errors

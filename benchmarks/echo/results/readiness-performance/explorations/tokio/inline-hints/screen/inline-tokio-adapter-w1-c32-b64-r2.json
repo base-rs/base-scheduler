@@ -1,0 +1,32 @@
+{
+  "bytes": 64,
+  "connections": 32,
+  "payload_mib_per_second": 39.493245442708336,
+  "requests": 1941172,
+  "requests_per_second": 647057.3333333334,
+  "rtt_max_us": 3104.767,
+  "rtt_mean_us": 49.38626868561871,
+  "rtt_p50_us": 50.527,
+  "rtt_p95_us": 54.847,
+  "rtt_p99_us": 57.311,
+  "seconds": 3.0,
+  "warmup_seconds": 1.0,
+  "identifier": "inline-tokio-adapter-w1-c32-b64-r2",
+  "mode": "inline",
+  "backend": "tokio-adapter",
+  "workers": 1,
+  "repeat": 2,
+  "client_cpu": {
+    "user": 1.351058,
+    "system": 3.370709999999999,
+    "voluntary_switches": 1423901,
+    "involuntary_switches": 905
+  },
+  "server_cpu": {
+    "user": 0.33517300000000017,
+    "system": 2.2955429999999986,
+    "voluntary_switches": 100,
+    "involuntary_switches": 58
+  },
+  "lifecycle_seconds": 4.002816486172378
+}

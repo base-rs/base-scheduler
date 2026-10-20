@@ -1,0 +1,19 @@
+{
+  "source": "427be5d2ef6c610a5d5de5b10570c938b65d6c2d",
+  "build": "cargo build --release --locked -p core-scheduler-echo-benchmark",
+  "environment": "CARGO_TARGET_DIR=/home/samuel/.cache/core-scheduler-native-next/build; no profile overrides or RUSTFLAGS",
+  "rustc": "rustc 1.99.0 (b940084d7 2026-09-28) (Arch Linux rust 1:1.99.0-1)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+  "files": {
+    "/home/samuel/.cache/core-scheduler-native-next/sample-runner.py": "31e6ad715214fcadfda358362100a21cb94cc41a79e23733191eb8e61b740909",
+    "/home/samuel/.cache/core-scheduler-native-next/profile.py": "ce2e04640a791576d538ca662feecd8012dfb20e175faf38d3f76bf19cc11e32",
+    "/home/samuel/.cache/core-scheduler-native-next/screen.py": "6733a4fc67d4cefbc411e077810e3665b86d270e64023aeafd4a4cf6d6da6329",
+    "/home/samuel/.cache/core-scheduler-native-next/route-screen.py": "d50d794e51da835b610da7d32934859140973c297f754a4c15ac7faa30d63b07",
+    "/home/samuel/.cache/core-scheduler-native-next/worker-screen.py": "e69ef400c054ccbab35a5c6be540ba9604b84d5c1185e7d569c918b51090eff2",
+    "/home/samuel/.cache/core-scheduler-native-next/completion": "c637336dc8b3f09792cf64fb239cd0cdb8c7cf2e7c3fe50954dcaaee6edb5182",
+    "/home/samuel/.cache/core-scheduler-native-next/route": "1143379f9e00d3806ea1c165fd1d163356f91d9897d0cc5da914640fa8ad5fbe",
+    "/home/samuel/.cache/core-scheduler-native-next/worker": "100528b2aab0a43344674612463c5b02c805e4ea3af26639a5c41f191075d345",
+    "/home/samuel/.cache/core-scheduler-native-next/completion.patch": "aaea0ec17f2fe8ce1df74bb738549771bdc47a88a075cc4ae29ea15ecb1d4aab",
+    "/home/samuel/.cache/core-scheduler-native-next/route.patch": "07a60a71cd407f2cde0e6ad1c5c4868b1f1ae1c953cb621ea9e62623869a05c6",
+    "/home/samuel/.cache/core-scheduler-native-next/worker.patch": "9e1823eb47fd7425db1c4d8d7a3f616cd05081fe707d7664f5ca1477c4d6aa66"
+  }
+}

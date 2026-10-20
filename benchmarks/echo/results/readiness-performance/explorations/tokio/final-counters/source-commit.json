@@ -1,0 +1,5 @@
+{
+  "commit": "7db25914ae14ef40a247b48ea2dbb3478547cace",
+  "instrumentation": "instrumentation.patch",
+  "note": "TLS counters only; not a capacity binary"
+}

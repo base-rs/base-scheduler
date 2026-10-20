@@ -1,0 +1,16 @@
+    Checking core-scheduler-tokio v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-tokio-next/crates/tokio)
+error: unused `tokio::io::unix::AsyncFdReadyGuard` that must be used
+   --> crates/tokio/src/tokio_socket/tests.rs:720:9
+    |
+720 |         registration.readable().await.unwrap();
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: You must explicitly choose whether to clear the readiness state by calling a method on ReadyGuard
+    = note: `-D unused-must-use` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(unused_must_use)]`
+help: use `let _ = ...` to ignore the resulting value
+    |
+720 |         let _ = registration.readable().await.unwrap();
+    |         +++++++
+
+error: could not compile `core-scheduler-tokio` (lib test) due to 1 previous error

@@ -1,0 +1,206 @@
+Waiting for exclusive benchmark lock.
+1 150 after iouring 1 32 64 1 629254
+2 150 after iouring 4 128 4096 1 1815537
+3 150 after tokio-adapter 1 32 4096 1 566147
+4 150 before tokio 4 128 64 2 2110422
+5 150 before iouring 1 32 64 1 622905
+6 150 before iouring-poll 4 128 64 1 1992874
+7 150 before iouring 4 128 64 3 1979353
+8 150 after iouring 4 128 64 3 2070175
+9 150 before tokio-adapter 4 128 4096 3 1780911
+10 150 before tokio-adapter-poll 4 128 4096 2 1790616
+11 150 before tokio-adapter 1 32 64 3 611715
+12 150 before tokio-adapter 4 128 64 2 2008432
+13 150 after tokio-adapter 1 32 64 1 638717
+14 150 before tokio-adapter 1 32 4096 2 547610
+15 150 after tokio-adapter 4 128 64 2 2009878
+16 150 after iouring 1 32 4096 2 554330
+17 150 before tokio-adapter 1 32 64 2 605519
+18 150 before tokio-adapter-poll 1 32 64 3 619754
+19 150 before tokio-adapter-poll 1 1 64 2 269437
+20 150 after tokio-adapter-poll 4 128 64 3 2044136
+21 150 after tokio-adapter-poll 1 1 64 1 268501
+22 150 before iouring-poll 1 32 4096 3 512257
+23 150 after iouring-poll 1 32 4096 3 512159
+24 150 before tokio-adapter 4 128 64 3 1985948
+25 150 after iouring 1 32 64 2 626061
+26 150 before tokio-adapter 1 32 4096 3 556688
+27 150 before iouring-poll 4 128 4096 1 1757059
+28 150 after iouring 1 32 4096 3 556290
+29 150 after tokio-adapter-poll 1 32 4096 2 567163
+30 150 after tokio-adapter 1 32 4096 3 568692
+31 150 after iouring 1 32 4096 1 569053
+32 150 before tokio-adapter-poll 4 128 4096 3 1774830
+33 150 before tokio-adapter-poll 4 128 4096 1 1769575
+34 150 before tokio 1 32 64 2 691309
+35 150 after tokio 4 128 64 2 2089537
+36 150 after tokio-adapter-poll 4 128 64 1 2025162
+37 150 before iouring 1 32 64 3 626447
+38 150 before iouring-poll 1 32 64 2 562170
+39 150 before tokio 1 32 64 3 695084
+40 150 after tokio-adapter 1 1 64 2 274746
+41 150 before tokio-adapter 1 1 64 2 268062
+42 150 after iouring-poll 1 32 64 2 566229
+43 150 before iouring-poll 1 1 64 3 237313
+44 150 after tokio 1 1 64 2 272314
+45 150 after tokio 1 32 4096 2 624470
+46 150 before iouring 4 128 4096 2 1737825
+47 150 after iouring-poll 4 128 64 1 2047240
+48 150 after tokio 4 128 4096 3 1857124
+49 150 after tokio-adapter 4 128 4096 2 1794807
+50 150 after tokio 1 32 4096 3 611452
+51 150 before tokio-adapter 4 128 4096 2 1794224
+52 150 before iouring 1 32 64 2 627999
+53 150 before tokio-adapter 1 32 64 1 619146
+54 150 before tokio 1 1 64 3 270164
+55 150 after tokio-adapter-poll 4 128 4096 1 1806254
+56 150 after tokio 1 32 64 3 697705
+57 150 after iouring-poll 4 128 4096 3 1834818
+58 150 before tokio 1 32 4096 2 612431
+59 150 after tokio-adapter-poll 4 128 4096 2 1804684
+60 150 before iouring-poll 1 32 64 3 560678
+61 150 before tokio-adapter-poll 1 1 64 3 267827
+62 150 after iouring 1 1 64 2 230123
+63 150 after tokio-adapter-poll 1 32 64 3 643542
+64 150 after iouring 4 128 4096 2 1801302
+65 150 after tokio 4 128 64 1 2107227
+66 150 after iouring-poll 1 32 4096 1 505573
+67 150 after iouring-poll 4 128 4096 2 1827446
+68 150 before tokio-adapter-poll 4 128 64 2 1981761
+69 150 after iouring 4 128 64 2 2053888
+70 150 before iouring-poll 4 128 4096 3 1762825
+71 150 after tokio 1 1 64 1 269126
+72 150 before tokio-adapter-poll 1 32 4096 1 548265
+73 150 before iouring-poll 1 1 64 1 238715
+74 150 after tokio-adapter 1 1 64 3 267692
+75 150 before iouring-poll 1 32 64 1 563756
+76 150 before iouring 4 128 4096 3 1742996
+77 150 after tokio 1 1 64 3 267866
+78 150 before iouring 4 128 64 1 1987460
+79 150 after tokio 4 128 4096 1 1865966
+80 150 before tokio 4 128 64 1 2105983
+81 150 after tokio-adapter-poll 1 32 64 2 642637
+82 150 after tokio-adapter-poll 4 128 4096 3 1793724
+83 150 before iouring-poll 4 128 64 2 1987578
+84 150 before iouring 4 128 4096 1 1733414
+85 150 after tokio 4 128 64 3 2113211
+86 150 before iouring-poll 1 32 4096 1 507191
+87 150 before tokio-adapter-poll 1 1 64 1 266255
+88 150 before tokio-adapter 1 1 64 3 269001
+89 150 before tokio-adapter-poll 1 32 4096 3 551992
+90 150 after tokio-adapter-poll 1 32 64 1 644296
+91 150 before tokio 4 128 4096 2 1858094
+92 150 after iouring-poll 4 128 4096 1 1825507
+93 150 after iouring-poll 4 128 64 3 2051757
+94 150 before iouring 1 32 4096 2 562988
+95 150 before tokio 1 1 64 2 272249
+96 150 after iouring-poll 1 32 64 3 566232
+97 150 before iouring 1 1 64 3 230469
+98 150 before tokio-adapter-poll 1 32 4096 2 555093
+99 150 before tokio-adapter 1 32 4096 1 550219
+100 150 before tokio-adapter 1 1 64 1 265669
+101 150 before iouring-poll 4 128 64 3 1972047
+102 150 after iouring 4 128 64 1 2066494
+103 150 before iouring 1 32 4096 3 563980
+104 150 after tokio-adapter-poll 1 1 64 3 266542
+105 150 after iouring 1 32 64 3 628328
+106 150 after tokio-adapter 1 32 4096 2 570655
+107 150 after iouring 1 1 64 1 232306
+108 150 after iouring-poll 1 32 64 1 566532
+109 150 before tokio-adapter-poll 1 32 64 2 616044
+110 150 after tokio-adapter-poll 1 1 64 2 271663
+111 150 before tokio 1 32 64 1 693954
+112 150 before iouring-poll 1 32 4096 2 512363
+113 150 after iouring-poll 1 1 64 2 227379
+114 150 after tokio-adapter-poll 1 32 4096 3 576629
+115 150 before tokio-adapter-poll 1 32 64 1 622417
+116 150 before iouring 1 32 4096 1 556850
+117 150 after tokio-adapter 1 32 64 3 640583
+118 150 before iouring-poll 4 128 4096 2 1764075
+119 150 after tokio 1 32 64 1 695268
+120 150 before iouring-poll 1 1 64 2 226007
+121 150 before tokio-adapter 4 128 4096 1 1789032
+122 150 after tokio 1 32 4096 1 609736
+123 150 before iouring 4 128 64 2 1974931
+124 150 after tokio-adapter 4 128 4096 3 1797729
+125 150 after iouring 1 1 64 3 237877
+126 150 after tokio-adapter 4 128 4096 1 1789312
+127 150 after tokio-adapter 4 128 64 1 2047356
+128 150 after iouring-poll 1 1 64 1 227836
+129 150 after tokio-adapter 1 32 64 2 642957
+130 150 after tokio-adapter-poll 4 128 64 2 2030107
+131 150 after tokio-adapter-poll 1 32 4096 1 575860
+132 150 before tokio-adapter-poll 4 128 64 1 2007822
+133 150 before tokio 4 128 4096 3 1862163
+134 150 after tokio-adapter 4 128 64 3 2013016
+135 150 before iouring 1 1 64 1 221975
+136 150 after tokio-adapter 1 1 64 1 269315
+137 150 before tokio-adapter 4 128 64 1 1978561
+138 150 before tokio 4 128 4096 1 1851111
+139 150 after tokio 1 32 64 2 691745
+140 150 before tokio 1 1 64 1 269404
+141 150 after iouring-poll 1 1 64 3 224583
+142 150 before tokio 1 32 4096 3 619298
+143 150 before tokio-adapter-poll 4 128 64 3 1998838
+144 150 after tokio 4 128 4096 2 1857401
+145 150 before iouring 1 1 64 2 231409
+146 150 before tokio 4 128 64 3 2125388
+147 150 after iouring-poll 1 32 4096 2 513318
+148 150 before tokio 1 32 4096 1 617732
+149 150 after iouring-poll 4 128 64 2 2060047
+150 150 after iouring 4 128 4096 3 1822744
+RESULT 1 1 64
+before tokio median 270164 range 269404 272249
+after tokio median 269126 range 267866 272314
+before tokio-adapter median 268062 range 265669 269001
+after tokio-adapter median 269315 range 267692 274746
+before tokio-adapter-poll median 267827 range 266255 269437
+after tokio-adapter-poll median 268501 range 266542 271663
+before iouring median 230469 range 221975 231409
+after iouring median 232306 range 230123 237877
+before iouring-poll median 237313 range 226007 238715
+after iouring-poll median 227379 range 224583 227836
+RESULT 1 32 64
+before tokio median 693954 range 691309 695084
+after tokio median 695268 range 691745 697705
+before tokio-adapter median 611715 range 605519 619146
+after tokio-adapter median 640583 range 638717 642957
+before tokio-adapter-poll median 619754 range 616044 622417
+after tokio-adapter-poll median 643542 range 642637 644296
+before iouring median 626447 range 622905 627999
+after iouring median 628328 range 626061 629254
+before iouring-poll median 562170 range 560678 563756
+after iouring-poll median 566232 range 566229 566532
+RESULT 1 32 4096
+before tokio median 617732 range 612431 619298
+after tokio median 611452 range 609736 624470
+before tokio-adapter median 550219 range 547610 556688
+after tokio-adapter median 568692 range 566147 570655
+before tokio-adapter-poll median 551992 range 548265 555093
+after tokio-adapter-poll median 575860 range 567163 576629
+before iouring median 562988 range 556850 563980
+after iouring median 556290 range 554330 569053
+before iouring-poll median 512257 range 507191 512363
+after iouring-poll median 512159 range 505573 513318
+RESULT 4 128 64
+before tokio median 2110422 range 2105983 2125388
+after tokio median 2107227 range 2089537 2113211
+before tokio-adapter median 1985948 range 1978561 2008432
+after tokio-adapter median 2013016 range 2009878 2047356
+before tokio-adapter-poll median 1998838 range 1981761 2007822
+after tokio-adapter-poll median 2030107 range 2025162 2044136
+before iouring median 1979353 range 1974931 1987460
+after iouring median 2066494 range 2053888 2070175
+before iouring-poll median 1987578 range 1972047 1992874
+after iouring-poll median 2051757 range 2047240 2060047
+RESULT 4 128 4096
+before tokio median 1858094 range 1851111 1862163
+after tokio median 1857401 range 1857124 1865966
+before tokio-adapter median 1789032 range 1780911 1794224
+after tokio-adapter median 1794807 range 1789312 1797729
+before tokio-adapter-poll median 1774830 range 1769575 1790616
+after tokio-adapter-poll median 1804684 range 1793724 1806254
+before iouring median 1737825 range 1733414 1742996
+after iouring median 1815537 range 1801302 1822744
+before iouring-poll median 1762825 range 1757059 1764075
+after iouring-poll median 1827446 range 1825507 1834818

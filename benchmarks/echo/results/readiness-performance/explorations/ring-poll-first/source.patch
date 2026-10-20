@@ -1,0 +1,13 @@
+diff --git a/crates/iouring/src/io_uring_selector.rs b/crates/iouring/src/io_uring_selector.rs
+index 1e91d07..77db6d8 100644
+--- a/crates/iouring/src/io_uring_selector.rs
++++ b/crates/iouring/src/io_uring_selector.rs
+@@ -128,7 +128,7 @@ impl<B: IoBuf> Request<B> {
+                         .flags(libc::MSG_NOSIGNAL)
+                         .build()
+                 } else {
+-                    opcode::Recv::new(descriptor, pointer, length).build()
++                    opcode::Recv::new(descriptor, pointer, length).ioprio(1).build()
+                 }
+             }
+             Resource::File(file, offset) => {

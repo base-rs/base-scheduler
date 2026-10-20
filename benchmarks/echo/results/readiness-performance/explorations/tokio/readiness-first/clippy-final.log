@@ -1,0 +1,22 @@
+    Checking core-scheduler-tokio v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-tokio-next/crates/tokio)
+error: the borrowed expression implements the required traits
+   --> crates/tokio/src/tokio_socket.rs:246:54
+    |
+246 |                         if result.as_ref().is_ok_and(&clear_read_ready) {
+    |                                                      ^^^^^^^^^^^^^^^^^ help: change this to: `clear_read_ready`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#needless_borrows_for_generic_args
+    = note: `-D clippy::needless-borrows-for-generic-args` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::needless_borrows_for_generic_args)]`
+
+error: the borrowed expression implements the required traits
+   --> crates/tokio/src/tokio_socket.rs:266:54
+    |
+266 |                         if result.as_ref().is_ok_and(&clear_read_ready) {
+    |                                                      ^^^^^^^^^^^^^^^^^ help: change this to: `clear_read_ready`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#needless_borrows_for_generic_args
+
+error: could not compile `core-scheduler-tokio` (lib) due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `core-scheduler-tokio` (lib test) due to 2 previous errors
