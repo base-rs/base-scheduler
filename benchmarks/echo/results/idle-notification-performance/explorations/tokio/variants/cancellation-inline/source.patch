@@ -1,0 +1,28 @@
+diff --git a/src/cancellation.rs b/src/cancellation.rs
+index e276523..598ad9e 100644
+--- a/src/cancellation.rs
++++ b/src/cancellation.rs
+@@ -145,6 +145,7 @@ impl Cancellation {
+     }
+ 
+     /// Whether cancellation has been requested.
++    #[inline]
+     pub fn is_cancelled(&self) -> bool {
+         self.node
+             .as_ref()
+@@ -152,6 +153,7 @@ impl Cancellation {
+     }
+ 
+     /// Check for cancellation at an explicit cooperative cancellation point.
++    #[inline]
+     pub fn check(&self) -> Result<(), Cancelled> {
+         if self.is_cancelled() {
+             Err(Cancelled)
+@@ -164,6 +166,7 @@ impl Cancellation {
+     /// This future is immediately ready if already cancelled. Dropping the wait
+     /// unregisters its listener without cancelling the signal or other waiters.
+     /// Listener storage is retained inline in the future, without a separate allocation.
++    #[inline]
+     pub async fn cancelled(&self) {
+         let Some(node) = &self.node else {
+             return pending().await;

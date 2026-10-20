@@ -1,0 +1,33 @@
+{
+  "bytes": 4096,
+  "connections": 32,
+  "payload_mib_per_second": 2359.9010416666665,
+  "requests": 1812404,
+  "requests_per_second": 604134.6666666666,
+  "rtt_max_us": 232.319,
+  "rtt_mean_us": 52.86544687222062,
+  "rtt_p50_us": 54.143,
+  "rtt_p95_us": 58.943,
+  "rtt_p99_us": 61.727,
+  "seconds": 3.0,
+  "warmup_seconds": 1.0,
+  "identifier": "after-tokio-w1-c32-b4096-r5",
+  "mode": "after",
+  "backend": "tokio",
+  "workers": 1,
+  "repeat": 5,
+  "client_cpu": {
+    "user": 1.3751299999999986,
+    "system": 3.6216999999999757,
+    "voluntary_switches": 1353375,
+    "involuntary_switches": 871
+  },
+  "server_cpu": {
+    "user": 0.22551900000000558,
+    "system": 2.39975400000003,
+    "voluntary_switches": 139,
+    "involuntary_switches": 41
+  },
+  "lifecycle_seconds": 4.003374341176823,
+  "variant": "after"
+}

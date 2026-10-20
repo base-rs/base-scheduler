@@ -20,7 +20,9 @@ The [socket readiness comparison](socket-performance.md) measures reserved Tokio
 
 The [owner-wake comparison with pure Tokio](tokio-comparison.md) measures the integrated owner-wake changes against pure Tokio and both adapter buffer paths using the same optimized executable for all five backends.
 
-The [current readiness and completion comparison](readiness-performance.md) measures cached Tokio readiness and cooperative io_uring task work with matched optimized before/after builds. It also records the rejected short-read shortcut and TCP urgent-data regression.
+The [readiness and completion comparison](readiness-performance.md) measures cached Tokio readiness and cooperative io_uring task work with matched optimized before/after builds. It also records the rejected short-read shortcut and TCP urgent-data regression.
+
+The [idle notification follow-up](idle-notification-performance.md) measures removing speculative eventfd reads before ring waits and records the other request, wakeup, and compiler experiments.
 
 Build and run the comparison on Linux:
 

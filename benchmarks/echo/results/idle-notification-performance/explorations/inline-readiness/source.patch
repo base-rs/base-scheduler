@@ -1,0 +1,236 @@
+diff --git a/crates/iouring/src/io_uring_selector.rs b/crates/iouring/src/io_uring_selector.rs
+index 665009a..130c072 100644
+--- a/crates/iouring/src/io_uring_selector.rs
++++ b/crates/iouring/src/io_uring_selector.rs
+@@ -211,11 +211,62 @@ impl<B: IoBuf> PendingRequest for Request<B> {
+     }
+ }
+ 
++// PollAdd retains only a descriptor and identifier, so readiness records can move
++// between queues. Owned operations keep stable boxed storage for kernel pointers.
++pub(crate) enum QueuedRequest {
++    Owned(Box<dyn PendingRequest>),
++    Readiness(readiness::ReadinessRequest),
++}
++
++impl QueuedRequest {
++    fn identifier(&self) -> u64 {
++        match self {
++            Self::Owned(request) => request.identifier(),
++            Self::Readiness(request) => request.identifier(),
++        }
++    }
++
++    fn entry(&mut self) -> squeue::Entry {
++        match self {
++            Self::Owned(request) => request.entry(),
++            Self::Readiness(request) => request.entry(),
++        }
++    }
++
++    fn finish(self, result: io::Result<usize>) {
++        match self {
++            Self::Owned(request) => request.finish(result),
++            Self::Readiness(request) => request.finish(result),
++        }
++    }
++
++    fn cancelling(&self) -> bool {
++        match self {
++            Self::Owned(request) => request.cancelling(),
++            Self::Readiness(request) => request.cancelling(),
++        }
++    }
++
++    fn set_cancelling(&self) {
++        match self {
++            Self::Owned(request) => request.set_cancelling(),
++            Self::Readiness(request) => request.set_cancelling(),
++        }
++    }
++
++    fn take_reply(&self) -> Option<Box<dyn Send>> {
++        match self {
++            Self::Owned(request) => request.take_reply(),
++            Self::Readiness(request) => request.take_reply(),
++        }
++    }
++}
++
+ /// Only terminal original completions remove requests from this map.
+ /// On an unexpected selector failure, leak kernel-accessible resources rather
+ /// than freeing memory whose completion cannot be established.
+ #[derive(Default)]
+-struct InFlight(HashMap<u64, Box<dyn PendingRequest>>);
++struct InFlight(HashMap<u64, QueuedRequest>);
+ 
+ impl Drop for InFlight {
+     fn drop(&mut self) {
+@@ -230,7 +281,7 @@ impl Drop for InFlight {
+ }
+ 
+ pub(crate) enum Command {
+-    Submit(Box<dyn PendingRequest>),
++    Submit(QueuedRequest),
+     Cancel(u64),
+     CancelAfterSubmission(u64),
+     Shutdown,
+@@ -619,7 +670,13 @@ impl IoUringSelector {
+             reply: Cell::new(Some(reply)),
+             cancelling: Cell::new(false),
+         };
+-        Self::submit(controller, Box::new(request), result, cancellation).await
++        Self::submit(
++            controller,
++            QueuedRequest::Owned(Box::new(request)),
++            result,
++            cancellation,
++        )
++        .await
+     }
+ 
+     // `try_update` is not available on the supported Rust 1.85 toolchain.
+@@ -635,7 +692,7 @@ impl IoUringSelector {
+ 
+     async fn submit<T>(
+         controller: Arc<Controller>,
+-        request: Box<dyn PendingRequest>,
++        request: QueuedRequest,
+         result: oneshot::Receiver<T>,
+         cancellation: &Cancellation,
+     ) -> T {
+@@ -795,7 +852,7 @@ pub(crate) struct Reactor {
+     notification: Arc<OwnedFd>,
+     incoming: mpsc::Receiver<Command>,
+     controller: Arc<Controller>,
+-    pending: VecDeque<Box<dyn PendingRequest>>,
++    pending: VecDeque<QueuedRequest>,
+     in_flight: InFlight,
+     cancellations: VecDeque<u64>,
+     closing: bool,
+diff --git a/crates/iouring/src/io_uring_selector/message.rs b/crates/iouring/src/io_uring_selector/message.rs
+index 4f6f05d..0457ed0 100644
+--- a/crates/iouring/src/io_uring_selector/message.rs
++++ b/crates/iouring/src/io_uring_selector/message.rs
+@@ -279,7 +279,13 @@ impl IoUringSelector {
+             reply: Cell::new(Some(reply)),
+             cancelling: Cell::new(false),
+         });
+-        Self::submit(controller, request, result, cancellation).await
++        Self::submit(
++            controller,
++            QueuedRequest::Owned(request),
++            result,
++            cancellation,
++        )
++        .await
+     }
+ }
+ 
+diff --git a/crates/iouring/src/io_uring_selector/readiness.rs b/crates/iouring/src/io_uring_selector/readiness.rs
+index 59edcd3..6143f9c 100644
+--- a/crates/iouring/src/io_uring_selector/readiness.rs
++++ b/crates/iouring/src/io_uring_selector/readiness.rs
+@@ -6,7 +6,7 @@ use super::*;
+ use std::io::{IoSlice, IoSliceMut};
+ 
+ // Readiness requests retain only the socket. Borrowed payloads and I/O vectors never enter the ring or its request bookkeeping.
+-struct ReadinessRequest {
++pub(crate) struct ReadinessRequest {
+     identifier: u64,
+     _permit: Permit,
+     socket: Option<RegisteredSocket>,
+@@ -15,12 +15,12 @@ struct ReadinessRequest {
+     cancelling: Cell<bool>,
+ }
+ 
+-impl PendingRequest for ReadinessRequest {
+-    fn identifier(&self) -> u64 {
++impl ReadinessRequest {
++    pub(super) fn identifier(&self) -> u64 {
+         self.identifier
+     }
+ 
+-    fn entry(&mut self) -> squeue::Entry {
++    pub(super) fn entry(&mut self) -> squeue::Entry {
+         let socket = self.socket.as_ref().expect("request retains its socket");
+         let events = match self.interest {
+             Interest::Readable => libc::POLLIN,
+@@ -31,7 +31,7 @@ impl PendingRequest for ReadinessRequest {
+             .user_data(self.identifier)
+     }
+ 
+-    fn finish(self: Box<Self>, result: io::Result<usize>) {
++    pub(super) fn finish(self, result: io::Result<usize>) {
+         let reply = self
+             .reply
+             .take()
+@@ -41,15 +41,15 @@ impl PendingRequest for ReadinessRequest {
+         discard(reply.send(result));
+     }
+ 
+-    fn cancelling(&self) -> bool {
++    pub(super) fn cancelling(&self) -> bool {
+         self.cancelling.get()
+     }
+ 
+-    fn set_cancelling(&self) {
++    pub(super) fn set_cancelling(&self) {
+         self.cancelling.set(true);
+     }
+ 
+-    fn take_reply(&self) -> Option<Box<dyn Send>> {
++    pub(super) fn take_reply(&self) -> Option<Box<dyn Send>> {
+         self.reply
+             .take()
+             .map(|reply| Box::new(reply) as Box<dyn Send>)
+@@ -94,7 +94,13 @@ impl IoUringSelector {
+             cancelling: Cell::new(false),
+         };
+         operation_result(
+-            Self::submit(controller, Box::new(request), result, cancellation).await,
++            Self::submit(
++                controller,
++                QueuedRequest::Readiness(request),
++                result,
++                cancellation,
++            )
++            .await,
+             cancellation,
+         )
+         .map(drop)
+diff --git a/crates/iouring/src/io_uring_selector/readiness/tests.rs b/crates/iouring/src/io_uring_selector/readiness/tests.rs
+index e222ab7..e345fd0 100644
+--- a/crates/iouring/src/io_uring_selector/readiness/tests.rs
++++ b/crates/iouring/src/io_uring_selector/readiness/tests.rs
+@@ -13,7 +13,7 @@ fn streams(selector: &IoUringSelector) -> (NativeSocket, NativeSocket) {
+     ))
+ }
+ 
+-fn submitted(driver: &IoUringDriver) -> Box<dyn PendingRequest> {
++fn submitted(driver: &IoUringDriver) -> QueuedRequest {
+     match driver
+         .reactor
+         .as_ref()
+diff --git a/crates/iouring/src/io_uring_selector/tests.rs b/crates/iouring/src/io_uring_selector/tests.rs
+index 2b27c4a..9e530be 100644
+--- a/crates/iouring/src/io_uring_selector/tests.rs
++++ b/crates/iouring/src/io_uring_selector/tests.rs
+@@ -748,7 +748,7 @@ fn submission_racing_shutdown_or_driver_exit_returns_unpublished_storage() {
+             drop(driver);
+             let (result, buffer) = block_on(IoUringSelector::submit(
+                 Arc::clone(&selector.controllers[0]),
+-                request,
++                QueuedRequest::Owned(request),
+                 result,
+                 &never,
+             ));
+@@ -758,7 +758,7 @@ fn submission_racing_shutdown_or_driver_exit_returns_unpublished_storage() {
+             let mut driver = driver;
+             let (result, buffer) = block_on(IoUringSelector::submit(
+                 Arc::clone(&selector.controllers[0]),
+-                request,
++                QueuedRequest::Owned(request),
+                 result,
+                 &never,
+             ));

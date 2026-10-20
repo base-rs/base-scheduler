@@ -1,0 +1,43 @@
+diff --git a/crates/iouring/src/io_uring_selector.rs b/crates/iouring/src/io_uring_selector.rs
+index 665009a..4ac17b2 100644
+--- a/crates/iouring/src/io_uring_selector.rs
++++ b/crates/iouring/src/io_uring_selector.rs
+@@ -12,6 +12,7 @@ use std::{
+     collections::{HashMap, VecDeque},
+     fs::File as StdFile,
+     future::{Future, poll_fn},
++    hash::{BuildHasherDefault, Hasher},
+     io,
+     os::fd::{AsRawFd, FromRawFd, OwnedFd},
+     pin::pin,
+@@ -211,11 +212,29 @@ impl<B: IoBuf> PendingRequest for Request<B> {
+     }
+ }
+ 
++// Keys are internal, never-reused u64 request IDs. An odd multiplier preserves distinct integer hashes and spreads sequential IDs over the table index and its upper-bit fingerprints without keyed string hashing.
++#[derive(Default)]
++struct IdentifierHasher(u64);
++
++impl Hasher for IdentifierHasher {
++    fn finish(&self) -> u64 {
++        self.0
++    }
++
++    fn write(&mut self, _: &[u8]) {
++        unreachable!("request identifiers hash with write_u64")
++    }
++
++    fn write_u64(&mut self, identifier: u64) {
++        self.0 = identifier.wrapping_mul(0x9e37_79b9_7f4a_7c15);
++    }
++}
++
+ /// Only terminal original completions remove requests from this map.
+ /// On an unexpected selector failure, leak kernel-accessible resources rather
+ /// than freeing memory whose completion cannot be established.
+ #[derive(Default)]
+-struct InFlight(HashMap<u64, Box<dyn PendingRequest>>);
++struct InFlight(HashMap<u64, Box<dyn PendingRequest>, BuildHasherDefault<IdentifierHasher>>);
+ 
+ impl Drop for InFlight {
+     fn drop(&mut self) {

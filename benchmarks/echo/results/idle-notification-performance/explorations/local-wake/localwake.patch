@@ -1,0 +1,35 @@
+diff --git a/crates/native/src/worker.rs b/crates/native/src/worker.rs
+index 2958751..2acb863 100644
+--- a/crates/native/src/worker.rs
++++ b/crates/native/src/worker.rs
+@@ -78,12 +78,16 @@ pub(crate) fn schedule(shared: &Arc<Shared>, runnable: Runnable) {
+                 && (preferred == UNASSIGNED_WORKER || preferred == worker.identifier)
+             {
+                 worker.ready.push(runnable);
+-                return None;
++                // An active worker rechecks its local queue before parking and fans out remaining work before running a task. A driver turn entered while sleeping still needs its wake permit.
++                if !shared.workers[worker.identifier].sleeping.load(Ordering::Relaxed) {
++                    return (None, false);
++                }
++                return (None, true);
+             }
+         }
+-        Some(runnable)
++        (Some(runnable), true)
+     });
+-    if let Some(runnable) = remote {
++    if let Some(runnable) = remote.0 {
+         if let Some(worker) = shared.workers.get(preferred) {
+             worker.incoming.push(runnable);
+         } else {
+@@ -91,7 +95,9 @@ pub(crate) fn schedule(shared: &Arc<Shared>, runnable: Runnable) {
+         }
+     }
+     // Publication precedes the sleeping flag exchange. A worker publishes its sleeping flag before rechecking queues, so a racing wake is retained.
+-    shared.wake_idle(preferred);
++    if remote.1 {
++        shared.wake_idle(preferred);
++    }
+ }
+ 
+ fn search(shared: &Shared, local: &LocalWorker, iteration: usize) -> Steal<Runnable> {

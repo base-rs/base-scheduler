@@ -1,0 +1,33 @@
+{
+  "bytes": 64,
+  "connections": 128,
+  "payload_mib_per_second": 125.73744710286458,
+  "requests": 6180247,
+  "requests_per_second": 2060082.3333333333,
+  "rtt_max_us": 254.847,
+  "rtt_mean_us": 62.09109245746963,
+  "rtt_p50_us": 60.991,
+  "rtt_p95_us": 94.335,
+  "rtt_p99_us": 112.319,
+  "seconds": 3.0,
+  "warmup_seconds": 1.0,
+  "identifier": "after-iouring-w4-c128-b64-r4",
+  "mode": "after",
+  "backend": "iouring",
+  "workers": 4,
+  "repeat": 4,
+  "client_cpu": {
+    "user": 1.604177,
+    "system": 7.537837999999994,
+    "voluntary_switches": 193020,
+    "involuntary_switches": 442
+  },
+  "server_cpu": {
+    "user": 2.8346230000000006,
+    "system": 8.695180999999991,
+    "voluntary_switches": 48220,
+    "involuntary_switches": 285
+  },
+  "lifecycle_seconds": 4.022380840964615,
+  "variant": "after"
+}

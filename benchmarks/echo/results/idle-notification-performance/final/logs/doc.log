@@ -1,0 +1,59 @@
+    Checking core-scheduler v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-completion-followup)
+    Checking regex-automata v0.4.18
+    Checking log v0.4.34
+   Compiling syn v3.0.9
+ Documenting core-scheduler v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-completion-followup)
+    Checking tokio v1.53.3
+    Checking core-scheduler-timers v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-completion-followup/crates/timers)
+ Documenting core-scheduler-timers v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-completion-followup/crates/timers)
+    Checking rustls v0.23.46
+    Checking core-scheduler-selector v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-completion-followup/crates/selector)
+ Documenting core-scheduler-conformance v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-completion-followup/crates/conformance)
+ Documenting core-scheduler-selector v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-completion-followup/crates/selector)
+ Documenting core-scheduler-direct v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-completion-followup/crates/direct)
+    Checking core-scheduler-iouring v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-completion-followup/crates/iouring)
+    Checking core-scheduler-native v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-completion-followup/crates/native)
+ Documenting core-scheduler-iouring v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-completion-followup/crates/iouring)
+ Documenting core-scheduler-native v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-completion-followup/crates/native)
+    Checking regex v1.13.1
+    Checking core-markdown v0.1.0
+   Compiling synstructure v0.14.0
+   Compiling zerovec-derive v0.11.6
+   Compiling displaydoc v0.2.7
+   Compiling serde_derive v1.0.229
+   Compiling linkme-impl v0.3.37
+   Compiling zerofrom-derive v0.1.8
+   Compiling yoke-derive v0.8.4
+    Checking linkme v0.3.37
+    Checking zerofrom v0.1.8
+    Checking yoke v0.8.3
+    Checking zerotrie v0.2.5
+    Checking zerovec v0.11.8
+    Checking tinystr v0.8.4
+    Checking potential_utf v0.1.6
+    Checking icu_collections v2.1.1
+    Checking icu_locale_core v2.1.1
+    Checking core-scheduler-tokio v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-completion-followup/crates/tokio)
+ Documenting core-scheduler-tokio v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-completion-followup/crates/tokio)
+    Checking icu_provider v2.1.1
+    Checking icu_normalizer v2.1.1
+    Checking icu_properties v2.1.2
+ Documenting core-scheduler-echo-benchmark v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-completion-followup/benchmarks/echo)
+    Checking serde v1.0.229
+    Checking bake v0.20.0
+    Checking serde_yaml_ng v0.10.0
+    Checking bake-license v0.2.3
+    Checking bake-releases v0.3.5
+    Checking bake-readme v0.2.5
+    Checking bake-markdown v0.4.0
+    Checking bake-test v0.3.3
+    Checking idna_adapter v1.2.1
+    Checking idna v1.1.0
+    Checking url v2.5.8
+    Checking bake-agent-context v0.4.0
+    Checking ureq v2.12.1
+    Checking bake-cargo v0.5.1
+    Checking core-project v0.2.0
+ Documenting core-scheduler-bake v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-completion-followup/bake)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.65s
+   Generated /home/samuel/Developer/core-rs/core-scheduler-perf-completion-followup/target/doc/core_scheduler/index.html and 9 other files

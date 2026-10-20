@@ -1,0 +1,33 @@
+{
+  "bytes": 64,
+  "connections": 32,
+  "payload_mib_per_second": 39.469217936197914,
+  "requests": 1939991,
+  "requests_per_second": 646663.6666666666,
+  "rtt_max_us": 218.111,
+  "rtt_mean_us": 49.414216244817624,
+  "rtt_p50_us": 50.559,
+  "rtt_p95_us": 54.879,
+  "rtt_p99_us": 57.343,
+  "seconds": 3.0,
+  "warmup_seconds": 1.0,
+  "identifier": "flat-tokio-adapter-w1-c32-b64-r2",
+  "mode": "flat",
+  "backend": "tokio-adapter",
+  "workers": 1,
+  "repeat": 2,
+  "client_cpu": {
+    "user": 1.4077850000000005,
+    "system": 3.31156,
+    "voluntary_switches": 1420604,
+    "involuntary_switches": 817
+  },
+  "server_cpu": {
+    "user": 0.37418699999999916,
+    "system": 2.2618560000000016,
+    "voluntary_switches": 87,
+    "involuntary_switches": 48
+  },
+  "lifecycle_seconds": 4.002794848987833,
+  "variant": "flat"
+}

@@ -1,0 +1,171 @@
+diff --git a/crates/iouring/src/io_uring_selector.rs b/crates/iouring/src/io_uring_selector.rs
+index 665009a..47410d0 100644
+--- a/crates/iouring/src/io_uring_selector.rs
++++ b/crates/iouring/src/io_uring_selector.rs
+@@ -892,6 +892,51 @@ impl Reactor {
+         }
+     }
+ 
++    fn complete(&mut self) -> io::Result<bool> {
++        let mut progressed = false;
++        // The CQ iterator snapshots the available batch. Finish publishing every completion in that batch before returning to the executor; application futures are polled only from its ready queue.
++        let mut notification_completed = false;
++        let mut notification_error = None;
++        for completion in self.ring.completion() {
++            progressed = true;
++            let identifier = completion.user_data();
++            if identifier == NOTIFICATION_TAG {
++                self.notification_armed = false;
++                notification_completed = true;
++                if completion.result() < 0 {
++                    notification_error = Some(io::Error::from_raw_os_error(-completion.result()));
++                }
++                continue;
++            }
++            if identifier & CANCEL_TAG != 0 {
++                continue;
++            }
++            // Every untagged CQE is the single original completion of a
++            // published request. Only this path removes it from InFlight.
++            let request = self
++                .in_flight
++                .0
++                .remove(&identifier)
++                .expect("original completion retains its in-flight request");
++            let result = completion.result();
++            request.finish(if result < 0 {
++                Err(io::Error::from_raw_os_error(-result))
++            } else {
++                Ok(result as usize)
++            });
++        }
++
++        if let Some(error) = notification_error {
++            return Err(error);
++        }
++        if notification_completed {
++            // Drain before rearming. Otherwise a readable eventfd produces another immediate poll completion, and the progress return keeps bypassing the idle drain.
++            self.drain_notification()?;
++        }
++
++        Ok(progressed)
++    }
++
+     pub(crate) fn turn(&mut self, timeout: Option<Duration>) -> io::Result<bool> {
+         self.started = true;
+         let mut progressed = false;
+@@ -957,45 +1002,7 @@ impl Reactor {
+             }
+         }
+ 
+-        // The CQ iterator snapshots the available batch. Finish publishing every completion in that batch before returning to the executor; application futures are polled only from its ready queue.
+-        let mut notification_completed = false;
+-        let mut notification_error = None;
+-        for completion in self.ring.completion() {
+-            progressed = true;
+-            let identifier = completion.user_data();
+-            if identifier == NOTIFICATION_TAG {
+-                self.notification_armed = false;
+-                notification_completed = true;
+-                if completion.result() < 0 {
+-                    notification_error = Some(io::Error::from_raw_os_error(-completion.result()));
+-                }
+-                continue;
+-            }
+-            if identifier & CANCEL_TAG != 0 {
+-                continue;
+-            }
+-            // Every untagged CQE is the single original completion of a
+-            // published request. Only this path removes it from InFlight.
+-            let request = self
+-                .in_flight
+-                .0
+-                .remove(&identifier)
+-                .expect("original completion retains its in-flight request");
+-            let result = completion.result();
+-            request.finish(if result < 0 {
+-                Err(io::Error::from_raw_os_error(-result))
+-            } else {
+-                Ok(result as usize)
+-            });
+-        }
+-
+-        if let Some(error) = notification_error {
+-            return Err(error);
+-        }
+-        if notification_completed {
+-            // Drain before rearming. Otherwise a readable eventfd produces another immediate poll completion, and the progress return keeps bypassing the idle drain.
+-            self.drain_notification()?;
+-        }
++        progressed |= self.complete()?;
+ 
+         {
+             let mut submissions = self.ring.submission();
+@@ -1101,6 +1108,7 @@ impl Reactor {
+                 return Err(error);
+             }
+         }
++        self.complete()?;
+         Ok(false)
+     }
+ }
+diff --git a/crates/native/src/task_service.rs b/crates/native/src/task_service.rs
+index 4d42dcd..8927798 100644
+--- a/crates/native/src/task_service.rs
++++ b/crates/native/src/task_service.rs
+@@ -132,17 +132,23 @@ impl Shared {
+         }
+     }
+     pub(crate) fn wake_idle(&self, preferred: usize) {
++        self.wake_idle_except(preferred, UNASSIGNED_WORKER);
++    }
++    pub(crate) fn wake_idle_except(&self, preferred: usize, source: usize) {
++        if source == 0 && self.workers.len() == 1 {
++            return;
++        }
+         std::sync::atomic::fence(Ordering::SeqCst);
+         if self.idle_workers.load(Ordering::SeqCst) == 0 {
+             return;
+         }
+-        if let Some(worker) = self.workers.get(preferred) {
++        if let Some(worker) = self.workers.get(preferred).filter(|_| preferred != source) {
+             if worker.wake() {
+                 return;
+             }
+         }
+-        for worker in &self.workers {
+-            if worker.wake() {
++        for (identifier, worker) in self.workers.iter().enumerate() {
++            if identifier != source && worker.wake() {
+                 return;
+             }
+         }
+diff --git a/crates/native/src/worker.rs b/crates/native/src/worker.rs
+index 2958751..1a0b83d 100644
+--- a/crates/native/src/worker.rs
++++ b/crates/native/src/worker.rs
+@@ -71,6 +71,7 @@ pub(crate) fn assert_outside_worker() {
+ 
+ pub(crate) fn schedule(shared: &Arc<Shared>, runnable: Runnable) {
+     let preferred = runnable.metadata().worker.load(Ordering::Relaxed);
++    let mut source = UNASSIGNED_WORKER;
+     let remote = CURRENT_WORKER.with(|current| {
+         let current = current.borrow();
+         if let Some(worker) = current.as_ref() {
+@@ -78,6 +79,7 @@ pub(crate) fn schedule(shared: &Arc<Shared>, runnable: Runnable) {
+                 && (preferred == UNASSIGNED_WORKER || preferred == worker.identifier)
+             {
+                 worker.ready.push(runnable);
++                source = worker.identifier;
+                 return None;
+             }
+         }
+@@ -91,7 +93,7 @@ pub(crate) fn schedule(shared: &Arc<Shared>, runnable: Runnable) {
+         }
+     }
+     // Publication precedes the sleeping flag exchange. A worker publishes its sleeping flag before rechecking queues, so a racing wake is retained.
+-    shared.wake_idle(preferred);
++    shared.wake_idle_except(preferred, source);
+ }
+ 
+ fn search(shared: &Shared, local: &LocalWorker, iteration: usize) -> Steal<Runnable> {

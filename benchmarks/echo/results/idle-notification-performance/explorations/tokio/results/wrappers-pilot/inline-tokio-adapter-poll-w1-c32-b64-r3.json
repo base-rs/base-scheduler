@@ -1,0 +1,33 @@
+{
+  "bytes": 64,
+  "connections": 32,
+  "payload_mib_per_second": 39.549357096354164,
+  "requests": 1943930,
+  "requests_per_second": 647976.6666666666,
+  "rtt_max_us": 79.615,
+  "rtt_mean_us": 49.315879333617865,
+  "rtt_p50_us": 50.463,
+  "rtt_p95_us": 54.751,
+  "rtt_p99_us": 57.247,
+  "seconds": 3.0,
+  "warmup_seconds": 1.0,
+  "identifier": "inline-tokio-adapter-poll-w1-c32-b64-r3",
+  "mode": "inline",
+  "backend": "tokio-adapter-poll",
+  "workers": 1,
+  "repeat": 3,
+  "client_cpu": {
+    "user": 1.3710960000000014,
+    "system": 3.334220000000002,
+    "voluntary_switches": 1407337,
+    "involuntary_switches": 905
+  },
+  "server_cpu": {
+    "user": 0.35132799999999875,
+    "system": 2.279554999999995,
+    "voluntary_switches": 98,
+    "involuntary_switches": 39
+  },
+  "lifecycle_seconds": 4.002936897100881,
+  "variant": "inline"
+}

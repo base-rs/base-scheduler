@@ -1,0 +1,52 @@
+{
+  "hostname": "aiko",
+  "platform": "Linux-7.2.6-arch2-1-x86_64-with-glibc2.44",
+  "machine": "Linux aiko 7.2.6-arch2-1 #1 SMP PREEMPT_DYNAMIC Mon, 14 Sep 2026 22:41:30 +0000 x86_64 GNU/Linux\n",
+  "rustc": "rustc 1.99.0 (b940084d7 2026-09-28) (Arch Linux rust 1:1.99.0-1)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+  "cargo": "cargo 1.99.0 (5f94df478 2026-08-27) (Arch Linux rust 1:1.99.0-1)\n",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "CARGO_PROFILE_RELEASE_OPT_LEVEL": null,
+    "CARGO_PROFILE_RELEASE_LTO": null,
+    "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": null,
+    "CARGO_PROFILE_RELEASE_DEBUG": null
+  },
+  "governors": {
+    "/sys/devices/system/cpu/cpu7/cpufreq/scaling_governor": "powersave",
+    "/sys/devices/system/cpu/cpu5/cpufreq/scaling_governor": "powersave",
+    "/sys/devices/system/cpu/cpu3/cpufreq/scaling_governor": "powersave",
+    "/sys/devices/system/cpu/cpu1/cpufreq/scaling_governor": "powersave",
+    "/sys/devices/system/cpu/cpu6/cpufreq/scaling_governor": "powersave",
+    "/sys/devices/system/cpu/cpu4/cpufreq/scaling_governor": "powersave",
+    "/sys/devices/system/cpu/cpu2/cpufreq/scaling_governor": "powersave",
+    "/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor": "powersave"
+  },
+  "before_commit": "a98f172f8b06f23b34a354a4b6f6c294aa5859ab",
+  "after_commit": "9e005c5061c26bed937953d1e540a3ddde5cc6ed",
+  "after_tree": "f693e85440a27d307d6f469a5bc3efd9668e53f6",
+  "verification_followup_commit": "1547fa6c7f915637b215acc87de7174e68e160db",
+  "build_command": "cargo build --release --locked -p core-scheduler-echo-benchmark",
+  "profile": "Default optimized Cargo release; no LTO, target CPU, or codegen-unit overrides.",
+  "source_patch_sha256": "ec6db99407ac75fb3e6eb000c6bafca6ccd65c32e80f44ed19a550c20d0e7516",
+  "coordination": "Builds and tests hold shared /tmp/core-scheduler-perf.lock; the runner holds its exclusive lock for all timed samples.",
+  "client_source": "5736301fded46c4e5f11d5387950ae2ee0807b94",
+  "cpu_model": "Architecture:                            x86_64\nCPU op-mode(s):                          32-bit, 64-bit\nAddress sizes:                           48 bits physical, 48 bits virtual\nByte Order:                              Little Endian\nCPU(s):                                  32\nOn-line CPU(s) list:                     0-31\nVendor ID:                               AuthenticAMD\nModel name:                              AMD Ryzen 9 9950X3D 16-Core Processor\nCPU family:                              26\nModel:                                   68\nThread(s) per core:                      2\nCore(s) per socket:                      16\nSocket(s):                               1\nStepping:                                0\nMicrocode version:                       0xb404035\nFrequency boost:                         enabled\nCPU(s) scaling MHz:                      90%\nCPU max MHz:                             5756.4521\nCPU min MHz:                             624.1940\nBogoMIPS:                                8599.98\nFlags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good amd_lbr_v2 nopl xtopology nonstop_tsc cpuid extd_apicid aperfmperf rapl pni pclmulqdq monitor ssse3 fma cx16 sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand lahf_lm cmp_legacy svm extapic cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw ibs skinit wdt tce topoext perfctr_core perfctr_nb bpext perfctr_llc mwaitx cpuid_fault cpb cat_l3 cdp_l3 hw_pstate ssbd mba perfmon_v2 ibrs ibpb stibp ibrs_enhanced vmmcall fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid cqm rdt_a avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local user_shstk avx_vnni avx512_bf16 clzero irperf xsaveerptr rdpru wbnoinvd cppc arat npt lbrv svm_lock nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold avic v_vmsave_vmload vgif x2avic v_spec_ctrl vnmi avx512vbmi umip pku ospke avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid bus_lock_detect movdiri movdir64b overflow_recov succor smca fsrm avx512_vp2intersect flush_l1d amd_lbr_pmc_freeze\nVirtualization:                          AMD-V\nL1d cache:                               768 KiB (16 instances)\nL1i cache:                               512 KiB (16 instances)\nL2 cache:                                16 MiB (16 instances)\nL3 cache:                                128 MiB (2 instances)\nNUMA node(s):                            1\nNUMA node0 CPU(s):                       0-31\nVulnerability Gather data sampling:      Not affected\nVulnerability Ghostwrite:                Not affected\nVulnerability Indirect target selection: Not affected\nVulnerability Itlb multihit:             Not affected\nVulnerability L1tf:                      Not affected\nVulnerability Mds:                       Not affected\nVulnerability Meltdown:                  Not affected\nVulnerability Mmio stale data:           Not affected\nVulnerability Old microcode:             Not affected\nVulnerability Reg file data sampling:    Not affected\nVulnerability Retbleed:                  Not affected\nVulnerability Spec rstack overflow:      Mitigation; IBPB on VMEXIT only\nVulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl\nVulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization\nVulnerability Spectre v2:                Mitigation; Enhanced / Automatic IBRS; IBPB conditional; STIBP always-on; PBRSB-eIBRS Not affected; BHI Not affected\nVulnerability Srbds:                     Not affected\nVulnerability Tsa:                       Not affected\nVulnerability Tsx async abort:           Not affected\nVulnerability Vmscape:                   Mitigation; IBPB on VMEXIT\n",
+  "cpu_topology": "CPU CORE SOCKET NODE L1d:L1i:L2:L3\n  0    0      0    0 0:0:0:0\n  1    1      0    0 1:1:1:0\n  2    2      0    0 2:2:2:0\n  3    3      0    0 3:3:3:0\n  4    4      0    0 4:4:4:0\n  5    5      0    0 5:5:5:0\n  6    6      0    0 6:6:6:0\n  7    7      0    0 7:7:7:0\n  8    8      0    0 8:8:8:1\n  9    9      0    0 9:9:9:1\n 10   10      0    0 10:10:10:1\n 11   11      0    0 11:11:11:1\n 12   12      0    0 12:12:12:1\n 13   13      0    0 13:13:13:1\n 14   14      0    0 14:14:14:1\n 15   15      0    0 15:15:15:1\n 16    0      0    0 0:0:0:0\n 17    1      0    0 1:1:1:0\n 18    2      0    0 2:2:2:0\n 19    3      0    0 3:3:3:0\n 20    4      0    0 4:4:4:0\n 21    5      0    0 5:5:5:0\n 22    6      0    0 6:6:6:0\n 23    7      0    0 7:7:7:0\n 24    8      0    0 8:8:8:1\n 25    9      0    0 9:9:9:1\n 26   10      0    0 10:10:10:1\n 27   11      0    0 11:11:11:1\n 28   12      0    0 12:12:12:1\n 29   13      0    0 13:13:13:1\n 30   14      0    0 14:14:14:1\n 31   15      0    0 15:15:15:1\n",
+  "binaries": {
+    "after": {
+      "sha256": "95a72a531c2c0cd12874500cc6f92ef20994f46c3eccb8fbe9dc0f60ecd3b44b",
+      "path": "/home/samuel/.cache/core-scheduler-idle-notification-followup/final-build/after"
+    },
+    "before": {
+      "sha256": "c461c4a6c690f83823148970badfdf3cc4a30a06157c4edfeea66f8777c61f59",
+      "path": "/home/samuel/.cache/core-scheduler-turn-followup/before"
+    }
+  },
+  "client": {
+    "sha256": "db6c914ab75011477ec6232e681046b1e75532cbaa1c81663bac984591675cf3",
+    "path": "/home/samuel/.cache/core-scheduler-owner-wake-final/client"
+  },
+  "baseline_build_log_sha256": "f6b96000696643e535e3646f28e0ab334ad3f54429e1fa18d116e6b0b9611a8c",
+  "after_build_log_sha256": "67986bc79ef4230ca68920412b5982299848afa7014e4e77c58e38448990780d"
+}

@@ -1,0 +1,33 @@
+{
+  "bytes": 64,
+  "connections": 32,
+  "payload_mib_per_second": 34.95355224609375,
+  "requests": 1718037,
+  "requests_per_second": 572679.0,
+  "rtt_max_us": 231.679,
+  "rtt_mean_us": 55.80773782054748,
+  "rtt_p50_us": 55.647,
+  "rtt_p95_us": 59.391,
+  "rtt_p99_us": 62.079,
+  "seconds": 3.0,
+  "warmup_seconds": 1.0,
+  "identifier": "thin-lto-iouring-poll-w1-c32-b64-r3",
+  "mode": "thin-lto",
+  "backend": "iouring-poll",
+  "workers": 1,
+  "repeat": 3,
+  "client_cpu": {
+    "user": 1.1701700000000006,
+    "system": 2.926984000000001,
+    "voluntary_switches": 1182866,
+    "involuntary_switches": 899
+  },
+  "server_cpu": {
+    "user": 0.5124040000000001,
+    "system": 2.2701899999999995,
+    "voluntary_switches": 108,
+    "involuntary_switches": 86
+  },
+  "lifecycle_seconds": 4.002832040190697,
+  "variant": "thin-lto"
+}

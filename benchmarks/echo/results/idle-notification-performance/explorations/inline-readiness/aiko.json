@@ -1,0 +1,451 @@
+{
+  "cases": [
+    {
+      "label": "before",
+      "backend": "iouring-poll",
+      "binary": {
+        "path": "/home/samuel/.cache/core-scheduler-readiness-followup/before",
+        "sha256": "c461c4a6c690f83823148970badfdf3cc4a30a06157c4edfeea66f8777c61f59"
+      }
+    },
+    {
+      "label": "inline",
+      "backend": "iouring-poll",
+      "binary": {
+        "path": "/home/samuel/.cache/core-scheduler-readiness-followup/inline-readiness",
+        "sha256": "b5acbfcb610e102285372d50a1966c8fc540b091997c42782efc47e16741731d"
+      }
+    }
+  ],
+  "helper": {
+    "path": "/home/samuel/.cache/core-scheduler-next-final/sample-runner.py",
+    "sha256": "31e6ad715214fcadfda358362100a21cb94cc41a79e23733191eb8e61b740909"
+  },
+  "client": {
+    "path": "/home/samuel/.cache/core-scheduler-owner-wake-final/client",
+    "sha256": "db6c914ab75011477ec6232e681046b1e75532cbaa1c81663bac984591675cf3"
+  },
+  "runner": {
+    "path": "/home/samuel/.cache/core-scheduler-next-final/run.py",
+    "sha256": "4dcb2f95087cc39998803fa7f3555512059b42991af3972679633ec7204205e2"
+  },
+  "shuffle_seed": 20261021,
+  "repeats": 3,
+  "workloads": [
+    [
+      1,
+      32,
+      64
+    ],
+    [
+      4,
+      128,
+      64
+    ]
+  ],
+  "warmup_seconds": 1,
+  "measurement_seconds": 3,
+  "server_cpus": "0 through workers-1",
+  "client_cpus": "4-7",
+  "platform": "Linux-7.2.6-arch2-1-x86_64-with-glibc2.44",
+  "samples": [
+    {
+      "bytes": 64,
+      "connections": 128,
+      "payload_mib_per_second": 126.2457275390625,
+      "requests": 6205230,
+      "requests_per_second": 2068410.0,
+      "rtt_max_us": 1050.623,
+      "rtt_mean_us": 61.84036202703221,
+      "rtt_p50_us": 59.423,
+      "rtt_p95_us": 98.751,
+      "rtt_p99_us": 118.079,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "inline-iouring-poll-w4-c128-b64-r3",
+      "mode": "inline",
+      "backend": "iouring-poll",
+      "workers": 4,
+      "repeat": 3,
+      "client_cpu": {
+        "user": 1.550864,
+        "system": 7.591398000000001,
+        "voluntary_switches": 315750,
+        "involuntary_switches": 912
+      },
+      "server_cpu": {
+        "user": 2.733586,
+        "system": 8.781411,
+        "voluntary_switches": 42427,
+        "involuntary_switches": 242
+      },
+      "lifecycle_seconds": 4.035219196928665,
+      "variant": "inline"
+    },
+    {
+      "bytes": 64,
+      "connections": 128,
+      "payload_mib_per_second": 126.43839518229167,
+      "requests": 6214700,
+      "requests_per_second": 2071566.6666666667,
+      "rtt_max_us": 888.831,
+      "rtt_mean_us": 61.74579949329831,
+      "rtt_p50_us": 59.583,
+      "rtt_p95_us": 98.559,
+      "rtt_p99_us": 115.967,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "before-iouring-poll-w4-c128-b64-r2",
+      "mode": "before",
+      "backend": "iouring-poll",
+      "workers": 4,
+      "repeat": 2,
+      "client_cpu": {
+        "user": 1.5774460000000001,
+        "system": 7.633772999999998,
+        "voluntary_switches": 305934,
+        "involuntary_switches": 612
+      },
+      "server_cpu": {
+        "user": 2.763999,
+        "system": 8.800704000000003,
+        "voluntary_switches": 15690,
+        "involuntary_switches": 70
+      },
+      "lifecycle_seconds": 4.028582411119714,
+      "variant": "before"
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 34.353535970052086,
+      "requests": 1688545,
+      "requests_per_second": 562848.3333333334,
+      "rtt_max_us": 240.383,
+      "rtt_mean_us": 56.784209984335696,
+      "rtt_p50_us": 56.639,
+      "rtt_p95_us": 60.319,
+      "rtt_p99_us": 62.879,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "before-iouring-poll-w1-c32-b64-r2",
+      "mode": "before",
+      "backend": "iouring-poll",
+      "workers": 1,
+      "repeat": 2,
+      "client_cpu": {
+        "user": 1.1361720000000002,
+        "system": 2.883220999999999,
+        "voluntary_switches": 1162130,
+        "involuntary_switches": 979
+      },
+      "server_cpu": {
+        "user": 0.5510819999999992,
+        "system": 2.2366930000000025,
+        "voluntary_switches": 124,
+        "involuntary_switches": 85
+      },
+      "lifecycle_seconds": 4.00280977296643,
+      "variant": "before"
+    },
+    {
+      "bytes": 64,
+      "connections": 128,
+      "payload_mib_per_second": 125.8349609375,
+      "requests": 6185040,
+      "requests_per_second": 2061680.0,
+      "rtt_max_us": 458.751,
+      "rtt_mean_us": 62.0422659221283,
+      "rtt_p50_us": 59.615,
+      "rtt_p95_us": 99.711,
+      "rtt_p99_us": 118.143,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "inline-iouring-poll-w4-c128-b64-r2",
+      "mode": "inline",
+      "backend": "iouring-poll",
+      "workers": 4,
+      "repeat": 2,
+      "client_cpu": {
+        "user": 1.600969000000001,
+        "system": 7.5995769999999965,
+        "voluntary_switches": 320674,
+        "involuntary_switches": 616
+      },
+      "server_cpu": {
+        "user": 2.827278999999999,
+        "system": 8.726391,
+        "voluntary_switches": 21162,
+        "involuntary_switches": 90
+      },
+      "lifecycle_seconds": 4.026005811057985,
+      "variant": "inline"
+    },
+    {
+      "bytes": 64,
+      "connections": 128,
+      "payload_mib_per_second": 125.70137532552083,
+      "requests": 6178474,
+      "requests_per_second": 2059491.3333333333,
+      "rtt_max_us": 3946.495,
+      "rtt_mean_us": 62.10823803596176,
+      "rtt_p50_us": 59.647,
+      "rtt_p95_us": 99.455,
+      "rtt_p99_us": 117.695,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "before-iouring-poll-w4-c128-b64-r1",
+      "mode": "before",
+      "backend": "iouring-poll",
+      "workers": 4,
+      "repeat": 1,
+      "client_cpu": {
+        "user": 1.5741720000000008,
+        "system": 7.640880000000003,
+        "voluntary_switches": 318780,
+        "involuntary_switches": 661
+      },
+      "server_cpu": {
+        "user": 2.8580630000000014,
+        "system": 8.707735999999997,
+        "voluntary_switches": 17715,
+        "involuntary_switches": 170
+      },
+      "lifecycle_seconds": 4.018454645993188,
+      "variant": "before"
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 34.304239908854164,
+      "requests": 1686122,
+      "requests_per_second": 562040.6666666666,
+      "rtt_max_us": 226.943,
+      "rtt_mean_us": 56.86481280476733,
+      "rtt_p50_us": 56.703,
+      "rtt_p95_us": 60.415,
+      "rtt_p99_us": 63.007,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "inline-iouring-poll-w1-c32-b64-r1",
+      "mode": "inline",
+      "backend": "iouring-poll",
+      "workers": 1,
+      "repeat": 1,
+      "client_cpu": {
+        "user": 1.1600539999999988,
+        "system": 2.9006820000000033,
+        "voluntary_switches": 1169701,
+        "involuntary_switches": 1251
+      },
+      "server_cpu": {
+        "user": 0.5194849999999995,
+        "system": 2.2609180000000038,
+        "voluntary_switches": 114,
+        "involuntary_switches": 72
+      },
+      "lifecycle_seconds": 4.002834707032889,
+      "variant": "inline"
+    },
+    {
+      "bytes": 64,
+      "connections": 128,
+      "payload_mib_per_second": 125.31001790364583,
+      "requests": 6159238,
+      "requests_per_second": 2053079.3333333333,
+      "rtt_max_us": 1128.447,
+      "rtt_mean_us": 62.30220357404607,
+      "rtt_p50_us": 60.031,
+      "rtt_p95_us": 99.199,
+      "rtt_p99_us": 117.631,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "inline-iouring-poll-w4-c128-b64-r1",
+      "mode": "inline",
+      "backend": "iouring-poll",
+      "workers": 4,
+      "repeat": 1,
+      "client_cpu": {
+        "user": 1.5925839999999987,
+        "system": 7.606741999999997,
+        "voluntary_switches": 299549,
+        "involuntary_switches": 470
+      },
+      "server_cpu": {
+        "user": 2.722652,
+        "system": 8.830044999999998,
+        "voluntary_switches": 23932,
+        "involuntary_switches": 204
+      },
+      "lifecycle_seconds": 4.025864579947665,
+      "variant": "inline"
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 34.434061686197914,
+      "requests": 1692503,
+      "requests_per_second": 564167.6666666666,
+      "rtt_max_us": 232.959,
+      "rtt_mean_us": 56.65210024206746,
+      "rtt_p50_us": 56.511,
+      "rtt_p95_us": 60.223,
+      "rtt_p99_us": 62.815,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "inline-iouring-poll-w1-c32-b64-r3",
+      "mode": "inline",
+      "backend": "iouring-poll",
+      "workers": 1,
+      "repeat": 3,
+      "client_cpu": {
+        "user": 1.1629160000000027,
+        "system": 2.8751589999999965,
+        "voluntary_switches": 1163402,
+        "involuntary_switches": 1174
+      },
+      "server_cpu": {
+        "user": 0.5430530000000005,
+        "system": 2.238664,
+        "voluntary_switches": 113,
+        "involuntary_switches": 89
+      },
+      "lifecycle_seconds": 4.00252032186836,
+      "variant": "inline"
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 34.474202473958336,
+      "requests": 1694476,
+      "requests_per_second": 564825.3333333334,
+      "rtt_max_us": 221.695,
+      "rtt_mean_us": 56.58369847138584,
+      "rtt_p50_us": 56.415,
+      "rtt_p95_us": 60.127,
+      "rtt_p99_us": 62.687,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "before-iouring-poll-w1-c32-b64-r1",
+      "mode": "before",
+      "backend": "iouring-poll",
+      "workers": 1,
+      "repeat": 1,
+      "client_cpu": {
+        "user": 1.1552139999999973,
+        "system": 2.9245460000000065,
+        "voluntary_switches": 1165909,
+        "involuntary_switches": 508
+      },
+      "server_cpu": {
+        "user": 0.5262050000000009,
+        "system": 2.2572589999999906,
+        "voluntary_switches": 93,
+        "involuntary_switches": 80
+      },
+      "lifecycle_seconds": 4.00244967197068,
+      "variant": "before"
+    },
+    {
+      "bytes": 64,
+      "connections": 128,
+      "payload_mib_per_second": 125.14727783203125,
+      "requests": 6151239,
+      "requests_per_second": 2050413.0,
+      "rtt_max_us": 482.303,
+      "rtt_mean_us": 62.38326933516972,
+      "rtt_p50_us": 60.191,
+      "rtt_p95_us": 99.135,
+      "rtt_p99_us": 117.375,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "before-iouring-poll-w4-c128-b64-r3",
+      "mode": "before",
+      "backend": "iouring-poll",
+      "workers": 4,
+      "repeat": 3,
+      "client_cpu": {
+        "user": 1.667670000000001,
+        "system": 7.579412000000005,
+        "voluntary_switches": 294819,
+        "involuntary_switches": 461
+      },
+      "server_cpu": {
+        "user": 2.7458089999999977,
+        "system": 8.844836999999998,
+        "voluntary_switches": 24724,
+        "involuntary_switches": 111
+      },
+      "lifecycle_seconds": 4.026278320932761,
+      "variant": "before"
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 34.47406005859375,
+      "requests": 1694469,
+      "requests_per_second": 564823.0,
+      "rtt_max_us": 225.791,
+      "rtt_mean_us": 56.586027495339266,
+      "rtt_p50_us": 56.447,
+      "rtt_p95_us": 60.127,
+      "rtt_p99_us": 62.559,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "inline-iouring-poll-w1-c32-b64-r2",
+      "mode": "inline",
+      "backend": "iouring-poll",
+      "workers": 1,
+      "repeat": 2,
+      "client_cpu": {
+        "user": 1.1327029999999993,
+        "system": 2.8800580000000053,
+        "voluntary_switches": 1139396,
+        "involuntary_switches": 784
+      },
+      "server_cpu": {
+        "user": 0.5551300000000055,
+        "system": 2.239288000000002,
+        "voluntary_switches": 199,
+        "involuntary_switches": 87
+      },
+      "lifecycle_seconds": 4.00256532500498,
+      "variant": "inline"
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 34.627970377604164,
+      "requests": 1702034,
+      "requests_per_second": 567344.6666666666,
+      "rtt_max_us": 231.935,
+      "rtt_mean_us": 56.3324098478644,
+      "rtt_p50_us": 56.191,
+      "rtt_p95_us": 59.871,
+      "rtt_p99_us": 62.431,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "before-iouring-poll-w1-c32-b64-r3",
+      "mode": "before",
+      "backend": "iouring-poll",
+      "workers": 1,
+      "repeat": 3,
+      "client_cpu": {
+        "user": 1.2012629999999973,
+        "system": 2.856499999999997,
+        "voluntary_switches": 1178730,
+        "involuntary_switches": 806
+      },
+      "server_cpu": {
+        "user": 0.5354049999999972,
+        "system": 2.243124999999992,
+        "voluntary_switches": 198,
+        "involuntary_switches": 84
+      },
+      "lifecycle_seconds": 4.002675279043615,
+      "variant": "before"
+    }
+  ],
+  "started_utc": "2026-10-20T05:26:07Z",
+  "finished_utc": "2026-10-20T05:26:55Z"
+}

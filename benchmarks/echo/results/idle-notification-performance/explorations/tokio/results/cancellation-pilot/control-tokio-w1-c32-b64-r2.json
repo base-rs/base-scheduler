@@ -1,0 +1,33 @@
+{
+  "bytes": 64,
+  "connections": 32,
+  "payload_mib_per_second": 43.24334716796875,
+  "requests": 2125497,
+  "requests_per_second": 708499.0,
+  "rtt_max_us": 3196.927,
+  "rtt_mean_us": 45.10270450769881,
+  "rtt_p50_us": 46.143,
+  "rtt_p95_us": 50.591,
+  "rtt_p99_us": 53.119,
+  "seconds": 3.0,
+  "warmup_seconds": 1.0,
+  "identifier": "control-tokio-w1-c32-b64-r2",
+  "mode": "control",
+  "backend": "tokio",
+  "workers": 1,
+  "repeat": 2,
+  "client_cpu": {
+    "user": 1.464307999999999,
+    "system": 3.7281409999999937,
+    "voluntary_switches": 1618519,
+    "involuntary_switches": 607
+  },
+  "server_cpu": {
+    "user": 0.26832800000000034,
+    "system": 2.267333000000008,
+    "voluntary_switches": 178,
+    "involuntary_switches": 60
+  },
+  "lifecycle_seconds": 4.003214661031961,
+  "variant": "control"
+}

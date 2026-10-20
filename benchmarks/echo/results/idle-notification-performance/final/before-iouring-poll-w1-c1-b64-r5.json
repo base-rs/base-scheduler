@@ -1,0 +1,33 @@
+{
+  "bytes": 64,
+  "connections": 1,
+  "payload_mib_per_second": 14.40380859375,
+  "requests": 707976,
+  "requests_per_second": 235992.0,
+  "rtt_max_us": 171.391,
+  "rtt_mean_us": 4.195479661739936,
+  "rtt_p50_us": 3.731,
+  "rtt_p95_us": 5.603,
+  "rtt_p99_us": 5.791,
+  "seconds": 3.0,
+  "warmup_seconds": 1.0,
+  "identifier": "before-iouring-poll-w1-c1-b64-r5",
+  "mode": "before",
+  "backend": "iouring-poll",
+  "workers": 1,
+  "repeat": 5,
+  "client_cpu": {
+    "user": 0.39645799999999554,
+    "system": 1.1581280000000334,
+    "voluntary_switches": 941796,
+    "involuntary_switches": 14
+  },
+  "server_cpu": {
+    "user": 0.4623459999999966,
+    "system": 1.3820779999999786,
+    "voluntary_switches": 941818,
+    "involuntary_switches": 10
+  },
+  "lifecycle_seconds": 4.002038934966549,
+  "variant": "before"
+}

@@ -1,0 +1,33 @@
+{
+  "bytes": 64,
+  "connections": 32,
+  "payload_mib_per_second": 39.625732421875,
+  "requests": 1947684,
+  "requests_per_second": 649228.0,
+  "rtt_max_us": 3131.391,
+  "rtt_mean_us": 49.22031292396512,
+  "rtt_p50_us": 50.367,
+  "rtt_p95_us": 54.687,
+  "rtt_p99_us": 57.151,
+  "seconds": 3.0,
+  "warmup_seconds": 1.0,
+  "identifier": "swap-tokio-adapter-w1-c32-b64-r3",
+  "mode": "swap",
+  "backend": "tokio-adapter",
+  "workers": 1,
+  "repeat": 3,
+  "client_cpu": {
+    "user": 1.3171590000000002,
+    "system": 3.3645879999999977,
+    "voluntary_switches": 1396329,
+    "involuntary_switches": 858
+  },
+  "server_cpu": {
+    "user": 0.3478449999999995,
+    "system": 2.2938290000000023,
+    "voluntary_switches": 96,
+    "involuntary_switches": 49
+  },
+  "lifecycle_seconds": 4.002711714943871,
+  "variant": "swap"
+}

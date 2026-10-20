@@ -1,0 +1,14 @@
+diff --git a/crates/iouring/src/io_uring_selector.rs b/crates/iouring/src/io_uring_selector.rs
+index 665009a..362598b 100644
+--- a/crates/iouring/src/io_uring_selector.rs
++++ b/crates/iouring/src/io_uring_selector.rs
+@@ -1055,8 +1055,7 @@ impl Reactor {
+             || !self.notification_armed;
+         if !return_to_executor {
+             // Keep the local permit through productive turns, then consume it with remote notifications at the wait boundary. The armed eventfd poll retains notifications racing this check.
+-            let mut notified = crate::io_uring_worker::take_notification(&self.controller);
+-            notified |= self.drain_notification()?;
++            let notified = crate::io_uring_worker::take_notification(&self.controller);
+             return_to_executor = notified;
+         }
+         if return_to_executor {

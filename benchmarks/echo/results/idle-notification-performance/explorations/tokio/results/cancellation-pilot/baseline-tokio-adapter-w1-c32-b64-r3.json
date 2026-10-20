@@ -1,0 +1,33 @@
+{
+  "bytes": 64,
+  "connections": 32,
+  "payload_mib_per_second": 39.5577392578125,
+  "requests": 1944342,
+  "requests_per_second": 648114.0,
+  "rtt_max_us": 1044.991,
+  "rtt_mean_us": 49.305871148182725,
+  "rtt_p50_us": 50.463,
+  "rtt_p95_us": 54.783,
+  "rtt_p99_us": 57.279,
+  "seconds": 3.0,
+  "warmup_seconds": 1.0,
+  "identifier": "baseline-tokio-adapter-w1-c32-b64-r3",
+  "mode": "baseline",
+  "backend": "tokio-adapter",
+  "workers": 1,
+  "repeat": 3,
+  "client_cpu": {
+    "user": 1.321568,
+    "system": 3.390944000000001,
+    "voluntary_switches": 1408314,
+    "involuntary_switches": 831
+  },
+  "server_cpu": {
+    "user": 0.33399100000000104,
+    "system": 2.292911,
+    "voluntary_switches": 99,
+    "involuntary_switches": 50
+  },
+  "lifecycle_seconds": 4.00283938809298,
+  "variant": "baseline"
+}
