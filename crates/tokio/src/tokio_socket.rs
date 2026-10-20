@@ -12,6 +12,8 @@ use tokio::runtime::{Handle, Id};
 pub(crate) struct RegisteredSocket {
     socket: Arc<socket2::Socket>,
     runtime: Handle,
+    stream: bool,
+    connected_stream: AtomicBool,
     read_waiting: AtomicBool,
     write_waiting: AtomicBool,
     registration: tokio::sync::OnceCell<tokio::io::unix::AsyncFd<Arc<socket2::Socket>>>,
@@ -20,8 +22,13 @@ pub(crate) struct RegisteredSocket {
 #[cfg(unix)]
 impl RegisteredSocket {
     fn new(runtime: &Handle, socket: socket2::Socket) -> Self {
+        let stream = socket
+            .r#type()
+            .is_ok_and(|kind| kind == socket2::Type::STREAM);
         Self {
             socket: Arc::new(socket),
+            stream,
+            connected_stream: AtomicBool::new(false),
             runtime: runtime.clone(),
             read_waiting: AtomicBool::new(false),
             write_waiting: AtomicBool::new(false),
@@ -145,18 +152,48 @@ impl TokioSocket {
         }
     }
 
+    #[cfg(test)]
     pub(super) async fn io<Output, Operation>(
         &self,
         interest: Interest,
-        mut operation: Operation,
+        operation: Operation,
     ) -> io::Result<Output>
     where
         Operation: FnMut(&socket2::Socket) -> io::Result<Output> + Send,
     {
-        // Try every operation before gating on readiness: lifecycle calls, invalid arguments, and state errors can complete even when a previous operation cleared the cached readiness.
-        let result = operation(self.get_ref());
-        if !matches!(&result, Err(error) if error.kind() == io::ErrorKind::WouldBlock) {
-            return result;
+        self.io_with(interest, operation, false).await
+    }
+
+    pub(super) async fn io_with<Output, Operation>(
+        &self,
+        interest: Interest,
+        mut operation: Operation,
+        read_nonempty: bool,
+    ) -> io::Result<Output>
+    where
+        Operation: FnMut(&socket2::Socket) -> io::Result<Output> + Send,
+    {
+        #[cfg(unix)]
+        let known_connected = read_nonempty && self.inner.connected_stream.load(Ordering::Relaxed);
+        #[cfg(unix)]
+        let mark_connected = read_nonempty && self.inner.stream && !known_connected;
+        #[cfg(unix)]
+        let ready_first =
+            read_nonempty && known_connected && self.inner.registration.get().is_some();
+        #[cfg(windows)]
+        let ready_first = false;
+        #[cfg(windows)]
+        let _ = read_nonempty;
+        // Only nonempty reads on a stream that already completed a read may skip the speculative syscall. Lifecycle operations, unknown socket states, and empty reads retain immediate OS results.
+        if !ready_first {
+            let result = operation(self.get_ref());
+            #[cfg(unix)]
+            if mark_connected && result.is_ok() {
+                self.inner.connected_stream.store(true, Ordering::Relaxed);
+            }
+            if !matches!(&result, Err(error) if error.kind() == io::ErrorKind::WouldBlock) {
+                return result;
+            }
         }
         #[cfg(unix)]
         {
@@ -179,9 +216,15 @@ impl TokioSocket {
                 .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
                 .is_err()
             {
-                return registration
-                    .async_io(interest, |_| operation(self.inner.get_ref()))
-                    .await;
+                loop {
+                    let mut ready = registration.ready(interest).await?;
+                    if let Ok(result) = ready.try_io(|_| operation(self.inner.get_ref())) {
+                        if mark_connected && result.is_ok() {
+                            self.inner.connected_stream.store(true, Ordering::Relaxed);
+                        }
+                        return result;
+                    }
+                }
             }
             let _waiter = PollWaiter(waiting);
             std::future::poll_fn(|context| {
@@ -193,6 +236,9 @@ impl TokioSocket {
                             registration.poll_write_ready(context)
                         })?;
                     if let Ok(result) = ready.try_io(|_| operation(self.inner.get_ref())) {
+                        if mark_connected && result.is_ok() {
+                            self.inner.connected_stream.store(true, Ordering::Relaxed);
+                        }
                         return std::task::Poll::Ready(result);
                     }
                 }

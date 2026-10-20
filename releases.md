@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Avoid redundant speculative Tokio receive attempts by waiting on cached readiness for established nonempty scalar stream reads. Lifecycle operations, empty reads, and datagrams retain syscall-first behavior; short reads preserve readiness until `WouldBlock`.
+
 - Use cooperative io_uring completion processing for fresh thread-bound workers where supported, retaining the original ring for movable drivers and when the optional setup fails.
 
 - Wait directly on io_uring with eventfd interrupts, retaining owner-thread wakes in memory to avoid kernel self-interrupts. Complete ready scalar socket writes synchronously and combine idle submission with waiting. Ring setup now requires extended wait arguments for timed driver turns, available since Linux 5.11.
