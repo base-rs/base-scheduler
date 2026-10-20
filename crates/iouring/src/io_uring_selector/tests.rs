@@ -1198,9 +1198,11 @@ fn nonblocking_turn_preserves_notifications_for_the_next_idle_turn() {
 
 #[test]
 fn notifications_racing_idle_preparation_remain_observable() {
-    for name in ["submit", "wait"] {
+    // Cover notification before initial publication, initial blocking
+    // publication, and a wait whose notification poll is already armed.
+    for (name, already_armed) in [("submit", false), ("wait", false), ("wait", true)] {
         let (selector, mut driver) = pair(1);
-        if name == "wait" {
+        if already_armed {
             driver.turn(Some(Duration::ZERO)).unwrap();
         }
         {
@@ -1383,10 +1385,10 @@ fn local_notifications_match_the_ring_controller_including_nested_workers() {
 #[test]
 fn remote_wakes_interrupt_entered_workers_during_idle_preparation() {
     use core_scheduler_selector::{SelectorDriver, SelectorWorker};
-    for name in ["submit", "wait"] {
+    for (name, already_armed) in [("submit", false), ("wait", false), ("wait", true)] {
         let (selector, driver) = pair(1);
         let mut worker = driver.enter();
-        if name == "wait" {
+        if already_armed {
             worker.turn(Some(Duration::ZERO)).unwrap();
         }
         {

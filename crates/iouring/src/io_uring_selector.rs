@@ -993,7 +993,7 @@ impl Reactor {
             return Err(error);
         }
         if notification_completed {
-            // Drain before rearming. Otherwise a readable eventfd produces another immediate poll completion, and the progress return keeps bypassing the idle drain.
+            // Drain before rearming; otherwise the readable counter immediately completes each replacement poll.
             self.drain_notification()?;
         }
 
