@@ -24,6 +24,8 @@ The [readiness and completion comparison](readiness-performance.md) measures cac
 
 The [idle notification follow-up](idle-notification-performance.md) measures removing speculative eventfd reads before ring waits and records the other request, wakeup, and compiler experiments.
 
+The [single-worker research](single-worker-research.md) profiles the merged alternating-queue executor, compares matching Tokio read policies, and records the remaining Native readiness costs and rejected ring hints.
+
 Build and run the comparison on Linux:
 
 ```sh

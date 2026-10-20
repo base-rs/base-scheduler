@@ -1,0 +1,7 @@
+{
+  "base_source": "130cd4a67e526e80ba9a5e7e7ebbe81494bd903b",
+  "patch_sha256": "872ee6416d29fe6e8dc66b8209bfd05680adccd282064ced0e1faa7649ea609e",
+  "binary_sha256": "34821493abf4aa1c7d655f782a9c799526ffefcc7f189ce8ff733b340443b88c",
+  "build_command": "cargo build --release --locked -p core-scheduler-echo-benchmark",
+  "production_changes": "None. Benchmark-only semantic and task-wrapper controls."
+}
