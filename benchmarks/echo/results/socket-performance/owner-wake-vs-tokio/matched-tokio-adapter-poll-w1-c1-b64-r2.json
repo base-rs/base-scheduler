@@ -1,0 +1,32 @@
+{
+  "bytes": 64,
+  "connections": 1,
+  "payload_mib_per_second": 16.491800944010418,
+  "requests": 810605,
+  "requests_per_second": 270201.6666666667,
+  "rtt_max_us": 162.175,
+  "rtt_mean_us": 3.6708713294391297,
+  "rtt_p50_us": 3.581,
+  "rtt_p95_us": 4.143,
+  "rtt_p99_us": 4.651,
+  "seconds": 3.0,
+  "warmup_seconds": 1.0,
+  "identifier": "matched-tokio-adapter-poll-w1-c1-b64-r2",
+  "mode": "matched",
+  "backend": "tokio-adapter-poll",
+  "workers": 1,
+  "repeat": 2,
+  "client_cpu": {
+    "user": 0.41331400000001395,
+    "system": 1.358791999999994,
+    "voluntary_switches": 1079800,
+    "involuntary_switches": 14
+  },
+  "server_cpu": {
+    "user": 0.39138499999998544,
+    "system": 1.4084240000000818,
+    "voluntary_switches": 1079779,
+    "involuntary_switches": 6
+  },
+  "lifecycle_seconds": 4.0021852168720216
+}

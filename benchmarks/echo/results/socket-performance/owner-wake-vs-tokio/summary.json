@@ -1,0 +1,237 @@
+[
+  {
+    "workers": 1,
+    "connections": 1,
+    "bytes": 64,
+    "backends": {
+      "tokio": {
+        "median_rps": 267560.0,
+        "min_rps": 267185.0,
+        "max_rps": 269693.0,
+        "median_p50_us": 3.591,
+        "median_p99_us": 4.383,
+        "pct_of_tokio": 100.0
+      },
+      "tokio-adapter": {
+        "median_rps": 269432.0,
+        "min_rps": 268771.0,
+        "max_rps": 269943.3333333333,
+        "median_p50_us": 3.581,
+        "median_p99_us": 4.703,
+        "pct_of_tokio": 100.69965615189116
+      },
+      "tokio-adapter-poll": {
+        "median_rps": 268628.6666666667,
+        "min_rps": 267929.3333333333,
+        "max_rps": 270201.6666666667,
+        "median_p50_us": 3.591,
+        "median_p99_us": 4.651,
+        "pct_of_tokio": 100.39941196990084
+      },
+      "iouring": {
+        "median_rps": 237931.33333333334,
+        "min_rps": 231743.33333333334,
+        "max_rps": 240840.33333333334,
+        "median_p50_us": 3.741,
+        "median_p99_us": 5.743,
+        "pct_of_tokio": 88.92634673842628
+      },
+      "iouring-poll": {
+        "median_rps": 225320.0,
+        "min_rps": 223982.33333333334,
+        "max_rps": 229834.33333333334,
+        "median_p50_us": 4.231,
+        "median_p99_us": 6.011,
+        "pct_of_tokio": 84.21288682912244
+      }
+    }
+  },
+  {
+    "workers": 1,
+    "connections": 32,
+    "bytes": 64,
+    "backends": {
+      "tokio": {
+        "median_rps": 695544.6666666666,
+        "min_rps": 691793.3333333334,
+        "max_rps": 696932.6666666666,
+        "median_p50_us": 47.007,
+        "median_p99_us": 53.791,
+        "pct_of_tokio": 99.99999999999999
+      },
+      "tokio-adapter": {
+        "median_rps": 613737.6666666666,
+        "min_rps": 613487.3333333334,
+        "max_rps": 619585.3333333334,
+        "median_p50_us": 53.279,
+        "median_p99_us": 59.871,
+        "pct_of_tokio": 88.23842609676637
+      },
+      "tokio-adapter-poll": {
+        "median_rps": 622170.3333333334,
+        "min_rps": 612502.0,
+        "max_rps": 623595.0,
+        "median_p50_us": 52.543,
+        "median_p99_us": 59.295,
+        "pct_of_tokio": 89.45080929381963
+      },
+      "iouring": {
+        "median_rps": 623747.3333333334,
+        "min_rps": 623434.6666666666,
+        "max_rps": 624388.0,
+        "median_p50_us": 51.039,
+        "median_p99_us": 58.335,
+        "pct_of_tokio": 89.67753808286456
+      },
+      "iouring-poll": {
+        "median_rps": 562958.0,
+        "min_rps": 561932.6666666666,
+        "max_rps": 568163.0,
+        "median_p50_us": 56.607,
+        "median_p99_us": 62.815,
+        "pct_of_tokio": 80.93772075026095
+      }
+    }
+  },
+  {
+    "workers": 1,
+    "connections": 32,
+    "bytes": 4096,
+    "backends": {
+      "tokio": {
+        "median_rps": 615263.3333333334,
+        "min_rps": 613354.3333333334,
+        "max_rps": 619601.6666666666,
+        "median_p50_us": 53.151,
+        "median_p99_us": 60.543,
+        "pct_of_tokio": 100.0
+      },
+      "tokio-adapter": {
+        "median_rps": 558088.3333333334,
+        "min_rps": 556658.6666666666,
+        "max_rps": 558581.6666666666,
+        "median_p50_us": 58.623,
+        "median_p99_us": 65.727,
+        "pct_of_tokio": 90.70723105011946
+      },
+      "tokio-adapter-poll": {
+        "median_rps": 551472.0,
+        "min_rps": 549467.6666666666,
+        "max_rps": 555017.0,
+        "median_p50_us": 59.327,
+        "median_p99_us": 66.495,
+        "pct_of_tokio": 89.63186494671658
+      },
+      "iouring": {
+        "median_rps": 556322.0,
+        "min_rps": 554673.6666666666,
+        "max_rps": 557290.3333333334,
+        "median_p50_us": 57.183,
+        "median_p99_us": 65.855,
+        "pct_of_tokio": 90.42014530363691
+      },
+      "iouring-poll": {
+        "median_rps": 506151.3333333333,
+        "min_rps": 501236.3333333333,
+        "max_rps": 510053.3333333333,
+        "median_p50_us": 62.975,
+        "median_p99_us": 69.503,
+        "pct_of_tokio": 82.26580488571288
+      }
+    }
+  },
+  {
+    "workers": 4,
+    "connections": 128,
+    "bytes": 64,
+    "backends": {
+      "tokio": {
+        "median_rps": 2104108.6666666665,
+        "min_rps": 2100341.0,
+        "max_rps": 2113541.6666666665,
+        "median_p50_us": 59.903,
+        "median_p99_us": 102.783,
+        "pct_of_tokio": 100.0
+      },
+      "tokio-adapter": {
+        "median_rps": 2000193.0,
+        "min_rps": 1995932.6666666667,
+        "max_rps": 2006462.3333333333,
+        "median_p50_us": 62.943,
+        "median_p99_us": 105.919,
+        "pct_of_tokio": 95.06129753121117
+      },
+      "tokio-adapter-poll": {
+        "median_rps": 1996654.0,
+        "min_rps": 1990286.3333333333,
+        "max_rps": 1997130.0,
+        "median_p50_us": 63.071,
+        "median_p99_us": 109.567,
+        "pct_of_tokio": 94.89310279602164
+      },
+      "iouring": {
+        "median_rps": 1961161.3333333333,
+        "min_rps": 1960539.3333333333,
+        "max_rps": 1968046.0,
+        "median_p50_us": 63.647,
+        "median_p99_us": 117.567,
+        "pct_of_tokio": 93.20627610170958
+      },
+      "iouring-poll": {
+        "median_rps": 1967921.0,
+        "min_rps": 1953997.0,
+        "max_rps": 1972054.0,
+        "median_p50_us": 62.335,
+        "median_p99_us": 124.031,
+        "pct_of_tokio": 93.52753644219263
+      }
+    }
+  },
+  {
+    "workers": 4,
+    "connections": 128,
+    "bytes": 4096,
+    "backends": {
+      "tokio": {
+        "median_rps": 1863051.0,
+        "min_rps": 1853673.6666666667,
+        "max_rps": 1869041.6666666667,
+        "median_p50_us": 67.775,
+        "median_p99_us": 117.183,
+        "pct_of_tokio": 100.0
+      },
+      "tokio-adapter": {
+        "median_rps": 1785506.3333333333,
+        "min_rps": 1775990.6666666667,
+        "max_rps": 1787822.6666666667,
+        "median_p50_us": 70.719,
+        "median_p99_us": 117.503,
+        "pct_of_tokio": 95.83775931701994
+      },
+      "tokio-adapter-poll": {
+        "median_rps": 1789281.6666666667,
+        "min_rps": 1786193.3333333333,
+        "max_rps": 1792084.6666666667,
+        "median_p50_us": 70.399,
+        "median_p99_us": 118.207,
+        "pct_of_tokio": 96.04040182832713
+      },
+      "iouring": {
+        "median_rps": 1745579.0,
+        "min_rps": 1734705.6666666667,
+        "max_rps": 1747753.6666666667,
+        "median_p50_us": 71.743,
+        "median_p99_us": 131.071,
+        "pct_of_tokio": 93.6946438932697
+      },
+      "iouring-poll": {
+        "median_rps": 1759655.3333333333,
+        "min_rps": 1759073.6666666667,
+        "max_rps": 1760059.3333333333,
+        "median_p50_us": 69.823,
+        "median_p99_us": 138.239,
+        "pct_of_tokio": 94.45019665770465
+      }
+    }
+  }
+]

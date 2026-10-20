@@ -18,6 +18,8 @@ The [Tokio admission-only comparison](tokio-admission-performance.md) measures r
 
 The [socket readiness comparison](socket-performance.md) measures reserved Tokio polling waiters and capacity/drain notification reductions with matching before/after benchmark code. It also links the rejected direct-ring interrupt experiments and io-event source review.
 
+The [current comparison with pure Tokio](tokio-comparison.md) measures the integrated owner-wake changes against pure Tokio and both adapter buffer paths using the same optimized executable for all five backends.
+
 Build and run the comparison on Linux:
 
 ```sh
@@ -35,7 +37,7 @@ The runner builds an optimized binary using the checked-in lockfile, then starts
 | `tokio` | Tokio | `TcpStream::read` / `write_all` with borrowed buffers |
 | `tokio-adapter` | Tokio | Owned `socket_read` / `socket_write`, implemented with readiness |
 | `tokio-adapter-poll` | Tokio | Borrowed `socket_recv_poll` / `socket_send_poll`, implemented with readiness |
-| `iouring` | Native | Owned `socket_read` / `socket_write`, submitting io_uring `Recv` / `Send` |
+| `iouring` | Native | Owned reads submit io_uring `Recv`; ready writes complete synchronously, otherwise submit `Send` |
 | `iouring-poll` | Native | Borrowed `socket_recv_poll` / `socket_send_poll`, using direct syscalls and ring readiness waits |
 
 The adapters share one generic owned echo loop and one generic borrowed echo loop. The borrowed loop uses default send/receive flags and keeps the buffer in its connection future. Ready calls can finish in the same task poll; calls returning `WouldBlock` wait for readiness. The io_uring configurations both retain one ring per worker, 256 SQ entries per ring, and admission capacity of at least the connection count. `iouring-poll` does not submit payload transfers to those rings; it submits `PollAdd` readiness waits only when a syscall would block. Listener handling uses the readiness fallback in both cases. Comparing owned and borrowed modes therefore measures a change of I/O mechanism for the native backend, while both Tokio adapter modes already use readiness. The historical borrowed-socket report records the earlier shared-readiness fallback implementation.

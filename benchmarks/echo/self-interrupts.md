@@ -20,7 +20,7 @@ The [historical 180-sample comparison](socket-performance.md) remains a measurem
 
 ## Final confirmation
 
-The [fresh 60-sample comparison](results/socket-performance/owner-wake-final/analysis.md) measures production runtime `3af77be0` against the original native backend at `63da755`. Each table cell has three randomized repetitions. All samples retain complete latency/CPU metadata and separate JSON files; [provenance](results/socket-performance/owner-wake-final/provenance.json) records release settings and executable/source hashes. This follow-up does not compare against pure Tokio.
+The [fresh 60-sample comparison](results/socket-performance/owner-wake-final/analysis.md) measures production runtime `3af77be0` against the original native backend at `63da755`. Each table cell has three randomized repetitions. All samples retain complete latency/CPU metadata and separate JSON files; [provenance](results/socket-performance/owner-wake-final/provenance.json) records release settings and executable/source hashes. This follow-up does not compare against pure Tokio. The subsequent [matched Tokio comparison](tokio-comparison.md) measures all five backends using this same frozen optimized executable; those samples remain separate from the native before/after results below.
 
 Median throughput change:
 
