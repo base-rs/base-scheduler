@@ -582,6 +582,7 @@ fn established_stream_empty_reads_do_not_require_reactor_progress() {
     let registration = block_on(socket.inner.registration()).unwrap();
     assert!(block_on(poll_once(registration.readable())).is_none());
     peer.write_all(b"x").unwrap();
+    wait_for_readable(&socket);
     let mut byte = [0];
     assert_eq!(
         block_on(scheduler.socket_recv_poll(
@@ -596,6 +597,7 @@ fn established_stream_empty_reads_do_not_require_reactor_progress() {
     assert!(socket.inner.connected_stream.load(Ordering::Relaxed));
     // The current-thread reactor is deliberately stopped, so the next peer write cannot update cached readiness. Empty reads must still return the syscall result immediately.
     peer.write_all(b"y").unwrap();
+    wait_for_readable(&socket);
     assert!(matches!(
         block_on(poll_once(scheduler.socket_recv_poll(
             &socket,
@@ -638,6 +640,18 @@ fn tcp_pair() -> (std::net::TcpStream, std::net::TcpStream) {
 }
 
 #[cfg(unix)]
+fn wait_for_readable(socket: &TokioSocket) {
+    use std::os::fd::AsRawFd;
+    let mut descriptor = libc::pollfd {
+        fd: socket.get_ref().as_raw_fd(),
+        events: libc::POLLIN,
+        revents: 0,
+    };
+    // SAFETY: One initialized descriptor remains live through this bounded synchronous wait. This observes packet arrival without driving Tokio's deliberately stopped reactor.
+    assert_eq!(unsafe { libc::poll(&mut descriptor, 1, 5000) }, 1);
+}
+
+#[cfg(unix)]
 #[test]
 fn datagrams_preserve_direct_syscall_behavior() {
     use core_scheduler::*;
@@ -661,6 +675,7 @@ fn datagrams_preserve_direct_syscall_behavior() {
     let mut buffer = [0; 8];
     for byte in *b"xy" {
         peer.send_to(&[byte], address).unwrap();
+        wait_for_readable(&socket);
         assert_eq!(
             block_on(scheduler.socket_recv_poll(
                 &socket,
