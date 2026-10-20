@@ -1,0 +1,226 @@
+diff --git a/context/design.md b/context/design.md
+index b297df3..0785bc0 100644
+--- a/context/design.md
++++ b/context/design.md
+@@ -123,7 +123,7 @@ Unix sockets retain the selected runtime identity and initialize their Tokio `As
+ 
+ ## Native backend and reusable timers
+ 
+-`core-scheduler-native` ports Socketry's default work-stealing executor and `async-io` readiness backend from revision `7a70586d5d37fb640d696d0c03a05b2ee3cbe06b`. Worker-local queues, preferred-worker remote inboxes, idle work stealing, periodic external fairness, and the publication/parking fence remain. Internal worker identity exists only for queue locality and blocking-wait detection; operations never find an implicit current scheduler. The root future can borrow local state and is polled on the caller's thread by `block_on`.
++`core-scheduler-native` ports Socketry's default work-stealing executor and `async-io` readiness backend from revision `7a70586d5d37fb640d696d0c03a05b2ee3cbe06b`. Worker-local queues, preferred-worker remote inboxes, idle work stealing, external fairness, and the publication/parking fence remain. This branch experiments with alternating ready batches, as described under worker ownership below. Internal worker identity exists only for queue locality and blocking-wait detection; operations never find an implicit current scheduler. The root future can borrow local state and is polled on the caller's thread by `block_on`.
+ 
+ The adapter adopts Core's owning task handles, guarded user destructors, lazy cancellation, and asynchronous shutdown. A short admission lock serializes spawning with closure; no task-ID registry is needed. Separate counters track task-future ownership and queued or running runnables: shutdown needs both to retire, since destroying a task future can precede the return of its final runnable. Closing admission preserves live task owners and wakes socket and clock operations. Drop does not join. Explicit shutdown drains tasks, accepted blocking/file/resolver work, cleanup, timers, and signal delivery. Applications coordinate cooperative cancellation and await tasks before shutdown. A task must not await shutdown of its own scheduler.
+ 
+@@ -141,7 +141,7 @@ The initial `core-scheduler-iouring` selector ports Socketry's owned request and
+ 
+ Owned scalar socket writes first attempt `NativeSocket::try_send` after checking cancellation and selector closure. Successful attempts and terminal errors return the original buffer immediately, without a ring request or capacity permit. `WouldBlock` and `Interrupted` fall through to the completion path; scalar reads submit directly to the ring. Capacity bounds queued and in-flight ring requests, rather than completed synchronous attempts. Socket requests submit `Recv`, `Send`, `RecvMsg`, and `SendMsg`. A nonblocking `EAGAIN` completion retires the attempt before a readiness wait; retries retain the operation's original ring. Message requests derive pointers only after being boxed and retain the header, address, iovec array, and whole sequence until original completion. Prepared vectors are used directly, including inline vector arrays whose containing request stays immobile. Ordinary sequences build request-owned vectors. Kernel-accessible message storage uses `UnsafeCell` so shared cancellation bookkeeping cannot freeze writable output. Borrowed `_poll` operations call synchronous `NativeSocket::try_recv`, `try_send`, `try_recvmsg`, and `try_sendmsg` with enforced nonblocking flags. Ready operations bypass routing, admission, and request allocation. After `WouldBlock`, they submit a one-shot `PollAdd` readiness request on the current worker's ring and retry after completion; `socket_wait` uses the same ring wait. The first wait selects the ring, which remains fixed across spurious readiness and task migration. Readiness requests retain only the socket and never borrow payloads or vectors. Cancellation awaits readiness retirement before returning; dropping requests cancellation, while a forgotten future may leave its readiness request pending until an event or shutdown. Ordinary socket destruction is safe during retirement; exclusive close requires completion or draining first. Socket lifecycle operations still use the shared readiness fallback. Nonblocking owned-transfer retries wait on their original ring after the preceding attempt retires.
+ 
+-`IoUringSelector::new` returns a selector and a separate `IoUringDriver`, starting no ring thread. The driver exposes bounded `turn(timeout)` processing and a waker for caller-owned event loops; `run` is a convenience loop for a dedicated thread. Processing that wakes a caller prevents a subsequent blocking wait in the same turn. External submissions and wakeups signal a nonblocking eventfd watched by one outstanding ring poll. Idle turns publish submissions and wait in one io_uring entry; productive turns skip empty submissions unless CQ overflow or deferred task work requires kernel progress. A fresh driver entering a thread-bound `IoUringWorker` attempts to replace its unused ring with one configured for cooperative task running and the taskrun flag, avoiding forced userspace interruptions for completions while retaining explicit progress checks. If that optional setup fails, the original validated ring remains in use. Movable drivers and drivers that have already processed a turn retain their original ring: cooperative task work remains associated with the submitting thread and cannot safely follow a moving driver. Timed waits require extended wait arguments, which ring setup probes explicitly. The eventfd poll retains only a descriptor and no userspace destination buffer, including across timeouts and teardown. A notification CQE drains the counter before rearming, so the same readable counter cannot repeatedly complete new polls; notification errors are propagated only after publishing the whole CQ snapshot. Idle preparation consumes the local wake permit without speculatively reading the eventfd. Its armed poll is either submitted already or published by the wait entry, preserving remote notifications before and during that entry. Cancellation and payload SQ entries precede notification rearming so a repeatedly signalled eventfd cannot monopolize a one-entry queue. If no slot remains to arm the interrupt, the driver submits the queued work and returns before parking. Futures may move between polling threads while one driver exclusively owns the ring. Dropping an operation requests cancellation without reclaiming in-flight storage. Orderly closure keeps driving until original requests retire. Dropping or failing a driver with unknown kernel access is exceptional: queued requests return errors, in-flight storage is deliberately leaked, and polling its waiting future panics because its buffer cannot safely be returned. Native executor composition and caller-owned event-loop tests exercise the same selector implementation.
++`IoUringSelector::new` returns a selector and a separate `IoUringDriver`, starting no ring thread. The driver exposes bounded `turn(timeout)` processing and a waker for caller-owned event loops; `run` is a convenience loop for a dedicated thread. Processing that wakes a caller prevents a subsequent blocking wait in the same turn, including wakes caused by command rejection, cancellation, or dropping retained owners. External submissions and wakeups signal a nonblocking eventfd watched by one outstanding ring poll. Idle turns publish submissions and wait in one io_uring entry; productive turns skip empty submissions unless CQ overflow or deferred task work requires kernel progress. A fresh driver entering a thread-bound `IoUringWorker` attempts to replace its unused ring with one configured for cooperative task running and the taskrun flag, avoiding forced userspace interruptions for completions while retaining explicit progress checks. If that optional setup fails, the original validated ring remains in use. Movable drivers and drivers that have already processed a turn retain their original ring: cooperative task work remains associated with the submitting thread and cannot safely follow a moving driver. Timed waits require extended wait arguments, which ring setup probes explicitly. The eventfd poll retains only a descriptor and no userspace destination buffer, including across timeouts and teardown. A notification CQE drains the counter before rearming, so the same readable counter cannot repeatedly complete new polls; notification errors are propagated only after publishing the whole CQ snapshot. Idle preparation consumes the local wake permit without speculatively reading the eventfd. Its armed poll is either submitted already or published by the wait entry, preserving remote notifications before and during that entry. Cancellation and payload SQ entries precede notification rearming so a repeatedly signalled eventfd cannot monopolize a one-entry queue. If no slot remains to arm the interrupt, the driver submits the queued work and returns before parking. Futures may move between polling threads while one driver exclusively owns the ring. Dropping an operation requests cancellation without reclaiming in-flight storage. Orderly closure keeps driving until original requests retire. Dropping or failing a driver with unknown kernel access is exceptional: queued requests return errors, in-flight storage is deliberately leaked, and polling its waiting future panics because its buffer cannot safely be returned. Native executor composition and caller-owned event-loop tests exercise the same selector implementation.
+ 
+ ### Worker ownership and contention
+ 
+@@ -151,7 +151,7 @@ A private thread-local lookup selects the current ring only when it belongs to t
+ 
+ The local and remote command queues are serviced with alternating preference and a bounded total batch. Cancellation may arrive through the other queue before an already-published submission is processed. An unknown cancellation is replayed once at the tail of the opposite FIFO, which places it after that submission; the replay never repeats. This handles migration without allocating a separate shared cancellation record or accumulating tombstones for already-completed operations.
+ 
+-CQ processing completes operations and publishes runnable tasks; it never polls application futures inline. The owning worker publishes the entire available CQ snapshot before polling any of those tasks. Other workers may steal published tasks immediately. A bounded command batch and periodic nonblocking driver turns while tasks remain runnable provide fairness. When idle, the worker publishes its sleeping state, rechecks runnable work, and enters an interruptible driver turn which checks both I/O queues before waiting. New runnable tasks, remote I/O, timers, and shutdown can interrupt the wait. Local submissions need no interrupt because their owning worker processes them before sleeping. When the executor wakes an io_uring worker from its own thread, the driver records a coalescing local notification flag instead of writing the eventfd. Productive and nonblocking turns retain this flag until the selector reaches its actual wait decision, where it consumes the local flag and returns before waiting. Remote notifications remain in the eventfd until its poll CQE is collected; one successful read clears the accumulated counter before rearming. Wakes from another thread or for a controller not entered on this thread still use the eventfd; matching uses controller identity rather than selector-group identity.
++CQ processing completes operations and publishes runnable tasks; it never polls application futures inline. The owning worker publishes the entire available CQ snapshot before polling any of those tasks. Other workers may steal published tasks immediately. The experimental worker loop alternates two reusable FIFO ready queues: it drains a finite current batch while new wakes enter the next queue, then runs a nonblocking driver turn before starting the next task batch. External wakes are admitted at batch boundaries, and both queue generations remain stealable. These are independent worker batches, not global scheduling rounds. Self-wakes cannot extend the owning worker's current batch. There is no fixed maximum batch size or preemption of an individual future poll, so a large batch can delay I/O checks. Driver command processing remains bounded independently. When idle, the worker publishes its sleeping state, rechecks runnable work, and enters an interruptible driver turn which checks both I/O queues before waiting. New runnable tasks, remote I/O, timers, and shutdown can interrupt the wait. Local submissions need no interrupt because their owning worker processes them before sleeping. A Native wake of its own executing worker clears the sleeping flag without calling thread unpark or the driver waker. Drivers must return after publishing completions or otherwise waking tasks, including cancellation and owner-drop paths, so those tasks can run; they must not wait for an interrupt from their own thread. Remote wakes retain the sleeping-flag exchange and interrupt path, including wakes racing the final queue recheck and wait. Explicit same-thread calls to an entered io_uring driver's waker still record a coalescing local notification flag instead of writing the eventfd. Productive and nonblocking turns retain this flag until the selector reaches its actual wait decision, where it consumes the local flag and returns before waiting. Remote notifications remain in the eventfd until its poll CQE is collected; one successful read clears the accumulated counter before rearming. Wakes from another thread or for a controller not entered on this thread still use the eventfd; matching uses controller identity rather than selector-group identity.
+ 
+ Closing admission does not permit a worker to exit while its ring retains kernel-accessible requests, even if all task futures have been abandoned. Stopping or failing any ring closes admission across the selector group and its shared fallback; the other drivers continue retiring accepted work. Queued local owners are returned before signaling driver retirement. After a driver retires, live tasks can still progress using the executor's ordinary parking and wakeup path. Partial worker startup closes the selector and drops unstarted drivers, while started workers retire normally.
+ 
+diff --git a/crates/native/src/native_scheduler/driver_tests.rs b/crates/native/src/native_scheduler/driver_tests.rs
+index 7e6bd46..40a340f 100644
+--- a/crates/native/src/native_scheduler/driver_tests.rs
++++ b/crates/native/src/native_scheduler/driver_tests.rs
+@@ -29,12 +29,16 @@ struct State {
+     turns: AtomicUsize,
+     dropped: AtomicUsize,
+     retired: AtomicBool,
++    only_idle_completions: AtomicBool,
++    interrupts: AtomicUsize,
++    completion_interrupts: AtomicUsize,
+ }
+ impl Wake for State {
+     fn wake(self: Arc<Self>) {
+         self.wake_by_ref();
+     }
+     fn wake_by_ref(self: &Arc<Self>) {
++        self.interrupts.fetch_add(1, Ordering::SeqCst);
+         if let Some(thread) = self.thread.get() {
+             thread.unpark();
+         }
+@@ -74,14 +78,21 @@ impl SelectorWorker for Driver {
+             self.0.retired.store(true, Ordering::SeqCst);
+             return Err(io::Error::other("driver failure"));
+         }
+-        if !self.0.paused.load(Ordering::SeqCst) {
++        if !self.0.paused.load(Ordering::SeqCst)
++            && (timeout.is_none() || !self.0.only_idle_completions.load(Ordering::SeqCst))
++        {
+             let batch = std::mem::take(&mut *self.0.queued.lock().unwrap());
+             if !batch.is_empty() {
+                 self.0.inside_turn.store(true, Ordering::SeqCst);
++                let interrupts = self.0.interrupts.load(Ordering::SeqCst);
+                 for sender in batch {
+                     let _ = sender.send(());
+                 }
+                 self.0.batches.fetch_add(1, Ordering::SeqCst);
++                self.0.completion_interrupts.fetch_add(
++                    self.0.interrupts.load(Ordering::SeqCst) - interrupts,
++                    Ordering::SeqCst,
++                );
+                 self.0.inside_turn.store(false, Ordering::SeqCst);
+                 return Ok(false);
+             }
+@@ -121,6 +132,31 @@ fn wait(mut condition: impl FnMut() -> bool) {
+     }
+ }
+ 
++#[test]
++fn idle_completions_resume_tasks_without_interrupting_their_own_worker() {
++    crate::test_support::run(|| {
++        let state = Arc::new(State::default());
++        state.only_idle_completions.store(true, Ordering::SeqCst);
++        let scheduler = construct(&[Arc::clone(&state)]);
++        let observed = Arc::clone(&state);
++        let task = scheduler
++            .spawn(async move {
++                for _ in 0..32 {
++                    observed.operation().await.unwrap();
++                    assert!(!observed.inside_turn.load(Ordering::SeqCst));
++                }
++                42
++            })
++            .unwrap();
++        assert_eq!(block_on(task).unwrap(), 42);
++        assert_eq!(state.batches.load(Ordering::SeqCst), 32);
++        assert_eq!(state.completion_interrupts.load(Ordering::SeqCst), 0);
++        block_on(scheduler.shutdown());
++        wait(|| state.dropped.load(Ordering::SeqCst) == 1);
++        assert!(state.retired.load(Ordering::SeqCst));
++    });
++}
++
+ #[test]
+ fn completion_batch_is_published_before_any_local_task_resumes() {
+     crate::test_support::run(|| {
+diff --git a/crates/native/src/worker.rs b/crates/native/src/worker.rs
+index 99a5031..85a1130 100644
+--- a/crates/native/src/worker.rs
++++ b/crates/native/src/worker.rs
+@@ -31,12 +31,16 @@ impl WorkerState {
+ 
+     pub(crate) fn wake(&self) -> bool {
+         if self.sleeping.swap(false, Ordering::SeqCst) {
+-            self.thread
++            let target = self
++                .thread
+                 .get()
+-                .expect("sleeping worker has registered its thread")
+-                .unpark();
+-            if let Some(waker) = self.driver_waker.get() {
+-                waker.wake_by_ref();
++                .expect("sleeping worker has registered its thread");
++            // A completion published by this worker makes its driver turn return. Interrupt only another thread; a self-notification would leave a stale permit for the next idle turn.
++            if target.id() != thread::current().id() {
++                target.unpark();
++                if let Some(waker) = self.driver_waker.get() {
++                    waker.wake_by_ref();
++                }
+             }
+             true
+         } else {
+diff --git a/crates/native/src/worker/tests.rs b/crates/native/src/worker/tests.rs
+index d93b280..059ccfc 100644
+--- a/crates/native/src/worker/tests.rs
++++ b/crates/native/src/worker/tests.rs
+@@ -6,6 +6,76 @@ use crate::task_service::{Runnable, TaskState, UNASSIGNED_WORKER};
+ use crossbeam_deque::{Steal, Worker};
+ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+ 
++#[derive(Default)]
++struct Interrupts(AtomicUsize);
++
++impl std::task::Wake for Interrupts {
++    fn wake(self: std::sync::Arc<Self>) {
++        self.0.fetch_add(1, Ordering::SeqCst);
++    }
++}
++
++#[test]
++fn local_worker_wake_clears_sleeping_without_interrupting_its_driver() {
++    use std::{sync::Arc, task::Waker};
++    let worker = worker_state();
++    worker.thread.set(std::thread::current()).unwrap();
++    let interrupts = Arc::new(Interrupts::default());
++    worker
++        .driver_waker
++        .set(Waker::from(Arc::clone(&interrupts)))
++        .unwrap();
++    worker.sleeping.store(true, Ordering::SeqCst);
++
++    assert!(worker.wake());
++    assert!(!worker.sleeping.load(Ordering::SeqCst));
++    assert_eq!(interrupts.0.load(Ordering::SeqCst), 0);
++    assert!(!worker.wake());
++}
++
++#[test]
++fn remote_wake_retains_the_unpark_token_and_interrupts_the_driver_once() {
++    use std::{
++        sync::{Arc, mpsc},
++        task::Waker,
++        thread,
++        time::Duration,
++    };
++    let worker = Arc::new(worker_state());
++    let interrupts = Arc::new(Interrupts::default());
++    worker
++        .driver_waker
++        .set(Waker::from(Arc::clone(&interrupts)))
++        .unwrap();
++    let (ready, started) = mpsc::channel();
++    let released = Arc::new(AtomicBool::new(false));
++    let release = Arc::clone(&released);
++    let (done, finished) = mpsc::channel();
++    let target = Arc::clone(&worker);
++    let handle = thread::spawn(move || {
++        target.thread.set(thread::current()).unwrap();
++        target.sleeping.store(true, Ordering::SeqCst);
++        ready.send(()).unwrap();
++        // Do not use a channel wait here: its implementation may consume Thread's unpark token.
++        let deadline = std::time::Instant::now() + Duration::from_secs(5);
++        while !released.load(Ordering::Acquire) {
++            assert!(std::time::Instant::now() < deadline);
++            thread::yield_now();
++        }
++        // The test publishes the wake before park, so progress depends on retaining its token.
++        thread::park_timeout(Duration::from_secs(30));
++        done.send(()).unwrap();
++    });
++    started.recv_timeout(Duration::from_secs(5)).unwrap();
++    assert!(worker.wake());
++    assert!(!worker.wake());
++    assert!(!worker.sleeping.load(Ordering::SeqCst));
++    assert_eq!(interrupts.0.load(Ordering::SeqCst), 1);
++    release.store(true, Ordering::Release);
++    finished.recv_timeout(Duration::from_secs(5)).unwrap();
++    handle.join().unwrap();
++}
++
+ fn worker_state() -> WorkerState {
+     let queues: [Worker<Runnable>; 2] = std::array::from_fn(|_| Worker::new_fifo());
+     WorkerState::new(queues.each_ref().map(Worker::stealer))
+diff --git a/crates/selector/src/selector_worker.rs b/crates/selector/src/selector_worker.rs
+index bef5840..80a3998 100644
+--- a/crates/selector/src/selector_worker.rs
++++ b/crates/selector/src/selector_worker.rs
+@@ -13,6 +13,6 @@ pub trait SelectorWorker {
+     /// Stop admission and begin retiring accepted work without synchronously waiting.
+     fn close(&mut self);
+ 
+-    /// Publish a bounded batch of completions and wait at most `timeout`. Zero is nonblocking; `None` permits an indefinite event wait. Check local and remote submissions before waiting. Return `true` when closed and drained. An error permanently stops the driver and must notify its waiters while preserving any storage still accessible to the OS.
++    /// Publish a bounded batch of completions and wait at most `timeout`. Zero is nonblocking; `None` permits an indefinite event wait. Check local and remote submissions before waiting. After publishing completions or otherwise waking tasks, return without waiting so the executor can poll those tasks; the executor need not interrupt a driver from its own thread. Return `true` when closed and drained. An error permanently stops the driver and must notify its waiters while preserving any storage still accessible to the OS.
+     fn turn(&mut self, timeout: Option<Duration>) -> io::Result<bool>;
+ }

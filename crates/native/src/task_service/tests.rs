@@ -304,7 +304,7 @@ fn submissions_from_another_native_worker_use_the_selected_scheduler() {
 
 #[test]
 fn intermediate_runnable_retirement_does_not_wake_drain_waiters() {
-    let queue = crossbeam_deque::Worker::new_fifo();
+    let queue = std::array::from_fn(|_| crossbeam_deque::Worker::new_fifo());
     let shared = Shared::new(std::slice::from_ref(&queue));
     shared.outstanding.store(2, Ordering::Release);
     let mut listener = Box::pin(shared.changed.listen());

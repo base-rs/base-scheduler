@@ -90,13 +90,13 @@ impl<T> Drop for TaskOutcome<T> {
 }
 
 impl Shared {
-    pub(crate) fn new(queues: &[Worker<Runnable>]) -> Self {
+    pub(crate) fn new(queues: &[[Worker<Runnable>; 2]]) -> Self {
         Self {
             admission: Mutex::new(()),
             ready: Injector::new(),
             workers: queues
                 .iter()
-                .map(|queue| WorkerState::new(queue.stealer()))
+                .map(|queues| WorkerState::new(queues.each_ref().map(Worker::stealer)))
                 .collect(),
             closed: AtomicBool::new(false),
             idle_workers: AtomicUsize::new(0),
@@ -144,7 +144,9 @@ impl Shared {
 }
 impl TaskService {
     pub(crate) fn new(threads: usize) -> io::Result<Self> {
-        let queues: Vec<_> = (0..threads).map(|_| Worker::new_fifo()).collect();
+        let queues: Vec<_> = (0..threads)
+            .map(|_| std::array::from_fn(|_| Worker::new_fifo()))
+            .collect();
         let service = Self {
             shared: Arc::new(Shared::new(&queues)),
         };
@@ -159,7 +161,9 @@ impl TaskService {
     pub(crate) fn with_drivers<D: core_scheduler_selector::SelectorDriver>(
         drivers: Vec<D>,
     ) -> io::Result<Self> {
-        let queues: Vec<_> = (0..drivers.len()).map(|_| Worker::new_fifo()).collect();
+        let queues: Vec<_> = (0..drivers.len())
+            .map(|_| std::array::from_fn(|_| Worker::new_fifo()))
+            .collect();
         let service = Self {
             shared: Arc::new(Shared::new(&queues)),
         };

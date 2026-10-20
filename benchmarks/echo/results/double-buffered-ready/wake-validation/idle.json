@@ -1,0 +1,100 @@
+{
+  "measurement_seconds": 2,
+  "warmup_seconds": 0.5,
+  "binaries": {
+    "before": {
+      "path": "/home/samuel/.cache/core-scheduler-double-buffer/before",
+      "sha256": "9775b17d5b32d630ac718e0dd5a39fd5fb29e157d733b5c69cd4355da5516383"
+    },
+    "after": {
+      "path": "/home/samuel/.cache/core-scheduler-wake-validation/fixed",
+      "sha256": "1e58573bd54ab7e4339101298e31846f9ec26f9951080fe441f51e63c0d99e1e"
+    }
+  },
+  "samples": [
+    {
+      "variant": "before",
+      "backend": "tokio",
+      "workers": 1,
+      "cpu_seconds": 0.0,
+      "elapsed_seconds": 2.0004236279055476
+    },
+    {
+      "variant": "after",
+      "backend": "tokio",
+      "workers": 1,
+      "cpu_seconds": 0.0,
+      "elapsed_seconds": 2.000429396983236
+    },
+    {
+      "variant": "before",
+      "backend": "iouring",
+      "workers": 1,
+      "cpu_seconds": 0.0,
+      "elapsed_seconds": 2.0003647170960903
+    },
+    {
+      "variant": "after",
+      "backend": "iouring",
+      "workers": 1,
+      "cpu_seconds": 0.0,
+      "elapsed_seconds": 2.0006637112237513
+    },
+    {
+      "variant": "before",
+      "backend": "iouring-poll",
+      "workers": 1,
+      "cpu_seconds": 0.0,
+      "elapsed_seconds": 2.0006492836400867
+    },
+    {
+      "variant": "after",
+      "backend": "iouring-poll",
+      "workers": 1,
+      "cpu_seconds": 0.0,
+      "elapsed_seconds": 2.000662413891405
+    },
+    {
+      "variant": "before",
+      "backend": "tokio",
+      "workers": 4,
+      "cpu_seconds": 0.0,
+      "elapsed_seconds": 2.000391487032175
+    },
+    {
+      "variant": "after",
+      "backend": "tokio",
+      "workers": 4,
+      "cpu_seconds": 0.0,
+      "elapsed_seconds": 2.000658824108541
+    },
+    {
+      "variant": "before",
+      "backend": "iouring",
+      "workers": 4,
+      "cpu_seconds": 0.0,
+      "elapsed_seconds": 2.0004006577655673
+    },
+    {
+      "variant": "after",
+      "backend": "iouring",
+      "workers": 4,
+      "cpu_seconds": 0.0,
+      "elapsed_seconds": 2.0006555537693202
+    },
+    {
+      "variant": "before",
+      "backend": "iouring-poll",
+      "workers": 4,
+      "cpu_seconds": 0.0,
+      "elapsed_seconds": 2.000466588884592
+    },
+    {
+      "variant": "after",
+      "backend": "iouring-poll",
+      "workers": 4,
+      "cpu_seconds": 0.0,
+      "elapsed_seconds": 2.0003661680966616
+    }
+  ]
+}

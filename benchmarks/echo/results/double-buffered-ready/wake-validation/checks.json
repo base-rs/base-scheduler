@@ -1,0 +1,101 @@
+{
+  "measured_and_tested_source": "9386f7c4f6cb0dccd7e528512476d2cf963f7a88",
+  "contract_clarification_source": "2df2721781a2e1bf9d27ca21914e56692308f49f",
+  "post_test_change": "Comments and design documentation only; executable code and tests unchanged.",
+  "ci_url": "https://github.com/core-rs/core-scheduler/actions/runs/39465549745",
+  "ci_coverage": [
+    {
+      "job": "test (macos-latest)",
+      "step": "Run workspace tests and require complete source-region coverage",
+      "regions": "15859/15859",
+      "excluded_unreachable": 0
+    },
+    {
+      "job": "test (macos-latest)",
+      "step": "Require complete timer coverage without optional features",
+      "regions": "579/579",
+      "excluded_unreachable": 0
+    },
+    {
+      "job": "test (macos-latest)",
+      "step": "Require complete timer coverage with the producer driver",
+      "regions": "1059/1059",
+      "excluded_unreachable": 0
+    },
+    {
+      "job": "test (macos-latest)",
+      "step": "Require complete timer coverage with sharded queues",
+      "regions": "1012/1012",
+      "excluded_unreachable": 0
+    },
+    {
+      "job": "test (ubuntu-latest)",
+      "step": "Run workspace tests and require complete source-region coverage",
+      "regions": "18447/18447",
+      "excluded_unreachable": 1
+    },
+    {
+      "job": "test (ubuntu-latest)",
+      "step": "Require complete timer coverage without optional features",
+      "regions": "579/579",
+      "excluded_unreachable": 0
+    },
+    {
+      "job": "test (ubuntu-latest)",
+      "step": "Require complete timer coverage with the producer driver",
+      "regions": "1059/1059",
+      "excluded_unreachable": 0
+    },
+    {
+      "job": "test (ubuntu-latest)",
+      "step": "Require complete timer coverage with sharded queues",
+      "regions": "1012/1012",
+      "excluded_unreachable": 0
+    },
+    {
+      "job": "test (windows-latest)",
+      "step": "Run workspace tests and require complete source-region coverage",
+      "regions": "15366/15366",
+      "excluded_unreachable": 0
+    },
+    {
+      "job": "test (windows-latest)",
+      "step": "Require complete timer coverage without optional features",
+      "regions": "579/579",
+      "excluded_unreachable": 0
+    },
+    {
+      "job": "test (windows-latest)",
+      "step": "Require complete timer coverage with the producer driver",
+      "regions": "1059/1059",
+      "excluded_unreachable": 0
+    },
+    {
+      "job": "test (windows-latest)",
+      "step": "Require complete timer coverage with sharded queues",
+      "regions": "1012/1012",
+      "excluded_unreachable": 0
+    }
+  ],
+  "local_macos_coverage": {
+    "command": "rustup run stable cargo bake --locked test:coverage --all-targets true --all-features true",
+    "regions": "15859/15859",
+    "excluded_unreachable": 0
+  },
+  "aiko_linux_coverage": {
+    "command": "LLVM_COV=<Arch-compiler-source-exclusion-wrapper> LLVM_PROFDATA=/usr/bin/llvm-profdata CARGO_LLVM_COV_TARGET_DIR=<isolated-directory> cargo bake --locked test:coverage --all-targets true --all-features true",
+    "regions": "18447/18447",
+    "excluded_unreachable": 1
+  },
+  "lint": {
+    "macos": "Workspace Clippy, all targets/features, warnings denied; formatting passed.",
+    "linux": "Workspace Clippy, all targets/features, warnings denied; formatting passed.",
+    "ci": "Formatting, workspace Clippy, docs, workspace coverage, three additional timer feature configurations; all passed on Linux/macOS/Windows. Rust 1.85 check passed."
+  },
+  "stress": "stress.json; 100 repeats of worker and driver tests: 2100 test executions passed.",
+  "independent_review": {
+    "reviewed_implementation": "9386f7c4f6cb0dccd7e528512476d2cf963f7a88",
+    "confirmed_clarification": "2df2721781a2e1bf9d27ca21914e56692308f49f",
+    "findings": "No remaining correctness findings. SeqCst publication, retained remote unpark token, driver interruption, io_uring progress decision, queue discovery, retirement and shutdown reviewed. Optional further hardening: explicit non-completion task-wake fake-driver test."
+  }
+}

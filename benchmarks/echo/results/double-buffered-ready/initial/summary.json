@@ -1,0 +1,467 @@
+[
+  {
+    "workers": 1,
+    "connections": 1,
+    "bytes": 64,
+    "backend": "tokio",
+    "before": {
+      "requests_per_second": {
+        "median": 273103.3333333333,
+        "min": 271869.3333333333,
+        "max": 273293.6666666667
+      },
+      "rtt_p99_us": {
+        "median": 4.323,
+        "min": 4.291,
+        "max": 4.363
+      }
+    },
+    "after": {
+      "requests_per_second": {
+        "median": 270331.3333333333,
+        "min": 270141.6666666667,
+        "max": 272126.6666666667
+      },
+      "rtt_p99_us": {
+        "median": 4.331,
+        "min": 4.323,
+        "max": 4.403
+      }
+    },
+    "throughput_change_percent": -1.015000427188728
+  },
+  {
+    "workers": 1,
+    "connections": 1,
+    "bytes": 64,
+    "backend": "iouring",
+    "before": {
+      "requests_per_second": {
+        "median": 243728.66666666666,
+        "min": 233279.0,
+        "max": 254925.0
+      },
+      "rtt_p99_us": {
+        "median": 5.831,
+        "min": 5.663,
+        "max": 9.375
+      }
+    },
+    "after": {
+      "requests_per_second": {
+        "median": 233473.66666666666,
+        "min": 233451.0,
+        "max": 238373.0
+      },
+      "rtt_p99_us": {
+        "median": 5.783,
+        "min": 5.743,
+        "max": 9.255
+      }
+    },
+    "throughput_change_percent": -4.207547737511385
+  },
+  {
+    "workers": 1,
+    "connections": 1,
+    "bytes": 64,
+    "backend": "iouring-poll",
+    "before": {
+      "requests_per_second": {
+        "median": 235550.66666666666,
+        "min": 230900.66666666666,
+        "max": 241634.33333333334
+      },
+      "rtt_p99_us": {
+        "median": 5.723,
+        "min": 5.703,
+        "max": 5.951
+      }
+    },
+    "after": {
+      "requests_per_second": {
+        "median": 235227.66666666666,
+        "min": 232797.0,
+        "max": 238626.33333333334
+      },
+      "rtt_p99_us": {
+        "median": 9.351,
+        "min": 6.351,
+        "max": 9.487
+      }
+    },
+    "throughput_change_percent": -0.13712548751011466
+  },
+  {
+    "workers": 1,
+    "connections": 32,
+    "bytes": 64,
+    "backend": "tokio",
+    "before": {
+      "requests_per_second": {
+        "median": 693862.0,
+        "min": 689758.6666666666,
+        "max": 696751.6666666666
+      },
+      "rtt_p99_us": {
+        "median": 53.983,
+        "min": 53.727,
+        "max": 54.207
+      }
+    },
+    "after": {
+      "requests_per_second": {
+        "median": 691580.3333333334,
+        "min": 683285.6666666666,
+        "max": 691787.0
+      },
+      "rtt_p99_us": {
+        "median": 54.143,
+        "min": 54.143,
+        "max": 54.719
+      }
+    },
+    "throughput_change_percent": -0.32883580116314093
+  },
+  {
+    "workers": 1,
+    "connections": 32,
+    "bytes": 64,
+    "backend": "iouring",
+    "before": {
+      "requests_per_second": {
+        "median": 625881.0,
+        "min": 622422.0,
+        "max": 628911.6666666666
+      },
+      "rtt_p99_us": {
+        "median": 58.143,
+        "min": 57.887,
+        "max": 58.463
+      }
+    },
+    "after": {
+      "requests_per_second": {
+        "median": 630437.6666666666,
+        "min": 626523.6666666666,
+        "max": 633563.3333333334
+      },
+      "rtt_p99_us": {
+        "median": 54.559,
+        "min": 54.335,
+        "max": 54.975
+      }
+    },
+    "throughput_change_percent": 0.7280404208893643
+  },
+  {
+    "workers": 1,
+    "connections": 32,
+    "bytes": 64,
+    "backend": "iouring-poll",
+    "before": {
+      "requests_per_second": {
+        "median": 563440.0,
+        "min": 562037.0,
+        "max": 563942.6666666666
+      },
+      "rtt_p99_us": {
+        "median": 62.751,
+        "min": 62.687,
+        "max": 62.879
+      }
+    },
+    "after": {
+      "requests_per_second": {
+        "median": 572202.3333333334,
+        "min": 567914.6666666666,
+        "max": 572979.0
+      },
+      "rtt_p99_us": {
+        "median": 60.159,
+        "min": 60.127,
+        "max": 60.575
+      }
+    },
+    "throughput_change_percent": 1.5551493208386669
+  },
+  {
+    "workers": 1,
+    "connections": 32,
+    "bytes": 4096,
+    "backend": "tokio",
+    "before": {
+      "requests_per_second": {
+        "median": 617280.6666666666,
+        "min": 608192.0,
+        "max": 617766.6666666666
+      },
+      "rtt_p99_us": {
+        "median": 60.351,
+        "min": 60.255,
+        "max": 61.183
+      }
+    },
+    "after": {
+      "requests_per_second": {
+        "median": 617894.3333333334,
+        "min": 604852.0,
+        "max": 621603.3333333334
+      },
+      "rtt_p99_us": {
+        "median": 60.255,
+        "min": 59.967,
+        "max": 61.439
+      }
+    },
+    "throughput_change_percent": 0.099414528885311
+  },
+  {
+    "workers": 1,
+    "connections": 32,
+    "bytes": 4096,
+    "backend": "iouring",
+    "before": {
+      "requests_per_second": {
+        "median": 558753.3333333334,
+        "min": 556914.3333333334,
+        "max": 559230.6666666666
+      },
+      "rtt_p99_us": {
+        "median": 65.727,
+        "min": 65.599,
+        "max": 65.727
+      }
+    },
+    "after": {
+      "requests_per_second": {
+        "median": 564839.0,
+        "min": 563691.6666666666,
+        "max": 566762.6666666666
+      },
+      "rtt_p99_us": {
+        "median": 61.151,
+        "min": 61.119,
+        "max": 61.279
+      }
+    },
+    "throughput_change_percent": 1.0891508477205214
+  },
+  {
+    "workers": 1,
+    "connections": 32,
+    "bytes": 4096,
+    "backend": "iouring-poll",
+    "before": {
+      "requests_per_second": {
+        "median": 509858.6666666667,
+        "min": 503760.0,
+        "max": 510947.0
+      },
+      "rtt_p99_us": {
+        "median": 68.863,
+        "min": 68.735,
+        "max": 69.759
+      }
+    },
+    "after": {
+      "requests_per_second": {
+        "median": 514259.0,
+        "min": 505716.3333333333,
+        "max": 514319.0
+      },
+      "rtt_p99_us": {
+        "median": 67.199,
+        "min": 67.007,
+        "max": 68.095
+      }
+    },
+    "throughput_change_percent": 0.8630496294397938
+  },
+  {
+    "workers": 4,
+    "connections": 128,
+    "bytes": 64,
+    "backend": "tokio",
+    "before": {
+      "requests_per_second": {
+        "median": 2108220.6666666665,
+        "min": 2104195.3333333335,
+        "max": 2118782.6666666665
+      },
+      "rtt_p99_us": {
+        "median": 102.399,
+        "min": 99.647,
+        "max": 103.295
+      }
+    },
+    "after": {
+      "requests_per_second": {
+        "median": 2093056.3333333333,
+        "min": 2087748.6666666667,
+        "max": 2108075.6666666665
+      },
+      "rtt_p99_us": {
+        "median": 102.655,
+        "min": 102.591,
+        "max": 104.831
+      }
+    },
+    "throughput_change_percent": -0.719295355230043
+  },
+  {
+    "workers": 4,
+    "connections": 128,
+    "bytes": 64,
+    "backend": "iouring",
+    "before": {
+      "requests_per_second": {
+        "median": 2038597.3333333333,
+        "min": 2036388.3333333333,
+        "max": 2061479.6666666667
+      },
+      "rtt_p99_us": {
+        "median": 115.007,
+        "min": 112.767,
+        "max": 117.311
+      }
+    },
+    "after": {
+      "requests_per_second": {
+        "median": 2055676.6666666667,
+        "min": 2052442.6666666667,
+        "max": 2085603.0
+      },
+      "rtt_p99_us": {
+        "median": 108.287,
+        "min": 108.031,
+        "max": 108.415
+      }
+    },
+    "throughput_change_percent": 0.8377982769852244
+  },
+  {
+    "workers": 4,
+    "connections": 128,
+    "bytes": 64,
+    "backend": "iouring-poll",
+    "before": {
+      "requests_per_second": {
+        "median": 2044070.3333333333,
+        "min": 2036398.6666666667,
+        "max": 2048633.6666666667
+      },
+      "rtt_p99_us": {
+        "median": 119.103,
+        "min": 119.103,
+        "max": 122.175
+      }
+    },
+    "after": {
+      "requests_per_second": {
+        "median": 2108481.0,
+        "min": 2106579.3333333335,
+        "max": 2110208.0
+      },
+      "rtt_p99_us": {
+        "median": 106.047,
+        "min": 105.087,
+        "max": 106.623
+      }
+    },
+    "throughput_change_percent": 3.151098355878501
+  },
+  {
+    "workers": 4,
+    "connections": 128,
+    "bytes": 4096,
+    "backend": "tokio",
+    "before": {
+      "requests_per_second": {
+        "median": 1864743.6666666667,
+        "min": 1855377.6666666667,
+        "max": 1870646.6666666667
+      },
+      "rtt_p99_us": {
+        "median": 115.839,
+        "min": 115.775,
+        "max": 116.735
+      }
+    },
+    "after": {
+      "requests_per_second": {
+        "median": 1851001.6666666667,
+        "min": 1848725.0,
+        "max": 1856038.0
+      },
+      "rtt_p99_us": {
+        "median": 117.119,
+        "min": 116.671,
+        "max": 117.823
+      }
+    },
+    "throughput_change_percent": -0.7369377489059747
+  },
+  {
+    "workers": 4,
+    "connections": 128,
+    "bytes": 4096,
+    "backend": "iouring",
+    "before": {
+      "requests_per_second": {
+        "median": 1808683.0,
+        "min": 1806765.6666666667,
+        "max": 1809568.0
+      },
+      "rtt_p99_us": {
+        "median": 127.423,
+        "min": 127.167,
+        "max": 128.191
+      }
+    },
+    "after": {
+      "requests_per_second": {
+        "median": 1841463.0,
+        "min": 1838461.0,
+        "max": 1857377.3333333333
+      },
+      "rtt_p99_us": {
+        "median": 120.639,
+        "min": 119.295,
+        "max": 120.895
+      }
+    },
+    "throughput_change_percent": 1.8123684470965795
+  },
+  {
+    "workers": 4,
+    "connections": 128,
+    "bytes": 4096,
+    "backend": "iouring-poll",
+    "before": {
+      "requests_per_second": {
+        "median": 1815194.6666666667,
+        "min": 1814243.0,
+        "max": 1819768.0
+      },
+      "rtt_p99_us": {
+        "median": 130.047,
+        "min": 129.343,
+        "max": 130.879
+      }
+    },
+    "after": {
+      "requests_per_second": {
+        "median": 1868534.3333333333,
+        "min": 1864657.3333333333,
+        "max": 1879872.0
+      },
+      "rtt_p99_us": {
+        "median": 118.399,
+        "min": 118.015,
+        "max": 119.103
+      }
+    },
+    "throughput_change_percent": 2.9385094417788693
+  }
+]

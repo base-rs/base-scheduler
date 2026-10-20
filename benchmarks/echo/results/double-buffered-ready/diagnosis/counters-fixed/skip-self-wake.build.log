@@ -1,0 +1,4 @@
+   Compiling core-scheduler-iouring v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-batch-diagnosis/crates/iouring)
+   Compiling core-scheduler-native v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-batch-diagnosis/crates/native)
+   Compiling core-scheduler-echo-benchmark v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-batch-diagnosis/benchmarks/echo)
+    Finished `release` profile [optimized] target(s) in 1.34s

@@ -1,0 +1,20 @@
+diff --git a/crates/native/src/worker.rs b/crates/native/src/worker.rs
+index 99a5031..8fd2eab 100644
+--- a/crates/native/src/worker.rs
++++ b/crates/native/src/worker.rs
+@@ -31,10 +31,11 @@ impl WorkerState {
+ 
+     pub(crate) fn wake(&self) -> bool {
+         if self.sleeping.swap(false, Ordering::SeqCst) {
+-            self.thread
+-                .get()
+-                .expect("sleeping worker has registered its thread")
+-                .unpark();
++            let target = self.thread.get().expect("sleeping worker has registered its thread");
++            if target.id() == thread::current().id() {
++                return true;
++            }
++            target.unpark();
+             if let Some(waker) = self.driver_waker.get() {
+                 waker.wake_by_ref();
+             }

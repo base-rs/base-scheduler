@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Process Native tasks in alternating, stealable ready batches with an I/O driver turn between batches. Avoid redundant worker self-interrupts while preserving remote wakeups and shutdown progress.
+
 - Simplify Native task admission and worker parking without a task-ID registry or duplicate search-result types. Configure Tokio sockets once on construction and clear io_uring notification counters with one successful read.
 
 - Avoid speculative eventfd reads before io_uring idle waits; the armed ring poll preserves remote wakeups, and notification completions drain the counter before rearming.

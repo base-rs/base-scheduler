@@ -1,0 +1,12 @@
+{
+  "pre-idle-probe": {
+    "base": "b03e582",
+    "source_sha256": "ba9cc46d850986e0e524473432bed24fe55e0b9bfba355153ceb930ac2217363",
+    "binary_sha256": "55a108cfbf44106c123b7410e41158b58d3c328094a4265933ba2e212f0a2c49"
+  },
+  "skip-self-wake": {
+    "base": "b03e582",
+    "source_sha256": "7d3af6a5b307e67a00d905e5853c31d54e853f8458ea1c4e6dfefe8e6afa4a0b",
+    "binary_sha256": "263b378200d51b67658398c98fb8c4393f77879b85bb2c822ae52bd88290fcf3"
+  }
+}

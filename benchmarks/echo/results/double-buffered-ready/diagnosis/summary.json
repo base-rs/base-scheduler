@@ -1,0 +1,226 @@
+{
+  "timing": {
+    "ablation": {
+      "after": {
+        "samples": 5,
+        "requests_per_second": 233221.33333333334,
+        "minimum": 228786.66666666666,
+        "maximum": 235736.0,
+        "median_per_run_p99_us": 7.171
+      },
+      "before": {
+        "samples": 5,
+        "requests_per_second": 239569.66666666666,
+        "minimum": 238916.33333333334,
+        "maximum": 245833.33333333334,
+        "median_per_run_p99_us": 9.327
+      },
+      "both": {
+        "samples": 5,
+        "requests_per_second": 230724.66666666666,
+        "minimum": 226107.0,
+        "maximum": 232411.33333333334,
+        "median_per_run_p99_us": 5.931
+      },
+      "external": {
+        "samples": 5,
+        "requests_per_second": 233292.0,
+        "minimum": 228881.33333333334,
+        "maximum": 235274.66666666666,
+        "median_per_run_p99_us": 6.503
+      },
+      "singleton": {
+        "samples": 5,
+        "requests_per_second": 233113.33333333334,
+        "minimum": 228535.33333333334,
+        "maximum": 237877.0,
+        "median_per_run_p99_us": 7.231
+      },
+      "tokio": {
+        "samples": 5,
+        "requests_per_second": 268586.0,
+        "minimum": 267757.0,
+        "maximum": 270315.0,
+        "median_per_run_p99_us": 4.363
+      }
+    },
+    "wake-ablation": {
+      "after": {
+        "samples": 5,
+        "requests_per_second": 231169.0,
+        "minimum": 226133.0,
+        "maximum": 234526.66666666666,
+        "median_per_run_p99_us": 6.063
+      },
+      "before": {
+        "samples": 5,
+        "requests_per_second": 233394.66666666666,
+        "minimum": 228559.0,
+        "maximum": 240702.66666666666,
+        "median_per_run_p99_us": 5.983
+      },
+      "pre-idle-probe": {
+        "samples": 5,
+        "requests_per_second": 235761.33333333334,
+        "minimum": 232246.66666666666,
+        "maximum": 239299.33333333334,
+        "median_per_run_p99_us": 6.183
+      },
+      "skip-self-wake": {
+        "samples": 5,
+        "requests_per_second": 241230.33333333334,
+        "minimum": 238412.66666666666,
+        "maximum": 244778.33333333334,
+        "median_per_run_p99_us": 5.771
+      },
+      "tokio": {
+        "samples": 5,
+        "requests_per_second": 272094.6666666667,
+        "minimum": 268837.0,
+        "maximum": 275648.0,
+        "median_per_run_p99_us": 4.343
+      }
+    }
+  },
+  "counters": {
+    "after": {
+      "samples": 2,
+      "per_request": {
+        "queue_searches": 6.999942357622759,
+        "local_queue_hits": 1.0000042144141374,
+        "nonblocking_driver_turns": 1.0000042144141374,
+        "idle_driver_turns": 2.999969762660659,
+        "sleep_cycles": 2.9999690716043106,
+        "task_polls": 1.0000042144141374,
+        "queue_swaps": 1.0000042144141374,
+        "successful_wake_notifications": 1.0000028096094251,
+        "driver_turns": 3.999973977074797,
+        "commands": 1.0000042144141374,
+        "cqes": 1.0000056192188498,
+        "notification_cqes": 2.809609424933104e-06,
+        "submit_calls": 1.0000056419108647,
+        "wait_calls": 0.9999831196514354
+      }
+    },
+    "before": {
+      "samples": 2,
+      "per_request": {
+        "queue_searches": 3.9836532972257994,
+        "local_queue_hits": 1.0000027756185137,
+        "nonblocking_driver_turns": 2.0164007137310778,
+        "idle_driver_turns": 1.0000380322163998,
+        "sleep_cycles": 1.983612489390886,
+        "task_polls": 1.0000041634277705,
+        "queue_swaps": 0.0,
+        "successful_wake_notifications": 3.180600876723421e-05,
+        "driver_turns": 3.016438745947477,
+        "commands": 1.0000041634277705,
+        "cqes": 1.0000055512370274,
+        "notification_cqes": 2.775618513705331e-06,
+        "submit_calls": 1.0000041634277705,
+        "wait_calls": 0.9999730323896083
+      }
+    },
+    "skip-self-wake": {
+      "samples": 2,
+      "per_request": {
+        "queue_searches": 4.999974116492347,
+        "local_queue_hits": 1.000004122503373,
+        "nonblocking_driver_turns": 1.000004122503373,
+        "idle_driver_turns": 1.9999856953624013,
+        "sleep_cycles": 1.9999849969944872,
+        "task_polls": 1.000004122503373,
+        "queue_swaps": 1.000004122503373,
+        "successful_wake_notifications": 0.0,
+        "driver_turns": 2.9999898178657745,
+        "commands": 1.000004122503373,
+        "cqes": 1.0000054966711636,
+        "notification_cqes": 2.7483355818373063e-06,
+        "submit_calls": 1.0000027483355818,
+        "wait_calls": 0.9999822486589053
+      }
+    }
+  },
+  "stat": {
+    "stat": {
+      "after": {
+        "samples": 3,
+        "per_request": {
+          "task-clock": 0.003942740350787291,
+          "cycles": 15674.167787801085,
+          "instructions": 27710.67921621332,
+          "context-switches": 1.0000215091609472,
+          "cpu-migrations": 1.9553782679259302e-06,
+          "syscalls:sys_enter_recvfrom": 7.821513071703721e-06,
+          "syscalls:sys_enter_sendto": 1.0000058661348037,
+          "syscalls:sys_enter_io_uring_enter": 2.0000019477800177,
+          "syscalls:sys_enter_epoll_ctl": 4.1062943626444535e-05,
+          "syscalls:sys_enter_epoll_wait": 3.9107565358518605e-06,
+          "syscalls:sys_enter_epoll_pwait": 3.9107565358518605e-06,
+          "syscalls:sys_enter_read": 7.82151307170372e-05,
+          "syscalls:sys_enter_write": 7.791120070899192e-06,
+          "syscalls:sys_enter_futex": 3.715218709059268e-05
+        }
+      },
+      "before": {
+        "samples": 3,
+        "per_request": {
+          "task-clock": 0.0038324512950433307,
+          "cycles": 15138.991365442798,
+          "instructions": 26677.480677201176,
+          "context-switches": 1.0000243600908632,
+          "cpu-migrations": 2.0183630671852516e-06,
+          "syscalls:sys_enter_recvfrom": 7.834258428682787e-06,
+          "syscalls:sys_enter_sendto": 1.0000060550892016,
+          "syscalls:sys_enter_io_uring_enter": 2.000006090022716,
+          "syscalls:sys_enter_epoll_ctl": 4.238562441089028e-05,
+          "syscalls:sys_enter_epoll_wait": 2.030007571928243e-06,
+          "syscalls:sys_enter_epoll_pwait": 4.036726134370503e-06,
+          "syscalls:sys_enter_read": 8.073452268741005e-05,
+          "syscalls:sys_enter_write": 8.073452268741006e-06,
+          "syscalls:sys_enter_futex": 3.857014386663662e-05
+        }
+      }
+    },
+    "stat-fixed": {
+      "after": {
+        "samples": 3,
+        "per_request": {
+          "task-clock": 0.003956861582232972,
+          "cycles": 15698.294162223554,
+          "instructions": 27746.594381641575,
+          "context-switches": 1.0000213191928942,
+          "cpu-migrations": 5.814325334759781e-06,
+          "syscalls:sys_enter_recvfrom": 7.836668162164175e-06,
+          "syscalls:sys_enter_sendto": 1.0000058775011216,
+          "syscalls:sys_enter_io_uring_enter": 2.0,
+          "syscalls:sys_enter_epoll_ctl": 4.1142507851361916e-05,
+          "syscalls:sys_enter_epoll_wait": 1.9591670405410437e-06,
+          "syscalls:sys_enter_epoll_pwait": 3.918334081082087e-06,
+          "syscalls:sys_enter_read": 7.836668162164174e-05,
+          "syscalls:sys_enter_write": 7.836668162164175e-06,
+          "syscalls:sys_enter_futex": 3.722417377027983e-05
+        }
+      },
+      "skip-self-wake": {
+        "samples": 3,
+        "per_request": {
+          "task-clock": 0.0038581879800716366,
+          "cycles": 15367.21073331101,
+          "instructions": 27004.901602183596,
+          "context-switches": 1.0000194443202168,
+          "cpu-migrations": 2.0293649102513367e-06,
+          "syscalls:sys_enter_recvfrom": 8.117459641005347e-06,
+          "syscalls:sys_enter_sendto": 1.0000060880947308,
+          "syscalls:sys_enter_io_uring_enter": 2.0000038888640432,
+          "syscalls:sys_enter_epoll_ctl": 4.2616663115278074e-05,
+          "syscalls:sys_enter_epoll_wait": 2.0293649102513367e-06,
+          "syscalls:sys_enter_epoll_pwait": 4.058729820502673e-06,
+          "syscalls:sys_enter_read": 8.117459641005347e-05,
+          "syscalls:sys_enter_write": 7.777728086737224e-06,
+          "syscalls:sys_enter_futex": 3.85579332947754e-05
+        }
+      }
+    }
+  }
+}

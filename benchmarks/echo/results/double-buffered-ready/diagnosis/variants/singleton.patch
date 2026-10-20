@@ -1,0 +1,19 @@
+diff --git a/crates/native/src/worker.rs b/crates/native/src/worker.rs
+index 99a5031..efb8a55 100644
+--- a/crates/native/src/worker.rs
++++ b/crates/native/src/worker.rs
+@@ -275,8 +275,12 @@ fn run_loop(
+         let has_more = CURRENT_WORKER.with(|current| {
+             let mut current = current.borrow_mut();
+             let local = current.as_mut().expect("worker context is installed");
+-            std::mem::swap(&mut local.ready, &mut local.current);
+-            !local.current.is_empty()
++            if local.ready.is_empty() {
++                false
++            } else {
++                std::mem::swap(&mut local.ready, &mut local.current);
++                true
++            }
+         });
+         if has_more {
+             shared.wake_idle(UNASSIGNED_WORKER);

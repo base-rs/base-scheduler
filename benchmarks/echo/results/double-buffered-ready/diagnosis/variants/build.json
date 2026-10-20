@@ -1,0 +1,17 @@
+{
+  "singleton": {
+    "base": "b03e582",
+    "source_sha256": "5bd693c94d27bc37c4975dcabe4e21d60b1874139d420762d42b780736c4486c",
+    "binary_sha256": "50b473f0d1e9086e30ff0bdb796066a8d536d0d30ebe866e0b79b2d4e97bc607"
+  },
+  "external": {
+    "base": "b03e582",
+    "source_sha256": "f6f82658716f2e9a0d5523b2360ec550eb3932a0fb7fb470004f83ce8115b50f",
+    "binary_sha256": "b6821510e69e8a869fb01ca975eb8221ffeb64d2a26c2658a66feec19118c383"
+  },
+  "both": {
+    "base": "b03e582",
+    "source_sha256": "98d8be1f2592c5d499af8ecd494f1c61b19fa27aeb8a35151c4fc7596d999acf",
+    "binary_sha256": "3a9cb654b577067c4f535a9dddfbfeddf18df37971cd773629ba10b0b731ff35"
+  }
+}

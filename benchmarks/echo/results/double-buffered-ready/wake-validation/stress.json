@@ -1,0 +1,26 @@
+{
+  "source": "9386f7c4f6cb0dccd7e528512476d2cf963f7a88",
+  "binary_sha256": "687fdba79d99068de5c1b184935e7415a8afd249cde251f7040da39518a86dbd",
+  "build_command": [
+    "cargo",
+    "test",
+    "--locked",
+    "-p",
+    "core-scheduler-native",
+    "--lib",
+    "--all-features",
+    "--no-run",
+    "--message-format=json"
+  ],
+  "repetitions": 100,
+  "filters": [
+    "worker::tests",
+    "native_scheduler::driver_tests"
+  ],
+  "passed": {
+    "worker::tests": 1400,
+    "native_scheduler::driver_tests": 700
+  },
+  "started_utc": "2026-10-20T17:25:49Z",
+  "finished_utc": "2026-10-20T17:25:50Z"
+}

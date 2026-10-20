@@ -1,0 +1,29 @@
+{
+  "original_source": "ddc994d2f1f3f10df53e46241a730d38a7c37531",
+  "uncorrected_source": "d1306dfc7ccde4502d4e966cc4e070bc32d2e101",
+  "fixed_source": "9386f7c4f6cb0dccd7e528512476d2cf963f7a88",
+  "fixed_tree": "3769574cba5c8b7778c14e4d3184325679f75b20",
+  "build_command": "cargo build --release --locked -p core-scheduler-echo-benchmark",
+  "profile": "Cargo default optimized release profile; no LTO or CPU override",
+  "rustc": "rustc 1.99.0 (b940084d7 2026-09-28) (Arch Linux rust 1:1.99.0-1)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.0\nLLVM version: 23.1.1",
+  "platform": "Linux-7.2.6-arch2-1-x86_64-with-glibc2.44",
+  "cpu_topology": "CPU CORE SOCKET NODE\n  0    0      0    0\n  1    1      0    0\n  2    2      0    0\n  3    3      0    0\n  4    4      0    0\n  5    5      0    0\n  6    6      0    0\n  7    7      0    0\n  8    8      0    0\n  9    9      0    0\n 10   10      0    0\n 11   11      0    0\n 12   12      0    0\n 13   13      0    0\n 14   14      0    0\n 15   15      0    0\n 16    0      0    0\n 17    1      0    0\n 18    2      0    0\n 19    3      0    0\n 20    4      0    0\n 21    5      0    0\n 22    6      0    0\n 23    7      0    0\n 24    8      0    0\n 25    9      0    0\n 26   10      0    0\n 27   11      0    0\n 28   12      0    0\n 29   13      0    0\n 30   14      0    0\n 31   15      0    0",
+  "profile_overrides": {},
+  "governors": {
+    "0": "powersave",
+    "1": "powersave",
+    "2": "powersave",
+    "3": "powersave",
+    "4": "powersave",
+    "5": "powersave",
+    "6": "powersave",
+    "7": "powersave"
+  },
+  "checkout_status": "",
+  "cases": {
+    "original": "original single-queue loop",
+    "uncorrected": "alternating queues before self-wakeup fix",
+    "fixed": "alternating queues; interrupt only a different worker thread"
+  },
+  "benchmark_plan": "Three interleaved repetitions of all five existing workloads and eight variant/backend cases. Then five repetitions of the already-selected owned serial case with both Tokio controls, kept separate from the matrix. Finally twelve idle-parking checks."
+}
