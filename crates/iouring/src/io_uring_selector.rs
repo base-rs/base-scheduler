@@ -1054,10 +1054,8 @@ impl Reactor {
             || !self.cancellations.is_empty()
             || !self.notification_armed;
         if !return_to_executor {
-            // Keep the local permit through productive turns, then consume it with remote notifications at the wait boundary. The armed eventfd poll retains notifications racing this check.
-            let mut notified = crate::io_uring_worker::take_notification(&self.controller);
-            notified |= self.drain_notification()?;
-            return_to_executor = notified;
+            // Keep the local permit through productive turns, then consume it at the wait boundary. The armed eventfd poll retains remote notifications, including writes before submission or racing the wait; drain its counter only after collecting that poll's CQE.
+            return_to_executor = crate::io_uring_worker::take_notification(&self.controller);
         }
         if return_to_executor {
             let needs_submit = {
