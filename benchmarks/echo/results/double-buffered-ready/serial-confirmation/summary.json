@@ -1,0 +1,64 @@
+[
+  {
+    "workers": 1,
+    "connections": 1,
+    "bytes": 64,
+    "backend": "tokio",
+    "before": {
+      "requests_per_second": {
+        "median": 271245.3333333333,
+        "min": 268798.6666666667,
+        "max": 274415.3333333333
+      },
+      "rtt_p99_us": {
+        "median": 4.351,
+        "min": 4.331,
+        "max": 4.351
+      }
+    },
+    "after": {
+      "requests_per_second": {
+        "median": 269906.0,
+        "min": 268534.0,
+        "max": 270656.0
+      },
+      "rtt_p99_us": {
+        "median": 4.371,
+        "min": 4.331,
+        "max": 4.383
+      }
+    },
+    "throughput_change_percent": -0.49377193586125356
+  },
+  {
+    "workers": 1,
+    "connections": 1,
+    "bytes": 64,
+    "backend": "iouring",
+    "before": {
+      "requests_per_second": {
+        "median": 236125.66666666666,
+        "min": 231542.33333333334,
+        "max": 241882.66666666666
+      },
+      "rtt_p99_us": {
+        "median": 6.311,
+        "min": 5.891,
+        "max": 9.543
+      }
+    },
+    "after": {
+      "requests_per_second": {
+        "median": 230357.0,
+        "min": 226842.0,
+        "max": 234925.0
+      },
+      "rtt_p99_us": {
+        "median": 9.543,
+        "min": 6.063,
+        "max": 9.591
+      }
+    },
+    "throughput_change_percent": -2.443049393190344
+  }
+]
