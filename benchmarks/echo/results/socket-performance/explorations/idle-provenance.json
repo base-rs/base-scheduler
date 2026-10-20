@@ -1,0 +1,46 @@
+{
+  "client_source": "5736301fded46c4e5f11d5387950ae2ee0807b94",
+  "base_source": "6690045baf43409466b5418a1c464b5ef9559329",
+  "variants": {
+    "ppoll": {
+      "algorithm_checkpoint": "f75b429",
+      "binary": "/tmp/core-perf-idle-ppoll-benchmark",
+      "sha256": "83c16da4620f420a36cc97a33ca57bbf761b7b1ac1911833c311b6d9d7e09891",
+      "results": "/tmp/core-perf-idle-quick/aiko.json",
+      "runner": "/tmp/core-perf-idle-quick.py",
+      "note": "Exploratory build during editing; checkpoint includes subsequent tests/comment/format edits. Exact binary is authoritative; root final integrated source matrix is required."
+    },
+    "ring": {
+      "algorithm_checkpoint": "20d4b5c",
+      "binary": "/tmp/core-perf-idle-ring-benchmark",
+      "sha256": "48550b6543a4d1abc2496704f760033d5d97f2d15c2354e4a0b4be5580b2f968",
+      "results": "/tmp/core-perf-idle-direct-quick/aiko.json",
+      "runner": "/tmp/core-perf-idle-direct-quick.py",
+      "note": "Exploratory build during editing; checkpoint includes subsequent tests/comment/format edits. Exact binary is authoritative; root final integrated source matrix is required."
+    },
+    "combined": {
+      "algorithm_checkpoint": "b7fb99d",
+      "binary": "/tmp/core-perf-idle-combined-benchmark",
+      "sha256": "e567e57eee0603ef56c892dc4e0a2bba003cee7a85b70343e91947c77554e5db",
+      "results": "/tmp/core-perf-idle-combined-quick/aiko.json",
+      "runner": "/tmp/core-perf-idle-combined-quick.py",
+      "note": "Exploratory build during editing; checkpoint includes subsequent tests/comment/format edits. Exact binary is authoritative; root final integrated source matrix is required."
+    },
+    "eventfd": {
+      "algorithm_checkpoint": "408dccb",
+      "binary": "/tmp/core-perf-idle-eventfd-benchmark",
+      "sha256": "3755217fb5ae0b1fc5a2d2c028925e4abf44ab9b1a56183a73179ed8e02d0604",
+      "results": "/tmp/core-perf-idle-eventfd-quick/aiko.json",
+      "runner": "/tmp/core-perf-idle-eventfd-quick.py",
+      "note": "Exploratory build during editing; checkpoint includes subsequent tests/comment/format edits. Exact binary is authoritative; root final integrated source matrix is required."
+    },
+    "empty-submit": {
+      "algorithm_checkpoint": "rejected prototype atop408dccb",
+      "binary": "/tmp/core-perf-idle-empty-submit-benchmark",
+      "sha256": "2e8732eb2565f8c6916ee331caa482d614f1fdbb54e719aaaed6c8a2f94118f7",
+      "results": "/tmp/core-perf-idle-empty-submit-quick/aiko.json",
+      "runner": "/tmp/core-perf-idle-empty-submit-quick.py",
+      "note": "Exploratory build during editing; checkpoint includes subsequent tests/comment/format edits. Exact binary is authoritative; root final integrated source matrix is required."
+    }
+  }
+}

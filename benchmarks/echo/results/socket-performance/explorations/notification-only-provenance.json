@@ -1,0 +1,25 @@
+{
+  "base": "6690045baf43409466b5418a1c464b5ef9559329",
+  "after_source": "181dc8a production changes with worker.rs restored exactly from6690045; no ready-send source. Only capacity full-to-available and runnable zero-transition notification changes remain. Test/doc files do not affect release benchmark runtime.",
+  "wakes_source": "2418e14 production changes with worker.rs restored exactly from6690045; ready-owned-send + capacity/drain reductions.",
+  "build": "CARGO_PROFILE_RELEASE_DEBUG=1 cargo build --release --locked -p core-scheduler-echo-benchmark; Rust1.99.0 LLVM23.1.1; no LTO/nativeCPU additions",
+  "runner": "/tmp/core-perf-requests-notify-compare.py imports sample() from benchmark readiness profiling runner;2randomized repeats withseed20261025,1secondwarmup3secondmeasure; serverCPU0 clientCPU4-7; shared flock exclusive during entirecollection; no build/profiles overlap",
+  "binaries": {
+    "before": {
+      "path": "/tmp/core-tokio-admission/release/core-scheduler-echo-benchmark",
+      "sha256": "ae485daa8ad173c43fa18b6eaa3c3f9342fbad19d30258ae8a365d20ba7b0fc1"
+    },
+    "after": {
+      "path": "/tmp/core-perf-requests-notifications-only",
+      "sha256": "aa9333bca17bd549df2ddbcd6618ab7cbdc50b13b1340f2d3da5bb13ea697980"
+    },
+    "wakes": {
+      "path": "/tmp/core-perf-requests-send-local-wake",
+      "sha256": "42c10aba17c05e99061f547ca00ec28a86eeabcd335eb166d8a9ff84df509ecf"
+    },
+    "client": {
+      "path": "/tmp/core-scheduler-profile-baseline/release/core-scheduler-echo-benchmark",
+      "sha256": "db6c914ab75011477ec6232e681046b1e75532cbaa1c81663bac984591675cf3"
+    }
+  }
+}

@@ -1,0 +1,478 @@
+# ========
+# captured on    : Tue Oct 20 13:02:26 2026
+# header version : 1
+# data offset    : 520
+# data size      : 49693312
+# feat offset    : 49693832
+# hostname : aiko
+# os release : 7.2.6-arch2-1
+# perf version : 7.2.8-2
+# arch : x86_64
+# nrcpus online : 32
+# nrcpus avail : 32
+# cpudesc : AMD Ryzen 9 9950X3D 16-Core Processor
+# cpuid : AuthenticAMD,26,68,0
+# total memory : 48436160 kB
+# cmdline : /usr/bin/perf 
+# event : name = cycles:u, , id = { 13928, 13929, 13930, 13931, 13932, 13933, 13934, 13935, 13936, 13937, 13938, 13939, 13940, 13941, 13942, 13943, 13944, 13945, 13946, 13947, 13948, 13949, 13950, 13951, 13952, 13953, 13954, 13955, 13956, 13957, 13958, 13959 }, type = 0 (PERF_TYPE_HARDWARE), size = 144, config = 0 (PERF_COUNT_HW_CPU_CYCLES), { sample_period, sample_freq } = 999, sample_type = IP|TID|TIME|CALLCHAIN|PERIOD|REGS_USER|STACK_USER, read_format = ID|LOST, disabled = 1, inherit = 1, exclude_kernel = 1, exclude_hv = 1, mmap = 1, comm = 1, freq = 1, enable_on_exec = 1, task = 1, mmap_data = 1, sample_id_all = 1, exclude_callchain_user = 1, mmap2 = 1, comm_exec = 1, ksymbol = 1, bpf_event = 1, build_id = 1, sample_regs_user = 0xff0fff, sample_stack_user = 8192
+# CPU_TOPOLOGY info available, use -I to display
+# NUMA_TOPOLOGY info available, use -I to display
+# pmu mappings: cpu = 4, amd_iommu_0 = 12, breakpoint = 5, drm_amdgpu = 4294836224, hwmon_amdgpu = 4294901762, hwmon_asusec = 4294901766, hwmon_asus = 4294901765, hwmon_eno2 = 4294901769, hwmon_iwlwifi_1 = 4294901770, hwmon_k10temp = 4294901764, hwmon_nct6799 = 4294901763, hwmon_nvme = 4294901760, hwmon_nvme = 4294901761, hwmon_spd5118 = 4294901768, hwmon_spd5118 = 4294901767, ibs_fetch = 10, ibs_op = 11, kprobe = 8, msr = 13, power = 14, power_core = 15, software = 1, tool = 4294967294, tracepoint = 2, uprobe = 9
+# CACHE info available, use -I to display
+# time of first sample : 2043546.371043
+# time of last sample : 2043552.374359
+# sample duration :   6003.316 ms
+# MEM_TOPOLOGY info available, use -I to display
+# bpf_prog_info empty
+# btf info empty
+# cpu pmu capabilities: branches=16, max_precise=0
+# ibs_fetch pmu capabilities: zen4_ibs_extensions=1
+# ibs_op pmu capabilities: zen4_ibs_extensions=1, ldlat=1, dtlb_pgsize=1
+# AMD systems uses ibs_op// PMU for some precise events, e.g.: cycles:p, see the 'perf list' man page for further details.
+# CPU_DOMAIN_INFO info available, use -I to display
+# e_machine : 62
+#   e_flags : 0
+# cacheline size: 64
+# missing features: TRACING_DATA BUILD_ID BRANCH_STACK GROUP_DESC AUXTRACE STAT CLOCKID DIR_FORMAT COMPRESSED CLOCK_DATA HYBRID_TOPOLOGY 
+# ========
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 5K of event 'cycles:u'
+# Event count (approx.): 4202395144
+#
+# Children      Self  Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       IPC   [IPC Coverage]
+# ........  ........  ...........................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................  ....................
+#
+    33.75%     0.00%  [.] 0x00007f5ce74a08f2                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       -      -            
+            |          
+            |--16.90%--0xffffffff9de0012f
+            |          |          
+            |           --15.21%--0xffffffff9f389afa
+            |                     |          
+            |                     |--11.67%--0xffffffff9f06f034
+            |                     |          |          
+            |                     |           --8.27%--0xffffffff9f06ef2b
+            |                     |                     |          
+            |                     |                      --4.77%--0xffffffff9e60c656
+            |                     |          
+            |                      --2.94%--0xffffffff9f06ed64
+            |                                |          
+            |                                 --2.14%--0xffffffff9f06ebbe
+            |          
+             --15.15%--0xffffffff9de00080
+
+    22.56%     0.13%  [.] recv                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     -      -            
+            |          
+             --22.46%--recv
+                       |          
+                        --22.34%--0x7f5ce74a08f2
+                                  |          
+                                  |--13.54%--0xffffffff9de0012f
+                                  |          |          
+                                  |           --12.19%--0xffffffff9f389afa
+                                  |                     |          
+                                  |                      --11.67%--0xffffffff9f06f034
+                                  |                                |          
+                                  |                                 --8.27%--0xffffffff9f06ef2b
+                                  |                                           |          
+                                  |                                            --4.77%--0xffffffff9e60c656
+                                  |          
+                                   --8.09%--0xffffffff9de00080
+
+    16.90%     0.00%  [.] 0xffffffff9de0012f                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       -      -            
+            |          
+             --15.21%--0xffffffff9f389afa
+                       |          
+                       |--11.67%--0xffffffff9f06f034
+                       |          |          
+                       |           --8.27%--0xffffffff9f06ef2b
+                       |                     |          
+                       |                      --4.77%--0xffffffff9e60c656
+                       |          
+                        --2.94%--0xffffffff9f06ed64
+                                  |          
+                                   --2.14%--0xffffffff9f06ebbe
+
+    15.21%     0.00%  [.] 0xffffffff9f389afa                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       -      -            
+            |          
+            |--11.67%--0xffffffff9f06f034
+            |          |          
+            |           --8.27%--0xffffffff9f06ef2b
+            |                     |          
+            |                      --4.77%--0xffffffff9e60c656
+            |          
+             --2.94%--0xffffffff9f06ed64
+                       |          
+                        --2.14%--0xffffffff9f06ebbe
+
+    15.15%    15.15%  [k] 0xffffffff9de00080                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       -      -            
+            |          
+            |--7.07%--0x7f5ce74a08f2
+            |          0xffffffff9de00080
+            |          
+            |--4.16%--recv
+            |          0x7f5ce74a08f2
+            |          0xffffffff9de00080
+            |          
+             --3.92%--<socket2::socket::Socket>::recv
+                       <socket2::socket::Socket>::recv_with_flags (inlined)
+                       socket2::sys::recv (inlined)
+                       recv
+                       0x7f5ce74a08f2
+                       0xffffffff9de00080
+
+    12.21%    12.21%  [.] <core_scheduler_tokio::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0}::{closure#1}> as core::future::future::Future>::poll                                                                                                                                                                                                                                                                                         -      -            
+            |          
+             --5.56%--<core_scheduler_tokio::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0}::{closure#1}> as core::future::future::Future>::poll
+                       std::panic::catch_unwind::<core::panic::unwind_safe::AssertUnwindSafe<<core_scheduler_tokio::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0}::{closure#1}> as core::future::future::Future>::poll::{closure#0}>, core::task::poll::Poll<()>> (inlined)
+                       std::panicking::catch_unwind::<core::task::poll::Poll<()>, core::panic::unwind_safe::AssertUnwindSafe<<core_scheduler_tokio::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0}::{closure#1}> as core::future::future::Future>::poll::{closure#0}>> (inlined)
+                       std::panicking::catch_unwind::do_call::<core::panic::unwind_safe::AssertUnwindSafe<<core_scheduler_tokio::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0}::{closure#1}> as core::future::future::Future>::poll::{closure#0}>, core::task::poll::Poll<()>> (inlined)
+                       <core::panic::unwind_safe::AssertUnwindSafe<<core_scheduler_tokio::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0}::{closure#1}> as core::future::future::Future>::poll::{closure#0}> as core::ops::function::FnOnce<()>>::call_once (inlined)
+                       <<core_scheduler_tokio::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0}::{closure#1}> as core::future::future::Future>::poll::{closure#0} as core::ops::function::FnOnce<()>>::call_once (inlined)
+                       <core_scheduler_tokio::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0}::{closure#1}> as core::future::future::Future>::poll::{closure#0} (inlined)
+                       core_scheduler_echo_benchmark::server::scheduler_server::<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0}::{closure#1} (inlined)
+                       core_scheduler_echo_benchmark::server::echo::<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0} (inlined)
+                       |          
+                       |--3.39%--<core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_read::SocketRead>::socket_read::<alloc::vec::Vec<u8>>::{closure#0} (inlined)
+                       |          |          
+                       |           --3.37%--<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::socket_operation::<alloc::vec::Vec<u8>, usize, <core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_read::SocketRead>::socket_read<alloc::vec::Vec<u8>>::{closure#0}::{closure#0}>::{closure#0} (inlined)
+                       |                     |          
+                       |                      --3.34%--<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::socket_operation::<alloc::vec::Vec<u8>, usize, <core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_read::SocketRead>::socket_read<alloc::vec::Vec<u8>>::{closure#0}::{closure#0}>::{closure#0}::{closure#0} (inlined)
+                       |          
+                        --2.10%--<core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_write::SocketWrite>::socket_write::<core_scheduler::buffer_slice::BufferSlice<alloc::vec::Vec<u8>>>::{closure#0} (inlined)
+
+    11.67%     0.00%  [.] 0xffffffff9f06f034                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       -      -            
+            |          
+             --8.27%--0xffffffff9f06ef2b
+                       |          
+                        --4.77%--0xffffffff9e60c656
+
+    10.95%     0.17%  [.] <socket2::socket::Socket>::recv                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          -      -            
+            |          
+             --10.80%--<socket2::socket::Socket>::recv
+                       <socket2::socket::Socket>::recv_with_flags (inlined)
+                       |          
+                        --10.78%--socket2::sys::recv (inlined)
+                                  recv
+                                  |          
+                                   --10.67%--0x7f5ce74a08f2
+                                             |          
+                                             |--6.33%--0xffffffff9de0012f
+                                             |          |          
+                                             |           --5.79%--0xffffffff9f389afa
+                                             |                     |          
+                                             |                      --5.47%--0xffffffff9f06f034
+                                             |                                |          
+                                             |                                 --4.14%--0xffffffff9f06ef2b
+                                             |                                           |          
+                                             |                                            --2.32%--0xffffffff9e60c656
+                                             |          
+                                              --3.92%--0xffffffff9de00080
+
+    10.88%     0.00%  [.] <socket2::socket::Socket>::recv_with_flags (inlined)                                                                                                                                                                                                                                                                                                                                                                                                                                                                     -      -            
+            |          
+             --10.85%--socket2::sys::recv (inlined)
+                       |          
+                        --10.78%--recv
+                                  |          
+                                   --10.67%--0x7f5ce74a08f2
+                                             |          
+                                             |--6.33%--0xffffffff9de0012f
+                                             |          |          
+                                             |           --5.79%--0xffffffff9f389afa
+                                             |                     |          
+                                             |                      --5.47%--0xffffffff9f06f034
+                                             |                                |          
+                                             |                                 --4.14%--0xffffffff9f06ef2b
+                                             |                                           |          
+                                             |                                            --2.32%--0xffffffff9e60c656
+                                             |          
+                                              --3.92%--0xffffffff9de00080
+
+    10.85%     0.00%  [.] socket2::sys::recv (inlined)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             -      -            
+            |          
+             --10.78%--recv
+                       |          
+                        --10.67%--0x7f5ce74a08f2
+                                  |          
+                                  |--6.33%--0xffffffff9de0012f
+                                  |          |          
+                                  |           --5.79%--0xffffffff9f389afa
+                                  |                     |          
+                                  |                      --5.47%--0xffffffff9f06f034
+                                  |                                |          
+                                  |                                 --4.14%--0xffffffff9f06ef2b
+                                  |                                           |          
+                                  |                                            --2.32%--0xffffffff9e60c656
+                                  |          
+                                   --3.92%--0xffffffff9de00080
+
+     8.27%     0.00%  [.] 0xffffffff9f06ef2b                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       -      -            
+            |          
+             --4.77%--0xffffffff9e60c656
+
+     7.33%     7.31%  [.] <core::future::poll_fn::PollFn<<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::socket_operation<alloc::vec::Vec<u8>, usize, <core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_read::SocketRead>::socket_read<alloc::vec::Vec<u8>>::{closure#0}::{closure#0}>::{closure#0}::{closure#0}::{closure#0}> as core::future::future::Future>::poll                                                                                                                                      -      -            
+            |          
+             --3.43%--<core::future::poll_fn::PollFn<<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::socket_operation<alloc::vec::Vec<u8>, usize, <core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_read::SocketRead>::socket_read<alloc::vec::Vec<u8>>::{closure#0}::{closure#0}>::{closure#0}::{closure#0}::{closure#0}> as core::future::future::Future>::poll
+                       <core_scheduler_tokio::tokio_scheduler::TokioScheduler>::socket_operation::<alloc::vec::Vec<u8>, usize, <core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_read::SocketRead>::socket_read<alloc::vec::Vec<u8>>::{closure#0}::{closure#0}>::{closure#0}::{closure#0}::{closure#0} (inlined)
+                       |          
+                        --3.40%--<core_scheduler_tokio::tokio_socket::TokioSocket>::io::<usize, <core_scheduler_tokio::tokio_scheduler::TokioScheduler>::socket_operation<alloc::vec::Vec<u8>, usize, <core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_read::SocketRead>::socket_read<alloc::vec::Vec<u8>>::{closure#0}::{closure#0}>::{closure#0}::{closure#0}::{closure#1}>::{closure#0} (inlined)
+
+     6.51%     6.51%  [k] 0xffffffff9e60c656                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       -      -            
+            |          
+            |--2.45%--recv
+            |          0x7f5ce74a08f2
+            |          0xffffffff9de0012f
+            |          0xffffffff9f389afa
+            |          0xffffffff9f06f034
+            |          0xffffffff9f06ef2b
+            |          0xffffffff9e60c656
+            |          
+             --2.32%--<socket2::socket::Socket>::recv
+                       <socket2::socket::Socket>::recv_with_flags (inlined)
+                       socket2::sys::recv (inlined)
+                       recv
+                       0x7f5ce74a08f2
+                       0xffffffff9de0012f
+                       0xffffffff9f389afa
+                       0xffffffff9f06f034
+                       0xffffffff9f06ef2b
+                       0xffffffff9e60c656
+
+     5.84%     5.84%  [.] <tokio::runtime::task::state::State>::transition_to_idle                                                                                                                                                                                                                                                                                                                                                                                                                                                                 -      -            
+            |          
+             --2.47%--0xc7
+                       <tokio::runtime::task::state::State>::transition_to_idle
+                       <tokio::runtime::task::state::State>::fetch_update_action::<<tokio::runtime::task::state::State>::transition_to_idle::{closure#0}, tokio::runtime::task::state::TransitionToIdle> (inlined)
+
+     5.68%     0.00%  [.] std::panic::catch_unwind::<core::panic::unwind_safe::AssertUnwindSafe<<core_scheduler_tokio::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0}::{closure#1}> as core::future::future::Future>::poll::{closure#0}>, core::task::poll::Poll<()>> (inlined)                                                                                                                                                              -      -            
+            |
+            ---std::panicking::catch_unwind::<core::task::poll::Poll<()>, core::panic::unwind_safe::AssertUnwindSafe<<core_scheduler_tokio::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0}::{closure#1}> as core::future::future::Future>::poll::{closure#0}>> (inlined)
+               std::panicking::catch_unwind::do_call::<core::panic::unwind_safe::AssertUnwindSafe<<core_scheduler_tokio::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0}::{closure#1}> as core::future::future::Future>::poll::{closure#0}>, core::task::poll::Poll<()>> (inlined)
+               <core::panic::unwind_safe::AssertUnwindSafe<<core_scheduler_tokio::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0}::{closure#1}> as core::future::future::Future>::poll::{closure#0}> as core::ops::function::FnOnce<()>>::call_once (inlined)
+               <<core_scheduler_tokio::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0}::{closure#1}> as core::future::future::Future>::poll::{closure#0} as core::ops::function::FnOnce<()>>::call_once (inlined)
+               <core_scheduler_tokio::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0}::{closure#1}> as core::future::future::Future>::poll::{closure#0} (inlined)
+               core_scheduler_echo_benchmark::server::scheduler_server::<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0}::{closure#1} (inlined)
+               core_scheduler_echo_benchmark::server::echo::<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0} (inlined)
+               |          
+               |--3.41%--<core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_read::SocketRead>::socket_read::<alloc::vec::Vec<u8>>::{closure#0} (inlined)
+               |          |          
+               |           --3.39%--<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::socket_operation::<alloc::vec::Vec<u8>, usize, <core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_read::SocketRead>::socket_read<alloc::vec::Vec<u8>>::{closure#0}::{closure#0}>::{closure#0} (inlined)
+               |                     |          
+               |                      --3.36%--<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::socket_operation::<alloc::vec::Vec<u8>, usize, <core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_read::SocketRead>::socket_read<alloc::vec::Vec<u8>>::{closure#0}::{closure#0}>::{closure#0}::{closure#0} (inlined)
+               |          
+                --2.20%--<core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_write::SocketWrite>::socket_write::<core_scheduler::buffer_slice::BufferSlice<alloc::vec::Vec<u8>>>::{closure#0} (inlined)
+
+     5.68%     0.00%  [.] std::panicking::catch_unwind::<core::task::poll::Poll<()>, core::panic::unwind_safe::AssertUnwindSafe<<core_scheduler_tokio::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0}::{closure#1}> as core::future::future::Future>::poll::{closure#0}>> (inlined)                                                                                                                                                          -      -            
+            |
+            ---std::panicking::catch_unwind::do_call::<core::panic::unwind_safe::AssertUnwindSafe<<core_scheduler_tokio::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0}::{closure#1}> as core::future::future::Future>::poll::{closure#0}>, core::task::poll::Poll<()>> (inlined)
+               <core::panic::unwind_safe::AssertUnwindSafe<<core_scheduler_tokio::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0}::{closure#1}> as core::future::future::Future>::poll::{closure#0}> as core::ops::function::FnOnce<()>>::call_once (inlined)
+               <<core_scheduler_tokio::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0}::{closure#1}> as core::future::future::Future>::poll::{closure#0} as core::ops::function::FnOnce<()>>::call_once (inlined)
+               <core_scheduler_tokio::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0}::{closure#1}> as core::future::future::Future>::poll::{closure#0} (inlined)
+               core_scheduler_echo_benchmark::server::scheduler_server::<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0}::{closure#1} (inlined)
+               core_scheduler_echo_benchmark::server::echo::<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0} (inlined)
+               |          
+               |--3.41%--<core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_read::SocketRead>::socket_read::<alloc::vec::Vec<u8>>::{closure#0} (inlined)
+               |          |          
+               |           --3.39%--<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::socket_operation::<alloc::vec::Vec<u8>, usize, <core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_read::SocketRead>::socket_read<alloc::vec::Vec<u8>>::{closure#0}::{closure#0}>::{closure#0} (inlined)
+               |                     |          
+               |                      --3.36%--<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::socket_operation::<alloc::vec::Vec<u8>, usize, <core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_read::SocketRead>::socket_read<alloc::vec::Vec<u8>>::{closure#0}::{closure#0}>::{closure#0}::{closure#0} (inlined)
+               |          
+                --2.20%--<core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_write::SocketWrite>::socket_write::<core_scheduler::buffer_slice::BufferSlice<alloc::vec::Vec<u8>>>::{closure#0} (inlined)
+
+     5.68%     0.00%  [.] std::panicking::catch_unwind::do_call::<core::panic::unwind_safe::AssertUnwindSafe<<core_scheduler_tokio::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0}::{closure#1}> as core::future::future::Future>::poll::{closure#0}>, core::task::poll::Poll<()>> (inlined)                                                                                                                                                 -      -            
+            |
+            ---<core::panic::unwind_safe::AssertUnwindSafe<<core_scheduler_tokio::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0}::{closure#1}> as core::future::future::Future>::poll::{closure#0}> as core::ops::function::FnOnce<()>>::call_once (inlined)
+               <<core_scheduler_tokio::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0}::{closure#1}> as core::future::future::Future>::poll::{closure#0} as core::ops::function::FnOnce<()>>::call_once (inlined)
+               <core_scheduler_tokio::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0}::{closure#1}> as core::future::future::Future>::poll::{closure#0} (inlined)
+               core_scheduler_echo_benchmark::server::scheduler_server::<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0}::{closure#1} (inlined)
+               core_scheduler_echo_benchmark::server::echo::<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0} (inlined)
+               |          
+               |--3.41%--<core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_read::SocketRead>::socket_read::<alloc::vec::Vec<u8>>::{closure#0} (inlined)
+               |          |          
+               |           --3.39%--<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::socket_operation::<alloc::vec::Vec<u8>, usize, <core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_read::SocketRead>::socket_read<alloc::vec::Vec<u8>>::{closure#0}::{closure#0}>::{closure#0} (inlined)
+               |                     |          
+               |                      --3.36%--<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::socket_operation::<alloc::vec::Vec<u8>, usize, <core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_read::SocketRead>::socket_read<alloc::vec::Vec<u8>>::{closure#0}::{closure#0}>::{closure#0}::{closure#0} (inlined)
+               |          
+                --2.20%--<core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_write::SocketWrite>::socket_write::<core_scheduler::buffer_slice::BufferSlice<alloc::vec::Vec<u8>>>::{closure#0} (inlined)
+
+     5.68%     0.00%  [.] <core::panic::unwind_safe::AssertUnwindSafe<<core_scheduler_tokio::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0}::{closure#1}> as core::future::future::Future>::poll::{closure#0}> as core::ops::function::FnOnce<()>>::call_once (inlined)                                                                                                                                                                      -      -            
+            |
+            ---<<core_scheduler_tokio::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0}::{closure#1}> as core::future::future::Future>::poll::{closure#0} as core::ops::function::FnOnce<()>>::call_once (inlined)
+               <core_scheduler_tokio::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0}::{closure#1}> as core::future::future::Future>::poll::{closure#0} (inlined)
+               core_scheduler_echo_benchmark::server::scheduler_server::<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0}::{closure#1} (inlined)
+               core_scheduler_echo_benchmark::server::echo::<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0} (inlined)
+               |          
+               |--3.41%--<core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_read::SocketRead>::socket_read::<alloc::vec::Vec<u8>>::{closure#0} (inlined)
+               |          |          
+               |           --3.39%--<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::socket_operation::<alloc::vec::Vec<u8>, usize, <core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_read::SocketRead>::socket_read<alloc::vec::Vec<u8>>::{closure#0}::{closure#0}>::{closure#0} (inlined)
+               |                     |          
+               |                      --3.36%--<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::socket_operation::<alloc::vec::Vec<u8>, usize, <core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_read::SocketRead>::socket_read<alloc::vec::Vec<u8>>::{closure#0}::{closure#0}>::{closure#0}::{closure#0} (inlined)
+               |          
+                --2.20%--<core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_write::SocketWrite>::socket_write::<core_scheduler::buffer_slice::BufferSlice<alloc::vec::Vec<u8>>>::{closure#0} (inlined)
+
+     5.68%     0.00%  [.] <<core_scheduler_tokio::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0}::{closure#1}> as core::future::future::Future>::poll::{closure#0} as core::ops::function::FnOnce<()>>::call_once (inlined)                                                                                                                                                                                                                  -      -            
+            |
+            ---<core_scheduler_tokio::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0}::{closure#1}> as core::future::future::Future>::poll::{closure#0} (inlined)
+               core_scheduler_echo_benchmark::server::scheduler_server::<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0}::{closure#1} (inlined)
+               core_scheduler_echo_benchmark::server::echo::<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0} (inlined)
+               |          
+               |--3.41%--<core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_read::SocketRead>::socket_read::<alloc::vec::Vec<u8>>::{closure#0} (inlined)
+               |          |          
+               |           --3.39%--<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::socket_operation::<alloc::vec::Vec<u8>, usize, <core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_read::SocketRead>::socket_read<alloc::vec::Vec<u8>>::{closure#0}::{closure#0}>::{closure#0} (inlined)
+               |                     |          
+               |                      --3.36%--<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::socket_operation::<alloc::vec::Vec<u8>, usize, <core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_read::SocketRead>::socket_read<alloc::vec::Vec<u8>>::{closure#0}::{closure#0}>::{closure#0}::{closure#0} (inlined)
+               |          
+                --2.20%--<core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_write::SocketWrite>::socket_write::<core_scheduler::buffer_slice::BufferSlice<alloc::vec::Vec<u8>>>::{closure#0} (inlined)
+
+     5.68%     0.00%  [.] <core_scheduler_tokio::task_service::TaskFuture<core_scheduler_echo_benchmark::server::scheduler_server<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0}::{closure#1}> as core::future::future::Future>::poll::{closure#0} (inlined)                                                                                                                                                                                                                                                                  -      -            
+            |
+            ---core_scheduler_echo_benchmark::server::scheduler_server::<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0}::{closure#1} (inlined)
+               core_scheduler_echo_benchmark::server::echo::<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0} (inlined)
+               |          
+               |--3.41%--<core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_read::SocketRead>::socket_read::<alloc::vec::Vec<u8>>::{closure#0} (inlined)
+               |          |          
+               |           --3.39%--<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::socket_operation::<alloc::vec::Vec<u8>, usize, <core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_read::SocketRead>::socket_read<alloc::vec::Vec<u8>>::{closure#0}::{closure#0}>::{closure#0} (inlined)
+               |                     |          
+               |                      --3.36%--<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::socket_operation::<alloc::vec::Vec<u8>, usize, <core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_read::SocketRead>::socket_read<alloc::vec::Vec<u8>>::{closure#0}::{closure#0}>::{closure#0}::{closure#0} (inlined)
+               |          
+                --2.20%--<core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_write::SocketWrite>::socket_write::<core_scheduler::buffer_slice::BufferSlice<alloc::vec::Vec<u8>>>::{closure#0} (inlined)
+
+     5.68%     0.00%  [.] core_scheduler_echo_benchmark::server::scheduler_server::<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0}::{closure#1} (inlined)                                                                                                                                                                                                                                                                                                                                                                     -      -            
+            |
+            ---core_scheduler_echo_benchmark::server::echo::<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0} (inlined)
+               |          
+               |--3.41%--<core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_read::SocketRead>::socket_read::<alloc::vec::Vec<u8>>::{closure#0} (inlined)
+               |          |          
+               |           --3.39%--<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::socket_operation::<alloc::vec::Vec<u8>, usize, <core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_read::SocketRead>::socket_read<alloc::vec::Vec<u8>>::{closure#0}::{closure#0}>::{closure#0} (inlined)
+               |                     |          
+               |                      --3.36%--<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::socket_operation::<alloc::vec::Vec<u8>, usize, <core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_read::SocketRead>::socket_read<alloc::vec::Vec<u8>>::{closure#0}::{closure#0}>::{closure#0}::{closure#0} (inlined)
+               |          
+                --2.20%--<core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_write::SocketWrite>::socket_write::<core_scheduler::buffer_slice::BufferSlice<alloc::vec::Vec<u8>>>::{closure#0} (inlined)
+
+     5.68%     0.00%  [.] core_scheduler_echo_benchmark::server::echo::<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::{closure#0} (inlined)                                                                                                                                                                                                                                                                                                                                                                                              -      -            
+            |          
+            |--3.41%--<core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_read::SocketRead>::socket_read::<alloc::vec::Vec<u8>>::{closure#0} (inlined)
+            |          |          
+            |           --3.39%--<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::socket_operation::<alloc::vec::Vec<u8>, usize, <core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_read::SocketRead>::socket_read<alloc::vec::Vec<u8>>::{closure#0}::{closure#0}>::{closure#0} (inlined)
+            |                     |          
+            |                      --3.36%--<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::socket_operation::<alloc::vec::Vec<u8>, usize, <core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_read::SocketRead>::socket_read<alloc::vec::Vec<u8>>::{closure#0}::{closure#0}>::{closure#0}::{closure#0} (inlined)
+            |          
+             --2.20%--<core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_write::SocketWrite>::socket_write::<core_scheduler::buffer_slice::BufferSlice<alloc::vec::Vec<u8>>>::{closure#0} (inlined)
+
+     5.50%     5.50%  [.] tokio::runtime::task::waker::wake_by_val                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 -      -            
+            |          
+             --2.63%--tokio::runtime::task::waker::wake_by_val
+                       <tokio::runtime::task::raw::RawTask>::wake_by_val (inlined)
+                       <tokio::runtime::task::raw::RawTask>::drop_reference (inlined)
+                       <tokio::runtime::task::state::State>::ref_dec (inlined)
+                       <tokio::runtime::task::state::Snapshot>::ref_count (inlined)
+
+     5.20%     4.49%  [.] <tokio::runtime::scheduler::multi_thread::worker::Context>::run                                                                                                                                                                                                                                                                                                                                                                                                                                                          -      -            
+            |          
+             --2.68%--<tokio::runtime::scheduler::multi_thread::worker::Context>::run
+
+     4.91%     4.91%  [.] <tokio::runtime::io::scheduled_io::ScheduledIo>::poll_readiness                                                                                                                                                                                                                                                                                                                                                                                                                                                          -      -            
+     4.18%     4.18%  [.] <tokio::runtime::io::registration::Registration>::clear_readiness                                                                                                                                                                                                                                                                                                                                                                                                                                                        -      -            
+            |          
+             --2.04%--<tokio::runtime::io::registration::Registration>::clear_readiness
+                       <tokio::runtime::io::scheduled_io::ScheduledIo>::clear_readiness (inlined)
+                       <tokio::runtime::io::scheduled_io::ScheduledIo>::set_readiness::<<tokio::runtime::io::scheduled_io::ScheduledIo>::clear_readiness::{closure#0}> (inlined)
+                       <tokio::loom::std::atomic_usize::AtomicUsize>::fetch_update::<<tokio::runtime::io::scheduled_io::ScheduledIo>::set_readiness<<tokio::runtime::io::scheduled_io::ScheduledIo>::clear_readiness::{closure#0}>::{closure#0}> (inlined)
+                       <core::sync::atomic::Atomic<usize>>::fetch_update::<<tokio::runtime::io::scheduled_io::ScheduledIo>::set_readiness<<tokio::runtime::io::scheduled_io::ScheduledIo>::clear_readiness::{closure#0}>::{closure#0}> (inlined)
+                       <core::sync::atomic::Atomic<usize>>::try_update::<<tokio::runtime::io::scheduled_io::ScheduledIo>::set_readiness<<tokio::runtime::io::scheduled_io::ScheduledIo>::clear_readiness::{closure#0}>::{closure#0}> (inlined)
+
+     4.01%     4.01%  [.] <tokio::runtime::io::scheduled_io::ScheduledIo>::wake                                                                                                                                                                                                                                                                                                                                                                                                                                                                    -      -            
+     3.51%     0.00%  [.] <core_scheduler_tokio::tokio_scheduler::TokioScheduler>::socket_operation::<alloc::vec::Vec<u8>, usize, <core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_read::SocketRead>::socket_read<alloc::vec::Vec<u8>>::{closure#0}::{closure#0}>::{closure#0}::{closure#0}::{closure#0} (inlined)                                                                                                                                                                                                 -      -            
+            |          
+             --3.48%--<core_scheduler_tokio::tokio_socket::TokioSocket>::io::<usize, <core_scheduler_tokio::tokio_scheduler::TokioScheduler>::socket_operation<alloc::vec::Vec<u8>, usize, <core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_read::SocketRead>::socket_read<alloc::vec::Vec<u8>>::{closure#0}::{closure#0}>::{closure#0}::{closure#0}::{closure#1}>::{closure#0} (inlined)
+
+     3.48%     0.00%  [.] <core_scheduler_tokio::tokio_socket::TokioSocket>::io::<usize, <core_scheduler_tokio::tokio_scheduler::TokioScheduler>::socket_operation<alloc::vec::Vec<u8>, usize, <core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_read::SocketRead>::socket_read<alloc::vec::Vec<u8>>::{closure#0}::{closure#0}>::{closure#0}::{closure#0}::{closure#1}>::{closure#0} (inlined)                                                                                                                      -      -            
+     3.44%     0.08%  [.] send                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     -      -            
+            |          
+             --3.40%--send
+                       |          
+                        --3.32%--0x7f5ce74a08f2
+                                  |          
+                                   --3.29%--0xffffffff9de0012f
+                                             |          
+                                              --2.97%--0xffffffff9f389afa
+                                                        |          
+                                                         --2.94%--0xffffffff9f06ed64
+                                                                   |          
+                                                                    --2.14%--0xffffffff9f06ebbe
+
+     3.41%     0.00%  [.] <core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_read::SocketRead>::socket_read::<alloc::vec::Vec<u8>>::{closure#0} (inlined)                                                                                                                                                                                                                                                                                                                                                            -      -            
+            |          
+             --3.39%--<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::socket_operation::<alloc::vec::Vec<u8>, usize, <core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_read::SocketRead>::socket_read<alloc::vec::Vec<u8>>::{closure#0}::{closure#0}>::{closure#0} (inlined)
+                       |          
+                        --3.36%--<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::socket_operation::<alloc::vec::Vec<u8>, usize, <core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_read::SocketRead>::socket_read<alloc::vec::Vec<u8>>::{closure#0}::{closure#0}>::{closure#0}::{closure#0} (inlined)
+
+     3.39%     0.00%  [.] <core_scheduler_tokio::tokio_scheduler::TokioScheduler>::socket_operation::<alloc::vec::Vec<u8>, usize, <core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_read::SocketRead>::socket_read<alloc::vec::Vec<u8>>::{closure#0}::{closure#0}>::{closure#0} (inlined)                                                                                                                                                                                                                           -      -            
+            |          
+             --3.36%--<core_scheduler_tokio::tokio_scheduler::TokioScheduler>::socket_operation::<alloc::vec::Vec<u8>, usize, <core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_read::SocketRead>::socket_read<alloc::vec::Vec<u8>>::{closure#0}::{closure#0}>::{closure#0}::{closure#0} (inlined)
+
+     3.36%     0.00%  [.] <core_scheduler_tokio::tokio_scheduler::TokioScheduler>::socket_operation::<alloc::vec::Vec<u8>, usize, <core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_read::SocketRead>::socket_read<alloc::vec::Vec<u8>>::{closure#0}::{closure#0}>::{closure#0}::{closure#0} (inlined)                                                                                                                                                                                                              -      -            
+     3.14%     3.14%  [.] <tokio::runtime::task::state::State>::transition_to_running                                                                                                                                                                                                                                                                                                                                                                                                                                                              -      -            
+     2.99%     2.99%  [.] tokio::runtime::task::waker::clone_waker                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 -      -            
+     2.94%     0.00%  [.] 0xffffffff9f06ed64                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       -      -            
+            |          
+             --2.14%--0xffffffff9f06ebbe
+
+     2.63%     0.00%  [.] <tokio::runtime::task::raw::RawTask>::wake_by_val (inlined)                                                                                                                                                                                                                                                                                                                                                                                                                                                              -      -            
+            |
+            ---<tokio::runtime::task::raw::RawTask>::drop_reference (inlined)
+               <tokio::runtime::task::state::State>::ref_dec (inlined)
+               <tokio::runtime::task::state::Snapshot>::ref_count (inlined)
+
+     2.63%     0.00%  [.] <tokio::runtime::task::raw::RawTask>::drop_reference (inlined)                                                                                                                                                                                                                                                                                                                                                                                                                                                           -      -            
+            |
+            ---<tokio::runtime::task::state::State>::ref_dec (inlined)
+               <tokio::runtime::task::state::Snapshot>::ref_count (inlined)
+
+     2.63%     0.00%  [.] <tokio::runtime::task::state::State>::ref_dec (inlined)                                                                                                                                                                                                                                                                                                                                                                                                                                                                  -      -            
+            |
+            ---<tokio::runtime::task::state::Snapshot>::ref_count (inlined)
+
+     2.63%     0.00%  [.] <tokio::runtime::task::state::Snapshot>::ref_count (inlined)                                                                                                                                                                                                                                                                                                                                                                                                                                                             -      -            
+     2.53%     2.53%  [.] <tokio::runtime::io::driver::Driver>::turn                                                                                                                                                                                                                                                                                                                                                                                                                                                                               -      -            
+     2.51%     0.00%  [.] <tokio::runtime::task::state::State>::fetch_update_action::<<tokio::runtime::task::state::State>::transition_to_idle::{closure#0}, tokio::runtime::task::state::TransitionToIdle> (inlined)                                                                                                                                                                                                                                                                                                                              -      -            
+     2.47%     0.00%  [.] 0x00000000000000c7                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       -      -            
+            |
+            ---<tokio::runtime::task::state::State>::transition_to_idle
+               <tokio::runtime::task::state::State>::fetch_update_action::<<tokio::runtime::task::state::State>::transition_to_idle::{closure#0}, tokio::runtime::task::state::TransitionToIdle> (inlined)
+
+     2.39%     0.00%  [k] 0x00000000000affff                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       -      -            
+     2.37%     2.37%  [.] <tokio::runtime::task::state::State>::transition_to_notified_by_val                                                                                                                                                                                                                                                                                                                                                                                                                                                      -      -            
+     2.20%     0.00%  [.] <core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_write::SocketWrite>::socket_write::<core_scheduler::buffer_slice::BufferSlice<alloc::vec::Vec<u8>>>::{closure#0} (inlined)                                                                                                                                                                                                                                                                                                              -      -            
+     2.14%     0.00%  [.] 0xffffffff9f06ebbe                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       -      -            
+     2.04%     0.00%  [.] <tokio::runtime::io::scheduled_io::ScheduledIo>::clear_readiness (inlined)                                                                                                                                                                                                                                                                                                                                                                                                                                               -      -            
+            |
+            ---<tokio::runtime::io::scheduled_io::ScheduledIo>::set_readiness::<<tokio::runtime::io::scheduled_io::ScheduledIo>::clear_readiness::{closure#0}> (inlined)
+               <tokio::loom::std::atomic_usize::AtomicUsize>::fetch_update::<<tokio::runtime::io::scheduled_io::ScheduledIo>::set_readiness<<tokio::runtime::io::scheduled_io::ScheduledIo>::clear_readiness::{closure#0}>::{closure#0}> (inlined)
+               <core::sync::atomic::Atomic<usize>>::fetch_update::<<tokio::runtime::io::scheduled_io::ScheduledIo>::set_readiness<<tokio::runtime::io::scheduled_io::ScheduledIo>::clear_readiness::{closure#0}>::{closure#0}> (inlined)
+               <core::sync::atomic::Atomic<usize>>::try_update::<<tokio::runtime::io::scheduled_io::ScheduledIo>::set_readiness<<tokio::runtime::io::scheduled_io::ScheduledIo>::clear_readiness::{closure#0}>::{closure#0}> (inlined)
+
+     2.04%     0.00%  [.] <tokio::runtime::io::scheduled_io::ScheduledIo>::set_readiness::<<tokio::runtime::io::scheduled_io::ScheduledIo>::clear_readiness::{closure#0}> (inlined)                                                                                                                                                                                                                                                                                                                                                                -      -            
+            |
+            ---<tokio::loom::std::atomic_usize::AtomicUsize>::fetch_update::<<tokio::runtime::io::scheduled_io::ScheduledIo>::set_readiness<<tokio::runtime::io::scheduled_io::ScheduledIo>::clear_readiness::{closure#0}>::{closure#0}> (inlined)
+               <core::sync::atomic::Atomic<usize>>::fetch_update::<<tokio::runtime::io::scheduled_io::ScheduledIo>::set_readiness<<tokio::runtime::io::scheduled_io::ScheduledIo>::clear_readiness::{closure#0}>::{closure#0}> (inlined)
+               <core::sync::atomic::Atomic<usize>>::try_update::<<tokio::runtime::io::scheduled_io::ScheduledIo>::set_readiness<<tokio::runtime::io::scheduled_io::ScheduledIo>::clear_readiness::{closure#0}>::{closure#0}> (inlined)
+
+     2.04%     0.00%  [.] <tokio::loom::std::atomic_usize::AtomicUsize>::fetch_update::<<tokio::runtime::io::scheduled_io::ScheduledIo>::set_readiness<<tokio::runtime::io::scheduled_io::ScheduledIo>::clear_readiness::{closure#0}>::{closure#0}> (inlined)                                                                                                                                                                                                                                                                                      -      -            
+            |
+            ---<core::sync::atomic::Atomic<usize>>::fetch_update::<<tokio::runtime::io::scheduled_io::ScheduledIo>::set_readiness<<tokio::runtime::io::scheduled_io::ScheduledIo>::clear_readiness::{closure#0}>::{closure#0}> (inlined)
+               <core::sync::atomic::Atomic<usize>>::try_update::<<tokio::runtime::io::scheduled_io::ScheduledIo>::set_readiness<<tokio::runtime::io::scheduled_io::ScheduledIo>::clear_readiness::{closure#0}>::{closure#0}> (inlined)
+
+     2.04%     0.00%  [.] <core::sync::atomic::Atomic<usize>>::fetch_update::<<tokio::runtime::io::scheduled_io::ScheduledIo>::set_readiness<<tokio::runtime::io::scheduled_io::ScheduledIo>::clear_readiness::{closure#0}>::{closure#0}> (inlined)                                                                                                                                                                                                                                                                                                -      -            
+            |
+            ---<core::sync::atomic::Atomic<usize>>::try_update::<<tokio::runtime::io::scheduled_io::ScheduledIo>::set_readiness<<tokio::runtime::io::scheduled_io::ScheduledIo>::clear_readiness::{closure#0}>::{closure#0}> (inlined)
+
+     2.04%     0.00%  [.] <core::sync::atomic::Atomic<usize>>::try_update::<<tokio::runtime::io::scheduled_io::ScheduledIo>::set_readiness<<tokio::runtime::io::scheduled_io::ScheduledIo>::clear_readiness::{closure#0}>::{closure#0}> (inlined)                                                                                                                                                                                                                                                                                                  -      -            
+
+
+#
+# (Tip: To show information about system the samples were collected on use perf report --header)
+#
