@@ -253,7 +253,6 @@ fn run_loop(
         }
         let runnable = match find_work(&shared, iteration) {
             Steal::Empty => {
-                drive(&mut driver, Some(Duration::ZERO));
                 worker.sleeping.store(true, Ordering::SeqCst);
                 shared.idle_workers.fetch_add(1, Ordering::SeqCst);
                 // Pair with the enqueuer's fence: either this search observes its queued work, or the enqueuer observes an idle worker.
