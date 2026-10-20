@@ -155,63 +155,33 @@ fn take_stolen<Value>(result: Steal<Value>, retry: &mut bool) -> Option<Value> {
     }
 }
 
-enum IdleSearch {
-    Runnable(Runnable),
-    Retry,
-    Empty,
-}
-
-enum SearchResult {
-    Runnable(Runnable),
-    Retry,
-    Empty,
-}
-
-fn classify_search(result: Steal<Runnable>) -> SearchResult {
-    match result {
-        Steal::Success(runnable) => SearchResult::Runnable(runnable),
-        Steal::Retry => {
-            thread::yield_now();
-            SearchResult::Retry
-        }
-        Steal::Empty => SearchResult::Empty,
+fn yield_on_retry(result: Steal<Runnable>) -> Steal<Runnable> {
+    if matches!(result, Steal::Retry) {
+        thread::yield_now();
     }
+    result
 }
 
 fn finish_idle_search(
     worker: &WorkerState,
     idle_workers: &std::sync::atomic::AtomicUsize,
     result: Steal<Runnable>,
-    should_park: &dyn Fn() -> bool,
-    park: &dyn Fn(),
-) -> IdleSearch {
-    match result {
-        Steal::Success(runnable) => {
-            worker.sleeping.store(false, Ordering::SeqCst);
-            idle_workers.fetch_sub(1, Ordering::SeqCst);
-            IdleSearch::Runnable(runnable)
-        }
-        Steal::Retry => {
-            worker.sleeping.store(false, Ordering::SeqCst);
-            idle_workers.fetch_sub(1, Ordering::SeqCst);
-            IdleSearch::Retry
-        }
+    should_park: impl FnOnce() -> bool,
+    park: impl FnOnce(),
+) -> Option<Runnable> {
+    let runnable = match result {
+        Steal::Success(runnable) => Some(runnable),
+        Steal::Retry => None,
         Steal::Empty => {
             if should_park() {
                 park();
             }
-            worker.sleeping.store(false, Ordering::SeqCst);
-            idle_workers.fetch_sub(1, Ordering::SeqCst);
-            IdleSearch::Empty
+            None
         }
-    }
-}
-
-fn take_idle_runnable(result: IdleSearch) -> Option<Runnable> {
-    match result {
-        IdleSearch::Runnable(runnable) => Some(runnable),
-        IdleSearch::Retry | IdleSearch::Empty => None,
-    }
+    };
+    worker.sleeping.store(false, Ordering::SeqCst);
+    idle_workers.fetch_sub(1, Ordering::SeqCst);
+    runnable
 }
 
 fn find_work(shared: &Shared, iteration: usize) -> Steal<Runnable> {
@@ -292,29 +262,24 @@ fn run_loop(
         if iteration % EXTERNAL_INTERVAL == 1 {
             drive(&mut driver, Some(Duration::ZERO));
         }
-        let search_result = classify_search(find_work(&shared, iteration));
-        let should_park = matches!(&search_result, SearchResult::Empty);
-        let runnable = match search_result {
-            SearchResult::Runnable(runnable) => Some(runnable),
-            SearchResult::Retry | SearchResult::Empty => None,
-        };
-        let runnable = if should_park {
-            drive(&mut driver, Some(Duration::ZERO));
-            worker.sleeping.store(true, Ordering::SeqCst);
-            shared.idle_workers.fetch_add(1, Ordering::SeqCst);
-            // Pair with the enqueuer's fence: either this search observes its queued work, or the enqueuer observes an idle worker.
-            std::sync::atomic::fence(Ordering::SeqCst);
-            // Recheck after publishing the sleeping flag. An unpark token remains available if work arrives immediately before park().
-            let driver = RefCell::new(&mut driver);
-            take_idle_runnable(finish_idle_search(
-                worker,
-                &shared.idle_workers,
-                find_work(&shared, iteration),
-                &|| !shared.finished(),
-                &|| drive(&mut driver.borrow_mut(), None),
-            ))
-        } else {
-            runnable
+        let runnable = match yield_on_retry(find_work(&shared, iteration)) {
+            Steal::Success(runnable) => Some(runnable),
+            Steal::Retry => None,
+            Steal::Empty => {
+                drive(&mut driver, Some(Duration::ZERO));
+                worker.sleeping.store(true, Ordering::SeqCst);
+                shared.idle_workers.fetch_add(1, Ordering::SeqCst);
+                // Pair with the enqueuer's fence: either this search observes its queued work, or the enqueuer observes an idle worker.
+                std::sync::atomic::fence(Ordering::SeqCst);
+                // Recheck after publishing the sleeping flag. An unpark token remains available if work arrives immediately before park().
+                finish_idle_search(
+                    worker,
+                    &shared.idle_workers,
+                    find_work(&shared, iteration),
+                    || !shared.finished(),
+                    || drive(&mut driver, None),
+                )
+            }
         };
         let Some(runnable) = runnable else {
             continue;

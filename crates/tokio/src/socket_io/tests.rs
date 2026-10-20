@@ -10,6 +10,17 @@ thread_local! {
     pub(super) static WAIT_ERROR: std::cell::Cell<Option<io::ErrorKind>> = const { std::cell::Cell::new(None) };
 }
 
+// These native syscall fixtures bypass TokioSocket, which normally sets the mode.
+fn open(
+    domain: SocketDomain,
+    kind: SocketType,
+    protocol: Option<SocketProtocol>,
+) -> io::Result<Socket> {
+    let socket = super::open(domain, kind, protocol)?;
+    socket.set_nonblocking(true)?;
+    Ok(socket)
+}
+
 fn retry<T>(mut operation: impl FnMut() -> io::Result<T>) -> io::Result<T> {
     let deadline = Instant::now() + Duration::from_secs(5);
     loop {

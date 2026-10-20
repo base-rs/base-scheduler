@@ -1450,7 +1450,7 @@ fn idle_ring_waits_honor_finite_timeouts_and_rearm_after_notifications() {
             assert!(!driver.turn(None).unwrap());
             assert!(BEFORE_SYSCALL.with(|hook| hook.borrow().is_none()));
         }
-        // Collect and rearm PollAdd, then drain the eventfd counter.
+        // Collect PollAdd, drain its counter, then rearm.
         assert!(!driver.turn(Some(Duration::ZERO)).unwrap());
         let _failure = Failures::new([("wait", io::ErrorKind::Interrupted.into())]);
         for _ in 0..4 {
@@ -1609,6 +1609,77 @@ fn idle_waits_do_not_read_the_eventfd_without_a_notification_completion() {
         .unwrap();
     assert!(!driver.turn(Some(Duration::ZERO)).unwrap());
     assert!(FAILURES.with(|failures| failures.borrow().is_empty()));
+    drain(&selector, &mut driver);
+}
+
+#[test]
+fn one_notification_read_clears_coalesced_wakes_without_a_second_read() {
+    let (selector, mut driver) = pair(1);
+    for _ in 0..3 {
+        driver.waker().wake_by_ref();
+    }
+    {
+        let _failures = Failures::new([]);
+        FAILURES.with(|failures| {
+            failures.borrow_mut().extend([
+                ("notification-read", None),
+                (
+                    "notification-read",
+                    Some(io::ErrorKind::PermissionDenied.into()),
+                ),
+            ]);
+        });
+        driver
+            .reactor
+            .as_ref()
+            .unwrap()
+            .drain_notification()
+            .unwrap();
+        assert_eq!(FAILURES.with(|failures| failures.borrow().len()), 1);
+    }
+    // All three notifications were consumed, so the next real read sees an empty eventfd.
+    let mut value = 0u64;
+    // SAFETY: This synchronous read targets a live eight-byte value and cannot retain its pointer.
+    assert_eq!(
+        unsafe {
+            libc::read(
+                selector.controllers[0].notification.as_raw_fd(),
+                (&mut value as *mut u64).cast(),
+                8,
+            )
+        },
+        -1
+    );
+    assert_eq!(io::Error::last_os_error().kind(), io::ErrorKind::WouldBlock);
+    drain(&selector, &mut driver);
+}
+
+#[test]
+fn interrupted_notification_reads_yield_without_losing_the_wake() {
+    let (selector, mut driver) = pair(1);
+    driver.waker().wake_by_ref();
+    {
+        let _failures = Failures::new(
+            (0..17).map(|_| ("notification-read", io::ErrorKind::Interrupted.into())),
+        );
+        driver
+            .reactor
+            .as_ref()
+            .unwrap()
+            .drain_notification()
+            .unwrap();
+        assert_eq!(FAILURES.with(|failures| failures.borrow().len()), 1);
+    }
+    // The unread counter still completes the next poll after the bounded interrupted retries.
+    assert!(!driver.turn(Some(Duration::ZERO)).unwrap());
+    driver
+        .reactor
+        .as_mut()
+        .unwrap()
+        .ring
+        .submit_and_wait(1)
+        .unwrap();
+    assert!(!driver.turn(Some(Duration::ZERO)).unwrap());
     drain(&selector, &mut driver);
 }
 
@@ -1836,14 +1907,12 @@ fn deferred_cancellations_prevent_waiting_while_originals_fill_the_submission_qu
             _ => panic!("expected queued read"),
         };
         // Stage an idle armed notification before inserting the original. Removing this initial remote wake keeps a notification CQ from masking the deferred-cancellation wait decision.
-        assert!(
-            driver
-                .reactor
-                .as_ref()
-                .unwrap()
-                .drain_notification()
-                .unwrap()
-        );
+        driver
+            .reactor
+            .as_ref()
+            .unwrap()
+            .drain_notification()
+            .unwrap();
         assert!(!driver.turn(Some(Duration::from_millis(1))).unwrap());
         assert!(driver.reactor.as_ref().unwrap().notification_armed);
         let identifier = request.identifier();

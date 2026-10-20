@@ -93,7 +93,7 @@ impl TokioSocket {
                 #[cfg(windows)]
                 {
                     let _ = runtime;
-                    RegisteredSocket::new(socket)
+                    RegisteredSocket::new_nonblocking(socket)
                 }
             },
         )
@@ -141,15 +141,7 @@ impl TokioSocket {
     }
 
     pub(super) fn get_ref(&self) -> &socket2::Socket {
-        #[cfg(unix)]
-        {
-            self.inner.get_ref()
-        }
-
-        #[cfg(windows)]
-        {
-            self.inner.get_ref()
-        }
+        self.inner.get_ref()
     }
 
     #[cfg(test)]
