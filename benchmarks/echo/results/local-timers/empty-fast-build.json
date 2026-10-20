@@ -1,0 +1,9 @@
+{
+  "source": "0d2c4f1c3fa0c2e502531880dab0acba18f097c0",
+  "base_patch_sha256": "72576d24fc0d85e2719431f20054cf651c16bdf67907988bd1c0565ba3bdc7bc",
+  "additional_patch_sha256": "82cda3f18f175536df9a758a4fb6a04236738869f505ef1ad89e71afa108ba55",
+  "binary": {
+    "path": "/home/samuel/.cache/core-scheduler-local-timers-final/empty-fast-echo",
+    "sha256": "0839f3f9556e79559c41e10350fdb451ea92c5ca0745f24808013527acc65590"
+  }
+}

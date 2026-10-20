@@ -1,0 +1,20 @@
+{
+  "collected_utc": "2026-10-20T19:53:20Z",
+  "hostname": "aiko",
+  "platform": "Linux-7.2.6-arch2-1-x86_64-with-glibc2.44",
+  "cpu_topology": "CPU CORE SOCKET NODE L1d:L1i:L2:L3\n  0    0      0    0 0:0:0:0\n  1    1      0    0 1:1:1:0\n  2    2      0    0 2:2:2:0\n  3    3      0    0 3:3:3:0\n  4    4      0    0 4:4:4:0\n  5    5      0    0 5:5:5:0\n  6    6      0    0 6:6:6:0\n  7    7      0    0 7:7:7:0\n  8    8      0    0 8:8:8:1\n  9    9      0    0 9:9:9:1\n 10   10      0    0 10:10:10:1\n 11   11      0    0 11:11:11:1\n 12   12      0    0 12:12:12:1\n 13   13      0    0 13:13:13:1\n 14   14      0    0 14:14:14:1\n 15   15      0    0 15:15:15:1\n 16    0      0    0 0:0:0:0\n 17    1      0    0 1:1:1:0\n 18    2      0    0 2:2:2:0\n 19    3      0    0 3:3:3:0\n 20    4      0    0 4:4:4:0\n 21    5      0    0 5:5:5:0\n 22    6      0    0 6:6:6:0\n 23    7      0    0 7:7:7:0\n 24    8      0    0 8:8:8:1\n 25    9      0    0 9:9:9:1\n 26   10      0    0 10:10:10:1\n 27   11      0    0 11:11:11:1\n 28   12      0    0 12:12:12:1\n 29   13      0    0 13:13:13:1\n 30   14      0    0 14:14:14:1\n 31   15      0    0 15:15:15:1\n",
+  "source_patch_verified_sha256": "72576d24fc0d85e2719431f20054cf651c16bdf67907988bd1c0565ba3bdc7bc",
+  "harness_sha256": "8f0a03b422f720a9c6b72cb466809213ebee744ac493b808de4af78f25f530e0",
+  "mixed_server_sha256": "ea81907a8355457c7969c2af08edc461be309cdbc16db694e4626d3832cf979b",
+  "compiler_environment_overrides_present": [],
+  "binaries": {
+    "before": {
+      "timers": "6102df169d331e42f77252250916e20c4247ae59c2aa006505f5b6fcd436453d",
+      "core-scheduler-echo-benchmark": "a7e4bc768a8ebcf373723081440835117a1bc226efb961bc3defac933a70d9da"
+    },
+    "local": {
+      "timers": "995f89cadd0712d25e39b70c1f1d3bc1fd9c5325adc1ead97e97e05dadfc4a6b",
+      "core-scheduler-echo-benchmark": "bab49ff561ed559944ddf92a7acebb734acfaae8c919c9e0257c94d50da9e0ac"
+    }
+  }
+}
