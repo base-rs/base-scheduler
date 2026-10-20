@@ -2,6 +2,8 @@
 
 This prototype combined lighter Tokio readiness waiting with direct io_uring idle waits against the implementation at `6690045`. The native interrupt/wait overhaul was rejected after a serial owned-I/O regression; see the [selected implementation and final confirmation](socket-performance.md). Both controls use the same benchmark source and an unchanged client executable. The [raw results](results/socket-performance/aiko.json) retain every measurement; the [runner](results/socket-performance/run.py) serializes workloads with an exclusive host lock.
 
+The later [owner-wake follow-up](self-interrupts.md) revisits direct ring waiting with local wake suppression, a corrected notification lifecycle, and a synchronous owned-send fast path. Those results are separate from this rejected prototype.
+
 ## Implementation and io-event review
 
 The Tokio adapter now reserves one polling waker per socket direction, avoiding the independent readiness-waiter list for the usual single reader and writer. Concurrent operations use Tokio's existing independent waiters. Dropping a reservation releases it; forgetting one leaves later operations on the independent waiter path. Lazy registration remains necessary to avoid permanently cached hangup readiness on unconnected Linux sockets.

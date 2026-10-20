@@ -1,0 +1,5 @@
+NOTIFICATION_COUNTERS {"owner_write_attempt":0,"remote_write_attempt":9673,"owner_write_success":0,"remote_write_success":9673,"owner_wake_avoided":3783,"payload_cqe":1981682,"notification_cqe":12389}
+NOTIFICATION_COUNTERS {"owner_write_attempt":0,"remote_write_attempt":9398,"owner_write_success":0,"remote_write_success":9398,"owner_wake_avoided":3346,"payload_cqe":2002125,"notification_cqe":6663}
+NOTIFICATION_COUNTERS {"owner_write_attempt":0,"remote_write_attempt":9427,"owner_write_success":0,"remote_write_success":9427,"owner_wake_avoided":3527,"payload_cqe":1997711,"notification_cqe":8220}
+NOTIFICATION_COUNTERS {"owner_write_attempt":0,"remote_write_attempt":9424,"owner_write_success":0,"remote_write_success":9424,"owner_wake_avoided":3483,"payload_cqe":2006603,"notification_cqe":10599}
+NOTIFICATION_COUNTERS {"owner_write_attempt":0,"remote_write_attempt":130,"owner_write_success":0,"remote_write_success":130,"owner_wake_avoided":0,"payload_cqe":0,"notification_cqe":0}

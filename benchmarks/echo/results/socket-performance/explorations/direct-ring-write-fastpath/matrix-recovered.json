@@ -1,0 +1,781 @@
+{
+  "recovery": {
+    "reason": "A subsequent serial-five runner reused the matrix aggregate output path and overwrote the original matrix aiko.json. This report is reconstructed from the completed contemporaneous run-matrix.log.",
+    "source_log": "../run-matrix.log",
+    "source_log_sha256": "45d95e84c3805afab65b138576ab31a7d479ca564c8ed8f81a1f20894de46e0f",
+    "sample_requests_per_second_precision": "Rounded to nearest integer by original log print; error <= 0.5 request/s",
+    "sample_voluntary_switches_precision": "Exact integer counts",
+    "throughput_medians_precision": "Full original Python float print from the completed run summary; not recomputed from rounded samples",
+    "unavailable_fields": [
+      "per-sample RTT statistics",
+      "per-sample server user/system CPU times",
+      "per-sample client resource usage",
+      "per-sample lifecycle elapsed time"
+    ],
+    "recovered_utc": "2026-10-20T03:20:47Z"
+  },
+  "source_before": "63da7551abbd777ac0f746ae2530eb7968009fe4",
+  "source_after": "base_commit + archived source.patch",
+  "binaries": {
+    "control": {
+      "path": "/home/samuel/.cache/core-scheduler-direct-notification-write-fastpath/control",
+      "sha256": "abc161cde925e54c6f3fb3d7e70d4d77f4f21e055877e293c27eb2a532e4834f"
+    },
+    "plain_final": {
+      "path": "/home/samuel/.cache/core-scheduler-direct-notification-write-fastpath/benchmark",
+      "sha256": "103d4f6f0a263312edf55d48a97341c03c8f8ec4106940111a0752942629855f"
+    },
+    "client": {
+      "path": "/tmp/core-scheduler-profile-baseline/release/core-scheduler-echo-benchmark",
+      "sha256": "db6c914ab75011477ec6232e681046b1e75532cbaa1c81663bac984591675cf3"
+    }
+  },
+  "samples": [
+    {
+      "order": 1,
+      "variant": "after",
+      "backend": "iouring",
+      "repeat": 1,
+      "workers": 1,
+      "connections": 32,
+      "bytes": 4096,
+      "requests_per_second": 559910,
+      "server_cpu": {
+        "voluntary_switches": 366
+      }
+    },
+    {
+      "order": 2,
+      "variant": "after",
+      "backend": "iouring",
+      "repeat": 2,
+      "workers": 1,
+      "connections": 32,
+      "bytes": 4096,
+      "requests_per_second": 559441,
+      "server_cpu": {
+        "voluntary_switches": 101
+      }
+    },
+    {
+      "order": 3,
+      "variant": "before",
+      "backend": "iouring",
+      "repeat": 1,
+      "workers": 1,
+      "connections": 32,
+      "bytes": 64,
+      "requests_per_second": 529995,
+      "server_cpu": {
+        "voluntary_switches": 100
+      }
+    },
+    {
+      "order": 4,
+      "variant": "after",
+      "backend": "iouring-poll",
+      "repeat": 2,
+      "workers": 4,
+      "connections": 128,
+      "bytes": 4096,
+      "requests_per_second": 1762113,
+      "server_cpu": {
+        "voluntary_switches": 44654
+      }
+    },
+    {
+      "order": 5,
+      "variant": "before",
+      "backend": "iouring",
+      "repeat": 3,
+      "workers": 4,
+      "connections": 128,
+      "bytes": 4096,
+      "requests_per_second": 1626834,
+      "server_cpu": {
+        "voluntary_switches": 52591
+      }
+    },
+    {
+      "order": 6,
+      "variant": "after",
+      "backend": "iouring",
+      "repeat": 1,
+      "workers": 1,
+      "connections": 32,
+      "bytes": 64,
+      "requests_per_second": 627562,
+      "server_cpu": {
+        "voluntary_switches": 113
+      }
+    },
+    {
+      "order": 7,
+      "variant": "after",
+      "backend": "iouring-poll",
+      "repeat": 3,
+      "workers": 1,
+      "connections": 32,
+      "bytes": 64,
+      "requests_per_second": 563565,
+      "server_cpu": {
+        "voluntary_switches": 98
+      }
+    },
+    {
+      "order": 8,
+      "variant": "before",
+      "backend": "iouring-poll",
+      "repeat": 2,
+      "workers": 1,
+      "connections": 32,
+      "bytes": 64,
+      "requests_per_second": 564096,
+      "server_cpu": {
+        "voluntary_switches": 102
+      }
+    },
+    {
+      "order": 9,
+      "variant": "after",
+      "backend": "iouring",
+      "repeat": 2,
+      "workers": 4,
+      "connections": 128,
+      "bytes": 4096,
+      "requests_per_second": 1760982,
+      "server_cpu": {
+        "voluntary_switches": 13246
+      }
+    },
+    {
+      "order": 10,
+      "variant": "after",
+      "backend": "iouring",
+      "repeat": 2,
+      "workers": 4,
+      "connections": 128,
+      "bytes": 64,
+      "requests_per_second": 1976510,
+      "server_cpu": {
+        "voluntary_switches": 15579
+      }
+    },
+    {
+      "order": 11,
+      "variant": "before",
+      "backend": "iouring",
+      "repeat": 2,
+      "workers": 1,
+      "connections": 32,
+      "bytes": 64,
+      "requests_per_second": 534017,
+      "server_cpu": {
+        "voluntary_switches": 89
+      }
+    },
+    {
+      "order": 12,
+      "variant": "before",
+      "backend": "iouring",
+      "repeat": 3,
+      "workers": 4,
+      "connections": 128,
+      "bytes": 64,
+      "requests_per_second": 1782400,
+      "server_cpu": {
+        "voluntary_switches": 74399
+      }
+    },
+    {
+      "order": 13,
+      "variant": "before",
+      "backend": "iouring-poll",
+      "repeat": 3,
+      "workers": 1,
+      "connections": 32,
+      "bytes": 64,
+      "requests_per_second": 561774,
+      "server_cpu": {
+        "voluntary_switches": 108
+      }
+    },
+    {
+      "order": 14,
+      "variant": "before",
+      "backend": "iouring-poll",
+      "repeat": 3,
+      "workers": 4,
+      "connections": 128,
+      "bytes": 4096,
+      "requests_per_second": 1740179,
+      "server_cpu": {
+        "voluntary_switches": 28784
+      }
+    },
+    {
+      "order": 15,
+      "variant": "before",
+      "backend": "iouring-poll",
+      "repeat": 2,
+      "workers": 4,
+      "connections": 128,
+      "bytes": 64,
+      "requests_per_second": 1955956,
+      "server_cpu": {
+        "voluntary_switches": 23865
+      }
+    },
+    {
+      "order": 16,
+      "variant": "before",
+      "backend": "iouring-poll",
+      "repeat": 3,
+      "workers": 1,
+      "connections": 32,
+      "bytes": 4096,
+      "requests_per_second": 507671,
+      "server_cpu": {
+        "voluntary_switches": 90
+      }
+    },
+    {
+      "order": 17,
+      "variant": "after",
+      "backend": "iouring-poll",
+      "repeat": 2,
+      "workers": 1,
+      "connections": 32,
+      "bytes": 4096,
+      "requests_per_second": 504409,
+      "server_cpu": {
+        "voluntary_switches": 98
+      }
+    },
+    {
+      "order": 18,
+      "variant": "before",
+      "backend": "iouring-poll",
+      "repeat": 2,
+      "workers": 4,
+      "connections": 128,
+      "bytes": 4096,
+      "requests_per_second": 1746562,
+      "server_cpu": {
+        "voluntary_switches": 8389
+      }
+    },
+    {
+      "order": 19,
+      "variant": "after",
+      "backend": "iouring-poll",
+      "repeat": 2,
+      "workers": 1,
+      "connections": 32,
+      "bytes": 64,
+      "requests_per_second": 565945,
+      "server_cpu": {
+        "voluntary_switches": 167
+      }
+    },
+    {
+      "order": 20,
+      "variant": "after",
+      "backend": "iouring",
+      "repeat": 3,
+      "workers": 1,
+      "connections": 32,
+      "bytes": 4096,
+      "requests_per_second": 555509,
+      "server_cpu": {
+        "voluntary_switches": 111
+      }
+    },
+    {
+      "order": 21,
+      "variant": "before",
+      "backend": "iouring",
+      "repeat": 1,
+      "workers": 1,
+      "connections": 32,
+      "bytes": 4096,
+      "requests_per_second": 479236,
+      "server_cpu": {
+        "voluntary_switches": 112
+      }
+    },
+    {
+      "order": 22,
+      "variant": "before",
+      "backend": "iouring",
+      "repeat": 1,
+      "workers": 4,
+      "connections": 128,
+      "bytes": 4096,
+      "requests_per_second": 1600101,
+      "server_cpu": {
+        "voluntary_switches": 76807
+      }
+    },
+    {
+      "order": 23,
+      "variant": "before",
+      "backend": "iouring-poll",
+      "repeat": 1,
+      "workers": 4,
+      "connections": 128,
+      "bytes": 4096,
+      "requests_per_second": 1753895,
+      "server_cpu": {
+        "voluntary_switches": 19057
+      }
+    },
+    {
+      "order": 24,
+      "variant": "after",
+      "backend": "iouring-poll",
+      "repeat": 3,
+      "workers": 4,
+      "connections": 128,
+      "bytes": 4096,
+      "requests_per_second": 1742921,
+      "server_cpu": {
+        "voluntary_switches": 44984
+      }
+    },
+    {
+      "order": 25,
+      "variant": "after",
+      "backend": "iouring",
+      "repeat": 1,
+      "workers": 4,
+      "connections": 128,
+      "bytes": 4096,
+      "requests_per_second": 1745843,
+      "server_cpu": {
+        "voluntary_switches": 11514
+      }
+    },
+    {
+      "order": 26,
+      "variant": "before",
+      "backend": "iouring-poll",
+      "repeat": 2,
+      "workers": 1,
+      "connections": 32,
+      "bytes": 4096,
+      "requests_per_second": 506987,
+      "server_cpu": {
+        "voluntary_switches": 92
+      }
+    },
+    {
+      "order": 27,
+      "variant": "after",
+      "backend": "iouring-poll",
+      "repeat": 1,
+      "workers": 1,
+      "connections": 32,
+      "bytes": 64,
+      "requests_per_second": 566267,
+      "server_cpu": {
+        "voluntary_switches": 100
+      }
+    },
+    {
+      "order": 28,
+      "variant": "after",
+      "backend": "iouring-poll",
+      "repeat": 3,
+      "workers": 1,
+      "connections": 32,
+      "bytes": 4096,
+      "requests_per_second": 508186,
+      "server_cpu": {
+        "voluntary_switches": 80
+      }
+    },
+    {
+      "order": 29,
+      "variant": "after",
+      "backend": "iouring",
+      "repeat": 3,
+      "workers": 4,
+      "connections": 128,
+      "bytes": 4096,
+      "requests_per_second": 1747017,
+      "server_cpu": {
+        "voluntary_switches": 22199
+      }
+    },
+    {
+      "order": 30,
+      "variant": "after",
+      "backend": "iouring",
+      "repeat": 3,
+      "workers": 1,
+      "connections": 32,
+      "bytes": 64,
+      "requests_per_second": 626804,
+      "server_cpu": {
+        "voluntary_switches": 100
+      }
+    },
+    {
+      "order": 31,
+      "variant": "before",
+      "backend": "iouring",
+      "repeat": 2,
+      "workers": 4,
+      "connections": 128,
+      "bytes": 64,
+      "requests_per_second": 1788311,
+      "server_cpu": {
+        "voluntary_switches": 48289
+      }
+    },
+    {
+      "order": 32,
+      "variant": "before",
+      "backend": "iouring",
+      "repeat": 3,
+      "workers": 1,
+      "connections": 32,
+      "bytes": 4096,
+      "requests_per_second": 487147,
+      "server_cpu": {
+        "voluntary_switches": 103
+      }
+    },
+    {
+      "order": 33,
+      "variant": "before",
+      "backend": "iouring-poll",
+      "repeat": 1,
+      "workers": 1,
+      "connections": 32,
+      "bytes": 4096,
+      "requests_per_second": 503590,
+      "server_cpu": {
+        "voluntary_switches": 93
+      }
+    },
+    {
+      "order": 34,
+      "variant": "before",
+      "backend": "iouring-poll",
+      "repeat": 3,
+      "workers": 4,
+      "connections": 128,
+      "bytes": 64,
+      "requests_per_second": 1954865,
+      "server_cpu": {
+        "voluntary_switches": 18099
+      }
+    },
+    {
+      "order": 35,
+      "variant": "before",
+      "backend": "iouring",
+      "repeat": 2,
+      "workers": 1,
+      "connections": 32,
+      "bytes": 4096,
+      "requests_per_second": 478999,
+      "server_cpu": {
+        "voluntary_switches": 102
+      }
+    },
+    {
+      "order": 36,
+      "variant": "after",
+      "backend": "iouring",
+      "repeat": 3,
+      "workers": 4,
+      "connections": 128,
+      "bytes": 64,
+      "requests_per_second": 1983754,
+      "server_cpu": {
+        "voluntary_switches": 24895
+      }
+    },
+    {
+      "order": 37,
+      "variant": "before",
+      "backend": "iouring-poll",
+      "repeat": 1,
+      "workers": 4,
+      "connections": 128,
+      "bytes": 64,
+      "requests_per_second": 1963306,
+      "server_cpu": {
+        "voluntary_switches": 12552
+      }
+    },
+    {
+      "order": 38,
+      "variant": "after",
+      "backend": "iouring",
+      "repeat": 1,
+      "workers": 4,
+      "connections": 128,
+      "bytes": 64,
+      "requests_per_second": 1976452,
+      "server_cpu": {
+        "voluntary_switches": 19686
+      }
+    },
+    {
+      "order": 39,
+      "variant": "after",
+      "backend": "iouring-poll",
+      "repeat": 1,
+      "workers": 4,
+      "connections": 128,
+      "bytes": 64,
+      "requests_per_second": 1971362,
+      "server_cpu": {
+        "voluntary_switches": 20085
+      }
+    },
+    {
+      "order": 40,
+      "variant": "after",
+      "backend": "iouring-poll",
+      "repeat": 2,
+      "workers": 4,
+      "connections": 128,
+      "bytes": 64,
+      "requests_per_second": 1967051,
+      "server_cpu": {
+        "voluntary_switches": 28847
+      }
+    },
+    {
+      "order": 41,
+      "variant": "after",
+      "backend": "iouring-poll",
+      "repeat": 3,
+      "workers": 4,
+      "connections": 128,
+      "bytes": 64,
+      "requests_per_second": 1957106,
+      "server_cpu": {
+        "voluntary_switches": 28540
+      }
+    },
+    {
+      "order": 42,
+      "variant": "after",
+      "backend": "iouring-poll",
+      "repeat": 1,
+      "workers": 1,
+      "connections": 32,
+      "bytes": 4096,
+      "requests_per_second": 509921,
+      "server_cpu": {
+        "voluntary_switches": 111
+      }
+    },
+    {
+      "order": 43,
+      "variant": "before",
+      "backend": "iouring",
+      "repeat": 1,
+      "workers": 4,
+      "connections": 128,
+      "bytes": 64,
+      "requests_per_second": 1779816,
+      "server_cpu": {
+        "voluntary_switches": 79518
+      }
+    },
+    {
+      "order": 44,
+      "variant": "before",
+      "backend": "iouring",
+      "repeat": 3,
+      "workers": 1,
+      "connections": 32,
+      "bytes": 64,
+      "requests_per_second": 532161,
+      "server_cpu": {
+        "voluntary_switches": 91
+      }
+    },
+    {
+      "order": 45,
+      "variant": "before",
+      "backend": "iouring-poll",
+      "repeat": 1,
+      "workers": 1,
+      "connections": 32,
+      "bytes": 64,
+      "requests_per_second": 558496,
+      "server_cpu": {
+        "voluntary_switches": 99
+      }
+    },
+    {
+      "order": 46,
+      "variant": "after",
+      "backend": "iouring",
+      "repeat": 2,
+      "workers": 1,
+      "connections": 32,
+      "bytes": 64,
+      "requests_per_second": 625550,
+      "server_cpu": {
+        "voluntary_switches": 110
+      }
+    },
+    {
+      "order": 47,
+      "variant": "after",
+      "backend": "iouring-poll",
+      "repeat": 1,
+      "workers": 4,
+      "connections": 128,
+      "bytes": 4096,
+      "requests_per_second": 1745486,
+      "server_cpu": {
+        "voluntary_switches": 37280
+      }
+    },
+    {
+      "order": 48,
+      "variant": "before",
+      "backend": "iouring",
+      "repeat": 2,
+      "workers": 4,
+      "connections": 128,
+      "bytes": 4096,
+      "requests_per_second": 1584556,
+      "server_cpu": {
+        "voluntary_switches": 70636
+      }
+    }
+  ],
+  "full_precision_medians": [
+    {
+      "workers": 1,
+      "connections": 32,
+      "bytes": 64,
+      "backend": "iouring",
+      "requests_per_second": {
+        "before": 532161.0,
+        "after": 626804.0
+      },
+      "delta_percent": 17.784655395641536,
+      "voluntary_switches": {
+        "before": 91,
+        "after": 110
+      }
+    },
+    {
+      "workers": 1,
+      "connections": 32,
+      "bytes": 64,
+      "backend": "iouring-poll",
+      "requests_per_second": {
+        "before": 561774.3333333334,
+        "after": 565944.6666666666
+      },
+      "delta_percent": 0.7423502794419612,
+      "voluntary_switches": {
+        "before": 102,
+        "after": 100
+      }
+    },
+    {
+      "workers": 1,
+      "connections": 32,
+      "bytes": 4096,
+      "backend": "iouring",
+      "requests_per_second": {
+        "before": 479235.6666666667,
+        "after": 559440.6666666666
+      },
+      "delta_percent": 16.736024795038198,
+      "voluntary_switches": {
+        "before": 103,
+        "after": 111
+      }
+    },
+    {
+      "workers": 1,
+      "connections": 32,
+      "bytes": 4096,
+      "backend": "iouring-poll",
+      "requests_per_second": {
+        "before": 506986.6666666667,
+        "after": 508186.3333333333
+      },
+      "delta_percent": 0.23662686724172932,
+      "voluntary_switches": {
+        "before": 92,
+        "after": 98
+      }
+    },
+    {
+      "workers": 4,
+      "connections": 128,
+      "bytes": 64,
+      "backend": "iouring",
+      "requests_per_second": {
+        "before": 1782400.0,
+        "after": 1976509.6666666667
+      },
+      "delta_percent": 10.890353830041889,
+      "voluntary_switches": {
+        "before": 74399,
+        "after": 19686
+      }
+    },
+    {
+      "workers": 4,
+      "connections": 128,
+      "bytes": 64,
+      "backend": "iouring-poll",
+      "requests_per_second": {
+        "before": 1955956.0,
+        "after": 1967051.0
+      },
+      "delta_percent": 0.5672417988952683,
+      "voluntary_switches": {
+        "before": 18099,
+        "after": 28540
+      }
+    },
+    {
+      "workers": 4,
+      "connections": 128,
+      "bytes": 4096,
+      "backend": "iouring",
+      "requests_per_second": {
+        "before": 1600101.0,
+        "after": 1747017.3333333333
+      },
+      "delta_percent": 9.181691239073864,
+      "voluntary_switches": {
+        "before": 70636,
+        "after": 13246
+      }
+    },
+    {
+      "workers": 4,
+      "connections": 128,
+      "bytes": 4096,
+      "backend": "iouring-poll",
+      "requests_per_second": {
+        "before": 1746561.6666666667,
+        "after": 1745486.0
+      },
+      "delta_percent": -0.061587671777985076,
+      "voluntary_switches": {
+        "before": 19057,
+        "after": 44654
+      }
+    }
+  ]
+}

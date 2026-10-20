@@ -1,0 +1,79 @@
+diff --git a/crates/iouring/src/io_uring_selector.rs b/crates/iouring/src/io_uring_selector.rs
+index 96f0d5d..06c3e88 100644
+--- a/crates/iouring/src/io_uring_selector.rs
++++ b/crates/iouring/src/io_uring_selector.rs
+@@ -898,27 +898,6 @@ impl Reactor {
+             }
+         }
+ 
+-        // The CQ iterator snapshots the available batch. Finish publishing every completion in that batch before returning to the executor; application futures are polled only from its ready queue.
+-        for completion in self.ring.completion() {
+-            progressed = true;
+-            let identifier = completion.user_data();
+-            if identifier & CANCEL_TAG != 0 {
+-                continue;
+-            }
+-            // Every untagged CQE is the single original completion of a
+-            // published request. Only this path removes it from InFlight.
+-            let request = self
+-                .in_flight
+-                .0
+-                .remove(&identifier)
+-                .expect("original completion retains its in-flight request");
+-            let result = completion.result();
+-            request.finish(if result < 0 {
+-                Err(io::Error::from_raw_os_error(-result))
+-            } else {
+-                Ok(result as usize)
+-            });
+-        }
+ 
+         {
+             let mut submissions = self.ring.submission();
+@@ -949,16 +928,44 @@ impl Reactor {
+             }
+         }
+ 
+-        match syscall("submit", || self.ring.submit()) {
++        let submission_retry = match syscall("submit", || self.ring.submit()) {
+             Err(error)
+                 if error.kind() == io::ErrorKind::Interrupted
+                     || matches!(error.raw_os_error(), Some(libc::EBUSY | libc::EAGAIN)) =>
+             {
+-                return Ok(false);
++                true
+             }
+             result => {
+                 result?;
++                false
+             }
++        };
++
++        // The CQ iterator snapshots the available batch. Finish publishing every completion in that batch before returning to the executor; application futures are polled only from its ready queue.
++        for completion in self.ring.completion() {
++            progressed = true;
++            let identifier = completion.user_data();
++            if identifier & CANCEL_TAG != 0 {
++                continue;
++            }
++            // Every untagged CQE is the single original completion of a
++            // published request. Only this path removes it from InFlight.
++            let request = self
++                .in_flight
++                .0
++                .remove(&identifier)
++                .expect("original completion retains its in-flight request");
++            let result = completion.result();
++            request.finish(if result < 0 {
++                Err(io::Error::from_raw_os_error(-result))
++            } else {
++                Ok(result as usize)
++            });
++        }
++
++
++        if submission_retry {
++            return Ok(false);
+         }
+ 
+         if self.closing

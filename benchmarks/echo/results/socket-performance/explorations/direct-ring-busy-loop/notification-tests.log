@@ -1,0 +1,11 @@
+   Compiling core-scheduler-iouring v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-perf-tokio/crates/iouring)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.17s
+     Running tests/notification_experiment.rs (/home/samuel/.cache/core-scheduler-perf-tokio/debug/deps/notification_experiment-0bbd901f7a115e3b)
+
+running 3 tests
+test external_waker_interrupts_direct_ring_wait ... ok
+test finite_idle_wait_times_out ... ok
+test local_wake_is_retained_through_nonblocking_turn_and_consumed_once ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+

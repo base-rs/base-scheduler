@@ -1,0 +1,15 @@
+Switched to a new branch 'perf/self-wake-selected-counted-baseline'
+/home/samuel/.cache/core-scheduler-self-wake/patches/self-wake.patch:9: indent with spaces.
+            self.thread
+/home/samuel/.cache/core-scheduler-self-wake/patches/self-wake.patch:13: indent with spaces.
+                .expect("sleeping worker has registered its thread")
+/home/samuel/.cache/core-scheduler-self-wake/patches/self-wake.patch:14: indent with spaces.
+                .unpark();
+/home/samuel/.cache/core-scheduler-self-wake/patches/self-wake.patch:15: indent with spaces.
+            if let Some(waker) = self.driver_waker.get() {
+/home/samuel/.cache/core-scheduler-self-wake/patches/self-wake.patch:16: indent with spaces.
+                waker.wake_by_ref();
+warning: 5 lines add whitespace errors.
+selected-frozen-counted 0550c647789d79b488aa32872d602685798c4124
+Switched to branch 'perf/self-wake-selected'
+tests completed

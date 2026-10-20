@@ -1,0 +1,16 @@
+{
+  "base_source": "63da755",
+  "runtime_patch_sha256": "8e14a0c1b92e5211b68f44263c6a1e12da5e52be9323450192a0d2a6f294021f",
+  "build": "cargo build --release --locked -p core-scheduler-echo-benchmark; CARGO_TARGET_DIR=/home/samuel/.cache/core-scheduler-perf-tokio; profile overrides unset",
+  "binaries": {
+    "benchmark": {
+      "path": "/home/samuel/.cache/core-scheduler-direct-notification-production/benchmark",
+      "sha256": "26d15531b5b2dacbdf9111a45b17561aec47ee74413abc486ca4f3d9e7a0b98e"
+    },
+    "control": {
+      "path": "/home/samuel/.cache/core-scheduler-direct-notification-production/control",
+      "sha256": "abc161cde925e54c6f3fb3d7e70d4d77f4f21e055877e293c27eb2a532e4834f"
+    }
+  },
+  "previous_busyloop_candidate": "/home/samuel/.cache/core-scheduler-ring-notification-results/INVALID-PERFORMANCE.md"
+}

@@ -1,0 +1,52 @@
+{
+  "sources": {
+    "selected-permit-skip": "98a3cfea834deb146058d35310ef73f3ed9762f1",
+    "selected-permit-poll": "7d1b1285be20e5b491724971a0529744b8ecc5f1",
+    "selected-frozen": "938e7e641f8d186991a0f46f211f4ce3d19c929e",
+    "selected-fixed": "c4f7eef1a57fc21d6f231960967a9f432c0d69d2"
+  },
+  "frozen_selected_build_source": "938e7e641f8d186991a0f46f211f4ce3d19c929e",
+  "binaries": {
+    "selected-frozen": {
+      "path": "/home/samuel/.cache/core-scheduler-local-permit/binaries/selected-frozen",
+      "sha256": "f5f0336a61e7ccfbf6db35b1ac10cf04845137465ef4250c0420691b1173908e"
+    },
+    "selected-fixed": {
+      "path": "/home/samuel/.cache/core-scheduler-local-permit/binaries/selected-fixed",
+      "sha256": "5554c06eb07593c95ea3535d0159beb659ee785e1e5f137abb957c746debb1e1"
+    },
+    "selected-permit-skip": {
+      "path": "/home/samuel/.cache/core-scheduler-local-permit/binaries/selected-permit-skip",
+      "sha256": "9b9f394539ccf5f92f5761911fc5ce051241d4bb248b8001972d64e4f60dfc24"
+    },
+    "selected-permit-poll": {
+      "path": "/home/samuel/.cache/core-scheduler-local-permit/binaries/selected-permit-poll",
+      "sha256": "eb28dfb4856cbbbd745b627ee690bcc2192a8db152f7135e0d307e98a952dc87"
+    }
+  },
+  "client": {
+    "path": "/home/samuel/.cache/core-scheduler-local-permit/binaries/client",
+    "sha256": "db6c914ab75011477ec6232e681046b1e75532cbaa1c81663bac984591675cf3"
+  },
+  "build": "cargo build --release --locked -p core-scheduler-echo-benchmark; CARGO_PROFILE_RELEASE_DEBUG=1; RUSTFLAGS unset",
+  "seed": 20261021,
+  "hostname": "aiko",
+  "platform": "Linux-7.2.6-arch2-1-x86_64-with-glibc2.44",
+  "server_cpus": "0",
+  "client_cpus": "4-7",
+  "client_workers": 4,
+  "warmup_seconds": 1,
+  "measurement_seconds": 3,
+  "load_before": [
+    0.1279296875,
+    0.435546875,
+    0.2314453125
+  ],
+  "load_after": [
+    0.880859375,
+    0.58837890625,
+    0.29541015625
+  ],
+  "runner_sha256": "fcd6a1d5ec4a42d284f9e9d7a7063dac2d392b50159e6ffd06ac4d13f8bc14a8",
+  "sample_runner_sha256": "31e6ad715214fcadfda358362100a21cb94cc41a79e23733191eb8e61b740909"
+}

@@ -1,0 +1,16 @@
+selected-permit-poll selected-permit-poll-iouring-w1-c1-b64-r3 184585 737407 None
+selected-fixed selected-fixed-iouring-w1-c1-b64-r2 177426 720932 None
+selected-frozen selected-frozen-iouring-w1-c1-b64-r2 237485 67177 None
+selected-permit-poll selected-permit-poll-iouring-w1-c1-b64-r2 200280 808822 None
+selected-fixed selected-fixed-iouring-w1-c1-b64-r1 171602 688233 None
+selected-permit-skip selected-permit-skip-iouring-w1-c1-b64-r1 185913 757819 None
+selected-permit-poll selected-permit-poll-iouring-w1-c1-b64-r1 188658 745587 None
+selected-permit-skip selected-permit-skip-iouring-w1-c1-b64-r3 181517 739265 None
+selected-frozen selected-frozen-iouring-w1-c1-b64-r1 238077 66906 None
+selected-fixed selected-fixed-iouring-w1-c1-b64-r3 174671 692670 None
+selected-permit-skip selected-permit-skip-iouring-w1-c1-b64-r2 191857 765878 None
+selected-frozen selected-frozen-iouring-w1-c1-b64-r3 239464 83769 None
+selected-frozen median-rps 238077 rps [237485, 238077, 239464] voluntary-csw [67177, 66906, 83769]
+selected-fixed median-rps 174671 rps [177426, 171602, 174671] voluntary-csw [720932, 688233, 692670]
+selected-permit-skip median-rps 185913 rps [185913, 181517, 191857] voluntary-csw [757819, 739265, 765878]
+selected-permit-poll median-rps 188658 rps [184585, 200280, 188658] voluntary-csw [737407, 808822, 745587]

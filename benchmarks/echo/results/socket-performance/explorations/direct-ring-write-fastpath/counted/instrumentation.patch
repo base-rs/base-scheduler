@@ -1,0 +1,102 @@
+--- a/crates/iouring/src/io_uring_selector.rs
++++ b/crates/iouring/src/io_uring_selector.rs
+@@ -23,6 +23,10 @@
+     task::Poll,
+     time::Duration,
+ };
++#[path = "notification_counters.rs"]
++pub(crate) mod notification_counters;
++use notification_counters as counters;
++
+ const CANCEL_TAG: u64 = 1 << 63;
+ const NOTIFICATION_TAG: u64 = u64::MAX;
+ 
+@@ -276,6 +280,7 @@
+     }
+ 
+     fn notify(&self) {
++        let owner = crate::io_uring_worker::counter_owns(self);
+         // A full eventfd already contains a wakeup. Other errors mean the selector
+         // has exited; dropping its receivers wakes pending operation futures.
+         loop {
+@@ -289,6 +294,7 @@
+                         8,
+                     )
+                 };
++                counters::write(owner, result >= 0);
+                 if result < 0 {
+                     Err(io::Error::last_os_error())
+                 } else {
+@@ -946,6 +952,7 @@
+             progressed = true;
+             let identifier = completion.user_data();
+             if identifier == NOTIFICATION_TAG {
++                counters::increment(counters::NOTIFICATION_CQE);
+                 self.notification_armed = false;
+                 notification_completed = true;
+                 if completion.result() < 0 {
+@@ -956,6 +963,7 @@
+             if identifier & CANCEL_TAG != 0 {
+                 continue;
+             }
++            counters::increment(counters::PAYLOAD_CQE);
+             // Every untagged CQE is the single original completion of a
+             // published request. Only this path removes it from InFlight.
+             let request = self
+@@ -1098,7 +1106,9 @@
+         self.wake_by_ref();
+     }
+     fn wake_by_ref(self: &Arc<Self>) {
+-        if !crate::io_uring_worker::notify(self) {
++        if crate::io_uring_worker::notify(self) {
++            counters::increment(counters::OWNER_WAKE_AVOIDED);
++        } else {
+             self.notify();
+         }
+     }
+--- a/crates/iouring/src/io_uring_worker.rs
++++ b/crates/iouring/src/io_uring_worker.rs
+@@ -129,3 +129,8 @@
+             .is_some_and(|route| route.notified.replace(false))
+     })
+ }
++
++// Experimental exact-controller owner classification; excluded from shipping code.
++pub(crate) fn counter_owns(controller: &Controller) -> bool {
++    ROUTES.with(|routes| routes.borrow().iter().any(|route| std::ptr::eq(Arc::as_ptr(&route.controller), controller)))
++}
+--- /dev/null
++++ b/crates/iouring/src/notification_counters.rs
+@@ -0,0 +1,32 @@
++// Experimental notification counts; excluded from shipping code and timing binaries.
++use std::cell::Cell;
++thread_local! { static COUNTERS: Counters = const { Counters { values: [const { Cell::new(0) }; 7] } }; }
++struct Counters { values: [Cell<u64>; 7] }
++pub(crate) const OWNER_WRITE_ATTEMPT: usize = 0;
++pub(crate) const REMOTE_WRITE_ATTEMPT: usize = 1;
++pub(crate) const OWNER_WRITE_SUCCESS: usize = 2;
++pub(crate) const REMOTE_WRITE_SUCCESS: usize = 3;
++pub(crate) const OWNER_WAKE_AVOIDED: usize = 4;
++pub(crate) const PAYLOAD_CQE: usize = 5;
++pub(crate) const NOTIFICATION_CQE: usize = 6;
++pub(crate) fn increment(index: usize) { COUNTERS.with(|c| c.values[index].set(c.values[index].get()+1)); }
++pub(crate) fn write(owner: bool, success: bool) {
++    increment(if owner { OWNER_WRITE_ATTEMPT } else { REMOTE_WRITE_ATTEMPT });
++    if success { increment(if owner { OWNER_WRITE_SUCCESS } else { REMOTE_WRITE_SUCCESS }); }
++}
++impl Drop for Counters {
++    fn drop(&mut self) {
++        use std::fmt::Write;
++        if self.values.iter().all(|x| x.get()==0) { return; }
++        let mut s=String::from("{");
++        write!(&mut s, "\"owner_write_attempt\":{}", self.values[0].get()).unwrap();
++        write!(&mut s, ",\"remote_write_attempt\":{}", self.values[1].get()).unwrap();
++        write!(&mut s, ",\"owner_write_success\":{}", self.values[2].get()).unwrap();
++        write!(&mut s, ",\"remote_write_success\":{}", self.values[3].get()).unwrap();
++        write!(&mut s, ",\"owner_wake_avoided\":{}", self.values[4].get()).unwrap();
++        write!(&mut s, ",\"payload_cqe\":{}", self.values[5].get()).unwrap();
++        write!(&mut s, ",\"notification_cqe\":{}", self.values[6].get()).unwrap();
++        s.push('}');
++        eprintln!("NOTIFICATION_COUNTERS {}", s);
++    }
++}

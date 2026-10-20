@@ -1,0 +1,4 @@
+counted-iouring-w1-c1-b64-r1 {'owner_write_attempt': 0, 'remote_write_attempt': 2, 'owner_write_success': 0, 'remote_write_success': 2, 'owner_wake_avoided': 39, 'payload_cqe': 910725, 'notification_cqe': 2}
+counted-iouring-poll-w1-c1-b64-r1 {'owner_write_attempt': 0, 'remote_write_attempt': 2, 'owner_write_success': 0, 'remote_write_success': 2, 'owner_wake_avoided': 12, 'payload_cqe': 883687, 'notification_cqe': 2}
+counted-iouring-w4-c128-b64-r1 {'owner_write_attempt': 0, 'remote_write_attempt': 38052, 'owner_write_success': 0, 'remote_write_success': 38052, 'owner_wake_avoided': 14139, 'payload_cqe': 7988121, 'notification_cqe': 37871}
+counted-iouring-poll-w4-c128-b64-r1 {'owner_write_attempt': 0, 'remote_write_attempt': 26201, 'owner_write_success': 0, 'remote_write_success': 26201, 'owner_wake_avoided': 6142, 'payload_cqe': 7935112, 'notification_cqe': 26134}

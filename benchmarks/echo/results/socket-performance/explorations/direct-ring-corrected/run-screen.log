@@ -1,0 +1,16 @@
+after iouring 2 189940
+after iouring-poll 3 213061
+before iouring 1 233644
+before iouring 2 242338
+before iouring-poll 3 177832
+before iouring-poll 1 179056
+after iouring 1 189063
+after iouring 3 185020
+before iouring-poll 2 180757
+after iouring-poll 1 219328
+after iouring-poll 2 205323
+before iouring 3 238953
+after iouring median 189063.33333333334 switches 755241
+after iouring-poll median 213061.0 switches 851274
+before iouring median 238952.66666666666 switches 114852
+before iouring-poll median 179056.0 switches 720296

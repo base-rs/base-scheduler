@@ -1,0 +1,1 @@
+Candidate experiment complete. See analysis.md: concurrent owned +9–18%, borrowed neutral; five-repeat serial owned64 −2.93%, other cases +14.9–24.2%; idle zero ticks; counted owner writes zero and remote writes positive. Recovered concurrent report loses detailed RTT/CPU; exact final-source fresh matrix will be separate.

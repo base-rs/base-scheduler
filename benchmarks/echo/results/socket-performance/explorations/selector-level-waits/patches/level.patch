@@ -1,0 +1,43 @@
+diff --git a/crates/iouring/src/io_uring_selector.rs b/crates/iouring/src/io_uring_selector.rs
+index 96f0d5d..9673b0b 100644
+--- a/crates/iouring/src/io_uring_selector.rs
++++ b/crates/iouring/src/io_uring_selector.rs
+@@ -7,7 +7,7 @@ use core_scheduler_selector::{NativeFile, NativeSocket, ReadinessSelector, Selec
+ use event_listener::Event as CompletionEvent;
+ use futures_channel::oneshot;
+ use io_uring::{IoUring, opcode, squeue, types};
+-use polling::{Event, Events, Poller};
++use polling::{Event, Events, PollMode, Poller};
+ use std::{
+     cell::Cell,
+     collections::{HashMap, VecDeque},
+@@ -800,12 +800,12 @@ impl Reactor {
+             syscall("add-notification", || {
+                 reactor
+                     .poller
+-                    .add(&reactor.notification, Event::readable(COMMAND_EVENT))
++                    .add_with_mode(&reactor.notification, Event::readable(COMMAND_EVENT), PollMode::Level)
+             })?;
+             syscall("add-ring", || {
+                 reactor
+                     .poller
+-                    .add(&reactor.ring, Event::readable(RING_EVENT))
++                    .add_with_mode(&reactor.ring, Event::readable(RING_EVENT), PollMode::Level)
+             })?;
+         }
+         Ok(reactor)
+@@ -995,13 +995,7 @@ impl Reactor {
+         if notified {
+             return Ok(false);
+         }
+-        syscall("modify-notification", || {
+-            self.poller
+-                .modify(&self.notification, Event::readable(COMMAND_EVENT))
+-        })?;
+-        syscall("modify-ring", || {
+-            self.poller.modify(&self.ring, Event::readable(RING_EVENT))
+-        })?;
++        // Both registrations remain level-triggered throughout their lifetime.
+         self.events.clear();
+         let result = syscall("wait", || self.poller.wait(&mut self.events, timeout));
+         if let Err(error) = result {

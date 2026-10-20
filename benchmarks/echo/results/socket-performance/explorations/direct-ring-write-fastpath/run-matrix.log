@@ -1,0 +1,56 @@
+1 48 after iouring 1 1 32 4096 559910 366
+2 48 after iouring 2 1 32 4096 559441 101
+3 48 before iouring 1 1 32 64 529995 100
+4 48 after iouring-poll 2 4 128 4096 1762113 44654
+5 48 before iouring 3 4 128 4096 1626834 52591
+6 48 after iouring 1 1 32 64 627562 113
+7 48 after iouring-poll 3 1 32 64 563565 98
+8 48 before iouring-poll 2 1 32 64 564096 102
+9 48 after iouring 2 4 128 4096 1760982 13246
+10 48 after iouring 2 4 128 64 1976510 15579
+11 48 before iouring 2 1 32 64 534017 89
+12 48 before iouring 3 4 128 64 1782400 74399
+13 48 before iouring-poll 3 1 32 64 561774 108
+14 48 before iouring-poll 3 4 128 4096 1740179 28784
+15 48 before iouring-poll 2 4 128 64 1955956 23865
+16 48 before iouring-poll 3 1 32 4096 507671 90
+17 48 after iouring-poll 2 1 32 4096 504409 98
+18 48 before iouring-poll 2 4 128 4096 1746562 8389
+19 48 after iouring-poll 2 1 32 64 565945 167
+20 48 after iouring 3 1 32 4096 555509 111
+21 48 before iouring 1 1 32 4096 479236 112
+22 48 before iouring 1 4 128 4096 1600101 76807
+23 48 before iouring-poll 1 4 128 4096 1753895 19057
+24 48 after iouring-poll 3 4 128 4096 1742921 44984
+25 48 after iouring 1 4 128 4096 1745843 11514
+26 48 before iouring-poll 2 1 32 4096 506987 92
+27 48 after iouring-poll 1 1 32 64 566267 100
+28 48 after iouring-poll 3 1 32 4096 508186 80
+29 48 after iouring 3 4 128 4096 1747017 22199
+30 48 after iouring 3 1 32 64 626804 100
+31 48 before iouring 2 4 128 64 1788311 48289
+32 48 before iouring 3 1 32 4096 487147 103
+33 48 before iouring-poll 1 1 32 4096 503590 93
+34 48 before iouring-poll 3 4 128 64 1954865 18099
+35 48 before iouring 2 1 32 4096 478999 102
+36 48 after iouring 3 4 128 64 1983754 24895
+37 48 before iouring-poll 1 4 128 64 1963306 12552
+38 48 after iouring 1 4 128 64 1976452 19686
+39 48 after iouring-poll 1 4 128 64 1971362 20085
+40 48 after iouring-poll 2 4 128 64 1967051 28847
+41 48 after iouring-poll 3 4 128 64 1957106 28540
+42 48 after iouring-poll 1 1 32 4096 509921 111
+43 48 before iouring 1 4 128 64 1779816 79518
+44 48 before iouring 3 1 32 64 532161 91
+45 48 before iouring-poll 1 1 32 64 558496 99
+46 48 after iouring 2 1 32 64 625550 110
+47 48 after iouring-poll 1 4 128 4096 1745486 37280
+48 48 before iouring 2 4 128 4096 1584556 70636
+1 32 64 iouring {'before': 532161.0, 'after': 626804.0} delta 17.784655395641536 switches {'before': 91, 'after': 110}
+1 32 64 iouring-poll {'before': 561774.3333333334, 'after': 565944.6666666666} delta 0.7423502794419612 switches {'before': 102, 'after': 100}
+1 32 4096 iouring {'before': 479235.6666666667, 'after': 559440.6666666666} delta 16.736024795038198 switches {'before': 103, 'after': 111}
+1 32 4096 iouring-poll {'before': 506986.6666666667, 'after': 508186.3333333333} delta 0.23662686724172932 switches {'before': 92, 'after': 98}
+4 128 64 iouring {'before': 1782400.0, 'after': 1976509.6666666667} delta 10.890353830041889 switches {'before': 74399, 'after': 19686}
+4 128 64 iouring-poll {'before': 1955956.0, 'after': 1967051.0} delta 0.5672417988952683 switches {'before': 18099, 'after': 28540}
+4 128 4096 iouring {'before': 1600101.0, 'after': 1747017.3333333333} delta 9.181691239073864 switches {'before': 70636, 'after': 13246}
+4 128 4096 iouring-poll {'before': 1746561.6666666667, 'after': 1745486.0} delta -0.061587671777985076 switches {'before': 19057, 'after': 44654}

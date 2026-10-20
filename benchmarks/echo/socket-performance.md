@@ -1,6 +1,8 @@
 # Socket readiness performance
 
-The selected changes reserve Tokio's lightweight polling waiter per socket direction, notify io_uring capacity waiters only when admission leaves full capacity, and notify native drain waiters only when the outstanding runnable count reaches zero. The native interrupt and wait implementation remains the original one. The benchmark chooses owned or borrowed echo dispatch before constructing its task future in both comparison builds.
+This report retains the historical comparison of runtime `938e7e6`. The [owner-wake follow-up](self-interrupts.md) describes the later native interrupt fix and its separate measurements; the 180-sample matrix below has not been rerun or relabelled as that implementation.
+
+The selected changes reserve Tokio's lightweight polling waiter per socket direction, notify io_uring capacity waiters only when admission leaves full capacity, and notify native drain waiters only when the outstanding runnable count reaches zero. That selected revision retained the original native interrupt and wait implementation. The benchmark chooses owned or borrowed echo dispatch before constructing its task future in both comparison builds.
 
 The [direct-ring interrupt prototype](direct-ring-experiment.md) was rejected after its 300-sample comparison exposed a 14.8% serial owned-I/O regression. That report retains the complete matrix, profiles, io-event review, and isolated experiments, including their source revisions and executable hashes. Its native results do not describe the selected implementation.
 
@@ -10,7 +12,7 @@ Tokio previously used independent linked-list readiness waiters even with one re
 
 Every operation still attempts its nonblocking syscall before consulting readiness. An experimental readiness-first shortcut delayed valid lifecycle calls and immediate OS errors after a previous operation cleared readiness. Independent review reproduced this with repeated `listen` and invalid `accept`; the shortcut was removed and regression tests added. Lazy registration remains necessary to avoid permanently cached hangup readiness on unconnected Linux sockets.
 
-Capacity and drain notifications occur at the transitions that can release their waiters; closure retains independent notifications. Local worker wake publication is unchanged. No direct-ring idle-wait or eventfd prototype is included in the final runtime.
+Capacity and drain notifications occur at the transitions that can release their waiters; closure retains independent notifications. Local worker wake publication was unchanged in this historical selection. Its runtime did not include direct-ring idle waits or eventfd interrupts; the later owner-wake follow-up changes that native path.
 
 ## io-event review
 
@@ -20,7 +22,7 @@ This mechanism fits a ring owned by one worker. Ruby's GVL-protected `blocked` c
 
 Independent review found a potential teardown use-after-free: the read targets inline `selector->wakeup_value`, while [close and destruction](https://github.com/socketry/io-event/blob/c8550a85e340941491ee4c09b73d54c5310fed1e/ext/io/event/selector/uring.c#L141-L170) close the ring and free the selector without explicitly draining that read. This is a substantiated missing lifetime guarantee, with no reproduced crash. [Upstream cancellation documentation](https://github.com/axboe/liburing/blob/f4fdfd910ad15e5477c68f2eec208581e3f2239e/man/io_uring_cancelation.7#L241-L249) distinguishes shutdown cancellation from draining before freeing associated resources. A direct read needs destination storage retained through original completion, including exceptional teardown. The pointer-free `PollAdd` prototype avoids that particular obligation. The io-event checkout was not changed.
 
-## Final confirmation
+## Historical final confirmation
 
 The selected runtime is `938e7e641f8d186991a0f46f211f4ce3d19c929e`. Its repeated optimized comparison uses the same benchmark source in both builds and the same fixed client. The [complete 180-sample final matrix](results/socket-performance/selected/aiko.json) is separate from the rejected prototype.
 

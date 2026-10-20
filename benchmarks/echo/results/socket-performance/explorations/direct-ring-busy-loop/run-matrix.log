@@ -1,0 +1,70 @@
+1 60 before iouring 3 1 32 4096 485489 95
+2 60 before iouring-poll 1 1 1 64 180470 716670
+3 60 after iouring 2 1 1 64 254750 11
+4 60 before iouring 2 4 128 4096 1629875 47717
+5 60 before iouring-poll 3 1 32 4096 507914 103
+6 60 before iouring-poll 1 4 128 64 1956167 34118
+7 60 before iouring 2 1 1 64 233052 147402
+8 60 after iouring 1 1 1 64 255655 11
+9 60 before iouring-poll 1 1 32 4096 507280 112
+10 60 before iouring 1 4 128 64 1803732 59886
+11 60 before iouring 2 4 128 64 1780654 78904
+12 60 before iouring-poll 3 4 128 4096 1749874 15137
+13 60 after iouring 2 4 128 64 1766155 222
+14 60 after iouring-poll 1 4 128 64 1960271 89
+15 60 after iouring 1 1 32 4096 474656 11
+16 60 after iouring-poll 3 1 32 64 557996 20
+17 60 before iouring-poll 2 4 128 64 1958800 15816
+18 60 before iouring 1 4 128 4096 1548396 112957
+19 60 after iouring 1 1 32 64 526065 31
+20 60 after iouring-poll 1 1 32 4096 507030 15
+21 60 before iouring-poll 2 1 1 64 180782 723928
+22 60 after iouring-poll 1 1 1 64 235602 11
+23 60 before iouring-poll 2 1 32 4096 505988 99
+24 60 after iouring-poll 3 4 128 64 1964809 69
+25 60 before iouring 2 1 32 64 533658 70
+26 60 before iouring 1 1 32 64 532049 102
+27 60 before iouring-poll 1 1 32 64 562764 104
+28 60 before iouring-poll 3 4 128 64 1958731 24625
+29 60 after iouring-poll 1 4 128 4096 1766045 297
+30 60 after iouring-poll 3 4 128 4096 1746857 92
+31 60 after iouring 3 1 32 4096 478631 21
+32 60 after iouring 2 1 32 4096 481045 33
+33 60 after iouring-poll 2 1 32 64 563820 13
+34 60 before iouring 2 1 32 4096 481021 86
+35 60 before iouring-poll 2 1 32 64 560636 100
+36 60 after iouring-poll 3 1 32 4096 498624 15
+37 60 before iouring 3 1 32 64 529451 93
+38 60 before iouring-poll 3 1 1 64 181352 725968
+39 60 before iouring 3 1 1 64 234436 193223
+40 60 after iouring 3 1 1 64 253954 11
+41 60 after iouring 3 4 128 64 1782349 332
+42 60 after iouring 3 1 32 64 528206 33
+43 60 after iouring-poll 2 4 128 64 1975792 74
+44 60 after iouring 1 4 128 4096 1610584 219
+45 60 before iouring-poll 2 4 128 4096 1420589 174610
+46 60 before iouring 1 1 1 64 221081 262740
+47 60 after iouring-poll 1 1 32 64 565725 15
+48 60 before iouring-poll 1 4 128 4096 1731486 38196
+49 60 after iouring 2 4 128 4096 1603386 322
+50 60 after iouring 2 1 32 64 529902 63
+51 60 after iouring 3 4 128 4096 1619391 258
+52 60 after iouring 1 4 128 64 1780229 379
+53 60 before iouring 3 4 128 64 1809882 59455
+54 60 after iouring-poll 3 1 1 64 224422 11
+55 60 before iouring 1 1 32 4096 481860 114
+56 60 after iouring-poll 2 1 32 4096 505381 17
+57 60 before iouring-poll 3 1 32 64 563543 96
+58 60 before iouring 3 4 128 4096 1614829 64104
+59 60 after iouring-poll 2 1 1 64 230841 11
+60 60 after iouring-poll 2 4 128 4096 1765739 253
+1 1 64 iouring {'before': 233051.66666666666, 'after': 254749.66666666666} delta 9.310381818051795 switches {'before': 193223, 'after': 11}
+1 1 64 iouring-poll {'before': 180781.66666666666, 'after': 230841.33333333334} delta 27.690676598843922 switches {'before': 723928, 'after': 11}
+1 32 64 iouring {'before': 532049.3333333334, 'after': 528205.6666666666} delta -0.7224267423822983 switches {'before': 93, 'after': 33}
+1 32 64 iouring-poll {'before': 562764.0, 'after': 563820.0} delta 0.18764526515555602 switches {'before': 100, 'after': 15}
+1 32 4096 iouring {'before': 481860.3333333333, 'after': 478631.3333333333} delta -0.6701111871282195 switches {'before': 95, 'after': 21}
+1 32 4096 iouring-poll {'before': 507280.0, 'after': 505381.0} delta -0.37434947169215915 switches {'before': 103, 'after': 15}
+4 128 64 iouring {'before': 1803732.3333333333, 'after': 1780229.0} delta -1.303038865522721 switches {'before': 59886, 'after': 332}
+4 128 64 iouring-poll {'before': 1958731.0, 'after': 1964809.3333333333} delta 0.31031996396306827 switches {'before': 24625, 'after': 74}
+4 128 4096 iouring {'before': 1614828.6666666667, 'after': 1610583.6666666667} delta -0.2628761854198802 switches {'before': 64104, 'after': 258}
+4 128 4096 iouring-poll {'before': 1731486.3333333333, 'after': 1765738.6666666667} delta 1.9782040824655844 switches {'before': 38196, 'after': 253}

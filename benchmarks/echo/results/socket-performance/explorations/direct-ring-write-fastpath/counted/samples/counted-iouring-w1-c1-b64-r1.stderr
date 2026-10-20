@@ -1,0 +1,2 @@
+NOTIFICATION_COUNTERS {"owner_write_attempt":0,"remote_write_attempt":0,"owner_write_success":0,"remote_write_success":0,"owner_wake_avoided":39,"payload_cqe":910725,"notification_cqe":2}
+NOTIFICATION_COUNTERS {"owner_write_attempt":0,"remote_write_attempt":2,"owner_write_success":0,"remote_write_success":2,"owner_wake_avoided":0,"payload_cqe":0,"notification_cqe":0}

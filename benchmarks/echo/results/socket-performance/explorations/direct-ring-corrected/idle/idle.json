@@ -1,0 +1,293 @@
+{
+  "binary_hashes": {
+    "before": "abc161cde925e54c6f3fb3d7e70d4d77f4f21e055877e293c27eb2a532e4834f",
+    "after": "26d15531b5b2dacbdf9111a45b17561aec47ee74413abc486ca4f3d9e7a0b98e"
+  },
+  "ticks_per_second": 100,
+  "samples": [
+    {
+      "variant": "before",
+      "backend": "iouring",
+      "workers": 1,
+      "connections": 1,
+      "elapsed": 2.000665742903948,
+      "cpu_seconds": {
+        "user_ticks": 0.0,
+        "system_ticks": 0.0
+      },
+      "wait_channels": [
+        {
+          "tid": "1112073",
+          "name": "control",
+          "wait": "futex_do_wait"
+        },
+        {
+          "tid": "1112074",
+          "name": "core-native-tas",
+          "wait": "do_epoll_wait"
+        },
+        {
+          "tid": "1112075",
+          "name": "async-io",
+          "wait": "do_epoll_wait"
+        }
+      ]
+    },
+    {
+      "variant": "before",
+      "backend": "iouring-poll",
+      "workers": 1,
+      "connections": 1,
+      "elapsed": 2.000372484792024,
+      "cpu_seconds": {
+        "user_ticks": 0.0,
+        "system_ticks": 0.0
+      },
+      "wait_channels": [
+        {
+          "tid": "1112092",
+          "name": "control",
+          "wait": "futex_do_wait"
+        },
+        {
+          "tid": "1112093",
+          "name": "core-native-tas",
+          "wait": "do_epoll_wait"
+        },
+        {
+          "tid": "1112094",
+          "name": "async-io",
+          "wait": "do_epoll_wait"
+        }
+      ]
+    },
+    {
+      "variant": "before",
+      "backend": "iouring",
+      "workers": 4,
+      "connections": 4,
+      "elapsed": 2.0007403718773276,
+      "cpu_seconds": {
+        "user_ticks": 0.0,
+        "system_ticks": 0.0
+      },
+      "wait_channels": [
+        {
+          "tid": "1112110",
+          "name": "control",
+          "wait": "futex_do_wait"
+        },
+        {
+          "tid": "1112111",
+          "name": "core-native-tas",
+          "wait": "do_epoll_wait"
+        },
+        {
+          "tid": "1112112",
+          "name": "core-native-tas",
+          "wait": "do_epoll_wait"
+        },
+        {
+          "tid": "1112113",
+          "name": "core-native-tas",
+          "wait": "do_epoll_wait"
+        },
+        {
+          "tid": "1112114",
+          "name": "core-native-tas",
+          "wait": "do_epoll_wait"
+        },
+        {
+          "tid": "1112115",
+          "name": "async-io",
+          "wait": "do_epoll_wait"
+        }
+      ]
+    },
+    {
+      "variant": "before",
+      "backend": "iouring-poll",
+      "workers": 4,
+      "connections": 4,
+      "elapsed": 2.000844492111355,
+      "cpu_seconds": {
+        "user_ticks": 0.0,
+        "system_ticks": 0.0
+      },
+      "wait_channels": [
+        {
+          "tid": "1112142",
+          "name": "control",
+          "wait": "futex_do_wait"
+        },
+        {
+          "tid": "1112143",
+          "name": "core-native-tas",
+          "wait": "do_epoll_wait"
+        },
+        {
+          "tid": "1112144",
+          "name": "core-native-tas",
+          "wait": "do_epoll_wait"
+        },
+        {
+          "tid": "1112145",
+          "name": "core-native-tas",
+          "wait": "do_epoll_wait"
+        },
+        {
+          "tid": "1112146",
+          "name": "core-native-tas",
+          "wait": "do_epoll_wait"
+        },
+        {
+          "tid": "1112147",
+          "name": "async-io",
+          "wait": "do_epoll_wait"
+        }
+      ]
+    },
+    {
+      "variant": "after",
+      "backend": "iouring",
+      "workers": 1,
+      "connections": 1,
+      "elapsed": 2.0003945829812437,
+      "cpu_seconds": {
+        "user_ticks": 0.0,
+        "system_ticks": 0.0
+      },
+      "wait_channels": [
+        {
+          "tid": "1112164",
+          "name": "benchmark",
+          "wait": "futex_do_wait"
+        },
+        {
+          "tid": "1112165",
+          "name": "core-native-tas",
+          "wait": "io_cqring_wait"
+        },
+        {
+          "tid": "1112166",
+          "name": "async-io",
+          "wait": "do_epoll_wait"
+        }
+      ]
+    },
+    {
+      "variant": "after",
+      "backend": "iouring-poll",
+      "workers": 1,
+      "connections": 1,
+      "elapsed": 2.0007242900319397,
+      "cpu_seconds": {
+        "user_ticks": 0.0,
+        "system_ticks": 0.0
+      },
+      "wait_channels": [
+        {
+          "tid": "1112198",
+          "name": "benchmark",
+          "wait": "futex_do_wait"
+        },
+        {
+          "tid": "1112199",
+          "name": "core-native-tas",
+          "wait": "io_cqring_wait"
+        },
+        {
+          "tid": "1112200",
+          "name": "async-io",
+          "wait": "do_epoll_wait"
+        }
+      ]
+    },
+    {
+      "variant": "after",
+      "backend": "iouring",
+      "workers": 4,
+      "connections": 4,
+      "elapsed": 2.000426803017035,
+      "cpu_seconds": {
+        "user_ticks": 0.0,
+        "system_ticks": 0.0
+      },
+      "wait_channels": [
+        {
+          "tid": "1112216",
+          "name": "benchmark",
+          "wait": "futex_do_wait"
+        },
+        {
+          "tid": "1112217",
+          "name": "core-native-tas",
+          "wait": "io_cqring_wait"
+        },
+        {
+          "tid": "1112218",
+          "name": "core-native-tas",
+          "wait": "io_cqring_wait"
+        },
+        {
+          "tid": "1112219",
+          "name": "core-native-tas",
+          "wait": "io_cqring_wait"
+        },
+        {
+          "tid": "1112220",
+          "name": "core-native-tas",
+          "wait": "io_cqring_wait"
+        },
+        {
+          "tid": "1112221",
+          "name": "async-io",
+          "wait": "do_epoll_wait"
+        }
+      ]
+    },
+    {
+      "variant": "after",
+      "backend": "iouring-poll",
+      "workers": 4,
+      "connections": 4,
+      "elapsed": 2.0004635830409825,
+      "cpu_seconds": {
+        "user_ticks": 0.0,
+        "system_ticks": 0.0
+      },
+      "wait_channels": [
+        {
+          "tid": "1112238",
+          "name": "benchmark",
+          "wait": "futex_do_wait"
+        },
+        {
+          "tid": "1112239",
+          "name": "core-native-tas",
+          "wait": "io_cqring_wait"
+        },
+        {
+          "tid": "1112240",
+          "name": "core-native-tas",
+          "wait": "io_cqring_wait"
+        },
+        {
+          "tid": "1112241",
+          "name": "core-native-tas",
+          "wait": "io_cqring_wait"
+        },
+        {
+          "tid": "1112242",
+          "name": "core-native-tas",
+          "wait": "io_cqring_wait"
+        },
+        {
+          "tid": "1112243",
+          "name": "async-io",
+          "wait": "do_epoll_wait"
+        }
+      ]
+    }
+  ]
+}

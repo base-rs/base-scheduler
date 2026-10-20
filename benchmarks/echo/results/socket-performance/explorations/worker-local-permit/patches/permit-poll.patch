@@ -1,0 +1,46 @@
+diff --git a/crates/native/src/worker.rs b/crates/native/src/worker.rs
+index 4cfe790..4532590 100644
+--- a/crates/native/src/worker.rs
++++ b/crates/native/src/worker.rs
+@@ -17,6 +17,7 @@ pub(crate) struct WorkerState {
+     pub(crate) incoming: Injector<Runnable>,
+     stealer: Stealer<Runnable>,
+     sleeping: AtomicBool,
++    local_wake: AtomicBool,
+     thread: OnceLock<Thread>,
+     driver_waker: OnceLock<Waker>,
+ }
+@@ -27,6 +28,7 @@ impl WorkerState {
+             incoming: Injector::new(),
+             stealer,
+             sleeping: AtomicBool::new(false),
++            local_wake: AtomicBool::new(false),
+             thread: OnceLock::new(),
+             driver_waker: OnceLock::new(),
+         }
+@@ -46,6 +48,8 @@ impl WorkerState {
+                 if let Some(waker) = self.driver_waker.get() {
+                     waker.wake_by_ref();
+                 }
++            } else {
++                self.local_wake.store(true, Ordering::Relaxed);
+             }
+             true
+         } else {
+@@ -317,7 +321,15 @@ fn run_loop(
+                 &shared.idle_workers,
+                 find_work(&shared, iteration),
+                 &|| !shared.finished(),
+-                &|| drive(&mut driver.borrow_mut(), None),
++                &|| {
++                    // Keep one local wake permit, like an unpark token, without
++                    // interrupting this worker through its own selector.
++                    let timeout = worker
++                        .local_wake
++                        .swap(false, Ordering::Relaxed)
++                        .then_some(Duration::ZERO);
++                    drive(&mut driver.borrow_mut(), timeout);
++                },
+             ))
+         } else {
+             runnable
