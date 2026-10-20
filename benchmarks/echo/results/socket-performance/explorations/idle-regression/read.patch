@@ -1,0 +1,128 @@
+diff --git a/crates/iouring/src/io_uring_selector.rs b/crates/iouring/src/io_uring_selector.rs
+index 27671fd..229aae1 100644
+--- a/crates/iouring/src/io_uring_selector.rs
++++ b/crates/iouring/src/io_uring_selector.rs
+@@ -8,7 +8,7 @@ use event_listener::Event as CompletionEvent;
+ use futures_channel::oneshot;
+ use io_uring::{IoUring, opcode, squeue, types};
+ use std::{
+-    cell::Cell,
++    cell::{Cell, UnsafeCell},
+     collections::{HashMap, VecDeque},
+     fs::File as StdFile,
+     future::{Future, poll_fn},
+@@ -792,6 +792,8 @@ pub(crate) struct Reactor {
+     cancellations: VecDeque<u64>,
+     closing: bool,
+     notification_pending: bool,
++    notification_cancelling: bool,
++    notification_read: Option<Box<UnsafeCell<u64>>>,
+     extended_wait: bool,
+ }
+ 
+@@ -813,6 +815,8 @@ impl Reactor {
+             cancellations: VecDeque::new(),
+             closing: false,
+             notification_pending: false,
++            notification_cancelling: false,
++            notification_read: Some(Box::new(UnsafeCell::new(0))),
+             extended_wait,
+         }
+     }
+@@ -912,7 +916,11 @@ impl Reactor {
+             if identifier == NOTIFICATION_TAG {
+                 self.notification_pending = false;
+                 notification_error = syscall("notification-completion", || {
+-                    completion_result(completion.result())
++                    if self.closing && completion.result() == -libc::ECANCELED {
++                        Ok(0)
++                    } else {
++                        completion_result(completion.result())
++                    }
+                 })
+                 .err();
+                 continue;
+@@ -946,6 +954,15 @@ impl Reactor {
+                 }
+                 self.cancellations.pop_front();
+             }
++            if self.closing && self.notification_pending && !self.notification_cancelling {
++                let entry = opcode::AsyncCancel::new(NOTIFICATION_TAG)
++                    .build()
++                    .user_data(CANCEL_TAG);
++                // SAFETY: this entry refers only to the internal read identifier.
++                if unsafe { submissions.push(&entry) }.is_ok() {
++                    self.notification_cancelling = true;
++                }
++            }
+             while !submissions.is_full() {
+                 let Some(request) = self.pending.pop_front() else {
+                     break;
+@@ -978,6 +995,7 @@ impl Reactor {
+             && !command_batch_full
+             && self.in_flight.0.is_empty()
+             && self.pending.is_empty()
++            && !self.notification_pending
+         {
+             return Ok(true);
+         }
+@@ -992,22 +1010,6 @@ impl Reactor {
+             return Ok(false);
+         }
+ 
+-        // Bound notification reads too: continuous producers must not monopolize a turn. A notification may represent executor work or a command arriving after the command batch above. Return before sleeping; a later idle turn will inspect both level-triggered sources, preserving notifications and CQEs which race this check.
+-        let mut notified = false;
+-        let mut bytes = [0; 8];
+-        for _ in 0..16 {
+-            match syscall("notification-read", || {
+-                (&*self.notification).read(&mut bytes)
+-            }) {
+-                Ok(_) => notified = true,
+-                Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+-                Err(error) if error.kind() == io::ErrorKind::WouldBlock => break,
+-                Err(error) => return Err(error),
+-            }
+-        }
+-        if notified {
+-            return Ok(false);
+-        }
+         let result = self.wait(timeout);
+         if let Err(error) = result {
+             if error.kind() != io::ErrorKind::Interrupted
+@@ -1024,15 +1026,15 @@ impl Reactor {
+ 
+     fn wait(&mut self, timeout: Option<Duration>) -> io::Result<()> {
+         if timeout.is_none() || self.extended_wait {
+-            if !self.notification_pending {
+-                let entry = opcode::PollAdd::new(
+-                    types::Fd(self.notification.as_raw_fd()),
+-                    libc::POLLIN as u32,
+-                )
+-                .build()
+-                .user_data(NOTIFICATION_TAG);
+-                // SAFETY: PollAdd retains no userspace pointer. Reactor owns the
+-                // notification descriptor, and this worker alone accesses SQ.
++            if !self.notification_pending && !self.closing {
++                let pointer = self.notification_read.as_ref().unwrap().get().cast::<u8>();
++                let entry = opcode::Read::new(types::Fd(self.notification.as_raw_fd()), pointer, 8)
++                    .offset(0)
++                    .build()
++                    .user_data(NOTIFICATION_TAG);
++                // SAFETY: this stable allocation remains owned until the original
++                // read CQE. Exceptional teardown retains it rather than freeing it.
++                // Only this worker accesses the SQ.
+                 unsafe { self.ring.submission().push(&entry) }
+                     .expect("an idle wait has an empty submission queue");
+                 self.notification_pending = true;
+@@ -1093,6 +1095,11 @@ impl Reactor {
+ 
+ impl Drop for Reactor {
+     fn drop(&mut self) {
++        if self.notification_pending {
++            // Ring teardown alone is not a userspace-memory lifetime guarantee.
++            std::mem::forget(self.notification_read.take());
++        }
++
+         // Pop without retaining a queue borrow: returning a buffer or waking its owner can reenter local routing.
+         while let Some(command) = crate::io_uring_worker::pop(&self.controller) {
+             discard(command);

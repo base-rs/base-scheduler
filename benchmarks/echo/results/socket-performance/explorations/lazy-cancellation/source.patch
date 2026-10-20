@@ -1,0 +1,287 @@
+diff --git a/crates/tokio/src/socket_operations.rs b/crates/tokio/src/socket_operations.rs
+index c447746..ed55705 100644
+--- a/crates/tokio/src/socket_operations.rs
++++ b/crates/tokio/src/socket_operations.rs
+@@ -21,27 +21,14 @@ impl TokioScheduler {
+         interest: Interest,
+         mut operation: impl FnMut(&Socket, &mut Input) -> io::Result<Output> + Send,
+     ) -> (OperationResult<Output>, Input) {
+-        use std::{
+-            future::{Future, poll_fn},
+-            pin::pin,
+-            task::Poll,
+-        };
+         let result = async {
+             cancellation.check()?;
+             self.check_socket(socket)?;
+-            let mut operation = pin!(socket.io(interest, |socket| operation(socket, &mut input)));
+-            let mut cancelled = pin!(cancellation.cancelled());
+-            poll_fn(|context| {
+-                match operation.as_mut().poll(context) {
+-                    Poll::Ready(result) => return Poll::Ready(result.map_err(Into::into)),
+-                    Poll::Pending => (),
+-                }
+-                if cancelled.as_mut().poll(context).is_ready() {
+-                    return Poll::Ready(Err(Cancelled.into()));
+-                }
+-                Poll::Pending
+-            })
+-            .await
++            socket
++                .io(interest, cancellation, |socket| {
++                    operation(socket, &mut input)
++                })
++                .await
+         }
+         .await;
+         (result, input)
+diff --git a/crates/tokio/src/tokio_socket.rs b/crates/tokio/src/tokio_socket.rs
+index a2635d7..40c486c 100644
+--- a/crates/tokio/src/tokio_socket.rs
++++ b/crates/tokio/src/tokio_socket.rs
+@@ -1,7 +1,7 @@
+ // Released under the MIT License.
+ // Copyright, 2026, by Samuel Williams.
+ 
+-use core_scheduler::Interest;
++use core_scheduler::{Cancellation, Cancelled, Interest, OperationResult};
+ #[cfg(unix)]
+ use std::sync::atomic::{AtomicBool, Ordering};
+ use std::{io, net::SocketAddr, sync::Arc};
+@@ -148,65 +148,86 @@ impl TokioSocket {
+     pub(super) async fn io<Output, Operation>(
+         &self,
+         interest: Interest,
++        cancellation: &Cancellation,
+         mut operation: Operation,
+-    ) -> io::Result<Output>
++    ) -> OperationResult<Output>
+     where
+         Operation: FnMut(&socket2::Socket) -> io::Result<Output> + Send,
+     {
+         // Try every operation before gating on readiness: lifecycle calls, invalid arguments, and state errors can complete even when a previous operation cleared the cached readiness.
+         let result = operation(self.get_ref());
+         if !matches!(&result, Err(error) if error.kind() == io::ErrorKind::WouldBlock) {
+-            return result;
++            return result.map_err(Into::into);
+         }
+-        #[cfg(unix)]
+-        {
+-            // Linux can report EPOLLHUP for an unconnected TCP socket; Tokio retains closed readiness permanently, which would spin after the socket later connects and a syscall returns WouldBlock. Register only after a syscall needs to wait, then reuse the registration on subsequent waits.
+-            let registration = match self.inner.registration.get() {
+-                Some(registration) => registration,
+-                None => self.inner.registration().await?,
+-            };
+-            let interest = match interest {
+-                Interest::Readable => tokio::io::Interest::READABLE,
+-                Interest::Writable => tokio::io::Interest::WRITABLE,
+-            };
+-            // Tokio's poll methods keep one waker per direction. Reserve that slot for one operation until completion or drop; concurrent operations use Tokio's independent multi-waiter list. Forgetting a reservation only leaves later operations on the multi-waiter path.
+-            let waiting = if interest == tokio::io::Interest::READABLE {
+-                &self.inner.read_waiting
+-            } else {
+-                &self.inner.write_waiting
+-            };
+-            if waiting
+-                .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+-                .is_err()
++        use std::{
++            future::{Future, poll_fn},
++            pin::pin,
++            task::Poll,
++        };
++        // Only waiting I/O needs a cancellation listener and a nested future.
++        let mut operation = pin!(async {
++            #[cfg(unix)]
+             {
+-                return registration
+-                    .async_io(interest, |_| operation(self.inner.get_ref()))
+-                    .await;
+-            }
+-            let _waiter = PollWaiter(waiting);
+-            std::future::poll_fn(|context| {
+-                loop {
+-                    let mut ready =
+-                        std::task::ready!(if interest == tokio::io::Interest::READABLE {
+-                            registration.poll_read_ready(context)
+-                        } else {
+-                            registration.poll_write_ready(context)
+-                        })?;
+-                    if let Ok(result) = ready.try_io(|_| operation(self.inner.get_ref())) {
+-                        return std::task::Poll::Ready(result);
+-                    }
++                // Linux can report EPOLLHUP for an unconnected TCP socket; Tokio retains closed readiness permanently, which would spin after the socket later connects and a syscall returns WouldBlock. Register only after a syscall needs to wait, then reuse the registration on subsequent waits.
++                let registration = match self.inner.registration.get() {
++                    Some(registration) => registration,
++                    None => self.inner.registration().await?,
++                };
++                let interest = match interest {
++                    Interest::Readable => tokio::io::Interest::READABLE,
++                    Interest::Writable => tokio::io::Interest::WRITABLE,
++                };
++                // Tokio's poll methods keep one waker per direction. Reserve that slot for one operation until completion or drop; concurrent operations use Tokio's independent multi-waiter list. Forgetting a reservation only leaves later operations on the multi-waiter path.
++                let waiting = if interest == tokio::io::Interest::READABLE {
++                    &self.inner.read_waiting
++                } else {
++                    &self.inner.write_waiting
++                };
++                if waiting
++                    .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
++                    .is_err()
++                {
++                    return registration
++                        .async_io(interest, |_| operation(self.inner.get_ref()))
++                        .await;
+                 }
+-            })
+-            .await
+-        }
++                let _waiter = PollWaiter(waiting);
++                std::future::poll_fn(|context| {
++                    loop {
++                        let mut ready =
++                            std::task::ready!(if interest == tokio::io::Interest::READABLE {
++                                registration.poll_read_ready(context)
++                            } else {
++                                registration.poll_write_ready(context)
++                            })?;
++                        if let Ok(result) = ready.try_io(|_| operation(self.inner.get_ref())) {
++                            return std::task::Poll::Ready(result);
++                        }
++                    }
++                })
++                .await
++            }
+ 
+-        #[cfg(windows)]
+-        {
+-            match interest {
+-                Interest::Readable => self.inner.read_with(|socket| operation(socket)).await,
+-                Interest::Writable => self.inner.write_with(|socket| operation(socket)).await,
++            #[cfg(windows)]
++            {
++                match interest {
++                    Interest::Readable => self.inner.read_with(|socket| operation(socket)).await,
++                    Interest::Writable => self.inner.write_with(|socket| operation(socket)).await,
++                }
+             }
+-        }
++        });
++        let mut cancelled = pin!(cancellation.cancelled());
++        poll_fn(|context| {
++            match operation.as_mut().poll(context) {
++                Poll::Ready(result) => return Poll::Ready(result.map_err(Into::into)),
++                Poll::Pending => (),
++            }
++            if cancelled.as_mut().poll(context).is_ready() {
++                return Poll::Ready(Err(Cancelled.into()));
++            }
++            Poll::Pending
++        })
++        .await
+     }
+ 
+     pub fn local_addr(&self) -> io::Result<SocketAddr> {
+diff --git a/crates/tokio/src/tokio_socket/tests.rs b/crates/tokio/src/tokio_socket/tests.rs
+index 6cc067b..662271e 100644
+--- a/crates/tokio/src/tokio_socket/tests.rs
++++ b/crates/tokio/src/tokio_socket/tests.rs
+@@ -4,6 +4,8 @@
+ use super::*;
+ use std::time::Duration;
+ 
++static NEVER: Cancellation = Cancellation::never();
++
+ fn runtime() -> tokio::runtime::Runtime {
+     tokio::runtime::Builder::new_current_thread()
+         .enable_all()
+@@ -64,7 +66,9 @@ fn invalid_accept_returns_without_waiting_for_readiness() {
+     let result = runtime.block_on(async {
+         tokio::time::timeout(
+             Duration::from_secs(1),
+-            socket.io(Interest::Readable, |socket| socket.accept().map(|_| ())),
++            socket.io(Interest::Readable, &NEVER, |socket| {
++                socket.accept().map(|_| ())
++            }),
+         )
+         .await
+     });
+@@ -90,7 +94,7 @@ fn transient_would_block_retries_with_the_requested_readiness_direction() {
+             // Model a socket becoming ready between the initial syscall and readiness registration. Both reactor directions must retry the actual syscall.
+             let mut writes = 0;
+             let sent = client
+-                .io(Interest::Writable, |socket| {
++                .io(Interest::Writable, &NEVER, |socket| {
+                     writes += 1;
+                     if writes == 1 {
+                         return Err(io::ErrorKind::WouldBlock.into());
+@@ -104,7 +108,7 @@ fn transient_would_block_retries_with_the_requested_readiness_direction() {
+             let mut reads = 0;
+             let mut buffer = [0];
+             let received = server
+-                .io(Interest::Readable, |socket| {
++                .io(Interest::Readable, &NEVER, |socket| {
+                     reads += 1;
+                     if reads == 1 {
+                         return Err(io::ErrorKind::WouldBlock.into());
+@@ -242,10 +246,12 @@ fn reserved_and_concurrent_waiters_both_receive_readiness_wakeups() {
+                     crate::socket_io::send(socket, b"x")
+                 }
+             };
+-            let mut first =
+-                Box::pin(descriptor.io(interest, |socket| operation(socket, &mut first_buffer)));
+-            let mut second =
+-                Box::pin(descriptor.io(interest, |socket| operation(socket, &mut second_buffer)));
++            let mut first = Box::pin(descriptor.io(interest, &NEVER, |socket| {
++                operation(socket, &mut first_buffer)
++            }));
++            let mut second = Box::pin(descriptor.io(interest, &NEVER, |socket| {
++                operation(socket, &mut second_buffer)
++            }));
+             let (notified, notifications) = mpsc::channel();
+             let first_waker = Waker::from(Arc::new(Notify(0, notified.clone())));
+             let second_waker = Waker::from(Arc::new(Notify(1, notified)));
+@@ -308,12 +314,12 @@ fn dropping_or_forgetting_a_reserved_waiter_preserves_other_waiters() {
+             let (mut peer, _) = listener.accept().unwrap();
+             let descriptor =
+                 TokioSocket::new(crate::test_support::runtime().handle(), native.into()).unwrap();
+-            let mut first = Box::pin(descriptor.io(Interest::Readable, |socket| {
++            let mut first = Box::pin(descriptor.io(Interest::Readable, &NEVER, |socket| {
+                 crate::socket_io::recv(socket, &mut [0])
+             }));
+             assert!(block_on(poll_once(&mut first)).is_none());
+             assert!(descriptor.inner.read_waiting.load(Ordering::Acquire));
+-            let mut second = Box::pin(descriptor.io(Interest::Readable, |socket| {
++            let mut second = Box::pin(descriptor.io(Interest::Readable, &NEVER, |socket| {
+                 crate::socket_io::recv(socket, &mut [0])
+             }));
+             assert!(block_on(poll_once(&mut second)).is_none());
+@@ -329,12 +335,9 @@ fn dropping_or_forgetting_a_reserved_waiter_preserves_other_waiters() {
+             peer.write_all(b"ab").unwrap();
+             assert_eq!(block_on(second).unwrap(), 1);
+             assert_eq!(
+-                block_on(
+-                    descriptor.io(Interest::Readable, |socket| crate::socket_io::recv(
+-                        socket,
+-                        &mut [0]
+-                    ))
+-                )
++                block_on(descriptor.io(Interest::Readable, &NEVER, |socket| {
++                    crate::socket_io::recv(socket, &mut [0])
++                }))
+                 .unwrap(),
+                 1
+             );
+@@ -351,10 +354,10 @@ fn runtime_shutdown_wakes_both_reserved_and_concurrent_waiters() {
+     let native = std::net::TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+     let (_peer, _) = listener.accept().unwrap();
+     let descriptor = TokioSocket::new(runtime.handle(), native.into()).unwrap();
+-    let mut first = Box::pin(descriptor.io(Interest::Readable, |socket| {
++    let mut first = Box::pin(descriptor.io(Interest::Readable, &NEVER, |socket| {
+         crate::socket_io::recv(socket, &mut [0])
+     }));
+-    let mut second = Box::pin(descriptor.io(Interest::Readable, |socket| {
++    let mut second = Box::pin(descriptor.io(Interest::Readable, &NEVER, |socket| {
+         crate::socket_io::recv(socket, &mut [0])
+     }));
+     assert!(block_on(poll_once(&mut first)).is_none());

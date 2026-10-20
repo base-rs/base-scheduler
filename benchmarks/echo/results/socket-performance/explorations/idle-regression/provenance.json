@@ -1,0 +1,30 @@
+{
+  "base": "4a061fbc4355738f39f5eb6ea1db1520db6a753e",
+  "build": "cargo build --release --locked -p core-scheduler-echo-benchmark; RUSTFLAGS=-Cdebuginfo=1",
+  "variants": {
+    "ppoll": {
+      "commit": "7fb498afd0afc8a2a1aba87d235a45176458ec80",
+      "binary": "/tmp/core-perf-idle-fix-ppoll",
+      "sha256": "31051769e3f6beb68de9e702560eb701a3acd869f28e1cfe96c159b1404c6269",
+      "results": "/home/samuel/.cache/core-scheduler-perf-idle-fix/ppoll-screen/aiko.json"
+    },
+    "direct-read": {
+      "commit": "6bd87198787b489950766ca52f34a6f8589d5ddc",
+      "binary": "/tmp/core-perf-idle-fix-read",
+      "sha256": "213ca795fefd6a561cc2fecc41702a0948078e6deee00757b4550247dd12bdfa",
+      "results": "/home/samuel/.cache/core-scheduler-perf-idle-fix/read-screen/aiko.json"
+    },
+    "stream": {
+      "commit": "d9161c2a11821b2360357c2e0f549d5b66f09234",
+      "binary": "/tmp/core-perf-idle-fix-stream",
+      "sha256": "4cf6f987593cbf769c18bbdfedf118fe647a6c61ac22b4d7383a9e7d02777f95",
+      "results": "/home/samuel/.cache/core-scheduler-perf-idle-fix/stream-screen/aiko.json"
+    },
+    "spin": {
+      "commit": "d2660b73736c89a4745fff199a1032bcc958d55f",
+      "binary": "/tmp/core-perf-idle-fix-spin",
+      "sha256": "62d3907202724ee5c0c953985dd67d7d060bc6ae85e996c92af8efae9d9484b0",
+      "results": "/home/samuel/.cache/core-scheduler-perf-idle-fix/spin-screen/aiko.json"
+    }
+  }
+}

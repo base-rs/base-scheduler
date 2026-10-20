@@ -1,0 +1,41 @@
+diff --git a/crates/iouring/src/io_uring_selector.rs b/crates/iouring/src/io_uring_selector.rs
+index 27671fd..42796cc 100644
+--- a/crates/iouring/src/io_uring_selector.rs
++++ b/crates/iouring/src/io_uring_selector.rs
+@@ -1023,36 +1023,6 @@ impl Reactor {
+     }
+ 
+     fn wait(&mut self, timeout: Option<Duration>) -> io::Result<()> {
+-        if timeout.is_none() || self.extended_wait {
+-            if !self.notification_pending {
+-                let entry = opcode::PollAdd::new(
+-                    types::Fd(self.notification.as_raw_fd()),
+-                    libc::POLLIN as u32,
+-                )
+-                .build()
+-                .user_data(NOTIFICATION_TAG);
+-                // SAFETY: PollAdd retains no userspace pointer. Reactor owns the
+-                // notification descriptor, and this worker alone accesses SQ.
+-                unsafe { self.ring.submission().push(&entry) }
+-                    .expect("an idle wait has an empty submission queue");
+-                self.notification_pending = true;
+-            }
+-            let deadline = timeout.map(|timeout| {
+-                types::Timespec::new()
+-                    .sec(timeout.as_secs().min(i64::MAX as u64))
+-                    .nsec(timeout.subsec_nanos())
+-            });
+-            return syscall("wait", || match deadline {
+-                Some(ref deadline) => self
+-                    .ring
+-                    .submitter()
+-                    .submit_with_args(1, &types::SubmitArgs::new().timespec(deadline)),
+-                None => self.ring.submit_and_wait(1),
+-            })
+-            .map(|_| ());
+-        }
+-        // Older kernels lack the extended enter timeout. Keep their bounded
+-        // waits on these two level-triggered descriptors without epoll setup.
+         let mut sources = [
+             libc::pollfd {
+                 fd: self.notification.as_raw_fd(),

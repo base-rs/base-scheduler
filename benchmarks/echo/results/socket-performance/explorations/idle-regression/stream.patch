@@ -1,0 +1,102 @@
+diff --git a/crates/iouring/src/io_uring_selector.rs b/crates/iouring/src/io_uring_selector.rs
+index 27671fd..65571d3 100644
+--- a/crates/iouring/src/io_uring_selector.rs
++++ b/crates/iouring/src/io_uring_selector.rs
+@@ -13,7 +13,7 @@ use std::{
+     fs::File as StdFile,
+     future::{Future, poll_fn},
+     io::{self, Read, Write},
+-    os::fd::{AsRawFd, FromRawFd},
++    os::{fd::AsRawFd, unix::net::UnixStream},
+     pin::pin,
+     sync::{
+         Arc, OnceLock, Weak,
+@@ -78,18 +78,11 @@ fn validate_operation_support(supported: impl Fn(u8) -> bool) -> io::Result<()>
+     Ok(())
+ }
+ 
+-fn notification() -> io::Result<StdFile> {
+-    syscall("notification", || {
+-        // SAFETY: eventfd has no pointer arguments. The returned descriptor is
+-        // private to this selector, nonblocking, and closed on exec.
+-        let descriptor = unsafe { libc::eventfd(0, libc::EFD_CLOEXEC | libc::EFD_NONBLOCK) };
+-        if descriptor < 0 {
+-            Err(io::Error::last_os_error())
+-        } else {
+-            // SAFETY: This successful syscall returns a fresh owned descriptor.
+-            Ok(unsafe { StdFile::from_raw_fd(descriptor) })
+-        }
+-    })
++fn notification() -> io::Result<(Arc<UnixStream>, Arc<UnixStream>)> {
++    let (writer, reader) = syscall("notification-pair", UnixStream::pair)?;
++    syscall("notification-mode", || writer.set_nonblocking(true))?;
++    syscall("receiver-mode", || reader.set_nonblocking(true))?;
++    Ok((Arc::new(writer), Arc::new(reader)))
+ }
+ 
+ fn completion_result(result: i32) -> io::Result<usize> {
+@@ -269,7 +262,7 @@ impl Drop for SignalCompletion {
+ pub(crate) struct Controller {
+     capacity: Arc<Capacity>,
+     commands: mpsc::Sender<Command>,
+-    notification: Arc<StdFile>,
++    notification: Arc<UnixStream>,
+     next_identifier: AtomicU64,
+     closed: AtomicBool,
+     shutdown: Arc<Shutdown>,
+@@ -296,9 +289,7 @@ impl Controller {
+         // A saturated event counter already contains a wakeup. Other errors mean the selector
+         // has exited; dropping its receivers wakes pending operation futures.
+         loop {
+-            match syscall("notify", || {
+-                (&*self.notification).write(&1_u64.to_ne_bytes())
+-            }) {
++            match syscall("notify", || (&*self.notification).write(&[1])) {
+                 Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+                 _ => break,
+             }
+@@ -498,7 +489,7 @@ impl IoUringSelector {
+         syscall("operation-support", || {
+             validate_operation_support(|operation| probe.is_supported(operation))
+         })?;
+-        let notification = Arc::new(notification()?);
++        let (notification, receiver) = notification()?;
+         let (commands, incoming) = mpsc::channel();
+         let shutdown = Arc::new(Shutdown {
+             finished: AtomicBool::new(false),
+@@ -517,7 +508,7 @@ impl IoUringSelector {
+             closed: AtomicBool::new(false),
+             shutdown: Arc::clone(&shutdown),
+         });
+-        let reactor = Reactor::new(ring, notification, incoming, Arc::clone(&controller));
++        let reactor = Reactor::new(ring, receiver, incoming, Arc::clone(&controller));
+         Ok(IoUringDriver {
+             reactor: Some(reactor),
+             controller,
+@@ -784,7 +775,7 @@ impl Selector for IoUringSelector {
+ }
+ pub(crate) struct Reactor {
+     ring: IoUring,
+-    notification: Arc<StdFile>,
++    notification: Arc<UnixStream>,
+     incoming: mpsc::Receiver<Command>,
+     controller: Arc<Controller>,
+     pending: VecDeque<Box<dyn PendingRequest>>,
+@@ -798,7 +789,7 @@ pub(crate) struct Reactor {
+ impl Reactor {
+     fn new(
+         ring: IoUring,
+-        notification: Arc<StdFile>,
++        notification: Arc<UnixStream>,
+         incoming: mpsc::Receiver<Command>,
+         controller: Arc<Controller>,
+     ) -> Self {
+@@ -994,7 +985,7 @@ impl Reactor {
+ 
+         // Bound notification reads too: continuous producers must not monopolize a turn. A notification may represent executor work or a command arriving after the command batch above. Return before sleeping; a later idle turn will inspect both level-triggered sources, preserving notifications and CQEs which race this check.
+         let mut notified = false;
+-        let mut bytes = [0; 8];
++        let mut bytes = [0; 256];
+         for _ in 0..16 {
+             match syscall("notification-read", || {
+                 (&*self.notification).read(&mut bytes)

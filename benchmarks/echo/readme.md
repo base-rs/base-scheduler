@@ -16,7 +16,7 @@ The [fresh socket-path profiles](readiness-profiling.md) combine optimized-build
 
 The [Tokio admission-only comparison](tokio-admission-performance.md) measures removing per-operation scheduler-shutdown listeners, with before/after pure Tokio controls and both adapter buffer interfaces.
 
-The [socket readiness and interrupt comparison](socket-performance.md) measures reserved Tokio polling waiters and io-event-style direct ring interrupts with matching before/after benchmark code.
+The [socket readiness comparison](socket-performance.md) measures reserved Tokio polling waiters and capacity/drain notification reductions with matching before/after benchmark code. It also links the rejected direct-ring interrupt experiments and io-event source review.
 
 Build and run the comparison on Linux:
 
