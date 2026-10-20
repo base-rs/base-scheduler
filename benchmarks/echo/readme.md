@@ -26,6 +26,8 @@ The [idle notification follow-up](idle-notification-performance.md) measures rem
 
 The [single-worker research](single-worker-research.md) profiles the merged alternating-queue executor, compares matching Tokio read policies, and records the remaining Native readiness costs and rejected ring hints.
 
+The [worker timer research](worker-timers-research.md) tests using timer deadlines in worker I/O waits, distinguishes timer precision from integration costs, and measures the CPU cost of sharing one queue between workers.
+
 Build and run the comparison on Linux:
 
 ```sh

@@ -1,0 +1,380 @@
+diff --git a/crates/native/src/native_scheduler.rs b/crates/native/src/native_scheduler.rs
+index 647402e..751d48e 100644
+--- a/crates/native/src/native_scheduler.rs
++++ b/crates/native/src/native_scheduler.rs
+@@ -12,7 +12,7 @@ use std::{future::Future, io};
+ pub struct NativeScheduler<S: Selector = ReadinessSelector> {
+     selector: S,
+     pub(crate) tasks: crate::task_service::TaskService,
+-    pub(crate) timers: crate::timer_service::TimerService,
++    pub(crate) timers: std::sync::Arc<crate::timer_service::TimerService>,
+ }
+ 
+ impl NativeScheduler {
+@@ -55,7 +55,9 @@ impl<S: Selector> NativeScheduler<S> {
+             Ok(tasks) => Ok(Self {
+                 selector,
+                 tasks,
+-                timers: crate::timer_service::TimerService::new(options.timer_capacity),
++                timers: std::sync::Arc::new(crate::timer_service::TimerService::new(
++                    options.timer_capacity,
++                )),
+             }),
+             Err(error) => {
+                 selector.close();
+@@ -72,6 +74,9 @@ impl<S: Selector> NativeScheduler<S> {
+         drivers: Vec<D>,
+         options: NativeExecutorOptions,
+     ) -> io::Result<Self> {
++        let timers = std::sync::Arc::new(crate::timer_service::TimerService::new(
++            options.timer_capacity.max(1),
++        ));
+         let result = if options.workers == 0
+             || options.timer_capacity == 0
+             || drivers.len() != options.workers
+@@ -81,13 +86,13 @@ impl<S: Selector> NativeScheduler<S> {
+                 "one driver per nonzero worker and nonzero timer capacity are required",
+             ))
+         } else {
+-            crate::task_service::TaskService::with_drivers(drivers)
++            crate::task_service::TaskService::with_drivers(drivers, std::sync::Arc::clone(&timers))
+         };
+         match result {
+             Ok(tasks) => Ok(Self {
+                 selector,
+                 tasks,
+-                timers: crate::timer_service::TimerService::new(options.timer_capacity),
++                timers,
+             }),
+             Err(error) => {
+                 selector.close();
+diff --git a/crates/native/src/native_scheduler/driver_tests.rs b/crates/native/src/native_scheduler/driver_tests.rs
+index 40a340f..2673ba1 100644
+--- a/crates/native/src/native_scheduler/driver_tests.rs
++++ b/crates/native/src/native_scheduler/driver_tests.rs
+@@ -32,6 +32,7 @@ struct State {
+     only_idle_completions: AtomicBool,
+     interrupts: AtomicUsize,
+     completion_interrupts: AtomicUsize,
++    timed_waits: AtomicUsize,
+ }
+ impl Wake for State {
+     fn wake(self: Arc<Self>) {
+@@ -101,8 +102,13 @@ impl SelectorWorker for Driver {
+                 return Ok(true);
+             }
+         }
+-        if timeout.is_none() {
+-            thread::park();
++        match timeout {
++            Some(timeout) if !timeout.is_zero() => {
++                self.0.timed_waits.fetch_add(1, Ordering::SeqCst);
++                thread::park_timeout(timeout);
++            }
++            None => thread::park(),
++            _ => (),
+         }
+         Ok(false)
+     }
+@@ -132,6 +138,62 @@ fn wait(mut condition: impl FnMut() -> bool) {
+     }
+ }
+ 
++#[test]
++fn earlier_external_timer_interrupts_an_existing_io_wait_without_a_timer_thread() {
++    use core_scheduler::{Cancellation, Clock};
++    use futures_lite::future::poll_once;
++    crate::test_support::run(|| {
++        let state = Arc::new(State::default());
++        let scheduler = construct(&[Arc::clone(&state)]);
++        crate::thread::FAIL_AFTER.set(Some(0));
++        let never = Cancellation::never();
++        let mut distant = Box::pin(scheduler.sleep(Duration::from_secs(3600), &never));
++        assert!(block_on(poll_once(&mut distant)).is_none());
++        wait(|| state.timed_waits.load(Ordering::SeqCst) > 0);
++        let before = std::time::Instant::now();
++        block_on(scheduler.sleep(Duration::from_millis(20), &never)).unwrap();
++        assert!(before.elapsed() < Duration::from_secs(2));
++        assert_eq!(crate::thread::FAIL_AFTER.take(), Some(0));
++        drop(distant);
++        let turns = state.turns.load(Ordering::SeqCst);
++        thread::sleep(Duration::from_millis(30));
++        assert!(state.turns.load(Ordering::SeqCst) - turns < 20);
++        block_on(scheduler.shutdown());
++    });
++}
++
++#[test]
++fn worker_timer_delivery_is_drained_during_shutdown() {
++    use core_scheduler::{Cancellation, Clock};
++    use futures_lite::future::poll_once;
++    use std::task::Context;
++    crate::test_support::run(|| {
++        struct GatedWake(Arc<crate::test_support::Gate>);
++        impl Wake for GatedWake {
++            fn wake(self: Arc<Self>) {
++                self.0.wait();
++            }
++        }
++        let scheduler = construct(&[Arc::new(State::default())]);
++        let (gate, started, release) = crate::test_support::Gate::new();
++        let waker = Waker::from(Arc::new(GatedWake(gate)));
++        let never = Cancellation::never();
++        let mut sleep = Box::pin(scheduler.sleep(Duration::from_millis(20), &never));
++        assert!(
++            sleep
++                .as_mut()
++                .poll(&mut Context::from_waker(&waker))
++                .is_pending()
++        );
++        started.recv_timeout(Duration::from_secs(5)).unwrap();
++        let mut shutdown = Box::pin(scheduler.shutdown());
++        assert!(block_on(poll_once(&mut shutdown)).is_none());
++        drop(release);
++        block_on(shutdown);
++        block_on(sleep).unwrap();
++    });
++}
++
+ #[test]
+ fn idle_completions_resume_tasks_without_interrupting_their_own_worker() {
+     crate::test_support::run(|| {
+diff --git a/crates/native/src/task_service.rs b/crates/native/src/task_service.rs
+index ea8cc65..acff013 100644
+--- a/crates/native/src/task_service.rs
++++ b/crates/native/src/task_service.rs
+@@ -36,6 +36,7 @@ pub(crate) struct Shared {
+     remaining: AtomicUsize,
+     outstanding: AtomicUsize,
+     changed: Event,
++    pub(crate) timers: Option<Arc<crate::timer_service::TimerService>>,
+ }
+ pub(crate) struct TaskService {
+     pub(crate) shared: Arc<Shared>,
+@@ -103,6 +104,7 @@ impl Shared {
+             remaining: AtomicUsize::new(0),
+             outstanding: AtomicUsize::new(0),
+             changed: Event::new(),
++            timers: None,
+         }
+     }
+ 
+@@ -160,13 +162,17 @@ impl TaskService {
+     }
+     pub(crate) fn with_drivers<D: core_scheduler_selector::SelectorDriver>(
+         drivers: Vec<D>,
++        timers: Arc<crate::timer_service::TimerService>,
+     ) -> io::Result<Self> {
+         let queues: Vec<_> = (0..drivers.len())
+             .map(|_| std::array::from_fn(|_| Worker::new_fifo()))
+             .collect();
++        let mut shared = Shared::new(&queues);
++        shared.timers = Some(Arc::clone(&timers));
+         let service = Self {
+-            shared: Arc::new(Shared::new(&queues)),
++            shared: Arc::new(shared),
+         };
++        timers.attach(&service.shared);
+         for (identifier, (queue, driver)) in queues.into_iter().zip(drivers).enumerate() {
+             let shared = Arc::clone(&service.shared);
+             thread::start("core-native-task", move || {
+diff --git a/crates/native/src/timer_service.rs b/crates/native/src/timer_service.rs
+index 86a4fa8..c473d11 100644
+--- a/crates/native/src/timer_service.rs
++++ b/crates/native/src/timer_service.rs
+@@ -12,8 +12,8 @@ use std::{
+     io,
+     pin::pin,
+     sync::{
+-        Arc, Mutex,
+-        atomic::{AtomicBool, Ordering},
++        Arc, Mutex, OnceLock, Weak,
++        atomic::{AtomicBool, AtomicUsize, Ordering},
+     },
+     task::Poll,
+     time::Instant,
+@@ -40,6 +40,8 @@ struct Shared {
+     running: AtomicBool,
+     closing: AtomicBool,
+     changed: Event,
++    workers: OnceLock<Weak<crate::task_service::Shared>>,
++    deliveries: AtomicUsize,
+ }
+ pub(crate) struct TimerService {
+     shared: Arc<Shared>,
+@@ -65,6 +67,8 @@ impl TimerService {
+                 running: AtomicBool::new(false),
+                 closing: AtomicBool::new(false),
+                 changed: Event::new(),
++                workers: OnceLock::new(),
++                deliveries: AtomicUsize::new(0),
+             }),
+         }
+     }
+@@ -78,6 +82,9 @@ impl TimerService {
+         if self.shared.state.lock().unwrap().owner.is_none() {
+             return Err(io::Error::new(io::ErrorKind::BrokenPipe, "clock is closed"));
+         }
++        if self.shared.workers.get().is_some() {
++            return Ok(());
++        }
+         if !*started {
+             let shared = Arc::clone(&self.shared);
+             let clock = self.clock.clone();
+@@ -94,6 +101,51 @@ impl TimerService {
+         }
+         Ok(())
+     }
++    pub(crate) fn attach(&self, workers: &Arc<crate::task_service::Shared>) {
++        assert!(self.shared.workers.set(Arc::downgrade(workers)).is_ok());
++    }
++    fn notify(&self) {
++        if let Some(workers) = self.shared.workers.get().and_then(Weak::upgrade) {
++            workers.wake_idle(crate::task_service::UNASSIGNED_WORKER);
++        }
++    }
++    fn notify_earlier(&self, previous: Option<Instant>) {
++        if self.shared.workers.get().is_some()
++            && self
++                .clock
++                .next_deadline()
++                .is_some_and(|next| previous.is_none_or(|old| next < old))
++        {
++            self.notify();
++        }
++    }
++    pub(crate) fn timeout(
++        &self,
++        requested: Option<std::time::Duration>,
++    ) -> Option<std::time::Duration> {
++        let deadline = self.clock.next_deadline()?;
++        let remaining = deadline.saturating_duration_since(Instant::now());
++        Some(requested.map_or(remaining, |requested| requested.min(remaining)))
++    }
++    pub(crate) fn poll(&self, ready: &mut Vec<SleepWake>) {
++        let Some(deadline) = self.clock.next_deadline() else {
++            return;
++        };
++        let now = Instant::now();
++        if deadline > now {
++            return;
++        }
++        #[cfg(test)]
++        if self.shared.state.lock().unwrap().paused.is_some() {
++            return;
++        }
++        self.shared.deliveries.fetch_add(1, Ordering::AcqRel);
++        let _delivery = Delivery(&self.shared);
++        self.clock.try_poll(now, ready);
++        for wake in ready.drain(..) {
++            crate::panic::discard(wake);
++        }
++    }
+     pub(crate) fn now(&self) -> Instant {
+         self.shared.state.lock().unwrap().now()
+     }
+@@ -107,6 +159,7 @@ impl TimerService {
+             return Ok(());
+         }
+         self.start()?;
++        let _changed = TimerChange(self);
+         let mut sleep = pin!(self.clock.sleep_until(deadline));
+         let mut cancelled = pin!(cancellation.cancelled());
+         poll_fn(|context| {
+@@ -117,7 +170,10 @@ impl TimerService {
+             if cancelled.as_mut().poll(context).is_ready() {
+                 return Poll::Ready(Err(core_scheduler::Cancelled.into()));
+             }
+-            sleep.as_mut().poll(context).map(|result| {
++            let previous = self.clock.next_deadline();
++            let result = sleep.as_mut().poll(context);
++            self.notify_earlier(previous);
++            result.map(|result| {
+                 result.map_err(|error| {
+                     io::Error::new(
+                         match error {
+@@ -154,6 +210,7 @@ impl TimerService {
+         loop {
+             event_listener::listener!(self.shared.changed => listener);
+             if !self.shared.running.load(Ordering::Acquire)
++                && self.shared.deliveries.load(Ordering::Acquire) == 0
+                 && !self.shared.closing.load(Ordering::Acquire)
+             {
+                 return;
+@@ -162,6 +219,29 @@ impl TimerService {
+         }
+     }
+ }
++struct Delivery<'a>(&'a Shared);
++impl Drop for Delivery<'_> {
++    fn drop(&mut self) {
++        if self.0.deliveries.fetch_sub(1, Ordering::AcqRel) == 1 {
++            self.0.changed.notify(usize::MAX);
++        }
++    }
++}
++// Declared before the sleep registration so its destructor runs after cancellation publishes cleanup.
++struct TimerChange<'a>(&'a TimerService);
++impl Drop for TimerChange<'_> {
++    fn drop(&mut self) {
++        if self.0.shared.workers.get().is_some()
++            && self
++                .0
++                .clock
++                .next_deadline()
++                .is_some_and(|deadline| deadline <= Instant::now())
++        {
++            self.0.notify();
++        }
++    }
++}
+ impl Drop for TimerService {
+     fn drop(&mut self) {
+         self.close();
+diff --git a/crates/native/src/worker.rs b/crates/native/src/worker.rs
+index 85a1130..7d732e0 100644
+--- a/crates/native/src/worker.rs
++++ b/crates/native/src/worker.rs
+@@ -201,8 +201,12 @@ fn drive(
+         if !matches!(active.turn(timeout), Ok(false)) {
+             *driver = None;
+         }
+-    } else if timeout.is_none() {
+-        thread::park();
++    } else {
++        match timeout {
++            Some(timeout) if !timeout.is_zero() => thread::park_timeout(timeout),
++            None => thread::park(),
++            _ => (),
++        }
+     }
+ }
+ 
+@@ -244,8 +248,12 @@ fn run_loop(
+             current,
+         }))
+     });
++    let mut timer_ready = Vec::with_capacity(if shared.timers.is_some() { 64 } else { 0 });
+     let mut iteration = 0usize;
+     loop {
++        if let Some(timers) = &shared.timers {
++            timers.poll(&mut timer_ready);
++        }
+         iteration = iteration.wrapping_add(1);
+         if shared.finished() {
+             if let Some(active) = driver.as_mut() {
+@@ -267,7 +275,13 @@ fn run_loop(
+                     &shared.idle_workers,
+                     find_work(&shared, iteration),
+                     || !shared.finished(),
+-                    || drive(&mut driver, None),
++                    || {
++                        let timeout = shared
++                            .timers
++                            .as_ref()
++                            .and_then(|timers| timers.timeout(None));
++                        drive(&mut driver, timeout);
++                    },
+                 )
+             }
+             result => yield_on_retry(result).success(),
