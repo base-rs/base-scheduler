@@ -29,12 +29,16 @@ struct State {
     turns: AtomicUsize,
     dropped: AtomicUsize,
     retired: AtomicBool,
+    only_idle_completions: AtomicBool,
+    interrupts: AtomicUsize,
+    completion_interrupts: AtomicUsize,
 }
 impl Wake for State {
     fn wake(self: Arc<Self>) {
         self.wake_by_ref();
     }
     fn wake_by_ref(self: &Arc<Self>) {
+        self.interrupts.fetch_add(1, Ordering::SeqCst);
         if let Some(thread) = self.thread.get() {
             thread.unpark();
         }
@@ -74,14 +78,21 @@ impl SelectorWorker for Driver {
             self.0.retired.store(true, Ordering::SeqCst);
             return Err(io::Error::other("driver failure"));
         }
-        if !self.0.paused.load(Ordering::SeqCst) {
+        if !self.0.paused.load(Ordering::SeqCst)
+            && (timeout.is_none() || !self.0.only_idle_completions.load(Ordering::SeqCst))
+        {
             let batch = std::mem::take(&mut *self.0.queued.lock().unwrap());
             if !batch.is_empty() {
                 self.0.inside_turn.store(true, Ordering::SeqCst);
+                let interrupts = self.0.interrupts.load(Ordering::SeqCst);
                 for sender in batch {
                     let _ = sender.send(());
                 }
                 self.0.batches.fetch_add(1, Ordering::SeqCst);
+                self.0.completion_interrupts.fetch_add(
+                    self.0.interrupts.load(Ordering::SeqCst) - interrupts,
+                    Ordering::SeqCst,
+                );
                 self.0.inside_turn.store(false, Ordering::SeqCst);
                 return Ok(false);
             }
@@ -119,6 +130,31 @@ fn wait(mut condition: impl FnMut() -> bool) {
         );
         thread::yield_now();
     }
+}
+
+#[test]
+fn idle_completions_resume_tasks_without_interrupting_their_own_worker() {
+    crate::test_support::run(|| {
+        let state = Arc::new(State::default());
+        state.only_idle_completions.store(true, Ordering::SeqCst);
+        let scheduler = construct(&[Arc::clone(&state)]);
+        let observed = Arc::clone(&state);
+        let task = scheduler
+            .spawn(async move {
+                for _ in 0..32 {
+                    observed.operation().await.unwrap();
+                    assert!(!observed.inside_turn.load(Ordering::SeqCst));
+                }
+                42
+            })
+            .unwrap();
+        assert_eq!(block_on(task).unwrap(), 42);
+        assert_eq!(state.batches.load(Ordering::SeqCst), 32);
+        assert_eq!(state.completion_interrupts.load(Ordering::SeqCst), 0);
+        block_on(scheduler.shutdown());
+        wait(|| state.dropped.load(Ordering::SeqCst) == 1);
+        assert!(state.retired.load(Ordering::SeqCst));
+    });
 }
 
 #[test]

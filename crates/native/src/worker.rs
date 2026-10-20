@@ -31,12 +31,16 @@ impl WorkerState {
 
     pub(crate) fn wake(&self) -> bool {
         if self.sleeping.swap(false, Ordering::SeqCst) {
-            self.thread
+            let target = self
+                .thread
                 .get()
-                .expect("sleeping worker has registered its thread")
-                .unpark();
-            if let Some(waker) = self.driver_waker.get() {
-                waker.wake_by_ref();
+                .expect("sleeping worker has registered its thread");
+            // A completion published by this worker makes its driver turn return. Interrupt only another thread; a self-notification would leave a stale permit for the next idle turn.
+            if target.id() != thread::current().id() {
+                target.unpark();
+                if let Some(waker) = self.driver_waker.get() {
+                    waker.wake_by_ref();
+                }
             }
             true
         } else {

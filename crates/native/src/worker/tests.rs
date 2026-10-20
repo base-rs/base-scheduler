@@ -6,6 +6,76 @@ use crate::task_service::{Runnable, TaskState, UNASSIGNED_WORKER};
 use crossbeam_deque::{Steal, Worker};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
+#[derive(Default)]
+struct Interrupts(AtomicUsize);
+
+impl std::task::Wake for Interrupts {
+    fn wake(self: std::sync::Arc<Self>) {
+        self.0.fetch_add(1, Ordering::SeqCst);
+    }
+}
+
+#[test]
+fn local_worker_wake_clears_sleeping_without_interrupting_its_driver() {
+    use std::{sync::Arc, task::Waker};
+    let worker = worker_state();
+    worker.thread.set(std::thread::current()).unwrap();
+    let interrupts = Arc::new(Interrupts::default());
+    worker
+        .driver_waker
+        .set(Waker::from(Arc::clone(&interrupts)))
+        .unwrap();
+    worker.sleeping.store(true, Ordering::SeqCst);
+
+    assert!(worker.wake());
+    assert!(!worker.sleeping.load(Ordering::SeqCst));
+    assert_eq!(interrupts.0.load(Ordering::SeqCst), 0);
+    assert!(!worker.wake());
+}
+
+#[test]
+fn remote_wake_retains_the_unpark_token_and_interrupts_the_driver_once() {
+    use std::{
+        sync::{Arc, mpsc},
+        task::Waker,
+        thread,
+        time::Duration,
+    };
+    let worker = Arc::new(worker_state());
+    let interrupts = Arc::new(Interrupts::default());
+    worker
+        .driver_waker
+        .set(Waker::from(Arc::clone(&interrupts)))
+        .unwrap();
+    let (ready, started) = mpsc::channel();
+    let released = Arc::new(AtomicBool::new(false));
+    let release = Arc::clone(&released);
+    let (done, finished) = mpsc::channel();
+    let target = Arc::clone(&worker);
+    let handle = thread::spawn(move || {
+        target.thread.set(thread::current()).unwrap();
+        target.sleeping.store(true, Ordering::SeqCst);
+        ready.send(()).unwrap();
+        // Do not use a channel wait here: its implementation may consume Thread's unpark token.
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        while !released.load(Ordering::Acquire) {
+            assert!(std::time::Instant::now() < deadline);
+            thread::yield_now();
+        }
+        // The test publishes the wake before park, so progress depends on retaining its token.
+        thread::park_timeout(Duration::from_secs(30));
+        done.send(()).unwrap();
+    });
+    started.recv_timeout(Duration::from_secs(5)).unwrap();
+    assert!(worker.wake());
+    assert!(!worker.wake());
+    assert!(!worker.sleeping.load(Ordering::SeqCst));
+    assert_eq!(interrupts.0.load(Ordering::SeqCst), 1);
+    release.store(true, Ordering::Release);
+    finished.recv_timeout(Duration::from_secs(5)).unwrap();
+    handle.join().unwrap();
+}
+
 fn worker_state() -> WorkerState {
     let queues: [Worker<Runnable>; 2] = std::array::from_fn(|_| Worker::new_fifo());
     WorkerState::new(queues.each_ref().map(Worker::stealer))
