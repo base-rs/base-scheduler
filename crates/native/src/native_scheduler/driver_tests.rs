@@ -12,7 +12,7 @@ use std::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
         mpsc,
     },
-    task::{Wake, Waker},
+    task::{Poll, Wake, Waker},
     thread::{self, Thread},
     time::Duration,
 };
@@ -165,6 +165,7 @@ fn busy_tasks_do_not_starve_driver_turns() {
         let state2 = Arc::clone(&state);
         let task = scheduler
             .spawn(async move {
+                let turns = state2.turns.load(Ordering::SeqCst);
                 let mut operation = state2.operation();
                 poll_fn(|context| {
                     let result = std::pin::Pin::new(&mut operation).poll(context);
@@ -173,7 +174,40 @@ fn busy_tasks_do_not_starve_driver_turns() {
                 })
                 .await
                 .unwrap();
-                assert!(state2.turns.load(Ordering::SeqCst) >= 2);
+                assert!(state2.turns.load(Ordering::SeqCst) > turns);
+            })
+            .unwrap();
+        block_on(task).unwrap();
+        block_on(scheduler.shutdown());
+        wait(|| state.retired.load(Ordering::SeqCst));
+    });
+}
+
+#[test]
+fn self_wakes_wait_for_the_next_driver_turn() {
+    crate::test_support::run(|| {
+        let state = Arc::new(State::default());
+        let scheduler = construct(&[Arc::clone(&state)]);
+        let observed = Arc::clone(&state);
+        let task = scheduler
+            .spawn(async move {
+                let mut previous_turn = None;
+                let mut polls = 0;
+                poll_fn(|context| {
+                    let turn = observed.turns.load(Ordering::SeqCst);
+                    if let Some(previous) = previous_turn {
+                        assert!(turn > previous, "self-wake extended the current batch");
+                    }
+                    previous_turn = Some(turn);
+                    polls += 1;
+                    if polls == 4 {
+                        Poll::Ready(())
+                    } else {
+                        context.waker().wake_by_ref();
+                        Poll::Pending
+                    }
+                })
+                .await;
             })
             .unwrap();
         block_on(task).unwrap();

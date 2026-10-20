@@ -10,22 +10,19 @@ use std::sync::{Arc, OnceLock, Weak};
 use std::thread::{self, Thread};
 use std::{task::Waker, time::Duration};
 
-// Check external work regularly even when the local queue stays busy.
-const EXTERNAL_INTERVAL: usize = 61;
-
 pub(crate) struct WorkerState {
     pub(crate) incoming: Injector<Runnable>,
-    stealer: Stealer<Runnable>,
+    stealers: [Stealer<Runnable>; 2],
     sleeping: AtomicBool,
     thread: OnceLock<Thread>,
     driver_waker: OnceLock<Waker>,
 }
 
 impl WorkerState {
-    pub(crate) fn new(stealer: Stealer<Runnable>) -> Self {
+    pub(crate) fn new(stealers: [Stealer<Runnable>; 2]) -> Self {
         Self {
             incoming: Injector::new(),
-            stealer,
+            stealers,
             sleeping: AtomicBool::new(false),
             thread: OnceLock::new(),
             driver_waker: OnceLock::new(),
@@ -52,6 +49,7 @@ struct LocalWorker {
     identifier: usize,
     scheduler: Weak<Shared>,
     ready: Worker<Runnable>,
+    current: Worker<Runnable>,
 }
 
 thread_local! {
@@ -97,21 +95,12 @@ pub(crate) fn schedule(shared: &Arc<Shared>, runnable: Runnable) {
 fn search(shared: &Shared, local: &LocalWorker, iteration: usize) -> Steal<Runnable> {
     let incoming = &shared.workers[local.identifier].incoming;
     let mut retry = false;
-    if iteration % EXTERNAL_INTERVAL == 0 {
-        for queue in [&shared.ready, incoming] {
-            if let Some(runnable) = take_stolen(queue.steal_batch_and_pop(&local.ready), &mut retry)
-            {
-                return Steal::Success(runnable);
-            }
-        }
+    // Admit external wakes at each batch boundary, even while local tasks keep waking themselves.
+    for queue in [&shared.ready, incoming] {
+        let _ = take_stolen(queue.steal_batch(&local.ready), &mut retry);
     }
     if let Some(runnable) = local.ready.pop() {
         return Steal::Success(runnable);
-    }
-    for queue in [incoming, &shared.ready] {
-        if let Some(runnable) = take_stolen(queue.steal_batch_and_pop(&local.ready), &mut retry) {
-            return Steal::Success(runnable);
-        }
     }
     // Only steal after exhausting this worker's own work. Rotate the first victim so idle workers do not always contend on worker zero.
     for offset in 0..shared.workers.len() {
@@ -124,10 +113,13 @@ fn search(shared: &Shared, local: &LocalWorker, iteration: usize) -> Steal<Runna
             continue;
         }
         let worker = &shared.workers[victim];
-        if let Some(runnable) =
-            take_stolen(worker.stealer.steal_batch_and_pop(&local.ready), &mut retry)
-        {
-            return Steal::Success(runnable);
+        // Both generations remain stealable while their owner swaps their roles.
+        for stealer in &worker.stealers {
+            if let Some(runnable) =
+                take_stolen(stealer.steal_batch_and_pop(&local.ready), &mut retry)
+            {
+                return Steal::Success(runnable);
+            }
         }
         // Remote wakes remain stealable while the previous worker is busy.
         if let Some(runnable) = take_stolen(
@@ -210,14 +202,14 @@ fn drive(
     }
 }
 
-pub(crate) fn run(shared: Arc<Shared>, identifier: usize, ready: Worker<Runnable>) {
-    run_loop(shared, identifier, ready, None);
+pub(crate) fn run(shared: Arc<Shared>, identifier: usize, queues: [Worker<Runnable>; 2]) {
+    run_loop(shared, identifier, queues, None);
 }
 
 pub(crate) fn run_driven<D: core_scheduler_selector::SelectorDriver>(
     shared: Arc<Shared>,
     identifier: usize,
-    ready: Worker<Runnable>,
+    queues: [Worker<Runnable>; 2],
     driver: D,
 ) {
     use core_scheduler_selector::SelectorWorker;
@@ -226,13 +218,13 @@ pub(crate) fn run_driven<D: core_scheduler_selector::SelectorDriver>(
         .driver_waker
         .set(driver.waker())
         .expect("worker driver registered once");
-    run_loop(shared, identifier, ready, Some(&mut driver));
+    run_loop(shared, identifier, queues, Some(&mut driver));
 }
 
 fn run_loop(
     shared: Arc<Shared>,
     identifier: usize,
-    ready: Worker<Runnable>,
+    [ready, current]: [Worker<Runnable>; 2],
     mut driver: Option<&mut dyn core_scheduler_selector::SelectorWorker>,
 ) {
     let worker = &shared.workers[identifier];
@@ -240,11 +232,12 @@ fn run_loop(
         .thread
         .set(thread::current())
         .expect("worker thread registered once");
-    CURRENT_WORKER.with(|current| {
-        current.replace(Some(LocalWorker {
+    CURRENT_WORKER.with(|context| {
+        context.replace(Some(LocalWorker {
             identifier,
             scheduler: Arc::downgrade(&shared),
             ready,
+            current,
         }))
     });
     let mut iteration = 0usize;
@@ -257,10 +250,6 @@ fn run_loop(
                 continue;
             }
             break;
-        }
-        // Publish the whole completion batch before polling any task on this worker. Bound task polling so a permanently runnable task cannot starve ring progress.
-        if iteration % EXTERNAL_INTERVAL == 1 {
-            drive(&mut driver, Some(Duration::ZERO));
         }
         let runnable = match find_work(&shared, iteration) {
             Steal::Empty => {
@@ -283,27 +272,34 @@ fn run_loop(
         let Some(runnable) = runnable else {
             continue;
         };
-        runnable
-            .metadata()
-            .worker
-            .store(identifier, Ordering::Relaxed);
-        // Fan out work taken in a batch when other workers are parked.
+        // Freeze the batch. Wakes during task polling go into the now-empty next queue.
         CURRENT_WORKER.with(|current| {
-            if !current
-                .borrow()
-                .as_ref()
-                .expect("worker context is installed")
-                .ready
-                .is_empty()
-            {
+            let mut current = current.borrow_mut();
+            let local = current.as_mut().expect("worker context is installed");
+            std::mem::swap(&mut local.ready, &mut local.current);
+            if !local.current.is_empty() {
                 shared.wake_idle(UNASSIGNED_WORKER);
             }
         });
-        // Future panics become TaskError in TaskFuture. Also contain a panic propagated by task machinery so that it does not remove a worker.
-        crate::panic::contain(|| {
-            runnable.run();
-        });
-        shared.retire_runnable();
+        let mut runnable = Some(runnable);
+        while let Some(task) = runnable {
+            task.metadata().worker.store(identifier, Ordering::Relaxed);
+            // Contain task-machinery panics as well as the guarded future's panics.
+            crate::panic::contain(|| {
+                task.run();
+            });
+            shared.retire_runnable();
+            runnable = CURRENT_WORKER.with(|current| {
+                current
+                    .borrow()
+                    .as_ref()
+                    .expect("worker context is installed")
+                    .current
+                    .pop()
+            });
+        }
+        // Publish the available completion batch before starting the next task batch.
+        drive(&mut driver, Some(Duration::ZERO));
     }
     CURRENT_WORKER.with(|current| current.take());
 }

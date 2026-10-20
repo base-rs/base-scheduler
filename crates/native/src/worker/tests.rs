@@ -7,8 +7,8 @@ use crossbeam_deque::{Steal, Worker};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 fn worker_state() -> WorkerState {
-    let queue = Worker::<Runnable>::new_fifo();
-    WorkerState::new(queue.stealer())
+    let queues: [Worker<Runnable>; 2] = std::array::from_fn(|_| Worker::new_fifo());
+    WorkerState::new(queues.each_ref().map(Worker::stealer))
 }
 
 fn runnable() -> Runnable {
@@ -128,28 +128,24 @@ fn idle_empty_search_parks_while_scheduler_is_running() {
 }
 
 #[test]
-fn periodic_search_checks_both_external_queues_before_local_work() {
+fn batch_search_checks_both_external_queues_before_local_work() {
     use super::{LocalWorker, search};
     use crate::task_service::Shared;
     use std::sync::Arc;
-    let queue = Worker::new_fifo();
-    let shared = Arc::new(Shared::new(std::slice::from_ref(&queue)));
+    let queues = std::array::from_fn(|_| Worker::new_fifo());
+    let shared = Arc::new(Shared::new(std::slice::from_ref(&queues)));
+    let [ready, current] = queues;
     let local = LocalWorker {
         identifier: 0,
         scheduler: Arc::downgrade(&shared),
-        ready: queue,
+        ready,
+        current,
     };
     for source in [&shared.ready, &shared.workers[0].incoming] {
         source.push(runnable());
-        assert!(matches!(
-            search(&shared, &local, super::EXTERNAL_INTERVAL),
-            Steal::Success(_)
-        ));
+        assert!(matches!(search(&shared, &local, 1), Steal::Success(_)));
     }
-    assert!(matches!(
-        search(&shared, &local, super::EXTERNAL_INTERVAL),
-        Steal::Empty
-    ));
+    assert!(matches!(search(&shared, &local, 1), Steal::Empty));
 }
 
 #[test]
@@ -157,12 +153,16 @@ fn idle_worker_steals_remote_wakes_when_preferred_worker_is_busy() {
     use super::{LocalWorker, search};
     use crate::task_service::Shared;
     use std::sync::Arc;
-    let mut queues = vec![Worker::new_fifo(), Worker::new_fifo()];
+    let mut queues: Vec<[Worker<Runnable>; 2]> = (0..2)
+        .map(|_| std::array::from_fn(|_| Worker::new_fifo()))
+        .collect();
     let shared = Arc::new(Shared::new(&queues));
+    let [ready, current] = queues.remove(0);
     let local = LocalWorker {
         identifier: 0,
         scheduler: Arc::downgrade(&shared),
-        ready: queues.remove(0),
+        ready,
+        current,
     };
     // The victim has no local work, but a remote wake has reached its inbox.
     shared.workers[1].incoming.push(runnable());
@@ -171,9 +171,32 @@ fn idle_worker_steals_remote_wakes_when_preferred_worker_is_busy() {
 }
 
 #[test]
+fn idle_worker_can_steal_both_ready_generations() {
+    use super::{LocalWorker, search};
+    use crate::task_service::Shared;
+    use std::sync::Arc;
+    let mut queues: Vec<[Worker<Runnable>; 2]> = (0..2)
+        .map(|_| std::array::from_fn(|_| Worker::new_fifo()))
+        .collect();
+    let shared = Arc::new(Shared::new(&queues));
+    let [ready, current] = queues.remove(0);
+    let local = LocalWorker {
+        identifier: 0,
+        scheduler: Arc::downgrade(&shared),
+        ready,
+        current,
+    };
+    for queue in &queues[0] {
+        queue.push(runnable());
+        assert!(matches!(search(&shared, &local, 1), Steal::Success(_)));
+    }
+    assert!(matches!(search(&shared, &local, 1), Steal::Empty));
+}
+
+#[test]
 fn idle_wake_falls_back_when_the_preferred_worker_is_busy() {
     use crate::task_service::Shared;
-    let queues = [Worker::new_fifo(), Worker::new_fifo()];
+    let queues = std::array::from_fn::<_, 2, _>(|_| std::array::from_fn(|_| Worker::new_fifo()));
     let shared = Shared::new(&queues);
     let idle = &shared.workers[1];
     idle.thread.set(std::thread::current()).unwrap();
@@ -192,7 +215,7 @@ fn idle_wake_falls_back_when_the_preferred_worker_is_busy() {
 #[test]
 fn idle_wake_prefers_the_requested_sleeping_worker() {
     use crate::task_service::Shared;
-    let queues = [Worker::new_fifo(), Worker::new_fifo()];
+    let queues = std::array::from_fn::<_, 2, _>(|_| std::array::from_fn(|_| Worker::new_fifo()));
     let shared = Shared::new(&queues);
     for worker in &shared.workers {
         worker.thread.set(std::thread::current()).unwrap();
