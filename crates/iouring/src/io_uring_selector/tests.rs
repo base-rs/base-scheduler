@@ -1651,6 +1651,13 @@ fn one_notification_read_clears_coalesced_wakes_without_a_second_read() {
         -1
     );
     assert_eq!(io::Error::last_os_error().kind(), io::ErrorKind::WouldBlock);
+    // A stale notification CQE can find the counter already cleared. It must still permit rearming.
+    driver
+        .reactor
+        .as_ref()
+        .unwrap()
+        .drain_notification()
+        .unwrap();
     drain(&selector, &mut driver);
 }
 

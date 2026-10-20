@@ -262,9 +262,7 @@ fn run_loop(
         if iteration % EXTERNAL_INTERVAL == 1 {
             drive(&mut driver, Some(Duration::ZERO));
         }
-        let runnable = match yield_on_retry(find_work(&shared, iteration)) {
-            Steal::Success(runnable) => Some(runnable),
-            Steal::Retry => None,
+        let runnable = match find_work(&shared, iteration) {
             Steal::Empty => {
                 drive(&mut driver, Some(Duration::ZERO));
                 worker.sleeping.store(true, Ordering::SeqCst);
@@ -280,6 +278,7 @@ fn run_loop(
                     || drive(&mut driver, None),
                 )
             }
+            result => yield_on_retry(result).success(),
         };
         let Some(runnable) = runnable else {
             continue;
