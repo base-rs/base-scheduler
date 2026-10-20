@@ -1,10 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use super::{
-    IdleSearch, SearchResult, WorkerState, classify_search, finish_idle_search, search_result,
-    take_idle_runnable, take_stolen,
-};
+use super::{WorkerState, finish_idle_search, search_result, take_stolen, yield_on_retry};
 use crate::task_service::{Runnable, TaskState, UNASSIGNED_WORKER};
 use crossbeam_deque::{Steal, Worker};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -46,8 +43,8 @@ fn search_reports_retry_only_when_a_queue_raced() {
 #[test]
 fn worker_yields_after_a_concurrent_steal_retry() {
     assert!(matches!(
-        classify_search(Steal::<crate::task_service::Runnable>::Retry),
-        SearchResult::Retry
+        yield_on_retry(Steal::<crate::task_service::Runnable>::Retry),
+        Steal::Retry
     ));
 }
 
@@ -57,16 +54,16 @@ fn idle_retry_restores_worker_sleep_state() {
     let idle_workers = AtomicUsize::new(1);
     worker.sleeping.store(true, Ordering::SeqCst);
 
-    assert!(matches!(
+    assert!(
         finish_idle_search(
             &worker,
             &idle_workers,
             Steal::Retry,
-            &|| panic!("retry results do not check whether the worker should park"),
-            &|| panic!("retry results do not park"),
-        ),
-        IdleSearch::Retry
-    ));
+            || panic!("retry results do not check whether the worker should park"),
+            || panic!("retry results do not park"),
+        )
+        .is_none()
+    );
     assert!(!worker.sleeping.load(Ordering::SeqCst));
     assert_eq!(idle_workers.load(Ordering::SeqCst), 0);
 }
@@ -77,19 +74,17 @@ fn idle_success_restores_worker_state_and_returns_the_runnable() {
     let idle_workers = AtomicUsize::new(1);
     worker.sleeping.store(true, Ordering::SeqCst);
 
-    let runnable = match finish_idle_search(
+    let runnable = finish_idle_search(
         &worker,
         &idle_workers,
         Steal::Success(runnable()),
-        &|| panic!("successful results do not check whether the worker should park"),
-        &|| panic!("successful results do not park"),
-    ) {
-        IdleSearch::Runnable(runnable) => runnable,
-        IdleSearch::Retry | IdleSearch::Empty => panic!("successful steal was discarded"),
-    };
+        || panic!("successful results do not check whether the worker should park"),
+        || panic!("successful results do not park"),
+    )
+    .expect("successful steal was discarded");
     assert!(!worker.sleeping.load(Ordering::SeqCst));
     assert_eq!(idle_workers.load(Ordering::SeqCst), 0);
-    assert!(take_idle_runnable(IdleSearch::Runnable(runnable)).is_some());
+    drop(runnable);
 }
 
 #[test]
@@ -98,11 +93,15 @@ fn idle_empty_search_skips_park_after_shutdown() {
     let idle_workers = AtomicUsize::new(1);
     worker.sleeping.store(true, Ordering::SeqCst);
 
-    let result = finish_idle_search(&worker, &idle_workers, Steal::Empty, &|| false, &|| {
-        panic!("a shut down scheduler must not park its worker")
-    });
+    let result = finish_idle_search(
+        &worker,
+        &idle_workers,
+        Steal::Empty,
+        || false,
+        || panic!("a shut down scheduler must not park its worker"),
+    );
 
-    assert!(matches!(result, IdleSearch::Empty));
+    assert!(result.is_none());
     assert!(!worker.sleeping.load(Ordering::SeqCst));
     assert_eq!(idle_workers.load(Ordering::SeqCst), 0);
 }
@@ -114,11 +113,15 @@ fn idle_empty_search_parks_while_scheduler_is_running() {
     let parked = AtomicBool::new(false);
     worker.sleeping.store(true, Ordering::SeqCst);
 
-    let result = finish_idle_search(&worker, &idle_workers, Steal::Empty, &|| true, &|| {
-        parked.store(true, Ordering::SeqCst)
-    });
+    let result = finish_idle_search(
+        &worker,
+        &idle_workers,
+        Steal::Empty,
+        || true,
+        || parked.store(true, Ordering::SeqCst),
+    );
 
-    assert!(matches!(result, IdleSearch::Empty));
+    assert!(result.is_none());
     assert!(parked.load(Ordering::SeqCst));
     assert!(!worker.sleeping.load(Ordering::SeqCst));
     assert_eq!(idle_workers.load(Ordering::SeqCst), 0);

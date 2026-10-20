@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Simplify Native task admission and worker parking without a task-ID registry or duplicate search-result types. Configure Tokio sockets once on construction and clear io_uring notification counters with one successful read.
+
 - Avoid speculative eventfd reads before io_uring idle waits; the armed ring poll preserves remote wakeups, and notification completions drain the counter before rearming.
 
 - Avoid redundant speculative Tokio receive attempts by waiting on cached readiness for established nonempty scalar stream reads. Lifecycle operations, empty reads, and datagrams retain syscall-first behavior; short reads preserve readiness until `WouldBlock`.

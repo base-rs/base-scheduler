@@ -42,11 +42,7 @@ pub(crate) fn open(
         SocketProtocol::Udp => Protocol::UDP,
         SocketProtocol::Other(value) => Protocol::from(value),
     });
-    Socket::new(domain, kind, protocol).and_then(nonblocking)
-}
-
-pub(crate) fn nonblocking(socket: Socket) -> io::Result<Socket> {
-    socket.set_nonblocking(true).map(|()| socket)
+    Socket::new(domain, kind, protocol)
 }
 
 pub(crate) fn address(address: SockAddr) -> SocketAddr {

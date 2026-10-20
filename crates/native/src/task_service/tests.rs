@@ -14,7 +14,7 @@ impl SpawnFixture for NativeScheduler {
     }
     fn registration_check(&self) -> impl FnOnce() + Send + 'static {
         let shared = Arc::clone(&self.tasks.shared);
-        move || assert_eq!(shared.state.lock().unwrap().registered.len(), 1)
+        move || assert_eq!(shared.remaining.load(Ordering::Acquire), 1)
     }
     async fn settle(&self) {
         self.tasks.wait(false).await;
@@ -41,7 +41,7 @@ mod dispatch {
 }
 
 #[test]
-fn startup_and_identifier_exhaustion_are_reported_without_polling_inputs() {
+fn worker_startup_failures_are_reported() {
     for fail_after in [0, 1] {
         thread::FAIL_AFTER.set(Some(fail_after));
         assert!(
@@ -54,13 +54,26 @@ fn startup_and_identifier_exhaustion_are_reported_without_polling_inputs() {
             .is_err()
         );
     }
-    let scheduler = test_support::scheduler();
-    scheduler.tasks.shared.state.lock().unwrap().next = usize::MAX;
-    assert!(matches!(
-        scheduler.spawn(async {}),
-        Err(SpawnError::IdentifiersExhausted)
-    ));
-    block_on(scheduler.shutdown());
+}
+
+#[test]
+fn rejected_future_destructors_can_close_admission_again() {
+    struct CloseOnDrop(Arc<TaskService>);
+    impl Drop for CloseOnDrop {
+        fn drop(&mut self) {
+            self.0.close();
+        }
+    }
+    test_support::run(|| {
+        let service = Arc::new(TaskService::new(1).unwrap());
+        service.close();
+        let guard = CloseOnDrop(Arc::clone(&service));
+        assert!(matches!(
+            service.spawn(async move { drop(guard) }),
+            Err(SpawnError::SchedulerClosed)
+        ));
+        block_on(service.drain());
+    });
 }
 
 #[test]

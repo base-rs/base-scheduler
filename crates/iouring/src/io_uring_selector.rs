@@ -838,9 +838,9 @@ impl Reactor {
         }
     }
 
-    fn drain_notification(&self) -> io::Result<bool> {
-        let mut notified = false;
+    fn drain_notification(&self) -> io::Result<()> {
         let mut value = 0u64;
+        // One successful eventfd read clears the accumulated counter. Bound interrupted retries; a later write or an unread counter remains visible to the next poll.
         for _ in 0..16 {
             match syscall("notification-read", || {
                 // SAFETY: The retained eventfd writes exactly one native-endian u64 into this destination; this synchronous call cannot retain the pointer.
@@ -860,13 +860,13 @@ impl Reactor {
                 Ok(0) => unreachable!(
                     "an eventfd read with a valid eight-byte destination never returns EOF"
                 ),
-                Ok(_) => notified = true,
+                Ok(_) => return Ok(()),
                 Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
                 Err(error) if error.kind() == io::ErrorKind::WouldBlock => break,
                 Err(error) => return Err(error),
             }
         }
-        Ok(notified)
+        Ok(())
     }
 
     fn cancel(&mut self, identifier: u64) -> bool {
@@ -912,17 +912,15 @@ impl Reactor {
             } else {
                 remote().or_else(local)
             };
+            let Some((command, local)) = command else {
+                command_batch_full = false;
+                break;
+            };
+            progressed = true;
             match command {
-                Some((Command::Submit(request), _)) if !self.closing => {
-                    progressed = true;
-                    self.pending.push_back(request)
-                }
-                Some((Command::Submit(request), _)) => {
-                    progressed = true;
-                    request.finish(Err(io::ErrorKind::Interrupted.into()))
-                }
-                Some((Command::Cancel(identifier), local)) => {
-                    progressed = true;
+                Command::Submit(request) if !self.closing => self.pending.push_back(request),
+                Command::Submit(request) => request.finish(Err(io::ErrorKind::Interrupted.into())),
+                Command::Cancel(identifier) => {
                     if !self.cancel(identifier) {
                         // A migrated waiter can cancel through the other queue before its Submit is processed. Defer once to that opposite FIFO: the original Submit was already published before this Cancel existed. Late cancellations are discarded on the second pass rather than retained as tombstones.
                         let command = Command::CancelAfterSubmission(identifier);
@@ -933,12 +931,10 @@ impl Reactor {
                         }
                     }
                 }
-                Some((Command::CancelAfterSubmission(identifier), _)) => {
-                    progressed = true;
+                Command::CancelAfterSubmission(identifier) => {
                     self.cancel(identifier);
                 }
-                Some((Command::Shutdown, _)) => {
-                    progressed = true;
+                Command::Shutdown => {
                     self.closing = true;
                     for request in self.pending.drain(..) {
                         request.finish(Err(io::ErrorKind::Interrupted.into()));
@@ -950,25 +946,17 @@ impl Reactor {
                         }
                     }
                 }
-                None => {
-                    command_batch_full = false;
-                    break;
-                }
             }
         }
 
         // The CQ iterator snapshots the available batch. Finish publishing every completion in that batch before returning to the executor; application futures are polled only from its ready queue.
-        let mut notification_completed = false;
-        let mut notification_error = None;
+        let mut notification_result = None;
         for completion in self.ring.completion() {
             progressed = true;
             let identifier = completion.user_data();
             if identifier == NOTIFICATION_TAG {
                 self.notification_armed = false;
-                notification_completed = true;
-                if completion.result() < 0 {
-                    notification_error = Some(io::Error::from_raw_os_error(-completion.result()));
-                }
+                notification_result = Some(completion.result());
                 continue;
             }
             if identifier & CANCEL_TAG != 0 {
@@ -989,10 +977,10 @@ impl Reactor {
             });
         }
 
-        if let Some(error) = notification_error {
-            return Err(error);
-        }
-        if notification_completed {
+        if let Some(result) = notification_result {
+            if result < 0 {
+                return Err(io::Error::from_raw_os_error(-result));
+            }
             // Drain before rearming; otherwise the readable counter immediately completes each replacement poll.
             self.drain_notification()?;
         }
@@ -1048,15 +1036,13 @@ impl Reactor {
         }
 
         // Publish queued work before returning to the executor; skip empty enters unless CQ overflow or deferred task work requires kernel progress. At a genuine idle wait, the wait enter also publishes the SQ.
-        let mut return_to_executor = progressed
+        // Short-circuiting preserves the local permit through productive turns. At the actual wait decision, consume it; the armed poll retains remote notifications until their CQE drains the counter.
+        let return_to_executor = progressed
             || timeout == Some(Duration::ZERO)
             || !self.pending.is_empty()
             || !self.cancellations.is_empty()
-            || !self.notification_armed;
-        if !return_to_executor {
-            // Keep the local permit through productive turns, then consume it at the wait boundary. The armed eventfd poll retains remote notifications, including writes before submission or racing the wait; drain its counter only after collecting that poll's CQE.
-            return_to_executor = crate::io_uring_worker::take_notification(&self.controller);
-        }
+            || !self.notification_armed
+            || crate::io_uring_worker::take_notification(&self.controller);
         if return_to_executor {
             let needs_submit = {
                 let submissions = self.ring.submission();

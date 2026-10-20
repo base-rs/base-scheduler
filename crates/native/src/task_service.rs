@@ -9,7 +9,6 @@ use core_scheduler::{SpawnError, TaskError};
 use crossbeam_deque::{Injector, Worker};
 use event_listener::Event;
 use std::{
-    collections::HashSet,
     future::Future,
     io,
     panic::{AssertUnwindSafe, catch_unwind},
@@ -26,17 +25,14 @@ pub(crate) struct TaskState {
     pub(crate) worker: AtomicUsize,
 }
 pub(crate) type Runnable = async_task::Runnable<TaskState>;
-pub(crate) struct State {
-    closed: bool,
-    pub(crate) next: usize,
-    pub(crate) registered: HashSet<usize>,
-}
 pub(crate) struct Shared {
-    pub(crate) state: Mutex<State>,
+    // Serialize registration with closure; task ownership itself needs only a count.
+    admission: Mutex<()>,
     pub(crate) ready: Injector<Runnable>,
     pub(crate) workers: Vec<WorkerState>,
     closed: AtomicBool,
     pub(crate) idle_workers: AtomicUsize,
+    // Task-future ownership can retire before its final runnable returns. Shutdown waits for both.
     remaining: AtomicUsize,
     outstanding: AtomicUsize,
     changed: Event,
@@ -46,16 +42,9 @@ pub(crate) struct TaskService {
 }
 struct Registration {
     shared: Arc<Shared>,
-    id: usize,
 }
 impl Drop for Registration {
     fn drop(&mut self) {
-        self.shared
-            .state
-            .lock()
-            .unwrap()
-            .registered
-            .remove(&self.id);
         self.shared.remaining.fetch_sub(1, Ordering::AcqRel);
         self.shared.changed.notify(usize::MAX);
         if self.shared.closed.load(Ordering::Acquire) {
@@ -103,11 +92,7 @@ impl<T> Drop for TaskOutcome<T> {
 impl Shared {
     pub(crate) fn new(queues: &[Worker<Runnable>]) -> Self {
         Self {
-            state: Mutex::new(State {
-                closed: false,
-                next: 0,
-                registered: HashSet::new(),
-            }),
+            admission: Mutex::new(()),
             ready: Injector::new(),
             workers: queues
                 .iter()
@@ -191,22 +176,15 @@ impl TaskService {
         F: Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        let mut state = self.shared.state.lock().unwrap();
-        if state.closed {
-            drop(state);
+        let admission = self.shared.admission.lock().unwrap();
+        if self.shared.closed.load(Ordering::Acquire) {
+            drop(admission);
             return Err(SpawnError::SchedulerClosed);
         }
-        let Some(next) = state.next.checked_add(1) else {
-            drop(state);
-            return Err(SpawnError::IdentifiersExhausted);
-        };
-        let id = state.next;
-        state.next = next;
-        state.registered.insert(id);
+        // Publish ownership while admission is locked, before close can let the workers exit.
         self.shared.remaining.fetch_add(1, Ordering::Release);
         let registration = Registration {
             shared: Arc::clone(&self.shared),
-            id,
         };
         let shared = Arc::clone(&self.shared);
         let (runnable, task) = async_task::Builder::new()
@@ -223,13 +201,15 @@ impl TaskService {
                     worker::schedule(&shared, runnable);
                 },
             );
-        drop(state);
+        drop(admission);
         runnable.schedule();
         Ok(NativeTask(task))
     }
     pub(crate) fn close(&self) {
-        self.shared.state.lock().unwrap().closed = true;
-        self.shared.closed.store(true, Ordering::Release);
+        {
+            let _admission = self.shared.admission.lock().unwrap();
+            self.shared.closed.store(true, Ordering::Release);
+        }
         self.shared.wake_all();
     }
     pub(crate) async fn drain(&self) {
