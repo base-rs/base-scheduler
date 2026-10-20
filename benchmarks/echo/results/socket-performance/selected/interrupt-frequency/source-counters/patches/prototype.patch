@@ -1,0 +1,300 @@
+diff --git a/crates/iouring/src/interrupt_counters.rs b/crates/iouring/src/interrupt_counters.rs
+new file mode 100644
+index 0000000..f6b0f85
+--- /dev/null
++++ b/crates/iouring/src/interrupt_counters.rs
+@@ -0,0 +1,207 @@
++// Experimental worker-local counters; deliberately excluded from shipping code.
++use std::{cell::Cell, io};
++thread_local! { static COUNTERS: Counters = const { Counters::new() }; }
++struct Counters {
++    active_worker: Cell<bool>,
++    ever_worker: Cell<bool>,
++    values: [Cell<u64>; 21],
++}
++impl Counters {
++    const fn new() -> Self {
++        Self {
++            active_worker: Cell::new(false),
++            ever_worker: Cell::new(false),
++            values: [const { Cell::new(0) }; 21],
++        }
++    }
++    #[inline(always)]
++    fn add(&self, index: usize) {
++        let value = &self.values[index];
++        value.set(value.get() + 1);
++    }
++}
++pub(crate) const NOTIFY_LOCAL_ATTEMPT: usize = 0;
++pub(crate) const NOTIFY_LOCAL_SUCCESS: usize = 1;
++pub(crate) const NOTIFY_LOCAL_EAGAIN: usize = 2;
++pub(crate) const NOTIFY_LOCAL_ERROR: usize = 3;
++pub(crate) const NOTIFY_REMOTE_ATTEMPT: usize = 4;
++pub(crate) const NOTIFY_REMOTE_SUCCESS: usize = 5;
++pub(crate) const NOTIFY_REMOTE_EAGAIN: usize = 6;
++pub(crate) const NOTIFY_REMOTE_ERROR: usize = 7;
++pub(crate) const WAIT_FUNCTION: usize = 8;
++pub(crate) const WAIT_SYSCALL: usize = 9;
++pub(crate) const SUBMIT_SYSCALL: usize = 10;
++pub(crate) const NOTIFICATION_ARMED: usize = 11;
++pub(crate) const NOTIFICATION_CQE: usize = 12;
++pub(crate) const NOTIFICATION_CQE_SUCCESS: usize = 13;
++pub(crate) const NOTIFICATION_CQE_ERROR: usize = 14;
++pub(crate) const SYNC_READ_ATTEMPT: usize = 15;
++pub(crate) const SYNC_READ_SUCCESS: usize = 16;
++pub(crate) const SYNC_READ_EAGAIN: usize = 17;
++pub(crate) const SYNC_READ_ERROR: usize = 18;
++pub(crate) const PAYLOAD_CQE: usize = 19;
++pub(crate) const TURN: usize = 20;
++#[inline(always)]
++pub(crate) fn increment(index: usize) {
++    COUNTERS.with(|c| c.add(index));
++}
++pub(crate) fn worker(active: bool) {
++    COUNTERS.with(|c| {
++        c.active_worker.set(active);
++        if active {
++            c.ever_worker.set(true);
++        }
++    });
++}
++#[inline(always)]
++pub(crate) fn syscall<T>(name: &'static str, result: &io::Result<T>) {
++    match name {
++        "notify" => COUNTERS.with(|c| {
++            let first = if c.active_worker.get() {
++                NOTIFY_LOCAL_ATTEMPT
++            } else {
++                NOTIFY_REMOTE_ATTEMPT
++            };
++            c.add(first);
++            c.add(
++                first
++                    + match result {
++                        Ok(_) => 1,
++                        Err(e) if e.kind() == io::ErrorKind::WouldBlock => 2,
++                        Err(_) => 3,
++                    },
++            );
++        }),
++        "wait" => increment(WAIT_SYSCALL),
++        "submit" => increment(SUBMIT_SYSCALL),
++        "notification-read" => COUNTERS.with(|c| {
++            c.add(SYNC_READ_ATTEMPT);
++            c.add(match result {
++                Ok(_) => SYNC_READ_SUCCESS,
++                Err(e) if e.kind() == io::ErrorKind::WouldBlock => SYNC_READ_EAGAIN,
++                Err(_) => SYNC_READ_ERROR,
++            });
++        }),
++        "notification-completion" => COUNTERS.with(|c| {
++            c.add(if result.is_ok() {
++                NOTIFICATION_CQE_SUCCESS
++            } else {
++                NOTIFICATION_CQE_ERROR
++            });
++        }),
++        _ => (),
++    }
++}
++impl Drop for Counters {
++    fn drop(&mut self) {
++        use std::fmt::Write;
++        if self.values.iter().all(|v| v.get() == 0) {
++            return;
++        }
++        let mut output = String::new();
++        write!(&mut output, "{{\"worker\":{}", self.ever_worker.get()).unwrap();
++        write!(
++            &mut output,
++            ",\"notify_local_attempt\":{}",
++            self.values[0].get()
++        )
++        .unwrap();
++        write!(
++            &mut output,
++            ",\"notify_local_success\":{}",
++            self.values[1].get()
++        )
++        .unwrap();
++        write!(
++            &mut output,
++            ",\"notify_local_eagain\":{}",
++            self.values[2].get()
++        )
++        .unwrap();
++        write!(
++            &mut output,
++            ",\"notify_local_error\":{}",
++            self.values[3].get()
++        )
++        .unwrap();
++        write!(
++            &mut output,
++            ",\"notify_remote_attempt\":{}",
++            self.values[4].get()
++        )
++        .unwrap();
++        write!(
++            &mut output,
++            ",\"notify_remote_success\":{}",
++            self.values[5].get()
++        )
++        .unwrap();
++        write!(
++            &mut output,
++            ",\"notify_remote_eagain\":{}",
++            self.values[6].get()
++        )
++        .unwrap();
++        write!(
++            &mut output,
++            ",\"notify_remote_error\":{}",
++            self.values[7].get()
++        )
++        .unwrap();
++        write!(&mut output, ",\"wait_function\":{}", self.values[8].get()).unwrap();
++        write!(&mut output, ",\"wait_syscall\":{}", self.values[9].get()).unwrap();
++        write!(&mut output, ",\"submit_syscall\":{}", self.values[10].get()).unwrap();
++        write!(
++            &mut output,
++            ",\"notification_armed\":{}",
++            self.values[11].get()
++        )
++        .unwrap();
++        write!(
++            &mut output,
++            ",\"notification_cqe\":{}",
++            self.values[12].get()
++        )
++        .unwrap();
++        write!(
++            &mut output,
++            ",\"notification_cqe_success\":{}",
++            self.values[13].get()
++        )
++        .unwrap();
++        write!(
++            &mut output,
++            ",\"notification_cqe_error\":{}",
++            self.values[14].get()
++        )
++        .unwrap();
++        write!(
++            &mut output,
++            ",\"sync_read_attempt\":{}",
++            self.values[15].get()
++        )
++        .unwrap();
++        write!(
++            &mut output,
++            ",\"sync_read_success\":{}",
++            self.values[16].get()
++        )
++        .unwrap();
++        write!(
++            &mut output,
++            ",\"sync_read_eagain\":{}",
++            self.values[17].get()
++        )
++        .unwrap();
++        write!(
++            &mut output,
++            ",\"sync_read_error\":{}",
++            self.values[18].get()
++        )
++        .unwrap();
++        write!(&mut output, ",\"payload_cqe\":{}", self.values[19].get()).unwrap();
++        write!(&mut output, ",\"turn\":{}", self.values[20].get()).unwrap();
++        output.push('}');
++        eprintln!("INTERRUPT_COUNTERS {}", output);
++    }
++}
+diff --git a/crates/iouring/src/io_uring_selector.rs b/crates/iouring/src/io_uring_selector.rs
+index 27671fd..d9cb16b 100644
+--- a/crates/iouring/src/io_uring_selector.rs
++++ b/crates/iouring/src/io_uring_selector.rs
+@@ -23,6 +23,10 @@ use std::{
+     task::Poll,
+     time::Duration,
+ };
++#[path = "interrupt_counters.rs"]
++pub(crate) mod interrupt_counters;
++use interrupt_counters as counters;
++
+ const CANCEL_TAG: u64 = 1 << 63;
+ // The largest request identifier is CANCEL_TAG - 2, so tagged cancellations cannot produce u64::MAX.
+ const NOTIFICATION_TAG: u64 = u64::MAX;
+@@ -35,8 +39,9 @@ fn syscall<T>(name: &'static str, operation: impl FnOnce() -> io::Result<T>) ->
+     }
+     #[cfg(not(test))]
+     {
+-        let _ = name;
+-        operation()
++        let result = operation();
++        counters::syscall(name, &result);
++        result
+     }
+ }
+ 
+@@ -841,6 +846,7 @@ impl Reactor {
+     }
+ 
+     pub(crate) fn turn(&mut self, timeout: Option<Duration>) -> io::Result<bool> {
++        counters::increment(counters::TURN);
+         let mut progressed = false;
+         // Bound command processing so a busy producer cannot starve completions.
+         let mut command_batch_full = true;
+@@ -910,6 +916,7 @@ impl Reactor {
+             progressed = true;
+             let identifier = completion.user_data();
+             if identifier == NOTIFICATION_TAG {
++                counters::increment(counters::NOTIFICATION_CQE);
+                 self.notification_pending = false;
+                 notification_error = syscall("notification-completion", || {
+                     completion_result(completion.result())
+@@ -920,6 +927,7 @@ impl Reactor {
+             if identifier & CANCEL_TAG != 0 {
+                 continue;
+             }
++            counters::increment(counters::PAYLOAD_CQE);
+             // Every untagged CQE is the single original completion of a
+             // published request. Only this path removes it from InFlight.
+             let request = self
+@@ -1023,6 +1031,7 @@ impl Reactor {
+     }
+ 
+     fn wait(&mut self, timeout: Option<Duration>) -> io::Result<()> {
++        counters::increment(counters::WAIT_FUNCTION);
+         if timeout.is_none() || self.extended_wait {
+             if !self.notification_pending {
+                 let entry = opcode::PollAdd::new(
+@@ -1035,6 +1044,7 @@ impl Reactor {
+                 // notification descriptor, and this worker alone accesses SQ.
+                 unsafe { self.ring.submission().push(&entry) }
+                     .expect("an idle wait has an empty submission queue");
++                counters::increment(counters::NOTIFICATION_ARMED);
+                 self.notification_pending = true;
+             }
+             let deadline = timeout.map(|timeout| {
+diff --git a/crates/iouring/src/io_uring_worker.rs b/crates/iouring/src/io_uring_worker.rs
+index fcd34b4..3c14a11 100644
+--- a/crates/iouring/src/io_uring_worker.rs
++++ b/crates/iouring/src/io_uring_worker.rs
+@@ -34,6 +34,7 @@ impl IoUringWorker {
+             commands: RefCell::new(VecDeque::new()),
+         });
+         ROUTES.with(|routes| routes.borrow_mut().push(Rc::clone(&route)));
++        crate::io_uring_selector::interrupt_counters::worker(true);
+         Self { driver, route }
+     }
+ }
+@@ -52,6 +53,7 @@ impl Drop for IoUringWorker {
+     fn drop(&mut self) {
+         // Stop while the local route remains installed, so queued owners retire before the driver's shutdown notification. Reactor teardown invokes callbacks without retaining TLS or queue borrows.
+         self.driver.stop();
++        crate::io_uring_selector::interrupt_counters::worker(false);
+         ROUTES.with(|routes| {
+             routes
+                 .borrow_mut()

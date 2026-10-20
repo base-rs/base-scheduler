@@ -1,0 +1,52 @@
+{
+  "sources": {
+    "prototype-frozen": "4a061fbc4355738f39f5eb6ea1db1520db6a753e",
+    "prototype-counted": "65297d6469f1df23cc08ef1a94f6a11ad6fa29ed",
+    "direct-read-frozen": "6bd87198787b489950766ca52f34a6f8589d5ddc",
+    "direct-read-counted": "aa17915d9566a74002d0df0d41213140df910fb9"
+  },
+  "binaries": {
+    "prototype-frozen": {
+      "path": "/tmp/core-perf-socket-candidate",
+      "sha256": "2387876a4f7cab272524f62cd79aa5302931016b1d4f010ef9406d94f7eb35f5"
+    },
+    "prototype-counted": {
+      "path": "/home/samuel/.cache/core-scheduler-interrupt-counters/prototype-counted",
+      "sha256": "b6659680d1226cf5aef49778c8e5a30c70ce5862ed9c15a79c40ae96f33048b9"
+    },
+    "direct-read-frozen": {
+      "path": "/tmp/core-perf-idle-fix-read",
+      "sha256": "213ca795fefd6a561cc2fecc41702a0948078e6deee00757b4550247dd12bdfa"
+    },
+    "direct-read-counted": {
+      "path": "/home/samuel/.cache/core-scheduler-interrupt-counters/direct-read-counted",
+      "sha256": "3d0d6811da90b3ace39595b6b2faf2e44e6c2219af40855800fb320114bfcf8b"
+    }
+  },
+  "client": {
+    "path": "/tmp/core-scheduler-profile-baseline/release/core-scheduler-echo-benchmark",
+    "sha256": "db6c914ab75011477ec6232e681046b1e75532cbaa1c81663bac984591675cf3"
+  },
+  "counter_build": "cargo build --release --locked -p core-scheduler-echo-benchmark; CARGO_PROFILE_RELEASE_DEBUG=1; RUSTFLAGS unset",
+  "frozen_direct_read_build_note": "Existing frozen experimental executable originally built with RUSTFLAGS=-Cdebuginfo=1; retained exactly as requested.",
+  "runner_sha256": "ac7b996108799c9daf5fd78746b98dfe417d3ff9fe6bc7482bf1829d3610cabe",
+  "sample_runner_sha256": "31e6ad715214fcadfda358362100a21cb94cc41a79e23733191eb8e61b740909",
+  "seed": 20261103,
+  "hostname": "aiko",
+  "platform": "Linux-7.2.6-arch2-1-x86_64-with-glibc2.44",
+  "server_cpus": "0",
+  "client_cpus": "4-7",
+  "client_workers": 4,
+  "warmup_seconds": 1,
+  "measurement_seconds": 3,
+  "load_before": [
+    0.34375,
+    0.26611328125,
+    0.66552734375
+  ],
+  "load_after": [
+    0.9609375,
+    0.4560546875,
+    0.7119140625
+  ]
+}

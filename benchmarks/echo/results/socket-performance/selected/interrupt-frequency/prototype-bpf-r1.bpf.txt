@@ -1,0 +1,52 @@
+/home/samuel/.cache/core-scheduler-interrupt-frequency/prototype-bpf-r1.bt:15:10-23: WARNING: Expression of type: uint64 being cast to type: int64. This may cause unexpected results. Use an explicit cast to suppress this warning.
+ @writes[@writefd[tid]-1, args->ret] = count(); delete(@writefd[tid]);
+         ~~~~~~~~~~~~~
+/home/samuel/.cache/core-scheduler-interrupt-frequency/prototype-bpf-r1.bt:19:9-21: WARNING: Expression of type: uint64 being cast to type: int64. This may cause unexpected results. Use an explicit cast to suppress this warning.
+ @reads[@readfd[tid]-1, args->ret] = count(); delete(@readfd[tid]);
+        ~~~~~~~~~~~~
+/home/samuel/.cache/core-scheduler-interrupt-frequency/prototype-bpf-r1.bt:13:71-83: WARNING: Addrspace mismatch
+tracepoint:syscalls:sys_enter_write /pid == 974094/ { @writefd[tid] = args->fd + 1; }
+                                                                      ~~~~~~~~~~~~
+/home/samuel/.cache/core-scheduler-interrupt-frequency/prototype-bpf-r1.bt:17:69-81: WARNING: Addrspace mismatch
+tracepoint:syscalls:sys_enter_read /pid == 974094/ { @readfd[tid] = args->fd + 1; }
+                                                                    ~~~~~~~~~~~~
+/home/samuel/.cache/core-scheduler-interrupt-frequency/prototype-bpf-r1.bt:14:37-67: WARNING: Addrspace mismatch
+tracepoint:syscalls:sys_exit_write /pid == 974094 && @writefd[tid]/ {
+                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/samuel/.cache/core-scheduler-interrupt-frequency/prototype-bpf-r1.bt:18:36-65: WARNING: Addrspace mismatch
+tracepoint:syscalls:sys_exit_read /pid == 974094 && @readfd[tid]/ {
+                                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/samuel/.cache/core-scheduler-interrupt-frequency/prototype-bpf-r1.bt:15:10-25: WARNING: Addrspace mismatch
+ @writes[@writefd[tid]-1, args->ret] = count(); delete(@writefd[tid]);
+         ~~~~~~~~~~~~~~~
+/home/samuel/.cache/core-scheduler-interrupt-frequency/prototype-bpf-r1.bt:19:9-23: WARNING: Addrspace mismatch
+ @reads[@readfd[tid]-1, args->ret] = count(); delete(@readfd[tid]);
+        ~~~~~~~~~~~~~~
+/home/samuel/.cache/core-scheduler-interrupt-frequency/prototype-bpf-r1.bt:15:49-70: WARNING: Return value discarded.
+ @writes[@writefd[tid]-1, args->ret] = count(); delete(@writefd[tid]);
+                                                ~~~~~~~~~~~~~~~~~~~~~
+/home/samuel/.cache/core-scheduler-interrupt-frequency/prototype-bpf-r1.bt:19:47-67: WARNING: Return value discarded.
+ @reads[@readfd[tid]-1, args->ret] = count(); delete(@readfd[tid]);
+                                              ~~~~~~~~~~~~~~~~~~~~
+READY
+
+
+@cqes[false, 0]: 1
+@cqes[true, 1]: 97532
+@cqes[false, 64]: 1844678
+@enter[0, 1, 1]: 2654
+@enter[1, 1, 1]: 97532
+@enter[1, 0, 0]: 1844679
+@enter[0, 0, 0]: 3984140
+@epoll[974098]: 1
+@reads[7, -11]: 1
+@reads[5, 8]: 911686
+@reads[5, -11]: 1011872
+@sqes[6, true]: 97532
+@sqes[26, false]: 922339
+@sqes[27, false]: 922340
+@switches[974097, 16]: 1
+@switches[974097, 0]: 7
+@switches[974097, 256]: 34
+@switches[974097, 1]: 15041
+@writes[5, 8]: 1428766
