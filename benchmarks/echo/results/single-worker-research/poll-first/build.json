@@ -1,0 +1,9 @@
+{
+  "base_source": "130cd4a67e526e80ba9a5e7e7ebbe81494bd903b",
+  "production_patch_sha256": "7b3ad5365cf4e0643e2a0faded713f6385f914850c9368b6e1da23e9474919f2",
+  "benchmark_patch": "controls.patch (unchanged in both variants)",
+  "binary_sha256": "c5187728e2b5e546eaf3273b4e7e84d9b83b9bba13a2761016c0766641cb1a7f",
+  "baseline_binary_sha256": "34821493abf4aa1c7d655f782a9c799526ffefcc7f189ce8ff733b340443b88c",
+  "build_command": "cargo build --release --locked -p core-scheduler-echo-benchmark",
+  "limitation": "Only a Linux 7.2 diagnostic. POLL_FIRST availability and fallback on older supported kernels are not implemented. Zero-length Recv retains the original behavior."
+}

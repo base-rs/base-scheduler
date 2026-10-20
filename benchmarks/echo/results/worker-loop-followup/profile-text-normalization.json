@@ -1,0 +1,114 @@
+{
+  "timer-loop/before/perf/perf-iouring-poll-w1-c1-b64-r1.self.txt": {
+    "original_sha256": "b4d8bf4312645af64f24eb28d5994831763f6ebe0a012f5783777a5928116fdf",
+    "archived_sha256": "d8276f58e68abf0978e1312601745609ceeab504c56554fc39e5ab83c3d3e1b9",
+    "change": "Remove trailing whitespace only; preserve every line and symbol.",
+    "compressed_path": "timer-loop/before/perf/perf-iouring-poll-w1-c1-b64-r1.self.txt.gz",
+    "compressed_sha256": "35beef1381dbf6e9545d86109ac952d167ca0b9b9613b3f637299da7c184cbdd"
+  },
+  "timer-loop/before/perf/perf-iouring-poll-w1-c1-b64-r2.callgraph.txt": {
+    "original_sha256": "53bdbfd3af16a2294a34a5071cfbe6469a73171997549431edd71995eb1d334b",
+    "archived_sha256": "43dd9044e70115acab27a40d199fcae9ce31cde7a4e6705f924e3a6940241f00",
+    "change": "Remove trailing whitespace only; preserve every line and symbol.",
+    "compressed_path": "timer-loop/before/perf/perf-iouring-poll-w1-c1-b64-r2.callgraph.txt.gz",
+    "compressed_sha256": "e7acf8d6075538620581006faeddc0063db9377dea28b4745a11b363a4c9a426"
+  },
+  "timer-loop/before/perf/perf-iouring-w1-c1-b64-r2.self.txt": {
+    "original_sha256": "dcda865487a0f08150304f6d471b7991c2ae268dc8e4a4eb3ac11abaea6893ac",
+    "archived_sha256": "d424121196494b4bd607e6f7729f34fb68ff6752b16fff19477f106e7e134eec",
+    "change": "Remove trailing whitespace only; preserve every line and symbol.",
+    "compressed_path": "timer-loop/before/perf/perf-iouring-w1-c1-b64-r2.self.txt.gz",
+    "compressed_sha256": "3a62588a7a16d07ee019e113007bda3e501245e865d078a4a1cfb3e202d0e7a5"
+  },
+  "timer-loop/before/perf/perf-iouring-poll-w1-c1-b64-r1.callgraph.txt": {
+    "original_sha256": "c2024bdde9681b60532122b62e3c20ab9d31758a37e39329ef2ca13e5d2eb6ec",
+    "archived_sha256": "ff7c38a1c86ade945214b12972faaf21dccc4b332238a29fa3ef3a9833920ef6",
+    "change": "Remove trailing whitespace only; preserve every line and symbol.",
+    "compressed_path": "timer-loop/before/perf/perf-iouring-poll-w1-c1-b64-r1.callgraph.txt.gz",
+    "compressed_sha256": "beaa4ab8a69cdb43b3b37284160f94eee89b5a6cd96355e8d6558654c9f14948"
+  },
+  "timer-loop/before/perf/perf-iouring-poll-w1-c1-b64-r2.self.txt": {
+    "original_sha256": "290644ea3b5451a86bcdc30a2e72d0da39355d8299fd8dfbcadff0baba4686e9",
+    "archived_sha256": "417992275aeb2074ead9c5346c8dbf6e45da6a450bd5e465c21fe9a2856a2375",
+    "change": "Remove trailing whitespace only; preserve every line and symbol.",
+    "compressed_path": "timer-loop/before/perf/perf-iouring-poll-w1-c1-b64-r2.self.txt.gz",
+    "compressed_sha256": "d7065f805674bb054ed647e2fc1eb8f7ed16085ed34d6408aa2bd59c05b7028f"
+  },
+  "timer-loop/before/perf/perf-iouring-w1-c1-b64-r1.callgraph.txt": {
+    "original_sha256": "602197c59c8fb74f23e1d4a3e0cc408d4ac306827d4c2818352eccd82f2a1bc7",
+    "archived_sha256": "f26b5abbb79a537436d59e344737cd14554ad2fb87c0e83c8a0691a3b3b130b6",
+    "change": "Remove trailing whitespace only; preserve every line and symbol.",
+    "compressed_path": "timer-loop/before/perf/perf-iouring-w1-c1-b64-r1.callgraph.txt.gz",
+    "compressed_sha256": "2af5fec2a18da29241fc1a0670b63b62f5e44651f6d8725ed6fd8413a82242fe"
+  },
+  "timer-loop/before/perf/perf-iouring-w1-c1-b64-r1.self.txt": {
+    "original_sha256": "d77341f4a5566567a42cf975269e0c247e943a43e728a8507b783b9e93d6562a",
+    "archived_sha256": "bb96d6a714099bbee0cc7b33672ed07fd44f22ab050dd773f7c4e66ab0f0e7b6",
+    "change": "Remove trailing whitespace only; preserve every line and symbol.",
+    "compressed_path": "timer-loop/before/perf/perf-iouring-w1-c1-b64-r1.self.txt.gz",
+    "compressed_sha256": "05900a59d826e35b7f2220e5f74f7443f80dedb12ced00683e6ae8bd66dbeb1a"
+  },
+  "timer-loop/before/perf/perf-iouring-w1-c1-b64-r2.callgraph.txt": {
+    "original_sha256": "37f92d6b9e725c64e15e368162c0b619539cf42f4e88b40b7a5c7e3de8ee1c57",
+    "archived_sha256": "9fe5b278d4cd16efc1e508a77253fedd7c7440a2d6d77fe47d1011a0713a26c4",
+    "change": "Remove trailing whitespace only; preserve every line and symbol.",
+    "compressed_path": "timer-loop/before/perf/perf-iouring-w1-c1-b64-r2.callgraph.txt.gz",
+    "compressed_sha256": "71ca56e1d5f52c351100902cdb3ff81be0f55f63d9937e71afb844c8a6bfc56e"
+  },
+  "timer-loop/local/perf/perf-iouring-poll-w1-c1-b64-r1.self.txt": {
+    "original_sha256": "ba98ac4a892e7f44d82bfa49b15355c440bbc1e5d309d15dbb0f7fe1f0f231c9",
+    "archived_sha256": "132a10663f859fdc72d6a43e1d2197eb3f2e6bc271b91427a9be0bc011f37460",
+    "change": "Remove trailing whitespace only; preserve every line and symbol.",
+    "compressed_path": "timer-loop/local/perf/perf-iouring-poll-w1-c1-b64-r1.self.txt.gz",
+    "compressed_sha256": "64f48f446eb5678fc8f98bb2404e45bd494788fd47400e5b1106b03951a02f45"
+  },
+  "timer-loop/local/perf/perf-iouring-poll-w1-c1-b64-r2.callgraph.txt": {
+    "original_sha256": "dccfefeca6043164bfa2c20134c0d8acb9643a6cab02d68bb21bd472ae1c8bad",
+    "archived_sha256": "f05d53cf93744085cd6f41a30f5dcec8762bf17127542a36c4cb4881fd5ef30b",
+    "change": "Remove trailing whitespace only; preserve every line and symbol.",
+    "compressed_path": "timer-loop/local/perf/perf-iouring-poll-w1-c1-b64-r2.callgraph.txt.gz",
+    "compressed_sha256": "f43c3ff8cc802d77137e592b7b1d73c18c7e8bd13d5e7b122886ec3d804761e4"
+  },
+  "timer-loop/local/perf/perf-iouring-w1-c1-b64-r2.self.txt": {
+    "original_sha256": "3bb1c89961e5c2a397df5b944ae728b4c38530c78e454f415112f3887b3f7a82",
+    "archived_sha256": "ea2b72d54580513e18f47cab87d8ec21545cec98c3eee97848f02c6760310ecd",
+    "change": "Remove trailing whitespace only; preserve every line and symbol.",
+    "compressed_path": "timer-loop/local/perf/perf-iouring-w1-c1-b64-r2.self.txt.gz",
+    "compressed_sha256": "93669a92275acafefe62dd39f210c03c6b2ba5664c3a01d3a072e610a6bb9eb1"
+  },
+  "timer-loop/local/perf/perf-iouring-poll-w1-c1-b64-r1.callgraph.txt": {
+    "original_sha256": "483557927c97036028232079468460d8f049acc8d7bb6b576acfc038878deeef",
+    "archived_sha256": "2d6c7a814fe6f9dbbd0ebd656bc6c4f7b47d4f1461ddc6f04f1530932dc6f805",
+    "change": "Remove trailing whitespace only; preserve every line and symbol.",
+    "compressed_path": "timer-loop/local/perf/perf-iouring-poll-w1-c1-b64-r1.callgraph.txt.gz",
+    "compressed_sha256": "6d6082466a71dbf05b2445a979562573d698ebceb7e9a6943791dfa84759fc2e"
+  },
+  "timer-loop/local/perf/perf-iouring-poll-w1-c1-b64-r2.self.txt": {
+    "original_sha256": "8aeb326199c444772de87f000651c21f6b90df3b4f9edf1129dd48d9204e6636",
+    "archived_sha256": "b7e335bdc75e2097e68bac09ace19f01c98c5f83b079808abd9bd0bb0b96423c",
+    "change": "Remove trailing whitespace only; preserve every line and symbol.",
+    "compressed_path": "timer-loop/local/perf/perf-iouring-poll-w1-c1-b64-r2.self.txt.gz",
+    "compressed_sha256": "1cf9dc56bab5783b2ee6d3076aff8de143774ee0d95f554878c8a2ec9c589682"
+  },
+  "timer-loop/local/perf/perf-iouring-w1-c1-b64-r1.callgraph.txt": {
+    "original_sha256": "60eb2346ee2854f98d8503ef81c065d8e42c3e31fbcc769e3369176d797157c2",
+    "archived_sha256": "3ac0d2cbaf8fbde4fb5cc1f02db30400cfdc0f7539c3d64d8a8b3bbc516658b7",
+    "change": "Remove trailing whitespace only; preserve every line and symbol.",
+    "compressed_path": "timer-loop/local/perf/perf-iouring-w1-c1-b64-r1.callgraph.txt.gz",
+    "compressed_sha256": "4583ce059be6fae09ed06e2eff559247a43a58fa5abc2e18f2308578339176bc"
+  },
+  "timer-loop/local/perf/perf-iouring-w1-c1-b64-r1.self.txt": {
+    "original_sha256": "cf602c8f45ed7c680b8ade18b00c3f49c5fab6a67c4ac0ccfd52d9926e0123c7",
+    "archived_sha256": "859c7ec517440831a5fa64df80e387d0f73d2617828af0aa0acc87b5d9535b85",
+    "change": "Remove trailing whitespace only; preserve every line and symbol.",
+    "compressed_path": "timer-loop/local/perf/perf-iouring-w1-c1-b64-r1.self.txt.gz",
+    "compressed_sha256": "9a5c46f9e07f64e0e7e7b9aa4cc6c2eff0a7f106bd40e688be5c4f096b9dca27"
+  },
+  "timer-loop/local/perf/perf-iouring-w1-c1-b64-r2.callgraph.txt": {
+    "original_sha256": "61eab290614ff1a192299088df4ceac216b80d53fbd1eaa8f633a7bd6c5013c8",
+    "archived_sha256": "cb08007693cf250f6a12265c2d16e7cb39129ed03dfc69934c5f40a0e4253a35",
+    "change": "Remove trailing whitespace only; preserve every line and symbol.",
+    "compressed_path": "timer-loop/local/perf/perf-iouring-w1-c1-b64-r2.callgraph.txt.gz",
+    "compressed_sha256": "008783f0e0227637dfe0ad1b30d4032707e16247da9683795cd5b86b40b28bf8"
+  }
+}

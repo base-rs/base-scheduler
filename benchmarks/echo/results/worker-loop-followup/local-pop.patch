@@ -1,0 +1,74 @@
+diff --git a/crates/timers/src/timers.rs b/crates/timers/src/timers.rs
+index 6153859..46d1d87 100644
+--- a/crates/timers/src/timers.rs
++++ b/crates/timers/src/timers.rs
+@@ -680,7 +685,8 @@ pub mod local {
+             if self.next_deadline()? > now {
+                 return None;
+             }
+-            self.pop()
++            let entry = self.0.heap.pop().unwrap();
++            self.0.remove(entry.key)
+         }
+ 
+         /// Remove the earliest value, for closure and draining.
+diff --git a/crates/timers/src/timers/tests.rs b/crates/timers/src/timers/tests.rs
+index d8c88eb..a3ff602 100644
+--- a/crates/timers/src/timers/tests.rs
++++ b/crates/timers/src/timers/tests.rs
+@@ -5,6 +5,55 @@ use super::*;
+ use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
+ use std::sync::{Barrier, Mutex};
+ 
++#[cfg(feature = "local")]
++#[test]
++fn local_expiry_preserves_deadline_order_and_observes_changes_between_pops() {
++    let now = Instant::now();
++    let mut timers = local::TimerQueue::with_capacity(4);
++    let later = timers
++        .try_schedule(now + Duration::from_secs(2), 2)
++        .unwrap();
++    let first = timers.try_schedule(now, 0).unwrap();
++    assert_eq!(timers.next_deadline(), Some(now));
++    assert_eq!(timers.pop_expired(now), Some(0));
++    assert_eq!(timers.pop_expired(now), None);
++    assert_eq!(timers.release(first), None);
++
++    // A callback between pops can schedule an earlier timer or cancel a later one.
++    let middle = timers
++        .try_schedule(now + Duration::from_secs(1), 1)
++        .unwrap();
++    assert_eq!(timers.release(later), Some(2));
++    assert_eq!(timers.next_deadline(), Some(now + Duration::from_secs(1)));
++    assert_eq!(timers.pop_expired(now + Duration::from_secs(3)), Some(1));
++    assert_eq!(timers.release(middle), None);
++    assert_eq!(timers.next_deadline(), None);
++}
++
++#[cfg(feature = "local")]
++#[test]
++fn local_expired_slots_are_not_reused_until_released() {
++    let now = Instant::now();
++    let mut timers = local::TimerQueue::with_capacity(1);
++    let keys: Vec<_> = (0..timers.capacity())
++        .map(|_| timers.try_schedule(now, 1).unwrap())
++        .collect();
++    for _ in &keys {
++        assert_eq!(timers.pop_expired(now), Some(1));
++    }
++    assert_eq!(timers.next_deadline(), None);
++    assert_eq!(timers.try_schedule(now, 2), Err(2));
++    assert_eq!(timers.release(keys[0]), None);
++    let replacement = timers.try_schedule(now, 3).unwrap();
++    assert_ne!(keys[0], replacement);
++    assert_eq!(timers.pop(), Some(3));
++    assert_eq!(timers.release(replacement), None);
++    for key in &keys[1..] {
++        assert_eq!(timers.release(*key), None);
++    }
++    assert_eq!(timers.pop(), None);
++}
++
+ #[test]
+ fn deadlines_are_exact_and_expire_in_order() {
+     let now = Instant::now();

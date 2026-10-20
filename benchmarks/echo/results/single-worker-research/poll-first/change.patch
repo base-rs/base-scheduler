@@ -1,0 +1,16 @@
+diff --git a/crates/iouring/src/io_uring_selector.rs b/crates/iouring/src/io_uring_selector.rs
+index 9898ef1..d169c9b 100644
+--- a/crates/iouring/src/io_uring_selector.rs
++++ b/crates/iouring/src/io_uring_selector.rs
+@@ -128,7 +128,10 @@ impl<B: IoBuf> Request<B> {
+                         .flags(libc::MSG_NOSIGNAL)
+                         .build()
+                 } else {
+-                    opcode::Recv::new(descriptor, pointer, length).build()
++                    opcode::Recv::new(descriptor, pointer, length)
++                        // Diagnostic: IORING_RECVSEND_POLL_FIRST from linux/io_uring.h.
++                        .ioprio(u16::from(length != 0))
++                        .build()
+                 }
+             }
+             Resource::File(file, offset) => {

@@ -1,0 +1,35 @@
+[
+  {
+    "log": "/home/samuel/.cache/core-scheduler-perf-followup/verify-timer-fixed.log",
+    "coverage_lines": [
+      "Region coverage passed: 584/584 measured source regions covered (excluded: 0 unreachable regions)",
+      "Region coverage passed: 1491/1491 measured source regions covered (excluded: 0 unreachable regions)"
+    ],
+    "completed_lint": false
+  },
+  {
+    "log": "/home/samuel/.cache/core-scheduler-perf-followup/driver-coverage.log",
+    "coverage_lines": [
+      "Region coverage passed: 1337/1337 measured source regions covered (excluded: 0 unreachable regions)",
+      "Region coverage passed: 2128/2128 measured source regions covered (excluded: 1 unreachable regions)"
+    ],
+    "completed_lint": true
+  },
+  {
+    "log": "/home/samuel/.cache/core-scheduler-perf-followup/driver-drain-coverage.log",
+    "coverage_lines": [
+      "Region coverage passed: 1337/1337 measured source regions covered (excluded: 0 unreachable regions)",
+      "bake: test:coverage: region coverage is 2138/2139 measured source regions (excluded: 1 unreachable regions); 1 source regions remain uncovered",
+      "  /home/samuel/Developer/core-rs/core-scheduler-driver-turn/crates/iouring/src/io_uring_selector.rs:1121:35-1121:36"
+    ],
+    "completed_lint": false
+  },
+  {
+    "log": "/home/samuel/.cache/core-scheduler-perf-followup/wait-drain-only-build.log",
+    "coverage_lines": [
+      "Region coverage passed: 1337/1337 measured source regions covered (excluded: 0 unreachable regions)",
+      "Region coverage passed: 2131/2131 measured source regions covered (excluded: 1 unreachable regions)"
+    ],
+    "completed_lint": true
+  }
+]

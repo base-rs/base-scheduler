@@ -1,0 +1,389 @@
+{
+  "build": {
+    "source": "64eb1548e1371b067f0e7c8b85d5a37c2f745768",
+    "patch_sha256": "99e59419194ceda13b682431cb1fec0fe11309f6f5449f37eec7274feffec0bd",
+    "common_patch_sha256": "fb7faa0010c061596064b1b36c19ee7e45f27f8df962211a3f6e29d60253b333",
+    "rustc": "rustc 1.99.0 (b940084d7 2026-09-28) (Arch Linux rust 1:1.99.0-1)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+    "environment_overrides": {},
+    "binaries": {
+      "before": {
+        "path": "/home/samuel/.cache/core-scheduler-perf-followup/before-driver-echo",
+        "sha256": "3f22166e2d1a5b6fad19f9d8bc4bb48ad342e2fbce292f2cb1baaaac1a9e2e5c",
+        "command": [
+          "cargo",
+          "build",
+          "--release",
+          "--locked",
+          "-p",
+          "core-scheduler-echo-benchmark"
+        ]
+      },
+      "driver-turn": {
+        "path": "/home/samuel/.cache/core-scheduler-perf-followup/driver-turn-driver-echo",
+        "sha256": "5862670ebbcfa78a10792d5be1e13f1142528351b9fefc94a986be05573a5ac7",
+        "command": [
+          "cargo",
+          "build",
+          "--release",
+          "--locked",
+          "-p",
+          "core-scheduler-echo-benchmark"
+        ]
+      }
+    },
+    "tests": "Linux Native and io_uring all features passed",
+    "finished_utc": "2026-10-20T20:40:18Z"
+  },
+  "client": {
+    "path": "/home/samuel/.cache/core-scheduler-owner-wake-final/client",
+    "sha256": "db6c914ab75011477ec6232e681046b1e75532cbaa1c81663bac984591675cf3"
+  },
+  "scripts": {
+    "stat-driver.py": {
+      "path": "/home/samuel/.cache/core-scheduler-perf-followup/stat-driver.py",
+      "sha256": "b38a374c9980e9570fd5a825e09806b6d3e8339bd3a40136fd3ad8810b46b020"
+    },
+    "sample-runner.py": {
+      "path": "/home/samuel/.cache/core-scheduler-perf-followup/sample-runner.py",
+      "sha256": "31e6ad715214fcadfda358362100a21cb94cc41a79e23733191eb8e61b740909"
+    },
+    "supervise.py": {
+      "path": "/home/samuel/.cache/core-scheduler-perf-followup/supervise.py",
+      "sha256": "fe118d20518274c0a6ff084ad35a9e4f416b49aa621c5c36eaebecfbcb5a4c6f"
+    }
+  },
+  "samples": [
+    {
+      "bytes": 64,
+      "connections": 1,
+      "payload_mib_per_second": 10.38739013671875,
+      "requests": 510561,
+      "requests_per_second": 170187.0,
+      "rtt_max_us": 177.919,
+      "rtt_mean_us": 5.823889942631717,
+      "rtt_p50_us": 5.911,
+      "rtt_p95_us": 6.683,
+      "rtt_p99_us": 7.783,
+      "seconds": 3.0,
+      "warmup_seconds": 0.0,
+      "identifier": "stat-iouring-poll-w1-c1-b64-r1",
+      "mode": "stat",
+      "backend": "iouring-poll",
+      "workers": 1,
+      "repeat": 1,
+      "client_cpu": {
+        "user": 0.18109899999999998,
+        "system": 0.706429,
+        "voluntary_switches": 510579,
+        "involuntary_switches": 11
+      },
+      "server_cpu": {
+        "user": 0.19080499999999997,
+        "system": 1.474932,
+        "voluntary_switches": 510705,
+        "involuntary_switches": 26
+      },
+      "lifecycle_seconds": 3.2511635087430477,
+      "variant": "before"
+    },
+    {
+      "bytes": 64,
+      "connections": 1,
+      "payload_mib_per_second": 9.922810872395834,
+      "requests": 487726,
+      "requests_per_second": 162575.33333333334,
+      "rtt_max_us": 165.887,
+      "rtt_mean_us": 6.099072678102063,
+      "rtt_p50_us": 5.931,
+      "rtt_p95_us": 6.731,
+      "rtt_p99_us": 7.843,
+      "seconds": 3.0,
+      "warmup_seconds": 0.0,
+      "identifier": "stat-iouring-poll-w1-c1-b64-r2",
+      "mode": "stat",
+      "backend": "iouring-poll",
+      "workers": 1,
+      "repeat": 2,
+      "client_cpu": {
+        "user": 0.12831300000000007,
+        "system": 0.7172770000000002,
+        "voluntary_switches": 487741,
+        "involuntary_switches": 12
+      },
+      "server_cpu": {
+        "user": 0.17167899999999992,
+        "system": 1.3587160000000003,
+        "voluntary_switches": 487822,
+        "involuntary_switches": 10
+      },
+      "lifecycle_seconds": 3.238164660986513,
+      "variant": "driver-turn"
+    },
+    {
+      "bytes": 64,
+      "connections": 1,
+      "payload_mib_per_second": 10.17626953125,
+      "requests": 500184,
+      "requests_per_second": 166728.0,
+      "rtt_max_us": 168.575,
+      "rtt_mean_us": 5.94264583033444,
+      "rtt_p50_us": 5.911,
+      "rtt_p95_us": 6.743,
+      "rtt_p99_us": 12.047,
+      "seconds": 3.0,
+      "warmup_seconds": 0.0,
+      "identifier": "stat-iouring-w1-c1-b64-r2",
+      "mode": "stat",
+      "backend": "iouring",
+      "workers": 1,
+      "repeat": 2,
+      "client_cpu": {
+        "user": 0.18286900000000006,
+        "system": 0.6795469999999995,
+        "voluntary_switches": 500197,
+        "involuntary_switches": 14
+      },
+      "server_cpu": {
+        "user": 0.16452200000000006,
+        "system": 1.4568940000000001,
+        "voluntary_switches": 500273,
+        "involuntary_switches": 11
+      },
+      "lifecycle_seconds": 3.236540628131479,
+      "variant": "before"
+    },
+    {
+      "bytes": 64,
+      "connections": 1,
+      "payload_mib_per_second": 10.048136393229166,
+      "requests": 493886,
+      "requests_per_second": 164628.66666666666,
+      "rtt_max_us": 209.407,
+      "rtt_mean_us": 6.025953396127864,
+      "rtt_p50_us": 5.891,
+      "rtt_p95_us": 6.751,
+      "rtt_p99_us": 11.655,
+      "seconds": 3.0,
+      "warmup_seconds": 0.0,
+      "identifier": "stat-iouring-w1-c1-b64-r1",
+      "mode": "stat",
+      "backend": "iouring",
+      "workers": 1,
+      "repeat": 1,
+      "client_cpu": {
+        "user": 0.14156999999999997,
+        "system": 0.701295,
+        "voluntary_switches": 493905,
+        "involuntary_switches": 10
+      },
+      "server_cpu": {
+        "user": 0.15490999999999988,
+        "system": 1.3729609999999992,
+        "voluntary_switches": 493980,
+        "involuntary_switches": 9
+      },
+      "lifecycle_seconds": 3.2373242527246475,
+      "variant": "driver-turn"
+    },
+    {
+      "bytes": 64,
+      "connections": 1,
+      "payload_mib_per_second": 10.511454264322916,
+      "requests": 516659,
+      "requests_per_second": 172219.66666666666,
+      "rtt_max_us": 189.311,
+      "rtt_mean_us": 5.754074869498068,
+      "rtt_p50_us": 5.563,
+      "rtt_p95_us": 6.663,
+      "rtt_p99_us": 12.023,
+      "seconds": 3.0,
+      "warmup_seconds": 0.0,
+      "identifier": "stat-iouring-poll-w1-c1-b64-r2",
+      "mode": "stat",
+      "backend": "iouring-poll",
+      "workers": 1,
+      "repeat": 2,
+      "client_cpu": {
+        "user": 0.17090399999999994,
+        "system": 0.7224390000000014,
+        "voluntary_switches": 516663,
+        "involuntary_switches": 14
+      },
+      "server_cpu": {
+        "user": 0.2067730000000001,
+        "system": 1.470993,
+        "voluntary_switches": 516749,
+        "involuntary_switches": 11
+      },
+      "lifecycle_seconds": 3.236569437664002,
+      "variant": "before"
+    },
+    {
+      "bytes": 64,
+      "connections": 1,
+      "payload_mib_per_second": 10.116048177083334,
+      "requests": 497224,
+      "requests_per_second": 165741.33333333334,
+      "rtt_max_us": 184.319,
+      "rtt_mean_us": 5.977953230334809,
+      "rtt_p50_us": 5.811,
+      "rtt_p95_us": 6.691,
+      "rtt_p99_us": 11.407,
+      "seconds": 3.0,
+      "warmup_seconds": 0.0,
+      "identifier": "stat-tokio-w1-c1-b64-r2",
+      "mode": "stat",
+      "backend": "tokio",
+      "workers": 1,
+      "repeat": 2,
+      "client_cpu": {
+        "user": 0.18323100000000014,
+        "system": 0.6771159999999998,
+        "voluntary_switches": 497228,
+        "involuntary_switches": 12
+      },
+      "server_cpu": {
+        "user": 0.1849780000000001,
+        "system": 1.2520889999999998,
+        "voluntary_switches": 497319,
+        "involuntary_switches": 7
+      },
+      "lifecycle_seconds": 3.2363281729631126,
+      "variant": "before"
+    },
+    {
+      "bytes": 64,
+      "connections": 1,
+      "payload_mib_per_second": 9.995524088541666,
+      "requests": 491300,
+      "requests_per_second": 163766.66666666666,
+      "rtt_max_us": 176.127,
+      "rtt_mean_us": 6.0544497598208755,
+      "rtt_p50_us": 5.951,
+      "rtt_p95_us": 6.731,
+      "rtt_p99_us": 11.583,
+      "seconds": 3.0,
+      "warmup_seconds": 0.0,
+      "identifier": "stat-iouring-w1-c1-b64-r1",
+      "mode": "stat",
+      "backend": "iouring",
+      "workers": 1,
+      "repeat": 1,
+      "client_cpu": {
+        "user": 0.1822379999999999,
+        "system": 0.6616809999999997,
+        "voluntary_switches": 491309,
+        "involuntary_switches": 11
+      },
+      "server_cpu": {
+        "user": 0.13780499999999973,
+        "system": 1.4298579999999994,
+        "voluntary_switches": 491388,
+        "involuntary_switches": 15
+      },
+      "lifecycle_seconds": 3.235870794393122,
+      "variant": "before"
+    },
+    {
+      "bytes": 64,
+      "connections": 1,
+      "payload_mib_per_second": 9.874369303385416,
+      "requests": 485345,
+      "requests_per_second": 161781.66666666666,
+      "rtt_max_us": 175.743,
+      "rtt_mean_us": 6.12749162966549,
+      "rtt_p50_us": 5.923,
+      "rtt_p95_us": 6.851,
+      "rtt_p99_us": 11.975,
+      "seconds": 3.0,
+      "warmup_seconds": 0.0,
+      "identifier": "stat-iouring-w1-c1-b64-r2",
+      "mode": "stat",
+      "backend": "iouring",
+      "workers": 1,
+      "repeat": 2,
+      "client_cpu": {
+        "user": 0.15414400000000006,
+        "system": 0.6852940000000007,
+        "voluntary_switches": 485360,
+        "involuntary_switches": 11
+      },
+      "server_cpu": {
+        "user": 0.1488400000000003,
+        "system": 1.3815109999999997,
+        "voluntary_switches": 485441,
+        "involuntary_switches": 13
+      },
+      "lifecycle_seconds": 3.235634989105165,
+      "variant": "driver-turn"
+    },
+    {
+      "bytes": 64,
+      "connections": 1,
+      "payload_mib_per_second": 9.92120361328125,
+      "requests": 487647,
+      "requests_per_second": 162549.0,
+      "rtt_max_us": 36.383,
+      "rtt_mean_us": 6.099127415938171,
+      "rtt_p50_us": 5.931,
+      "rtt_p95_us": 6.791,
+      "rtt_p99_us": 11.655,
+      "seconds": 3.0,
+      "warmup_seconds": 0.0,
+      "identifier": "stat-iouring-poll-w1-c1-b64-r1",
+      "mode": "stat",
+      "backend": "iouring-poll",
+      "workers": 1,
+      "repeat": 1,
+      "client_cpu": {
+        "user": 0.1452469999999999,
+        "system": 0.7023019999999995,
+        "voluntary_switches": 487656,
+        "involuntary_switches": 14
+      },
+      "server_cpu": {
+        "user": 0.18125499999999972,
+        "system": 1.3579010000000018,
+        "voluntary_switches": 487742,
+        "involuntary_switches": 10
+      },
+      "lifecycle_seconds": 3.2362562720663846,
+      "variant": "driver-turn"
+    },
+    {
+      "bytes": 64,
+      "connections": 1,
+      "payload_mib_per_second": 10.10968017578125,
+      "requests": 496911,
+      "requests_per_second": 165637.0,
+      "rtt_max_us": 57.247,
+      "rtt_mean_us": 5.985000215330309,
+      "rtt_p50_us": 5.931,
+      "rtt_p95_us": 6.643,
+      "rtt_p99_us": 11.007,
+      "seconds": 3.0,
+      "warmup_seconds": 0.0,
+      "identifier": "stat-tokio-w1-c1-b64-r1",
+      "mode": "stat",
+      "backend": "tokio",
+      "workers": 1,
+      "repeat": 1,
+      "client_cpu": {
+        "user": 0.1776340000000003,
+        "system": 0.6803479999999986,
+        "voluntary_switches": 496932,
+        "involuntary_switches": 8
+      },
+      "server_cpu": {
+        "user": 0.15195999999999987,
+        "system": 1.2699350000000003,
+        "voluntary_switches": 497003,
+        "involuntary_switches": 6
+      },
+      "lifecycle_seconds": 3.236655429005623,
+      "variant": "before"
+    }
+  ],
+  "policy": "Exclusive lock; CPU0 server, clients4-7; perfstat separate from capacity controls;0warmup,3s.",
+  "finished_utc": "2026-10-20T20:44:26Z"
+}

@@ -1,0 +1,39 @@
+{
+  "variant": "immediate",
+  "source": "64eb1548e1371b067f0e7c8b85d5a37c2f745768",
+  "rustc": "rustc 1.99.0 (b940084d7 2026-09-28) (Arch Linux rust 1:1.99.0-1)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+  "build_command": [
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "-p",
+    "core-scheduler-echo-benchmark",
+    "--bins",
+    "--features",
+    "core-scheduler-native/worker-timers"
+  ],
+  "environment_overrides": {},
+  "files": {
+    "crates/native/src/worker.rs": "147db5b0e8d3ce897370e439f243a51b98f2957d4652762befa605adf354917e",
+    "crates/native/src/task_service.rs": "aa979a468e236c4122a696079d1c71d459ce511cbde8f9c6a3024e1c8528b289",
+    "crates/native/src/worker_timers.rs": "fccac88c67e5073a70c90d2e883cf3be983804f16c782d1d138206a6780cfbb9",
+    "benchmarks/echo/src/bin/timers.rs": "b9b074a4729fd202982f8b30d47fc9c6a7c69799107d02417370ac9767d7f0de"
+  },
+  "binaries": {
+    "immediate-core-scheduler-echo-benchmark": {
+      "path": "/home/samuel/.cache/core-scheduler-timer-ready/immediate-core-scheduler-echo-benchmark",
+      "sha256": "bab49ff561ed559944ddf92a7acebb734acfaae8c919c9e0257c94d50da9e0ac"
+    },
+    "immediate-timers": {
+      "path": "/home/samuel/.cache/core-scheduler-timer-ready/immediate-timers",
+      "sha256": "830d3399a406404642ade39ffbdc9ee90195352a3dae24eca59443a801c43bf6"
+    },
+    "immediate-mixed": {
+      "path": "/home/samuel/.cache/core-scheduler-timer-ready/immediate-mixed",
+      "sha256": "84cf9044aacb62bd93b35c77fd1c43641673695886759322f7329635f0d0059b"
+    }
+  },
+  "finished_utc": "2026-10-20T20:00:25Z",
+  "mixed_harness_sha256": "ea81907a8355457c7969c2af08edc461be309cdbc16db694e4626d3832cf979b"
+}

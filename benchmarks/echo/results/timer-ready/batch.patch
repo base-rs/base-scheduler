@@ -1,0 +1,146 @@
+diff --git a/crates/native/src/worker_timers.rs b/crates/native/src/worker_timers.rs
+index d4bb036..7c68d75 100644
+--- a/crates/native/src/worker_timers.rs
++++ b/crates/native/src/worker_timers.rs
+@@ -28,17 +28,21 @@ struct LocalTimers {
+     scheduler: Weak<Shared>,
+     identifier: usize,
+     queue: TimerQueue<Waker>,
++    expired: Vec<Waker>,
+ }
+ thread_local! {
+     static TIMERS: RefCell<Option<LocalTimers>> = const { RefCell::new(None) };
+ }
+ 
+ pub(crate) fn enter(shared: &Arc<Shared>, identifier: usize) {
++    let queue = TimerQueue::with_capacity(shared.timer_capacity);
++    let expired = Vec::with_capacity(queue.capacity());
+     TIMERS.with(|timers| {
+         timers.replace(Some(LocalTimers {
+             scheduler: Arc::downgrade(shared),
+             identifier,
+-            queue: TimerQueue::with_capacity(shared.timer_capacity),
++            queue,
++            expired,
+         }))
+     });
+ }
+@@ -177,29 +181,29 @@ pub(crate) fn turn(shared: &Arc<Shared>, identifier: usize) {
+         .unwrap();
+         deliver(displaced);
+     }
+-    // The common empty-queue path does not read the clock.
+-    if local(shared, Some(identifier), |timers| {
+-        timers.queue.next_deadline()
+-    })
+-    .unwrap()
+-    .is_none()
+-    {
+-        return;
+-    }
+-    let now = Instant::now();
+-    loop {
+-        let wake = local(shared, Some(identifier), |timers| {
+-            if shared.is_closed() {
++    let expired = local(shared, Some(identifier), |timers| {
++        // The common empty-queue path does not read the clock.
++        timers.queue.next_deadline()?;
++        let now = Instant::now();
++        loop {
++            let wake = if shared.is_closed() {
+                 timers.queue.pop()
+             } else {
+                 timers.queue.pop_expired(now)
+-            }
+-        })
+-        .unwrap();
+-        let Some(wake) = wake else { break };
+-        // Remove first, release the local borrow, then publish the runnable through its normal Waker.
++            };
++            let Some(wake) = wake else { break };
++            timers.expired.push(wake);
++        }
++        Some(std::mem::take(&mut timers.expired))
++    })
++    .unwrap();
++    let Some(mut expired) = expired else { return };
++    // Collect the due batch under one borrow, then publish each runnable through its normal Waker.
++    for wake in expired.drain(..) {
+         crate::panic::contain(|| wake.wake());
+     }
++    // Reuse the reserved batch storage on the next turn.
++    local(shared, Some(identifier), |timers| timers.expired = expired).unwrap();
+ }
+ 
+ pub(crate) fn timeout(shared: &Arc<Shared>, identifier: usize) -> Option<Duration> {
+@@ -287,6 +291,70 @@ mod tests {
+         block_on(scheduler.shutdown());
+     }
+ 
++    #[test]
++    fn expiry_batch_reuses_storage_and_wakes_outside_the_timer_borrow() {
++        use std::sync::atomic::{AtomicUsize, Ordering};
++        struct Inspect {
++            shared: Arc<Shared>,
++            wakes: AtomicUsize,
++        }
++        impl std::task::Wake for Inspect {
++            fn wake(self: Arc<Self>) {
++                // Every due value has been removed, and the timer queue is available to callbacks.
++                assert!(
++                    local(&self.shared, None, |timers| timers.queue.next_deadline())
++                        .unwrap()
++                        .is_none()
++                );
++                self.wakes.fetch_add(1, Ordering::Relaxed);
++            }
++        }
++        // The timer engine may round this reservation up; batch storage must match its real capacity.
++        let scheduler = scheduler(1);
++        let shared = Arc::clone(&scheduler.tasks.shared);
++        let task = scheduler
++            .spawn(async move {
++                let (identifier, capacity, storage) = local(&shared, None, |timers| {
++                    assert!(timers.expired.capacity() >= timers.queue.capacity());
++                    (
++                        timers.identifier,
++                        timers.queue.capacity(),
++                        timers.expired.as_ptr() as usize,
++                    )
++                })
++                .unwrap();
++                let inspect = Arc::new(Inspect {
++                    shared: Arc::clone(&shared),
++                    wakes: AtomicUsize::new(0),
++                });
++                let waker = Waker::from(Arc::clone(&inspect));
++                let mut keys = Vec::with_capacity(capacity);
++                for round in 1..=2 {
++                    let now = Instant::now();
++                    local(&shared, None, |timers| {
++                        for _ in 0..capacity {
++                            keys.push(timers.queue.try_schedule(now, waker.clone()).unwrap());
++                        }
++                    })
++                    .unwrap();
++                    let allocations = allocation_counter::measure(|| turn(&shared, identifier));
++                    assert_eq!(allocations.count_total, 0, "{allocations:?}");
++                    assert_eq!(inspect.wakes.load(Ordering::Relaxed), round * capacity);
++                    local(&shared, None, |timers| {
++                        assert!(timers.expired.is_empty());
++                        assert_eq!(timers.expired.as_ptr() as usize, storage);
++                        for key in keys.drain(..) {
++                            assert!(timers.queue.release(key).is_none());
++                        }
++                    })
++                    .unwrap();
++                }
++            })
++            .unwrap();
++        block_on(task).unwrap();
++        block_on(scheduler.shutdown());
++    }
++
+     #[test]
+     fn local_timers_expire_and_do_not_start_the_fallback_thread() {
+         let scheduler = scheduler(64);

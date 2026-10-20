@@ -1,0 +1,7 @@
+{
+  "base_source": "130cd4a67e526e80ba9a5e7e7ebbe81494bd903b",
+  "patch_sha256": "37790780ef7f837b59471d98dc77de24c6e37102dfbf1371be0939b4515f5def",
+  "binary_sha256": "eca8f74ff1c3ef5ac28b4ddd4ee6a60e3b606e5ee41e40f15147181621f51d5b",
+  "production_changes": "None. Existing benchmark-only controls plus poll_read_ready/try_read loop.",
+  "build_command": "cargo build --release --locked -p core-scheduler-echo-benchmark"
+}

@@ -1,0 +1,918 @@
+diff --git a/crates/native/Cargo.toml b/crates/native/Cargo.toml
+index 8937fcd..5ca93dc 100644
+--- a/crates/native/Cargo.toml
++++ b/crates/native/Cargo.toml
+@@ -8,6 +8,9 @@ repository = "https://github.com/core-rs/core-scheduler"
+ description = "Native work-stealing scheduler with readiness I/O and batched timers"
+ readme = "readme.md"
+ 
++[features]
++worker-timers = ["core-scheduler-timers/local"]
++
+ [dependencies]
+ core-scheduler-selector = { path = "../selector", version = "=0.0.0" }
+ core-scheduler = { path = "../..", version = "=0.0.0" }
+diff --git a/crates/native/src/lib.rs b/crates/native/src/lib.rs
+index f06b198..7fc0e39 100644
+--- a/crates/native/src/lib.rs
++++ b/crates/native/src/lib.rs
+@@ -16,6 +16,8 @@ mod test_support;
+ mod thread;
+ mod timer_service;
+ mod worker;
++#[cfg(feature = "worker-timers")]
++mod worker_timers;
+ 
+ #[cfg(unix)]
+ pub use core_scheduler_selector::NativeSubscription;
+diff --git a/crates/native/src/native_scheduler.rs b/crates/native/src/native_scheduler.rs
+index 647402e..3de57e5 100644
+--- a/crates/native/src/native_scheduler.rs
++++ b/crates/native/src/native_scheduler.rs
+@@ -49,7 +49,7 @@ impl<S: Selector> NativeScheduler<S> {
+                     "worker count and timer capacity must be nonzero",
+                 ));
+             }
+-            crate::task_service::TaskService::new(options.workers)
++            crate::task_service::TaskService::new(options.workers, options.timer_capacity)
+         })();
+         match result {
+             Ok(tasks) => Ok(Self {
+@@ -81,7 +81,7 @@ impl<S: Selector> NativeScheduler<S> {
+                 "one driver per nonzero worker and nonzero timer capacity are required",
+             ))
+         } else {
+-            crate::task_service::TaskService::with_drivers(drivers)
++            crate::task_service::TaskService::with_drivers(drivers, options.timer_capacity)
+         };
+         match result {
+             Ok(tasks) => Ok(Self {
+diff --git a/crates/native/src/task_service.rs b/crates/native/src/task_service.rs
+index ea8cc65..3d85b25 100644
+--- a/crates/native/src/task_service.rs
++++ b/crates/native/src/task_service.rs
+@@ -28,6 +28,8 @@ pub(crate) type Runnable = async_task::Runnable<TaskState>;
+ pub(crate) struct Shared {
+     // Serialize registration with closure; task ownership itself needs only a count.
+     admission: Mutex<()>,
++    #[cfg(feature = "worker-timers")]
++    pub(crate) timer_capacity: usize,
+     pub(crate) ready: Injector<Runnable>,
+     pub(crate) workers: Vec<WorkerState>,
+     closed: AtomicBool,
+@@ -35,11 +37,29 @@ pub(crate) struct Shared {
+     // Task-future ownership can retire before its final runnable returns. Shutdown waits for both.
+     remaining: AtomicUsize,
+     outstanding: AtomicUsize,
++    #[cfg(feature = "worker-timers")]
++    active_workers: AtomicUsize,
+     changed: Event,
+ }
+ pub(crate) struct TaskService {
+     pub(crate) shared: Arc<Shared>,
+ }
++#[cfg(feature = "worker-timers")]
++struct WorkerRegistration(Arc<Shared>);
++#[cfg(feature = "worker-timers")]
++impl WorkerRegistration {
++    fn new(shared: &Arc<Shared>) -> Self {
++        shared.active_workers.fetch_add(1, Ordering::Relaxed);
++        Self(Arc::clone(shared))
++    }
++}
++#[cfg(feature = "worker-timers")]
++impl Drop for WorkerRegistration {
++    fn drop(&mut self) {
++        self.0.active_workers.fetch_sub(1, Ordering::Release);
++        self.0.changed.notify(usize::MAX);
++    }
++}
+ struct Registration {
+     shared: Arc<Shared>,
+ }
+@@ -90,9 +110,29 @@ impl<T> Drop for TaskOutcome<T> {
+ }
+ 
+ impl Shared {
++    #[cfg(feature = "worker-timers")]
++    pub(crate) fn is_closed(&self) -> bool {
++        self.closed.load(Ordering::Acquire)
++    }
++    #[cfg(feature = "worker-timers")]
++    pub(crate) fn send_timer(&self, owner: usize, command: crate::worker_timers::Command) {
++        // Remote messages serialize with closure so none can arrive after the worker's final drain.
++        let admission = self.admission.lock().unwrap();
++        if self.is_closed() {
++            drop(admission);
++            crate::worker_timers::rejected(command);
++            return;
++        }
++        self.workers[owner].timers.push(command);
++        drop(admission);
++        self.workers[owner].wake();
++    }
++
+     pub(crate) fn new(queues: &[[Worker<Runnable>; 2]]) -> Self {
+         Self {
+             admission: Mutex::new(()),
++            #[cfg(feature = "worker-timers")]
++            timer_capacity: 1024,
+             ready: Injector::new(),
+             workers: queues
+                 .iter()
+@@ -102,6 +142,8 @@ impl Shared {
+             idle_workers: AtomicUsize::new(0),
+             remaining: AtomicUsize::new(0),
+             outstanding: AtomicUsize::new(0),
++            #[cfg(feature = "worker-timers")]
++            active_workers: AtomicUsize::new(0),
+             changed: Event::new(),
+         }
+     }
+@@ -143,16 +185,28 @@ impl Shared {
+     }
+ }
+ impl TaskService {
+-    pub(crate) fn new(threads: usize) -> io::Result<Self> {
++    pub(crate) fn new(threads: usize, _timer_capacity: usize) -> io::Result<Self> {
+         let queues: Vec<_> = (0..threads)
+             .map(|_| std::array::from_fn(|_| Worker::new_fifo()))
+             .collect();
+         let service = Self {
+-            shared: Arc::new(Shared::new(&queues)),
++            shared: Arc::new({
++                #[allow(unused_mut)]
++                let mut shared = Shared::new(&queues);
++                #[cfg(feature = "worker-timers")]
++                {
++                    shared.timer_capacity = _timer_capacity;
++                }
++                shared
++            }),
+         };
+         for (identifier, queue) in queues.into_iter().enumerate() {
+             let shared = Arc::clone(&service.shared);
++            #[cfg(feature = "worker-timers")]
++            let registration = WorkerRegistration::new(&shared);
+             thread::start("core-native-task", move || {
++                #[cfg(feature = "worker-timers")]
++                let _registration = registration;
+                 worker::run(shared, identifier, queue)
+             })?;
+         }
+@@ -160,16 +214,29 @@ impl TaskService {
+     }
+     pub(crate) fn with_drivers<D: core_scheduler_selector::SelectorDriver>(
+         drivers: Vec<D>,
++        _timer_capacity: usize,
+     ) -> io::Result<Self> {
+         let queues: Vec<_> = (0..drivers.len())
+             .map(|_| std::array::from_fn(|_| Worker::new_fifo()))
+             .collect();
+         let service = Self {
+-            shared: Arc::new(Shared::new(&queues)),
++            shared: Arc::new({
++                #[allow(unused_mut)]
++                let mut shared = Shared::new(&queues);
++                #[cfg(feature = "worker-timers")]
++                {
++                    shared.timer_capacity = _timer_capacity;
++                }
++                shared
++            }),
+         };
+         for (identifier, (queue, driver)) in queues.into_iter().zip(drivers).enumerate() {
+             let shared = Arc::clone(&service.shared);
++            #[cfg(feature = "worker-timers")]
++            let registration = WorkerRegistration::new(&shared);
+             thread::start("core-native-task", move || {
++                #[cfg(feature = "worker-timers")]
++                let _registration = registration;
+                 worker::run_driven(shared, identifier, queue, driver)
+             })?;
+         }
+@@ -226,6 +293,14 @@ impl TaskService {
+             if (!all || self.shared.remaining.load(Ordering::Acquire) == 0)
+                 && self.shared.outstanding.load(Ordering::Acquire) == 0
+             {
++                #[cfg(feature = "worker-timers")]
++                if all
++                    && self.shared.is_closed()
++                    && self.shared.active_workers.load(Ordering::Acquire) != 0
++                {
++                    listener.await;
++                    continue;
++                }
+                 return;
+             }
+             listener.await;
+diff --git a/crates/native/src/task_service/tests.rs b/crates/native/src/task_service/tests.rs
+index 5ae49d3..5546774 100644
+--- a/crates/native/src/task_service/tests.rs
++++ b/crates/native/src/task_service/tests.rs
+@@ -65,7 +65,7 @@ fn rejected_future_destructors_can_close_admission_again() {
+         }
+     }
+     test_support::run(|| {
+-        let service = Arc::new(TaskService::new(1).unwrap());
++        let service = Arc::new(TaskService::new(1, 1024).unwrap());
+         service.close();
+         let guard = CloseOnDrop(Arc::clone(&service));
+         assert!(matches!(
+diff --git a/crates/native/src/timer_service.rs b/crates/native/src/timer_service.rs
+index 86a4fa8..9b3c4a0 100644
+--- a/crates/native/src/timer_service.rs
++++ b/crates/native/src/timer_service.rs
+@@ -48,6 +48,10 @@ pub(crate) struct TimerService {
+     capacity: usize,
+ }
+ impl TimerService {
++    #[cfg(all(test, feature = "worker-timers"))]
++    pub(crate) fn has_started(&self) -> bool {
++        *self.started.lock().unwrap()
++    }
+     pub(crate) fn new(capacity: usize) -> Self {
+         let owner = WorkerTimers::with_capacity(capacity);
+         Self {
+@@ -205,6 +209,45 @@ impl<S: crate::Selector> Clock for NativeScheduler<S> {
+         deadline: Instant,
+         cancellation: &Cancellation,
+     ) -> OperationResult<()> {
++        #[cfg(feature = "worker-timers")]
++        {
++            // The paused conformance fixture retains the explicit, manually driven queue.
++            #[cfg(test)]
++            let paused = self.timers.shared.state.lock().unwrap().paused.is_some();
++            #[cfg(not(test))]
++            let paused = false;
++            if !paused {
++                cancellation.check()?;
++                if Instant::now() >= deadline {
++                    return Ok(());
++                }
++                let mut cancelled = pin!(cancellation.cancelled());
++                let mut sleep = None;
++                let local = poll_fn(|cx| {
++                    if sleep.is_none() {
++                        match crate::worker_timers::sleep(&self.tasks.shared, deadline, cx.waker())
++                        {
++                            None => return Poll::Ready(None),
++                            Some(Err(error)) => return Poll::Ready(Some(Err(error.into()))),
++                            Some(Ok(registration)) => sleep = Some(registration),
++                        }
++                    }
++                    if Instant::now() >= deadline {
++                        return Poll::Ready(Some(Ok(())));
++                    }
++                    if cancelled.as_mut().poll(cx).is_ready() {
++                        return Poll::Ready(Some(Err(core_scheduler::Cancelled.into())));
++                    }
++                    std::pin::Pin::new(sleep.as_mut().unwrap())
++                        .poll(cx)
++                        .map(|result| Some(result.map_err(Into::into)))
++                })
++                .await;
++                if let Some(result) = local {
++                    return result;
++                }
++            }
++        }
+         self.timers.sleep(deadline, cancellation).await
+     }
+ }
+diff --git a/crates/native/src/worker.rs b/crates/native/src/worker.rs
+index 85a1130..08f502b 100644
+--- a/crates/native/src/worker.rs
++++ b/crates/native/src/worker.rs
+@@ -12,6 +12,8 @@ use std::{task::Waker, time::Duration};
+ 
+ pub(crate) struct WorkerState {
+     pub(crate) incoming: Injector<Runnable>,
++    #[cfg(feature = "worker-timers")]
++    pub(crate) timers: Injector<crate::worker_timers::Command>,
+     stealers: [Stealer<Runnable>; 2],
+     sleeping: AtomicBool,
+     thread: OnceLock<Thread>,
+@@ -22,6 +24,8 @@ impl WorkerState {
+     pub(crate) fn new(stealers: [Stealer<Runnable>; 2]) -> Self {
+         Self {
+             incoming: Injector::new(),
++            #[cfg(feature = "worker-timers")]
++            timers: Injector::new(),
+             stealers,
+             sleeping: AtomicBool::new(false),
+             thread: OnceLock::new(),
+@@ -201,8 +205,12 @@ fn drive(
+         if !matches!(active.turn(timeout), Ok(false)) {
+             *driver = None;
+         }
+-    } else if timeout.is_none() {
+-        thread::park();
++    } else {
++        match timeout {
++            None => thread::park(),
++            Some(timeout) if !timeout.is_zero() => thread::park_timeout(timeout),
++            Some(_) => {}
++        }
+     }
+ }
+ 
+@@ -244,10 +252,16 @@ fn run_loop(
+             current,
+         }))
+     });
++    #[cfg(feature = "worker-timers")]
++    crate::worker_timers::enter(&shared, identifier);
+     let mut iteration = 0usize;
+     loop {
+         iteration = iteration.wrapping_add(1);
++        #[cfg(feature = "worker-timers")]
++        crate::worker_timers::turn(&shared, identifier);
+         if shared.finished() {
++            #[cfg(feature = "worker-timers")]
++            crate::worker_timers::turn(&shared, identifier);
+             if let Some(active) = driver.as_mut() {
+                 active.close();
+                 drive(&mut driver, None);
+@@ -267,7 +281,13 @@ fn run_loop(
+                     &shared.idle_workers,
+                     find_work(&shared, iteration),
+                     || !shared.finished(),
+-                    || drive(&mut driver, None),
++                    || {
++                        #[cfg(feature = "worker-timers")]
++                        let timeout = crate::worker_timers::timeout(&shared, identifier);
++                        #[cfg(not(feature = "worker-timers"))]
++                        let timeout = None;
++                        drive(&mut driver, timeout);
++                    },
+                 )
+             }
+             result => yield_on_retry(result).success(),
+@@ -305,6 +325,8 @@ fn run_loop(
+         // Publish the available completion batch before starting the next task batch.
+         drive(&mut driver, Some(Duration::ZERO));
+     }
++    #[cfg(feature = "worker-timers")]
++    crate::worker_timers::exit();
+     CURRENT_WORKER.with(|current| current.take());
+ }
+ 
+diff --git a/crates/timers/Cargo.toml b/crates/timers/Cargo.toml
+index 0f05496..ab570a8 100644
+--- a/crates/timers/Cargo.toml
++++ b/crates/timers/Cargo.toml
+@@ -11,6 +11,7 @@ readme = "readme.md"
+ [features]
+ driver = ["dep:crossbeam-queue"]
+ sharded = []
++local = []
+ 
+ [dependencies]
+ crossbeam-queue = { version = "0.3.13", optional = true }
+diff --git a/crates/timers/src/lib.rs b/crates/timers/src/lib.rs
+index 4bd8db6..6afb6d3 100644
+--- a/crates/timers/src/lib.rs
++++ b/crates/timers/src/lib.rs
+@@ -9,6 +9,9 @@ mod timers;
+ pub use timer_handle::TimerHandle;
+ pub use timers::Timers;
+ 
++#[cfg(feature = "local")]
++pub use timers::local;
++
+ #[cfg(feature = "driver")]
+ pub mod driver;
+ 
+diff --git a/crates/timers/src/timers.rs b/crates/timers/src/timers.rs
+index 951cf69..6153859 100644
+--- a/crates/timers/src/timers.rs
++++ b/crates/timers/src/timers.rs
+@@ -98,6 +98,22 @@ pub(crate) struct State<Value> {
+ }
+ 
+ impl<Value> State<Value> {
++    fn new() -> Self {
++        Self {
++            #[cfg(any(feature = "driver", feature = "sharded"))]
++            closed: false,
++            #[cfg(feature = "sharded")]
++            publication: None,
++            slots: Vec::new(),
++            heap: BinaryHeap::new(),
++            scheduled: Vec::new(),
++            free: NO_SLOT,
++            free_count: 0,
++            live: 0,
++            cancelled: 0,
++        }
++    }
++
+     fn capacity(&self) -> usize {
+         self.slots
+             .capacity()
+@@ -470,19 +486,7 @@ impl<Value> Timers<Value> {
+     /// Reserve space for at least `capacity` registrations.
+     pub fn with_capacity(capacity: usize) -> Self {
+         let timers = Self {
+-            shared: Arc::new(Mutex::new(State {
+-                #[cfg(any(feature = "driver", feature = "sharded"))]
+-                closed: false,
+-                #[cfg(feature = "sharded")]
+-                publication: None,
+-                slots: Vec::new(),
+-                heap: BinaryHeap::new(),
+-                scheduled: Vec::new(),
+-                free: NO_SLOT,
+-                free_count: 0,
+-                live: 0,
+-                cancelled: 0,
+-            })),
++            shared: Arc::new(Mutex::new(State::new())),
+         };
+         // Acquire the mutex now, including native lock initialization on macOS.
+         lock(&timers.shared).reserve(capacity);
+@@ -617,3 +621,73 @@ impl<Value> Drop for Timers<Value> {
+ 
+ #[cfg(test)]
+ mod tests;
++
++/// Experimental, exclusively owned queue using the same batching and slot engine.
++#[cfg(feature = "local")]
++pub mod local {
++    use super::*;
++
++    /// Identifies one registration until it is released. Keys belong to their originating queue.
++    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
++    pub struct TimerKey(Key);
++
++    /// Timer storage manipulated only by its owning worker; no synchronization or shared allocation.
++    pub struct TimerQueue<Value>(State<Value>);
++
++    impl<Value> TimerQueue<Value> {
++        pub fn capacity(&self) -> usize {
++            self.0.capacity()
++        }
++        pub fn with_capacity(capacity: usize) -> Self {
++            let mut state = State::new();
++            state.reserve(capacity);
++            Self(state)
++        }
++
++        pub fn try_schedule(&mut self, deadline: Instant, value: Value) -> Result<TimerKey, Value> {
++            self.0.try_insert(deadline, value).map(TimerKey)
++        }
++
++        /// Update a pending value. Delayed updates for released or expired registrations are rejected.
++        pub fn update(&mut self, key: TimerKey, value: Value) -> Result<Value, Value> {
++            let Some(slot) = self.0.slots.get_mut(key.0.index) else {
++                return Err(value);
++            };
++            if slot.generation != key.0.generation || slot.handles == 0 {
++                return Err(value);
++            }
++            let Some(previous) = slot.value.as_mut() else {
++                return Err(value);
++            };
++            Ok(std::mem::replace(previous, value))
++        }
++
++        /// Cancel and release exactly once, including after expiry. Returns the value to drop outside queue borrows.
++        pub fn release(&mut self, key: TimerKey) -> Option<Value> {
++            let value = self.0.cancel(key.0);
++            self.0.drop_handle(key.0);
++            value
++        }
++
++        pub fn next_deadline(&mut self) -> Option<Instant> {
++            self.0.flush();
++            self.0.discard_cancelled();
++            self.0.heap.peek().map(|entry| entry.deadline)
++        }
++
++        /// Remove before returning, so application wakeups run outside the queue borrow.
++        pub fn pop_expired(&mut self, now: Instant) -> Option<Value> {
++            if self.next_deadline()? > now {
++                return None;
++            }
++            self.pop()
++        }
++
++        /// Remove the earliest value, for closure and draining.
++        pub fn pop(&mut self) -> Option<Value> {
++            self.next_deadline()?;
++            let entry = self.0.heap.pop().unwrap();
++            self.0.remove(entry.key)
++        }
++    }
++}
+diff --git a/crates/native/src/worker_timers.rs b/crates/native/src/worker_timers.rs
+new file mode 100644
+index 0000000..d4bb036
+--- /dev/null
++++ b/crates/native/src/worker_timers.rs
+@@ -0,0 +1,404 @@
++// Released under the MIT License.
++// Copyright, 2026, by Samuel Williams.
++
++//! Experimental worker-owned timers. Only cross-thread updates use the owner's inbox.
++use crate::task_service::Shared;
++use core_scheduler_timers::local::{TimerKey, TimerQueue};
++use std::{
++    cell::RefCell,
++    future::Future,
++    io,
++    pin::Pin,
++    sync::{Arc, Weak},
++    task::{Context, Poll, Waker},
++    time::{Duration, Instant},
++};
++
++pub(crate) enum Command {
++    Update(TimerKey, Waker),
++    Release(TimerKey),
++}
++pub(crate) fn rejected(command: Command) {
++    // Closure may overtake an update after Sleep checked admission. Wake the replacement context too.
++    if let Command::Update(_, waker) = command {
++        crate::panic::contain(|| waker.wake());
++    }
++}
++struct LocalTimers {
++    scheduler: Weak<Shared>,
++    identifier: usize,
++    queue: TimerQueue<Waker>,
++}
++thread_local! {
++    static TIMERS: RefCell<Option<LocalTimers>> = const { RefCell::new(None) };
++}
++
++pub(crate) fn enter(shared: &Arc<Shared>, identifier: usize) {
++    TIMERS.with(|timers| {
++        timers.replace(Some(LocalTimers {
++            scheduler: Arc::downgrade(shared),
++            identifier,
++            queue: TimerQueue::with_capacity(shared.timer_capacity),
++        }))
++    });
++}
++pub(crate) fn exit() {
++    TIMERS.with(|timers| timers.take());
++}
++
++// The callback never polls application code or invokes a waker inside this RefCell borrow.
++fn local<T>(
++    shared: &Arc<Shared>,
++    owner: Option<usize>,
++    apply: impl FnOnce(&mut LocalTimers) -> T,
++) -> Option<T> {
++    TIMERS.with(|timers| {
++        let mut timers = timers.borrow_mut();
++        let local = timers.as_mut()?;
++        if !std::ptr::eq(local.scheduler.as_ptr(), Arc::as_ptr(shared))
++            || owner.is_some_and(|owner| owner != local.identifier)
++        {
++            return None;
++        }
++        Some(apply(local))
++    })
++}
++// Return a displaced waker to drop, or a replacement that must be woken because expiry won the race.
++fn apply(queue: &mut TimerQueue<Waker>, command: Command) -> (Option<Waker>, bool) {
++    match command {
++        Command::Release(key) => (queue.release(key), false),
++        Command::Update(key, waker) => match queue.update(key, waker) {
++            Ok(previous) => (Some(previous), false),
++            Err(replacement) => (Some(replacement), true),
++        },
++    }
++}
++fn deliver((waker, wake): (Option<Waker>, bool)) {
++    if wake {
++        crate::panic::contain(|| waker.unwrap().wake());
++    } else {
++        crate::panic::discard(waker);
++    }
++}
++fn dispatch(shared: &Arc<Shared>, owner: usize, command: Command) {
++    let mut command = Some(command);
++    if let Some(waker) = local(shared, Some(owner), |timers| {
++        apply(&mut timers.queue, command.take().unwrap())
++    }) {
++        deliver(waker);
++    } else {
++        shared.send_timer(owner, command.unwrap());
++    }
++}
++
++pub(crate) struct Sleep<'a> {
++    shared: &'a Arc<Shared>,
++    owner: usize,
++    key: TimerKey,
++    deadline: Instant,
++    waker: Waker,
++}
++impl Future for Sleep<'_> {
++    type Output = io::Result<()>;
++    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
++        if Instant::now() >= self.deadline {
++            return Poll::Ready(Ok(()));
++        }
++        if self.shared.is_closed() {
++            return Poll::Ready(Err(io::Error::new(
++                io::ErrorKind::BrokenPipe,
++                "clock is closed",
++            )));
++        }
++        if !self.waker.will_wake(cx.waker()) {
++            dispatch(
++                self.shared,
++                self.owner,
++                Command::Update(self.key, cx.waker().clone()),
++            );
++            self.waker.clone_from(cx.waker());
++        }
++        Poll::Pending
++    }
++}
++impl Drop for Sleep<'_> {
++    fn drop(&mut self) {
++        dispatch(self.shared, self.owner, Command::Release(self.key));
++    }
++}
++
++pub(crate) fn sleep<'a>(
++    shared: &'a Arc<Shared>,
++    deadline: Instant,
++    waker: &Waker,
++) -> Option<io::Result<Sleep<'a>>> {
++    let cached = waker.clone();
++    let mut wake = Some(waker.clone());
++    let registered = local(shared, None, |timers| {
++        if shared.is_closed() {
++            return Err(io::Error::new(io::ErrorKind::BrokenPipe, "clock is closed"));
++        }
++        Ok((
++            timers.identifier,
++            timers.queue.try_schedule(deadline, wake.take().unwrap()),
++        ))
++    })?;
++    Some(registered.and_then(|(owner, result)| {
++        result
++            .map(|key| Sleep {
++                shared,
++                owner,
++                key,
++                deadline,
++                waker: cached,
++            })
++            .map_err(|waker| {
++                drop(waker);
++                io::Error::new(io::ErrorKind::WouldBlock, "worker timer queue is full")
++            })
++    }))
++}
++
++pub(crate) fn turn(shared: &Arc<Shared>, identifier: usize) {
++    let incoming = &shared.workers[identifier].timers;
++    // Bound command processing to a snapshot so senders cannot extend this turn forever.
++    for _ in 0..incoming.len() {
++        let command = loop {
++            match incoming.steal() {
++                crossbeam_deque::Steal::Success(command) => break Some(command),
++                crossbeam_deque::Steal::Empty => break None,
++                crossbeam_deque::Steal::Retry => continue,
++            }
++        };
++        let Some(command) = command else { break };
++        let displaced = local(shared, Some(identifier), |timers| {
++            apply(&mut timers.queue, command)
++        })
++        .unwrap();
++        deliver(displaced);
++    }
++    // The common empty-queue path does not read the clock.
++    if local(shared, Some(identifier), |timers| {
++        timers.queue.next_deadline()
++    })
++    .unwrap()
++    .is_none()
++    {
++        return;
++    }
++    let now = Instant::now();
++    loop {
++        let wake = local(shared, Some(identifier), |timers| {
++            if shared.is_closed() {
++                timers.queue.pop()
++            } else {
++                timers.queue.pop_expired(now)
++            }
++        })
++        .unwrap();
++        let Some(wake) = wake else { break };
++        // Remove first, release the local borrow, then publish the runnable through its normal Waker.
++        crate::panic::contain(|| wake.wake());
++    }
++}
++
++pub(crate) fn timeout(shared: &Arc<Shared>, identifier: usize) -> Option<Duration> {
++    if !shared.workers[identifier].timers.is_empty() {
++        return Some(Duration::ZERO);
++    }
++    local(shared, Some(identifier), |timers| {
++        timers.queue.next_deadline()
++    })
++    .unwrap()
++    .map(|deadline| {
++        if shared.is_closed() {
++            Duration::ZERO
++        } else {
++            deadline.saturating_duration_since(Instant::now())
++        }
++    })
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use core_scheduler::{Cancellation, Clock, Spawn};
++    use futures_lite::future::{block_on, poll_once};
++
++    fn scheduler(capacity: usize) -> Arc<crate::NativeScheduler> {
++        Arc::new(
++            crate::NativeScheduler::with_options(crate::NativeOptions {
++                workers: 1,
++                timer_capacity: capacity,
++                ..Default::default()
++            })
++            .unwrap(),
++        )
++    }
++
++    #[test]
++    fn expired_or_released_registration_wakes_a_late_replacement() {
++        use std::sync::atomic::{AtomicUsize, Ordering};
++        struct Count(AtomicUsize);
++        impl std::task::Wake for Count {
++            fn wake(self: Arc<Self>) {
++                self.0.fetch_add(1, Ordering::Relaxed);
++            }
++        }
++        let count = Arc::new(Count(AtomicUsize::new(0)));
++        let waker = Waker::from(Arc::clone(&count));
++        let mut queue = TimerQueue::with_capacity(4);
++        let now = Instant::now();
++        let key = queue.try_schedule(now, Waker::noop().clone()).unwrap();
++        queue.pop_expired(now).unwrap().wake();
++        // An update sent before expiry may be delivered after that expiry woke the old context.
++        deliver(apply(&mut queue, Command::Update(key, waker.clone())));
++        assert_eq!(count.0.load(Ordering::Relaxed), 1);
++        deliver(apply(&mut queue, Command::Release(key)));
++        queue.next_deadline();
++        let replacement = queue.try_schedule(now, Waker::noop().clone()).unwrap();
++        assert_ne!(key, replacement);
++        deliver(apply(&mut queue, Command::Update(key, waker)));
++        assert_eq!(count.0.load(Ordering::Relaxed), 2);
++        deliver(apply(&mut queue, Command::Release(replacement)));
++    }
++
++    #[test]
++    fn local_registration_repoll_and_drop_allocate_nothing() {
++        let scheduler = scheduler(64);
++        let shared = Arc::clone(&scheduler);
++        let task = scheduler
++            .spawn(async move {
++                let token = Cancellation::new();
++                let deadline = shared.now() + Duration::from_secs(3600);
++                let allocations = allocation_counter::measure(|| {
++                    for _ in 0..32 {
++                        let mut sleep = std::pin::pin!(shared.sleep_until(deadline, &token));
++                        let mut cx = Context::from_waker(Waker::noop());
++                        assert!(sleep.as_mut().poll(&mut cx).is_pending());
++                        assert!(sleep.as_mut().poll(&mut cx).is_pending());
++                    }
++                });
++                assert_eq!(allocations.count_total, 0, "{allocations:?}");
++                assert!(!shared.timers.has_started());
++            })
++            .unwrap();
++        block_on(task).unwrap();
++        block_on(scheduler.shutdown());
++    }
++
++    #[test]
++    fn local_timers_expire_and_do_not_start_the_fallback_thread() {
++        let scheduler = scheduler(64);
++        let shared = Arc::clone(&scheduler);
++        let task = scheduler
++            .spawn(async move {
++                for _ in 0..8 {
++                    let deadline = Instant::now() + Duration::from_millis(1);
++                    shared
++                        .sleep_until(deadline, &Cancellation::never())
++                        .await
++                        .unwrap();
++                    assert!(Instant::now() >= deadline);
++                }
++                assert!(!shared.timers.has_started());
++            })
++            .unwrap();
++        block_on(task).unwrap();
++        block_on(scheduler.shutdown());
++    }
++
++    #[test]
++    #[allow(clippy::async_yields_async)] // Deliberately transfer a pending future to a different polling thread.
++    fn pending_sleep_can_move_to_another_thread_and_replace_its_waker() {
++        let scheduler = scheduler(64);
++        let shared = Arc::clone(&scheduler);
++        let task = scheduler
++            .spawn(async move {
++                let mut sleep = Box::pin(async move {
++                    shared
++                        .sleep(Duration::from_millis(30), &Cancellation::never())
++                        .await
++                });
++                assert!(poll_once(&mut sleep).await.is_none());
++                sleep
++            })
++            .unwrap();
++        let sleep = block_on(task).unwrap();
++        std::thread::spawn(move || block_on(sleep).unwrap())
++            .join()
++            .unwrap();
++        assert!(!scheduler.timers.has_started());
++        block_on(scheduler.shutdown());
++    }
++
++    #[test]
++    #[allow(clippy::async_yields_async)] // Deliberately drop a registered future outside its worker.
++    fn remote_drop_reclaims_capacity_and_cancellation_releases_local_waits() {
++        let scheduler = scheduler(1);
++        let shared = Arc::clone(&scheduler);
++        let task = scheduler
++            .spawn(async move {
++                let mut sleep = Box::pin(async move {
++                    shared
++                        .sleep(Duration::from_secs(3600), &Cancellation::never())
++                        .await
++                });
++                assert!(poll_once(&mut sleep).await.is_none());
++                sleep
++            })
++            .unwrap();
++        drop(block_on(task).unwrap());
++        let shared = Arc::clone(&scheduler);
++        let task = scheduler
++            .spawn(async move {
++                let token = Cancellation::new();
++                let mut sleep = std::pin::pin!(shared.sleep(Duration::from_secs(3600), &token));
++                assert!(poll_once(&mut sleep).await.is_none());
++                token.cancel();
++                assert!(matches!(
++                    sleep.await,
++                    Err(core_scheduler::OperationError::Cancelled(_))
++                ));
++            })
++            .unwrap();
++        block_on(task).unwrap();
++        block_on(scheduler.shutdown());
++    }
++
++    #[test]
++    fn closure_wakes_local_timers_and_reports_capacity() {
++        let scheduler = scheduler(1);
++        let shared = Arc::clone(&scheduler);
++        let (registered, ready) = std::sync::mpsc::channel();
++        let task = scheduler
++            .spawn(async move {
++                let token = Cancellation::never();
++                let capacity =
++                    local(&shared.tasks.shared, None, |timers| timers.queue.capacity()).unwrap();
++                let mut sleeps = Vec::new();
++                for _ in 0..capacity {
++                    let mut sleep = Box::pin(shared.sleep(Duration::from_secs(3600), &token));
++                    assert!(poll_once(&mut sleep).await.is_none());
++                    sleeps.push(sleep);
++                }
++                assert_eq!(
++                    shared
++                        .sleep(Duration::from_secs(3600), &token)
++                        .await
++                        .unwrap_err()
++                        .kind(),
++                    io::ErrorKind::WouldBlock
++                );
++                registered.send(()).unwrap();
++                for sleep in sleeps {
++                    assert_eq!(sleep.await.unwrap_err().kind(), io::ErrorKind::BrokenPipe);
++                }
++            })
++            .unwrap();
++        ready.recv_timeout(Duration::from_secs(5)).unwrap();
++        scheduler.close();
++        block_on(task).unwrap();
++        block_on(scheduler.shutdown());
++    }
++}

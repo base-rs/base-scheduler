@@ -25,6 +25,7 @@ struct State {
     closed: AtomicBool,
     failed: AtomicBool,
     inside_turn: AtomicBool,
+    idle: AtomicBool,
     batches: AtomicUsize,
     turns: AtomicUsize,
     dropped: AtomicUsize,
@@ -102,7 +103,9 @@ impl SelectorWorker for Driver {
             }
         }
         if timeout.is_none() {
+            self.0.idle.store(true, Ordering::SeqCst);
             thread::park();
+            self.0.idle.store(false, Ordering::SeqCst);
         }
         Ok(false)
     }
@@ -154,6 +157,36 @@ fn idle_completions_resume_tasks_without_interrupting_their_own_worker() {
         block_on(scheduler.shutdown());
         wait(|| state.dropped.load(Ordering::SeqCst) == 1);
         assert!(state.retired.load(Ordering::SeqCst));
+    });
+}
+
+#[test]
+fn remote_task_wakes_still_interrupt_an_idle_single_worker() {
+    crate::test_support::run(|| {
+        let state = Arc::new(State::default());
+        let scheduler = construct(&[Arc::clone(&state)]);
+        let (send, receive) = mpsc::channel();
+        let ready = Arc::new(AtomicBool::new(false));
+        let observed = Arc::clone(&ready);
+        let task = scheduler
+            .spawn(poll_fn(move |context| {
+                if observed.load(Ordering::Acquire) {
+                    Poll::Ready(42)
+                } else {
+                    send.send(context.waker().clone()).unwrap();
+                    Poll::Pending
+                }
+            }))
+            .unwrap();
+        let waker = receive.recv_timeout(Duration::from_secs(5)).unwrap();
+        wait(|| state.idle.load(Ordering::SeqCst));
+        let interrupts = state.interrupts.load(Ordering::SeqCst);
+        ready.store(true, Ordering::Release);
+        waker.wake();
+        assert_eq!(block_on(task).unwrap(), 42);
+        assert!(state.interrupts.load(Ordering::SeqCst) > interrupts);
+        block_on(scheduler.shutdown());
+        wait(|| state.retired.load(Ordering::SeqCst));
     });
 }
 

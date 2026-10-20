@@ -1,0 +1,41 @@
+{
+  "source_files": {
+    "immediate": {
+      "crates/native/src/worker.rs": "147db5b0e8d3ce897370e439f243a51b98f2957d4652762befa605adf354917e",
+      "crates/native/src/task_service.rs": "aa979a468e236c4122a696079d1c71d459ce511cbde8f9c6a3024e1c8528b289",
+      "crates/native/src/worker_timers.rs": "fccac88c67e5073a70c90d2e883cf3be983804f16c782d1d138206a6780cfbb9",
+      "crates/timers/src/timers.rs": "b7c308e8d844f57eb9235ca657f7b6a04184659a5aa770dd79eebe8d2cb062c9"
+    },
+    "ready": {
+      "crates/native/src/worker.rs": "20b4acec5e1348e233253056a4ccc502deaef4eb35386db99b8db65d73cf4fd0",
+      "crates/native/src/task_service.rs": "6f8492ac4c25673e63d64b0b6a077cf321028bac404d7b2eca641424fdd964f3",
+      "crates/native/src/worker_timers.rs": "f4822c28563ad90e0ae5184032338bbc167dbe4a40025264035403dc5e190af0",
+      "crates/timers/src/timers.rs": "b7c308e8d844f57eb9235ca657f7b6a04184659a5aa770dd79eebe8d2cb062c9"
+    },
+    "batch": {
+      "crates/native/src/worker.rs": "147db5b0e8d3ce897370e439f243a51b98f2957d4652762befa605adf354917e",
+      "crates/native/src/task_service.rs": "aa979a468e236c4122a696079d1c71d459ce511cbde8f9c6a3024e1c8528b289",
+      "crates/native/src/worker_timers.rs": "19c4029c5f5ec8426b2de21e804c37a232536a73581eba7243a72b39ee53ff62",
+      "crates/timers/src/timers.rs": "b7c308e8d844f57eb9235ca657f7b6a04184659a5aa770dd79eebe8d2cb062c9"
+    },
+    "ready-batch": {
+      "crates/native/src/worker.rs": "baa0ef51dd6ad8208b7c5011cc1c21bf731ea5126fbfc55ee6c033fd7cc8f9fd",
+      "crates/native/src/task_service.rs": "631c5b84be9a9793db323b14554836255e1e8feec42804ca162720c6a822f3aa",
+      "crates/native/src/worker_timers.rs": "5eaeb2e4593c7d10eb494716c76a9dad2670ce1ea7d9507782ede869cebba115",
+      "crates/timers/src/timers.rs": "b7c308e8d844f57eb9235ca657f7b6a04184659a5aa770dd79eebe8d2cb062c9"
+    },
+    "ready-local": {
+      "crates/native/src/worker.rs": "2e4b24256685e86d175d6623f5586a31a80ff6583bd5ec3393dd5721d94a6ae3",
+      "crates/native/src/task_service.rs": "631c5b84be9a9793db323b14554836255e1e8feec42804ca162720c6a822f3aa",
+      "crates/native/src/worker_timers.rs": "5eaeb2e4593c7d10eb494716c76a9dad2670ce1ea7d9507782ede869cebba115",
+      "crates/timers/src/timers.rs": "b7c308e8d844f57eb9235ca657f7b6a04184659a5aa770dd79eebe8d2cb062c9"
+    }
+  },
+  "patches": {
+    "ready": "b6821b338cb51019760ee90d357edc548dd42bcfde99e518e83f67fca1733041",
+    "batch": "626ecbe9c6c9c8f3dfadb9ce003a9d306f864ff77f94128a350f6984be79ecbf",
+    "ready-batch": "4e8d283db3fd7c63dee920ef0241c39e8f57ebd3b506a556e094e224d33a4edd",
+    "ready-local": "699bbb25177887a58d461b789dcb7a321cd4ba1ffa2577e2cd9943796ff86b17"
+  },
+  "candidate_sha256": "72576d24fc0d85e2719431f20054cf651c16bdf67907988bd1c0565ba3bdc7bc"
+}

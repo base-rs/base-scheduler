@@ -1,0 +1,118 @@
+{
+  "source": "64eb1548e1371b067f0e7c8b85d5a37c2f745768",
+  "rustc": "rustc 1.99.0 (b940084d7 2026-09-28) (Arch Linux rust 1:1.99.0-1)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+  "environment_overrides": {},
+  "harness_sha256": "b9b074a4729fd202982f8b30d47fc9c6a7c69799107d02417370ac9767d7f0de",
+  "patches": {
+    "core-scheduler-timer-flush-production.patch": "7ab04a7ec700843394b7d36476109dbb32365a1d9855590726e9144114583ee5",
+    "candidate.patch": "72576d24fc0d85e2719431f20054cf651c16bdf67907988bd1c0565ba3bdc7bc",
+    "core-scheduler-timer-local-pop.patch": "14d26d8290028eb67d14ed06c884a2fbc3481dc485610e2a10668c2dc300fdc6"
+  },
+  "variants": {
+    "production": {
+      "command": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "-p",
+        "core-scheduler-echo-benchmark",
+        "--bins"
+      ],
+      "patches": [],
+      "binaries": {
+        "timers": {
+          "path": "/home/samuel/.cache/core-scheduler-perf-followup/production-timers",
+          "sha256": "59121f6e5ec92630b2e152047171a507a2016cbee16ac1e1e800e392528dec00"
+        },
+        "core-scheduler-echo-benchmark": {
+          "path": "/home/samuel/.cache/core-scheduler-perf-followup/production-core-scheduler-echo-benchmark",
+          "sha256": "a7e4bc768a8ebcf373723081440835117a1bc226efb961bc3defac933a70d9da"
+        }
+      },
+      "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "flush": {
+      "command": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "-p",
+        "core-scheduler-echo-benchmark",
+        "--bins"
+      ],
+      "patches": [
+        "core-scheduler-timer-flush-production.patch"
+      ],
+      "binaries": {
+        "timers": {
+          "path": "/home/samuel/.cache/core-scheduler-perf-followup/flush-timers",
+          "sha256": "a7368772b1e078994e0e88cde97d7ec78bb07bfb80527550a689b5d610dc36c8"
+        },
+        "core-scheduler-echo-benchmark": {
+          "path": "/home/samuel/.cache/core-scheduler-perf-followup/flush-core-scheduler-echo-benchmark",
+          "sha256": "afda8029c972c7b258c7507cbda5bd68b36da633786361cedb7727238a69a672"
+        }
+      },
+      "diff_sha256": "7ab04a7ec700843394b7d36476109dbb32365a1d9855590726e9144114583ee5"
+    },
+    "local": {
+      "command": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "-p",
+        "core-scheduler-echo-benchmark",
+        "--bins",
+        "--features",
+        "core-scheduler-native/worker-timers"
+      ],
+      "patches": [
+        "candidate.patch"
+      ],
+      "binaries": {
+        "timers": {
+          "path": "/home/samuel/.cache/core-scheduler-perf-followup/local-timers",
+          "sha256": "830d3399a406404642ade39ffbdc9ee90195352a3dae24eca59443a801c43bf6"
+        },
+        "core-scheduler-echo-benchmark": {
+          "path": "/home/samuel/.cache/core-scheduler-perf-followup/local-core-scheduler-echo-benchmark",
+          "sha256": "bab49ff561ed559944ddf92a7acebb734acfaae8c919c9e0257c94d50da9e0ac"
+        }
+      },
+      "diff_sha256": "b58039db85b6882fbc32cf28b28bff2f0c45890fdcab5c5334d8772f11d4d296"
+    },
+    "local-fast": {
+      "command": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "-p",
+        "core-scheduler-echo-benchmark",
+        "--bins",
+        "--features",
+        "core-scheduler-native/worker-timers"
+      ],
+      "patches": [
+        "candidate.patch",
+        "core-scheduler-timer-flush-production.patch",
+        "core-scheduler-timer-local-pop.patch"
+      ],
+      "binaries": {
+        "timers": {
+          "path": "/home/samuel/.cache/core-scheduler-perf-followup/local-fast-timers",
+          "sha256": "cd1fa5b8d5d8851295828285251f351bf8a2c694bb9c3a07bfe44588cf145248"
+        },
+        "core-scheduler-echo-benchmark": {
+          "path": "/home/samuel/.cache/core-scheduler-perf-followup/local-fast-core-scheduler-echo-benchmark",
+          "sha256": "927334a621577d08471f5b7210d2c7213dbf0befd7a97ef9d7ed2197d853eb2d"
+        }
+      },
+      "diff_sha256": "88f8038e1aed8895d20475bea2cb9d187c0b2ef86468cad3b523f105f3bb1bfe"
+    }
+  },
+  "finished_utc": "2026-10-20T20:28:29Z"
+}

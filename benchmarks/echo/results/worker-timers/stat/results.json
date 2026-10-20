@@ -1,0 +1,227 @@
+{
+  "build": {
+    "source": "130cd4a67e526e80ba9a5e7e7ebbe81494bd903b",
+    "patch_sha256": "611ea3d8f7d620758e9799dcf6dca924ac358dfef0feabc60aa6273b1098c2b8",
+    "harness_sha256": "8f0a03b422f720a9c6b72cb466809213ebee744ac493b808de4af78f25f530e0",
+    "rustc": "rustc 1.99.0 (b940084d7 2026-09-28) (Arch Linux rust 1:1.99.0-1)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+    "command": "cargo build --release --locked -p core-scheduler-echo-benchmark --bins",
+    "binaries": {
+      "before": {
+        "core-scheduler-echo-benchmark": {
+          "path": "/home/samuel/.cache/core-scheduler-worker-timers/before-core-scheduler-echo-benchmark",
+          "sha256": "a7e4bc768a8ebcf373723081440835117a1bc226efb961bc3defac933a70d9da"
+        },
+        "timers": {
+          "path": "/home/samuel/.cache/core-scheduler-worker-timers/before-timers",
+          "sha256": "6102df169d331e42f77252250916e20c4247ae59c2aa006505f5b6fcd436453d"
+        }
+      },
+      "integrated": {
+        "core-scheduler-echo-benchmark": {
+          "path": "/home/samuel/.cache/core-scheduler-worker-timers/integrated-core-scheduler-echo-benchmark",
+          "sha256": "7a1105a24041a784796bcd5470910de0dff277f9b4beed68d38aab727d189a6d"
+        },
+        "timers": {
+          "path": "/home/samuel/.cache/core-scheduler-worker-timers/integrated-timers",
+          "sha256": "f8ba24ec8301068b5fc0e2f21a61f47eb4f5f70a24ffce6ecb926999606cef1a"
+        }
+      }
+    },
+    "finished_utc": "2026-10-20T18:52:13Z"
+  },
+  "runner_sha256": "4eaa790f440ab732950b464abc18894878020553bb5132fac55c1840e0d0f496",
+  "events": [
+    "task-clock",
+    "cycles",
+    "instructions",
+    "context-switches",
+    "syscalls:sys_enter_io_uring_enter",
+    "syscalls:sys_enter_futex",
+    "syscalls:sys_enter_read",
+    "syscalls:sys_enter_write"
+  ],
+  "instrumented": true,
+  "denominator": "whole process; timer histogram excludes warmup and final late expiries",
+  "samples": [
+    {
+      "backend": "iouring",
+      "completed": 3056979,
+      "delay_us": 1000,
+      "expiries_per_second": 1018993.0,
+      "lateness_max_us": 33.887,
+      "lateness_p50_us": 4.143,
+      "lateness_p99_us": 15.015,
+      "seconds": 3,
+      "tasks": 1024,
+      "workers": 4,
+      "variant": "integrated",
+      "repeat": 2,
+      "identifier": "integrated-w4-t1024-d1000-r2"
+    },
+    {
+      "backend": "iouring",
+      "completed": 3057128,
+      "delay_us": 1000,
+      "expiries_per_second": 1019042.6666666666,
+      "lateness_max_us": 39.455,
+      "lateness_p50_us": 4.111,
+      "lateness_p99_us": 14.871,
+      "seconds": 3,
+      "tasks": 1024,
+      "workers": 4,
+      "variant": "integrated",
+      "repeat": 1,
+      "identifier": "integrated-w4-t1024-d1000-r1"
+    },
+    {
+      "backend": "iouring",
+      "completed": 2991,
+      "delay_us": 1000,
+      "expiries_per_second": 997.0,
+      "lateness_max_us": 14.951,
+      "lateness_p50_us": 2.611,
+      "lateness_p99_us": 6.411,
+      "seconds": 3,
+      "tasks": 1,
+      "workers": 4,
+      "variant": "integrated",
+      "repeat": 1,
+      "identifier": "integrated-w4-t1-d1000-r1"
+    },
+    {
+      "backend": "iouring",
+      "completed": 2842,
+      "delay_us": 1000,
+      "expiries_per_second": 947.3333333333334,
+      "lateness_max_us": 199.167,
+      "lateness_p50_us": 55.807,
+      "lateness_p99_us": 60.607,
+      "seconds": 3,
+      "tasks": 1,
+      "workers": 4,
+      "variant": "before",
+      "repeat": 2,
+      "identifier": "before-w4-t1-d1000-r2"
+    },
+    {
+      "backend": "iouring",
+      "completed": 2842,
+      "delay_us": 1000,
+      "expiries_per_second": 947.3333333333334,
+      "lateness_max_us": 76.799,
+      "lateness_p50_us": 55.807,
+      "lateness_p99_us": 58.271,
+      "seconds": 3,
+      "tasks": 1,
+      "workers": 4,
+      "variant": "before",
+      "repeat": 1,
+      "identifier": "before-w4-t1-d1000-r1"
+    },
+    {
+      "backend": "iouring",
+      "completed": 2894174,
+      "delay_us": 1000,
+      "expiries_per_second": 964724.6666666666,
+      "lateness_max_us": 307.967,
+      "lateness_p50_us": 60.767,
+      "lateness_p99_us": 102.399,
+      "seconds": 3,
+      "tasks": 1024,
+      "workers": 4,
+      "variant": "before",
+      "repeat": 1,
+      "identifier": "before-w4-t1024-d1000-r1"
+    },
+    {
+      "backend": "iouring",
+      "completed": 2990,
+      "delay_us": 1000,
+      "expiries_per_second": 996.6666666666666,
+      "lateness_max_us": 1222.655,
+      "lateness_p50_us": 2.491,
+      "lateness_p99_us": 11.911,
+      "seconds": 3,
+      "tasks": 1,
+      "workers": 1,
+      "variant": "integrated",
+      "repeat": 1,
+      "identifier": "integrated-w1-t1-d1000-r1"
+    },
+    {
+      "backend": "iouring",
+      "completed": 2991,
+      "delay_us": 1000,
+      "expiries_per_second": 997.0,
+      "lateness_max_us": 12.367,
+      "lateness_p50_us": 2.591,
+      "lateness_p99_us": 9.583,
+      "seconds": 3,
+      "tasks": 1,
+      "workers": 4,
+      "variant": "integrated",
+      "repeat": 2,
+      "identifier": "integrated-w4-t1-d1000-r2"
+    },
+    {
+      "backend": "iouring",
+      "completed": 2850,
+      "delay_us": 1000,
+      "expiries_per_second": 950.0,
+      "lateness_max_us": 122.751,
+      "lateness_p50_us": 54.111,
+      "lateness_p99_us": 55.519,
+      "seconds": 3,
+      "tasks": 1,
+      "workers": 1,
+      "variant": "before",
+      "repeat": 1,
+      "identifier": "before-w1-t1-d1000-r1"
+    },
+    {
+      "backend": "iouring",
+      "completed": 2990,
+      "delay_us": 1000,
+      "expiries_per_second": 996.6666666666666,
+      "lateness_max_us": 1359.871,
+      "lateness_p50_us": 2.491,
+      "lateness_p99_us": 11.871,
+      "seconds": 3,
+      "tasks": 1,
+      "workers": 1,
+      "variant": "integrated",
+      "repeat": 2,
+      "identifier": "integrated-w1-t1-d1000-r2"
+    },
+    {
+      "backend": "iouring",
+      "completed": 2848,
+      "delay_us": 1000,
+      "expiries_per_second": 949.3333333333334,
+      "lateness_max_us": 1191.935,
+      "lateness_p50_us": 54.111,
+      "lateness_p99_us": 55.487,
+      "seconds": 3,
+      "tasks": 1,
+      "workers": 1,
+      "variant": "before",
+      "repeat": 2,
+      "identifier": "before-w1-t1-d1000-r2"
+    },
+    {
+      "backend": "iouring",
+      "completed": 2894955,
+      "delay_us": 1000,
+      "expiries_per_second": 964985.0,
+      "lateness_max_us": 233.727,
+      "lateness_p50_us": 60.671,
+      "lateness_p99_us": 100.607,
+      "seconds": 3,
+      "tasks": 1024,
+      "workers": 4,
+      "variant": "before",
+      "repeat": 2,
+      "identifier": "before-w4-t1024-d1000-r2"
+    }
+  ]
+}

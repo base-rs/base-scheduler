@@ -1,0 +1,12 @@
+--- a/crates/timers/src/timers.rs
++++ b/crates/timers/src/timers.rs
+@@ -670,6 +670,9 @@
+         }
+ 
+         pub fn next_deadline(&mut self) -> Option<Instant> {
++            if self.0.heap.is_empty() && self.0.scheduled.is_empty() {
++                return None;
++            }
+             self.0.flush();
+             self.0.discard_cancelled();
+             self.0.heap.peek().map(|entry| entry.deadline)

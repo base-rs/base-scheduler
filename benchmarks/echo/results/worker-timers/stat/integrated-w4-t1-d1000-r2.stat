@@ -1,0 +1,10 @@
+# started on Wed Oct 21 08:03:55 2026
+
+50.40;msec;task-clock;50404600;100.00;;
+176470457;;cycles;50404600;100.00;;
+250190222;;instructions;50404600;100.00;;
+18105;;context-switches;50404600;100.00;;
+26849;;syscalls:sys_enter_io_uring_enter;50404600;100.00;;
+33;;syscalls:sys_enter_futex;50404600;100.00;;
+7379;;syscalls:sys_enter_read;50404600;100.00;;
+7684;;syscalls:sys_enter_write;50404600;100.00;;

@@ -1,0 +1,649 @@
+{
+  "timers": [
+    {
+      "backend": "iouring",
+      "workers": 1,
+      "tasks": 1,
+      "delay_us": 10,
+      "before": {
+        "expiries_per_second": 74581.66666666667,
+        "lateness_p50_us": 3.281,
+        "lateness_p99_us": 10.631,
+        "threads_at_250ms": 3,
+        "voluntary_switches": 895010,
+        "involuntary_switches": 11,
+        "cpu_seconds": 0.8852689999999999,
+        "rate_range": [
+          74529.0,
+          74593.0
+        ]
+      },
+      "local": {
+        "expiries_per_second": 87422.0,
+        "lateness_p50_us": 1.3,
+        "lateness_p99_us": 2.161,
+        "threads_at_250ms": 2,
+        "voluntary_switches": 349749,
+        "involuntary_switches": 3,
+        "cpu_seconds": 0.34128300000000067,
+        "rate_range": [
+          87304.66666666667,
+          87536.66666666667
+        ]
+      },
+      "cpu_change_percent": -61.4486670153365
+    },
+    {
+      "backend": "iouring",
+      "workers": 1,
+      "tasks": 1,
+      "delay_us": 1000,
+      "before": {
+        "expiries_per_second": 997.0,
+        "lateness_p50_us": 2.499,
+        "lateness_p99_us": 12.079,
+        "threads_at_250ms": 3,
+        "voluntary_switches": 11971,
+        "involuntary_switches": 6,
+        "cpu_seconds": 0.012827000000001476,
+        "rate_range": [
+          997.0,
+          997.0
+        ]
+      },
+      "local": {
+        "expiries_per_second": 998.3333333333334,
+        "lateness_p50_us": 1.309,
+        "lateness_p99_us": 10.831,
+        "threads_at_250ms": 2,
+        "voluntary_switches": 3999,
+        "involuntary_switches": 4,
+        "cpu_seconds": 0.004840999999998985,
+        "rate_range": [
+          998.0,
+          998.3333333333334
+        ]
+      },
+      "cpu_change_percent": -62.25929679583358
+    },
+    {
+      "backend": "iouring",
+      "workers": 1,
+      "tasks": 32,
+      "delay_us": 1000,
+      "before": {
+        "expiries_per_second": 31870.666666666668,
+        "lateness_p50_us": 3.421,
+        "lateness_p99_us": 13.271,
+        "threads_at_250ms": 3,
+        "voluntary_switches": 36469,
+        "involuntary_switches": 6,
+        "cpu_seconds": 0.07700200000000024,
+        "rate_range": [
+          31867.666666666668,
+          31872.0
+        ]
+      },
+      "local": {
+        "expiries_per_second": 31925.333333333332,
+        "lateness_p50_us": 1.519,
+        "lateness_p99_us": 11.663,
+        "threads_at_250ms": 2,
+        "voluntary_switches": 14194,
+        "involuntary_switches": 3,
+        "cpu_seconds": 0.044026999999999816,
+        "rate_range": [
+          31907.666666666668,
+          31946.666666666668
+        ]
+      },
+      "cpu_change_percent": -42.82356302433744
+    },
+    {
+      "backend": "iouring",
+      "workers": 4,
+      "tasks": 1,
+      "delay_us": 1000,
+      "before": {
+        "expiries_per_second": 995.6666666666666,
+        "lateness_p50_us": 3.889,
+        "lateness_p99_us": 13.575,
+        "threads_at_250ms": 6,
+        "voluntary_switches": 11980,
+        "involuntary_switches": 5,
+        "cpu_seconds": 0.01765099999999986,
+        "rate_range": [
+          995.6666666666666,
+          995.6666666666666
+        ]
+      },
+      "local": {
+        "expiries_per_second": 997.6666666666666,
+        "lateness_p50_us": 1.93,
+        "lateness_p99_us": 11.503,
+        "threads_at_250ms": 5,
+        "voluntary_switches": 8010,
+        "involuntary_switches": 3,
+        "cpu_seconds": 0.013989999999999725,
+        "rate_range": [
+          997.6666666666666,
+          997.6666666666666
+        ]
+      },
+      "cpu_change_percent": -20.74103450229542
+    },
+    {
+      "backend": "iouring",
+      "workers": 4,
+      "tasks": 32,
+      "delay_us": 1000,
+      "before": {
+        "expiries_per_second": 31831.333333333332,
+        "lateness_p50_us": 3.691,
+        "lateness_p99_us": 13.967,
+        "threads_at_250ms": 6,
+        "voluntary_switches": 169301,
+        "involuntary_switches": 2320,
+        "cpu_seconds": 0.32642900000000097,
+        "rate_range": [
+          31797.333333333332,
+          31841.0
+        ]
+      },
+      "local": {
+        "expiries_per_second": 31932.333333333332,
+        "lateness_p50_us": 1.95,
+        "lateness_p99_us": 7.459,
+        "threads_at_250ms": 5,
+        "voluntary_switches": 83741,
+        "involuntary_switches": 15,
+        "cpu_seconds": 0.1650740000000006,
+        "rate_range": [
+          31929.333333333332,
+          31936.0
+        ]
+      },
+      "cpu_change_percent": -49.43035085730737
+    },
+    {
+      "backend": "iouring",
+      "workers": 4,
+      "tasks": 1024,
+      "delay_us": 1000,
+      "before": {
+        "expiries_per_second": 1015029.6666666666,
+        "lateness_p50_us": 8.463,
+        "lateness_p99_us": 20.479,
+        "threads_at_250ms": 6,
+        "voluntary_switches": 1385261,
+        "involuntary_switches": 74823,
+        "cpu_seconds": 5.7015090000000015,
+        "rate_range": [
+          1014990.3333333334,
+          1015045.6666666666
+        ]
+      },
+      "local": {
+        "expiries_per_second": 1021492.0,
+        "lateness_p50_us": 2.099,
+        "lateness_p99_us": 13.087,
+        "threads_at_250ms": 5,
+        "voluntary_switches": 164890,
+        "involuntary_switches": 64,
+        "cpu_seconds": 1.541465,
+        "rate_range": [
+          1021278.3333333334,
+          1021573.3333333334
+        ]
+      },
+      "cpu_change_percent": -72.96391183456872
+    },
+    {
+      "backend": "native",
+      "workers": 1,
+      "tasks": 1,
+      "delay_us": 1000,
+      "before": {
+        "expiries_per_second": 997.3333333333334,
+        "lateness_p50_us": 2.261,
+        "lateness_p99_us": 11.743,
+        "threads_at_250ms": 3,
+        "voluntary_switches": 11973,
+        "involuntary_switches": 6,
+        "cpu_seconds": 0.010836999999999986,
+        "rate_range": [
+          997.0,
+          997.3333333333334
+        ]
+      },
+      "local": {
+        "expiries_per_second": 998.0,
+        "lateness_p50_us": 1.28,
+        "lateness_p99_us": 10.823,
+        "threads_at_250ms": 2,
+        "voluntary_switches": 3997,
+        "involuntary_switches": 3,
+        "cpu_seconds": 0.004935000000001466,
+        "rate_range": [
+          998.0,
+          998.3333333333334
+        ]
+      },
+      "cpu_change_percent": -54.46156685428187
+    },
+    {
+      "backend": "native",
+      "workers": 4,
+      "tasks": 1024,
+      "delay_us": 1000,
+      "before": {
+        "expiries_per_second": 1015655.3333333334,
+        "lateness_p50_us": 7.783,
+        "lateness_p99_us": 19.023,
+        "threads_at_250ms": 6,
+        "voluntary_switches": 1531220,
+        "involuntary_switches": 82086,
+        "cpu_seconds": 5.338149,
+        "rate_range": [
+          1015515.3333333334,
+          1015677.3333333334
+        ]
+      },
+      "local": {
+        "expiries_per_second": 1021849.0,
+        "lateness_p50_us": 1.92,
+        "lateness_p99_us": 11.127,
+        "threads_at_250ms": 5,
+        "voluntary_switches": 140773,
+        "involuntary_switches": 26,
+        "cpu_seconds": 1.4557969999999996,
+        "rate_range": [
+          1021644.6666666666,
+          1021933.0
+        ]
+      },
+      "cpu_change_percent": -72.72843077253933
+    }
+  ],
+  "echo": [
+    {
+      "backend": "iouring",
+      "workers": 1,
+      "connections": 1,
+      "bytes": 64,
+      "before": {
+        "requests_per_second": 239273.66666666666,
+        "min": 238433.66666666666,
+        "max": 242257.33333333334
+      },
+      "local": {
+        "requests_per_second": 232530.0,
+        "min": 227770.0,
+        "max": 236264.0
+      },
+      "change_percent": -2.818390657280845
+    },
+    {
+      "backend": "iouring-poll",
+      "workers": 1,
+      "connections": 1,
+      "bytes": 64,
+      "before": {
+        "requests_per_second": 241233.66666666666,
+        "min": 232790.66666666666,
+        "max": 241711.33333333334
+      },
+      "local": {
+        "requests_per_second": 228666.0,
+        "min": 228268.0,
+        "max": 236238.66666666666
+      },
+      "change_percent": -5.209748224750276
+    },
+    {
+      "backend": "tokio",
+      "workers": 1,
+      "connections": 1,
+      "bytes": 64,
+      "before": {
+        "requests_per_second": 270157.0,
+        "min": 266557.3333333333,
+        "max": 274277.0
+      },
+      "local": {
+        "requests_per_second": 267945.0,
+        "min": 266269.6666666667,
+        "max": 269725.0
+      },
+      "change_percent": -0.8187831520190092
+    },
+    {
+      "backend": "iouring",
+      "workers": 1,
+      "connections": 32,
+      "bytes": 64,
+      "before": {
+        "requests_per_second": 636216.0,
+        "min": 634468.0,
+        "max": 637901.3333333334
+      },
+      "local": {
+        "requests_per_second": 634484.6666666666,
+        "min": 630396.6666666666,
+        "max": 640636.3333333334
+      },
+      "change_percent": -0.2721298007804518
+    },
+    {
+      "backend": "iouring-poll",
+      "workers": 1,
+      "connections": 32,
+      "bytes": 64,
+      "before": {
+        "requests_per_second": 570716.3333333334,
+        "min": 568428.0,
+        "max": 578197.6666666666
+      },
+      "local": {
+        "requests_per_second": 570877.0,
+        "min": 566034.3333333334,
+        "max": 573674.6666666666
+      },
+      "change_percent": 0.028151755483896146
+    },
+    {
+      "backend": "tokio",
+      "workers": 1,
+      "connections": 32,
+      "bytes": 64,
+      "before": {
+        "requests_per_second": 701667.3333333334,
+        "min": 701351.3333333334,
+        "max": 702650.6666666666
+      },
+      "local": {
+        "requests_per_second": 695718.0,
+        "min": 693313.0,
+        "max": 699392.3333333334
+      },
+      "change_percent": -0.8478851801566045
+    },
+    {
+      "backend": "iouring",
+      "workers": 4,
+      "connections": 128,
+      "bytes": 64,
+      "before": {
+        "requests_per_second": 2084103.0,
+        "min": 2073694.3333333333,
+        "max": 2088298.6666666667
+      },
+      "local": {
+        "requests_per_second": 2087008.0,
+        "min": 2063760.6666666667,
+        "max": 2093451.3333333333
+      },
+      "change_percent": 0.1393885043109666
+    },
+    {
+      "backend": "iouring-poll",
+      "workers": 4,
+      "connections": 128,
+      "bytes": 64,
+      "before": {
+        "requests_per_second": 2117975.0,
+        "min": 2106661.6666666665,
+        "max": 2118354.6666666665
+      },
+      "local": {
+        "requests_per_second": 2114193.0,
+        "min": 2106114.3333333335,
+        "max": 2118292.6666666665
+      },
+      "change_percent": -0.17856679139272025
+    },
+    {
+      "backend": "tokio",
+      "workers": 4,
+      "connections": 128,
+      "bytes": 64,
+      "before": {
+        "requests_per_second": 2117125.3333333335,
+        "min": 2113936.3333333335,
+        "max": 2134449.6666666665
+      },
+      "local": {
+        "requests_per_second": 2109594.3333333335,
+        "min": 2099670.0,
+        "max": 2110946.0
+      },
+      "change_percent": -0.35571819397874904
+    }
+  ],
+  "mixed": [
+    {
+      "backend": "iouring",
+      "workers": 1,
+      "connections": 32,
+      "bytes": 64,
+      "before": {
+        "requests_per_second": 590797.3333333334,
+        "min": 589379.3333333334,
+        "max": 593866.0,
+        "timer_p50_us": 52.127,
+        "timer_p99_us": 645.631,
+        "completed": 89204
+      },
+      "local": {
+        "requests_per_second": 629576.0,
+        "min": 628046.0,
+        "max": 631078.3333333334,
+        "timer_p50_us": 33.855,
+        "timer_p99_us": 46.015,
+        "completed": 93189
+      },
+      "change_percent": 6.563784986616938
+    },
+    {
+      "backend": "iouring-poll",
+      "workers": 1,
+      "connections": 32,
+      "bytes": 64,
+      "before": {
+        "requests_per_second": 536075.6666666666,
+        "min": 535438.0,
+        "max": 537602.6666666666,
+        "timer_p50_us": 60.927,
+        "timer_p99_us": 622.079,
+        "completed": 88723
+      },
+      "local": {
+        "requests_per_second": 564853.6666666666,
+        "min": 563511.3333333334,
+        "max": 565162.6666666666,
+        "timer_p50_us": 41.183,
+        "timer_p99_us": 53.631,
+        "completed": 92408
+      },
+      "change_percent": 5.368272016326059
+    },
+    {
+      "backend": "iouring",
+      "workers": 4,
+      "connections": 128,
+      "bytes": 64,
+      "before": {
+        "requests_per_second": 1863529.3333333333,
+        "min": 1833384.0,
+        "max": 1913936.6666666667,
+        "timer_p50_us": 34.111,
+        "timer_p99_us": 3799.039,
+        "completed": 81738
+      },
+      "local": {
+        "requests_per_second": 2108706.0,
+        "min": 2106275.6666666665,
+        "max": 2110766.6666666665,
+        "timer_p50_us": 9.135,
+        "timer_p99_us": 25.663,
+        "completed": 95632
+      },
+      "change_percent": 13.15657673217916
+    },
+    {
+      "backend": "iouring-poll",
+      "workers": 4,
+      "connections": 128,
+      "bytes": 64,
+      "before": {
+        "requests_per_second": 1990970.3333333333,
+        "min": 1985731.3333333333,
+        "max": 1997281.6666666667,
+        "timer_p50_us": 31.695,
+        "timer_p99_us": 3162.111,
+        "completed": 85947
+      },
+      "local": {
+        "requests_per_second": 2122837.6666666665,
+        "min": 2119586.3333333335,
+        "max": 2129475.0,
+        "timer_p50_us": 15.391,
+        "timer_p99_us": 42.591,
+        "completed": 94965
+      },
+      "change_percent": 6.623269625145922
+    }
+  ],
+  "stat": [
+    {
+      "variant": "before",
+      "workers": 1,
+      "tasks": 1,
+      "delay_us": 1000,
+      "counts": {
+        "task-clock": 23.675,
+        "cycles": 96647593.0,
+        "instructions": 167806469.5,
+        "context-switches": 11955.0,
+        "syscalls:sys_enter_io_uring_enter": 7965.0,
+        "syscalls:sys_enter_futex": 11966.5,
+        "syscalls:sys_enter_read": 4011.5,
+        "syscalls:sys_enter_write": 3984.5
+      }
+    },
+    {
+      "variant": "local",
+      "workers": 1,
+      "tasks": 1,
+      "delay_us": 1000,
+      "counts": {
+        "task-clock": 9.32,
+        "cycles": 33328719.0,
+        "instructions": 52528894.0,
+        "context-switches": 3995.5,
+        "syscalls:sys_enter_io_uring_enter": 3990.5,
+        "syscalls:sys_enter_futex": 17.0,
+        "syscalls:sys_enter_read": 30.0,
+        "syscalls:sys_enter_write": 3.0
+      }
+    },
+    {
+      "variant": "before",
+      "workers": 4,
+      "tasks": 1024,
+      "delay_us": 1000,
+      "counts": {
+        "task-clock": 6518.4,
+        "cycles": 30818713116.0,
+        "instructions": 31212517075.0,
+        "context-switches": 1184165.0,
+        "syscalls:sys_enter_io_uring_enter": 1618987.0,
+        "syscalls:sys_enter_futex": 1479973.0,
+        "syscalls:sys_enter_read": 812465.0,
+        "syscalls:sys_enter_write": 833573.5
+      }
+    },
+    {
+      "variant": "local",
+      "workers": 4,
+      "tasks": 1024,
+      "delay_us": 1000,
+      "counts": {
+        "task-clock": 1779.5,
+        "cycles": 8981005189.5,
+        "instructions": 13916646552.0,
+        "context-switches": 178782.0,
+        "syscalls:sys_enter_io_uring_enter": 299281.5,
+        "syscalls:sys_enter_futex": 680.5,
+        "syscalls:sys_enter_read": 108349.5,
+        "syscalls:sys_enter_write": 108634.5
+      }
+    }
+  ],
+  "empty_fast": [
+    {
+      "backend": "iouring",
+      "variant": "before",
+      "requests_per_second": 247101.33333333334,
+      "min": 240003.66666666666,
+      "max": 247282.66666666666,
+      "change_percent": 0.0
+    },
+    {
+      "backend": "iouring",
+      "variant": "local",
+      "requests_per_second": 236722.0,
+      "min": 232488.33333333334,
+      "max": 251714.66666666666,
+      "change_percent": -4.200435988474371
+    },
+    {
+      "backend": "iouring",
+      "variant": "empty-fast",
+      "requests_per_second": 236607.66666666666,
+      "min": 236306.33333333334,
+      "max": 238778.0,
+      "change_percent": -4.246705804905959
+    },
+    {
+      "backend": "iouring-poll",
+      "variant": "before",
+      "requests_per_second": 239219.0,
+      "min": 233236.0,
+      "max": 241222.33333333334,
+      "change_percent": 0.0
+    },
+    {
+      "backend": "iouring-poll",
+      "variant": "local",
+      "requests_per_second": 239289.66666666666,
+      "min": 231870.66666666666,
+      "max": 243165.66666666666,
+      "change_percent": 0.029540574396946795
+    },
+    {
+      "backend": "iouring-poll",
+      "variant": "empty-fast",
+      "requests_per_second": 234648.33333333334,
+      "min": 232968.66666666666,
+      "max": 236999.66666666666,
+      "change_percent": -1.9106620572223232
+    },
+    {
+      "backend": "tokio",
+      "variant": "before",
+      "requests_per_second": 270056.6666666667,
+      "min": 268935.6666666667,
+      "max": 272600.3333333333,
+      "change_percent": 0.0
+    },
+    {
+      "backend": "tokio",
+      "variant": "empty-fast",
+      "requests_per_second": 270564.3333333333,
+      "min": 270325.6666666667,
+      "max": 271376.3333333333,
+      "change_percent": 0.18798523766614395
+    }
+  ]
+}

@@ -1,0 +1,562 @@
+diff --git a/crates/native/Cargo.toml b/crates/native/Cargo.toml
+index 5ca93dc..a456fa5 100644
+--- a/crates/native/Cargo.toml
++++ b/crates/native/Cargo.toml
+@@ -9,6 +9,7 @@ description = "Native work-stealing scheduler with readiness I/O and batched tim
+ readme = "readme.md"
+ 
+ [features]
++ready-timers = ["worker-timers"]
+ worker-timers = ["core-scheduler-timers/local"]
+ 
+ [dependencies]
+diff --git a/crates/native/src/task_service.rs b/crates/native/src/task_service.rs
+index 3d85b25..99174a4 100644
+--- a/crates/native/src/task_service.rs
++++ b/crates/native/src/task_service.rs
+@@ -3,7 +3,7 @@
+ 
+ use crate::{
+     NativeTask, thread,
+-    worker::{self, WorkerState},
++    worker::{self, Ready, WorkerState},
+ };
+ use core_scheduler::{SpawnError, TaskError};
+ use crossbeam_deque::{Injector, Worker};
+@@ -30,7 +30,7 @@ pub(crate) struct Shared {
+     admission: Mutex<()>,
+     #[cfg(feature = "worker-timers")]
+     pub(crate) timer_capacity: usize,
+-    pub(crate) ready: Injector<Runnable>,
++    pub(crate) ready: Injector<Ready>,
+     pub(crate) workers: Vec<WorkerState>,
+     closed: AtomicBool,
+     pub(crate) idle_workers: AtomicUsize,
+@@ -128,7 +128,7 @@ impl Shared {
+         self.workers[owner].wake();
+     }
+ 
+-    pub(crate) fn new(queues: &[[Worker<Runnable>; 2]]) -> Self {
++    pub(crate) fn new(queues: &[[Worker<Ready>; 2]]) -> Self {
+         Self {
+             admission: Mutex::new(()),
+             #[cfg(feature = "worker-timers")]
+@@ -174,6 +174,10 @@ impl Shared {
+             }
+         }
+     }
++    #[cfg(feature = "ready-timers")]
++    pub(crate) fn admit_ready_timers(&self, count: usize) {
++        self.outstanding.fetch_add(count, Ordering::AcqRel);
++    }
+     pub(crate) fn retire_runnable(&self) {
+         if self.outstanding.fetch_sub(1, Ordering::AcqRel) == 1 {
+             // Draining waits for quiescence; intermediate retirements cannot satisfy that condition.
+diff --git a/crates/native/src/worker.rs b/crates/native/src/worker.rs
+index 08f502b..81f6541 100644
+--- a/crates/native/src/worker.rs
++++ b/crates/native/src/worker.rs
+@@ -10,18 +10,38 @@ use std::sync::{Arc, OnceLock, Weak};
+ use std::thread::{self, Thread};
+ use std::{task::Waker, time::Duration};
+ 
++// Keep the original single-pointer queue element when this experiment is disabled.
++#[cfg(not(feature = "ready-timers"))]
++pub(crate) type Ready = Runnable;
++#[cfg(feature = "ready-timers")]
++pub(crate) enum Ready {
++    Task(Runnable),
++    Timer(Waker),
++}
++
++fn ready_task(runnable: Runnable) -> Ready {
++    #[cfg(feature = "ready-timers")]
++    {
++        Ready::Task(runnable)
++    }
++    #[cfg(not(feature = "ready-timers"))]
++    {
++        runnable
++    }
++}
++
+ pub(crate) struct WorkerState {
+-    pub(crate) incoming: Injector<Runnable>,
++    pub(crate) incoming: Injector<Ready>,
+     #[cfg(feature = "worker-timers")]
+     pub(crate) timers: Injector<crate::worker_timers::Command>,
+-    stealers: [Stealer<Runnable>; 2],
++    stealers: [Stealer<Ready>; 2],
+     sleeping: AtomicBool,
+     thread: OnceLock<Thread>,
+     driver_waker: OnceLock<Waker>,
+ }
+ 
+ impl WorkerState {
+-    pub(crate) fn new(stealers: [Stealer<Runnable>; 2]) -> Self {
++    pub(crate) fn new(stealers: [Stealer<Ready>; 2]) -> Self {
+         Self {
+             incoming: Injector::new(),
+             #[cfg(feature = "worker-timers")]
+@@ -56,8 +76,8 @@ impl WorkerState {
+ struct LocalWorker {
+     identifier: usize,
+     scheduler: Weak<Shared>,
+-    ready: Worker<Runnable>,
+-    current: Worker<Runnable>,
++    ready: Worker<Ready>,
++    current: Worker<Ready>,
+ }
+ 
+ thread_local! {
+@@ -77,6 +97,7 @@ pub(crate) fn assert_outside_worker() {
+ 
+ pub(crate) fn schedule(shared: &Arc<Shared>, runnable: Runnable) {
+     let preferred = runnable.metadata().worker.load(Ordering::Relaxed);
++    let runnable = ready_task(runnable);
+     let remote = CURRENT_WORKER.with(|current| {
+         let current = current.borrow();
+         if let Some(worker) = current.as_ref() {
+@@ -100,7 +121,51 @@ pub(crate) fn schedule(shared: &Arc<Shared>, runnable: Runnable) {
+     shared.wake_idle(preferred);
+ }
+ 
+-fn search(shared: &Shared, local: &LocalWorker, iteration: usize) -> Steal<Runnable> {
++#[cfg(feature = "ready-timers")]
++pub(crate) fn schedule_timer_batch(
++    shared: &Arc<Shared>,
++    identifier: usize,
++    expired: &mut Vec<Waker>,
++) {
++    if expired.is_empty() {
++        return;
++    }
++    // Account for the whole batch before publishing its first stealable entry.
++    shared.admit_ready_timers(expired.len());
++    CURRENT_WORKER.with(|current| {
++        let current = current.borrow();
++        let local = current.as_ref().expect("worker context is installed");
++        debug_assert_eq!(local.identifier, identifier);
++        debug_assert!(std::ptr::eq(local.scheduler.as_ptr(), Arc::as_ptr(shared)));
++        for waker in expired.drain(..) {
++            local.ready.push(Ready::Timer(waker));
++        }
++    });
++    shared.wake_idle(UNASSIGNED_WORKER);
++}
++
++fn run_ready(shared: &Shared, identifier: usize, ready: Ready) {
++    #[cfg(feature = "ready-timers")]
++    let task = match ready {
++        Ready::Task(task) => task,
++        Ready::Timer(waker) => {
++            // Waking retains async-task's single-poller contract. The resulting Runnable
++            // enters the next ready generation through the ordinary scheduling callback.
++            crate::panic::contain(|| waker.wake());
++            shared.retire_runnable();
++            return;
++        }
++    };
++    #[cfg(not(feature = "ready-timers"))]
++    let task = ready;
++    task.metadata().worker.store(identifier, Ordering::Relaxed);
++    crate::panic::contain(|| {
++        task.run();
++    });
++    shared.retire_runnable();
++}
++
++fn search(shared: &Shared, local: &LocalWorker, iteration: usize) -> Steal<Ready> {
+     let incoming = &shared.workers[local.identifier].incoming;
+     let mut retry = false;
+     // Admit external wakes at each batch boundary, even while local tasks keep waking themselves.
+@@ -140,7 +205,7 @@ fn search(shared: &Shared, local: &LocalWorker, iteration: usize) -> Steal<Runna
+     search_result(retry)
+ }
+ 
+-fn search_result(retry: bool) -> Steal<Runnable> {
++fn search_result(retry: bool) -> Steal<Ready> {
+     if retry { Steal::Retry } else { Steal::Empty }
+ }
+ 
+@@ -155,7 +220,7 @@ fn take_stolen<Value>(result: Steal<Value>, retry: &mut bool) -> Option<Value> {
+     }
+ }
+ 
+-fn yield_on_retry(result: Steal<Runnable>) -> Steal<Runnable> {
++fn yield_on_retry(result: Steal<Ready>) -> Steal<Ready> {
+     if matches!(result, Steal::Retry) {
+         thread::yield_now();
+     }
+@@ -165,10 +230,10 @@ fn yield_on_retry(result: Steal<Runnable>) -> Steal<Runnable> {
+ fn finish_idle_search(
+     worker: &WorkerState,
+     idle_workers: &std::sync::atomic::AtomicUsize,
+-    result: Steal<Runnable>,
++    result: Steal<Ready>,
+     should_park: impl FnOnce() -> bool,
+     park: impl FnOnce(),
+-) -> Option<Runnable> {
++) -> Option<Ready> {
+     let runnable = match result {
+         Steal::Success(runnable) => Some(runnable),
+         Steal::Retry => None,
+@@ -184,7 +249,7 @@ fn finish_idle_search(
+     runnable
+ }
+ 
+-fn find_work(shared: &Shared, iteration: usize) -> Steal<Runnable> {
++fn find_work(shared: &Shared, iteration: usize) -> Steal<Ready> {
+     CURRENT_WORKER.with(|current| {
+         search(
+             shared,
+@@ -214,14 +279,14 @@ fn drive(
+     }
+ }
+ 
+-pub(crate) fn run(shared: Arc<Shared>, identifier: usize, queues: [Worker<Runnable>; 2]) {
++pub(crate) fn run(shared: Arc<Shared>, identifier: usize, queues: [Worker<Ready>; 2]) {
+     run_loop(shared, identifier, queues, None);
+ }
+ 
+ pub(crate) fn run_driven<D: core_scheduler_selector::SelectorDriver>(
+     shared: Arc<Shared>,
+     identifier: usize,
+-    queues: [Worker<Runnable>; 2],
++    queues: [Worker<Ready>; 2],
+     driver: D,
+ ) {
+     use core_scheduler_selector::SelectorWorker;
+@@ -236,7 +301,7 @@ pub(crate) fn run_driven<D: core_scheduler_selector::SelectorDriver>(
+ fn run_loop(
+     shared: Arc<Shared>,
+     identifier: usize,
+-    [ready, current]: [Worker<Runnable>; 2],
++    [ready, current]: [Worker<Ready>; 2],
+     mut driver: Option<&mut dyn core_scheduler_selector::SelectorWorker>,
+ ) {
+     let worker = &shared.workers[identifier];
+@@ -307,12 +372,7 @@ fn run_loop(
+         }
+         let mut runnable = Some(runnable);
+         while let Some(task) = runnable {
+-            task.metadata().worker.store(identifier, Ordering::Relaxed);
+-            // Contain task-machinery panics as well as the guarded future's panics.
+-            crate::panic::contain(|| {
+-                task.run();
+-            });
+-            shared.retire_runnable();
++            run_ready(&shared, identifier, task);
+             runnable = CURRENT_WORKER.with(|current| {
+                 current
+                     .borrow()
+diff --git a/crates/native/src/worker/tests.rs b/crates/native/src/worker/tests.rs
+index 059ccfc..65d77ad 100644
+--- a/crates/native/src/worker/tests.rs
++++ b/crates/native/src/worker/tests.rs
+@@ -1,8 +1,8 @@
+ // Released under the MIT License.
+ // Copyright, 2026, by Samuel Williams.
+ 
+-use super::{WorkerState, finish_idle_search, search_result, take_stolen, yield_on_retry};
+-use crate::task_service::{Runnable, TaskState, UNASSIGNED_WORKER};
++use super::{Ready, WorkerState, finish_idle_search, search_result, take_stolen, yield_on_retry};
++use crate::task_service::{TaskState, UNASSIGNED_WORKER};
+ use crossbeam_deque::{Steal, Worker};
+ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+ 
+@@ -77,18 +77,18 @@ fn remote_wake_retains_the_unpark_token_and_interrupts_the_driver_once() {
+ }
+ 
+ fn worker_state() -> WorkerState {
+-    let queues: [Worker<Runnable>; 2] = std::array::from_fn(|_| Worker::new_fifo());
++    let queues: [Worker<Ready>; 2] = std::array::from_fn(|_| Worker::new_fifo());
+     WorkerState::new(queues.each_ref().map(Worker::stealer))
+ }
+ 
+-fn runnable() -> Runnable {
++fn runnable() -> Ready {
+     let state = TaskState {
+         worker: AtomicUsize::new(UNASSIGNED_WORKER),
+     };
+     let (runnable, _task) = async_task::Builder::new()
+         .metadata(state)
+         .spawn(|_| std::future::pending::<()>(), |_| {});
+-    runnable
++    super::ready_task(runnable)
+ }
+ 
+ #[test]
+@@ -113,7 +113,7 @@ fn search_reports_retry_only_when_a_queue_raced() {
+ #[test]
+ fn worker_yields_after_a_concurrent_steal_retry() {
+     assert!(matches!(
+-        yield_on_retry(Steal::<crate::task_service::Runnable>::Retry),
++        yield_on_retry(Steal::<Ready>::Retry),
+         Steal::Retry
+     ));
+ }
+@@ -223,7 +223,7 @@ fn idle_worker_steals_remote_wakes_when_preferred_worker_is_busy() {
+     use super::{LocalWorker, search};
+     use crate::task_service::Shared;
+     use std::sync::Arc;
+-    let mut queues: Vec<[Worker<Runnable>; 2]> = (0..2)
++    let mut queues: Vec<[Worker<Ready>; 2]> = (0..2)
+         .map(|_| std::array::from_fn(|_| Worker::new_fifo()))
+         .collect();
+     let shared = Arc::new(Shared::new(&queues));
+@@ -245,7 +245,7 @@ fn idle_worker_can_steal_both_ready_generations() {
+     use super::{LocalWorker, search};
+     use crate::task_service::Shared;
+     use std::sync::Arc;
+-    let mut queues: Vec<[Worker<Runnable>; 2]> = (0..2)
++    let mut queues: Vec<[Worker<Ready>; 2]> = (0..2)
+         .map(|_| std::array::from_fn(|_| Worker::new_fifo()))
+         .collect();
+     let shared = Arc::new(Shared::new(&queues));
+@@ -299,3 +299,127 @@ fn idle_wake_prefers_the_requested_sleeping_worker() {
+     assert!(!shared.workers[1].sleeping.load(Ordering::SeqCst));
+     shared.wake_all();
+ }
++
++#[cfg(feature = "ready-timers")]
++#[test]
++fn idle_worker_can_steal_timer_delivery_from_both_ready_generations() {
++    use super::{LocalWorker, search};
++    use crate::task_service::Shared;
++    use std::{sync::Arc, task::Waker};
++    let mut queues: Vec<[Worker<Ready>; 2]> = (0..2)
++        .map(|_| std::array::from_fn(|_| Worker::new_fifo()))
++        .collect();
++    let shared = Arc::new(Shared::new(&queues));
++    let [ready, current] = queues.remove(0);
++    let local = LocalWorker {
++        identifier: 0,
++        scheduler: Arc::downgrade(&shared),
++        ready,
++        current,
++    };
++    let count = Arc::new(Interrupts::default());
++    for queue in &queues[0] {
++        shared.admit_ready_timers(1);
++        queue.push(Ready::Timer(Waker::from(Arc::clone(&count))));
++        let timer = search(&shared, &local, 1).success().unwrap();
++        assert!(matches!(timer, Ready::Timer(_)));
++        super::run_ready(&shared, 0, timer);
++    }
++    assert_eq!(count.0.load(Ordering::SeqCst), 2);
++    assert!(matches!(search(&shared, &local, 1), Steal::Empty));
++}
++
++#[cfg(feature = "ready-timers")]
++#[test]
++fn timer_delivery_remains_outstanding_until_the_waker_returns() {
++    use crate::task_service::{Shared, TaskService};
++    use std::{
++        sync::Arc,
++        task::{Wake, Waker},
++    };
++    struct CheckDelivery(Arc<Shared>);
++    impl Wake for CheckDelivery {
++        fn wake(self: Arc<Self>) {
++            assert!(
++                !self.0.finished(),
++                "shutdown completed during timer delivery"
++            );
++            // Waker invocation must not hold the executor's TLS RefCell borrow.
++            assert!(!super::is_worker());
++        }
++    }
++    let queues = std::array::from_fn::<_, 2, _>(|_| Worker::new_fifo());
++    let shared = Arc::new(Shared::new(std::slice::from_ref(&queues)));
++    let service = TaskService {
++        shared: Arc::clone(&shared),
++    };
++    service.close();
++    assert!(shared.finished());
++    shared.admit_ready_timers(1);
++    assert!(!shared.finished());
++    let ready = Ready::Timer(Waker::from(Arc::new(CheckDelivery(Arc::clone(&shared)))));
++    super::run_ready(&shared, 0, ready);
++    assert!(shared.finished());
++}
++
++#[cfg(feature = "ready-timers")]
++#[test]
++fn an_empty_timer_batch_does_not_publish_work_or_wake_a_worker() {
++    use crate::task_service::{Shared, TaskService};
++    use std::sync::Arc;
++    let queues = std::array::from_fn::<_, 2, _>(|_| Worker::new_fifo());
++    let shared = Arc::new(Shared::new(std::slice::from_ref(&queues)));
++    let service = TaskService {
++        shared: Arc::clone(&shared),
++    };
++    service.close();
++    let worker = &shared.workers[0];
++    worker.thread.set(std::thread::current()).unwrap();
++    worker.sleeping.store(true, Ordering::SeqCst);
++    shared.idle_workers.store(1, Ordering::SeqCst);
++
++    super::schedule_timer_batch(&shared, 0, &mut Vec::new());
++
++    assert!(shared.finished());
++    assert!(worker.sleeping.load(Ordering::SeqCst));
++}
++
++#[cfg(feature = "ready-timers")]
++#[test]
++fn a_published_timer_batch_is_drained_before_shutdown_finishes() {
++    use super::{CURRENT_WORKER, LocalWorker};
++    use crate::task_service::{Shared, TaskService};
++    use std::{sync::Arc, task::Waker};
++    let queues = std::array::from_fn::<_, 2, _>(|_| Worker::new_fifo());
++    let shared = Arc::new(Shared::new(std::slice::from_ref(&queues)));
++    let service = TaskService {
++        shared: Arc::clone(&shared),
++    };
++    let [ready, current] = queues;
++    CURRENT_WORKER.with(|context| {
++        context.replace(Some(LocalWorker {
++            identifier: 0,
++            scheduler: Arc::downgrade(&shared),
++            ready,
++            current,
++        }))
++    });
++    let count = Arc::new(Interrupts::default());
++    let mut expired = (0..3)
++        .map(|_| Waker::from(Arc::clone(&count)))
++        .collect::<Vec<_>>();
++    let storage = expired.as_ptr();
++    super::schedule_timer_batch(&shared, 0, &mut expired);
++    assert!(expired.is_empty());
++    assert_eq!(expired.as_ptr(), storage);
++    service.close();
++    for expected in 1..=3 {
++        assert!(!shared.finished());
++        let timer =
++            CURRENT_WORKER.with(|context| context.borrow().as_ref().unwrap().ready.pop().unwrap());
++        super::run_ready(&shared, 0, timer);
++        assert_eq!(count.0.load(Ordering::SeqCst), expected);
++    }
++    assert!(shared.finished());
++    CURRENT_WORKER.with(|context| context.take());
++}
+diff --git a/crates/native/src/worker_timers.rs b/crates/native/src/worker_timers.rs
+index d4bb036..c31feec 100644
+--- a/crates/native/src/worker_timers.rs
++++ b/crates/native/src/worker_timers.rs
+@@ -28,17 +28,21 @@ struct LocalTimers {
+     scheduler: Weak<Shared>,
+     identifier: usize,
+     queue: TimerQueue<Waker>,
++    expired: Vec<Waker>,
+ }
+ thread_local! {
+     static TIMERS: RefCell<Option<LocalTimers>> = const { RefCell::new(None) };
+ }
+ 
+ pub(crate) fn enter(shared: &Arc<Shared>, identifier: usize) {
++    let queue = TimerQueue::with_capacity(shared.timer_capacity);
++    let expired = Vec::with_capacity(queue.capacity());
+     TIMERS.with(|timers| {
+         timers.replace(Some(LocalTimers {
+             scheduler: Arc::downgrade(shared),
+             identifier,
+-            queue: TimerQueue::with_capacity(shared.timer_capacity),
++            queue,
++            expired,
+         }))
+     });
+ }
+@@ -177,29 +181,32 @@ pub(crate) fn turn(shared: &Arc<Shared>, identifier: usize) {
+         .unwrap();
+         deliver(displaced);
+     }
+-    // The common empty-queue path does not read the clock.
+-    if local(shared, Some(identifier), |timers| {
+-        timers.queue.next_deadline()
+-    })
+-    .unwrap()
+-    .is_none()
+-    {
+-        return;
+-    }
+-    let now = Instant::now();
+-    loop {
+-        let wake = local(shared, Some(identifier), |timers| {
+-            if shared.is_closed() {
++    let expired = local(shared, Some(identifier), |timers| {
++        // The common empty-queue path does not read the clock.
++        timers.queue.next_deadline()?;
++        let now = Instant::now();
++        loop {
++            let wake = if shared.is_closed() {
+                 timers.queue.pop()
+             } else {
+                 timers.queue.pop_expired(now)
+-            }
+-        })
+-        .unwrap();
+-        let Some(wake) = wake else { break };
+-        // Remove first, release the local borrow, then publish the runnable through its normal Waker.
++            };
++            let Some(wake) = wake else { break };
++            timers.expired.push(wake);
++        }
++        Some(std::mem::take(&mut timers.expired))
++    })
++    .unwrap();
++    let Some(mut expired) = expired else { return };
++    // Release the timer borrow before publishing the complete due batch.
++    #[cfg(feature = "ready-timers")]
++    crate::worker::schedule_timer_batch(shared, identifier, &mut expired);
++    #[cfg(not(feature = "ready-timers"))]
++    for wake in expired.drain(..) {
+         crate::panic::contain(|| wake.wake());
+     }
++    // Reuse the reserved batch storage on the next turn.
++    local(shared, Some(identifier), |timers| timers.expired = expired).unwrap();
+ }
+ 
+ pub(crate) fn timeout(shared: &Arc<Shared>, identifier: usize) -> Option<Duration> {
+@@ -401,4 +408,39 @@ mod tests {
+         block_on(task).unwrap();
+         block_on(scheduler.shutdown());
+     }
++
++    #[cfg(feature = "ready-timers")]
++    #[test]
++    fn dropping_an_expired_sleep_before_queued_delivery_is_safe() {
++        use std::sync::atomic::{AtomicUsize, Ordering};
++        struct Count(AtomicUsize);
++        impl std::task::Wake for Count {
++            fn wake(self: Arc<Self>) {
++                self.0.fetch_add(1, Ordering::SeqCst);
++            }
++        }
++        let scheduler = scheduler(64);
++        let shared = Arc::clone(&scheduler);
++        let count = Arc::new(Count(AtomicUsize::new(0)));
++        let delivered = Arc::clone(&count);
++        let task = scheduler
++            .spawn(async move {
++                let deadline = Instant::now() + Duration::from_millis(1);
++                let waker = Waker::from(Arc::clone(&delivered));
++                let sleep = sleep(&shared.tasks.shared, deadline, &waker)
++                    .unwrap()
++                    .unwrap();
++                // Hold this worker in its current task until expiry. The timer action
++                // is then explicitly collected, but cannot run until this task yields.
++                std::thread::sleep(Duration::from_millis(2));
++                turn(&shared.tasks.shared, sleep.owner);
++                assert_eq!(delivered.0.load(Ordering::SeqCst), 0);
++                drop(sleep);
++                assert_eq!(delivered.0.load(Ordering::SeqCst), 0);
++            })
++            .unwrap();
++        block_on(task).unwrap();
++        block_on(scheduler.shutdown());
++        assert_eq!(count.0.load(Ordering::SeqCst), 1);
++    }
+ }

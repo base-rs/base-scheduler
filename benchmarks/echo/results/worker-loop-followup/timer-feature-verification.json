@@ -1,0 +1,123 @@
+[
+  {
+    "platform": "macos",
+    "log": "/Users/samuel/.cache/core-scheduler-perf-followup/timer-feature-verification-macos.log",
+    "log_sha256": "76115ce9375189f110f29b73143656bcd8d4bf656832bff249b737e10dbaf5a9",
+    "commands": [
+      {
+        "feature": "driver",
+        "command": [
+          "rustup",
+          "run",
+          "stable",
+          "cargo",
+          "bake",
+          "--locked",
+          "test:coverage",
+          "--package",
+          "core-scheduler-timers",
+          "--all-targets",
+          "true",
+          "--features",
+          "driver"
+        ],
+        "exit_code": 0
+      },
+      {
+        "feature": "sharded",
+        "command": [
+          "rustup",
+          "run",
+          "stable",
+          "cargo",
+          "bake",
+          "--locked",
+          "test:coverage",
+          "--package",
+          "core-scheduler-timers",
+          "--all-targets",
+          "true",
+          "--features",
+          "sharded"
+        ],
+        "exit_code": 0
+      }
+    ],
+    "coverage_lines": [
+      "Region coverage passed: 1064/1064 measured source regions covered (excluded: 0 unreachable regions)",
+      "Region coverage passed: 1017/1017 measured source regions covered (excluded: 0 unreachable regions)"
+    ]
+  },
+  {
+    "platform": "linux",
+    "log": "/Users/samuel/.cache/core-scheduler-perf-followup/download/timer-feature-verification-linux.log",
+    "log_sha256": "4397639d837d0fedeb0a1f359cb437da31641dc56e4511c3360ea01e4ac43fd9",
+    "commands": [
+      {
+        "feature": "driver",
+        "command": [
+          "cargo",
+          "bake",
+          "--locked",
+          "test:coverage",
+          "--package",
+          "core-scheduler-timers",
+          "--all-targets",
+          "true",
+          "--features",
+          "driver"
+        ],
+        "exit_code": 1
+      }
+    ],
+    "coverage_lines": [
+      "bake: test:coverage: region coverage is 1064/1446 measured source regions (excluded: 0 unreachable regions); 382 source regions remain uncovered"
+    ],
+    "note": "Initial driver-only invocation reused a Native/io_uring coverage target containing an instrumented sharded timer dependency. All tests passed, but the report included unexecuted sharded regions. Retried both features with separate CARGO_LLVM_COV_TARGET_DIR values, matching CI isolation."
+  },
+  {
+    "platform": "linux",
+    "log": "/Users/samuel/.cache/core-scheduler-perf-followup/download/timer-feature-verification-linux-isolated.log",
+    "log_sha256": "f6a3ab276c1beb0d09a683040a330d4b3e7f615d5d772150486bc2f5a43eb503",
+    "commands": [
+      {
+        "feature": "driver",
+        "command": [
+          "cargo",
+          "bake",
+          "--locked",
+          "test:coverage",
+          "--package",
+          "core-scheduler-timers",
+          "--all-targets",
+          "true",
+          "--features",
+          "driver"
+        ],
+        "coverage_target": "/home/samuel/.cache/core-scheduler-perf-followup/coverage-feature-driver",
+        "exit_code": 0
+      },
+      {
+        "feature": "sharded",
+        "command": [
+          "cargo",
+          "bake",
+          "--locked",
+          "test:coverage",
+          "--package",
+          "core-scheduler-timers",
+          "--all-targets",
+          "true",
+          "--features",
+          "sharded"
+        ],
+        "coverage_target": "/home/samuel/.cache/core-scheduler-perf-followup/coverage-feature-sharded",
+        "exit_code": 0
+      }
+    ],
+    "coverage_lines": [
+      "Region coverage passed: 1064/1064 measured source regions covered (excluded: 0 unreachable regions)",
+      "Region coverage passed: 1017/1017 measured source regions covered (excluded: 0 unreachable regions)"
+    ]
+  }
+]

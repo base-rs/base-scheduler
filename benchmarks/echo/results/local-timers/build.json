@@ -1,0 +1,29 @@
+{
+  "source": "0d2c4f1c3fa0c2e502531880dab0acba18f097c0",
+  "patch_sha256": "72576d24fc0d85e2719431f20054cf651c16bdf67907988bd1c0565ba3bdc7bc",
+  "rustc": "rustc 1.99.0 (b940084d7 2026-09-28) (Arch Linux rust 1:1.99.0-1)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+  "command": "cargo build --release --locked -p core-scheduler-echo-benchmark --bins [--features core-scheduler-native/worker-timers]",
+  "binaries": {
+    "before": {
+      "core-scheduler-echo-benchmark": {
+        "path": "/home/samuel/.cache/core-scheduler-local-timers-final/before-core-scheduler-echo-benchmark",
+        "sha256": "a7e4bc768a8ebcf373723081440835117a1bc226efb961bc3defac933a70d9da"
+      },
+      "timers": {
+        "path": "/home/samuel/.cache/core-scheduler-local-timers-final/before-timers",
+        "sha256": "6102df169d331e42f77252250916e20c4247ae59c2aa006505f5b6fcd436453d"
+      }
+    },
+    "local": {
+      "core-scheduler-echo-benchmark": {
+        "path": "/home/samuel/.cache/core-scheduler-local-timers-final/local-core-scheduler-echo-benchmark",
+        "sha256": "bab49ff561ed559944ddf92a7acebb734acfaae8c919c9e0257c94d50da9e0ac"
+      },
+      "timers": {
+        "path": "/home/samuel/.cache/core-scheduler-local-timers-final/local-timers",
+        "sha256": "995f89cadd0712d25e39b70c1f1d3bc1fd9c5325adc1ead97e97e05dadfc4a6b"
+      }
+    }
+  },
+  "finished_utc": "2026-10-20T19:41:06Z"
+}

@@ -1,0 +1,109 @@
+diff --git a/benchmarks/echo/src/server.rs b/benchmarks/echo/src/server.rs
+index 6e19ea4..38285ae 100644
+--- a/benchmarks/echo/src/server.rs
++++ b/benchmarks/echo/src/server.rs
+@@ -147,9 +147,104 @@ async fn scheduler_server<S>(
+     }
+ }
+ 
++
++// Diagnostic only: compare conservative readiness semantics with native Tokio reads,
++// independently of adapter task ownership. No short-read readiness clearing.
++async fn tokio_policy_server<const CONSERVATIVE: bool, const ADAPTER_TASKS: bool, const POLLING: bool>(
++    listener: TcpListener,
++    connections: usize,
++) {
++    listener.set_nonblocking(true).unwrap();
++    let listener = tokio::net::TcpListener::from_std(listener).unwrap();
++    let scheduler = TokioScheduler::new(tokio::runtime::Handle::current());
++    let mut raw_tasks = Vec::new();
++    let mut adapter_tasks = Vec::new();
++    for _ in 0..connections {
++        let (mut socket, _) = listener.accept().await.unwrap();
++        socket.set_nodelay(true).unwrap();
++        let future = async move {
++            let mut buffer = vec![0; BUFFER_SIZE];
++            loop {
++                let count = if CONSERVATIVE {
++                    loop {
++                        if POLLING {
++                            std::future::poll_fn(|cx| socket.poll_read_ready(cx)).await.unwrap();
++                        } else {
++                            socket.readable().await.unwrap();
++                        }
++                        match socket.try_read(&mut buffer) {
++                            Err(error) if error.kind() == io::ErrorKind::WouldBlock => continue,
++                            result => break result.unwrap(),
++                        }
++                    }
++                } else {
++                    socket.read(&mut buffer).await.unwrap()
++                };
++                if count == 0 { return; }
++                socket.write_all(&buffer[..count]).await.unwrap();
++            }
++        };
++        if ADAPTER_TASKS {
++            adapter_tasks.push(scheduler.spawn(future).unwrap());
++        } else {
++            raw_tasks.push(tokio::spawn(future));
++        }
++    }
++    for task in raw_tasks { task.await.unwrap(); }
++    for task in adapter_tasks { task.await.unwrap(); }
++    scheduler.shutdown().await;
++}
++
++async fn adapter_raw_task_server(
++    scheduler: Arc<TokioScheduler>, listener: TcpListener, connections: usize, poll: bool,
++) {
++    let listener = scheduler.register_listener(listener).unwrap();
++    let never = Cancellation::never();
++    let mut tasks = Vec::new();
++    for _ in 0..connections {
++        let (socket, _) = scheduler.socket_accept(&listener, &never).await.unwrap();
++        scheduler.socket_set_option(&socket, TcpNoDelay, true, &never).await.unwrap();
++        let shared = Arc::clone(&scheduler);
++        let task = if poll {
++            tokio::spawn(async move { echo_poll(shared.as_ref(), socket).await })
++        } else {
++            tokio::spawn(async move { echo(shared.as_ref(), socket).await })
++        };
++        tasks.push(task);
++    }
++    for task in tasks { task.await.unwrap(); }
++}
++
+ pub(crate) fn run(backend: &str, workers: usize, connections: usize) -> Result<()> {
+     let listener = TcpListener::bind("127.0.0.1:0").expect("bind echo listener");
+     match backend {
++
++        "tokio-policy-poll" | "tokio-policy-native" | "tokio-policy-conservative" | "tokio-policy-native-adapter-task" | "tokio-policy-conservative-adapter-task" => {
++            let runtime = crate::runtime(workers);
++            ready(&listener);
++            match backend {
++                "tokio-policy-native" => runtime.block_on(tokio_policy_server::<false, false, false>(listener, connections)),
++                "tokio-policy-poll" => runtime.block_on(tokio_policy_server::<true, false, true>(listener, connections)),
++                "tokio-policy-conservative" => runtime.block_on(tokio_policy_server::<true, false, false>(listener, connections)),
++                "tokio-policy-native-adapter-task" => runtime.block_on(tokio_policy_server::<false, true, false>(listener, connections)),
++                _ => runtime.block_on(tokio_policy_server::<true, true, false>(listener, connections)),
++            }
++        }
++        "tokio-adapter-raw-task" | "tokio-adapter-poll-raw-task" => {
++            let runtime = crate::runtime(workers);
++            let scheduler = Arc::new(TokioScheduler::new(runtime.handle().clone()));
++            ready(&listener);
++            runtime.block_on(adapter_raw_task_server(Arc::clone(&scheduler), listener, connections, backend == "tokio-adapter-poll-raw-task"));
++            runtime.block_on(scheduler.shutdown());
++        }
++        "native-readiness" | "native-readiness-poll" => {
++            use core_scheduler_native::NativeScheduler;
++            let scheduler = Arc::new(NativeScheduler::with_options(core_scheduler_native::NativeOptions { workers, ..Default::default() }).unwrap());
++            ready(&listener);
++            scheduler.block_on(scheduler_server(Arc::clone(&scheduler), listener, connections, backend == "native-readiness-poll"));
++            scheduler.block_on(scheduler.shutdown());
++        }
++
+         "tokio" => {
+             let runtime = crate::runtime(workers);
+             ready(&listener);

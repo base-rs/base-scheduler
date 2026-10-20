@@ -1,0 +1,1432 @@
+{
+  "build": {
+    "base_source": "130cd4a67e526e80ba9a5e7e7ebbe81494bd903b",
+    "patch_sha256": "872ee6416d29fe6e8dc66b8209bfd05680adccd282064ced0e1faa7649ea609e",
+    "binary_sha256": "34821493abf4aa1c7d655f782a9c799526ffefcc7f189ce8ff733b340443b88c",
+    "build_command": "cargo build --release --locked -p core-scheduler-echo-benchmark",
+    "production_changes": "None. Benchmark-only semantic and task-wrapper controls."
+  },
+  "cases": [
+    {
+      "label": "diagnostic",
+      "backend": "tokio",
+      "binary": {
+        "path": "/home/samuel/.cache/core-scheduler-single-worker-research/controls",
+        "sha256": "34821493abf4aa1c7d655f782a9c799526ffefcc7f189ce8ff733b340443b88c"
+      }
+    },
+    {
+      "label": "diagnostic",
+      "backend": "tokio-policy-native",
+      "binary": {
+        "path": "/home/samuel/.cache/core-scheduler-single-worker-research/controls",
+        "sha256": "34821493abf4aa1c7d655f782a9c799526ffefcc7f189ce8ff733b340443b88c"
+      }
+    },
+    {
+      "label": "diagnostic",
+      "backend": "tokio-policy-conservative",
+      "binary": {
+        "path": "/home/samuel/.cache/core-scheduler-single-worker-research/controls",
+        "sha256": "34821493abf4aa1c7d655f782a9c799526ffefcc7f189ce8ff733b340443b88c"
+      }
+    },
+    {
+      "label": "diagnostic",
+      "backend": "tokio-policy-native-adapter-task",
+      "binary": {
+        "path": "/home/samuel/.cache/core-scheduler-single-worker-research/controls",
+        "sha256": "34821493abf4aa1c7d655f782a9c799526ffefcc7f189ce8ff733b340443b88c"
+      }
+    },
+    {
+      "label": "diagnostic",
+      "backend": "tokio-policy-conservative-adapter-task",
+      "binary": {
+        "path": "/home/samuel/.cache/core-scheduler-single-worker-research/controls",
+        "sha256": "34821493abf4aa1c7d655f782a9c799526ffefcc7f189ce8ff733b340443b88c"
+      }
+    },
+    {
+      "label": "diagnostic",
+      "backend": "tokio-adapter",
+      "binary": {
+        "path": "/home/samuel/.cache/core-scheduler-single-worker-research/controls",
+        "sha256": "34821493abf4aa1c7d655f782a9c799526ffefcc7f189ce8ff733b340443b88c"
+      }
+    },
+    {
+      "label": "diagnostic",
+      "backend": "tokio-adapter-poll",
+      "binary": {
+        "path": "/home/samuel/.cache/core-scheduler-single-worker-research/controls",
+        "sha256": "34821493abf4aa1c7d655f782a9c799526ffefcc7f189ce8ff733b340443b88c"
+      }
+    },
+    {
+      "label": "diagnostic",
+      "backend": "tokio-adapter-raw-task",
+      "binary": {
+        "path": "/home/samuel/.cache/core-scheduler-single-worker-research/controls",
+        "sha256": "34821493abf4aa1c7d655f782a9c799526ffefcc7f189ce8ff733b340443b88c"
+      }
+    },
+    {
+      "label": "diagnostic",
+      "backend": "tokio-adapter-poll-raw-task",
+      "binary": {
+        "path": "/home/samuel/.cache/core-scheduler-single-worker-research/controls",
+        "sha256": "34821493abf4aa1c7d655f782a9c799526ffefcc7f189ce8ff733b340443b88c"
+      }
+    },
+    {
+      "label": "diagnostic",
+      "backend": "iouring",
+      "binary": {
+        "path": "/home/samuel/.cache/core-scheduler-single-worker-research/controls",
+        "sha256": "34821493abf4aa1c7d655f782a9c799526ffefcc7f189ce8ff733b340443b88c"
+      }
+    },
+    {
+      "label": "diagnostic",
+      "backend": "iouring-poll",
+      "binary": {
+        "path": "/home/samuel/.cache/core-scheduler-single-worker-research/controls",
+        "sha256": "34821493abf4aa1c7d655f782a9c799526ffefcc7f189ce8ff733b340443b88c"
+      }
+    },
+    {
+      "label": "diagnostic",
+      "backend": "native-readiness",
+      "binary": {
+        "path": "/home/samuel/.cache/core-scheduler-single-worker-research/controls",
+        "sha256": "34821493abf4aa1c7d655f782a9c799526ffefcc7f189ce8ff733b340443b88c"
+      }
+    },
+    {
+      "label": "diagnostic",
+      "backend": "native-readiness-poll",
+      "binary": {
+        "path": "/home/samuel/.cache/core-scheduler-single-worker-research/controls",
+        "sha256": "34821493abf4aa1c7d655f782a9c799526ffefcc7f189ce8ff733b340443b88c"
+      }
+    }
+  ],
+  "helper": {
+    "path": "/home/samuel/.cache/core-scheduler-single-worker-research/sample-runner.py",
+    "sha256": "31e6ad715214fcadfda358362100a21cb94cc41a79e23733191eb8e61b740909"
+  },
+  "client": {
+    "path": "/home/samuel/.cache/core-scheduler-owner-wake-final/client",
+    "sha256": "db6c914ab75011477ec6232e681046b1e75532cbaa1c81663bac984591675cf3"
+  },
+  "runner": {
+    "path": "/home/samuel/.cache/core-scheduler-single-worker-research/run.py",
+    "sha256": "b36d9ba77451032ca5a513bc22f67112d2ee61eb12b3509d0887a5c68649bc22"
+  },
+  "shuffle_seed": 20261021,
+  "repeats": 3,
+  "workloads": [
+    [
+      1,
+      32,
+      64
+    ]
+  ],
+  "warmup_seconds": 1,
+  "measurement_seconds": 3,
+  "server_cpus": "0 through workers-1",
+  "client_cpus": "4-7",
+  "platform": "Linux-7.2.6-arch2-1-x86_64-with-glibc2.44",
+  "samples": [
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 39.740804036458336,
+      "requests": 1953340,
+      "requests_per_second": 651113.3333333334,
+      "rtt_max_us": 218.495,
+      "rtt_mean_us": 49.078097108542195,
+      "rtt_p50_us": 50.239,
+      "rtt_p95_us": 54.495,
+      "rtt_p99_us": 56.959,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "diagnostic-tokio-policy-conservative-w1-c32-b64-r2",
+      "mode": "diagnostic",
+      "backend": "tokio-policy-conservative",
+      "workers": 1,
+      "repeat": 2,
+      "client_cpu": {
+        "user": 1.305387,
+        "system": 3.3841780000000004,
+        "voluntary_switches": 1414542,
+        "involuntary_switches": 1353
+      },
+      "server_cpu": {
+        "user": 0.35230000000000006,
+        "system": 2.2831209999999995,
+        "voluntary_switches": 100,
+        "involuntary_switches": 51
+      },
+      "lifecycle_seconds": 4.002896316815168,
+      "variant": "diagnostic"
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 43.410786946614586,
+      "requests": 2133727,
+      "requests_per_second": 711242.3333333334,
+      "rtt_max_us": 217.599,
+      "rtt_mean_us": 44.928463787072964,
+      "rtt_p50_us": 45.951,
+      "rtt_p95_us": 50.303,
+      "rtt_p99_us": 52.735,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "diagnostic-tokio-policy-native-w1-c32-b64-r3",
+      "mode": "diagnostic",
+      "backend": "tokio-policy-native",
+      "workers": 1,
+      "repeat": 3,
+      "client_cpu": {
+        "user": 1.427378,
+        "system": 3.7369709999999996,
+        "voluntary_switches": 1629649,
+        "involuntary_switches": 791
+      },
+      "server_cpu": {
+        "user": 0.23011999999999988,
+        "system": 2.309061,
+        "voluntary_switches": 220,
+        "involuntary_switches": 47
+      },
+      "lifecycle_seconds": 4.002710951957852,
+      "variant": "diagnostic"
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 39.4454345703125,
+      "requests": 1938822,
+      "requests_per_second": 646274.0,
+      "rtt_max_us": 220.031,
+      "rtt_mean_us": 49.44608831806113,
+      "rtt_p50_us": 50.591,
+      "rtt_p95_us": 54.847,
+      "rtt_p99_us": 57.279,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "diagnostic-tokio-adapter-poll-raw-task-w1-c32-b64-r1",
+      "mode": "diagnostic",
+      "backend": "tokio-adapter-poll-raw-task",
+      "workers": 1,
+      "repeat": 1,
+      "client_cpu": {
+        "user": 1.3528990000000003,
+        "system": 3.311204,
+        "voluntary_switches": 1400364,
+        "involuntary_switches": 985
+      },
+      "server_cpu": {
+        "user": 0.3575089999999994,
+        "system": 2.2708220000000026,
+        "voluntary_switches": 96,
+        "involuntary_switches": 51
+      },
+      "lifecycle_seconds": 4.002676199190319,
+      "variant": "diagnostic"
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 25.33587646484375,
+      "requests": 1245309,
+      "requests_per_second": 415103.0,
+      "rtt_max_us": 278.271,
+      "rtt_mean_us": 77.02460339963825,
+      "rtt_p50_us": 83.519,
+      "rtt_p95_us": 112.511,
+      "rtt_p99_us": 116.543,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "diagnostic-native-readiness-w1-c32-b64-r1",
+      "mode": "diagnostic",
+      "backend": "native-readiness",
+      "workers": 1,
+      "repeat": 1,
+      "client_cpu": {
+        "user": 0.6398130000000002,
+        "system": 2.0130459999999992,
+        "voluntary_switches": 618536,
+        "involuntary_switches": 1120
+      },
+      "server_cpu": {
+        "user": 0.5211839999999999,
+        "system": 2.526737999999998,
+        "voluntary_switches": 617941,
+        "involuntary_switches": 561512
+      },
+      "lifecycle_seconds": 4.002530544996262,
+      "variant": "diagnostic"
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 39.572408040364586,
+      "requests": 1945063,
+      "requests_per_second": 648354.3333333334,
+      "rtt_max_us": 217.855,
+      "rtt_mean_us": 49.28588855168192,
+      "rtt_p50_us": 50.431,
+      "rtt_p95_us": 54.687,
+      "rtt_p99_us": 57.151,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "diagnostic-tokio-adapter-poll-w1-c32-b64-r1",
+      "mode": "diagnostic",
+      "backend": "tokio-adapter-poll",
+      "workers": 1,
+      "repeat": 1,
+      "client_cpu": {
+        "user": 1.3571490000000006,
+        "system": 3.3773240000000015,
+        "voluntary_switches": 1438144,
+        "involuntary_switches": 686
+      },
+      "server_cpu": {
+        "user": 0.3267319999999998,
+        "system": 2.31588,
+        "voluntary_switches": 96,
+        "involuntary_switches": 51
+      },
+      "lifecycle_seconds": 4.002764738164842,
+      "variant": "diagnostic"
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 42.676961263020836,
+      "requests": 2097658,
+      "requests_per_second": 699219.3333333334,
+      "rtt_max_us": 843.775,
+      "rtt_mean_us": 45.697781487735355,
+      "rtt_p50_us": 46.751,
+      "rtt_p95_us": 51.103,
+      "rtt_p99_us": 53.567,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "diagnostic-tokio-w1-c32-b64-r3",
+      "mode": "diagnostic",
+      "backend": "tokio",
+      "workers": 1,
+      "repeat": 3,
+      "client_cpu": {
+        "user": 1.4450529999999997,
+        "system": 3.7086289999999984,
+        "voluntary_switches": 1629306,
+        "involuntary_switches": 959
+      },
+      "server_cpu": {
+        "user": 0.24681400000000053,
+        "system": 2.2992840000000037,
+        "voluntary_switches": 114,
+        "involuntary_switches": 43
+      },
+      "lifecycle_seconds": 4.002728077117354,
+      "variant": "diagnostic"
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 39.628214518229164,
+      "requests": 1947806,
+      "requests_per_second": 649268.6666666666,
+      "rtt_max_us": 219.647,
+      "rtt_mean_us": 49.21784138512763,
+      "rtt_p50_us": 50.335,
+      "rtt_p95_us": 54.591,
+      "rtt_p99_us": 57.023,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "diagnostic-tokio-adapter-w1-c32-b64-r1",
+      "mode": "diagnostic",
+      "backend": "tokio-adapter",
+      "workers": 1,
+      "repeat": 1,
+      "client_cpu": {
+        "user": 1.312479999999999,
+        "system": 3.3967269999999985,
+        "voluntary_switches": 1421763,
+        "involuntary_switches": 734
+      },
+      "server_cpu": {
+        "user": 0.3485830000000014,
+        "system": 2.2807219999999973,
+        "voluntary_switches": 90,
+        "involuntary_switches": 43
+      },
+      "lifecycle_seconds": 4.002721475902945,
+      "variant": "diagnostic"
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 38.821451822916664,
+      "requests": 1908152,
+      "requests_per_second": 636050.6666666666,
+      "rtt_max_us": 218.367,
+      "rtt_mean_us": 50.23939119315443,
+      "rtt_p50_us": 50.207,
+      "rtt_p95_us": 52.863,
+      "rtt_p99_us": 54.271,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "diagnostic-iouring-w1-c32-b64-r3",
+      "mode": "diagnostic",
+      "backend": "iouring",
+      "workers": 1,
+      "repeat": 3,
+      "client_cpu": {
+        "user": 1.386842999999999,
+        "system": 3.4398650000000046,
+        "voluntary_switches": 1568635,
+        "involuntary_switches": 965
+      },
+      "server_cpu": {
+        "user": 0.5352820000000005,
+        "system": 2.097381999999996,
+        "voluntary_switches": 93,
+        "involuntary_switches": 79
+      },
+      "lifecycle_seconds": 4.002875328995287,
+      "variant": "diagnostic"
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 39.203633626302086,
+      "requests": 1926937,
+      "requests_per_second": 642312.3333333334,
+      "rtt_max_us": 261.503,
+      "rtt_mean_us": 49.7521065193102,
+      "rtt_p50_us": 49.727,
+      "rtt_p95_us": 52.319,
+      "rtt_p99_us": 53.663,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "diagnostic-iouring-w1-c32-b64-r1",
+      "mode": "diagnostic",
+      "backend": "iouring",
+      "workers": 1,
+      "repeat": 1,
+      "client_cpu": {
+        "user": 1.4278759999999995,
+        "system": 3.4539329999999993,
+        "voluntary_switches": 1591699,
+        "involuntary_switches": 581
+      },
+      "server_cpu": {
+        "user": 0.4848890000000008,
+        "system": 2.1458450000000013,
+        "voluntary_switches": 91,
+        "involuntary_switches": 73
+      },
+      "lifecycle_seconds": 4.003011031076312,
+      "variant": "diagnostic"
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 39.471150716145836,
+      "requests": 1940086,
+      "requests_per_second": 646695.3333333334,
+      "rtt_max_us": 222.463,
+      "rtt_mean_us": 49.412886041649735,
+      "rtt_p50_us": 50.559,
+      "rtt_p95_us": 54.815,
+      "rtt_p99_us": 57.279,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "diagnostic-tokio-policy-conservative-adapter-task-w1-c32-b64-r2",
+      "mode": "diagnostic",
+      "backend": "tokio-policy-conservative-adapter-task",
+      "workers": 1,
+      "repeat": 2,
+      "client_cpu": {
+        "user": 1.370909000000001,
+        "system": 3.383476999999999,
+        "voluntary_switches": 1436134,
+        "involuntary_switches": 1003
+      },
+      "server_cpu": {
+        "user": 0.3442489999999978,
+        "system": 2.2915780000000012,
+        "voluntary_switches": 97,
+        "involuntary_switches": 49
+      },
+      "lifecycle_seconds": 4.002715865150094,
+      "variant": "diagnostic"
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 42.97760009765625,
+      "requests": 2112435,
+      "requests_per_second": 704145.0,
+      "rtt_max_us": 2826.239,
+      "rtt_mean_us": 45.3796862488077,
+      "rtt_p50_us": 46.431,
+      "rtt_p95_us": 50.815,
+      "rtt_p99_us": 53.311,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "diagnostic-tokio-policy-native-adapter-task-w1-c32-b64-r2",
+      "mode": "diagnostic",
+      "backend": "tokio-policy-native-adapter-task",
+      "workers": 1,
+      "repeat": 2,
+      "client_cpu": {
+        "user": 1.3919090000000018,
+        "system": 3.824029000000003,
+        "voluntary_switches": 1652703,
+        "involuntary_switches": 909
+      },
+      "server_cpu": {
+        "user": 0.253072999999997,
+        "system": 2.2843839999999958,
+        "voluntary_switches": 460,
+        "involuntary_switches": 53
+      },
+      "lifecycle_seconds": 4.003058013040572,
+      "variant": "diagnostic"
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 38.87908935546875,
+      "requests": 1910985,
+      "requests_per_second": 636995.0,
+      "rtt_max_us": 214.527,
+      "rtt_mean_us": 50.165571878376824,
+      "rtt_p50_us": 50.111,
+      "rtt_p95_us": 52.671,
+      "rtt_p99_us": 53.983,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "diagnostic-iouring-w1-c32-b64-r2",
+      "mode": "diagnostic",
+      "backend": "iouring",
+      "workers": 1,
+      "repeat": 2,
+      "client_cpu": {
+        "user": 1.3932670000000016,
+        "system": 3.424401000000003,
+        "voluntary_switches": 1578078,
+        "involuntary_switches": 701
+      },
+      "server_cpu": {
+        "user": 0.5190260000000002,
+        "system": 2.109396000000004,
+        "voluntary_switches": 215,
+        "involuntary_switches": 93
+      },
+      "lifecycle_seconds": 4.002594013698399,
+      "variant": "diagnostic"
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 34.939921061197914,
+      "requests": 1717367,
+      "requests_per_second": 572455.6666666666,
+      "rtt_max_us": 222.463,
+      "rtt_mean_us": 55.83027821543099,
+      "rtt_p50_us": 55.775,
+      "rtt_p95_us": 58.687,
+      "rtt_p99_us": 60.063,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "diagnostic-iouring-poll-w1-c32-b64-r1",
+      "mode": "diagnostic",
+      "backend": "iouring-poll",
+      "workers": 1,
+      "repeat": 1,
+      "client_cpu": {
+        "user": 1.1224600000000002,
+        "system": 2.9763129999999904,
+        "voluntary_switches": 1191765,
+        "involuntary_switches": 847
+      },
+      "server_cpu": {
+        "user": 0.509214,
+        "system": 2.2741100000000074,
+        "voluntary_switches": 104,
+        "involuntary_switches": 95
+      },
+      "lifecycle_seconds": 4.002924000844359,
+      "variant": "diagnostic"
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 42.401509602864586,
+      "requests": 2084119,
+      "requests_per_second": 694706.3333333334,
+      "rtt_max_us": 215.679,
+      "rtt_mean_us": 45.99499007206395,
+      "rtt_p50_us": 47.071,
+      "rtt_p95_us": 51.359,
+      "rtt_p99_us": 53.823,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "diagnostic-tokio-policy-native-adapter-task-w1-c32-b64-r3",
+      "mode": "diagnostic",
+      "backend": "tokio-policy-native-adapter-task",
+      "workers": 1,
+      "repeat": 3,
+      "client_cpu": {
+        "user": 1.456230999999999,
+        "system": 3.6526250000000005,
+        "voluntary_switches": 1622584,
+        "involuntary_switches": 838
+      },
+      "server_cpu": {
+        "user": 0.24725199999999958,
+        "system": 2.30574,
+        "voluntary_switches": 106,
+        "involuntary_switches": 47
+      },
+      "lifecycle_seconds": 4.002824961207807,
+      "variant": "diagnostic"
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 39.3768310546875,
+      "requests": 1935450,
+      "requests_per_second": 645150.0,
+      "rtt_max_us": 223.359,
+      "rtt_mean_us": 49.53267270867241,
+      "rtt_p50_us": 50.687,
+      "rtt_p95_us": 54.911,
+      "rtt_p99_us": 57.311,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "diagnostic-tokio-policy-conservative-adapter-task-w1-c32-b64-r1",
+      "mode": "diagnostic",
+      "backend": "tokio-policy-conservative-adapter-task",
+      "workers": 1,
+      "repeat": 1,
+      "client_cpu": {
+        "user": 1.335014000000001,
+        "system": 3.3210249999999917,
+        "voluntary_switches": 1399427,
+        "involuntary_switches": 861
+      },
+      "server_cpu": {
+        "user": 0.31543399999999977,
+        "system": 2.31945300000001,
+        "voluntary_switches": 101,
+        "involuntary_switches": 45
+      },
+      "lifecycle_seconds": 4.002872272860259,
+      "variant": "diagnostic"
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 34.899271647135414,
+      "requests": 1715369,
+      "requests_per_second": 571789.6666666666,
+      "rtt_max_us": 229.887,
+      "rtt_mean_us": 55.89455252251856,
+      "rtt_p50_us": 55.839,
+      "rtt_p95_us": 58.751,
+      "rtt_p99_us": 60.159,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "diagnostic-iouring-poll-w1-c32-b64-r2",
+      "mode": "diagnostic",
+      "backend": "iouring-poll",
+      "workers": 1,
+      "repeat": 2,
+      "client_cpu": {
+        "user": 1.1822820000000007,
+        "system": 2.948960999999997,
+        "voluntary_switches": 1202915,
+        "involuntary_switches": 882
+      },
+      "server_cpu": {
+        "user": 0.5003050000000009,
+        "system": 2.2749840000000034,
+        "voluntary_switches": 115,
+        "involuntary_switches": 91
+      },
+      "lifecycle_seconds": 4.002514617051929,
+      "variant": "diagnostic"
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 39.6341552734375,
+      "requests": 1948098,
+      "requests_per_second": 649366.0,
+      "rtt_max_us": 3108.863,
+      "rtt_mean_us": 49.21001015554659,
+      "rtt_p50_us": 50.367,
+      "rtt_p95_us": 54.623,
+      "rtt_p99_us": 57.087,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "diagnostic-tokio-policy-conservative-w1-c32-b64-r1",
+      "mode": "diagnostic",
+      "backend": "tokio-policy-conservative",
+      "workers": 1,
+      "repeat": 1,
+      "client_cpu": {
+        "user": 1.3090179999999982,
+        "system": 3.4144839999999874,
+        "voluntary_switches": 1432570,
+        "involuntary_switches": 746
+      },
+      "server_cpu": {
+        "user": 0.3659920000000021,
+        "system": 2.270119000000008,
+        "voluntary_switches": 94,
+        "involuntary_switches": 45
+      },
+      "lifecycle_seconds": 4.002808444201946,
+      "variant": "diagnostic"
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 42.292012532552086,
+      "requests": 2078737,
+      "requests_per_second": 692912.3333333334,
+      "rtt_max_us": 216.063,
+      "rtt_mean_us": 46.11474207704003,
+      "rtt_p50_us": 47.199,
+      "rtt_p95_us": 51.487,
+      "rtt_p99_us": 53.951,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "diagnostic-tokio-w1-c32-b64-r2",
+      "mode": "diagnostic",
+      "backend": "tokio",
+      "workers": 1,
+      "repeat": 2,
+      "client_cpu": {
+        "user": 1.463168999999997,
+        "system": 3.656708999999992,
+        "voluntary_switches": 1625336,
+        "involuntary_switches": 905
+      },
+      "server_cpu": {
+        "user": 0.24079599999999957,
+        "system": 2.3196510000000075,
+        "voluntary_switches": 118,
+        "involuntary_switches": 47
+      },
+      "lifecycle_seconds": 4.002615071833134,
+      "variant": "diagnostic"
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 39.570515950520836,
+      "requests": 1944970,
+      "requests_per_second": 648323.3333333334,
+      "rtt_max_us": 3158.015,
+      "rtt_mean_us": 49.28976382309234,
+      "rtt_p50_us": 50.431,
+      "rtt_p95_us": 54.751,
+      "rtt_p99_us": 57.183,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "diagnostic-tokio-adapter-poll-w1-c32-b64-r3",
+      "mode": "diagnostic",
+      "backend": "tokio-adapter-poll",
+      "workers": 1,
+      "repeat": 3,
+      "client_cpu": {
+        "user": 1.365279000000001,
+        "system": 3.362612999999996,
+        "voluntary_switches": 1421108,
+        "involuntary_switches": 990
+      },
+      "server_cpu": {
+        "user": 0.34505300000000005,
+        "system": 2.3005090000000052,
+        "voluntary_switches": 98,
+        "involuntary_switches": 45
+      },
+      "lifecycle_seconds": 4.002535873092711,
+      "variant": "diagnostic"
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 42.228413899739586,
+      "requests": 2075611,
+      "requests_per_second": 691870.3333333334,
+      "rtt_max_us": 215.679,
+      "rtt_mean_us": 46.183575510536365,
+      "rtt_p50_us": 47.263,
+      "rtt_p95_us": 51.551,
+      "rtt_p99_us": 54.015,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "diagnostic-tokio-policy-native-adapter-task-w1-c32-b64-r1",
+      "mode": "diagnostic",
+      "backend": "tokio-policy-native-adapter-task",
+      "workers": 1,
+      "repeat": 1,
+      "client_cpu": {
+        "user": 1.4434180000000012,
+        "system": 3.700502,
+        "voluntary_switches": 1633616,
+        "involuntary_switches": 790
+      },
+      "server_cpu": {
+        "user": 0.264840999999997,
+        "system": 2.293662999999995,
+        "voluntary_switches": 198,
+        "involuntary_switches": 47
+      },
+      "lifecycle_seconds": 4.002464544028044,
+      "variant": "diagnostic"
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 25.443339029947918,
+      "requests": 1250591,
+      "requests_per_second": 416863.6666666667,
+      "rtt_max_us": 269.823,
+      "rtt_mean_us": 76.69555246919259,
+      "rtt_p50_us": 83.327,
+      "rtt_p95_us": 111.999,
+      "rtt_p99_us": 116.031,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "diagnostic-native-readiness-poll-w1-c32-b64-r3",
+      "mode": "diagnostic",
+      "backend": "native-readiness-poll",
+      "workers": 1,
+      "repeat": 3,
+      "client_cpu": {
+        "user": 0.6984370000000055,
+        "system": 2.0292610000000053,
+        "voluntary_switches": 665463,
+        "involuntary_switches": 1236
+      },
+      "server_cpu": {
+        "user": 0.5025089999999963,
+        "system": 2.5493299999999977,
+        "voluntary_switches": 620544,
+        "involuntary_switches": 563583
+      },
+      "lifecycle_seconds": 4.002913976088166,
+      "variant": "diagnostic"
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 39.43524169921875,
+      "requests": 1938321,
+      "requests_per_second": 646107.0,
+      "rtt_max_us": 221.311,
+      "rtt_mean_us": 49.460126888683575,
+      "rtt_p50_us": 50.591,
+      "rtt_p95_us": 54.879,
+      "rtt_p99_us": 57.311,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "diagnostic-tokio-adapter-raw-task-w1-c32-b64-r3",
+      "mode": "diagnostic",
+      "backend": "tokio-adapter-raw-task",
+      "workers": 1,
+      "repeat": 3,
+      "client_cpu": {
+        "user": 1.2809060000000017,
+        "system": 3.352204999999998,
+        "voluntary_switches": 1379711,
+        "involuntary_switches": 658
+      },
+      "server_cpu": {
+        "user": 0.33303699999999736,
+        "system": 2.3021109999999965,
+        "voluntary_switches": 100,
+        "involuntary_switches": 48
+      },
+      "lifecycle_seconds": 4.002819186076522,
+      "variant": "diagnostic"
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 39.5377197265625,
+      "requests": 1943358,
+      "requests_per_second": 647786.0,
+      "rtt_max_us": 221.055,
+      "rtt_mean_us": 49.330745674754645,
+      "rtt_p50_us": 50.463,
+      "rtt_p95_us": 54.751,
+      "rtt_p99_us": 57.151,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "diagnostic-tokio-adapter-w1-c32-b64-r2",
+      "mode": "diagnostic",
+      "backend": "tokio-adapter",
+      "workers": 1,
+      "repeat": 2,
+      "client_cpu": {
+        "user": 1.3191690000000023,
+        "system": 3.3457010000000054,
+        "voluntary_switches": 1401959,
+        "involuntary_switches": 794
+      },
+      "server_cpu": {
+        "user": 0.3526680000000013,
+        "system": 2.2809130000000124,
+        "voluntary_switches": 90,
+        "involuntary_switches": 49
+      },
+      "lifecycle_seconds": 4.002781678922474,
+      "variant": "diagnostic"
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 39.902628580729164,
+      "requests": 1961294,
+      "requests_per_second": 653764.6666666666,
+      "rtt_max_us": 217.855,
+      "rtt_mean_us": 48.88066756947184,
+      "rtt_p50_us": 50.015,
+      "rtt_p95_us": 54.271,
+      "rtt_p99_us": 56.703,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "diagnostic-tokio-adapter-poll-w1-c32-b64-r2",
+      "mode": "diagnostic",
+      "backend": "tokio-adapter-poll",
+      "workers": 1,
+      "repeat": 2,
+      "client_cpu": {
+        "user": 1.3278639999999982,
+        "system": 3.387465999999989,
+        "voluntary_switches": 1428064,
+        "involuntary_switches": 759
+      },
+      "server_cpu": {
+        "user": 0.34078999999999837,
+        "system": 2.3012970000000053,
+        "voluntary_switches": 94,
+        "involuntary_switches": 51
+      },
+      "lifecycle_seconds": 4.0029437760822475,
+      "variant": "diagnostic"
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 39.48956298828125,
+      "requests": 1940991,
+      "requests_per_second": 646997.0,
+      "rtt_max_us": 219.519,
+      "rtt_mean_us": 49.39222415147731,
+      "rtt_p50_us": 50.559,
+      "rtt_p95_us": 54.783,
+      "rtt_p99_us": 57.183,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "diagnostic-tokio-adapter-poll-raw-task-w1-c32-b64-r2",
+      "mode": "diagnostic",
+      "backend": "tokio-adapter-poll-raw-task",
+      "workers": 1,
+      "repeat": 2,
+      "client_cpu": {
+        "user": 1.3151550000000043,
+        "system": 3.313085000000001,
+        "voluntary_switches": 1371124,
+        "involuntary_switches": 951
+      },
+      "server_cpu": {
+        "user": 0.3642719999999997,
+        "system": 2.273937999999987,
+        "voluntary_switches": 98,
+        "involuntary_switches": 51
+      },
+      "lifecycle_seconds": 4.002782094758004,
+      "variant": "diagnostic"
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 42.610738118489586,
+      "requests": 2094403,
+      "requests_per_second": 698134.3333333334,
+      "rtt_max_us": 215.551,
+      "rtt_mean_us": 45.7684410946699,
+      "rtt_p50_us": 46.815,
+      "rtt_p95_us": 51.135,
+      "rtt_p99_us": 53.567,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "diagnostic-tokio-policy-native-w1-c32-b64-r1",
+      "mode": "diagnostic",
+      "backend": "tokio-policy-native",
+      "workers": 1,
+      "repeat": 1,
+      "client_cpu": {
+        "user": 1.4507059999999967,
+        "system": 3.748885999999999,
+        "voluntary_switches": 1655980,
+        "involuntary_switches": 883
+      },
+      "server_cpu": {
+        "user": 0.23102099999999837,
+        "system": 2.318781999999999,
+        "voluntary_switches": 126,
+        "involuntary_switches": 46
+      },
+      "lifecycle_seconds": 4.002763928845525,
+      "variant": "diagnostic"
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 39.7498779296875,
+      "requests": 1953786,
+      "requests_per_second": 651262.0,
+      "rtt_max_us": 225.407,
+      "rtt_mean_us": 49.06733307486086,
+      "rtt_p50_us": 50.207,
+      "rtt_p95_us": 54.463,
+      "rtt_p99_us": 56.895,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "diagnostic-tokio-policy-conservative-w1-c32-b64-r3",
+      "mode": "diagnostic",
+      "backend": "tokio-policy-conservative",
+      "workers": 1,
+      "repeat": 3,
+      "client_cpu": {
+        "user": 1.3360070000000022,
+        "system": 3.3781649999999956,
+        "voluntary_switches": 1419776,
+        "involuntary_switches": 863
+      },
+      "server_cpu": {
+        "user": 0.3358729999999994,
+        "system": 2.3051550000000134,
+        "voluntary_switches": 96,
+        "involuntary_switches": 49
+      },
+      "lifecycle_seconds": 4.002787713427097,
+      "variant": "diagnostic"
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 39.472900390625,
+      "requests": 1940172,
+      "requests_per_second": 646724.0,
+      "rtt_max_us": 224.511,
+      "rtt_mean_us": 49.411300384192636,
+      "rtt_p50_us": 50.559,
+      "rtt_p95_us": 54.847,
+      "rtt_p99_us": 57.247,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "diagnostic-tokio-adapter-raw-task-w1-c32-b64-r1",
+      "mode": "diagnostic",
+      "backend": "tokio-adapter-raw-task",
+      "workers": 1,
+      "repeat": 1,
+      "client_cpu": {
+        "user": 1.399082,
+        "system": 3.2902559999999994,
+        "voluntary_switches": 1414334,
+        "involuntary_switches": 978
+      },
+      "server_cpu": {
+        "user": 0.331037000000002,
+        "system": 2.30396300000001,
+        "voluntary_switches": 91,
+        "involuntary_switches": 45
+      },
+      "lifecycle_seconds": 4.002803447190672,
+      "variant": "diagnostic"
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 34.933512369791664,
+      "requests": 1717052,
+      "requests_per_second": 572350.6666666666,
+      "rtt_max_us": 383.743,
+      "rtt_mean_us": 55.8413079755302,
+      "rtt_p50_us": 55.775,
+      "rtt_p95_us": 58.687,
+      "rtt_p99_us": 60.095,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "diagnostic-iouring-poll-w1-c32-b64-r3",
+      "mode": "diagnostic",
+      "backend": "iouring-poll",
+      "workers": 1,
+      "repeat": 3,
+      "client_cpu": {
+        "user": 1.1613419999999977,
+        "system": 2.9398359999999855,
+        "voluntary_switches": 1199616,
+        "involuntary_switches": 747
+      },
+      "server_cpu": {
+        "user": 0.4850940000000037,
+        "system": 2.2931289999999933,
+        "voluntary_switches": 350,
+        "involuntary_switches": 84
+      },
+      "lifecycle_seconds": 4.0029324241913855,
+      "variant": "diagnostic"
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 39.731547037760414,
+      "requests": 1952885,
+      "requests_per_second": 650961.6666666666,
+      "rtt_max_us": 1039.871,
+      "rtt_mean_us": 49.09130459243624,
+      "rtt_p50_us": 50.239,
+      "rtt_p95_us": 54.495,
+      "rtt_p99_us": 56.959,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "diagnostic-tokio-adapter-w1-c32-b64-r3",
+      "mode": "diagnostic",
+      "backend": "tokio-adapter",
+      "workers": 1,
+      "repeat": 3,
+      "client_cpu": {
+        "user": 1.3064249999999973,
+        "system": 3.373441000000014,
+        "voluntary_switches": 1402495,
+        "involuntary_switches": 921
+      },
+      "server_cpu": {
+        "user": 0.35315299999999894,
+        "system": 2.276204000000007,
+        "voluntary_switches": 243,
+        "involuntary_switches": 50
+      },
+      "lifecycle_seconds": 4.002830007113516,
+      "variant": "diagnostic"
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 25.492838541666668,
+      "requests": 1253024,
+      "requests_per_second": 417674.6666666667,
+      "rtt_max_us": 276.479,
+      "rtt_mean_us": 76.54980175080455,
+      "rtt_p50_us": 83.135,
+      "rtt_p95_us": 111.679,
+      "rtt_p99_us": 115.647,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "diagnostic-native-readiness-poll-w1-c32-b64-r1",
+      "mode": "diagnostic",
+      "backend": "native-readiness-poll",
+      "workers": 1,
+      "repeat": 1,
+      "client_cpu": {
+        "user": 0.6445440000000033,
+        "system": 2.0550839999999937,
+        "voluntary_switches": 651325,
+        "involuntary_switches": 1394
+      },
+      "server_cpu": {
+        "user": 0.4745360000000005,
+        "system": 2.574216000000007,
+        "voluntary_switches": 620598,
+        "involuntary_switches": 563411
+      },
+      "lifecycle_seconds": 4.002725368831307,
+      "variant": "diagnostic"
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 39.144246419270836,
+      "requests": 1924018,
+      "requests_per_second": 641339.3333333334,
+      "rtt_max_us": 1363.967,
+      "rtt_mean_us": 49.826041949711446,
+      "rtt_p50_us": 50.975,
+      "rtt_p95_us": 55.231,
+      "rtt_p99_us": 57.663,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "diagnostic-tokio-policy-conservative-adapter-task-w1-c32-b64-r3",
+      "mode": "diagnostic",
+      "backend": "tokio-policy-conservative-adapter-task",
+      "workers": 1,
+      "repeat": 3,
+      "client_cpu": {
+        "user": 1.3551420000000007,
+        "system": 3.3116139999999916,
+        "voluntary_switches": 1397241,
+        "involuntary_switches": 797
+      },
+      "server_cpu": {
+        "user": 0.3506919999999951,
+        "system": 2.293321999999989,
+        "voluntary_switches": 101,
+        "involuntary_switches": 47
+      },
+      "lifecycle_seconds": 4.002482517622411,
+      "variant": "diagnostic"
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 42.472920735677086,
+      "requests": 2087629,
+      "requests_per_second": 695876.3333333334,
+      "rtt_max_us": 3229.695,
+      "rtt_mean_us": 45.91785676286353,
+      "rtt_p50_us": 46.975,
+      "rtt_p95_us": 51.295,
+      "rtt_p99_us": 53.759,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "diagnostic-tokio-policy-native-w1-c32-b64-r2",
+      "mode": "diagnostic",
+      "backend": "tokio-policy-native",
+      "workers": 1,
+      "repeat": 2,
+      "client_cpu": {
+        "user": 1.4647649999999999,
+        "system": 3.707457000000005,
+        "voluntary_switches": 1632282,
+        "involuntary_switches": 539
+      },
+      "server_cpu": {
+        "user": 0.2564309999999992,
+        "system": 2.29416599999999,
+        "voluntary_switches": 269,
+        "involuntary_switches": 48
+      },
+      "lifecycle_seconds": 4.002826961223036,
+      "variant": "diagnostic"
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 39.4912109375,
+      "requests": 1941072,
+      "requests_per_second": 647024.0,
+      "rtt_max_us": 221.311,
+      "rtt_mean_us": 49.38849186944115,
+      "rtt_p50_us": 50.527,
+      "rtt_p95_us": 54.815,
+      "rtt_p99_us": 57.215,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "diagnostic-tokio-adapter-raw-task-w1-c32-b64-r2",
+      "mode": "diagnostic",
+      "backend": "tokio-adapter-raw-task",
+      "workers": 1,
+      "repeat": 2,
+      "client_cpu": {
+        "user": 1.3288480000000007,
+        "system": 3.383638000000019,
+        "voluntary_switches": 1416363,
+        "involuntary_switches": 864
+      },
+      "server_cpu": {
+        "user": 0.3472360000000023,
+        "system": 2.2838549999999884,
+        "voluntary_switches": 97,
+        "involuntary_switches": 47
+      },
+      "lifecycle_seconds": 4.002733705099672,
+      "variant": "diagnostic"
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 25.342264811197918,
+      "requests": 1245623,
+      "requests_per_second": 415207.6666666667,
+      "rtt_max_us": 287.231,
+      "rtt_mean_us": 77.00434358469624,
+      "rtt_p50_us": 83.583,
+      "rtt_p95_us": 112.511,
+      "rtt_p99_us": 116.543,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "diagnostic-native-readiness-poll-w1-c32-b64-r2",
+      "mode": "diagnostic",
+      "backend": "native-readiness-poll",
+      "workers": 1,
+      "repeat": 2,
+      "client_cpu": {
+        "user": 0.6562049999999999,
+        "system": 2.0502209999999934,
+        "voluntary_switches": 647235,
+        "involuntary_switches": 1300
+      },
+      "server_cpu": {
+        "user": 0.4900969999999987,
+        "system": 2.5566320000000076,
+        "voluntary_switches": 618210,
+        "involuntary_switches": 561274
+      },
+      "lifecycle_seconds": 4.002796511165798,
+      "variant": "diagnostic"
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 25.217508951822918,
+      "requests": 1239491,
+      "requests_per_second": 413163.6666666667,
+      "rtt_max_us": 287.999,
+      "rtt_mean_us": 77.38615309832826,
+      "rtt_p50_us": 83.839,
+      "rtt_p95_us": 112.959,
+      "rtt_p99_us": 117.055,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "diagnostic-native-readiness-w1-c32-b64-r3",
+      "mode": "diagnostic",
+      "backend": "native-readiness",
+      "workers": 1,
+      "repeat": 3,
+      "client_cpu": {
+        "user": 0.6190360000000013,
+        "system": 2.031092000000001,
+        "voluntary_switches": 617405,
+        "involuntary_switches": 865
+      },
+      "server_cpu": {
+        "user": 0.5183469999999986,
+        "system": 2.5325559999999996,
+        "voluntary_switches": 615107,
+        "involuntary_switches": 558684
+      },
+      "lifecycle_seconds": 4.002624684013426,
+      "variant": "diagnostic"
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 42.151835123697914,
+      "requests": 2071847,
+      "requests_per_second": 690615.6666666666,
+      "rtt_max_us": 3190.783,
+      "rtt_mean_us": 46.27029715707761,
+      "rtt_p50_us": 47.359,
+      "rtt_p95_us": 51.647,
+      "rtt_p99_us": 54.111,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "diagnostic-tokio-w1-c32-b64-r1",
+      "mode": "diagnostic",
+      "backend": "tokio",
+      "workers": 1,
+      "repeat": 1,
+      "client_cpu": {
+        "user": 1.3791080000000022,
+        "system": 3.671742999999992,
+        "voluntary_switches": 1591239,
+        "involuntary_switches": 690
+      },
+      "server_cpu": {
+        "user": 0.2476039999999955,
+        "system": 2.3052410000000236,
+        "voluntary_switches": 155,
+        "involuntary_switches": 52
+      },
+      "lifecycle_seconds": 4.002768052276224,
+      "variant": "diagnostic"
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 25.213094075520832,
+      "requests": 1239274,
+      "requests_per_second": 413091.3333333333,
+      "rtt_max_us": 287.231,
+      "rtt_mean_us": 77.39872593954212,
+      "rtt_p50_us": 83.967,
+      "rtt_p95_us": 113.279,
+      "rtt_p99_us": 117.375,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "diagnostic-native-readiness-w1-c32-b64-r2",
+      "mode": "diagnostic",
+      "backend": "native-readiness",
+      "workers": 1,
+      "repeat": 2,
+      "client_cpu": {
+        "user": 0.6514690000000058,
+        "system": 2.005012999999991,
+        "voluntary_switches": 618799,
+        "involuntary_switches": 1088
+      },
+      "server_cpu": {
+        "user": 0.5058349999999976,
+        "system": 2.541214999999994,
+        "voluntary_switches": 620924,
+        "involuntary_switches": 564721
+      },
+      "lifecycle_seconds": 4.002930702175945,
+      "variant": "diagnostic"
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 39.415140787760414,
+      "requests": 1937333,
+      "requests_per_second": 645777.6666666666,
+      "rtt_max_us": 222.975,
+      "rtt_mean_us": 49.483947657940085,
+      "rtt_p50_us": 50.623,
+      "rtt_p95_us": 54.911,
+      "rtt_p99_us": 57.343,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "identifier": "diagnostic-tokio-adapter-poll-raw-task-w1-c32-b64-r3",
+      "mode": "diagnostic",
+      "backend": "tokio-adapter-poll-raw-task",
+      "workers": 1,
+      "repeat": 3,
+      "client_cpu": {
+        "user": 1.3005679999999984,
+        "system": 3.417664000000002,
+        "voluntary_switches": 1409331,
+        "involuntary_switches": 637
+      },
+      "server_cpu": {
+        "user": 0.3455340000000007,
+        "system": 2.2906849999999963,
+        "voluntary_switches": 99,
+        "involuntary_switches": 49
+      },
+      "lifecycle_seconds": 4.002446957863867,
+      "variant": "diagnostic"
+    }
+  ],
+  "started_utc": "2026-10-20T18:14:39Z",
+  "finished_utc": "2026-10-20T18:17:15Z"
+}

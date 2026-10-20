@@ -1,0 +1,158 @@
+diff --git a/crates/iouring/src/io_uring_selector.rs b/crates/iouring/src/io_uring_selector.rs
+index 4019d61..b5a7a62 100644
+--- a/crates/iouring/src/io_uring_selector.rs
++++ b/crates/iouring/src/io_uring_selector.rs
+@@ -890,6 +890,47 @@ impl Reactor {
+         Ok(())
+     }
+ 
++    fn collect_completions(&mut self) -> io::Result<bool> {
++        let mut completed = false;
++        // The CQ iterator snapshots the available batch. Finish publishing every completion in that batch before returning to the executor; application futures are polled only from its ready queue.
++        let mut notification_result = None;
++        for completion in self.ring.completion() {
++            completed = true;
++            let identifier = completion.user_data();
++            if identifier == NOTIFICATION_TAG {
++                self.notification_armed = false;
++                notification_result = Some(completion.result());
++                continue;
++            }
++            if identifier & CANCEL_TAG != 0 {
++                continue;
++            }
++            // Every untagged CQE is the single original completion of a
++            // published request. Only this path removes it from InFlight.
++            let request = self
++                .in_flight
++                .0
++                .remove(&identifier)
++                .expect("original completion retains its in-flight request");
++            let result = completion.result();
++            request.finish(if result < 0 {
++                Err(io::Error::from_raw_os_error(-result))
++            } else {
++                Ok(result as usize)
++            });
++        }
++
++        if let Some(result) = notification_result {
++            if result < 0 {
++                return Err(io::Error::from_raw_os_error(-result));
++            }
++            // Drain before rearming; otherwise the readable counter immediately completes each replacement poll.
++            self.drain_notification()?;
++        }
++
++        Ok(completed)
++    }
++
+     fn cancel(&mut self, identifier: u64) -> bool {
+         if let Some(position) = self
+             .pending
+@@ -972,41 +1013,7 @@ impl Reactor {
+             }
+         }
+ 
+-        // The CQ iterator snapshots the available batch. Finish publishing every completion in that batch before returning to the executor; application futures are polled only from its ready queue.
+-        let mut notification_result = None;
+-        for completion in self.ring.completion() {
+-            progressed = true;
+-            let identifier = completion.user_data();
+-            if identifier == NOTIFICATION_TAG {
+-                self.notification_armed = false;
+-                notification_result = Some(completion.result());
+-                continue;
+-            }
+-            if identifier & CANCEL_TAG != 0 {
+-                continue;
+-            }
+-            // Every untagged CQE is the single original completion of a
+-            // published request. Only this path removes it from InFlight.
+-            let request = self
+-                .in_flight
+-                .0
+-                .remove(&identifier)
+-                .expect("original completion retains its in-flight request");
+-            let result = completion.result();
+-            request.finish(if result < 0 {
+-                Err(io::Error::from_raw_os_error(-result))
+-            } else {
+-                Ok(result as usize)
+-            });
+-        }
+-
+-        if let Some(result) = notification_result {
+-            if result < 0 {
+-                return Err(io::Error::from_raw_os_error(-result));
+-            }
+-            // Drain before rearming; otherwise the readable counter immediately completes each replacement poll.
+-            self.drain_notification()?;
+-        }
++        progressed |= self.collect_completions()?;
+ 
+         {
+             let mut submissions = self.ring.submission();
+@@ -1109,6 +1116,9 @@ impl Reactor {
+                 return Err(error);
+             }
+         }
++        // Publish the completion snapshot produced by this wait before returning.
++        // Its wakeups enter the executor's ready queue without another idle turn.
++        self.collect_completions()?;
+         Ok(false)
+     }
+ }
+diff --git a/crates/iouring/src/io_uring_selector/tests.rs b/crates/iouring/src/io_uring_selector/tests.rs
+index 2b113a7..95d85f5 100644
+--- a/crates/iouring/src/io_uring_selector/tests.rs
++++ b/crates/iouring/src/io_uring_selector/tests.rs
+@@ -1418,27 +1418,29 @@ fn scalar_buffer_callbacks_run_before_enqueue_and_never_during_driver_preparatio
+ }
+ 
+ #[test]
+-fn completion_turn_preserves_an_explicit_owner_wake_for_the_next_idle_decision() {
++fn idle_wait_publishes_completions_and_preserves_explicit_wakes() {
+     use core_scheduler_selector::{SelectorDriver, SelectorWorker};
++    use std::task::Context;
+     let (selector, driver) = pair(1);
+     let (_directory, file) = file(&selector);
+     let mut worker = driver.enter();
+     assert!(!worker.turn(Some(Duration::ZERO)).unwrap());
+     let never = Cancellation::never();
+     let mut operation = Box::pin(selector.file_read_at(&file, vec![0; 6], 0, &never));
+-    assert!(block_on(poll_once(&mut operation)).is_none());
+-    // This turn accepts the local submission and waits for its CQE in one enter.
+-    // The CQ snapshot was taken before publication, so collection is next turn.
++    let waker = worker.waker();
++    let mut context = Context::from_waker(&waker);
++    assert!(operation.as_mut().poll(&mut context).is_pending());
++    // One turn submits, waits, and publishes the completed read. Publishing
++    // wakes its owner, leaving an explicit permit for the next idle decision.
+     assert!(!worker.turn(None).unwrap());
+-    worker.waker().wake_by_ref();
++    let std::task::Poll::Ready((result, buffer)) = operation.as_mut().poll(&mut context) else {
++        panic!("idle wait did not publish the completed read");
++    };
++    assert_eq!(result.unwrap(), 6);
++    assert_eq!(buffer, b"abcdef");
+     {
+         let _failure = Failures::new([("wait", io::ErrorKind::Interrupted.into())]);
+         assert!(!worker.turn(None).unwrap());
+-        let (result, buffer) = block_on(poll_once(&mut operation)).unwrap();
+-        assert_eq!(result.unwrap(), 6);
+-        assert_eq!(buffer, b"abcdef");
+-        // Completion delivery returned without consuming the explicit permit.
+-        assert!(!worker.turn(None).unwrap());
+         assert_eq!(FAILURES.with(|failures| failures.borrow().len()), 1);
+         assert!(!worker.turn(None).unwrap());
+         assert!(FAILURES.with(|failures| failures.borrow().is_empty()));
+@@ -1567,7 +1569,7 @@ fn idle_ring_waits_honor_finite_timeouts_and_rearm_after_notifications() {
+             assert!(!driver.turn(None).unwrap());
+             assert!(BEFORE_SYSCALL.with(|hook| hook.borrow().is_none()));
+         }
+-        // Collect PollAdd, drain its counter, then rearm.
++        // The wait collected PollAdd and drained its counter; rearm it.
+         assert!(!driver.turn(Some(Duration::ZERO)).unwrap());
+         let _failure = Failures::new([("wait", io::ErrorKind::Interrupted.into())]);
+         for _ in 0..4 {

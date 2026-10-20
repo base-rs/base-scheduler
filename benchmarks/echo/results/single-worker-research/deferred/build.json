@@ -1,0 +1,9 @@
+{
+  "base_source": "130cd4a67e526e80ba9a5e7e7ebbe81494bd903b",
+  "production_patch_sha256": "a0f933b0867da63124206a36c1ceca2e1edb5e6368bf562a5a46bd0ccc6e979d",
+  "benchmark_patch": "controls.patch (unchanged in both variants)",
+  "binary_sha256": "cacd75d8b67716108a75cd09928b439a29fd2d407f357d1ee5dd4a085603cb28",
+  "baseline_binary_sha256": "34821493abf4aa1c7d655f782a9c799526ffefcc7f189ce8ff733b340443b88c",
+  "build_command": "cargo build --release --locked -p core-scheduler-echo-benchmark",
+  "scope": "Only fresh worker-bound rings; original fallback and standalone rings unchanged. Separate from POLL_FIRST."
+}
