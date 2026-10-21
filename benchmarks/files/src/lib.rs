@@ -58,11 +58,10 @@ where
                     let never = Cancellation::never();
                     let mut monitor = scheduler.file_monitor(&file).unwrap();
                     let mut buffer = vec![42; size];
-                    let mut elapsed = 0;
+                    let mut steady_start = Instant::now();
                     // Measure each task's steady-state loop, excluding its first operation.
                     for index in 0..=iterations {
                         let result;
-                        let operation = Instant::now();
                         (result, buffer) = match (monitored, workload.as_str()) {
                             (true, "read-at") => {
                                 scheduler
@@ -84,15 +83,15 @@ where
                         };
                         assert_eq!(result.unwrap(), size);
                         std::hint::black_box(buffer[0]);
-                        if index > 0 {
-                            elapsed += operation.elapsed().as_nanos() as u64;
+                        if index == 0 {
+                            steady_start = Instant::now();
                         }
                     }
                     scheduler
                         .file_monitor_close(&mut monitor, &never)
                         .await
                         .unwrap();
-                    elapsed
+                    steady_start.elapsed().as_nanos() as u64
                 })
                 .unwrap(),
         );

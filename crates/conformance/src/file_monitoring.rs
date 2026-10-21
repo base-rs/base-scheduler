@@ -136,10 +136,7 @@ pub async fn cancellation<S: FileMonitoring>(scheduler: &S, file: &S::File) {
             .await
             .unwrap_err(),
     ] {
-        assert!(matches!(
-            error,
-            core_scheduler::OperationError::Cancelled(_)
-        ));
+        crate::file::cancelled::<()>(Err(error));
     }
     assert!(
         scheduler
@@ -185,6 +182,111 @@ pub async fn abandonment<S: FileMonitoring>(scheduler: &S, file: &S::File) {
     }
     scheduler
         .file_monitor_close(&mut monitor, &never)
+        .await
+        .unwrap();
+}
+
+// Stop inside payload access, on the independent file worker or ring driver, so lifecycle assertions cannot accidentally test an already-completed operation.
+struct GatedBuffer {
+    bytes: Vec<u8>,
+    started: Option<std::sync::mpsc::Sender<()>>,
+    release: std::sync::mpsc::Receiver<()>,
+}
+impl AsRef<[u8]> for GatedBuffer {
+    fn as_ref(&self) -> &[u8] {
+        &self.bytes
+    }
+}
+impl AsMut<[u8]> for GatedBuffer {
+    fn as_mut(&mut self) -> &mut [u8] {
+        if let Some(started) = self.started.take() {
+            started.send(()).unwrap();
+            self.release
+                .recv_timeout(std::time::Duration::from_secs(10))
+                .unwrap();
+        }
+        &mut self.bytes
+    }
+}
+// SAFETY: The Vec owns stable initialized storage, with exclusive access through the transferred owner. Gating never changes its allocation or range.
+unsafe impl core_scheduler::IoBuf for GatedBuffer {}
+unsafe impl core_scheduler::IoBufMut for GatedBuffer {}
+
+pub async fn pending_retirement<S: FileMonitoring>(scheduler: &S, file: &S::File) {
+    let never = Cancellation::never();
+    let mut monitor = scheduler.file_monitor(file).unwrap();
+    let (started, wait_started) = std::sync::mpsc::channel();
+    let (release, wait_release) = std::sync::mpsc::channel();
+    let buffer = GatedBuffer {
+        bytes: vec![0; 6],
+        started: Some(started),
+        release: wait_release,
+    };
+    let mut operation = Box::pin(scheduler.file_monitor_read_at(&mut monitor, buffer, 0, &never));
+    assert!(
+        futures_lite::future::poll_once(operation.as_mut())
+            .await
+            .is_none()
+    );
+    wait_started
+        .recv_timeout(std::time::Duration::from_secs(10))
+        .unwrap();
+    drop(operation);
+    let error = scheduler
+        .file_monitor_read_at(&mut monitor, vec![0], 0, &never)
+        .await
+        .0
+        .unwrap_err();
+    assert_eq!(
+        std::io::Error::from(error).kind(),
+        std::io::ErrorKind::WouldBlock
+    );
+    let cancellation = Cancellation::new();
+    let mut close = Box::pin(scheduler.file_monitor_close(&mut monitor, &cancellation));
+    assert!(
+        futures_lite::future::poll_once(close.as_mut())
+            .await
+            .is_none()
+    );
+    cancellation.cancel();
+    crate::file::cancelled(close.await);
+    release.send(()).unwrap();
+    scheduler
+        .file_monitor_close(&mut monitor, &never)
+        .await
+        .unwrap();
+    // Dropping monitor here leaves the caller free to immediately close the original file.
+}
+
+pub async fn inflight_cancellation<S: FileMonitoring>(scheduler: &S, file: &S::File) {
+    let cancellation = Cancellation::new();
+    let mut monitor = scheduler.file_monitor(file).unwrap();
+    let (started, wait_started) = std::sync::mpsc::channel();
+    let (release, wait_release) = std::sync::mpsc::channel();
+    let buffer = GatedBuffer {
+        bytes: vec![0; 6],
+        started: Some(started),
+        release: wait_release,
+    };
+    let allocation = buffer.as_ref().as_ptr() as usize;
+    let mut operation =
+        Box::pin(scheduler.file_monitor_read_at(&mut monitor, buffer, 0, &cancellation));
+    assert!(
+        futures_lite::future::poll_once(operation.as_mut())
+            .await
+            .is_none()
+    );
+    wait_started
+        .recv_timeout(std::time::Duration::from_secs(10))
+        .unwrap();
+    cancellation.cancel();
+    release.send(()).unwrap();
+    let (_, mut buffer) = operation.await;
+    // Either completed progress or cancellation may win, but ownership and the original stable allocation must always return after retirement.
+    assert_eq!(buffer.as_ref().as_ptr() as usize, allocation);
+    assert_eq!(buffer.as_mut().len(), 6);
+    scheduler
+        .file_monitor_close(&mut monitor, &Cancellation::never())
         .await
         .unwrap();
 }

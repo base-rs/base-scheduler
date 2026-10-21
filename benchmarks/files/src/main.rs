@@ -121,3 +121,46 @@ fn execute(args: &[String]) -> serde_json::Value {
 fn main() {
     println!("{}", execute(&std::env::args().collect::<Vec<_>>()));
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn matched_workloads_run_on_each_backend() {
+        #[cfg(target_os = "linux")]
+        let backends = ["native", "tokio", "direct", "iouring"];
+        #[cfg(not(target_os = "linux"))]
+        let backends = ["native", "tokio", "direct"];
+        for backend in backends {
+            for mode in ["ordinary", "monitor"] {
+                for workload in ["read-at", "write-at"] {
+                    let args = ["files", backend, mode, workload, "2", "2", "1", "4096"]
+                        .map(str::to_owned);
+                    let result = execute(&args);
+                    assert_eq!(result["operations"], 4);
+                    assert_eq!(result["backend"], backend);
+                }
+            }
+        }
+        assert_eq!(execute(&[])["mode"], "monitor");
+    }
+
+    #[test]
+    #[should_panic(expected = "unknown backend")]
+    fn unknown_backend_is_rejected() {
+        execute(&["files".into(), "unknown".into()]);
+    }
+
+    #[test]
+    #[should_panic(expected = "unknown mode")]
+    fn unknown_mode_is_rejected() {
+        execute(&["files".into(), "native".into(), "unknown".into()]);
+    }
+
+    #[test]
+    #[should_panic]
+    fn unknown_workload_is_rejected() {
+        execute(&["files", "native", "monitor", "unknown", "1", "1", "1", "1"].map(str::to_owned));
+    }
+}

@@ -111,9 +111,6 @@ pub trait FileMonitoring: FileRead + FileWrite + FileReadAt + FileWriteAt {
                     let mut listener = pin!(listener);
                     let mut cancelled = pin!(cancellation.cancelled());
                     poll_fn(|context| {
-                        if !activity.running.load(Ordering::Acquire) {
-                            return Poll::Ready(Ok(()));
-                        }
                         if cancelled.as_mut().poll(context).is_ready() {
                             return Poll::Ready(Err(crate::Cancelled));
                         }
