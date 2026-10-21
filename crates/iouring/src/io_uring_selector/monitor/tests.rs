@@ -1396,3 +1396,99 @@ fn a_stream_monitor_on_a_datagram_socket_keeps_message_semantics() {
         assert!(!reader.registration().read_started.load(Ordering::Acquire));
     }
 }
+
+#[test]
+fn urgent_tcp_boundary_keeps_trailing_bytes_readable() {
+    for (armed, inline) in [(false, false), (true, false), (false, true), (true, true)] {
+        let (selector, driver) = IoUringSelector::new(options()).unwrap();
+        let mut worker = driver.enter();
+        let wake = worker.waker();
+        let mut context = Context::from_waker(&wake);
+        let (socket, mut peer) = sockets(&selector);
+        socket::retain_socket(&socket)
+            .get_ref()
+            .set_out_of_band_inline(inline)
+            .unwrap();
+        let mut reader = selector
+            .socket_stream_monitor(&socket, Interest::Readable)
+            .unwrap();
+        let inspect = reader.retained();
+        let never = Cancellation::never();
+        if armed {
+            // Cover a persistent poll which was armed before the urgent mark arrived.
+            let mut waiting = pin!(selector.socket_monitor_wait(&mut reader, &never));
+            assert!(waiting.as_mut().poll(&mut context).is_pending());
+            worker.turn(Some(Duration::ZERO)).unwrap();
+        }
+        peer.write_all(b"before").unwrap();
+        assert_eq!(
+            socket2::SockRef::from(&peer)
+                .send_with_flags(b"!", libc::MSG_OOB)
+                .unwrap(),
+            1
+        );
+        peer.write_all(b"after").unwrap();
+        // Coalesce the loopback segments before collecting the readiness snapshot.
+        std::thread::sleep(Duration::from_millis(10));
+        if armed {
+            let mut waiting = pin!(selector.socket_monitor_wait(&mut reader, &never));
+            drive(&mut worker, &mut context, waiting.as_mut()).unwrap();
+        }
+        let mut buffer = [0; 64];
+        let count = block_on(selector.socket_monitor_recv_poll(
+            &mut reader,
+            &mut buffer,
+            SocketRecvFlags::default(),
+            &never,
+        ))
+        .unwrap();
+        assert_eq!(&buffer[..count], b"before");
+        let count = {
+            let mut receive = pin!(selector.socket_monitor_recv_poll(
+                &mut reader,
+                &mut buffer,
+                SocketRecvFlags::default(),
+                &never,
+            ));
+            let deadline = std::time::Instant::now() + Duration::from_millis(100);
+            loop {
+                if let Poll::Ready(result) = receive.as_mut().poll(&mut context) {
+                    break result.unwrap();
+                }
+                assert!(
+                    std::time::Instant::now() < deadline,
+                    "trailing normal TCP bytes stalled at an urgent mark"
+                );
+                worker.turn(Some(Duration::ZERO)).unwrap();
+            }
+        };
+        assert_eq!(
+            &buffer[..count],
+            if inline {
+                &b"!after"[..]
+            } else {
+                &b"after"[..]
+            }
+        );
+        assert_ne!(
+            inspect.registration().readiness.load(Ordering::Acquire) & URGENT,
+            0
+        );
+        {
+            // Urgent-data history disables the short-read hint; it must not make readiness permanent or busy-loop after the normal bytes are drained.
+            let mut receive = pin!(selector.socket_monitor_recv_poll(
+                &mut reader,
+                &mut buffer,
+                SocketRecvFlags::default(),
+                &never,
+            ));
+            assert!(receive.as_mut().poll(&mut context).is_pending());
+            assert_eq!(
+                inspect.registration().readiness.load(Ordering::Acquire) & (READY | URGENT),
+                URGENT
+            );
+        }
+        let mut close = pin!(selector.socket_monitor_close(&mut reader, &never));
+        drive(&mut worker, &mut context, close.as_mut()).unwrap();
+    }
+}

@@ -8,6 +8,7 @@ use std::task::Waker;
 pub(super) const MONITOR_TAG: u64 = 1;
 const READY: u64 = 1;
 const SHUTDOWN: u64 = 2;
+const URGENT: u64 = 4;
 const NO_SLOT: usize = usize::MAX;
 type State = SocketMonitor<NativeSocket, IoUringMonitorRegistration>;
 pub(super) type Storage = MonitorStorage<State>;
@@ -64,16 +65,21 @@ impl IoUringMonitorRegistration {
     fn notify(&self, events: i32) {
         let waker = {
             let mut status = self.status.lock().unwrap();
-            // The low bits cache readiness and permanent peer shutdown; the remaining bits distinguish notifications racing a syscall. Like readiness ticks in other reactors, this counter wraps.
+            // The low bits cache readiness, peer shutdown and observed urgent data; the remaining bits distinguish notifications racing a syscall. Like readiness ticks in other reactors, this counter wraps.
             let terminal = if events & (libc::POLLHUP | libc::POLLRDHUP) as i32 != 0 {
                 SHUTDOWN
+            } else {
+                0
+            };
+            let urgent = if events & libc::POLLPRI as i32 != 0 {
+                URGENT
             } else {
                 0
             };
             discard(
                 self.readiness
                     .fetch_update(Ordering::AcqRel, Ordering::Acquire, |value| {
-                        Some(value.wrapping_add(4) | READY | terminal)
+                        Some(value.wrapping_add(8) | READY | terminal | urgent)
                     }),
             );
             status.waker.take()
@@ -313,7 +319,7 @@ impl IoUringSelector {
             // Only an established stream's nonempty, consuming receive may skip the speculative syscall. Other operations retain immediate OS results.
             if ready_first
                 && registration.read_started.load(Ordering::Acquire)
-                && registration.readiness.load(Ordering::Acquire) & READY == 0
+                && registration.readiness.load(Ordering::Acquire) & (READY | URGENT) == 0
             {
                 self.monitor_wait(monitor, cancellation).await?;
             }
@@ -330,7 +336,10 @@ impl IoUringSelector {
                 Ok(value) => {
                     if drained(&value) {
                         registration.read_started.store(true, Ordering::Release);
-                        registration.clear_readiness(readiness);
+                        // A short TCP read may stop at an urgent mark with normal bytes still queued. Once POLLPRI is observed, retain syscall-first behavior and clear readiness only on WouldBlock.
+                        if readiness & URGENT == 0 {
+                            registration.clear_readiness(readiness);
+                        }
                     }
                     return Ok(value);
                 }
@@ -533,7 +542,7 @@ impl Monitors {
             self.slots.len() - 1
         });
         let events = match submission.storage.interest() {
-            Interest::Readable => libc::POLLIN | libc::POLLRDHUP,
+            Interest::Readable => libc::POLLIN | libc::POLLRDHUP | libc::POLLPRI,
             Interest::Writable => libc::POLLOUT,
         };
         let entry = opcode::PollAdd::new(
