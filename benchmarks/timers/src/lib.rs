@@ -191,6 +191,7 @@ fn cpu_time() -> f64 {
             unsafe { libc::getrusage(libc::RUSAGE_SELF, usage.as_mut_ptr()) },
             0
         );
+        // SAFETY: The successful getrusage call initialized this value.
         let usage = unsafe { usage.assume_init() };
         (usage.ru_utime.tv_sec + usage.ru_stime.tv_sec) as f64
             + (usage.ru_utime.tv_usec + usage.ru_stime.tv_usec) as f64 / 1e6
