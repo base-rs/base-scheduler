@@ -1,6 +1,6 @@
 # TCP echo benchmark
 
-Compare pure Tokio, `TokioScheduler`, and `NativeScheduler<IoUringSelector>` using the same persistent-connection TCP echo workload. Both scheduler adapters offer owned-buffer, borrowed `_poll`, and portable multishot cases. `tokio-adapter-multishot` uses on-demand polling with reusable owned leases; `iouring-multishot` uses kernel rearming through the same generic echo loop. The private workspace package adds no dependencies to the public scheduler interface.
+Compare pure Tokio, `TokioScheduler`, and `NativeScheduler<IoUringSelector>` using the same persistent-connection TCP echo workload. Both scheduler adapters offer owned-buffer, borrowed `_poll`, reusable stream-monitor, and portable multishot cases. `tokio-adapter-multishot` uses on-demand polling with reusable owned leases; `iouring-multishot` uses kernel rearming through the same generic echo loop. The private workspace package adds no dependencies to the public scheduler interface.
 
 The [initial Aiko results](results.md) include throughput, latency, variation across repetitions, and raw samples.
 
@@ -57,6 +57,8 @@ The runner builds an optimized binary using the checked-in lockfile, then starts
 | `tokio-adapter-poll` | Tokio | Borrowed `socket_recv_poll` / `socket_send_poll`, implemented with readiness |
 | `iouring` | Native | Owned reads submit io_uring `Recv`; ready writes complete synchronously, otherwise submit `Send` |
 | `iouring-poll` | Native | Borrowed `socket_recv_poll` / `socket_send_poll`, using direct syscalls and ring readiness waits |
+| `tokio-adapter-monitor` | Tokio | Borrowed I/O through separate reusable `SocketStreamMonitor` reader/writer state |
+| `iouring-monitor` | Native | Borrowed I/O with persistent directional ring polls and cached stream readiness |
 | `iouring-multishot` | Native | Persistent `socket_recvmsg_multishot` with provided-buffer leases; borrowed sends |
 
 The adapters share one generic owned echo loop and one generic borrowed echo loop. The borrowed loop uses default send/receive flags and keeps the buffer in its connection future. Ready calls can finish in the same task poll; calls returning `WouldBlock` wait for readiness. The io_uring configurations retain one ring per worker, 256 SQ entries per ring, and admission capacity of at least twice the connection count, with a minimum of 256. `iouring-poll` does not submit payload transfers to those rings; it submits `PollAdd` readiness waits only when a syscall would block. Listener handling uses the readiness fallback. Comparing owned and borrowed modes therefore measures a change of I/O mechanism for the native backend, while both Tokio adapter modes already use readiness. The historical borrowed-socket report records the earlier shared-readiness fallback implementation.

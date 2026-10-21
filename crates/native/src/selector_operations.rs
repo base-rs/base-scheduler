@@ -515,3 +515,98 @@ impl<S: Selector + Signals> Signals for NativeScheduler<S> {
         self.selector().signal_subscribe(signals, target)
     }
 }
+
+impl<S: Selector + SocketMonitoring> SocketMonitoring for NativeScheduler<S>
+where
+    S::Socket: 'static,
+{
+    type MonitorRegistration = S::MonitorRegistration;
+    fn socket_monitor_state(
+        &self,
+        socket: &Self::Socket,
+        interest: Interest,
+    ) -> io::Result<SocketMonitor<Self::Socket, Self::MonitorRegistration>> {
+        self.selector().socket_monitor_state(socket, interest)
+    }
+    fn socket_stream_monitor_state(
+        &self,
+        socket: &Self::Socket,
+        interest: Interest,
+    ) -> io::Result<SocketStreamMonitor<Self::Socket, Self::MonitorRegistration>> {
+        self.selector()
+            .socket_stream_monitor_state(socket, interest)
+    }
+    async fn socket_monitor_wait<M: SocketMonitorState<Self::Socket, Self::MonitorRegistration>>(
+        &self,
+        monitor: &mut MonitorStorage<M>,
+        cancellation: &Cancellation,
+    ) -> OperationResult<()> {
+        self.selector()
+            .socket_monitor_wait(monitor, cancellation)
+            .await
+    }
+    async fn socket_monitor_close<
+        M: SocketMonitorState<Self::Socket, Self::MonitorRegistration>,
+    >(
+        &self,
+        monitor: &mut MonitorStorage<M>,
+        cancellation: &Cancellation,
+    ) -> OperationResult<()> {
+        self.selector()
+            .socket_monitor_close(monitor, cancellation)
+            .await
+    }
+    async fn socket_monitor_recv_poll<
+        M: SocketMonitorState<Self::Socket, Self::MonitorRegistration>,
+    >(
+        &self,
+        monitor: &mut MonitorStorage<M>,
+        buffer: &mut [u8],
+        flags: SocketRecvFlags,
+        cancellation: &Cancellation,
+    ) -> OperationResult<usize> {
+        self.selector()
+            .socket_monitor_recv_poll(monitor, buffer, flags, cancellation)
+            .await
+    }
+    async fn socket_monitor_send_poll<
+        M: SocketMonitorState<Self::Socket, Self::MonitorRegistration>,
+    >(
+        &self,
+        monitor: &mut MonitorStorage<M>,
+        buffer: &[u8],
+        flags: SocketSendFlags,
+        cancellation: &Cancellation,
+    ) -> OperationResult<usize> {
+        self.selector()
+            .socket_monitor_send_poll(monitor, buffer, flags, cancellation)
+            .await
+    }
+    async fn socket_monitor_recvmsg_poll<
+        M: SocketMonitorState<Self::Socket, Self::MonitorRegistration>,
+    >(
+        &self,
+        monitor: &mut MonitorStorage<M>,
+        buffers: &mut [IoSliceMut<'_>],
+        flags: SocketRecvFlags,
+        cancellation: &Cancellation,
+    ) -> OperationResult<SocketRecvResult> {
+        self.selector()
+            .socket_monitor_recvmsg_poll(monitor, buffers, flags, cancellation)
+            .await
+    }
+    async fn socket_monitor_sendmsg_poll<
+        M: SocketMonitorState<Self::Socket, Self::MonitorRegistration>,
+    >(
+        &self,
+        monitor: &mut MonitorStorage<M>,
+        buffers: &[IoSlice<'_>],
+        address: Option<SocketAddress>,
+        flags: SocketSendFlags,
+        cancellation: &Cancellation,
+    ) -> OperationResult<usize> {
+        self.selector()
+            .socket_monitor_sendmsg_poll(monitor, buffers, address, flags, cancellation)
+            .await
+    }
+}

@@ -246,6 +246,8 @@ impl Drop for InFlight {
 
 pub(crate) enum Command {
     Submit(Box<dyn PendingRequest>),
+    MonitorSubmit(monitor::Submission),
+    MonitorCancel(u64, u64),
     Recycle(Arc<multishot::pool::Pool>, u16),
     Rearm(u64),
     Cancel(u64),
@@ -278,7 +280,9 @@ pub(crate) struct Controller {
 
 impl Controller {
     pub(crate) fn send(&self, command: Command) -> Result<(), mpsc::SendError<Command>> {
-        if matches!(&command, Command::Submit(_)) && self.closed.load(Ordering::Acquire) {
+        if matches!(&command, Command::Submit(_) | Command::MonitorSubmit(_))
+            && self.closed.load(Ordering::Acquire)
+        {
             return Err(mpsc::SendError(command));
         }
         let command = match crate::io_uring_worker::enqueue(self, command) {
@@ -647,7 +651,7 @@ impl IoUringSelector {
         controller
             .next_identifier
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |identifier| {
-                (identifier < CANCEL_TAG - 1).then_some(identifier + 1)
+                (identifier < CANCEL_TAG - 2).then_some(identifier + 2)
             })
             .map_err(|_| io::Error::other("io_uring operation identifiers exhausted"))
     }
@@ -816,6 +820,8 @@ pub(crate) struct Reactor {
     controller: Arc<Controller>,
     pending: VecDeque<Box<dyn PendingRequest>>,
     dormant: HashMap<u64, Box<dyn PendingRequest>>,
+    monitors: monitor::Monitors,
+    pending_monitors: VecDeque<monitor::Submission>,
     in_flight: InFlight,
     cancellations: VecDeque<u64>,
     closing: bool,
@@ -829,8 +835,12 @@ impl Reactor {
         incoming: mpsc::Receiver<Command>,
         controller: Arc<Controller>,
     ) -> Self {
+        let monitors = monitor::Monitors::new(controller.capacity.limit);
+        let pending_monitors = VecDeque::with_capacity(controller.capacity.limit);
         Self {
             ring,
+            monitors,
+            pending_monitors,
             started: false,
             notification,
             incoming,
@@ -904,6 +914,23 @@ impl Reactor {
                 continue;
             }
             if identifier & CANCEL_TAG != 0 {
+                if identifier & monitor::MONITOR_TAG != 0 {
+                    self.monitors.complete(
+                        identifier & !CANCEL_TAG,
+                        completion.result(),
+                        false,
+                        true,
+                    );
+                }
+                continue;
+            }
+            if identifier & monitor::MONITOR_TAG != 0 {
+                self.monitors.complete(
+                    identifier,
+                    completion.result(),
+                    io_uring::cqueue::more(completion.flags()),
+                    false,
+                );
                 continue;
             }
             let result = completion.result();
@@ -1010,8 +1037,19 @@ impl Reactor {
                 break;
             };
             // Accepted submissions alone do not wake tasks. Entry preparation below retains the yield for requests which invoke user callbacks.
-            progressed |= !matches!(&command, Command::Submit(_) if !self.closing);
+            progressed |= !matches!(&command, Command::Submit(_) | Command::MonitorSubmit(_) if !self.closing);
             match command {
+                Command::MonitorSubmit(submission) if !self.closing => {
+                    self.pending_monitors.push_back(submission)
+                }
+                Command::MonitorSubmit(submission) => {
+                    submission.finish(Err(io::ErrorKind::Interrupted.into()))
+                }
+                Command::MonitorCancel(token, generation) => {
+                    if let Some(token) = self.monitors.cancel(token, generation) {
+                        self.cancellations.push_back(token);
+                    }
+                }
                 Command::Submit(request) if !self.closing => self.pending.push_back(request),
                 Command::Submit(request) => request.finish(Err(io::ErrorKind::Interrupted.into())),
                 Command::Recycle(pool, buffer) => {
@@ -1041,6 +1079,10 @@ impl Reactor {
                 }
                 Command::Shutdown => {
                     self.closing = true;
+                    self.monitors.close(&mut self.cancellations);
+                    for submission in self.pending_monitors.drain(..) {
+                        submission.finish(Err(io::ErrorKind::Interrupted.into()));
+                    }
                     for request in self.pending.drain(..) {
                         request.retire(
                             &self.ring.submitter(),
@@ -1074,8 +1116,7 @@ impl Reactor {
                 let entry = opcode::AsyncCancel::new(identifier)
                     .build()
                     .user_data(identifier | CANCEL_TAG);
-                // SAFETY: cancellation entries reference only a never-reused
-                // numeric operation identifier, not userspace memory.
+                // SAFETY: cancellation entries contain an opaque request token. Monitor owners remain retained through both original and cancellation CQEs.
                 if unsafe { submissions.push(&entry) }.is_err() {
                     break;
                 }
@@ -1102,6 +1143,21 @@ impl Reactor {
                 unsafe { submissions.push(&entry) }
                     .expect("submission capacity was checked and the local queue has not changed");
             }
+            while !submissions.is_full() {
+                let Some(submission) = self.pending_monitors.pop_front() else {
+                    break;
+                };
+                if submission.cancelled() {
+                    submission.finish(Err(io::ErrorKind::Interrupted.into()));
+                    progressed = true;
+                    continue;
+                }
+                let entry = self.monitors.insert(submission);
+                prepared = true;
+                // SAFETY: The monitor table retains the stable record and socket before publication. Both original and cancellation CQEs must retire before the record can be reused.
+                unsafe { submissions.push(&entry) }
+                    .expect("monitor submission capacity was checked");
+            }
             // Payloads and cancellations take priority: a repeatedly signalled eventfd must not monopolize a one-entry SQ. If the notification cannot be armed, this turn submits the work and returns before parking.
             if !self.notification_armed && !submissions.is_full() {
                 let entry = opcode::PollAdd::new(
@@ -1127,6 +1183,8 @@ impl Reactor {
             && !command_batch_full
             && self.in_flight.0.is_empty()
             && self.pending.is_empty()
+            && self.pending_monitors.is_empty()
+            && self.monitors.is_empty()
         {
             return Ok(true);
         }
@@ -1137,6 +1195,7 @@ impl Reactor {
             || command_batch_full
             || timeout == Some(Duration::ZERO)
             || !self.pending.is_empty()
+            || !self.pending_monitors.is_empty()
             || !self.cancellations.is_empty()
             || !self.notification_armed
             || crate::io_uring_worker::take_notification(&self.controller);
@@ -1192,6 +1251,9 @@ impl Reactor {
 
 impl Drop for Reactor {
     fn drop(&mut self) {
+        for submission in self.pending_monitors.drain(..) {
+            submission.finish(Err(io::ErrorKind::BrokenPipe.into()));
+        }
         for request in self.pending.drain(..) {
             request.retire(
                 &self.ring.submitter(),
@@ -1223,6 +1285,7 @@ impl std::task::Wake for Controller {
 }
 
 mod message;
+pub(crate) mod monitor;
 pub(crate) mod multishot;
 mod readiness;
 mod socket;

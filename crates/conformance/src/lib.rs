@@ -12,6 +12,7 @@ pub mod file_allocate;
 pub mod signals;
 pub mod socket;
 pub mod socket_messages;
+pub mod socket_monitoring;
 pub mod socket_options;
 pub mod socket_poll;
 pub mod socket_registration;
