@@ -17,6 +17,7 @@ async-io = "2.6.0"
 socket2 = { version = "0.6.3", features = ["all"] }
 event-listener = "5.4.2"
 futures-channel = "0.3.31"
+atomic-waker = "1.1.2"
 
 [target.'cfg(target_os = "linux")'.dev-dependencies]
 core-scheduler-native = { path = "../native", version = "=0.0.0" }

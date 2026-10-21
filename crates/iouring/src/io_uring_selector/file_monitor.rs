@@ -8,22 +8,34 @@ use std::{any::Any, sync::Mutex};
 pub struct IoUringFileRegistration {
     owner: Weak<DriverGroup>,
     shared: Arc<Shared>,
-}
-
-#[derive(Default)]
-struct State {
     cached: Option<Box<dyn Any + Send>>,
-    // Only never-submitted requests need this separate owner-return path.
-    buffer: Option<Box<dyn Any + Send>>,
-    result: Option<io::Result<usize>>,
     running: Option<(Arc<Controller>, u64)>,
     closed: bool,
     failed: bool,
 }
 
+enum Completion {
+    Request(io::Result<usize>, Box<dyn Any + Send>),
+    Rejected(Box<dyn Any + Send>),
+    Failed,
+}
+
 struct Shared {
-    state: Mutex<State>,
-    completed: CompletionEvent,
+    result: Mutex<Option<Completion>>,
+    ready: AtomicBool,
+    waker: atomic_waker::AtomicWaker,
+}
+
+impl Shared {
+    fn publish(&self, result: Completion) {
+        *self.result.lock().unwrap() = Some(result);
+        self.ready.store(true, Ordering::Release);
+        self.waker.wake();
+    }
+
+    fn take(&self) -> Completion {
+        self.result.lock().unwrap().take().unwrap()
+    }
 }
 
 struct FileRequest<B: IoBuf> {
@@ -66,13 +78,7 @@ impl<B: IoBuf> PendingRequest for FileRequest<B> {
         // Release kernel-accessible resources and capacity before publishing retirement. The cached box has no back-reference to Shared.
         drop(self.file.take());
         drop(self.permit.take());
-        {
-            let mut state = shared.state.lock().unwrap();
-            state.running = None;
-            state.result = Some(result);
-            state.cached = Some(self);
-        }
-        shared.completed.notify(usize::MAX);
+        shared.publish(Completion::Request(result, self));
     }
 
     fn begin_cancellation(&self) -> bool {
@@ -92,16 +98,7 @@ impl<B: IoBuf> Drop for FileRequest<B> {
         drop(self.permit.take());
         // Queued commands may be destroyed before reaching the ring. Published requests with unknown retirement are deliberately leaked by InFlight instead.
         if let Some(shared) = self.reply.take() {
-            {
-                let mut state = shared.state.lock().unwrap();
-                state.buffer = Some(Box::new(self.buffer.take().unwrap()));
-                state.result = Some(Err(io::Error::new(
-                    io::ErrorKind::BrokenPipe,
-                    "selector closed before submission",
-                )));
-                state.running = None;
-            }
-            shared.completed.notify(usize::MAX);
+            shared.publish(Completion::Rejected(Box::new(self.buffer.take().unwrap())));
         }
     }
 }
@@ -109,8 +106,7 @@ impl<B: IoBuf> Drop for FileRequest<B> {
 struct Failure(Arc<Shared>);
 impl Drop for Failure {
     fn drop(&mut self) {
-        self.0.state.lock().unwrap().failed = true;
-        self.0.completed.notify(usize::MAX);
+        self.0.publish(Completion::Failed);
     }
 }
 
@@ -119,7 +115,10 @@ impl IoUringSelector {
         &self,
         monitor: &FileMonitor<NativeFile, IoUringFileRegistration>,
     ) -> io::Result<()> {
-        if !Weak::ptr_eq(&monitor.registration().owner, &Arc::downgrade(&self.group)) {
+        if !std::ptr::eq(
+            monitor.registration().owner.as_ptr(),
+            Arc::as_ptr(&self.group),
+        ) {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "file monitor belongs to a different selector",
@@ -140,8 +139,7 @@ impl IoUringSelector {
         let check = cancellation
             .check()
             .map_err(OperationError::from)
-            .and_then(|()| self.check_file_monitor(monitor).map_err(Into::into))
-            .and_then(|()| self.check_open().map_err(Into::into));
+            .and_then(|()| self.check_file_monitor(monitor).map_err(Into::into));
         if let Err(error) = check {
             return (Err(error), buffer);
         }
@@ -154,28 +152,47 @@ impl IoUringSelector {
                 buffer,
             );
         }
-        let shared = Arc::clone(&monitor.registration().shared);
-        let error = {
-            let state = shared.state.lock().unwrap();
-            if state.failed {
-                Some((
-                    io::ErrorKind::BrokenPipe,
-                    "selector failed with an operation in flight",
-                ))
-            } else if state.closed {
-                Some((io::ErrorKind::BrokenPipe, "file monitor is closed"))
-            } else if state.running.is_some() {
-                Some((
-                    io::ErrorKind::WouldBlock,
-                    "file monitor operation has not retired",
-                ))
-            } else {
-                None
-            }
-        };
-        if let Some((kind, message)) = error {
-            return (Err(io::Error::new(kind, message).into()), buffer);
+        let registration = monitor.registration_mut();
+        if registration.closed {
+            return (
+                Err(io::Error::new(io::ErrorKind::BrokenPipe, "file monitor is closed").into()),
+                buffer,
+            );
         }
+        if registration.running.is_some() {
+            if !registration.shared.ready.load(Ordering::Acquire) {
+                return (
+                    Err(io::Error::new(
+                        io::ErrorKind::WouldBlock,
+                        "file monitor operation has not retired",
+                    )
+                    .into()),
+                    buffer,
+                );
+            }
+            registration.running = None;
+            // Abandonment forfeits the old buffer to retirement. Dispose of it without a completion lock held.
+            match registration.shared.take() {
+                Completion::Request(_, cached) => registration.cached = Some(cached),
+                Completion::Rejected(buffer) => drop(buffer),
+                Completion::Failed => {
+                    registration.closed = true;
+                    registration.failed = true;
+                    return (
+                        Err(io::Error::new(
+                            io::ErrorKind::BrokenPipe,
+                            "selector failed with an operation in flight",
+                        )
+                        .into()),
+                        buffer,
+                    );
+                }
+            }
+        }
+        if let Err(error) = self.check_open() {
+            return (Err(error.into()), buffer);
+        }
+        let shared = Arc::clone(&registration.shared);
         let controller = self.route();
         let permit = match controller.capacity.acquire(cancellation).await {
             Ok(permit) => permit,
@@ -185,16 +202,7 @@ impl IoUringSelector {
             Ok(identifier) => identifier,
             Err(error) => return (Err(error.into()), buffer),
         };
-        let (cached, old_buffer, old_result) = {
-            let mut state = shared.state.lock().unwrap();
-            (
-                state.cached.take(),
-                state.buffer.take(),
-                state.result.take(),
-            )
-        };
-        // Owners and error payloads may have arbitrary destructors. Never destroy them under the completion lock.
-        drop((old_buffer, old_result));
+        let cached = monitor.registration_mut().cached.take();
         let mut request = cached
             .and_then(|cached| cached.downcast::<FileRequest<B>>().ok())
             .unwrap_or_else(|| {
@@ -220,7 +228,8 @@ impl IoUringSelector {
         request.write = write;
         request.reply.set(Some(Arc::clone(&shared)));
         request.cancelling.set(false);
-        shared.state.lock().unwrap().running = Some((Arc::clone(&controller), identifier));
+        shared.ready.store(false, Ordering::Relaxed);
+        monitor.registration_mut().running = Some((Arc::clone(&controller), identifier));
         if let Err(mpsc::SendError(Command::Submit(request))) =
             controller.send(Command::Submit(request))
         {
@@ -235,45 +244,38 @@ impl IoUringSelector {
             armed: true,
         };
         let mut cancelled = pin!(cancellation.cancelled());
-        loop {
-            event_listener::listener!(shared.completed => listener);
-            let mut listener = pin!(listener);
-            poll_fn(|context| {
-                let (ready, failed) = {
-                    let state = shared.state.lock().unwrap();
-                    (state.result.is_some(), state.failed)
-                };
-                assert!(
-                    !failed,
-                    "io_uring selector failed with an operation in flight"
-                );
-                if ready {
-                    return Poll::Ready(());
-                }
-                if cancelled.as_mut().poll(context).is_ready() {
-                    cancel.request();
-                }
-                listener.as_mut().poll(context).map(|_| ())
-            })
-            .await;
-            let completed = {
-                let mut state = shared.state.lock().unwrap();
-                state
-                    .result
-                    .take()
-                    .map(|result| (result, state.cached.take(), state.buffer.take()))
-            };
-            if let Some((result, cached, fallback)) = completed {
-                cancel.armed = false;
-                let buffer = if let Some(cached) = cached {
-                    let mut request = cached.downcast::<FileRequest<B>>().ok().unwrap();
-                    let buffer = request.buffer.take().unwrap();
-                    shared.state.lock().unwrap().cached = Some(request);
-                    buffer
-                } else {
-                    *fallback.unwrap().downcast::<B>().ok().unwrap()
-                };
-                return (operation_result(result, cancellation), buffer);
+        poll_fn(|context| {
+            shared.waker.register(context.waker());
+            if shared.ready.load(Ordering::Acquire) {
+                return Poll::Ready(());
+            }
+            if cancelled.as_mut().poll(context).is_ready() {
+                cancel.request();
+            }
+            Poll::Pending
+        })
+        .await;
+        cancel.armed = false;
+        monitor.registration_mut().running = None;
+        match shared.take() {
+            Completion::Request(result, cached) => {
+                let mut request = cached.downcast::<FileRequest<B>>().ok().unwrap();
+                let buffer = request.buffer.take().unwrap();
+                monitor.registration_mut().cached = Some(request);
+                (operation_result(result, cancellation), buffer)
+            }
+            Completion::Rejected(buffer) => (
+                Err(io::Error::new(
+                    io::ErrorKind::BrokenPipe,
+                    "selector closed before submission",
+                )
+                .into()),
+                *buffer.downcast::<B>().ok().unwrap(),
+            ),
+            Completion::Failed => {
+                monitor.registration_mut().closed = true;
+                monitor.registration_mut().failed = true;
+                panic!("io_uring selector failed with an operation in flight");
             }
         }
     }
@@ -286,16 +288,19 @@ impl FileMonitoring for IoUringSelector {
         &self,
         file: &NativeFile,
     ) -> io::Result<FileMonitor<NativeFile, IoUringFileRegistration>> {
-        let completed = CompletionEvent::new();
-        completed.notify(0);
         Ok(self
             .fallback
             .file_monitor(file)?
             .map_registration(|()| IoUringFileRegistration {
                 owner: Arc::downgrade(&self.group),
+                cached: None,
+                running: None,
+                closed: false,
+                failed: false,
                 shared: Arc::new(Shared {
-                    state: Mutex::new(State::default()),
-                    completed,
+                    result: Mutex::new(None),
+                    ready: AtomicBool::new(false),
+                    waker: atomic_waker::AtomicWaker::new(),
                 }),
             }))
     }
@@ -374,50 +379,47 @@ impl FileMonitoring for IoUringSelector {
     ) -> OperationResult<()> {
         cancellation.check()?;
         self.check_file_monitor(monitor)?;
-        let shared = &monitor.registration().shared;
-        let running = {
-            let mut state = shared.state.lock().unwrap();
-            state.closed = true;
-            state.running.clone()
-        };
-        if let Some((controller, identifier)) = running {
-            let _ = controller.send(Command::Cancel(identifier));
+        let registration = monitor.registration_mut();
+        registration.closed = true;
+        if registration.failed {
+            return Err(io::Error::new(
+                io::ErrorKind::BrokenPipe,
+                "selector failed before file retirement",
+            )
+            .into());
         }
-        let mut cancelled = pin!(cancellation.cancelled());
-        loop {
-            event_listener::listener!(shared.completed => listener);
-            let (running, failed) = {
-                let state = shared.state.lock().unwrap();
-                (state.running.is_some(), state.failed)
-            };
-            if failed {
+        if let Some((controller, identifier)) = &registration.running {
+            if !registration.shared.ready.load(Ordering::Acquire) {
+                let _ = controller.send(Command::Cancel(*identifier));
+            }
+            let mut cancelled = pin!(cancellation.cancelled());
+            poll_fn(|context| {
+                registration.shared.waker.register(context.waker());
+                if registration.shared.ready.load(Ordering::Acquire) {
+                    return Poll::Ready(Ok(()));
+                }
+                if cancelled.as_mut().poll(context).is_ready() {
+                    return Poll::Ready(Err(Cancelled));
+                }
+                Poll::Pending
+            })
+            .await?;
+            registration.running = None;
+            let completion = registration.shared.take();
+            if matches!(completion, Completion::Failed) {
+                registration.failed = true;
                 return Err(io::Error::new(
                     io::ErrorKind::BrokenPipe,
                     "selector failed before file retirement",
                 )
                 .into());
             }
-            if !running {
-                break;
-            }
-            let mut listener = pin!(listener);
-            poll_fn(|context| {
-                if cancelled.as_mut().poll(context).is_ready() {
-                    return Poll::Ready(Err(Cancelled));
-                }
-                listener.as_mut().poll(context).map(|_| Ok(()))
-            })
-            .await?;
+            drop(completion);
         }
-        let retired = {
-            let mut state = shared.state.lock().unwrap();
-            (
-                state.cached.take(),
-                state.buffer.take(),
-                state.result.take(),
-            )
-        };
-        drop(retired);
+        drop(registration.cached.take());
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests;

@@ -8,7 +8,7 @@ use core_scheduler::{
 };
 use std::io::{self, SeekFrom};
 
-fn cancelled<T>(result: Result<T, OperationError>) {
+pub(crate) fn cancelled<T>(result: Result<T, OperationError>) {
     assert!(
         matches!(result, Err(OperationError::Cancelled(_))),
         "expected cooperative cancellation"
