@@ -43,13 +43,19 @@ impl core_scheduler::TimerClock for DirectScheduler {
         self.timers.start()?;
         let mut cancelled = pin!(cancellation.cancelled());
         let result = poll_fn(|context| {
-            if self.now() >= deadline {
+            let now = self.now();
+            if now >= deadline {
                 return Poll::Ready(Ok(()));
             }
             if cancelled.as_mut().poll(context).is_ready() {
                 return Poll::Ready(Err(core_scheduler::Cancelled.into()));
             }
-            let changed = timer.armed != Some(deadline)
+            // Retain an earlier wake while postponing a timeout. Reuse its identifier when that wake expires.
+            let armed = timer
+                .armed
+                .filter(|armed| *armed <= deadline && *armed > now)
+                .unwrap_or(deadline);
+            let changed = timer.armed != Some(armed)
                 || timer
                     .waker
                     .as_ref()
@@ -80,7 +86,7 @@ impl core_scheduler::TimerClock for DirectScheduler {
                         });
                         id
                     };
-                    state.timers.insert(id, (deadline, replacement.unwrap()))
+                    state.timers.insert(id, (armed, replacement.unwrap()))
                 } else {
                     None
                 }
@@ -88,7 +94,7 @@ impl core_scheduler::TimerClock for DirectScheduler {
             drop(previous);
             if changed {
                 timer.waker = cached;
-                timer.armed = Some(deadline);
+                timer.armed = Some(armed);
                 self.timers.shared.changed.notify_one();
             }
             Poll::Pending

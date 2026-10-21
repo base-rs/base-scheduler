@@ -35,9 +35,14 @@ impl NativeTimer {
         &mut self,
         shared: &Arc<Shared>,
         deadline: Instant,
+        now: Instant,
         context: &mut Context<'_>,
     ) -> Poll<io::Result<()>> {
-        if self.armed != Some(deadline) {
+        // Extending a pending timeout need not touch the queue. Its old wake will rearm for the current desired deadline when polled.
+        if self
+            .armed
+            .is_none_or(|armed| deadline < armed || now >= armed)
+        {
             self.disarm();
             self.armed = Some(deadline);
         }
@@ -111,7 +116,8 @@ impl<S: Selector> TimerClock for NativeScheduler<S> {
         }
         let mut cancelled = pin!(cancellation.cancelled());
         let result = poll_fn(|context| {
-            if self.now() >= deadline {
+            let now = self.now();
+            if now >= deadline {
                 return Poll::Ready(Ok(()));
             }
             if cancelled.as_mut().poll(context).is_ready() {
@@ -120,7 +126,9 @@ impl<S: Selector> TimerClock for NativeScheduler<S> {
             if shared.is_closed() {
                 return Poll::Ready(Err(worker_timers::closed().into()));
             }
-            timer.poll(shared, deadline, context).map_err(Into::into)
+            timer
+                .poll(shared, deadline, now, context)
+                .map_err(Into::into)
         })
         .await;
         timer.disarm();

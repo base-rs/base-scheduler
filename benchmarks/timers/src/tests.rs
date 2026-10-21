@@ -22,6 +22,15 @@ async fn semantics<S: TimerClock>(scheduler: &S) {
         .await
         .unwrap();
     assert!(scheduler.now() >= later);
+    // Extending a live timer must survive an early backend wake without completing early.
+    let first = scheduler.now() + Duration::from_millis(2);
+    pending_once(scheduler.timer_wait(&mut timer, first, &never)).await;
+    let extended = scheduler.now() + Duration::from_millis(4);
+    scheduler
+        .timer_wait(&mut timer, extended, &never)
+        .await
+        .unwrap();
+    assert!(scheduler.now() >= extended);
     // Cancellation retires a previously armed wait, without poisoning the resource.
     {
         let cancellation = Cancellation::new();
