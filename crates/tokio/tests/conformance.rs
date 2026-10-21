@@ -78,6 +78,7 @@ mod files {
     // Public macros must resolve support paths even when a caller shadows `std`.
     mod std {}
     conformance::file_tests!(run: run_file);
+    conformance::file_monitor_tests!(run: run_file);
 }
 
 #[test]

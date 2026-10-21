@@ -128,14 +128,17 @@ fn run_native_workers(
 mod native_worker_rings {
     use super::*;
     core_scheduler_conformance::file_tests!(run: run_native_workers);
+    core_scheduler_conformance::file_monitor_tests!(run: run_native_workers);
 }
 mod independent_selector {
     use super::*;
     core_scheduler_conformance::file_tests!(run: run_selector);
+    core_scheduler_conformance::file_monitor_tests!(run: run_selector);
 }
 mod native_composition {
     use super::*;
     core_scheduler_conformance::file_tests!(run: run_native);
+    core_scheduler_conformance::file_monitor_tests!(run: run_native);
 }
 
 #[test]
