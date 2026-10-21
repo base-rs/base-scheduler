@@ -348,3 +348,20 @@ fn native_local_capacity_and_drop() {
         .unwrap();
     scheduler.block_on(scheduler.shutdown());
 }
+
+#[test]
+fn benchmark_counts_immediate_expirations() {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let scheduler = core_scheduler_tokio::TokioScheduler::new(runtime.handle().clone());
+    for mode in [Mode::Sleep, Mode::Reuse, Mode::After] {
+        let (operations, overshoot, expired) =
+            runtime.block_on(workload(&scheduler, mode, "cycle", 2, Duration::ZERO));
+        assert_eq!(operations, 66);
+        assert_eq!(overshoot.len(), 2);
+        assert_eq!(expired, 64);
+    }
+    runtime.block_on(scheduler.shutdown());
+}
