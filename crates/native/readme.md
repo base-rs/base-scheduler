@@ -23,7 +23,11 @@ Operation futures receive the scheduler and cancellation explicitly. Task handle
 
 Sockets have no scheduler-instance affinity. Finish outstanding operations before exclusive close. TCP resources imported from the standard library must remain nonblocking through any external aliases.
 
-`NativeOptions` configures executor workers, blocking workers, admitted blocking jobs, and timer slots. A full timer queue returns `WouldBlock`; a closed scheduler returns `BrokenPipe` for pending clock and socket operations.
+`NativeOptions` configures executor workers, blocking workers, admitted blocking jobs, and timer slots per worker. A full owning timer queue returns `WouldBlock`, even if another worker has capacity; a closed scheduler returns `BrokenPipe` for pending clock and socket operations.
+
+Each worker owns an unsynchronized timer queue and collects expiries in its event loop. The earliest deadline bounds its interruptible I/O wait, or its thread park when there is no active I/O driver. There is no timer thread. Expired timers wake tasks through their registered wakers, placing runnable tasks into the ordinary queues where they can be stolen. Native never polls application futures during timer collection.
+
+A sleep first polled on a worker registers directly with that worker. Root futures and other executors choose a worker by round robin and send it a registration command. A pending sleep retains its original owner when its future moves; waker changes, cancellation, and drop update that owner's queue. A subsequent sleep can choose the task's new worker. Shutdown wakes pending sleepers and waits for worker timer callbacks and driver retirement.
 
 The executor and readiness design come from [Socketry](https://github.com/core-rs/socketry-rust/tree/7a70586d5d37fb640d696d0c03a05b2ee3cbe06b/crates/executor). This adapter follows Core's current ownership, cancellation, and asynchronous shutdown contracts. It does not include Socketry's io_uring backend.
 

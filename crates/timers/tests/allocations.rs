@@ -207,6 +207,43 @@ fn bounded_driver_lifecycles_allocate_nothing() {
     assert_eq!(calls, 0);
 }
 
+#[cfg(feature = "local")]
+#[test]
+fn local_queue_reuses_slots_and_compacts_without_allocating() {
+    use core_scheduler_timers::local::TimerQueue;
+    let now = Instant::now();
+    let mut queue = TimerQueue::with_capacity(512);
+    let mut keys = Vec::with_capacity(queue.capacity());
+    let calls = allocations(|| {
+        for _ in 0..3 {
+            for index in 0..queue.capacity() {
+                keys.push(
+                    queue
+                        .try_schedule(
+                            now + Duration::from_nanos(index as u64),
+                            Waker::noop().clone(),
+                        )
+                        .unwrap(),
+                );
+            }
+            queue.next_deadline();
+            // Reclaim a non-root cancellation at full capacity, preserving the heap's allocation.
+            queue.release(keys[1]);
+            let replacement = queue.try_schedule(now, Waker::noop().clone()).unwrap();
+            queue.update(replacement, Waker::noop().clone()).unwrap();
+            while let Some(waker) = queue.pop_expired(now + Duration::from_secs(1)) {
+                waker.wake();
+            }
+            for key in keys.drain(..) {
+                queue.release(key);
+            }
+            queue.release(replacement);
+        }
+    });
+    assert_eq!(calls, 0);
+    assert!(queue.is_empty());
+}
+
 #[cfg(feature = "sharded")]
 #[test]
 fn sharded_registration_assistance_and_reuse_allocate_nothing() {

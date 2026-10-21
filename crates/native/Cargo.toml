@@ -15,7 +15,8 @@ event-listener = "5.4.2"
 futures-channel = "0.3.31"
 async-task = "4.7.1"
 crossbeam-deque = "0.8.7"
-core-scheduler-timers = { path = "../timers", version = "=0.0.0", features = ["sharded"] }
+crossbeam-queue = "0.3.12"
+core-scheduler-timers = { path = "../timers", version = "=0.0.0", features = ["local"] }
 
 [dev-dependencies]
 socket2 = { version = "0.6.3", features = ["all"] }

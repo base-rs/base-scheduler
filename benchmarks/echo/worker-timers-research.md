@@ -1,5 +1,7 @@
 # Worker-driven timer research
 
+This archived experiment predates the [production worker-local timer integration](worker-local-timers.md). Its baseline and candidate descriptions apply to the measurements below.
+
 Driving the existing timer queue from Native’s I/O workers removes one thread and can improve timer latency. Having every worker drive the **same queue** also introduces a substantial CPU cost under concurrent timer load. This experiment does not justify adopting that shared-queue design. Production behavior remains unchanged; the next useful implementation experiment is one timer queue per worker, paired with its ring.
 
 The [validated measurements](results/worker-timers/tables.md), [raw evidence and reproduction instructions](results/worker-timers/readme.md), and [diagnostic patch](results/worker-timers/candidate.patch) preserve the experiment. The patch is not applied to the workspace.

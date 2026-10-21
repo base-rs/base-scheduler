@@ -326,6 +326,7 @@ dependencies = [
  "core-scheduler-selector",
  "core-scheduler-timers",
  "crossbeam-deque",
+ "crossbeam-queue",
  "event-listener",
  "futures-channel",
  "futures-lite",

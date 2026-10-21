@@ -12,7 +12,6 @@ use std::{future::Future, io};
 pub struct NativeScheduler<S: Selector = ReadinessSelector> {
     selector: S,
     pub(crate) tasks: crate::task_service::TaskService,
-    pub(crate) timers: crate::timer_service::TimerService,
 }
 
 impl NativeScheduler {
@@ -49,14 +48,10 @@ impl<S: Selector> NativeScheduler<S> {
                     "worker count and timer capacity must be nonzero",
                 ));
             }
-            crate::task_service::TaskService::new(options.workers)
+            crate::task_service::TaskService::new(options.workers, options.timer_capacity)
         })();
         match result {
-            Ok(tasks) => Ok(Self {
-                selector,
-                tasks,
-                timers: crate::timer_service::TimerService::new(options.timer_capacity),
-            }),
+            Ok(tasks) => Ok(Self { selector, tasks }),
             Err(error) => {
                 selector.close();
                 Err(error)
@@ -81,14 +76,10 @@ impl<S: Selector> NativeScheduler<S> {
                 "one driver per nonzero worker and nonzero timer capacity are required",
             ))
         } else {
-            crate::task_service::TaskService::with_drivers(drivers)
+            crate::task_service::TaskService::with_drivers(drivers, options.timer_capacity)
         };
         match result {
-            Ok(tasks) => Ok(Self {
-                selector,
-                tasks,
-                timers: crate::timer_service::TimerService::new(options.timer_capacity),
-            }),
+            Ok(tasks) => Ok(Self { selector, tasks }),
             Err(error) => {
                 selector.close();
                 Err(error)
@@ -144,7 +135,6 @@ impl<S: Selector> NativeScheduler<S> {
     pub fn close(&self) {
         self.selector.close();
         self.tasks.close();
-        self.timers.close();
     }
 
     /// Close admission and await selector, task, and timer retirement. Coordinate task cancellation and cleanup first; a task must not await shutdown of its own scheduler.
@@ -152,7 +142,6 @@ impl<S: Selector> NativeScheduler<S> {
         self.close();
         self.selector.shutdown().await;
         self.tasks.drain().await;
-        self.timers.drain().await;
     }
 }
 impl<S: Selector> Drop for NativeScheduler<S> {

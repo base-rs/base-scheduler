@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Drive Native timers from an exclusively owned queue on each task worker, using the next deadline to bound its I/O wait. Remove the dedicated timer thread, retain original timer ownership across task migration, and configure reserved timer capacity per worker.
+
 - Stage io_uring readiness submissions for at most one nonblocking turn so idle workers can submit and wait together. Publish completions immediately after waiting, while preserving callback-induced wakes and bounded command processing.
 
 - Skip empty Native admission-queue steals and unchanged timer-queue flushes, reducing idle-path synchronization and timer bookkeeping while preserving remote wakeups.

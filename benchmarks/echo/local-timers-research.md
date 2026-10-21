@@ -1,5 +1,7 @@
 # Worker-owned timer experiment
 
+This archived experiment predates the [production worker-local timer integration](worker-local-timers.md). Its baseline and candidate descriptions apply to the measurements below.
+
 Worker-owned timers reduce process CPU by about 73% in the large periodic-timer test and improve mixed timer/echo throughput by 5–13% on Aiko. Single-connection echo without timers still needs investigation before production adoption.
 
 The prototype gives each Native task worker its own unsynchronized timer queue, paired with its I/O driver. Registration, cancellation, and expiry on that worker manipulate ordinary local state. Its earliest deadline bounds its own idle wait. Expiry removes the timer before waking the task, and wakeups enter the executor's ordinary ready queues.

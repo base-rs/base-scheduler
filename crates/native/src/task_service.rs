@@ -28,6 +28,11 @@ pub(crate) type Runnable = async_task::Runnable<TaskState>;
 pub(crate) struct Shared {
     // Serialize registration with closure; task ownership itself needs only a count.
     admission: Mutex<()>,
+    pub(crate) timer_capacity: usize,
+    pub(crate) timer_next: AtomicUsize,
+    #[cfg(test)]
+    pub(crate) paused: Mutex<Option<std::time::Instant>>,
+    workers_remaining: AtomicUsize,
     pub(crate) ready: Injector<Runnable>,
     pub(crate) workers: Vec<WorkerState>,
     closed: AtomicBool,
@@ -40,6 +45,22 @@ pub(crate) struct Shared {
 pub(crate) struct TaskService {
     pub(crate) shared: Arc<Shared>,
 }
+
+// Retire after normal worker-local timer delivery and driver destruction; also balance partial startup and unwinding.
+struct WorkerRegistration(Arc<Shared>);
+impl WorkerRegistration {
+    fn new(shared: &Arc<Shared>) -> Self {
+        shared.workers_remaining.fetch_add(1, Ordering::AcqRel);
+        Self(Arc::clone(shared))
+    }
+}
+impl Drop for WorkerRegistration {
+    fn drop(&mut self) {
+        self.0.workers_remaining.fetch_sub(1, Ordering::AcqRel);
+        self.0.changed.notify(usize::MAX);
+    }
+}
+
 struct Registration {
     shared: Arc<Shared>,
 }
@@ -90,9 +111,14 @@ impl<T> Drop for TaskOutcome<T> {
 }
 
 impl Shared {
-    pub(crate) fn new(queues: &[[Worker<Runnable>; 2]]) -> Self {
+    pub(crate) fn new(queues: &[[Worker<Runnable>; 2]], timer_capacity: usize) -> Self {
         Self {
             admission: Mutex::new(()),
+            timer_capacity,
+            timer_next: AtomicUsize::new(0),
+            #[cfg(test)]
+            paused: Mutex::new(None),
+            workers_remaining: AtomicUsize::new(0),
             ready: Injector::new(),
             workers: queues
                 .iter()
@@ -103,6 +129,27 @@ impl Shared {
             remaining: AtomicUsize::new(0),
             outstanding: AtomicUsize::new(0),
             changed: Event::new(),
+        }
+    }
+
+    pub(crate) fn is_closed(&self) -> bool {
+        self.closed.load(Ordering::Acquire)
+    }
+
+    pub(crate) fn send_timer(&self, owner: usize, command: crate::worker_timers::Command) {
+        let rejected = {
+            let _admission = self.admission.lock().unwrap();
+            if self.is_closed() {
+                Some(command)
+            } else {
+                self.workers[owner].timers.push(command);
+                None
+            }
+        };
+        if let Some(command) = rejected {
+            crate::worker_timers::rejected(command);
+        } else {
+            self.workers[owner].wake();
         }
     }
 
@@ -143,16 +190,18 @@ impl Shared {
     }
 }
 impl TaskService {
-    pub(crate) fn new(threads: usize) -> io::Result<Self> {
+    pub(crate) fn new(threads: usize, timer_capacity: usize) -> io::Result<Self> {
         let queues: Vec<_> = (0..threads)
             .map(|_| std::array::from_fn(|_| Worker::new_fifo()))
             .collect();
         let service = Self {
-            shared: Arc::new(Shared::new(&queues)),
+            shared: Arc::new(Shared::new(&queues, timer_capacity)),
         };
         for (identifier, queue) in queues.into_iter().enumerate() {
             let shared = Arc::clone(&service.shared);
+            let registration = WorkerRegistration::new(&shared);
             thread::start("core-native-task", move || {
+                let _registration = registration;
                 worker::run(shared, identifier, queue)
             })?;
         }
@@ -160,16 +209,19 @@ impl TaskService {
     }
     pub(crate) fn with_drivers<D: core_scheduler_selector::SelectorDriver>(
         drivers: Vec<D>,
+        timer_capacity: usize,
     ) -> io::Result<Self> {
         let queues: Vec<_> = (0..drivers.len())
             .map(|_| std::array::from_fn(|_| Worker::new_fifo()))
             .collect();
         let service = Self {
-            shared: Arc::new(Shared::new(&queues)),
+            shared: Arc::new(Shared::new(&queues, timer_capacity)),
         };
         for (identifier, (queue, driver)) in queues.into_iter().zip(drivers).enumerate() {
             let shared = Arc::clone(&service.shared);
+            let registration = WorkerRegistration::new(&shared);
             thread::start("core-native-task", move || {
+                let _registration = registration;
                 worker::run_driven(shared, identifier, queue, driver)
             })?;
         }
@@ -223,7 +275,10 @@ impl TaskService {
         loop {
             event_listener::listener!(self.shared.changed => listener);
             // Observe registration retirement first. After close, no new registrations can appear; its release also precedes the final runnable retirement. Reading in reverse order could combine pre-publication quiescence with post-completion registration state.
-            if (!all || self.shared.remaining.load(Ordering::Acquire) == 0)
+            if (!all
+                || (self.shared.remaining.load(Ordering::Acquire) == 0
+                    && (!self.shared.is_closed()
+                        || self.shared.workers_remaining.load(Ordering::Acquire) == 0)))
                 && self.shared.outstanding.load(Ordering::Acquire) == 0
             {
                 return;

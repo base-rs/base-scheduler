@@ -48,6 +48,10 @@ jobs:
         env:
           CARGO_LLVM_COV_TARGET_DIR: target/coverage-timers-sharded
         run: cargo bake --locked test:coverage --package core-scheduler-timers --all-targets true --features sharded
+      - name: Require complete timer coverage with local queues
+        env:
+          CARGO_LLVM_COV_TARGET_DIR: target/coverage-timers-local
+        run: cargo bake --locked test:coverage --package core-scheduler-timers --all-targets true --features local
 
   msrv:
     runs-on: ubuntu-latest

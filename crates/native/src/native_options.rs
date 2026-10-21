@@ -10,7 +10,7 @@ pub struct NativeOptions {
     pub threads: usize,
     /// Maximum admitted blocking jobs, including queued and running work. Must be nonzero.
     pub capacity: usize,
-    /// Reserve at least this many simultaneous timer registrations. Must be nonzero. A full queue returns `WouldBlock`.
+    /// Reserve at least this many simultaneous timer registrations per worker. Must be nonzero. A full owning queue returns `WouldBlock`; spare capacity on other workers is not borrowed.
     pub timer_capacity: usize,
 }
 impl Default for NativeOptions {

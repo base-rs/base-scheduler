@@ -80,7 +80,8 @@ impl SelectorWorker for Driver {
             return Err(io::Error::other("driver failure"));
         }
         if !self.0.paused.load(Ordering::SeqCst)
-            && (timeout.is_none() || !self.0.only_idle_completions.load(Ordering::SeqCst))
+            && (timeout != Some(Duration::ZERO)
+                || !self.0.only_idle_completions.load(Ordering::SeqCst))
         {
             let batch = std::mem::take(&mut *self.0.queued.lock().unwrap());
             if !batch.is_empty() {
@@ -102,9 +103,13 @@ impl SelectorWorker for Driver {
                 return Ok(true);
             }
         }
-        if timeout.is_none() {
+        if timeout != Some(Duration::ZERO) {
             self.0.idle.store(true, Ordering::SeqCst);
-            thread::park();
+            if let Some(timeout) = timeout {
+                thread::park_timeout(timeout);
+            } else {
+                thread::park();
+            }
             self.0.idle.store(false, Ordering::SeqCst);
         }
         Ok(false)
@@ -133,6 +138,33 @@ fn wait(mut condition: impl FnMut() -> bool) {
         );
         thread::yield_now();
     }
+}
+
+#[test]
+fn timer_deadlines_bound_driver_waits_and_survive_driver_retirement() {
+    use core_scheduler::{Cancellation, Clock};
+    crate::test_support::run(|| {
+        let state = Arc::new(State::default());
+        let scheduler = Arc::new(construct(&[Arc::clone(&state)]));
+        let owned = Arc::clone(&scheduler);
+        let task = scheduler
+            .spawn(async move {
+                let never = Cancellation::never();
+                let deadline = owned.now() + Duration::from_millis(10);
+                owned.sleep_until(deadline, &never).await.unwrap();
+                assert!(owned.now() >= deadline);
+            })
+            .unwrap();
+        block_on(task).unwrap();
+        // A failed driver switches back to thread parking, still with timer deadlines.
+        state.failed.store(true, Ordering::SeqCst);
+        state.wake_by_ref();
+        wait(|| state.retired.load(Ordering::SeqCst));
+        scheduler
+            .block_on(scheduler.sleep(Duration::from_millis(10), &Cancellation::never()))
+            .unwrap();
+        block_on(scheduler.shutdown());
+    });
 }
 
 #[test]

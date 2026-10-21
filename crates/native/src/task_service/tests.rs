@@ -65,7 +65,7 @@ fn rejected_future_destructors_can_close_admission_again() {
         }
     }
     test_support::run(|| {
-        let service = Arc::new(TaskService::new(1).unwrap());
+        let service = Arc::new(TaskService::new(1, 8).unwrap());
         service.close();
         let guard = CloseOnDrop(Arc::clone(&service));
         assert!(matches!(
@@ -305,7 +305,7 @@ fn submissions_from_another_native_worker_use_the_selected_scheduler() {
 #[test]
 fn intermediate_runnable_retirement_does_not_wake_drain_waiters() {
     let queue = std::array::from_fn(|_| crossbeam_deque::Worker::new_fifo());
-    let shared = Shared::new(std::slice::from_ref(&queue));
+    let shared = Shared::new(std::slice::from_ref(&queue), 8);
     shared.outstanding.store(2, Ordering::Release);
     let mut listener = Box::pin(shared.changed.listen());
     shared.retire_runnable();
