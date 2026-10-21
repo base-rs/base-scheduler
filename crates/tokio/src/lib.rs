@@ -47,3 +47,6 @@ pub use tokio_socket::TokioSocket;
 #[cfg(unix)]
 pub use tokio_subscription::TokioSubscription;
 pub use tokio_task::TokioTask;
+
+mod tokio_timer;
+pub use tokio_timer::TokioTimer;

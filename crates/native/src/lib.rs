@@ -29,3 +29,5 @@ pub use native_scheduler::NativeScheduler;
 pub use native_task::NativeTask;
 
 pub use selector_operations::NativeRecvMsgReceiver;
+
+pub use worker_timers::NativeTimer;

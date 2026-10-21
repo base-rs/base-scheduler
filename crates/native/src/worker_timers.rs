@@ -253,3 +253,6 @@ impl<S: crate::Selector> Clock for crate::NativeScheduler<S> {
 
 #[cfg(test)]
 mod tests;
+
+mod native_timer;
+pub use native_timer::NativeTimer;
