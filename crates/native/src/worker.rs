@@ -12,6 +12,7 @@ use std::{task::Waker, time::Duration};
 
 pub(crate) struct WorkerState {
     pub(crate) incoming: Injector<Runnable>,
+    pub(crate) timers: crossbeam_queue::SegQueue<crate::worker_timers::Command>,
     stealers: [Stealer<Runnable>; 2],
     sleeping: AtomicBool,
     thread: OnceLock<Thread>,
@@ -22,6 +23,7 @@ impl WorkerState {
     pub(crate) fn new(stealers: [Stealer<Runnable>; 2]) -> Self {
         Self {
             incoming: Injector::new(),
+            timers: crossbeam_queue::SegQueue::new(),
             stealers,
             sleeping: AtomicBool::new(false),
             thread: OnceLock::new(),
@@ -54,6 +56,7 @@ struct LocalWorker {
     scheduler: Weak<Shared>,
     ready: Worker<Runnable>,
     current: Worker<Runnable>,
+    timers: core_scheduler_timers::local::TimerQueue<Waker>,
 }
 
 thread_local! {
@@ -69,6 +72,24 @@ pub(crate) fn assert_outside_worker() {
         !is_worker(),
         "cannot synchronously wait on a native scheduler worker; use .await"
     );
+}
+
+// Callbacks never execute user code while borrowing the worker. Return displaced wakers and acknowledgments for delivery after this borrow ends.
+pub(crate) fn timers<T>(
+    shared: &Arc<Shared>,
+    owner: Option<usize>,
+    apply: impl FnOnce(usize, &mut core_scheduler_timers::local::TimerQueue<Waker>) -> T,
+) -> Option<T> {
+    CURRENT_WORKER.with(|current| {
+        let mut current = current.borrow_mut();
+        let local = current.as_mut()?;
+        if !std::ptr::eq(local.scheduler.as_ptr(), Arc::as_ptr(shared))
+            || owner.is_some_and(|owner| owner != local.identifier)
+        {
+            return None;
+        }
+        Some(apply(local.identifier, &mut local.timers))
+    })
 }
 
 pub(crate) fn schedule(shared: &Arc<Shared>, runnable: Runnable) {
@@ -203,8 +224,12 @@ fn drive(
         if !matches!(active.turn(timeout), Ok(false)) {
             *driver = None;
         }
-    } else if timeout.is_none() {
-        thread::park();
+    } else {
+        match timeout {
+            Some(timeout) if !timeout.is_zero() => thread::park_timeout(timeout),
+            Some(_) => {}
+            None => thread::park(),
+        }
     }
 }
 
@@ -244,12 +269,16 @@ fn run_loop(
             scheduler: Arc::downgrade(&shared),
             ready,
             current,
+            timers: core_scheduler_timers::local::TimerQueue::with_capacity(shared.timer_capacity),
         }))
     });
     let mut iteration = 0usize;
     loop {
         iteration = iteration.wrapping_add(1);
+        crate::worker_timers::turn(&shared, identifier);
         if shared.finished() {
+            // Closure may have followed the open timer pass above. Notify local waiters before retiring this worker, even when no task futures remain.
+            crate::worker_timers::turn(&shared, identifier);
             if let Some(active) = driver.as_mut() {
                 active.close();
                 drive(&mut driver, None);
@@ -269,7 +298,12 @@ fn run_loop(
                     &shared.idle_workers,
                     find_work(&shared, iteration),
                     || !shared.finished(),
-                    || drive(&mut driver, None),
+                    || {
+                        drive(
+                            &mut driver,
+                            crate::worker_timers::timeout(&shared, identifier),
+                        )
+                    },
                 )
             }
             result => yield_on_retry(result).success(),

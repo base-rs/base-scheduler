@@ -9,6 +9,9 @@ mod timers;
 pub use timer_handle::TimerHandle;
 pub use timers::Timers;
 
+#[cfg(feature = "local")]
+pub use timers::local;
+
 #[cfg(feature = "driver")]
 pub mod driver;
 

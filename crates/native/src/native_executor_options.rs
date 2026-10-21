@@ -6,7 +6,7 @@
 pub struct NativeExecutorOptions {
     /// Number of work-stealing task workers. Must be nonzero.
     pub workers: usize,
-    /// Reserve at least this many simultaneous timer registrations. Must be nonzero.
+    /// Reserve at least this many simultaneous timer registrations per worker. Must be nonzero. A full owning queue returns `WouldBlock`; spare capacity on other workers is not borrowed.
     pub timer_capacity: usize,
 }
 

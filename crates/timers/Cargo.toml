@@ -11,6 +11,7 @@ readme = "readme.md"
 [features]
 driver = ["dep:crossbeam-queue"]
 sharded = []
+local = []
 
 [dependencies]
 crossbeam-queue = { version = "0.3.13", optional = true }

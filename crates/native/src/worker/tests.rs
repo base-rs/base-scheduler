@@ -203,13 +203,14 @@ fn batch_search_checks_both_external_queues_before_local_work() {
     use crate::task_service::Shared;
     use std::sync::Arc;
     let queues = std::array::from_fn(|_| Worker::new_fifo());
-    let shared = Arc::new(Shared::new(std::slice::from_ref(&queues)));
+    let shared = Arc::new(Shared::new(std::slice::from_ref(&queues), 8));
     let [ready, current] = queues;
     let local = LocalWorker {
         identifier: 0,
         scheduler: Arc::downgrade(&shared),
         ready,
         current,
+        timers: core_scheduler_timers::local::TimerQueue::with_capacity(8),
     };
     for source in [&shared.ready, &shared.workers[0].incoming] {
         source.push(runnable());
@@ -226,13 +227,14 @@ fn idle_worker_steals_remote_wakes_when_preferred_worker_is_busy() {
     let mut queues: Vec<[Worker<Runnable>; 2]> = (0..2)
         .map(|_| std::array::from_fn(|_| Worker::new_fifo()))
         .collect();
-    let shared = Arc::new(Shared::new(&queues));
+    let shared = Arc::new(Shared::new(&queues, 8));
     let [ready, current] = queues.remove(0);
     let local = LocalWorker {
         identifier: 0,
         scheduler: Arc::downgrade(&shared),
         ready,
         current,
+        timers: core_scheduler_timers::local::TimerQueue::with_capacity(8),
     };
     // The victim has no local work, but a remote wake has reached its inbox.
     shared.workers[1].incoming.push(runnable());
@@ -248,13 +250,14 @@ fn idle_worker_can_steal_both_ready_generations() {
     let mut queues: Vec<[Worker<Runnable>; 2]> = (0..2)
         .map(|_| std::array::from_fn(|_| Worker::new_fifo()))
         .collect();
-    let shared = Arc::new(Shared::new(&queues));
+    let shared = Arc::new(Shared::new(&queues, 8));
     let [ready, current] = queues.remove(0);
     let local = LocalWorker {
         identifier: 0,
         scheduler: Arc::downgrade(&shared),
         ready,
         current,
+        timers: core_scheduler_timers::local::TimerQueue::with_capacity(8),
     };
     for queue in &queues[0] {
         queue.push(runnable());
@@ -267,7 +270,7 @@ fn idle_worker_can_steal_both_ready_generations() {
 fn idle_wake_falls_back_when_the_preferred_worker_is_busy() {
     use crate::task_service::Shared;
     let queues = std::array::from_fn::<_, 2, _>(|_| std::array::from_fn(|_| Worker::new_fifo()));
-    let shared = Shared::new(&queues);
+    let shared = Shared::new(&queues, 8);
     let idle = &shared.workers[1];
     idle.thread.set(std::thread::current()).unwrap();
     idle.sleeping.store(true, Ordering::SeqCst);
@@ -286,7 +289,7 @@ fn idle_wake_falls_back_when_the_preferred_worker_is_busy() {
 fn idle_wake_prefers_the_requested_sleeping_worker() {
     use crate::task_service::Shared;
     let queues = std::array::from_fn::<_, 2, _>(|_| std::array::from_fn(|_| Worker::new_fifo()));
-    let shared = Shared::new(&queues);
+    let shared = Shared::new(&queues, 8);
     for worker in &shared.workers {
         worker.thread.set(std::thread::current()).unwrap();
         worker.sleeping.store(true, Ordering::SeqCst);

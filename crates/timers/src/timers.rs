@@ -98,6 +98,22 @@ pub(crate) struct State<Value> {
 }
 
 impl<Value> State<Value> {
+    pub(crate) fn new() -> Self {
+        Self {
+            #[cfg(any(feature = "driver", feature = "sharded"))]
+            closed: false,
+            #[cfg(feature = "sharded")]
+            publication: None,
+            slots: Vec::new(),
+            heap: BinaryHeap::new(),
+            scheduled: Vec::new(),
+            free: NO_SLOT,
+            free_count: 0,
+            live: 0,
+            cancelled: 0,
+        }
+    }
+
     fn capacity(&self) -> usize {
         self.slots
             .capacity()
@@ -475,19 +491,7 @@ impl<Value> Timers<Value> {
     /// Reserve space for at least `capacity` registrations.
     pub fn with_capacity(capacity: usize) -> Self {
         let timers = Self {
-            shared: Arc::new(Mutex::new(State {
-                #[cfg(any(feature = "driver", feature = "sharded"))]
-                closed: false,
-                #[cfg(feature = "sharded")]
-                publication: None,
-                slots: Vec::new(),
-                heap: BinaryHeap::new(),
-                scheduled: Vec::new(),
-                free: NO_SLOT,
-                free_count: 0,
-                live: 0,
-                cancelled: 0,
-            })),
+            shared: Arc::new(Mutex::new(State::new())),
         };
         // Acquire the mutex now, including native lock initialization on macOS.
         lock(&timers.shared).reserve(capacity);
@@ -622,3 +626,7 @@ impl<Value> Drop for Timers<Value> {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(feature = "local")]
+#[path = "local/timer_queue.rs"]
+pub mod local;

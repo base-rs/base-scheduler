@@ -14,8 +14,8 @@ mod task_service;
 #[cfg(test)]
 mod test_support;
 mod thread;
-mod timer_service;
 mod worker;
+mod worker_timers;
 
 #[cfg(unix)]
 pub use core_scheduler_selector::NativeSubscription;
