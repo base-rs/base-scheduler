@@ -1,6 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
+use super::ring_binding::RingBinding;
 use super::*;
 use std::sync::Mutex;
 use std::task::Waker;
@@ -25,12 +26,15 @@ pub struct IoUringMonitorRegistration {
 #[derive(Default)]
 struct Status {
     pending: bool,
-    generation: u64,
-    token: u64,
-    controller: Option<Arc<Controller>>,
+    binding: Option<RingBinding<PollRegistration>>,
     retiring: bool,
     error: Option<io::Error>,
     waker: Option<Waker>,
+}
+
+struct PollRegistration {
+    generation: u64,
+    token: u64,
 }
 
 fn wake(waker: Option<Waker>) {
@@ -79,10 +83,11 @@ impl IoUringMonitorRegistration {
                 return;
             }
             status.retiring = true;
+            let binding = status.binding.as_ref().unwrap();
             (
-                Arc::clone(status.controller.as_ref().unwrap()),
-                status.token,
-                status.generation,
+                Arc::clone(&binding.controller),
+                binding.state.token,
+                binding.state.generation,
             )
         };
         discard(command.0.send(Command::MonitorCancel(command.1, command.2)));
@@ -184,26 +189,30 @@ impl IoUringSelector {
                 let mut submission = None;
                 let mut retirement = None;
                 if status.pending {
-                    if !status.retiring
-                        && !Arc::ptr_eq(status.controller.as_ref().unwrap(), &controller)
-                    {
+                    if !status.retiring && !status.binding.as_ref().unwrap().matches(&controller) {
                         status.retiring = true;
+                        let binding = status.binding.as_ref().unwrap();
                         retirement = Some((
-                            Arc::clone(status.controller.as_ref().unwrap()),
-                            status.token,
-                            status.generation,
+                            Arc::clone(&binding.controller),
+                            binding.state.token,
+                            binding.state.generation,
                         ));
                     }
                 } else {
-                    status.generation = controller.next_identifier()?;
-                    status.token = state as *const State as u64 | MONITOR_TAG;
-                    status.controller = Some(Arc::clone(&controller));
+                    let generation = controller.next_identifier()?;
+                    status.binding = Some(RingBinding::new(
+                        &controller,
+                        PollRegistration {
+                            generation,
+                            token: state as *const State as u64 | MONITOR_TAG,
+                        },
+                    ));
                     status.retiring = false;
                     status.pending = true;
                     submission = Some(Submission::new(
                         monitor.retained_project(AsRef::as_ref),
                         Arc::clone(&registration.status),
-                        status.generation,
+                        generation,
                     ));
                 }
                 (status.waker.replace(replacement), submission, retirement)
@@ -424,9 +433,12 @@ impl Drop for Retirement {
     fn drop(&mut self) {
         let waker = {
             let mut status = self.status.lock().unwrap();
-            assert_eq!(status.generation, self.generation);
+            assert_eq!(
+                status.binding.as_ref().unwrap().state.generation,
+                self.generation
+            );
             status.pending = false;
-            status.controller = None;
+            status.binding = None;
             if !status.retiring {
                 status.error = self.error.take();
             }

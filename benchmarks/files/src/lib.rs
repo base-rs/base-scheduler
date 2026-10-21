@@ -105,3 +105,8 @@ where
     scheduler.file_close(file).await.unwrap();
     serde_json::json!({"operations": tasks * iterations, "seconds": elapsed.as_secs_f64(), "operations_per_second": (tasks * iterations) as f64 / elapsed.as_secs_f64(), "mean_operation_ns": task_ns as f64 / (tasks * iterations) as f64})
 }
+
+#[cfg(target_os = "linux")]
+mod migration;
+#[cfg(target_os = "linux")]
+pub use migration::run_migration;
