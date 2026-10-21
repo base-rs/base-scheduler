@@ -13,6 +13,7 @@ include = ["src/**", "context/**", "Cargo.toml", "readme.md", "license.md", "rel
 members = [
     "bake",
     "benchmarks/echo",
+    "benchmarks/timers",
     "crates/conformance",
     "crates/direct",
     "crates/tokio",

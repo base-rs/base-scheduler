@@ -219,3 +219,6 @@ impl Clock for DirectScheduler {
 
 #[cfg(test)]
 mod tests;
+
+mod direct_timer;
+pub use direct_timer::DirectTimer;

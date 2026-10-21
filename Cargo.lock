@@ -355,6 +355,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "core-scheduler-timer-benchmark"
+version = "0.0.0"
+dependencies = [
+ "allocation-counter",
+ "core-scheduler",
+ "core-scheduler-direct",
+ "core-scheduler-iouring",
+ "core-scheduler-native",
+ "core-scheduler-tokio",
+ "futures-lite",
+ "libc",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "core-scheduler-timers"
 version = "0.0.0"
 dependencies = [
