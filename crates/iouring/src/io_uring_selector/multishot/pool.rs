@@ -199,8 +199,7 @@ mod tests {
     fn group_identifiers_are_bounded_and_reused_after_release() {
         let (selector, mut driver) = super::super::super::tests::pair(1);
         let controller = &selector.controllers[0];
-        // Each live group represents a legal receiver, independently of whether
-        // its pool has been registered with the kernel yet.
+        // Each live group represents a legal receiver, independently of whether its pool has been registered with the kernel yet.
         let mut groups = Vec::with_capacity(u16::MAX as usize + 1);
         for identifier in 0..=u16::MAX {
             let group = Group::new(controller).unwrap();

@@ -9,12 +9,7 @@ use std::future::Future;
 
 /// A bounded sequence of owned receive leases, optionally using kernel multishot I/O.
 ///
-/// Readiness backends can receive directly into reusable buffers on demand. This
-/// capability requires neither kernel rearming, a background task, receive-ahead,
-/// nor a heap allocation per message. Successful creation permits receive-ahead,
-/// including before the first `recv`, so callers must not assume demand-only I/O.
-/// Concrete receiver and buffer types retain static dispatch. Socket metadata and truncation follow [`SocketRecvResult`](crate::SocketRecvResult).
-/// Peeking is rejected because a sequence could repeatedly return the same bytes.
+/// Readiness backends can receive directly into reusable buffers on demand. This capability requires neither kernel rearming, a background task, receive-ahead, nor a heap allocation per message. Successful creation permits receive-ahead, including before the first `recv`, so callers must not assume demand-only I/O. Concrete receiver and buffer types retain static dispatch. Socket metadata and truncation follow [`SocketRecvResult`](crate::SocketRecvResult). Peeking is rejected because a sequence could repeatedly return the same bytes.
 ///
 /// ```
 /// use core_scheduler::{Cancellation, OperationResult, RecvMsgMultishotOptions,
@@ -37,10 +32,7 @@ use std::future::Future;
 pub trait SocketRecvMsgMultishot: SocketOperation {
     type Receiver: SocketRecvMsgReceiver<Self>;
 
-    /// Lazily create a receiver retaining its socket and bounded storage. The
-    /// token controls creation; subsequent waits receive their own explicit token.
-    /// Retire the receiver before exclusive socket close. Backends may bound
-    /// persistent receiver admission separately from payload buffers.
+    /// Lazily create a receiver retaining its socket and bounded storage. The token controls creation; subsequent waits receive their own explicit token. Retire the receiver before exclusive socket close. Backends may bound persistent receiver admission separately from payload buffers.
     fn socket_recvmsg_multishot(
         &self,
         socket: &Self::Socket,

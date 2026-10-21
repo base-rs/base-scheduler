@@ -1,4 +1,4 @@
-# TCP echo benchmark
+# `core-scheduler-echo-benchmark`
 
 Compare pure Tokio, `TokioScheduler`, and `NativeScheduler<IoUringSelector>` using the same persistent-connection TCP echo workload. Both scheduler adapters offer owned-buffer, borrowed `_poll`, reusable stream-monitor, and portable multishot cases. `tokio-adapter-multishot` uses on-demand polling with reusable owned leases; `iouring-multishot` uses kernel rearming through the same generic echo loop. The private workspace package adds no dependencies to the public scheduler interface.
 

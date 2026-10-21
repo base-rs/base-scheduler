@@ -17,19 +17,14 @@ pub trait Clock: Send + Sync {
 
     /// Wait until an absolute deadline, or until cancellation is observed.
     ///
-    /// Futures are lazy. Pre-cancelled waits return cancellation without
-    /// registering a timer, including for elapsed deadlines. Otherwise an
-    /// elapsed deadline can complete immediately; no scheduler yield is promised.
-    /// Once waiting, expiry wins if expiry and cancellation are observed together.
-    /// Dropping the future releases its timer registration.
+    /// Futures are lazy. Pre-cancelled waits return cancellation without registering a timer, including for elapsed deadlines. Otherwise an elapsed deadline can complete immediately; no scheduler yield is promised. Once waiting, expiry wins if expiry and cancellation are observed together. Dropping the future releases its timer registration.
     fn sleep_until(
         &self,
         deadline: Instant,
         cancellation: &Cancellation,
     ) -> impl Future<Output = OperationResult<()>> + Send;
 
-    /// Wait for a duration measured from the first poll, not construction.
-    /// An unrepresentable deadline returns `io::ErrorKind::InvalidInput`.
+    /// Wait for a duration measured from the first poll, not construction. An unrepresentable deadline returns `io::ErrorKind::InvalidInput`.
     fn sleep(
         &self,
         duration: Duration,

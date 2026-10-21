@@ -1,8 +1,12 @@
-# Core Scheduler Conformance
+# `core-scheduler-conformance`
 
 Reusable, capability-specific tests for implementations of `core-scheduler`. Add this crate as a **development dependency** of a backend. Generated suites report ordinary named Rust tests, while async assertion helpers remain available for custom fixtures and smaller capability sets.
 
-## Generated suites
+## Usage
+
+The workspace is not published yet. Add this development dependency from Git with `cargo add --dev core-scheduler-conformance --git https://github.com/core-rs/core-scheduler`.
+
+### Generated suites
 
 Invoke a suite inside a dedicated module and supply a runner function:
 
@@ -86,3 +90,19 @@ Socket-option fixtures independently observe native state and syscall attempts, 
 Allocation fixtures start with known contents and cursor state, and must observe real reservation at the allocation boundary. Cases check extending and keeping size, no shrinking or payload/cursor changes, zero-filled exposed bytes, laziness/cancellation, invalid ranges, and read-only failures. Advice fixtures observe actual call arguments because cache residency and eviction are not promised. Cases check all supported modes, zero-length-to-EOF ranges, lazy admission, validation and execution errors, completion versus submission, and accepted work surviving waiter abandonment. Select a filesystem/profile supporting the tested modes; unsupported capabilities are omitted rather than counted as passing.
 
 The conformance crate's integration tests run all generated suites against controlled test implementations and reject deliberately incorrect variants. Socket extensions also exercise native standard-library TCP resources. These tests validate the reusable assertions, not every behavior of a production runtime or filesystem. Direct and Tokio run these suites against their real implementations where each capability is supported, with Unix signal and Linux filesystem suites selected explicitly. Native boundary observations and execution gates supplement the shared assertions; the controlled test implementations remain tests of the conformance library itself. Complete measured source-region coverage is a separate requirement from contract coverage, which grows as further edge cases and backend-specific tests are added.
+
+## Releasing
+
+This package releases with the workspace. Follow the [workspace release process](../../readme.md#releasing).
+
+## Releases
+
+See the shared [release notes](../../releases.md) for changes awaiting the first release.
+
+## See Also
+
+The [workspace overview](../../readme.md) describes the interface and companion backends.
+
+## Contributing
+
+Please open an issue or pull request on [GitHub](https://github.com/core-rs/core-scheduler).

@@ -5,6 +5,11 @@ use super::*;
 use crate::test_support;
 use core_scheduler_conformance::ClockFixture;
 use futures_lite::future::{block_on, poll_once};
+use std::sync::{
+    Weak,
+    atomic::{AtomicUsize, Ordering},
+};
+use std::task::{Context, RawWaker, RawWakerVTable};
 use std::time::Duration;
 
 pub(super) fn observe_wait(state: &State, deadline: bool) {
@@ -101,5 +106,96 @@ fn startup_failure_exhaustion_and_shutdown_release_waiters() {
         assert!(poll_once(&mut wait).await.is_none());
         scheduler.close();
         assert_eq!(wait.await.unwrap_err().kind(), io::ErrorKind::BrokenPipe);
+    });
+}
+
+struct WakerProbe {
+    shared: Weak<Shared>,
+    cloned: AtomicUsize,
+    dropped: AtomicUsize,
+    locked: AtomicUsize,
+}
+
+impl WakerProbe {
+    const VTABLE: RawWakerVTable =
+        RawWakerVTable::new(Self::clone, Self::wake, Self::wake_by_ref, Self::drop);
+
+    fn observe(&self, callback: &AtomicUsize) {
+        callback.fetch_add(1, Ordering::Relaxed);
+        if self.shared.upgrade().unwrap().state.try_lock().is_err() {
+            self.locked.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    fn waker(self: Arc<Self>) -> Waker {
+        let raw = RawWaker::new(Arc::into_raw(self).cast(), &Self::VTABLE);
+        // SAFETY: Every raw waker owns one Arc, with thread-safe clone, wake and drop callbacks.
+        unsafe { Waker::from_raw(raw) }
+    }
+
+    unsafe fn clone(data: *const ()) -> RawWaker {
+        // SAFETY: A live raw waker retains this allocation throughout the callback.
+        let probe = unsafe { &*data.cast::<Self>() };
+        probe.observe(&probe.cloned);
+        // SAFETY: The new raw waker receives its own strong reference.
+        unsafe { Arc::increment_strong_count(data.cast::<Self>()) };
+        RawWaker::new(data, &Self::VTABLE)
+    }
+
+    unsafe fn wake(data: *const ()) {
+        // SAFETY: Consuming wake releases exactly the reference owned by its raw waker.
+        unsafe { Self::drop(data) };
+    }
+
+    unsafe fn wake_by_ref(_data: *const ()) {}
+
+    unsafe fn drop(data: *const ()) {
+        // SAFETY: Each raw waker transfers its strong reference here exactly once.
+        let probe = unsafe { Arc::from_raw(data.cast::<Self>()) };
+        probe.observe(&probe.dropped);
+    }
+}
+
+#[test]
+fn timer_waker_callbacks_run_outside_the_registry_lock() {
+    run(async |scheduler| {
+        let probe = Arc::new(WakerProbe {
+            shared: Arc::downgrade(&scheduler.timers.shared),
+            cloned: AtomicUsize::new(0),
+            dropped: AtomicUsize::new(0),
+            locked: AtomicUsize::new(0),
+        });
+        let waker = Arc::clone(&probe).waker();
+        let mut context = Context::from_waker(&waker);
+        let never = Cancellation::never();
+        let deadline = scheduler.now() + Duration::from_secs(3600);
+
+        // Registration clones the waker; repolling and abandonment release stored wakers.
+        let mut sleep = Box::pin(scheduler.sleep_until(deadline, &never));
+        assert!(sleep.as_mut().poll(&mut context).is_pending());
+        assert_eq!(probe.cloned.load(Ordering::Relaxed), 1);
+        assert_eq!(probe.locked.load(Ordering::Relaxed), 0);
+        assert!(sleep.as_mut().poll(&mut context).is_pending());
+        assert_eq!(probe.cloned.load(Ordering::Relaxed), 2);
+        assert_eq!(probe.dropped.load(Ordering::Relaxed), 1);
+        assert_eq!(probe.locked.load(Ordering::Relaxed), 0);
+        drop(sleep);
+        assert_eq!(probe.dropped.load(Ordering::Relaxed), 2);
+        assert_eq!(probe.locked.load(Ordering::Relaxed), 0);
+        assert_eq!(scheduler.registrations(), 0);
+
+        // Rejected registrations also release their new waker after unlocking.
+        scheduler.timers.shared.state.lock().unwrap().next = usize::MAX;
+        let mut exhausted = Box::pin(scheduler.sleep_until(deadline, &never));
+        assert!(exhausted.as_mut().poll(&mut context).is_ready());
+        scheduler.close();
+        let mut closed = Box::pin(scheduler.sleep_until(deadline, &never));
+        assert!(closed.as_mut().poll(&mut context).is_ready());
+        assert_eq!(probe.cloned.load(Ordering::Relaxed), 4);
+        assert_eq!(probe.dropped.load(Ordering::Relaxed), 4);
+
+        waker.wake_by_ref();
+        waker.wake();
+        assert_eq!(probe.locked.load(Ordering::Relaxed), 0);
     });
 }

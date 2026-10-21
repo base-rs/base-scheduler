@@ -428,9 +428,7 @@ fn selected_error_and_eof_buffers_are_returned_without_reading_a_header() {
         else {
             panic!("receive submission")
         };
-        // Exercise valid terminal decoder outcomes without relying on whether
-        // this particular kernel selects a buffer for an error/EOF. This request
-        // is never submitted, and its payload intentionally contains no header.
+        // Exercise valid terminal decoder outcomes without relying on whether this particular kernel selects a buffer for an error/EOF. This request is never submitted, and its payload intentionally contains no header.
         request.completion(result, 1); // IORING_CQE_F_BUFFER, selected buffer zero.
         request.finish(if result < 0 {
             Err(io::Error::from_raw_os_error(-result))
@@ -506,8 +504,7 @@ fn local_returns_publish_directly_and_only_exhaustion_queues_a_rearm() {
             Some(second)
         } else {
             assert!(command.is_none());
-            // Reuse the entire pool repeatedly. Publishing directly must advance
-            // the provided-ring tail without ending the persistent submission.
+            // Reuse the entire pool repeatedly. Publishing directly must advance the provided-ring tail without ending the persistent submission.
             for _ in 0..16 {
                 sender
                     .try_send(b"next", SocketSendFlags::default())
@@ -526,8 +523,7 @@ fn local_returns_publish_directly_and_only_exhaustion_queues_a_rearm() {
             None
         };
         driven(&mut worker, receiving.close(&selector)).unwrap();
-        // A lease can return after retirement. Its late rearm notification must
-        // be harmless even though the original request has already been removed.
+        // A lease can return after retirement. Its late rearm notification must be harmless even though the original request has already been removed.
         drop(held);
         worker.turn(Some(Duration::ZERO)).unwrap();
         selector.close();
@@ -685,8 +681,7 @@ fn terminal_decoding_preserves_payload_before_rearm_and_accepts_eof_without_a_bu
         finished: false,
     });
     let overhead = 16 + std::mem::size_of::<libc::sockaddr_storage>();
-    // The request is never published. Initialize a valid kernel completion layout
-    // to exercise the legitimate no-MORE outcome independently of kernel timing.
+    // The request is never published. Initialize a valid kernel completion layout to exercise the legitimate no-MORE outcome independently of kernel timing.
     // SAFETY: This private, unregistered pool has no kernel or lease references.
     unsafe {
         let pointer = pool.pointer(0);
@@ -737,8 +732,7 @@ fn dropping_pending_dormant_and_prepared_requests_notifies_receivers() {
                 panic!("receive submission")
             };
             if stage == "prepared" {
-                // Registration can succeed before an SQE is published. Dropping
-                // that unfinished request must still notify its waiting consumer.
+                // Registration can succeed before an SQE is published. Dropping that unfinished request must still notify its waiting consumer.
                 request.prepare(&reactor.ring.submitter()).unwrap();
                 drop(request);
             } else {
@@ -778,8 +772,7 @@ fn a_returned_buffer_before_terminal_collection_allows_immediate_resubmission() 
     sender
         .try_send(b"efgh", SocketSendFlags::default())
         .unwrap();
-    // Wait for the kernel's exhausted-pool completion without collecting it.
-    // Returning the lease now queues recycling ahead of completion collection.
+    // Wait for the kernel's exhausted-pool completion without collecting it. Returning the lease now queues recycling ahead of completion collection.
     let deadline = std::time::Instant::now() + Duration::from_secs(3);
     while driver
         .reactor

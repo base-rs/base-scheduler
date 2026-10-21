@@ -5,8 +5,7 @@ use std::io;
 
 /// Bounded storage for a sequence of received messages.
 ///
-/// Backends may receive ahead, but need not do so. Held messages consume the
-/// configured buffers; returning a lease makes its storage available again.
+/// Backends may receive ahead, but need not do so. Held messages consume the configured buffers; returning a lease makes its storage available again.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct RecvMsgMultishotOptions {
     /// Number of reusable payload buffers, in 1..=32768.

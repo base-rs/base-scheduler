@@ -29,8 +29,7 @@ fn checks_clones_and_first_and_repeated_waits_do_not_allocate() {
     let first = Waker::from(Arc::new(WakeCounter::default()));
     let second = Waker::from(Arc::new(WakeCounter::default()));
 
-    // Count on the polling thread, excluding token and executor-waker setup.
-    // In particular, do not warm up the token with an unmeasured first wait.
+    // Count on the polling thread, excluding token and executor-waker setup. In particular, do not warm up the token with an unmeasured first wait.
     let allocations = allocation_counter::measure(|| {
         for token in [&root, &child, &never] {
             for _ in 0..16 {

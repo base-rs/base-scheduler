@@ -4,7 +4,7 @@
 use core_scheduler::{
     Blocking, Cancellation, FileClose, FileMetadata, FileOpen, FileOptions, FileStat,
 };
-use core_scheduler_conformance::{blocking, file};
+use core_scheduler_conformance::{BlockingFixture, blocking, file};
 use core_scheduler_direct::{DirectOptions, DirectScheduler};
 use futures_lite::future::block_on;
 use std::{sync::mpsc, time::Duration};
@@ -154,7 +154,7 @@ impl Drop for Hold {
         let _ = self.release.take().unwrap().send(());
     }
 }
-impl blocking::BlockingFixture for QueueFixture {
+impl BlockingFixture for QueueFixture {
     type Scheduler = DirectScheduler;
     type Guard = Hold;
     fn scheduler(&self) -> &Self::Scheduler {

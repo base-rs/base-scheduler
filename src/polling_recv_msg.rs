@@ -80,8 +80,7 @@ impl AsRef<[u8]> for PollingRecvMsgBuffer {
     }
 }
 
-// SAFETY: The lease uniquely owns a fixed boxed allocation. Its completed prefix
-// and allocation remain unchanged while the buffer moves or an operation owns it.
+// SAFETY: The lease uniquely owns a fixed boxed allocation. Its completed prefix and allocation remain unchanged while the buffer moves or an operation owns it.
 unsafe impl IoBuf for PollingRecvMsgBuffer {}
 
 struct Receiving<Socket> {
@@ -91,9 +90,7 @@ struct Receiving<Socket> {
 
 /// A bounded receive resource built from synchronous nonblocking message receives.
 ///
-/// Each `recv` uses the explicitly supplied scheduler. The resource retains its
-/// socket and payload pool, without retaining a scheduler or starting a background
-/// task. Retaining all returned leases pauses the next receive until one is dropped.
+/// Each `recv` uses the explicitly supplied scheduler. The resource retains its socket and payload pool, without retaining a scheduler or starting a background task. Retaining all returned leases pauses the next receive until one is dropped.
 pub struct PollingRecvMsg<Socket, Check> {
     receiving: Option<Receiving<Socket>>,
     stream: bool,
@@ -102,10 +99,7 @@ pub struct PollingRecvMsg<Socket, Check> {
 }
 
 impl<Socket, Check> PollingRecvMsg<Socket, Check> {
-    /// Retain a socket and reserve its payload pool. `check` validates scheduler
-    /// compatibility before each receive and close, without consuming the resource
-    /// on rejection. Backends normally supply a function pointer and keep admission
-    /// checks in their I/O operations, so close remains possible during shutdown.
+    /// Retain a socket and reserve its payload pool. `check` validates scheduler compatibility before each receive and close, without consuming the resource on rejection. Backends normally supply a function pointer and keep admission checks in their I/O operations, so close remains possible during shutdown.
     pub fn new(
         socket: Socket,
         kind: SocketType,

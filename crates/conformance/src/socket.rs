@@ -327,8 +327,7 @@ pub async fn abandoned_operation<F: SocketIoFixture>(fixture: &F) {
     fixture.assert_released();
 }
 
-/// A bounded portable receiver preserves datagrams, metadata, empty messages,
-/// truncation, and lease lifetime across cancellation and close.
+/// A bounded portable receiver preserves datagrams, metadata, empty messages, truncation, and lease lifetime across cancellation and close.
 pub async fn multishot_messages<S: SocketScheduler + SocketSendMsg + SocketRecvMsgMultishot>(
     scheduler: &S,
 ) {
@@ -408,8 +407,7 @@ pub async fn multishot_messages<S: SocketScheduler + SocketSendMsg + SocketRecvM
     drop(first);
     let empty = waiting.await.unwrap().unwrap();
     assert!(empty.buffer.as_ref().is_empty());
-    // Cancellation while capacity is exhausted closes the receiver, without
-    // invalidating the returned lease or requiring it to be released first.
+    // Cancellation while capacity is exhausted closes the receiver, without invalidating the returned lease or requiring it to be released first.
     let token = Cancellation::new();
     let mut waiting = Box::pin(receiver.recv(scheduler, &token));
     assert!(poll_once(&mut waiting).await.is_none());
@@ -425,8 +423,7 @@ pub async fn multishot_messages<S: SocketScheduler + SocketSendMsg + SocketRecvM
     scheduler.socket_close(sender).await.unwrap();
 }
 
-/// Stream receivers preserve ordering across leases, EOF, and explicit close.
-/// Non-power-of-two buffer counts are portable, even when a kernel ring rounds up.
+/// Stream receivers preserve ordering across leases, EOF, and explicit close. Non-power-of-two buffer counts are portable, even when a kernel ring rounds up.
 pub async fn multishot_stream<S: SocketScheduler + SocketRecvMsgMultishot>(scheduler: &S) {
     let never = Cancellation::never();
     let (sender, socket) = stream_pair(scheduler, SocketDomain::Ipv4).await;

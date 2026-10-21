@@ -162,10 +162,7 @@ impl<B: IoBuf> Request<B> {
 impl<B: IoBuf> Drop for Request<B> {
     fn drop(&mut self) {
         drop(self.resource.take());
-        // A submission can race Shutdown and remain in the incoming queue as
-        // the selector exits. Such requests have never reached the kernel and
-        // can return their buffers normally. InFlight deliberately suppresses
-        // this destructor for requests whose completion is unknown.
+        // A submission can race Shutdown and remain in the incoming queue as the selector exits. Such requests have never reached the kernel and can return their buffers normally. InFlight deliberately suppresses this destructor for requests whose completion is unknown.
         if let Some(reply) = self.reply.take() {
             discard(reply.send((
                 Err(io::Error::new(
@@ -178,8 +175,7 @@ impl<B: IoBuf> Drop for Request<B> {
     }
 }
 
-// One erased request allocation lets a selector queue heterogeneous owned buffer types. Its typed completion returns the exact original owner.
-// Only entry preparation (before publication) and original completion may access the request exclusively. In-flight bookkeeping uses shared access so inline UnsafeCell output can remain kernel-accessible without creating an aliasing mutable reference.
+// One erased request allocation lets a selector queue heterogeneous owned buffer types. Its typed completion returns the exact original owner. Only entry preparation (before publication) and original completion may access the request exclusively. In-flight bookkeeping uses shared access so inline UnsafeCell output can remain kernel-accessible without creating an aliasing mutable reference.
 pub(crate) trait PendingRequest: Send {
     fn identifier(&self) -> u64;
     fn prepare(&mut self, _ring: &io_uring::Submitter<'_>) -> io::Result<()> {
@@ -223,9 +219,7 @@ impl<B: IoBuf> PendingRequest for Request<B> {
     }
 }
 
-/// Only terminal original completions remove requests from this map.
-/// On an unexpected selector failure, leak kernel-accessible resources rather
-/// than freeing memory whose completion cannot be established.
+/// Only terminal original completions remove requests from this map. On an unexpected selector failure, leak kernel-accessible resources rather than freeing memory whose completion cannot be established.
 #[derive(Default)]
 struct InFlight(HashMap<u64, Box<dyn PendingRequest>>);
 
@@ -295,8 +289,7 @@ impl Controller {
     }
 
     fn notify(&self) {
-        // A full eventfd already contains a wakeup. Other errors mean the selector
-        // has exited; dropping its receivers wakes pending operation futures.
+        // A full eventfd already contains a wakeup. Other errors mean the selector has exited; dropping its receivers wakes pending operation futures.
         loop {
             match syscall("notify", || {
                 let value = 1u64;
@@ -1137,10 +1130,7 @@ impl Reactor {
                 let entry = request.entry();
                 progressed |= request.entry_may_wake();
                 prepared = true;
-                // SAFETY: InFlight owns the buffer allocation and descriptor
-                // before publication. Neither is released or accessed until
-                // the original CQE, even when cancellation completes first.
-                // A failed push does not publish the entry.
+                // SAFETY: InFlight owns the buffer allocation and descriptor before publication. Neither is released or accessed until the original CQE, even when cancellation completes first. A failed push does not publish the entry.
                 unsafe { submissions.push(&entry) }
                     .expect("submission capacity was checked and the local queue has not changed");
             }
@@ -1190,8 +1180,7 @@ impl Reactor {
             return Ok(true);
         }
 
-        // Nonblocking turns may stage one readiness-only batch for the next turn. An idle wait submits it and waits in one entry; a busy worker submits it on its next nonblocking turn. Overflow and task work always enter.
-        // Short-circuiting preserves the local permit through productive turns. At the actual wait decision, consume it; the armed poll retains remote notifications until their CQE drains the counter.
+        // Nonblocking turns may stage one readiness-only batch for the next turn. An idle wait submits it and waits in one entry; a busy worker submits it on its next nonblocking turn. Overflow and task work always enter. Short-circuiting preserves the local permit through productive turns. At the actual wait decision, consume it; the armed poll retains remote notifications until their CQE drains the counter.
         let return_to_executor = progressed
             || command_batch_full
             || timeout == Some(Duration::ZERO)

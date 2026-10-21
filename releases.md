@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Keep Direct timer waker callbacks outside the registry lock, so reentrant callbacks cannot deadlock the clock.
+
 - Add reusable directional `SocketMonitor` and `SocketStreamMonitor` state, with shared operations, caller-owned connection storage, and explicit cancellation and retirement. io_uring retains persistent poll registrations and caches readiness; stream monitors provide a separate specialization point while preserving readiness until `WouldBlock`. Other backends reuse their existing polling operations.
 
 - Add portable `SocketRecvMsgMultishot` and explicitly advanced receivers, with a fixed-buffer polling implementation for Direct, Readiness, and Tokio, and Native forwarding. Add io_uring `socket_recvmsg_multishot` with bounded provided-buffer pools, owned receive leases, automatic rearming after exhaustion, and explicit retirement. Add a matched echo benchmark against Tokio and Native readiness I/O.

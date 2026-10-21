@@ -59,8 +59,7 @@ fn watchdog(test: impl FnOnce() + Send + 'static) {
     }
 }
 fn options() -> IoUringOptions {
-    // Each case creates independent rings; keep their locked kernel memory small
-    // when the shared conformance suites run many fixtures concurrently.
+    // Each case creates independent rings; keep their locked kernel memory small when the shared conformance suites run many fixtures concurrently.
     IoUringOptions {
         entries: 16,
         ..Default::default()

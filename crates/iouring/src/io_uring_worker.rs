@@ -90,8 +90,7 @@ pub(crate) fn enqueue(controller: &Controller, command: Command) -> Result<(), C
             .find(|route| std::ptr::eq(Arc::as_ptr(&route.controller), controller))
         {
             if let Command::Recycle(pool, buffer) = command {
-                // This thread exclusively owns the provided ring. Returning a
-                // lease needs no queued work while its receive remains armed.
+                // This thread exclusively owns the provided ring. Returning a lease needs no queued work while its receive remains armed.
                 pool.recycle(buffer);
                 if pool.needs_rearm() {
                     route

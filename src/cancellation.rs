@@ -39,8 +39,7 @@ impl Drop for Node {
         let mut parent = self.parent.take();
         // Release an exclusively owned ancestor chain without recursive drops.
         while let Some(node) = parent {
-            // The allocation's address identifies its weak registration until
-            // destruction removes it, so recycled addresses cannot alias it.
+            // The allocation's address identifies its weak registration until destruction removes it, so recycled addresses cannot alias it.
             node.children
                 .lock()
                 .unwrap_or_else(PoisonError::into_inner)
@@ -83,15 +82,12 @@ impl Cancellation {
         }
     }
 
-    /// Create a signal which cannot be cancelled and requires no allocation.
-    /// `cancel` always returns false and `cancelled` remains pending forever.
+    /// Create a signal which cannot be cancelled and requires no allocation. `cancel` always returns false and `cancelled` remains pending forever.
     pub const fn never() -> Self {
         Self { node: None }
     }
 
-    /// Create a signal cancelled by this signal or any of its ancestors.
-    /// A child of an already-cancelled signal starts cancelled. A child of a
-    /// never-cancelled signal is an independent, cancellable signal.
+    /// Create a signal cancelled by this signal or any of its ancestors. A child of an already-cancelled signal starts cancelled. A child of a never-cancelled signal is an independent, cancellable signal.
     pub fn child(&self) -> Self {
         let Some(parent) = &self.node else {
             return Self::new();
@@ -113,11 +109,7 @@ impl Cancellation {
         Self { node: Some(child) }
     }
 
-    /// Request cancellation of this signal and all its descendants.
-    /// Returns true only for the first request on this signal. Repeated requests
-    /// never escalate. Waiters are woken after the entire family lock is released.
-    /// Concurrent observers may see propagation in progress, but all descendants
-    /// are cancelled when this call returns. This does not wait for their work.
+    /// Request cancellation of this signal and all its descendants. Returns true only for the first request on this signal. Repeated requests never escalate. Waiters are woken after the entire family lock is released. Concurrent observers may see propagation in progress, but all descendants are cancelled when this call returns. This does not wait for their work.
     pub fn cancel(&self) -> bool {
         let Some(root) = &self.node else {
             return false;
@@ -160,10 +152,7 @@ impl Cancellation {
         }
     }
 
-    /// Wait for cancellation using standard future polling and wakeups.
-    /// This future is immediately ready if already cancelled. Dropping the wait
-    /// unregisters its listener without cancelling the signal or other waiters.
-    /// Listener storage is retained inline in the future, without a separate allocation.
+    /// Wait for cancellation using standard future polling and wakeups. This future is immediately ready if already cancelled. Dropping the wait unregisters its listener without cancelling the signal or other waiters. Listener storage is retained inline in the future, without a separate allocation.
     pub async fn cancelled(&self) {
         let Some(node) = &self.node else {
             return pending().await;

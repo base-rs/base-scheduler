@@ -96,9 +96,9 @@ The suite could live in a companion support crate or another reusable test packa
 
 Socketry already has capability traits, associated resource types, multiple backends, and a generic interface probe with a simulator. Review these before introducing a parallel API:
 
-- [Socketry design](../../socketry-rust/context/design.md).
-- [Socketry implementation guidance](../../socketry-rust/context/implementation.md).
-- [Existing generic interface tests](../../socketry-rust/crates/executor/examples/interface_probe/tests.rs).
-- [Existing simulator](../../socketry-rust/crates/executor/examples/interface_probe/simulated.rs).
+- [Socketry design](https://github.com/core-rs/socketry-rust/blob/b54b8d61bf80b71a1a5b97c3f5b80bae8a5ebabd/context/design.md).
+- [Socketry implementation guidance](https://github.com/core-rs/socketry-rust/blob/b54b8d61bf80b71a1a5b97c3f5b80bae8a5ebabd/context/implementation.md).
+- [Existing generic interface tests](https://github.com/core-rs/socketry-rust/blob/b54b8d61bf80b71a1a5b97c3f5b80bae8a5ebabd/crates/executor/examples/interface_probe/tests.rs).
+- [Existing simulator](https://github.com/core-rs/socketry-rust/blob/b54b8d61bf80b71a1a5b97c3f5b80bae8a5ebabd/crates/executor/examples/interface_probe/simulated.rs).
 
 A future extraction should identify the minimal shared types, settle future bounds and optional capabilities, package the conformance suite, and migrate an implementation plus a representative consumer to validate the boundary. Publication, crate naming, and migration details remain open.

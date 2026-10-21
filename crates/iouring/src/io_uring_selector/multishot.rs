@@ -68,19 +68,13 @@ impl State {
 
 /// A persistent receive on its original ring, even if the consumer moves threads.
 ///
-/// `recv` returns completed messages without resubmitting the receive. Retaining all
-/// buffers pauses reception; returning a buffer rearms an exhausted request. TCP
-/// byte ordering and datagram boundaries are preserved. Do not run other receives
-/// concurrently on this socket unless your protocol permits competing readers.
-/// Drop requests cancellation; `close` waits for terminal original completion.
+/// `recv` returns completed messages without resubmitting the receive. Retaining all buffers pauses reception; returning a buffer rearms an exhausted request. TCP byte ordering and datagram boundaries are preserved. Do not run other receives concurrently on this socket unless your protocol permits competing readers. Drop requests cancellation; `close` waits for terminal original completion.
 pub struct RecvMsgMultishot {
     state: Arc<State>,
     cancel: CancelOnDrop,
 }
 impl RecvMsgMultishot {
-    /// Receive the next message; `None` is terminal stream EOF. Empty datagrams are messages.
-    /// Successful queued progress wins concurrent cancellation. Cancellation with no
-    /// queued message closes and drains the persistent receive before returning.
+    /// Receive the next message; `None` is terminal stream EOF. Empty datagrams are messages. Successful queued progress wins concurrent cancellation. Cancellation with no queued message closes and drains the persistent receive before returning.
     async fn receive(
         &mut self,
         cancellation: &Cancellation,
@@ -122,8 +116,7 @@ impl RecvMsgMultishot {
         self.state.received.lock().unwrap().statistics
     }
 
-    /// Stop receiving, await original-request retirement, and discard unread messages.
-    /// Already returned buffer leases remain valid, including after scheduler shutdown.
+    /// Stop receiving, await original-request retirement, and discard unread messages. Already returned buffer leases remain valid, including after scheduler shutdown.
     async fn retire(&mut self) -> io::Result<()> {
         self.cancel.request();
         loop {
@@ -197,13 +190,7 @@ impl core_scheduler::SocketRecvMsgMultishot for IoUringSelector {
 
     /// Start a bounded multishot `recvmsg` receive (Linux 6.0+, provided rings 5.19+).
     ///
-    /// This lazy operation selects one ring and retains the socket through final
-    /// completion. The returned receiver is a backend resource, not an implicit
-    /// scheduler. Pool registration errors are reported by its first `recv`.
-    /// Each receiver holds one ring admission slot until EOF or close; reserve
-    /// additional capacity for sends and other operations which may need the ring.
-    /// Peeking is rejected: a persistent peek can repeatedly consume the whole pool
-    /// with copies of the same datagram. Unsupported kernels fail explicitly.
+    /// This lazy operation selects one ring and retains the socket through final completion. The returned receiver is a backend resource, not an implicit scheduler. Pool registration errors are reported by its first `recv`. Each receiver holds one ring admission slot until EOF or close; reserve additional capacity for sends and other operations which may need the ring. Peeking is rejected: a persistent peek can repeatedly consume the whole pool with copies of the same datagram. Unsupported kernels fail explicitly.
     async fn socket_recvmsg_multishot(
         &self,
         socket: &NativeSocket,
@@ -339,8 +326,7 @@ impl PendingRequest for MultiRequest {
         };
         self.pool.selected();
         if result <= 0 {
-            // Flags transfer buffer ownership independently of the result. Error
-            // and zero-byte CQEs have no recvmsg header to inspect.
+            // Flags transfer buffer ownership independently of the result. Error and zero-byte CQEs have no recvmsg header to inspect.
             self.pool.recycle(identifier);
             if result == 0 {
                 self.eof.set(true);

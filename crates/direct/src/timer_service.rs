@@ -36,7 +36,12 @@ struct Registration {
 }
 impl Drop for Registration {
     fn drop(&mut self) {
-        self.shared.state.lock().unwrap().timers.remove(&self.id);
+        let timer = {
+            let mut state = self.shared.state.lock().unwrap();
+            state.timers.remove(&self.id)
+        };
+        // A waker destructor may reenter the clock, just like a wake callback.
+        drop(timer);
         self.shared.changed.notify_one();
     }
 }
@@ -89,7 +94,7 @@ impl TimerService {
         let mut started = self.started.lock().unwrap();
         if !*started {
             let shared = Arc::clone(&self.shared);
-            thread::start("protocol-direct-timer", move || work(shared))?;
+            thread::start("core-direct-timer", move || work(shared))?;
             *started = true;
         }
         Ok(())
@@ -117,32 +122,36 @@ impl TimerService {
             if cancelled.as_mut().poll(context).is_ready() {
                 return Poll::Ready(Err(core_scheduler::Cancelled.into()));
             }
-            let mut state = self.shared.state.lock().unwrap();
-            if state.closed {
-                return Poll::Ready(Err(io::Error::new(
-                    io::ErrorKind::BrokenPipe,
-                    "clock is closed",
-                )
-                .into()));
-            }
-            let id = if let Some(registration) = &registration {
-                registration.id
-            } else {
-                let id = state.next;
-                let Some(next) = id.checked_add(1) else {
-                    return Poll::Ready(
-                        Err(io::Error::other("timer identifiers exhausted").into()),
-                    );
+            // Clone the current waker and release any displaced waker outside the timer lock.
+            let waker = context.waker().clone();
+            let previous = {
+                let mut state = self.shared.state.lock().unwrap();
+                if state.closed {
+                    return Poll::Ready(Err(io::Error::new(
+                        io::ErrorKind::BrokenPipe,
+                        "clock is closed",
+                    )
+                    .into()));
+                }
+                let id = if let Some(registration) = &registration {
+                    registration.id
+                } else {
+                    let id = state.next;
+                    let Some(next) = id.checked_add(1) else {
+                        return Poll::Ready(Err(
+                            io::Error::other("timer identifiers exhausted").into()
+                        ));
+                    };
+                    state.next = next;
+                    registration = Some(Registration {
+                        shared: Arc::clone(&self.shared),
+                        id,
+                    });
+                    id
                 };
-                state.next = next;
-                registration = Some(Registration {
-                    shared: Arc::clone(&self.shared),
-                    id,
-                });
-                id
+                state.timers.insert(id, (deadline, waker))
             };
-            state.timers.insert(id, (deadline, context.waker().clone()));
-            drop(state);
+            drop(previous);
             self.shared.changed.notify_one();
             Poll::Pending
         })
