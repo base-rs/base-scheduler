@@ -311,7 +311,7 @@ fn run_loop(
         let Some(runnable) = runnable else {
             continue;
         };
-        run_ready_batch(&shared, identifier, runnable);
+        run_ready_batch(&shared, runnable);
         // Publish the available completion batch before starting the next task batch.
         drive(&mut driver, Some(Duration::ZERO));
     }
@@ -319,13 +319,13 @@ fn run_loop(
 }
 
 #[inline(always)]
-fn run_ready_batch(shared: &Arc<Shared>, identifier: usize, first: Runnable) {
+fn run_ready_batch(shared: &Shared, first: Runnable) {
     // Freeze the batch. Wakes during task polling go into the now-empty next queue.
-    let has_more = CURRENT_WORKER.with(|current| {
+    let (identifier, has_more) = CURRENT_WORKER.with(|current| {
         let mut current = current.borrow_mut();
         let local = current.as_mut().expect("worker context is installed");
         std::mem::swap(&mut local.ready, &mut local.current);
-        !local.current.is_empty()
+        (local.identifier, !local.current.is_empty())
     });
     if has_more {
         shared.wake_idle(UNASSIGNED_WORKER);
