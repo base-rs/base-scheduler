@@ -4,8 +4,7 @@
 use core_scheduler_timer_benchmark::{Mode, run};
 use std::{sync::Arc, time::Duration};
 
-fn main() {
-    let args: Vec<_> = std::env::args().collect();
+fn execute(args: &[String]) -> serde_json::Value {
     let backend = args.get(1).map(String::as_str).unwrap_or("native");
     let mode_name = args.get(2).map(String::as_str).unwrap_or("after");
     let mode = Mode::parse(mode_name);
@@ -112,5 +111,58 @@ fn main() {
     result["iterations"] = iterations.into();
     result["workers"] = workers.into();
     result["delay_us"] = (delay.as_micros() as u64).into();
-    println!("{result}");
+    result
+}
+
+fn main() {
+    println!("{}", execute(&std::env::args().collect::<Vec<_>>()));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn benchmark_cli_exercises_backends_and_workloads() {
+        #[cfg(target_os = "linux")]
+        let backends = ["native", "tokio", "direct", "iouring"];
+        #[cfg(not(target_os = "linux"))]
+        let backends = ["native", "tokio", "direct"];
+        for backend in backends {
+            for mode in ["sleep", "reuse", "after"] {
+                for workload in [
+                    "refresh",
+                    "fixed",
+                    "earlier",
+                    "earlier-yield",
+                    "yield",
+                    "expire",
+                    "cycle",
+                    "alloc",
+                ] {
+                    let args = ["timers", backend, mode, workload, "2", "2", "1", "10000"]
+                        .map(str::to_owned);
+                    let result = execute(&args);
+                    assert_eq!(result["backend"], backend);
+                    assert_eq!(result["mode"], mode);
+                    if workload == "alloc" {
+                        assert!(result["allocations"].is_number());
+                    } else {
+                        assert!(result["operations"].as_u64().unwrap() > 0);
+                    }
+                }
+            }
+        }
+        assert_eq!(execute(&[])["mode"], "after");
+    }
+    #[test]
+    #[should_panic(expected = "unknown backend")]
+    fn unknown_backend_is_rejected() {
+        execute(&["timers".into(), "unknown".into()]);
+    }
+    #[test]
+    #[should_panic(expected = "unknown mode")]
+    fn unknown_mode_is_rejected() {
+        Mode::parse("unknown");
+    }
 }

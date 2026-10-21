@@ -58,6 +58,20 @@ async fn semantics<S: TimerClock>(scheduler: &S) {
         .wait(scheduler, scheduler.now(), &never)
         .await
         .unwrap();
+    {
+        let cancellation = Cancellation::new();
+        let mut waiting = pin!(after.wait(scheduler, far, &cancellation));
+        assert!(
+            futures_lite::future::poll_once(waiting.as_mut())
+                .await
+                .is_none()
+        );
+        cancellation.cancel();
+        assert!(waiting.await.is_err());
+    }
+    let cancelled = Cancellation::new();
+    cancelled.cancel();
+    assert!(after.wait(scheduler, far, &cancelled).await.is_err());
 }
 
 #[test]
@@ -204,5 +218,133 @@ fn native_resource_moves_between_tasks_and_executors() {
     })
     .join()
     .unwrap();
+    scheduler.block_on(scheduler.shutdown());
+}
+
+#[test]
+fn native_capacity_and_resource_drop() {
+    let scheduler = core_scheduler_native::NativeScheduler::with_options(
+        core_scheduler_native::NativeOptions {
+            workers: 1,
+            timer_capacity: 1,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    scheduler.block_on(async {
+        let never = Cancellation::never();
+        let far = scheduler.now() + Duration::from_secs(30);
+        let capacity =
+            core_scheduler_timers::local::TimerQueue::<std::task::Waker>::with_capacity(1)
+                .capacity();
+        let mut first: Vec<_> = (0..capacity)
+            .map(|_| core_scheduler_native::NativeTimer::default())
+            .collect();
+        let mut second = core_scheduler_native::NativeTimer::default();
+        for timer in &mut first {
+            pending_once(scheduler.timer_wait(timer, far, &never)).await;
+        }
+        assert_eq!(
+            scheduler
+                .timer_wait(&mut second, far, &never)
+                .await
+                .unwrap_err()
+                .kind(),
+            std::io::ErrorKind::WouldBlock
+        );
+        drop(first);
+        pending_once(scheduler.timer_wait(&mut second, far, &never)).await;
+        scheduler.close();
+        assert_eq!(
+            scheduler
+                .timer_wait(&mut second, far, &never)
+                .await
+                .unwrap_err()
+                .kind(),
+            std::io::ErrorKind::BrokenPipe
+        );
+    });
+    scheduler.block_on(scheduler.shutdown());
+}
+
+#[test]
+fn closed_backends_reject_pending_timers() {
+    let direct = core_scheduler_direct::DirectScheduler::new(Default::default()).unwrap();
+    direct.close();
+    futures_lite::future::block_on(async {
+        assert_eq!(
+            direct
+                .timer_wait(
+                    &mut Default::default(),
+                    direct.now() + Duration::from_secs(1),
+                    &Cancellation::never()
+                )
+                .await
+                .unwrap_err()
+                .kind(),
+            std::io::ErrorKind::BrokenPipe
+        );
+        direct.shutdown().await;
+    });
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let tokio = core_scheduler_tokio::TokioScheduler::new(runtime.handle().clone());
+    tokio.close();
+    runtime.block_on(async {
+        assert_eq!(
+            tokio
+                .timer_wait(
+                    &mut Default::default(),
+                    tokio.now() + Duration::from_secs(1),
+                    &Cancellation::never()
+                )
+                .await
+                .unwrap_err()
+                .kind(),
+            std::io::ErrorKind::BrokenPipe
+        );
+        tokio.shutdown().await;
+    });
+}
+
+#[test]
+fn native_local_capacity_and_drop() {
+    let scheduler = Arc::new(
+        core_scheduler_native::NativeScheduler::with_options(
+            core_scheduler_native::NativeOptions {
+                workers: 1,
+                timer_capacity: 1,
+                ..Default::default()
+            },
+        )
+        .unwrap(),
+    );
+    let instance = scheduler.clone();
+    scheduler
+        .block_on(
+            scheduler
+                .spawn(async move {
+                    let never = Cancellation::never();
+                    let far = instance.now() + Duration::from_secs(30);
+                    let capacity = core_scheduler_timers::local::TimerQueue::<std::task::Waker>::with_capacity(1).capacity();
+                    let mut first: Vec<_> = (0..capacity).map(|_| core_scheduler_native::NativeTimer::default()).collect();
+                    let mut second = core_scheduler_native::NativeTimer::default();
+                    for timer in &mut first { pending_once(instance.timer_wait(timer, far, &never)).await; }
+                    assert_eq!(
+                        instance
+                            .timer_wait(&mut second, far, &never)
+                            .await
+                            .unwrap_err()
+                            .kind(),
+                        std::io::ErrorKind::WouldBlock
+                    );
+                    drop(first);
+                    pending_once(instance.timer_wait(&mut second, far, &never)).await;
+                })
+                .unwrap(),
+        )
+        .unwrap();
     scheduler.block_on(scheduler.shutdown());
 }
