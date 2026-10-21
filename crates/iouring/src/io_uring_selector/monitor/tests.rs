@@ -704,7 +704,7 @@ fn registrations_do_not_consume_transient_operation_capacity() {
 }
 
 fn staged(selector: &IoUringSelector, storage: &Storage) -> Submission {
-    let generation = IoUringSelector::next_identifier(&selector.controllers[0]).unwrap();
+    let generation = selector.controllers[0].next_identifier().unwrap();
     let mut status = storage.registration().status.lock().unwrap();
     status.generation = generation;
     status.controller = Some(Arc::clone(&selector.controllers[0]));

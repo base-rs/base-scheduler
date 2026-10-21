@@ -225,7 +225,7 @@ impl core_scheduler::SocketRecvMsgMultishot for IoUringSelector {
             controller.capacity.acquire(cancellation).await,
             cancellation,
         )?;
-        let identifier = Self::next_identifier(&controller)?;
+        let identifier = controller.next_identifier()?;
         let pool = Pool::new(&controller, options, identifier)?;
         let socket = super::socket::retain_socket(socket);
         let stream = syscall("socket-type", || socket.get_ref().r#type())? == socket2::Type::STREAM;
@@ -422,11 +422,8 @@ impl PendingRequest for MultiRequest {
         drop(self);
         state.finish(result);
     }
-    fn cancelling(&self) -> bool {
-        self.cancelling.get()
-    }
-    fn set_cancelling(&self) {
-        self.cancelling.set(true);
+    fn begin_cancellation(&self) -> bool {
+        !self.cancelling.replace(true)
     }
     fn take_reply(&self) -> Option<Box<dyn Send>> {
         struct Failed(Arc<State>);

@@ -733,7 +733,7 @@ fn submission_racing_shutdown_or_driver_exit_returns_unpublished_storage() {
         let permit = block_on(selector.controllers[0].capacity.acquire(&never)).unwrap();
         let (reply, result) = oneshot::channel();
         let request = Box::new(Request {
-            identifier: IoUringSelector::next_identifier(&selector.controllers[0]).unwrap(),
+            identifier: selector.controllers[0].next_identifier().unwrap(),
             _permit: permit,
             resource: Some(Resource::File(retain_file(&file), None)),
             buffer: Some(vec![3]),

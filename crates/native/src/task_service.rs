@@ -2,22 +2,21 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::{
-    NativeTask, thread,
+    NativeTask,
+    native_task::TaskFuture,
+    thread,
     worker::{self, WorkerState},
 };
-use core_scheduler::{SpawnError, TaskError};
+use core_scheduler::SpawnError;
 use crossbeam_deque::{Injector, Worker};
 use event_listener::Event;
 use std::{
     future::Future,
     io,
-    panic::{AssertUnwindSafe, catch_unwind},
-    pin::Pin,
     sync::{
         Arc, Mutex,
         atomic::{AtomicBool, AtomicUsize, Ordering},
     },
-    task::{Context, Poll},
 };
 
 pub(crate) const UNASSIGNED_WORKER: usize = usize::MAX;
@@ -61,52 +60,16 @@ impl Drop for WorkerRegistration {
     }
 }
 
-struct Registration {
+pub(crate) struct TaskRegistration {
     shared: Arc<Shared>,
 }
-impl Drop for Registration {
+impl Drop for TaskRegistration {
     fn drop(&mut self) {
         self.shared.remaining.fetch_sub(1, Ordering::AcqRel);
         self.shared.changed.notify(usize::MAX);
         if self.shared.closed.load(Ordering::Acquire) {
             self.shared.wake_all();
         }
-    }
-}
-
-// async-task aborts if its future or stored output destructor unwinds. Keep both user-owned values behind guards, including when the task is abandoned.
-struct TaskFuture<F: Future> {
-    future: Option<Pin<Box<F>>>,
-    _registration: Registration,
-}
-impl<F: Future> Unpin for TaskFuture<F> {}
-impl<F: Future> Future for TaskFuture<F> {
-    type Output = TaskOutcome<F::Output>;
-    fn poll(self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Self::Output> {
-        let this = self.get_mut();
-        let mut result = match catch_unwind(AssertUnwindSafe(|| {
-            this.future.as_mut().unwrap().as_mut().poll(context)
-        })) {
-            Ok(Poll::Pending) => return Poll::Pending,
-            Ok(Poll::Ready(output)) => Ok(output),
-            Err(payload) => Err(TaskError::Panicked(payload)),
-        };
-        if let Err(payload) = catch_unwind(AssertUnwindSafe(|| drop(this.future.take()))) {
-            crate::panic::discard(result);
-            result = Err(TaskError::Panicked(payload));
-        }
-        Poll::Ready(TaskOutcome(Some(result)))
-    }
-}
-impl<F: Future> Drop for TaskFuture<F> {
-    fn drop(&mut self) {
-        crate::panic::discard(self.future.take());
-    }
-}
-pub(crate) struct TaskOutcome<T>(pub(crate) Option<Result<T, TaskError>>);
-impl<T> Drop for TaskOutcome<T> {
-    fn drop(&mut self) {
-        crate::panic::discard(self.0.take());
     }
 }
 
@@ -239,7 +202,7 @@ impl TaskService {
         }
         // Publish ownership while admission is locked, before close can let the workers exit.
         self.shared.remaining.fetch_add(1, Ordering::Release);
-        let registration = Registration {
+        let registration = TaskRegistration {
             shared: Arc::clone(&self.shared),
         };
         let shared = Arc::clone(&self.shared);
@@ -248,10 +211,7 @@ impl TaskService {
                 worker: AtomicUsize::new(UNASSIGNED_WORKER),
             })
             .spawn(
-                move |_| TaskFuture {
-                    future: Some(Box::pin(future)),
-                    _registration: registration,
-                },
+                move |_| TaskFuture::new(future, registration),
                 move |runnable| {
                     shared.outstanding.fetch_add(1, Ordering::AcqRel);
                     worker::schedule(&shared, runnable);

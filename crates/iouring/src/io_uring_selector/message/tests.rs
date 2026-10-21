@@ -106,9 +106,8 @@ fn message_cancellation_and_abandonment_retain_payload_until_original_completion
                             opcode::RecvMsg::CODE
                         }
                     );
-                    assert!(!request.cancelling());
-                    request.set_cancelling();
-                    assert!(request.cancelling());
+                    assert!(request.begin_cancellation());
+                    assert!(!request.begin_cancellation());
                     token.cancel();
                     assert!(poll_once(&mut future).await.is_none());
                     assert!(

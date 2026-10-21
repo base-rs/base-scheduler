@@ -108,11 +108,8 @@ impl<B: IoBufSequence> PendingRequest for MessageRequest<B> {
         discard(reply.send((result, buffers)));
     }
 
-    fn cancelling(&self) -> bool {
-        self.cancelling.get()
-    }
-    fn set_cancelling(&self) {
-        self.cancelling.set(true);
+    fn begin_cancellation(&self) -> bool {
+        !self.cancelling.replace(true)
     }
     fn take_reply(&self) -> Option<Box<dyn Send>> {
         self.reply
@@ -259,7 +256,7 @@ impl IoUringSelector {
             Ok(permit) => permit,
             Err(error) => return (Err(error), buffers),
         };
-        let identifier = match Self::next_identifier(&controller) {
+        let identifier = match controller.next_identifier() {
             Ok(identifier) => identifier,
             Err(error) => return (Err(error), buffers),
         };
