@@ -66,7 +66,7 @@ Use `--backends tokio native direct` on macOS. Process CPU time is available on 
 
 The initial eager-replacement experiment is recorded at `5ff562f`; [its retained samples](results/initial-policy.jsonl) and [full summary](results/initial-policy.md) separate resource reuse from the portable `After` wrapper. Native's eager resource reuse alone did little for continually changing deadlines and was slower for the one-task yield case. Keeping the earlier wake was the useful optimization.
 
-The final backend-deferral implementation was measured at `9a63e72`. Subsequent commits add test coverage and documentation; the measured timer function bodies are unchanged. [Raw final samples](results/backend-deferral.jsonl) and the [full paired summary](results/backend-deferral.md) preserve all workloads and repeat ranges.
+The final backend-deferral implementation was measured at `9a63e72` in the experimental checkout and incorporated here in `b417fa3`. Subsequent commits add test coverage, documentation, and consistent runtime binding for an already elapsed first Tokio wait; the timed refresh path is unchanged. [Raw final samples](results/backend-deferral.jsonl) and the [full paired summary](results/backend-deferral.md) preserve all workloads and repeat ranges.
 
 ### Refreshing an idle timeout
 

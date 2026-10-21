@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Prototype optional `TimerClock` resources in Native, Direct, and Tokio, retaining timer state across explicitly scheduled waits. Add a timer benchmark comparing refresh, expiry, and allocation costs; the reusable capability and its retention policy remain experimental.
+
 - Keep Direct timer waker callbacks outside the registry lock, so reentrant callbacks cannot deadlock the clock.
 
 - Add reusable directional `SocketMonitor` and `SocketStreamMonitor` state, with shared operations, caller-owned connection storage, and explicit cancellation and retirement. io_uring retains persistent poll registrations and caches readiness; stream monitors provide a separate specialization point while preserving readiness until `WouldBlock`. Other backends reuse their existing polling operations.

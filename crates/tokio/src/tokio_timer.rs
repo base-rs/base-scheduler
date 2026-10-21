@@ -38,6 +38,7 @@ impl TimerClock for TokioScheduler {
             )
             .into());
         }
+        timer.runtime = Some(self.runtime.id());
         if self.now() >= deadline {
             timer.sleep = None;
             return Ok(());
@@ -51,7 +52,6 @@ impl TimerClock for TokioScheduler {
                 }
             } else {
                 timer.sleep = Some(Box::pin(tokio::time::sleep_until(deadline)));
-                timer.runtime = Some(self.runtime.id());
             }
         }
         let mut cancelled = pin!(cancellation.cancelled());

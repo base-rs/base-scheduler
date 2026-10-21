@@ -148,6 +148,15 @@ async fn deferred_deadline_and_waker_replacement() {
 async fn incompatible<S: TimerClock>(first: &S, second: &S) {
     let never = Cancellation::never();
     let mut timer = S::Timer::default();
+    first
+        .timer_wait(&mut timer, first.now(), &never)
+        .await
+        .unwrap();
+    let result = second.timer_wait(&mut timer, second.now(), &never).await;
+    assert!(
+        matches!(result, Err(OperationError::Io(error)) if error.kind() == std::io::ErrorKind::InvalidInput)
+    );
+    let mut timer = S::Timer::default();
     pending_once(first.timer_wait(&mut timer, first.now() + Duration::from_secs(30), &never)).await;
     let result = second.timer_wait(&mut timer, second.now(), &never).await;
     assert!(
@@ -206,7 +215,7 @@ fn native_resource_moves_between_tasks_and_executors() {
             scheduler
                 .spawn(async move {
                     let mut timer = core_scheduler_native::NativeTimer::default();
-                    let deadline = instance.now() + Duration::from_millis(50);
+                    let deadline = instance.now() + Duration::from_secs(30);
                     pending_once(instance.timer_wait(&mut timer, deadline, &Cancellation::never()))
                         .await;
                     (timer, deadline)
@@ -219,10 +228,13 @@ fn native_resource_moves_between_tasks_and_executors() {
     std::thread::spawn(move || {
         futures_lite::future::block_on(async move {
             let (mut timer, deadline) = timer;
-            instance
-                .timer_wait(&mut timer, deadline, &Cancellation::never())
-                .await
-                .unwrap();
+            let never = Cancellation::never();
+            let mut waiting = pin!(instance.timer_wait(&mut timer, deadline, &never));
+            assert!(
+                futures_lite::future::poll_once(waiting.as_mut())
+                    .await
+                    .is_none()
+            );
         })
     })
     .join()
