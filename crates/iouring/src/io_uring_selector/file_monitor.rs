@@ -249,7 +249,7 @@ impl IoUringSelector {
             if shared.ready.load(Ordering::Acquire) {
                 return Poll::Ready(());
             }
-            if cancelled.as_mut().poll(context).is_ready() {
+            if cancel.armed && cancelled.as_mut().poll(context).is_ready() {
                 cancel.request();
             }
             Poll::Pending
@@ -288,10 +288,8 @@ impl FileMonitoring for IoUringSelector {
         &self,
         file: &NativeFile,
     ) -> io::Result<FileMonitor<NativeFile, IoUringFileRegistration>> {
-        Ok(self
-            .fallback
-            .file_monitor(file)?
-            .map_registration(|()| IoUringFileRegistration {
+        self.fallback.file_monitor(file).map(|monitor| {
+            monitor.map_registration(|()| IoUringFileRegistration {
                 owner: Arc::downgrade(&self.group),
                 cached: None,
                 running: None,
@@ -302,7 +300,8 @@ impl FileMonitoring for IoUringSelector {
                     ready: AtomicBool::new(false),
                     waker: atomic_waker::AtomicWaker::new(),
                 }),
-            }))
+            })
+        })
     }
 
     async fn file_monitor_read<B: IoBufMut>(

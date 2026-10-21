@@ -61,6 +61,30 @@ Require individual operations, such as `FileRead`, `SocketRead + SocketWrite`, o
 
 Operation futures use static dispatch and are `Send`. File and socket resources are `Send + Sync`; spawned futures and outputs are `Send + 'static`. Local-only execution is outside this initial contract. Independent capabilities can be implemented separately without runtime-selection features.
 
+## Reusable file monitors
+
+`FileMonitoring` is an experimental capability for sequential owned-buffer reads and writes. Construct one monitor per sequential execution; separate monitors support concurrent operations on the same file. Retain it across operations to reuse backend request state:
+
+```rust
+use core_scheduler::{Cancellation, FileMonitoring, OperationResult};
+
+async fn read_chunk<S: FileMonitoring>(
+    scheduler: &S,
+    file: &S::File,
+    cancellation: &Cancellation,
+) -> OperationResult<Vec<u8>> {
+    let mut reader = scheduler.file_monitor(file)?;
+    let (result, buffer) = scheduler
+        .file_monitor_read_at(&mut reader, vec![0; 4096], 0, cancellation)
+        .await;
+    scheduler.file_monitor_close(&mut reader, &Cancellation::never()).await?;
+    result?;
+    Ok(buffer)
+}
+```
+
+A monitor can alternate reads and writes. Independent monitors share the underlying file cursor; use positioned operations for independent offsets. Close and drop every monitor before exclusively closing the file. After an operation future is dropped, reuse can return `WouldBlock` until backend access retires. The ordinary file operations remain available without monitor state. See the [file benchmark](benchmarks/files/readme.md) for measured costs and benefits.
+
 ## Reusable socket monitors
 
 `SocketMonitoring` supplies reusable directional readiness state. Use `socket_monitor` for general socket I/O, including UDP, or `socket_stream_monitor` to enable backend-specific byte-stream optimizations. Both use the same operations:

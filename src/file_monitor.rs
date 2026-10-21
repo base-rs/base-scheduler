@@ -38,12 +38,15 @@ impl<F, R> FileMonitor<F, R> {
         }
     }
 
+    /// The retained file, for backend operation dispatch.
     pub fn file(&self) -> &F {
         &self.file
     }
+    /// Backend state retained between operations.
     pub fn registration(&self) -> &R {
         &self.registration
     }
+    /// Exclusively access backend state without replacing the operation's explicit scheduler.
     pub fn registration_mut(&mut self) -> &mut R {
         &mut self.registration
     }

@@ -16,7 +16,7 @@ use std::{
 
 /// Optional reusable file operations. A monitor admits one operation at a time, including after abandonment until the backend retires the previous operation. Busy reuse returns `WouldBlock`; it never overwrites kernel-accessible storage.
 ///
-/// The default implementation delegates to ordinary file operations and tracks retirement through their owned buffers. Completion backends can reuse their request and completion storage. Shared-cursor ordering and owned-buffer cancellation semantics are unchanged. Construction and unpolled operations submit no work.
+/// The default implementation delegates to ordinary file operations and tracks retirement through their owned buffers. Forgetting a polled fallback future can leak this ownership and permanently prevent reuse or close. Completion backends can reuse their request and completion storage. Shared-cursor ordering and owned-buffer cancellation semantics are unchanged. Construction and unpolled operations submit no work.
 pub trait FileMonitoring: FileRead + FileWrite + FileReadAt + FileWriteAt {
     type FileRegistration: Send;
 
