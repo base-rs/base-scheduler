@@ -70,7 +70,7 @@ pub(super) fn pair(capacity: usize) -> (IoUringSelector, IoUringDriver) {
     })
     .unwrap()
 }
-fn file(selector: &IoUringSelector) -> (tempfile::TempDir, NativeFile) {
+pub(super) fn file(selector: &IoUringSelector) -> (tempfile::TempDir, NativeFile) {
     let directory = tempfile::tempdir().unwrap();
     std::fs::write(directory.path().join("file"), b"abcdef").unwrap();
     let file = block_on(selector.file_open(

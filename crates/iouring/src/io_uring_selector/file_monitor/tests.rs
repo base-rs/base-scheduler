@@ -3,7 +3,7 @@
 
 use super::*;
 use core_scheduler_selector::{SelectorDriver, SelectorWorker};
-use futures_lite::future::block_on;
+use futures_lite::future::{block_on, poll_once};
 use std::{pin::Pin, task::Context, time::Instant};
 
 fn drive<F: Future>(
@@ -261,4 +261,99 @@ fn close_and_reuse_both_report_an_abandoned_driver_failure() {
             );
         }
     }
+}
+
+#[test]
+fn admission_cancellation_and_identifier_exhaustion_return_the_buffer() {
+    let (selector, _driver) = super::super::tests::pair(1);
+    let (_directory, file) = super::super::tests::file(&selector);
+    let never = Cancellation::never();
+    let mut monitor = selector.file_monitor(&file).unwrap();
+    let controller = &selector.controllers[0];
+    let permit = block_on(controller.capacity.acquire(&never)).unwrap();
+    let cancellation = Cancellation::new();
+    {
+        let mut operation =
+            pin!(selector.file_monitor_read_at(&mut monitor, vec![42], 0, &cancellation));
+        assert!(block_on(poll_once(operation.as_mut())).is_none());
+        cancellation.cancel();
+        let (result, buffer) = block_on(operation);
+        assert!(matches!(result, Err(OperationError::Cancelled(_))));
+        assert_eq!(buffer, [42]);
+    }
+    drop(permit);
+    controller
+        .next_identifier
+        .store(CANCEL_TAG - 1, Ordering::Relaxed);
+    let (result, buffer) =
+        block_on(selector.file_monitor_read_at(&mut monitor, vec![43], 0, &never));
+    assert_eq!(result.unwrap_err().kind(), io::ErrorKind::Other);
+    assert_eq!(buffer, [43]);
+    block_on(selector.file_monitor_close(&mut monitor, &never)).unwrap();
+}
+
+#[test]
+fn rejected_abandoned_command_is_reclaimed_before_reuse_reports_shutdown() {
+    let (selector, driver) = IoUringSelector::new(Default::default()).unwrap();
+    let worker = driver.enter();
+    let waker = worker.waker();
+    let mut context = Context::from_waker(&waker);
+    let (_directory, file) = super::super::tests::file(&selector);
+    let never = Cancellation::never();
+    let mut monitor = selector.file_monitor(&file).unwrap();
+    let mut operation = Box::pin(selector.file_monitor_read_at(&mut monitor, vec![42], 0, &never));
+    assert!(operation.as_mut().poll(&mut context).is_pending());
+    drop(operation);
+    drop(worker);
+    let (result, buffer) =
+        block_on(selector.file_monitor_read_at(&mut monitor, vec![43], 0, &never));
+    assert_eq!(result.unwrap_err().kind(), io::ErrorKind::BrokenPipe);
+    assert_eq!(buffer, [43]);
+    assert!(monitor.registration().running.is_none());
+    block_on(selector.file_monitor_close(&mut monitor, &never)).unwrap();
+}
+
+struct ClosingBuffer {
+    bytes: Vec<u8>,
+    group: Arc<DriverGroup>,
+}
+impl AsRef<[u8]> for ClosingBuffer {
+    fn as_ref(&self) -> &[u8] {
+        &self.bytes
+    }
+}
+// SAFETY: The Vec retains the same initialized allocation and range throughout ownership, without aliases.
+unsafe impl IoBuf for ClosingBuffer {}
+impl Drop for ClosingBuffer {
+    fn drop(&mut self) {
+        self.group.close();
+    }
+}
+
+#[test]
+fn disposal_of_an_abandoned_owner_can_close_admission_before_publication() {
+    let (selector, driver) = IoUringSelector::new(Default::default()).unwrap();
+    let mut worker = driver.enter();
+    let waker = worker.waker();
+    let mut context = Context::from_waker(&waker);
+    let (_directory, file) = super::super::tests::file(&selector);
+    let never = Cancellation::never();
+    let mut monitor = selector.file_monitor(&file).unwrap();
+    let buffer = ClosingBuffer {
+        bytes: vec![42],
+        group: Arc::clone(&selector.group),
+    };
+    let mut operation = Box::pin(selector.file_monitor_write_at(&mut monitor, buffer, 0, &never));
+    assert!(operation.as_mut().poll(&mut context).is_pending());
+    // Forget only the future; the queued request independently owns its buffer until retirement.
+    std::mem::forget(operation);
+    while !monitor.registration().shared.ready.load(Ordering::Acquire) {
+        worker.turn(Some(Duration::ZERO)).unwrap();
+    }
+    // Changing buffer type discards the cached owner after admission but before publishing the new command.
+    let (result, buffer) =
+        block_on(selector.file_monitor_write_at(&mut monitor, vec![43], 0, &never));
+    assert_eq!(result.unwrap_err().kind(), io::ErrorKind::BrokenPipe);
+    assert_eq!(buffer, [43]);
+    block_on(selector.file_monitor_close(&mut monitor, &never)).unwrap();
 }
