@@ -89,7 +89,7 @@ fn repeated_notifications_retain_one_registration_without_allocations() {
         if iteration >= 2 {
             assert_eq!(counts.count_total, 0);
         }
-        assert!(inspect.registration().pending.load(Ordering::Acquire));
+        assert!(inspect.registration().status.lock().unwrap().pending);
         let current = inspect.registration().status.lock().unwrap().generation;
         if let Some(previous) = generation {
             assert_eq!(current, previous);
@@ -98,7 +98,7 @@ fn repeated_notifications_retain_one_registration_without_allocations() {
     }
     let mut close = pin!(selector.socket_monitor_close(&mut reader, &never));
     drive(&mut worker, &mut context, close.as_mut()).unwrap();
-    assert!(!inspect.registration().pending.load(Ordering::Acquire));
+    assert!(!inspect.registration().status.lock().unwrap().pending);
 }
 
 #[test]
@@ -546,7 +546,7 @@ fn cancelled_and_dropped_waiters_leave_the_registration_active() {
     let mut pending = Box::pin(selector.socket_monitor_wait(&mut reader, &never));
     assert!(pending.as_mut().poll(&mut context).is_pending());
     drop(pending);
-    assert!(alias.registration().pending.load(Ordering::Acquire));
+    assert!(alias.registration().status.lock().unwrap().pending);
     peer.write_all(b"x").unwrap();
     let mut byte = [0];
     let mut read = pin!(selector.socket_monitor_recv_poll(
@@ -587,7 +587,7 @@ fn the_last_application_handle_retires_an_embedded_registration() {
     drop(alias);
     assert!(inspect.registration().status.lock().unwrap().retiring);
     until(&mut worker, || {
-        !inspect.registration().pending.load(Ordering::Acquire)
+        !inspect.registration().status.lock().unwrap().pending
     });
     // The containing allocation can create a new handle after the prior registration retired.
     let mut reader = MonitorStorage::from_arc(owner, |state| state);
@@ -597,7 +597,7 @@ fn the_last_application_handle_retires_an_embedded_registration() {
     drop(waiting);
     drop(reader);
     until(&mut worker, || {
-        !inspect.registration().pending.load(Ordering::Acquire)
+        !inspect.registration().status.lock().unwrap().pending
     });
 }
 
@@ -708,15 +708,12 @@ fn staged(selector: &IoUringSelector, storage: &Storage) -> Submission {
     let mut status = storage.registration().status.lock().unwrap();
     status.generation = generation;
     status.controller = Some(Arc::clone(&selector.controllers[0]));
-    storage
-        .registration()
-        .pending
-        .store(true, Ordering::Release);
-    Submission {
-        storage: storage.retained(),
+    status.pending = true;
+    Submission::new(
+        storage.retained(),
+        Arc::clone(&storage.registration().status),
         generation,
-        finished: false,
-    }
+    )
 }
 
 #[test]
@@ -729,7 +726,7 @@ fn terminal_and_cancellation_cqes_retire_in_either_order() {
             .unwrap();
         let submission = staged(&selector, &storage);
         let token = submission.token();
-        let generation = submission.generation;
+        let generation = submission.retirement.generation;
         let mut monitors = Monitors::new(1);
         monitors.insert(submission);
         assert!(monitors.cancel(token, generation + 2).is_none());
@@ -1008,7 +1005,7 @@ fn one_shot_compatibility_waits_rearm_after_each_terminal_completion() {
         assert!(read.as_mut().poll(&mut context).is_pending());
         peer.write_all(b"x").unwrap();
         assert_eq!(drive(&mut worker, &mut context, read.as_mut()).unwrap(), 1);
-        assert!(!inspect.registration().pending.load(Ordering::Acquire));
+        assert!(!inspect.registration().status.lock().unwrap().pending);
     }
 }
 
@@ -1208,7 +1205,7 @@ fn forgetting_a_wait_cannot_prevent_last_handle_retirement() {
     assert_eq!(inspect.registration().users.load(Ordering::Acquire), 0);
     assert!(inspect.registration().claimed.load(Ordering::Acquire));
     until(&mut worker, || {
-        !inspect.registration().pending.load(Ordering::Acquire)
+        !inspect.registration().status.lock().unwrap().pending
     });
 }
 
@@ -1467,4 +1464,103 @@ fn stream_monitor_preserves_progress_across_live_and_consumed_urgent_data() {
             .socket_stream_monitor(socket, Interest::Readable)
             .unwrap()
     });
+}
+
+#[test]
+fn completion_releases_backend_storage_before_waking() {
+    struct ObserveRelease {
+        owner: std::sync::Weak<State>,
+        released: AtomicBool,
+        woken: AtomicBool,
+    }
+    impl std::task::Wake for ObserveRelease {
+        fn wake(self: Arc<Self>) {
+            self.released
+                .store(self.owner.upgrade().is_none(), Ordering::Release);
+            self.woken.store(true, Ordering::Release);
+        }
+    }
+    for finish in [false, true] {
+        let (selector, _driver) = IoUringSelector::new(options()).unwrap();
+        let (socket, _peer) = sockets(&selector);
+        let owner = Arc::new(
+            selector
+                .socket_monitor_state(&socket, Interest::Readable)
+                .unwrap(),
+        );
+        let observer = Arc::new(ObserveRelease {
+            owner: Arc::downgrade(&owner),
+            released: AtomicBool::new(false),
+            woken: AtomicBool::new(false),
+        });
+        let storage = MonitorStorage::from_arc(owner, |state| state);
+        let submission = staged(&selector, &storage);
+        storage.registration().status.lock().unwrap().waker =
+            Some(Waker::from(Arc::clone(&observer)));
+        drop(storage);
+        if finish {
+            submission.finish(Ok(()));
+        } else {
+            drop(submission);
+        }
+        assert!(observer.woken.load(Ordering::Acquire));
+        assert!(
+            observer.released.load(Ordering::Acquire),
+            "completion woke its caller before releasing the monitor's socket owner"
+        );
+        // The only remaining socket reference belongs to the caller, so immediate exclusive close is valid.
+        let native = socket::retain_socket(&socket);
+        drop(socket);
+        assert!(Arc::try_unwrap(native).is_ok());
+    }
+}
+
+#[test]
+fn a_close_caller_can_release_its_socket_before_the_completion_wake_returns() {
+    struct PauseWake {
+        entered: std::sync::mpsc::Sender<()>,
+        resume: Mutex<std::sync::mpsc::Receiver<()>>,
+    }
+    impl std::task::Wake for PauseWake {
+        fn wake(self: Arc<Self>) {
+            self.entered.send(()).unwrap();
+            self.resume
+                .lock()
+                .unwrap()
+                .recv_timeout(Duration::from_secs(10))
+                .unwrap();
+        }
+    }
+    let (selector, _driver) = IoUringSelector::new(options()).unwrap();
+    let (socket, _peer) = sockets(&selector);
+    let mut monitor = selector
+        .socket_monitor(&socket, Interest::Readable)
+        .unwrap();
+    let submission = staged(&selector, &monitor);
+    let (entered, waking) = std::sync::mpsc::channel();
+    let (resume, resumed) = std::sync::mpsc::channel();
+    let waker = Waker::from(Arc::new(PauseWake {
+        entered,
+        resume: Mutex::new(resumed),
+    }));
+    let mut context = Context::from_waker(&waker);
+    let never = Cancellation::never();
+    let mut thread = None;
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let mut close = Box::pin(selector.socket_monitor_close(&mut monitor, &never));
+        assert!(close.as_mut().poll(&mut context).is_pending());
+        thread = Some(std::thread::spawn(move || submission.finish(Ok(()))));
+        // Hold the completing driver inside the wake callback while independently repolling close.
+        waking.recv_timeout(Duration::from_secs(10)).unwrap();
+        assert!(matches!(
+            close.as_mut().poll(&mut context),
+            Poll::Ready(Ok(()))
+        ));
+        drop(close);
+        drop(monitor);
+        block_on(selector.socket_close(socket)).unwrap();
+    }));
+    let _ = resume.send(());
+    thread.unwrap().join().unwrap();
+    result.unwrap();
 }

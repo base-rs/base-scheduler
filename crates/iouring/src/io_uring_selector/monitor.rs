@@ -18,13 +18,13 @@ pub struct IoUringMonitorRegistration {
     users: AtomicUsize,
     closed: AtomicBool,
     claimed: AtomicBool,
-    pending: AtomicBool,
     readiness: AtomicU64,
     multishot: AtomicBool,
-    status: Mutex<Status>,
+    status: Arc<Mutex<Status>>,
 }
 #[derive(Default)]
 struct Status {
+    pending: bool,
     generation: u64,
     token: u64,
     controller: Option<Arc<Controller>>,
@@ -69,28 +69,13 @@ impl IoUringMonitorRegistration {
         wake(waker);
     }
 
-    fn complete(&self, generation: u64, result: io::Result<()>) {
-        let waker = {
-            let mut status = self.status.lock().unwrap();
-            assert_eq!(status.generation, generation);
-            self.pending.store(false, Ordering::Release);
-            status.controller = None;
-            if !status.retiring {
-                status.error = result.err();
-            }
-            status.retiring = false;
-            status.waker.take()
-        };
-        wake(waker);
-    }
-
     fn retire(&self, close: bool) {
         if close {
             self.closed.store(true, Ordering::Release);
         }
         let command = {
             let mut status = self.status.lock().unwrap();
-            if status.retiring || !self.pending.load(Ordering::Acquire) {
+            if status.retiring || !status.pending {
                 return;
             }
             status.retiring = true;
@@ -198,7 +183,7 @@ impl IoUringSelector {
                 }
                 let mut submission = None;
                 let mut retirement = None;
-                if registration.pending.load(Ordering::Acquire) {
+                if status.pending {
                     if !status.retiring
                         && !Arc::ptr_eq(status.controller.as_ref().unwrap(), &controller)
                     {
@@ -214,12 +199,12 @@ impl IoUringSelector {
                     status.token = state as *const State as u64 | MONITOR_TAG;
                     status.controller = Some(Arc::clone(&controller));
                     status.retiring = false;
-                    registration.pending.store(true, Ordering::Release);
-                    submission = Some(Submission {
-                        storage: monitor.retained_project(AsRef::as_ref),
-                        generation: status.generation,
-                        finished: false,
-                    });
+                    status.pending = true;
+                    submission = Some(Submission::new(
+                        monitor.retained_project(AsRef::as_ref),
+                        Arc::clone(&registration.status),
+                        status.generation,
+                    ));
                 }
                 (status.waker.replace(replacement), submission, retirement)
             };
@@ -261,7 +246,7 @@ impl IoUringSelector {
             let replacement = context.waker().clone();
             let previous = {
                 let mut status = registration.status.lock().unwrap();
-                if !registration.pending.load(Ordering::Acquire) {
+                if !status.pending {
                     return Poll::Ready(Ok(()));
                 }
                 status.waker.replace(replacement)
@@ -321,8 +306,7 @@ impl SocketMonitoring for IoUringSelector {
                 readiness: AtomicU64::new(0),
                 multishot: AtomicBool::new(true),
                 claimed: AtomicBool::new(false),
-                pending: AtomicBool::new(false),
-                status: Mutex::new(Status::default()),
+                status: Arc::new(Mutex::new(Status::default())),
             },
         ))
     }
@@ -404,32 +388,52 @@ impl SocketMonitoring for IoUringSelector {
 }
 
 pub(crate) struct Submission {
+    // Fields drop in declaration order: release the resource owner before retirement publishes completion, even when a submission is rejected or abandoned.
     storage: Storage,
-    generation: u64,
-    finished: bool,
+    retirement: Retirement,
 }
 impl Submission {
+    fn new(storage: Storage, status: Arc<Mutex<Status>>, generation: u64) -> Self {
+        Self {
+            storage,
+            retirement: Retirement {
+                status,
+                generation,
+                error: Some(io::ErrorKind::BrokenPipe.into()),
+            },
+        }
+    }
     fn token(&self) -> u64 {
         self.storage.as_ptr() as u64 | MONITOR_TAG
     }
     pub(super) fn finish(mut self, result: io::Result<()>) {
-        self.finished = true;
-        self.storage
-            .registration()
-            .complete(self.generation, result);
+        self.retirement.error = result.err();
     }
     pub(super) fn cancelled(&self) -> bool {
-        self.storage.registration().status.lock().unwrap().retiring
+        self.retirement.status.lock().unwrap().retiring
     }
 }
 
-impl Drop for Submission {
+// Independent of the monitor's resource-retaining storage, so completion cannot race its destruction or retain a socket that the caller may immediately close.
+struct Retirement {
+    status: Arc<Mutex<Status>>,
+    generation: u64,
+    error: Option<io::Error>,
+}
+impl Drop for Retirement {
     fn drop(&mut self) {
-        if !self.finished {
-            self.storage
-                .registration()
-                .complete(self.generation, Err(io::ErrorKind::BrokenPipe.into()));
-        }
+        let waker = {
+            let mut status = self.status.lock().unwrap();
+            assert_eq!(status.generation, self.generation);
+            status.pending = false;
+            status.controller = None;
+            if !status.retiring {
+                status.error = self.error.take();
+            }
+            status.retiring = false;
+            status.waker.take()
+        };
+        wake(waker);
     }
 }
 
@@ -567,7 +571,8 @@ impl Monitors {
     pub(super) fn cancel(&mut self, token: u64, generation: u64) -> Option<u64> {
         // Cancellation is cold. Compare opaque addresses against live owners instead of dereferencing a possibly stale pointer from a delayed command. Generations are unique per controller, including across address reuse.
         let entry = self.slots.iter_mut().flatten().find(|entry| {
-            entry.submission.token() == token && entry.submission.generation == generation
+            entry.submission.token() == token
+                && entry.submission.retirement.generation == generation
         })?;
         if entry.cancelling {
             return None;

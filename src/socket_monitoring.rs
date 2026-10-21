@@ -39,7 +39,7 @@ pub trait SocketMonitoring:
             .map(MonitorStorage::new)
     }
 
-    /// Construct stream-specific state without allocating. This does not assert connectedness; the backend checks which optimizations apply.
+    /// Construct stream-specific state for embedding, without a separate wrapper allocation. Backend registration setup may allocate. This does not assert connectedness; the backend checks which optimizations apply.
     fn socket_stream_monitor_state(
         &self,
         socket: &Self::Socket,
