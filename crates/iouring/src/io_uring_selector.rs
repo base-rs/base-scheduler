@@ -182,12 +182,23 @@ impl<B: IoBuf> Drop for Request<B> {
 // Only entry preparation (before publication) and original completion may access the request exclusively. In-flight bookkeeping uses shared access so inline UnsafeCell output can remain kernel-accessible without creating an aliasing mutable reference.
 pub(crate) trait PendingRequest: Send {
     fn identifier(&self) -> u64;
+    fn prepare(&mut self, _ring: &io_uring::Submitter<'_>) -> io::Result<()> {
+        Ok(())
+    }
     fn entry(&mut self) -> squeue::Entry;
     // Buffer accessors may run arbitrary user code, including waking tasks. Such requests must return to the executor after preparation instead of waiting.
     fn entry_may_wake(&self) -> bool {
         true
     }
     fn finish(self: Box<Self>, result: io::Result<usize>);
+    fn completion(&self, _result: i32, _flags: u32) {}
+    // None retires; Some(true) resubmits now; Some(false) waits for a buffer return.
+    fn retry(&self, _result: i32) -> Option<bool> {
+        None
+    }
+    fn retire(self: Box<Self>, _ring: &io_uring::Submitter<'_>, result: io::Result<usize>) {
+        self.finish(result);
+    }
     fn cancelling(&self) -> bool;
     fn set_cancelling(&self);
     fn take_reply(&self) -> Option<Box<dyn Send>>;
@@ -235,6 +246,8 @@ impl Drop for InFlight {
 
 pub(crate) enum Command {
     Submit(Box<dyn PendingRequest>),
+    Recycle(Arc<multishot::pool::Pool>, u16),
+    Rearm(u64),
     Cancel(u64),
     CancelAfterSubmission(u64),
     Shutdown,
@@ -258,6 +271,7 @@ pub(crate) struct Controller {
     commands: mpsc::Sender<Command>,
     notification: Arc<OwnedFd>,
     next_identifier: AtomicU64,
+    buffer_groups: Arc<std::sync::Mutex<Vec<bool>>>,
     closed: AtomicBool,
     shutdown: Arc<Shutdown>,
 }
@@ -525,6 +539,7 @@ impl IoUringSelector {
             commands,
             notification,
             next_identifier: AtomicU64::new(0),
+            buffer_groups: Arc::new(std::sync::Mutex::new(Vec::new())),
             closed: AtomicBool::new(false),
             shutdown: Arc::clone(&shutdown),
         });
@@ -800,6 +815,7 @@ pub(crate) struct Reactor {
     incoming: mpsc::Receiver<Command>,
     controller: Arc<Controller>,
     pending: VecDeque<Box<dyn PendingRequest>>,
+    dormant: HashMap<u64, Box<dyn PendingRequest>>,
     in_flight: InFlight,
     cancellations: VecDeque<u64>,
     closing: bool,
@@ -820,6 +836,7 @@ impl Reactor {
             incoming,
             controller,
             pending: VecDeque::new(),
+            dormant: HashMap::new(),
             in_flight: InFlight::default(),
             cancellations: VecDeque::new(),
             closing: false,
@@ -877,7 +894,8 @@ impl Reactor {
         let mut completed = false;
         // The CQ iterator snapshots the available batch. Finish publishing every completion in that batch before returning to the executor; application futures are polled only from its ready queue.
         let mut notification_result = None;
-        for completion in self.ring.completion() {
+        let (submitter, _, mut completions) = self.ring.split();
+        for completion in &mut completions {
             completed = true;
             let identifier = completion.user_data();
             if identifier == NOTIFICATION_TAG {
@@ -888,20 +906,42 @@ impl Reactor {
             if identifier & CANCEL_TAG != 0 {
                 continue;
             }
-            // Every untagged CQE is the single original completion of a published request. Only this path removes it from InFlight.
+            let result = completion.result();
+            let flags = completion.flags();
+            if io_uring::cqueue::more(flags) {
+                self.in_flight
+                    .0
+                    .get(&identifier)
+                    .expect("original completion retains its in-flight request")
+                    .completion(result, flags);
+                continue;
+            }
+            // Only a final original CQE ends kernel access. A cancellation CQE cannot release buffers or a multishot request.
             let request = self
                 .in_flight
                 .0
                 .remove(&identifier)
                 .expect("original completion retains its in-flight request");
-            let result = completion.result();
-            request.finish(if result < 0 {
-                Err(io::Error::from_raw_os_error(-result))
+            request.completion(result, flags);
+            if let Some(ready) = request.retry(result).filter(|_| !self.closing) {
+                if ready {
+                    self.pending.push_back(request);
+                } else {
+                    self.dormant.insert(identifier, request);
+                }
             } else {
-                Ok(result as usize)
-            });
+                request.retire(
+                    &submitter,
+                    if result < 0 {
+                        Err(io::Error::from_raw_os_error(-result))
+                    } else {
+                        Ok(result as usize)
+                    },
+                );
+            }
         }
 
+        drop(completions);
         if let Some(result) = notification_result {
             if result < 0 {
                 return Err(io::Error::from_raw_os_error(-result));
@@ -923,7 +963,16 @@ impl Reactor {
                 .pending
                 .remove(position)
                 .expect("pending queue is unchanged since finding this position");
-            request.finish(Err(io::ErrorKind::Interrupted.into()));
+            request.retire(
+                &self.ring.submitter(),
+                Err(io::ErrorKind::Interrupted.into()),
+            );
+            true
+        } else if let Some(request) = self.dormant.remove(&identifier) {
+            request.retire(
+                &self.ring.submitter(),
+                Err(io::ErrorKind::Interrupted.into()),
+            );
             true
         } else if let Some(request) = self.in_flight.0.get(&identifier) {
             if !request.cancelling() {
@@ -965,6 +1014,17 @@ impl Reactor {
             match command {
                 Command::Submit(request) if !self.closing => self.pending.push_back(request),
                 Command::Submit(request) => request.finish(Err(io::ErrorKind::Interrupted.into())),
+                Command::Recycle(pool, buffer) => {
+                    pool.recycle(buffer);
+                    if let Some(request) = self.dormant.remove(&pool.identifier) {
+                        self.pending.push_back(request);
+                    }
+                }
+                Command::Rearm(identifier) => {
+                    if let Some(request) = self.dormant.remove(&identifier) {
+                        self.pending.push_back(request);
+                    }
+                }
                 Command::Cancel(identifier) => {
                     if !self.cancel(identifier) {
                         // A migrated waiter can cancel through the other queue before its Submit is processed. Defer once to that opposite FIFO: the original Submit was already published before this Cancel existed. Late cancellations are discarded on the second pass rather than retained as tombstones.
@@ -982,7 +1042,16 @@ impl Reactor {
                 Command::Shutdown => {
                     self.closing = true;
                     for request in self.pending.drain(..) {
-                        request.finish(Err(io::ErrorKind::Interrupted.into()));
+                        request.retire(
+                            &self.ring.submitter(),
+                            Err(io::ErrorKind::Interrupted.into()),
+                        );
+                    }
+                    for (_, request) in self.dormant.drain() {
+                        request.retire(
+                            &self.ring.submitter(),
+                            Err(io::ErrorKind::Interrupted.into()),
+                        );
                     }
                     for request in self.in_flight.0.values() {
                         if !request.cancelling() {
@@ -998,7 +1067,7 @@ impl Reactor {
 
         let defer_submission;
         {
-            let mut submissions = self.ring.submission();
+            let (submitter, mut submissions, _) = self.ring.split();
             let had_submissions = !submissions.is_empty();
             let mut prepared = false;
             while let Some(&identifier) = self.cancellations.front() {
@@ -1013,9 +1082,14 @@ impl Reactor {
                 self.cancellations.pop_front();
             }
             while !submissions.is_full() {
-                let Some(request) = self.pending.pop_front() else {
+                let Some(mut request) = self.pending.pop_front() else {
                     break;
                 };
+                if let Err(error) = request.prepare(&submitter) {
+                    request.retire(&submitter, Err(error));
+                    progressed = true;
+                    continue;
+                }
                 let identifier = request.identifier();
                 let request = self.in_flight.0.entry(identifier).or_insert(request);
                 let entry = request.entry();
@@ -1118,6 +1192,18 @@ impl Reactor {
 
 impl Drop for Reactor {
     fn drop(&mut self) {
+        for request in self.pending.drain(..) {
+            request.retire(
+                &self.ring.submitter(),
+                Err(io::ErrorKind::BrokenPipe.into()),
+            );
+        }
+        for (_, request) in self.dormant.drain() {
+            request.retire(
+                &self.ring.submitter(),
+                Err(io::ErrorKind::BrokenPipe.into()),
+            );
+        }
         // Pop without retaining a queue borrow: returning a buffer or waking its owner can reenter local routing.
         while let Some(command) = crate::io_uring_worker::pop(&self.controller) {
             discard(command);
@@ -1137,6 +1223,7 @@ impl std::task::Wake for Controller {
 }
 
 mod message;
+pub(crate) mod multishot;
 mod readiness;
 mod socket;
 

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add io_uring `socket_recvmsg_multishot` with bounded provided-buffer pools, owned receive leases, automatic rearming after exhaustion, and explicit retirement. Add a matched echo benchmark against Tokio and Native readiness I/O.
+
 - Drive Native timers from an exclusively owned queue on each task worker, using the next deadline to bound its I/O wait. Remove the dedicated timer thread, retain original timer ownership across task migration, and configure reserved timer capacity per worker.
 
 - Stage io_uring readiness submissions for at most one nonblocking turn so idle workers can submit and wait together. Publish completions immediately after waiting, while preserving callback-induced wakes and bounded command processing.

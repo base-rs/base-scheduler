@@ -89,7 +89,19 @@ pub(crate) fn enqueue(controller: &Controller, command: Command) -> Result<(), C
             .rev()
             .find(|route| std::ptr::eq(Arc::as_ptr(&route.controller), controller))
         {
-            route.commands.borrow_mut().push_back(command);
+            if let Command::Recycle(pool, buffer) = command {
+                // This thread exclusively owns the provided ring. Returning a
+                // lease needs no queued work while its receive remains armed.
+                pool.recycle(buffer);
+                if pool.needs_rearm() {
+                    route
+                        .commands
+                        .borrow_mut()
+                        .push_back(Command::Rearm(pool.identifier));
+                }
+            } else {
+                route.commands.borrow_mut().push_back(command);
+            }
             Ok(())
         } else {
             Err(command)

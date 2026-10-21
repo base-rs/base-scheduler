@@ -102,6 +102,72 @@ async fn echo_poll<S: SocketRecvPoll + SocketSendPoll>(scheduler: &S, socket: S:
     }
 }
 
+#[cfg(target_os = "linux")]
+async fn multishot_server(
+    scheduler: Arc<core_scheduler_native::NativeScheduler<core_scheduler_iouring::IoUringSelector>>,
+    listener: TcpListener,
+    connections: usize,
+) {
+    use core_scheduler_iouring::RecvMsgMultishotOptions;
+    let listener = scheduler
+        .register_listener(listener)
+        .expect("register listener");
+    let never = Cancellation::never();
+    let mut tasks = Vec::with_capacity(connections);
+    for _ in 0..connections {
+        let (socket, _) = scheduler
+            .socket_accept(&listener, &never)
+            .await
+            .expect("accept connection");
+        scheduler
+            .socket_set_option(&socket, TcpNoDelay, true, &never)
+            .await
+            .expect("TCP_NODELAY");
+        let shared = Arc::clone(&scheduler);
+        tasks.push(
+            scheduler
+                .spawn(async move {
+                    let never = Cancellation::never();
+                    let mut receiving = shared
+                        .selector()
+                        .socket_recvmsg_multishot(
+                            &socket,
+                            RecvMsgMultishotOptions::default(),
+                            SocketRecvFlags::default(),
+                            &never,
+                        )
+                        .await
+                        .expect("start multishot receive");
+                    while let Some(message) =
+                        receiving.recv(&never).await.expect("multishot receive")
+                    {
+                        let mut bytes = message.buffer.as_ref();
+                        while !bytes.is_empty() {
+                            let sent = shared
+                                .socket_send_poll(
+                                    &socket,
+                                    bytes,
+                                    SocketSendFlags::default(),
+                                    &never,
+                                )
+                                .await
+                                .expect("echo write");
+                            assert_ne!(sent, 0, "echo write made zero progress");
+                            bytes = &bytes[sent..];
+                        }
+                        // The original ring recycles this buffer; no new receive is submitted.
+                        drop(message);
+                    }
+                    receiving.close().await.expect("retire multishot receive");
+                })
+                .expect("spawn echo task"),
+        );
+    }
+    for task in tasks {
+        task.await.expect("echo task failed");
+    }
+}
+
 async fn scheduler_server<S>(
     scheduler: Arc<S>,
     listener: TcpListener,
@@ -168,12 +234,12 @@ pub(crate) fn run(backend: &str, workers: usize, connections: usize) -> Result<(
             runtime.block_on(scheduler.shutdown());
         }
         #[cfg(target_os = "linux")]
-        "iouring" | "iouring-poll" => {
+        "iouring" | "iouring-poll" | "iouring-multishot" => {
             use core_scheduler_iouring::{IoUringOptions, IoUringSelector};
             use core_scheduler_native::{NativeExecutorOptions, NativeScheduler};
             let (selector, drivers) = IoUringSelector::with_workers(
                 IoUringOptions {
-                    capacity: connections.max(256),
+                    capacity: connections.saturating_mul(2).max(256),
                     ..Default::default()
                 },
                 workers,
@@ -191,12 +257,20 @@ pub(crate) fn run(backend: &str, workers: usize, connections: usize) -> Result<(
                 .expect("Native runtime setup"),
             );
             ready(&listener);
-            scheduler.block_on(scheduler_server(
-                Arc::clone(&scheduler),
-                listener,
-                connections,
-                backend == "iouring-poll",
-            ));
+            if backend == "iouring-multishot" {
+                scheduler.block_on(multishot_server(
+                    Arc::clone(&scheduler),
+                    listener,
+                    connections,
+                ));
+            } else {
+                scheduler.block_on(scheduler_server(
+                    Arc::clone(&scheduler),
+                    listener,
+                    connections,
+                    backend == "iouring-poll",
+                ));
+            }
             scheduler.block_on(scheduler.shutdown());
         }
         _ => return Err("unknown backend (iouring requires Linux)".into()),

@@ -93,6 +93,11 @@ fn native_iouring() {
 fn native_iouring_poll() {
     smoke("iouring-poll");
 }
+#[cfg(target_os = "linux")]
+#[test]
+fn native_iouring_multishot() {
+    smoke("iouring-multishot");
+}
 
 #[test]
 fn invalid_configuration_fails_before_running_a_workload() {
