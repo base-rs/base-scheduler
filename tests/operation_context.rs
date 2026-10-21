@@ -27,8 +27,7 @@ impl<Socket> Body<Socket> {
     }
 }
 
-// Two test-only services intentionally share a resource representation. This
-// establishes generic composition without promising compatibility for real backends.
+// Two test-only services intentionally share a resource representation. This establishes generic composition without promising compatibility for real backends.
 struct ReadService {
     calls: AtomicUsize,
 }

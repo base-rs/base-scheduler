@@ -50,7 +50,6 @@ impl<B: IoBufMut> AsMut<[u8]> for BufferSlice<B> {
     }
 }
 
-// SAFETY: The view retains its owner and always exposes the same validated
-// subrange. Moving the view does not move or resize the backing allocation.
+// SAFETY: The view retains its owner and always exposes the same validated subrange. Moving the view does not move or resize the backing allocation.
 unsafe impl<B: IoBuf> IoBuf for BufferSlice<B> {}
 unsafe impl<B: IoBufMut> IoBufMut for BufferSlice<B> {}

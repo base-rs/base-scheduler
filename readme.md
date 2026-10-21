@@ -1,4 +1,4 @@
-# Core Scheduler
+# `core-scheduler`
 
 Explicit scheduler capabilities for reusable Rust protocol libraries. Applications choose an execution environment; libraries ask for the operations they need.
 
@@ -9,13 +9,14 @@ The workspace also contains seven companion crates, released together with the i
 - [`core-scheduler-conformance`](crates/conformance/readme.md): reusable capability-specific assertions for backend development dependencies.
 - [`core-scheduler-direct`](crates/direct/readme.md): reference implementations of tasks, clocks, native address resolution, file/socket operations, and platform-supported signals and filesystem extensions, with explicit service ownership and bounded syscall admission.
 - [`core-scheduler-tokio`](crates/tokio/readme.md): an adapter for an explicitly selected Tokio runtime, preserving owning task handles, owned I/O, cancellation, and bounded native-work admission.
-
 - [`core-scheduler-native`](crates/native/readme.md): Socketry's work-stealing executor and native readiness I/O, with Core ownership and shutdown semantics.
 - [`core-scheduler-selector`](crates/selector/readme.md): independent I/O lifecycle contracts and the portable readiness selector.
 - [`core-scheduler-iouring`](crates/iouring/readme.md): Linux completion file and socket I/O with a separately owned event driver and explicit readiness fallback.
 - [`core-scheduler-timers`](crates/timers/readme.md): runtime-independent batched timers, reusable sleep registrations, and deadline notifications.
 
-## Explicit operation context
+## Usage
+
+The workspace is not published yet. Add the interface from Git with `cargo add core-scheduler --git https://github.com/core-rs/core-scheduler`. Applications also select a companion backend; reusable libraries require only the interface capabilities they use.
 
 Keep resources and protocol state in an object, and pass the scheduler and cancellation to each operation. The resulting future borrows that operation's execution context:
 
@@ -87,6 +88,10 @@ where
 
 Retain the monitor across operations to reuse its registration. Create separate readable and writable monitors for concurrent tasks. `SocketStreamMonitor` wraps the common state without another allocation; `socket_stream_monitor_state` and `MonitorStorage::from_arc` also let you embed it in shared connection state. It does not imply connectedness or a universal rule for short reads. Scheduler and cancellation remain explicit operation arguments.
 
+## Receiving message sequences
+
+`SocketRecvMsgMultishot` is an optional bounded receive capability. Its receiver returns owned `IoBuf` message leases via `recv(scheduler, cancellation)`, with metadata, truncation, and stream EOF semantics. io_uring uses kernel multishot receives; readiness backends use on-demand nonblocking receives and a fixed reusable buffer pool. Neither a background task nor a payload allocation per message is required. Receivers retain resources, while each receive and close takes its scheduler explicitly.
+
 ## Cancellation, ownership, and completion
 
 `Cancellation` is a runtime-independent cooperative signal. Clones share state, children inherit ancestor cancellation, and dropping a signal does not cancel it. Cancellation requests and completed cleanup are separate events.
@@ -99,17 +104,27 @@ Operation futures are lazy unless explicitly documented otherwise. Pre-cancellat
 
 A task handle owns its task: moving transfers ownership, awaiting observes completion, and dropping requests destruction after any active poll returns. Runtime adapters must preserve this contract, including when their host runtime normally detaches on drop. The interface exposes no forced-abort method or implicit task hierarchy.
 
-See the [design and behavioral contracts](context/design.md) for resource compatibility, shutdown, cancellation boundaries, and extraction decisions.
-
 ## Development
 
 Install the launcher with `cargo install bake --locked`. The private `bake/` workspace member supplies the shared Core development tasks:
 
 ```sh
-cargo bake --locked test:coverage --all-targets true
+cargo bake --locked test:coverage --all-targets true --all-features true
 ```
 
-The tests cover runtime-independent support, generic composition, reusable conformance assertions, and the Direct, Tokio, and Native backends.
+The tests cover runtime-independent support, generic composition, reusable conformance assertions, and the Direct, Tokio, Native, readiness, and io_uring backends.
+
+## Releasing
+
+Prepare a release with `cargo bake cargo:version:patch` (or `minor`, `major`, or `bump --version X.Y.Z`), then run `cargo bake cargo:release` and open a pull request. After review and merge, GitHub Actions publishes the release when the configured `crates-io` environment approves it. Follow the shared [Releasing skill](https://github.com/core-rs/core-project/blob/main/context/releasing.md) for the standard process.
+
+## Releases
+
+The workspace has not been released. See [release notes](releases.md) for changes awaiting the first release.
+
+## See Also
+
+See the [design and behavioral contracts](context/design.md) for resource compatibility, shutdown, cancellation boundaries, and extraction decisions.
 
 The [TCP echo benchmark](benchmarks/echo/readme.md) compares pure Tokio, the Tokio scheduler adapter, and Native with per-worker io_uring rings using separate server and client processes.
 
@@ -120,5 +135,3 @@ Please open an issue or pull request on [GitHub](https://github.com/core-rs/core
 ### Agent Context
 
 Run `cargo bake agent:context:install` to install shared context and skills. Use `cargo bake agent:context:list` and `cargo bake agent:context:show` to discover guidance. Follow `agents.md` and the relevant skills under `.agents/skills/`.
-
-`SocketRecvMsgMultishot` is an optional bounded receive capability. Its receiver returns owned `IoBuf` message leases via `recv(scheduler, cancellation)`, with metadata, truncation, and stream EOF semantics. io_uring uses kernel multishot receives; readiness backends use on-demand nonblocking receives and a fixed reusable buffer pool. Neither a background task nor a payload allocation per message is required. Receivers retain resources, while each receive and close takes its scheduler explicitly.

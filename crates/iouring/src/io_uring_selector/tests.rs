@@ -1198,8 +1198,7 @@ fn nonblocking_turn_preserves_notifications_for_the_next_idle_turn() {
 
 #[test]
 fn notifications_racing_idle_preparation_remain_observable() {
-    // Cover notification before initial publication, initial blocking
-    // publication, and a wait whose notification poll is already armed.
+    // Cover notification before initial publication, initial blocking publication, and a wait whose notification poll is already armed.
     for (name, already_armed) in [("submit", false), ("wait", false), ("wait", true)] {
         let (selector, mut driver) = pair(1);
         if already_armed {
@@ -1776,8 +1775,7 @@ fn idle_waits_do_not_read_the_eventfd_without_a_notification_completion() {
         assert_eq!(FAILURES.with(|failures| failures.borrow().len()), 1);
     }
     driver.waker().wake_by_ref();
-    // The armed poll now reports the remote notification. Its CQE, rather
-    // than an idle-boundary read, drains the counter and retries interruption.
+    // The armed poll now reports the remote notification. Its CQE, rather than an idle-boundary read, drains the counter and retries interruption.
     driver
         .reactor
         .as_mut()

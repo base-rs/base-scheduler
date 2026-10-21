@@ -15,8 +15,7 @@ pub enum OperationError {
 pub type OperationResult<T> = Result<T, OperationError>;
 
 impl OperationError {
-    /// I/O-compatible classification; match `Cancelled` to distinguish a
-    /// cooperative request from an OS interruption.
+    /// I/O-compatible classification; match `Cancelled` to distinguish a cooperative request from an OS interruption.
     pub fn kind(&self) -> io::ErrorKind {
         match self {
             Self::Cancelled(_) => io::ErrorKind::Interrupted,
