@@ -20,5 +20,3 @@ core-scheduler-iouring = { path = "../../crates/iouring" }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
-
-
