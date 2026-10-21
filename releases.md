@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Stage io_uring readiness submissions for at most one nonblocking turn so idle workers can submit and wait together. Publish completions immediately after waiting, while preserving callback-induced wakes and bounded command processing.
+
 - Skip empty Native admission-queue steals and unchanged timer-queue flushes, reducing idle-path synchronization and timer bookkeeping while preserving remote wakeups.
 
 - Process Native tasks in alternating, stealable ready batches with an I/O driver turn between batches. Avoid redundant worker self-interrupts while preserving remote wakeups and shutdown progress.

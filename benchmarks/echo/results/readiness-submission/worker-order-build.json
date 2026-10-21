@@ -1,0 +1,53 @@
+{
+  "source": "8400db7da957dfd7dd84de13f210c2b41a98ece1",
+  "patches": {
+    "candidate.patch": "9fc28e0e1d63a41d35a4572b93c724fb54134d3cbfd015444b62fc25eacc954f",
+    "loop.patch": "191cc1de7b7ec0111fcb7dc6dbce34243ff7f3aa1cb37140b9b767da9a27cc1b",
+    "submit.patch": "5ffc0da6931c332e3e5941259222a29f533a43d74780092fd5e59d8e03baca5c"
+  },
+  "rustc": "rustc 1.99.0 (b940084d7 2026-09-28) (Arch Linux rust 1:1.99.0-1)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+  "environment_overrides": {},
+  "binaries": {
+    "before": {
+      "path": "/home/samuel/.cache/core-scheduler-readiness-research/before-echo",
+      "sha256": "3f22166e2d1a5b6fad19f9d8bc4bb48ad342e2fbce292f2cb1baaaac1a9e2e5c",
+      "command": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "-p",
+        "core-scheduler-echo-benchmark"
+      ],
+      "source_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "loop-only": {
+      "path": "/home/samuel/.cache/core-scheduler-readiness-research/loop-only-echo",
+      "sha256": "4673408260e1f5e5a2e6c4c7f3b5b354de25ee5ed9d2da58c65c5c30b6ef8c52",
+      "command": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "-p",
+        "core-scheduler-echo-benchmark"
+      ],
+      "source_diff_sha256": "191cc1de7b7ec0111fcb7dc6dbce34243ff7f3aa1cb37140b9b767da9a27cc1b"
+    },
+    "readiness-submit": {
+      "path": "/home/samuel/.cache/core-scheduler-readiness-research/readiness-submit-echo",
+      "sha256": "023c8dc0cdffdb66da68c3bb343edd102ea291347e74bb3c6aff37becd6f2bdb",
+      "command": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "-p",
+        "core-scheduler-echo-benchmark"
+      ],
+      "source_diff_sha256": "9fc28e0e1d63a41d35a4572b93c724fb54134d3cbfd015444b62fc25eacc954f"
+    }
+  },
+  "tests": "Native and io_uring all features passed",
+  "finished_utc": "2026-10-20T21:54:59Z"
+}

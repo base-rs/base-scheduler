@@ -31,6 +31,11 @@ impl PendingRequest for ReadinessRequest {
             .user_data(self.identifier)
     }
 
+    fn entry_may_wake(&self) -> bool {
+        // Only fixed native socket metadata is accessed; no buffer callbacks.
+        false
+    }
+
     fn finish(self: Box<Self>, result: io::Result<usize>) {
         let reply = self
             .reply
