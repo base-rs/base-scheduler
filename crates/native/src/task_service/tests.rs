@@ -3,9 +3,14 @@
 
 use super::*;
 use crate::{NativeScheduler, test_support};
-use core_scheduler::{Cancellation, Spawn};
+use core_scheduler::{Cancellation, Spawn, TaskError};
 use core_scheduler_conformance::SpawnFixture;
 use futures_lite::future::block_on;
+use std::{
+    panic::{AssertUnwindSafe, catch_unwind},
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 impl SpawnFixture for NativeScheduler {
     type Scheduler = Self;

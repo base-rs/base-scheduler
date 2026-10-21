@@ -195,7 +195,7 @@ impl IoUringSelector {
                         ));
                     }
                 } else {
-                    status.generation = Self::next_identifier(&controller)?;
+                    status.generation = controller.next_identifier()?;
                     status.token = state as *const State as u64 | MONITOR_TAG;
                     status.controller = Some(Arc::clone(&controller));
                     status.retiring = false;

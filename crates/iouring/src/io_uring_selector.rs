@@ -199,8 +199,8 @@ pub(crate) trait PendingRequest: Send {
     fn retire(self: Box<Self>, _ring: &io_uring::Submitter<'_>, result: io::Result<usize>) {
         self.finish(result);
     }
-    fn cancelling(&self) -> bool;
-    fn set_cancelling(&self);
+    // Return true only for the transition which first requests cancellation.
+    fn begin_cancellation(&self) -> bool;
     fn take_reply(&self) -> Option<Box<dyn Send>>;
 }
 impl<B: IoBuf> PendingRequest for Request<B> {
@@ -213,11 +213,8 @@ impl<B: IoBuf> PendingRequest for Request<B> {
     fn finish(self: Box<Self>, result: io::Result<usize>) {
         Request::finish(*self, result);
     }
-    fn cancelling(&self) -> bool {
-        self.cancelling.get()
-    }
-    fn set_cancelling(&self) {
-        self.cancelling.set(true);
+    fn begin_cancellation(&self) -> bool {
+        !self.cancelling.replace(true)
     }
     fn take_reply(&self) -> Option<Box<dyn Send>> {
         self.reply
@@ -321,6 +318,16 @@ impl Controller {
                 _ => break,
             }
         }
+    }
+
+    // `try_update` is not available on the supported Rust 1.85 toolchain.
+    #[allow(deprecated)]
+    fn next_identifier(&self) -> io::Result<u64> {
+        self.next_identifier
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |identifier| {
+                (identifier < CANCEL_TAG - 2).then_some(identifier + 2)
+            })
+            .map_err(|_| io::Error::other("io_uring operation identifiers exhausted"))
     }
 
     pub(crate) fn close(&self) {
@@ -627,7 +634,7 @@ impl IoUringSelector {
             Ok(permit) => permit,
             Err(error) => return (Err(error), buffer),
         };
-        let identifier = match Self::next_identifier(&controller) {
+        let identifier = match controller.next_identifier() {
             Ok(identifier) => identifier,
             Err(error) => return (Err(error), buffer),
         };
@@ -643,17 +650,6 @@ impl IoUringSelector {
             cancelling: Cell::new(false),
         };
         Self::submit(controller, Box::new(request), result, cancellation).await
-    }
-
-    // `try_update` is not available on the supported Rust 1.85 toolchain.
-    #[allow(deprecated)]
-    fn next_identifier(controller: &Controller) -> io::Result<u64> {
-        controller
-            .next_identifier
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |identifier| {
-                (identifier < CANCEL_TAG - 2).then_some(identifier + 2)
-            })
-            .map_err(|_| io::Error::other("io_uring operation identifiers exhausted"))
     }
 
     async fn submit<T>(
@@ -1002,8 +998,7 @@ impl Reactor {
             );
             true
         } else if let Some(request) = self.in_flight.0.get(&identifier) {
-            if !request.cancelling() {
-                request.set_cancelling();
+            if request.begin_cancellation() {
                 self.cancellations.push_back(identifier);
             }
             true
@@ -1012,8 +1007,31 @@ impl Reactor {
         }
     }
 
-    pub(crate) fn turn(&mut self, timeout: Option<Duration>) -> io::Result<bool> {
-        self.started = true;
+    fn retire_pending(&mut self, kind: io::ErrorKind) {
+        for submission in self.pending_monitors.drain(..) {
+            submission.finish(Err(kind.into()));
+        }
+        for request in self.pending.drain(..) {
+            request.retire(&self.ring.submitter(), Err(kind.into()));
+        }
+        for (_, request) in self.dormant.drain() {
+            request.retire(&self.ring.submitter(), Err(kind.into()));
+        }
+    }
+
+    fn close(&mut self) {
+        self.closing = true;
+        self.monitors.close(&mut self.cancellations);
+        self.retire_pending(io::ErrorKind::Interrupted);
+        for request in self.in_flight.0.values() {
+            if request.begin_cancellation() {
+                self.cancellations.push_back(request.identifier());
+            }
+        }
+    }
+
+    // Returns whether command handling could have woken tasks and whether it reached the batch limit.
+    fn process_commands(&mut self) -> (bool, bool) {
         let mut progressed = false;
         // Bound command processing so a busy producer cannot starve completions.
         let mut command_batch_full = true;
@@ -1077,33 +1095,16 @@ impl Reactor {
                 Command::CancelAfterSubmission(identifier) => {
                     self.cancel(identifier);
                 }
-                Command::Shutdown => {
-                    self.closing = true;
-                    self.monitors.close(&mut self.cancellations);
-                    for submission in self.pending_monitors.drain(..) {
-                        submission.finish(Err(io::ErrorKind::Interrupted.into()));
-                    }
-                    for request in self.pending.drain(..) {
-                        request.retire(
-                            &self.ring.submitter(),
-                            Err(io::ErrorKind::Interrupted.into()),
-                        );
-                    }
-                    for (_, request) in self.dormant.drain() {
-                        request.retire(
-                            &self.ring.submitter(),
-                            Err(io::ErrorKind::Interrupted.into()),
-                        );
-                    }
-                    for request in self.in_flight.0.values() {
-                        if !request.cancelling() {
-                            request.set_cancelling();
-                            self.cancellations.push_back(request.identifier());
-                        }
-                    }
-                }
+                Command::Shutdown => self.close(),
             }
         }
+
+        (progressed, command_batch_full)
+    }
+
+    pub(crate) fn turn(&mut self, timeout: Option<Duration>) -> io::Result<bool> {
+        self.started = true;
+        let (mut progressed, command_batch_full) = self.process_commands();
 
         progressed |= self.collect_completions()?;
 
@@ -1251,21 +1252,7 @@ impl Reactor {
 
 impl Drop for Reactor {
     fn drop(&mut self) {
-        for submission in self.pending_monitors.drain(..) {
-            submission.finish(Err(io::ErrorKind::BrokenPipe.into()));
-        }
-        for request in self.pending.drain(..) {
-            request.retire(
-                &self.ring.submitter(),
-                Err(io::ErrorKind::BrokenPipe.into()),
-            );
-        }
-        for (_, request) in self.dormant.drain() {
-            request.retire(
-                &self.ring.submitter(),
-                Err(io::ErrorKind::BrokenPipe.into()),
-            );
-        }
+        self.retire_pending(io::ErrorKind::BrokenPipe);
         // Pop without retaining a queue borrow: returning a buffer or waking its owner can reenter local routing.
         while let Some(command) = crate::io_uring_worker::pop(&self.controller) {
             discard(command);

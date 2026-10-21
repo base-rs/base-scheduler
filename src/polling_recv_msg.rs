@@ -26,6 +26,29 @@ impl Pool {
             pool: Arc::clone(self),
         })
     }
+
+    async fn lease(self: &Arc<Self>, cancellation: &Cancellation) -> Result<Lease, Cancelled> {
+        if let Some(lease) = self.try_lease() {
+            return Ok(lease);
+        }
+        let mut cancelled = pin!(cancellation.cancelled());
+        loop {
+            event_listener::listener!(self.returned => listener);
+            // Register before rechecking so a concurrently returned lease cannot lose its wakeup between the empty check and this wait.
+            if let Some(lease) = self.try_lease() {
+                return Ok(lease);
+            }
+            let mut listener = pin!(listener);
+            poll_fn(|context| {
+                if listener.as_mut().poll(context).is_ready() {
+                    Poll::Ready(Ok(()))
+                } else {
+                    cancelled.as_mut().poll(context).map(|_| Err(Cancelled))
+                }
+            })
+            .await?;
+        }
+    }
 }
 
 struct Lease {
@@ -61,14 +84,18 @@ impl AsRef<[u8]> for PollingRecvMsgBuffer {
 // and allocation remain unchanged while the buffer moves or an operation owns it.
 unsafe impl IoBuf for PollingRecvMsgBuffer {}
 
+struct Receiving<Socket> {
+    socket: Socket,
+    pool: Arc<Pool>,
+}
+
 /// A bounded receive resource built from synchronous nonblocking message receives.
 ///
 /// Each `recv` uses the explicitly supplied scheduler. The resource retains its
 /// socket and payload pool, without retaining a scheduler or starting a background
 /// task. Retaining all returned leases pauses the next receive until one is dropped.
 pub struct PollingRecvMsg<Socket, Check> {
-    socket: Option<Socket>,
-    pool: Option<Arc<Pool>>,
+    receiving: Option<Receiving<Socket>>,
     stream: bool,
     flags: SocketRecvFlags,
     check: Check,
@@ -104,8 +131,10 @@ impl<Socket, Check> PollingRecvMsg<Socket, Check> {
         // Some platforms initialize their native mutex on the first lock.
         drop(free.lock().unwrap());
         Ok(Self {
-            socket: Some(socket),
-            pool: Some(Arc::new(Pool { free, returned })),
+            receiving: Some(Receiving {
+                socket,
+                pool: Arc::new(Pool { free, returned }),
+            }),
             stream: kind == SocketType::Stream,
             flags,
             check,
@@ -113,8 +142,7 @@ impl<Socket, Check> PollingRecvMsg<Socket, Check> {
     }
 
     fn retire(&mut self) {
-        self.socket.take();
-        self.pool.take();
+        self.receiving.take();
     }
 }
 
@@ -132,41 +160,20 @@ where
         cancellation: &Cancellation,
     ) -> OperationResult<Option<RecvMsgMultishotMessage<Self::Buffer>>> {
         cancellation.check()?;
-        if let Some(socket) = self.socket.as_ref() {
-            (self.check)(scheduler, socket)?;
-        }
-        let Some(pool) = self.pool.as_ref().map(Arc::clone) else {
+        let Some(receiving) = &self.receiving else {
             return Ok(None);
         };
-        let mut lease = if let Some(lease) = pool.try_lease() {
-            lease
-        } else {
-            let mut cancelled = pin!(cancellation.cancelled());
-            loop {
-                event_listener::listener!(pool.returned => listener);
-                // Register before rechecking so a concurrently returned lease
-                // cannot lose its wakeup between the empty check and this wait.
-                if let Some(lease) = pool.try_lease() {
-                    break lease;
-                }
-                let mut listener = pin!(listener);
-                let ready = poll_fn(|context| {
-                    if listener.as_mut().poll(context).is_ready() {
-                        Poll::Ready(true)
-                    } else {
-                        cancelled.as_mut().poll(context).map(|_| false)
-                    }
-                })
-                .await;
-                if !ready {
-                    self.retire();
-                    return Err(Cancelled.into());
-                }
+        (self.check)(scheduler, &receiving.socket)?;
+        let mut lease = match receiving.pool.lease(cancellation).await {
+            Ok(lease) => lease,
+            Err(error) => {
+                self.retire();
+                return Err(error.into());
             }
         };
         let result = scheduler
             .socket_recvmsg_poll(
-                self.socket.as_ref().unwrap(),
+                &receiving.socket,
                 &mut [IoSliceMut::new(lease.bytes.as_mut().unwrap())],
                 self.flags,
                 cancellation,
@@ -192,8 +199,8 @@ where
     }
 
     async fn close(&mut self, scheduler: &S) -> io::Result<()> {
-        if let Some(socket) = self.socket.as_ref() {
-            (self.check)(scheduler, socket)?;
+        if let Some(receiving) = &self.receiving {
+            (self.check)(scheduler, &receiving.socket)?;
         }
         self.retire();
         Ok(())

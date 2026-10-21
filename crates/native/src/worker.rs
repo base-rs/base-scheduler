@@ -311,37 +311,42 @@ fn run_loop(
         let Some(runnable) = runnable else {
             continue;
         };
-        // Freeze the batch. Wakes during task polling go into the now-empty next queue.
-        let has_more = CURRENT_WORKER.with(|current| {
-            let mut current = current.borrow_mut();
-            let local = current.as_mut().expect("worker context is installed");
-            std::mem::swap(&mut local.ready, &mut local.current);
-            !local.current.is_empty()
-        });
-        if has_more {
-            shared.wake_idle(UNASSIGNED_WORKER);
-        }
-        let mut runnable = Some(runnable);
-        while let Some(task) = runnable {
-            task.metadata().worker.store(identifier, Ordering::Relaxed);
-            // Contain task-machinery panics as well as the guarded future's panics.
-            crate::panic::contain(|| {
-                task.run();
-            });
-            shared.retire_runnable();
-            runnable = CURRENT_WORKER.with(|current| {
-                current
-                    .borrow()
-                    .as_ref()
-                    .expect("worker context is installed")
-                    .current
-                    .pop()
-            });
-        }
+        run_ready_batch(&shared, runnable);
         // Publish the available completion batch before starting the next task batch.
         drive(&mut driver, Some(Duration::ZERO));
     }
     CURRENT_WORKER.with(|current| current.take());
+}
+
+#[inline(always)]
+fn run_ready_batch(shared: &Shared, first: Runnable) {
+    // Freeze the batch. Wakes during task polling go into the now-empty next queue.
+    let (identifier, has_more) = CURRENT_WORKER.with(|current| {
+        let mut current = current.borrow_mut();
+        let local = current.as_mut().expect("worker context is installed");
+        std::mem::swap(&mut local.ready, &mut local.current);
+        (local.identifier, !local.current.is_empty())
+    });
+    if has_more {
+        shared.wake_idle(UNASSIGNED_WORKER);
+    }
+    let mut runnable = Some(first);
+    while let Some(task) = runnable {
+        task.metadata().worker.store(identifier, Ordering::Relaxed);
+        // Contain task-machinery panics as well as the guarded future's panics.
+        crate::panic::contain(|| {
+            task.run();
+        });
+        shared.retire_runnable();
+        runnable = CURRENT_WORKER.with(|current| {
+            current
+                .borrow()
+                .as_ref()
+                .expect("worker context is installed")
+                .current
+                .pop()
+        });
+    }
 }
 
 #[cfg(test)]

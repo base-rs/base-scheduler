@@ -46,12 +46,8 @@ impl PendingRequest for ReadinessRequest {
         discard(reply.send(result));
     }
 
-    fn cancelling(&self) -> bool {
-        self.cancelling.get()
-    }
-
-    fn set_cancelling(&self) {
-        self.cancelling.set(true);
+    fn begin_cancellation(&self) -> bool {
+        !self.cancelling.replace(true)
     }
 
     fn take_reply(&self) -> Option<Box<dyn Send>> {
@@ -88,7 +84,7 @@ impl IoUringSelector {
             controller.capacity.acquire(cancellation).await,
             cancellation,
         )?;
-        let identifier = Self::next_identifier(&controller)?;
+        let identifier = controller.next_identifier()?;
         let (reply, result) = oneshot::channel();
         let request = ReadinessRequest {
             identifier,
