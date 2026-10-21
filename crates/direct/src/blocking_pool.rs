@@ -87,7 +87,7 @@ impl BlockingPool {
                 return Err(io::Error::other("injected thread startup failure"));
             }
             thread::Builder::new()
-                .name(format!("protocol-direct-{identifier}"))
+                .name(format!("core-direct-{identifier}"))
                 .spawn(move || work(shared))
                 .map(drop)
         })

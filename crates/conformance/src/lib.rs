@@ -21,6 +21,7 @@ pub mod spawn;
 mod address_resolution_fixture;
 mod address_resolution_ip_tests;
 mod address_resolution_tests;
+mod blocking_fixture;
 mod blocking_queue_tests;
 mod blocking_tests;
 mod clock_fixture;
@@ -55,6 +56,7 @@ mod spawn_tests;
 mod test_cases;
 
 pub use address_resolution_fixture::AddressResolutionFixture;
+pub use blocking_fixture::BlockingFixture;
 pub use clock_fixture::ClockFixture;
 pub use file_advice_fixture::FileAdviceFixture;
 pub use file_allocate_fixture::FileAllocateFixture;

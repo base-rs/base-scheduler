@@ -98,7 +98,7 @@ impl SignalService {
             let native_handle = native.handle();
             let shared = Arc::clone(&self.shared);
             shared.state.lock().unwrap().exited = false;
-            if let Err(error) = thread::start("protocol-direct-signal", move || {
+            if let Err(error) = thread::start("core-direct-signal", move || {
                 let _exit = DispatchExit(shared.clone());
                 for signal in native.forever() {
                     shared.dispatch(signal);

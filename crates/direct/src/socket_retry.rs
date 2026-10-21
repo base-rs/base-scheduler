@@ -76,7 +76,7 @@ impl SocketRetry {
                 }
                 let shared = Arc::clone(&self.shared);
                 thread::Builder::new()
-                    .name("protocol-direct-socket-retry".into())
+                    .name("core-direct-socket-retry".into())
                     .spawn(move || work(shared))
                     .map(drop)
             })

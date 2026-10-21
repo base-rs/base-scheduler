@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use super::*;
+use super::super::*;
 
 /// A registration key belonging to its originating [`TimerQueue`]. Release it after expiry or cancellation so its slot can be reused.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -100,5 +100,4 @@ impl<Value> TimerQueue<Value> {
 }
 
 #[cfg(test)]
-#[path = "tests.rs"]
 mod tests;

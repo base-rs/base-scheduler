@@ -628,5 +628,4 @@ impl<Value> Drop for Timers<Value> {
 mod tests;
 
 #[cfg(feature = "local")]
-#[path = "local/timer_queue.rs"]
 pub mod local;

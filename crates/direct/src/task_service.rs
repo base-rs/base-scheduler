@@ -101,7 +101,7 @@ impl TaskService {
         };
         for _ in 0..threads {
             let shared = Arc::clone(&service.shared);
-            thread::start("protocol-direct-task", move || work(shared))?;
+            thread::start("core-direct-task", move || work(shared))?;
         }
         Ok(service)
     }

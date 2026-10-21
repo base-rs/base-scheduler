@@ -87,7 +87,7 @@ impl BlockingPool {
                 return Err(io::Error::other("injected thread startup failure"));
             }
             thread::Builder::new()
-                .name(format!("protocol-tokio-{identifier}"))
+                .name(format!("core-tokio-{identifier}"))
                 .spawn(move || work(shared))
                 .map(drop)
         })

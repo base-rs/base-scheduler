@@ -2,6 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 //! Blocking-work assertions. The caller drives futures on its own executor; synchronous closures run on the backend's blocking workers.
+pub use crate::BlockingFixture;
 use core_scheduler::{Blocking, BlockingError, Cancellation, TaskError};
 use futures_lite::future::poll_once;
 use std::sync::{
@@ -97,17 +98,6 @@ pub async fn panic_payload<S: Blocking>(scheduler: &S) {
         panic!("expected retained panic payload");
     };
     assert_eq!(*payload.downcast::<String>().unwrap(), "conformance panic");
-}
-
-/// Backend fixture for deterministic queue tests. Exclusive fixture ownership is required while these assertions run.
-pub trait BlockingFixture {
-    /// Service being tested.
-    type Scheduler: Blocking;
-    /// Holding every worker prevents queued jobs from starting. Dropping the guard releases them even during unwinding.
-    type Guard;
-    fn scheduler(&self) -> &Self::Scheduler;
-    /// Hold every worker at an execution boundary, leaving exactly one admission slot available.
-    fn hold_workers(&self) -> impl std::future::Future<Output = Self::Guard>;
 }
 
 /// Check queued cancellation and bounded, cancellation-aware admission while workers are held by the fixture.

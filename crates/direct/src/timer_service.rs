@@ -89,7 +89,7 @@ impl TimerService {
         let mut started = self.started.lock().unwrap();
         if !*started {
             let shared = Arc::clone(&self.shared);
-            thread::start("protocol-direct-timer", move || work(shared))?;
+            thread::start("core-direct-timer", move || work(shared))?;
             *started = true;
         }
         Ok(())

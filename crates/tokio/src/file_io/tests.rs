@@ -45,7 +45,7 @@ fn read_and_write_reject_offsets_outside_the_platform_range() {
 fn file_io_operations_read_and_write_at_the_requested_offset() {
     static NEXT_FILE: AtomicU64 = AtomicU64::new(0);
     let path = std::env::temp_dir().join(format!(
-        "protocol-tokio-file-{}-{}",
+        "core-tokio-file-{}-{}",
         std::process::id(),
         NEXT_FILE.fetch_add(1, Ordering::Relaxed)
     ));
