@@ -36,6 +36,8 @@ The [worker hot-path measurements](worker-hotpath-research.md) and [worker-loop 
 
 The [readiness submission research](readiness-submission-research.md) measures bounded staging of readiness requests and immediate completion publication after ring waits, including the rejected worker-order change and the retained combined variant.
 
+The [multishot receive comparison](multishot-performance.md) measures persistent io_uring `recvmsg` with provided-buffer leases against pure Tokio and Native `_poll`.
+
 Build and run the comparison on Linux:
 
 ```sh
