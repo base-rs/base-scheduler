@@ -70,6 +70,31 @@ impl SocketOperation for DirectScheduler {
     type Socket = DirectSocket;
 }
 
+impl SocketRecvMsgMultishot for DirectScheduler {
+    type Receiver = PollingRecvMsg<DirectSocket, fn(&Self, &DirectSocket) -> io::Result<()>>;
+
+    async fn socket_recvmsg_multishot(
+        &self,
+        socket: &DirectSocket,
+        options: RecvMsgMultishotOptions,
+        flags: SocketRecvFlags,
+        cancellation: &Cancellation,
+    ) -> OperationResult<Self::Receiver> {
+        cancellation.check()?;
+        self.socket_retry.check_open()?;
+        let kind = socket_io::recvmsg_socket_type(&socket.0)?;
+        let compatible: fn(&Self, &DirectSocket) -> io::Result<()> = |_, _| Ok(());
+        PollingRecvMsg::new(
+            DirectSocket(socket.retain()),
+            kind,
+            options,
+            flags,
+            compatible,
+        )
+        .map_err(Into::into)
+    }
+}
+
 impl SocketOpen for DirectScheduler {
     async fn socket_open(
         &self,

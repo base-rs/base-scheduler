@@ -3,9 +3,9 @@
 
 use crate::Result;
 use core_scheduler::{
-    Cancellation, IoBuf, SocketAccept, SocketRead, SocketRecvFlags, SocketRecvPoll,
-    SocketRegistration, SocketSendFlags, SocketSendPoll, SocketSetOption, SocketWrite, Spawn,
-    TcpNoDelay,
+    Cancellation, IoBuf, RecvMsgMultishotOptions, SocketAccept, SocketRead, SocketRecvFlags,
+    SocketRecvMsgMultishot, SocketRecvMsgReceiver, SocketRecvPoll, SocketRegistration,
+    SocketSendFlags, SocketSendPoll, SocketSetOption, SocketWrite, Spawn, TcpNoDelay,
 };
 use core_scheduler_tokio::TokioScheduler;
 use std::{
@@ -102,6 +102,81 @@ async fn echo_poll<S: SocketRecvPoll + SocketSendPoll>(scheduler: &S, socket: S:
     }
 }
 
+async fn multishot_server<S>(scheduler: Arc<S>, listener: TcpListener, connections: usize)
+where
+    S: SocketRegistration
+        + SocketAccept
+        + SocketSetOption<TcpNoDelay>
+        + SocketRecvMsgMultishot
+        + SocketSendPoll
+        + Spawn
+        + Send
+        + Sync
+        + 'static,
+{
+    let listener = scheduler
+        .register_listener(listener)
+        .expect("register listener");
+    let never = Cancellation::never();
+    let mut tasks = Vec::with_capacity(connections);
+    for _ in 0..connections {
+        let (socket, _) = scheduler
+            .socket_accept(&listener, &never)
+            .await
+            .expect("accept connection");
+        scheduler
+            .socket_set_option(&socket, TcpNoDelay, true, &never)
+            .await
+            .expect("TCP_NODELAY");
+        let shared = Arc::clone(&scheduler);
+        tasks.push(
+            scheduler
+                .spawn(async move {
+                    let never = Cancellation::never();
+                    let mut receiving = shared
+                        .socket_recvmsg_multishot(
+                            &socket,
+                            RecvMsgMultishotOptions::default(),
+                            SocketRecvFlags::default(),
+                            &never,
+                        )
+                        .await
+                        .expect("start multishot receive");
+                    while let Some(message) = receiving
+                        .recv(shared.as_ref(), &never)
+                        .await
+                        .expect("multishot receive")
+                    {
+                        let mut bytes = message.buffer.as_ref();
+                        while !bytes.is_empty() {
+                            let sent = shared
+                                .socket_send_poll(
+                                    &socket,
+                                    bytes,
+                                    SocketSendFlags::default(),
+                                    &never,
+                                )
+                                .await
+                                .expect("echo write");
+                            assert_ne!(sent, 0, "echo write made zero progress");
+                            bytes = &bytes[sent..];
+                        }
+                        // Return this lease to the backend's fixed receive pool.
+                        drop(message);
+                    }
+                    receiving
+                        .close(shared.as_ref())
+                        .await
+                        .expect("retire multishot receive");
+                })
+                .expect("spawn echo task"),
+        );
+    }
+    for task in tasks {
+        task.await.expect("echo task failed");
+    }
+}
+
 async fn scheduler_server<S>(
     scheduler: Arc<S>,
     listener: TcpListener,
@@ -155,25 +230,33 @@ pub(crate) fn run(backend: &str, workers: usize, connections: usize) -> Result<(
             ready(&listener);
             runtime.block_on(tokio_server(listener, connections));
         }
-        "tokio-adapter" | "tokio-adapter-poll" => {
+        "tokio-adapter" | "tokio-adapter-poll" | "tokio-adapter-multishot" => {
             let runtime = crate::runtime(workers);
             let scheduler = Arc::new(TokioScheduler::new(runtime.handle().clone()));
             ready(&listener);
-            runtime.block_on(scheduler_server(
-                Arc::clone(&scheduler),
-                listener,
-                connections,
-                backend == "tokio-adapter-poll",
-            ));
+            if backend == "tokio-adapter-multishot" {
+                runtime.block_on(multishot_server(
+                    Arc::clone(&scheduler),
+                    listener,
+                    connections,
+                ));
+            } else {
+                runtime.block_on(scheduler_server(
+                    Arc::clone(&scheduler),
+                    listener,
+                    connections,
+                    backend == "tokio-adapter-poll",
+                ));
+            }
             runtime.block_on(scheduler.shutdown());
         }
         #[cfg(target_os = "linux")]
-        "iouring" | "iouring-poll" => {
+        "iouring" | "iouring-poll" | "iouring-multishot" => {
             use core_scheduler_iouring::{IoUringOptions, IoUringSelector};
             use core_scheduler_native::{NativeExecutorOptions, NativeScheduler};
             let (selector, drivers) = IoUringSelector::with_workers(
                 IoUringOptions {
-                    capacity: connections.max(256),
+                    capacity: connections.saturating_mul(2).max(256),
                     ..Default::default()
                 },
                 workers,
@@ -191,12 +274,20 @@ pub(crate) fn run(backend: &str, workers: usize, connections: usize) -> Result<(
                 .expect("Native runtime setup"),
             );
             ready(&listener);
-            scheduler.block_on(scheduler_server(
-                Arc::clone(&scheduler),
-                listener,
-                connections,
-                backend == "iouring-poll",
-            ));
+            if backend == "iouring-multishot" {
+                scheduler.block_on(multishot_server(
+                    Arc::clone(&scheduler),
+                    listener,
+                    connections,
+                ));
+            } else {
+                scheduler.block_on(scheduler_server(
+                    Arc::clone(&scheduler),
+                    listener,
+                    connections,
+                    backend == "iouring-poll",
+                ));
+            }
             scheduler.block_on(scheduler.shutdown());
         }
         _ => return Err("unknown backend (iouring requires Linux)".into()),

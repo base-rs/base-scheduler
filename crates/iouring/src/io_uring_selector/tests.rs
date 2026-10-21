@@ -8,7 +8,7 @@ use std::{sync::atomic::AtomicUsize, time::Instant};
 use std::cell::RefCell;
 type SyscallHook = (&'static str, Box<dyn FnOnce()>);
 thread_local! {
-    static BEFORE_SYSCALL: RefCell<Option<SyscallHook>> = const { RefCell::new(None) };
+    pub(super) static BEFORE_SYSCALL: RefCell<Option<SyscallHook>> = const { RefCell::new(None) };
     static FAILURES: RefCell<VecDeque<(&'static str, Option<io::Error>)>> = const { RefCell::new(VecDeque::new()) };
 }
 

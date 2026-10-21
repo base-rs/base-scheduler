@@ -73,6 +73,24 @@ impl SocketOperation for ReadinessSelector {
     type Socket = NativeSocket;
 }
 
+impl SocketRecvMsgMultishot for ReadinessSelector {
+    type Receiver = PollingRecvMsg<NativeSocket, fn(&Self, &NativeSocket) -> io::Result<()>>;
+
+    async fn socket_recvmsg_multishot(
+        &self,
+        socket: &NativeSocket,
+        options: RecvMsgMultishotOptions,
+        flags: SocketRecvFlags,
+        cancellation: &Cancellation,
+    ) -> OperationResult<Self::Receiver> {
+        cancellation.check()?;
+        self.check_open()?;
+        let kind = socket_io::recvmsg_socket_type(socket.get_ref())?;
+        let compatible: fn(&Self, &NativeSocket) -> io::Result<()> = |_, _| Ok(());
+        PollingRecvMsg::new(socket.retain(), kind, options, flags, compatible).map_err(Into::into)
+    }
+}
+
 impl SocketOpen for ReadinessSelector {
     async fn socket_open(
         &self,

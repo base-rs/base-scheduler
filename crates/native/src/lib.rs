@@ -27,3 +27,5 @@ pub use native_executor_options::NativeExecutorOptions;
 pub use native_options::NativeOptions;
 pub use native_scheduler::NativeScheduler;
 pub use native_task::NativeTask;
+
+pub use selector_operations::NativeRecvMsgReceiver;

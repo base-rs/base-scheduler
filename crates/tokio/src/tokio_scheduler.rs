@@ -87,6 +87,9 @@ impl TokioScheduler {
     }
     pub(crate) fn check_socket(&self, socket: &crate::TokioSocket) -> io::Result<()> {
         self.check_open()?;
+        self.check_socket_compatibility(socket)
+    }
+    pub(crate) fn check_socket_compatibility(&self, socket: &crate::TokioSocket) -> io::Result<()> {
         if socket.runtime() != self.runtime.id() {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,

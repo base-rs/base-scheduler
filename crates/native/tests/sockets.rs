@@ -309,3 +309,21 @@ fn aggregate_socket_helpers_remain_compatible() {
         core_scheduler_conformance::socket_messages::datagrams(scheduler, sender, receiver).await;
     });
 }
+
+#[test]
+fn multishot_messages_use_the_explicit_native_scheduler() {
+    run(|| {
+        let scheduler = scheduler();
+        block_on(socket::multishot_messages(&scheduler));
+        block_on(scheduler.shutdown());
+    });
+}
+
+#[test]
+fn multishot_stream_uses_the_explicit_native_scheduler() {
+    run(|| {
+        let scheduler = scheduler();
+        block_on(socket::multishot_stream(&scheduler));
+        block_on(scheduler.shutdown());
+    });
+}

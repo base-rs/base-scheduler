@@ -50,3 +50,5 @@ scheduler.block_on(scheduler.shutdown());
 ```
 
 Selectors may supply their own progress mechanism. The readiness selector is independently driven by `async-io`. `with_drivers(selector, drivers, options)` instead assigns one driver to each task worker, with no separate ring thread. Each `SelectorDriver` enters its worker and supplies `SelectorWorker` event waits, interruptible wakeups, and bounded completion processing. Native polls ready tasks only after a complete driver turn publishes its completions. Workers continue retiring accepted I/O after tasks are abandoned, and can keep executing tasks after a driver has retired. See the [io_uring selector](../iouring/readme.md) for per-worker ring construction and routing.
+
+Native forwards the optional `SocketRecvMsgMultishot` capability when its selector implements it. The returned resource accepts the Native scheduler explicitly for `recv` and `close`, forwarding to that scheduler's selector without retaining a scheduler instance.

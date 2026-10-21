@@ -69,6 +69,25 @@ impl SocketOperation for TokioScheduler {
     type Socket = TokioSocket;
 }
 
+impl SocketRecvMsgMultishot for TokioScheduler {
+    type Receiver = PollingRecvMsg<TokioSocket, fn(&Self, &TokioSocket) -> io::Result<()>>;
+
+    async fn socket_recvmsg_multishot(
+        &self,
+        socket: &TokioSocket,
+        options: RecvMsgMultishotOptions,
+        flags: SocketRecvFlags,
+        cancellation: &Cancellation,
+    ) -> OperationResult<Self::Receiver> {
+        cancellation.check()?;
+        self.check_socket(socket)?;
+        let kind = socket_io::recvmsg_socket_type(socket.get_ref())?;
+        let compatible: fn(&Self, &TokioSocket) -> io::Result<()> =
+            Self::check_socket_compatibility;
+        PollingRecvMsg::new(socket.retain(), kind, options, flags, compatible).map_err(Into::into)
+    }
+}
+
 impl SocketOpen for TokioScheduler {
     async fn socket_open(
         &self,

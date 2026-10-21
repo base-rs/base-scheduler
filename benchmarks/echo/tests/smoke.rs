@@ -93,6 +93,11 @@ fn native_iouring() {
 fn native_iouring_poll() {
     smoke("iouring-poll");
 }
+#[cfg(target_os = "linux")]
+#[test]
+fn native_iouring_multishot() {
+    smoke("iouring-multishot");
+}
 
 #[test]
 fn invalid_configuration_fails_before_running_a_workload() {
@@ -155,4 +160,9 @@ fn every_client_field_is_validated_and_server_connection_count_must_be_positive(
         Process::new(&args).finish(false);
     }
     Process::new(&["server", "tokio", "1", "0"]).finish(false);
+}
+
+#[test]
+fn tokio_adapter_multishot() {
+    smoke("tokio-adapter-multishot");
 }
