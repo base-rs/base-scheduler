@@ -102,7 +102,7 @@ fn repeated_notifications_retain_one_registration_without_allocations() {
 }
 
 #[test]
-fn short_stream_reads_wait_without_a_speculative_receive_and_preserve_eof() {
+fn short_stream_reads_clear_readiness_only_on_would_block_and_preserve_eof() {
     let (selector, driver) = IoUringSelector::new(options()).unwrap();
     let mut worker = driver.enter();
     let wake = worker.waker();
@@ -126,7 +126,7 @@ fn short_stream_reads_wait_without_a_speculative_receive_and_preserve_eof() {
         3
     );
     assert_eq!(&bytes[..3], b"one");
-    assert!(inspect.registration().read_started.load(Ordering::Acquire));
+
     assert_eq!(
         inspect.registration().readiness.load(Ordering::Acquire) & 1,
         0
@@ -150,7 +150,7 @@ fn short_stream_reads_wait_without_a_speculative_receive_and_preserve_eof() {
             &never
         ));
         assert!(receive.as_mut().poll(&mut context).is_pending());
-        assert_eq!(attempts.load(Ordering::Relaxed), 0);
+        assert_eq!(attempts.load(Ordering::Relaxed), 1);
         worker.turn(Some(Duration::ZERO)).unwrap();
         peer.write_all(b"two").unwrap();
         assert_eq!(
@@ -160,7 +160,7 @@ fn short_stream_reads_wait_without_a_speculative_receive_and_preserve_eof() {
     }
     assert_eq!(attempts.load(Ordering::Relaxed), 1);
     assert_eq!(&bytes[..3], b"two");
-    assert_eq!(
+    assert_ne!(
         inspect.registration().readiness.load(Ordering::Acquire) & 1,
         0
     );
@@ -219,14 +219,13 @@ fn full_reads_keep_progress_and_short_reads_preserve_racing_notifications() {
         2
     );
     assert_eq!(&full, b"ab");
-    assert!(!inspect.registration().read_started.load(Ordering::Acquire));
 
     // Model a CQ notification delivered concurrently with the successful short syscall.
     let notified = inspect.retained();
     super::super::tests::BEFORE_SYSCALL.with(|hook| {
         *hook.borrow_mut() = Some((
             "monitor-recv",
-            Box::new(move || notified.registration().notify(libc::POLLIN as i32)),
+            Box::new(move || notified.registration().notify()),
         ));
     });
     let mut short = [0; 8];
@@ -241,7 +240,7 @@ fn full_reads_keep_progress_and_short_reads_preserve_racing_notifications() {
         1
     );
     assert_eq!(short[0], b'c');
-    assert!(inspect.registration().read_started.load(Ordering::Acquire));
+
     assert_ne!(
         inspect.registration().readiness.load(Ordering::Acquire) & 1,
         0
@@ -285,10 +284,6 @@ fn shutdown_readiness_survives_the_last_short_receive() {
         peer.shutdown(std::net::Shutdown::Write).unwrap();
         drive(&mut worker, &mut context, waiting.as_mut()).unwrap();
     }
-    // Deliver peer shutdown before consuming its final bytes. There need not be a new readiness edge after that last short receive.
-    until(&mut worker, || {
-        inspect.registration().readiness.load(Ordering::Acquire) & SHUTDOWN != 0
-    });
     let mut bytes = [0; 16];
     assert_eq!(
         block_on(selector.socket_monitor_recv_poll(
@@ -302,8 +297,8 @@ fn shutdown_readiness_survives_the_last_short_receive() {
     );
     assert_eq!(&bytes[..4], b"last");
     assert_eq!(
-        inspect.registration().readiness.load(Ordering::Acquire) & (READY | SHUTDOWN),
-        READY | SHUTDOWN
+        inspect.registration().readiness.load(Ordering::Acquire) & READY,
+        READY
     );
     assert_eq!(
         block_on(selector.socket_monitor_recv_poll(
@@ -320,25 +315,7 @@ fn shutdown_readiness_survives_the_last_short_receive() {
 }
 
 #[test]
-fn error_notifications_do_not_imply_permanent_peer_shutdown() {
-    let (selector, _driver) = IoUringSelector::new(options()).unwrap();
-    let (socket, _peer) = sockets(&selector);
-    let reader = selector
-        .socket_stream_monitor(&socket, Interest::Readable)
-        .unwrap();
-    // Socket errors can be consumed or cleared; unlike EOF, they must not make readiness permanent.
-    reader.registration().notify(libc::POLLERR as i32);
-    let readiness = reader.registration().readiness.load(Ordering::Acquire);
-    assert_eq!(readiness & SHUTDOWN, 0);
-    reader.registration().clear_readiness(readiness);
-    assert_eq!(
-        reader.registration().readiness.load(Ordering::Acquire) & READY,
-        0
-    );
-}
-
-#[test]
-fn readiness_first_receive_cancellation_leaves_the_stream_usable() {
+fn pending_receive_cancellation_leaves_the_stream_usable() {
     let (selector, driver) = IoUringSelector::new(options()).unwrap();
     let mut worker = driver.enter();
     let wake = worker.waker();
@@ -390,7 +367,7 @@ fn readiness_first_receive_cancellation_leaves_the_stream_usable() {
 }
 
 #[test]
-fn peeking_empty_receives_and_unknown_socket_types_keep_syscall_semantics() {
+fn peeking_and_empty_receives_keep_syscall_semantics() {
     let (selector, driver) = IoUringSelector::new(options()).unwrap();
     let mut worker = driver.enter();
     let wake = worker.waker();
@@ -474,31 +451,6 @@ fn peeking_empty_receives_and_unknown_socket_types_keep_syscall_semantics() {
         1
     );
     assert_eq!(bytes[0], b'y');
-
-    for query in ["monitor-socket-type", "monitor-socket-protocol"] {
-        let _failure = super::super::tests::Failures::new([(query, io::ErrorKind::Other.into())]);
-        let mut conservative = selector
-            .socket_stream_monitor(&socket, Interest::Readable)
-            .unwrap();
-        assert!(!conservative.registration().tcp);
-        peer.write_all(b"z").unwrap();
-        assert_eq!(
-            block_on(selector.socket_monitor_recv_poll(
-                &mut conservative,
-                &mut bytes,
-                SocketRecvFlags::default(),
-                &never
-            ))
-            .unwrap(),
-            1
-        );
-        assert!(
-            !conservative
-                .registration()
-                .read_started
-                .load(Ordering::Acquire)
-        );
-    }
 }
 
 #[test]
@@ -515,7 +467,7 @@ fn datagram_scalar_receives_do_not_treat_short_messages_as_stream_exhaustion() {
     let mut reader = selector
         .socket_monitor(&socket, Interest::Readable)
         .unwrap();
-    assert!(!reader.registration().tcp);
+
     // Queue several datagrams before the first syscall. A short message does not mean there are no further messages.
     for payload in [&b"x"[..], b"", b"yz"] {
         peer.send(payload).unwrap();
@@ -533,7 +485,6 @@ fn datagram_scalar_receives_do_not_treat_short_messages_as_stream_exhaustion() {
             expected.len()
         );
         assert_eq!(&bytes[..expected.len()], expected);
-        assert!(!reader.registration().read_started.load(Ordering::Acquire));
     }
 }
 
@@ -556,7 +507,6 @@ fn unconnected_stream_receives_return_the_os_error_without_waiting() {
     )))
     .expect("unconnected receive must not wait for readiness");
     assert_eq!(result.unwrap_err().kind(), io::ErrorKind::NotConnected);
-    assert!(!reader.registration().read_started.load(Ordering::Acquire));
 }
 
 #[test]
@@ -999,7 +949,7 @@ fn cached_readiness_survives_success_and_newer_notifications_survive_would_block
         .socket_monitor(&socket, Interest::Writable)
         .unwrap();
     let inspect = writer.retained();
-    inspect.registration().notify(libc::POLLIN as i32);
+    inspect.registration().notify();
     let before = inspect.registration().readiness.load(Ordering::Acquire);
     let mut attempts = 0;
     assert_eq!(
@@ -1008,7 +958,7 @@ fn cached_readiness_survives_success_and_newer_notifications_survive_would_block
                 attempts += 1;
                 if attempts == 1 {
                     // A notification racing the syscall's EAGAIN must not be cleared using the older readiness tick.
-                    inspect.registration().notify(libc::POLLIN as i32);
+                    inspect.registration().notify();
                     Err(io::ErrorKind::WouldBlock.into())
                 } else {
                     Ok(5)
@@ -1324,7 +1274,7 @@ fn a_general_tcp_monitor_keeps_syscall_first_behavior_after_short_reads() {
         .socket_monitor(&socket, Interest::Readable)
         .unwrap();
     let never = Cancellation::never();
-    reader.registration().notify(libc::POLLIN as i32);
+    reader.registration().notify();
     peer.write_all(b"a").unwrap();
     let mut buffer = [0; 16];
     assert_eq!(
@@ -1337,7 +1287,7 @@ fn a_general_tcp_monitor_keeps_syscall_first_behavior_after_short_reads() {
         .unwrap(),
         1
     );
-    assert!(!reader.registration().read_started.load(Ordering::Acquire));
+
     assert_ne!(
         reader.registration().readiness.load(Ordering::Acquire) & READY,
         0
@@ -1371,8 +1321,8 @@ fn a_stream_monitor_on_a_datagram_socket_keeps_message_semantics() {
     let mut reader = selector
         .socket_stream_monitor(&socket, Interest::Readable)
         .unwrap();
-    assert!(!reader.registration().tcp);
-    reader.registration().notify(libc::POLLIN as i32);
+
+    reader.registration().notify();
     for payload in [&b"x"[..], b"", b"yz"] {
         peer.send(payload).unwrap();
     }
@@ -1393,13 +1343,20 @@ fn a_stream_monitor_on_a_datagram_socket_keeps_message_semantics() {
             reader.registration().readiness.load(Ordering::Acquire) & READY,
             0
         );
-        assert!(!reader.registration().read_started.load(Ordering::Acquire));
     }
 }
 
-#[test]
-fn urgent_tcp_boundary_keeps_trailing_bytes_readable() {
-    for (armed, inline) in [(false, false), (true, false), (false, true), (true, true)] {
+fn urgent_tcp_boundary<M: SocketMonitorState<NativeSocket, IoUringMonitorRegistration>>(
+    monitor: impl Fn(&IoUringSelector, &NativeSocket) -> MonitorStorage<M>,
+) {
+    for (armed, inline, consumed) in [
+        (false, false, false),
+        (true, false, false),
+        (false, true, false),
+        (true, true, false),
+        (false, false, true),
+        (true, false, true),
+    ] {
         let (selector, driver) = IoUringSelector::new(options()).unwrap();
         let mut worker = driver.enter();
         let wake = worker.waker();
@@ -1409,17 +1366,6 @@ fn urgent_tcp_boundary_keeps_trailing_bytes_readable() {
             .get_ref()
             .set_out_of_band_inline(inline)
             .unwrap();
-        let mut reader = selector
-            .socket_stream_monitor(&socket, Interest::Readable)
-            .unwrap();
-        let inspect = reader.retained();
-        let never = Cancellation::never();
-        if armed {
-            // Cover a persistent poll which was armed before the urgent mark arrived.
-            let mut waiting = pin!(selector.socket_monitor_wait(&mut reader, &never));
-            assert!(waiting.as_mut().poll(&mut context).is_pending());
-            worker.turn(Some(Duration::ZERO)).unwrap();
-        }
         peer.write_all(b"before").unwrap();
         assert_eq!(
             socket2::SockRef::from(&peer)
@@ -1428,8 +1374,21 @@ fn urgent_tcp_boundary_keeps_trailing_bytes_readable() {
             1
         );
         peer.write_all(b"after").unwrap();
-        // Coalesce the loopback segments before collecting the readiness snapshot.
         std::thread::sleep(Duration::from_millis(10));
+        if consumed {
+            // Consuming OOB removes POLLPRI but leaves the ordinary receive's short-read boundary.
+            let mut urgent = [std::mem::MaybeUninit::uninit(); 1];
+            assert_eq!(
+                socket::retain_socket(&socket)
+                    .get_ref()
+                    .recv_out_of_band(&mut urgent)
+                    .unwrap(),
+                1
+            );
+        }
+        let mut reader = monitor(&selector, &socket);
+        let inspect = reader.retained();
+        let never = Cancellation::never();
         if armed {
             let mut waiting = pin!(selector.socket_monitor_wait(&mut reader, &never));
             drive(&mut worker, &mut context, waiting.as_mut()).unwrap();
@@ -1470,12 +1429,8 @@ fn urgent_tcp_boundary_keeps_trailing_bytes_readable() {
                 &b"after"[..]
             }
         );
-        assert_ne!(
-            inspect.registration().readiness.load(Ordering::Acquire) & URGENT,
-            0
-        );
         {
-            // Urgent-data history disables the short-read hint; it must not make readiness permanent or busy-loop after the normal bytes are drained.
+            // Draining the ordinary bytes still clears readiness on WouldBlock, without spinning.
             let mut receive = pin!(selector.socket_monitor_recv_poll(
                 &mut reader,
                 &mut buffer,
@@ -1484,11 +1439,32 @@ fn urgent_tcp_boundary_keeps_trailing_bytes_readable() {
             ));
             assert!(receive.as_mut().poll(&mut context).is_pending());
             assert_eq!(
-                inspect.registration().readiness.load(Ordering::Acquire) & (READY | URGENT),
-                URGENT
+                inspect
+                    .as_ref()
+                    .registration()
+                    .readiness
+                    .load(Ordering::Acquire)
+                    & READY,
+                0
             );
         }
         let mut close = pin!(selector.socket_monitor_close(&mut reader, &never));
         drive(&mut worker, &mut context, close.as_mut()).unwrap();
     }
+}
+
+#[test]
+fn urgent_tcp_boundary_keeps_trailing_bytes_readable() {
+    urgent_tcp_boundary(|selector, socket| {
+        selector.socket_monitor(socket, Interest::Readable).unwrap()
+    });
+}
+
+#[test]
+fn stream_monitor_preserves_progress_across_live_and_consumed_urgent_data() {
+    urgent_tcp_boundary(|selector, socket| {
+        selector
+            .socket_stream_monitor(socket, Interest::Readable)
+            .unwrap()
+    });
 }

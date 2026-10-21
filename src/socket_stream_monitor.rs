@@ -8,6 +8,8 @@ use std::ops::Deref;
 ///
 /// Construct through `SocketMonitoring::socket_stream_monitor_state` or `socket_stream_monitor`, then use the ordinary `socket_monitor_*` operations. Readable and writable monitors remain independent. A stream monitor does not assert that a socket is connected, nor that every short receive exhausts readiness: backends select applicable policies for the actual socket and platform. Other socket types retain ordinary monitoring behavior.
 ///
+/// Current backends preserve readiness after short reads and clear it only on `WouldBlock`; the distinct type is a specialization point for future stream policies.
+///
 /// Like `SocketMonitor`, this state can be embedded in an `Arc`-owned connection and projected with `MonitorStorage::from_arc`. The wrapper adds no allocation or registration.
 pub struct SocketStreamMonitor<Socket, Registration> {
     monitor: SocketMonitor<Socket, Registration>,

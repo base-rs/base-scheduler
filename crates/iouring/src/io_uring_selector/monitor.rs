@@ -7,8 +7,6 @@ use std::task::Waker;
 
 pub(super) const MONITOR_TAG: u64 = 1;
 const READY: u64 = 1;
-const SHUTDOWN: u64 = 2;
-const URGENT: u64 = 4;
 const NO_SLOT: usize = usize::MAX;
 type State = SocketMonitor<NativeSocket, IoUringMonitorRegistration>;
 pub(super) type Storage = MonitorStorage<State>;
@@ -22,8 +20,6 @@ pub struct IoUringMonitorRegistration {
     claimed: AtomicBool,
     pending: AtomicBool,
     readiness: AtomicU64,
-    tcp: bool,
-    read_started: AtomicBool,
     multishot: AtomicBool,
     status: Mutex<Status>,
 }
@@ -47,10 +43,6 @@ fn wake(waker: Option<Waker>) {
 
 impl IoUringMonitorRegistration {
     fn clear_readiness(&self, observed: u64) {
-        // Peer-shutdown readiness is permanent: clearing it after the last bytes could strand the next EOF read without another edge.
-        if observed & SHUTDOWN != 0 {
-            return;
-        }
         // Preserve notifications published after the syscall took its readiness snapshot.
         discard(self.readiness.compare_exchange(
             observed,
@@ -62,24 +54,14 @@ impl IoUringMonitorRegistration {
 
     // `try_update` is not available on the supported Rust 1.85 toolchain.
     #[allow(deprecated)]
-    fn notify(&self, events: i32) {
+    fn notify(&self) {
         let waker = {
             let mut status = self.status.lock().unwrap();
-            // The low bits cache readiness, peer shutdown and observed urgent data; the remaining bits distinguish notifications racing a syscall. Like readiness ticks in other reactors, this counter wraps.
-            let terminal = if events & (libc::POLLHUP | libc::POLLRDHUP) as i32 != 0 {
-                SHUTDOWN
-            } else {
-                0
-            };
-            let urgent = if events & libc::POLLPRI as i32 != 0 {
-                URGENT
-            } else {
-                0
-            };
+            // The low bit caches readiness; the remaining bits distinguish notifications racing a syscall. Like readiness ticks in other reactors, this counter wraps.
             discard(
                 self.readiness
                     .fetch_update(Ordering::AcqRel, Ordering::Acquire, |value| {
-                        Some(value.wrapping_add(8) | READY | terminal | urgent)
+                        Some(value.wrapping_add(2) | READY)
                     }),
             );
             status.waker.take()
@@ -295,20 +277,7 @@ impl IoUringSelector {
         monitor: &MonitorStorage<M>,
         interest: Interest,
         cancellation: &Cancellation,
-        operation: impl FnMut(&NativeSocket) -> io::Result<T> + Send,
-    ) -> OperationResult<T> {
-        self.monitor_io_with(monitor, interest, cancellation, false, operation, |_| false)
-            .await
-    }
-
-    async fn monitor_io_with<T, M: SocketMonitorState<NativeSocket, IoUringMonitorRegistration>>(
-        &self,
-        monitor: &MonitorStorage<M>,
-        interest: Interest,
-        cancellation: &Cancellation,
-        ready_first: bool,
         mut operation: impl FnMut(&NativeSocket) -> io::Result<T> + Send,
-        drained: impl Fn(&T) -> bool + Send,
     ) -> OperationResult<T> {
         let state = monitor.as_ref();
         let registration = state.registration();
@@ -316,13 +285,6 @@ impl IoUringSelector {
         self.check_monitor(state)?;
         state.check_interest(interest)?;
         loop {
-            // Only an established stream's nonempty, consuming receive may skip the speculative syscall. Other operations retain immediate OS results.
-            if ready_first
-                && registration.read_started.load(Ordering::Acquire)
-                && registration.readiness.load(Ordering::Acquire) & (READY | URGENT) == 0
-            {
-                self.monitor_wait(monitor, cancellation).await?;
-            }
             let readiness = registration.readiness.load(Ordering::Acquire);
             match operation(state.socket()) {
                 Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
@@ -332,16 +294,6 @@ impl IoUringSelector {
                 Err(error) if error.kind() == io::ErrorKind::Interrupted => {
                     cancellation.check()?;
                     self.check_monitor(state)?;
-                }
-                Ok(value) => {
-                    if drained(&value) {
-                        registration.read_started.store(true, Ordering::Release);
-                        // A short TCP read may stop at an urgent mark with normal bytes still queued. Once POLLPRI is observed, retain syscall-first behavior and clear readiness only on WouldBlock.
-                        if readiness & URGENT == 0 {
-                            registration.clear_readiness(readiness);
-                        }
-                    }
-                    return Ok(value);
                 }
                 result => return result.map_err(Into::into),
             }
@@ -367,34 +319,12 @@ impl SocketMonitoring for IoUringSelector {
                 users: AtomicUsize::new(0),
                 closed: AtomicBool::new(false),
                 readiness: AtomicU64::new(0),
-                tcp: false,
-                read_started: AtomicBool::new(false),
                 multishot: AtomicBool::new(true),
                 claimed: AtomicBool::new(false),
                 pending: AtomicBool::new(false),
                 status: Mutex::new(Status::default()),
             },
         ))
-    }
-    fn socket_stream_monitor_state(
-        &self,
-        socket: &NativeSocket,
-        interest: Interest,
-    ) -> io::Result<SocketStreamMonitor<NativeSocket, IoUringMonitorRegistration>> {
-        let monitor = self.socket_monitor_state(socket, interest)?;
-        // Cache TCP recognition at setup, never on the payload path. Other transports and failed queries keep the conservative syscall-first behavior.
-        let native = socket::retain_socket(socket);
-        let tcp = syscall("monitor-socket-type", || native.get_ref().r#type())
-            .is_ok_and(|kind| kind == socket2::Type::STREAM)
-            && syscall("monitor-socket-protocol", || native.get_ref().protocol())
-                .is_ok_and(|protocol| protocol == Some(socket2::Protocol::TCP));
-        let (socket, mut registration) = monitor.into_parts();
-        registration.tcp = tcp;
-        Ok(SocketStreamMonitor::new(SocketMonitor::new(
-            socket,
-            interest,
-            registration,
-        )))
     }
     async fn socket_monitor_wait<
         M: SocketMonitorState<NativeSocket, IoUringMonitorRegistration>,
@@ -423,17 +353,9 @@ impl SocketMonitoring for IoUringSelector {
         flags: SocketRecvFlags,
         cancellation: &Cancellation,
     ) -> OperationResult<usize> {
-        let length = buffer.len();
-        let ready_first =
-            M::STREAM && monitor.as_ref().registration().tcp && length != 0 && !flags.peek;
-        self.monitor_io_with(
-            monitor,
-            Interest::Readable,
-            cancellation,
-            ready_first,
-            |socket| syscall("monitor-recv", || socket.try_recv(buffer, flags)),
-            |count| ready_first && 0 < *count && *count < length,
-        )
+        self.monitor_io(monitor, Interest::Readable, cancellation, |socket| {
+            syscall("monitor-recv", || socket.try_recv(buffer, flags))
+        })
         .await
     }
     async fn socket_monitor_send_poll<
@@ -542,7 +464,7 @@ impl Monitors {
             self.slots.len() - 1
         });
         let events = match submission.storage.interest() {
-            Interest::Readable => libc::POLLIN | libc::POLLRDHUP | libc::POLLPRI,
+            Interest::Readable => libc::POLLIN | libc::POLLRDHUP,
             Interest::Writable => libc::POLLOUT,
         };
         let entry = opcode::PollAdd::new(
@@ -605,10 +527,9 @@ impl Monitors {
                     result >= 0,
                     "multishot poll errors carry a final CQE without MORE"
                 );
-                entry.submission.storage.registration().notify(result);
+                entry.submission.storage.registration().notify();
                 return;
             }
-            let completion_events = result;
             let result = if result < 0 {
                 Err(io::Error::from_raw_os_error(-result))
             } else {
@@ -625,11 +546,7 @@ impl Monitors {
                 entry.original = Some(Ok(()));
             } else {
                 if result.is_ok() {
-                    entry
-                        .submission
-                        .storage
-                        .registration()
-                        .notify(completion_events);
+                    entry.submission.storage.registration().notify();
                 }
                 entry.original = Some(result);
             }
