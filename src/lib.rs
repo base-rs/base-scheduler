@@ -102,7 +102,7 @@ mod spawn_error;
 mod sync_mode;
 mod task_error;
 mod tcp_no_delay;
-mod timer_clock;
+mod timers;
 
 pub use address_hints::AddressHints;
 pub use address_info::AddressInfo;
@@ -200,7 +200,7 @@ pub use spawn_error::SpawnError;
 pub use sync_mode::SyncMode;
 pub use task_error::TaskError;
 pub use tcp_no_delay::TcpNoDelay;
-pub use timer_clock::TimerClock;
+pub use timers::Timers;
 
 /// An IP endpoint, compatible with standard-library socket addresses.
 pub use std::net::SocketAddr as SocketAddress;

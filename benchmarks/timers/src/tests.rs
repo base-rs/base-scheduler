@@ -4,37 +4,37 @@
 use super::*;
 use core_scheduler::{Clock, OperationError};
 
-async fn semantics<S: TimerClock>(scheduler: &S) {
+async fn semantics<S: Timers>(scheduler: &S) {
     let never = Cancellation::never();
-    let mut timer = S::Timer::default();
+    let mut timer = scheduler.timer();
     let far = scheduler.now() + Duration::from_secs(30);
-    pending_once(scheduler.timer_wait(&mut timer, far, &never)).await;
+    pending_once(scheduler.timer_wait_until(&mut timer, far, &never)).await;
     // Pull a pending timer forward, then reuse it after expiry.
     let early = scheduler.now() + Duration::from_millis(2);
     scheduler
-        .timer_wait(&mut timer, early, &never)
+        .timer_wait_until(&mut timer, early, &never)
         .await
         .unwrap();
     assert!(scheduler.now() >= early);
     let later = scheduler.now() + Duration::from_millis(2);
     scheduler
-        .timer_wait(&mut timer, later, &never)
+        .timer_wait_until(&mut timer, later, &never)
         .await
         .unwrap();
     assert!(scheduler.now() >= later);
     // Extending a live timer must survive an early backend wake without completing early.
     let first = scheduler.now() + Duration::from_millis(2);
-    pending_once(scheduler.timer_wait(&mut timer, first, &never)).await;
+    pending_once(scheduler.timer_wait_until(&mut timer, first, &never)).await;
     let extended = scheduler.now() + Duration::from_millis(4);
     scheduler
-        .timer_wait(&mut timer, extended, &never)
+        .timer_wait_until(&mut timer, extended, &never)
         .await
         .unwrap();
     assert!(scheduler.now() >= extended);
     // Cancellation retires a previously armed wait, without poisoning the resource.
     {
         let cancellation = Cancellation::new();
-        let mut waiting = pin!(scheduler.timer_wait(&mut timer, far, &cancellation));
+        let mut waiting = pin!(scheduler.timer_wait_until(&mut timer, far, &cancellation));
         assert!(
             futures_lite::future::poll_once(waiting.as_mut())
                 .await
@@ -47,16 +47,16 @@ async fn semantics<S: TimerClock>(scheduler: &S) {
     cancelled.cancel();
     assert!(
         scheduler
-            .timer_wait(&mut S::Timer::default(), scheduler.now(), &cancelled)
+            .timer_wait_until(&mut scheduler.timer(), scheduler.now(), &cancelled)
             .await
             .is_err()
     );
     scheduler
-        .timer_wait(&mut timer, scheduler.now(), &never)
+        .timer_wait_until(&mut timer, scheduler.now(), &never)
         .await
         .unwrap();
     // After must not complete at its old, earlier deadline when extended.
-    let mut after = After::<S::Timer>::default();
+    let mut after = After::new(scheduler.timer());
     let first = scheduler.now() + Duration::from_millis(2);
     pending_once(after.wait(scheduler, first, &never)).await;
     let extended = scheduler.now() + Duration::from_millis(4);
@@ -127,7 +127,7 @@ fn tokio_semantics() {
 async fn deferred_deadline_and_waker_replacement() {
     let scheduler = core_scheduler_tokio::TokioScheduler::new(tokio::runtime::Handle::current());
     let never = Cancellation::never();
-    let mut after = After::default();
+    let mut after = After::new(scheduler.timer());
     let first = scheduler.now() + Duration::from_secs(1);
     pending_once(after.wait(&scheduler, first, &never)).await;
     let final_deadline = first + Duration::from_secs(1);
@@ -145,20 +145,33 @@ async fn deferred_deadline_and_waker_replacement() {
     assert!(scheduler.now() >= final_deadline);
 }
 
-async fn incompatible<S: TimerClock>(first: &S, second: &S) {
+async fn incompatible<S: Timers>(first: &S, second: &S) {
     let never = Cancellation::never();
-    let mut timer = S::Timer::default();
-    first
-        .timer_wait(&mut timer, first.now(), &never)
-        .await
-        .unwrap();
-    let result = second.timer_wait(&mut timer, second.now(), &never).await;
+    let mut timer = first.timer();
+    // Construction binds the resource before any wait is created or polled.
+    let result = second
+        .timer_wait_until(&mut timer, second.now(), &never)
+        .await;
     assert!(
         matches!(result, Err(OperationError::Io(error)) if error.kind() == std::io::ErrorKind::InvalidInput)
     );
-    let mut timer = S::Timer::default();
-    pending_once(first.timer_wait(&mut timer, first.now() + Duration::from_secs(30), &never)).await;
-    let result = second.timer_wait(&mut timer, second.now(), &never).await;
+    // An unpolled wait must leave the resource compatible with its constructor.
+    drop(second.timer_wait_until(&mut timer, second.now(), &never));
+    first
+        .timer_wait_until(&mut timer, first.now(), &never)
+        .await
+        .unwrap();
+    let result = second
+        .timer_wait_until(&mut timer, second.now(), &never)
+        .await;
+    assert!(
+        matches!(result, Err(OperationError::Io(error)) if error.kind() == std::io::ErrorKind::InvalidInput)
+    );
+    pending_once(first.timer_wait_until(&mut timer, first.now() + Duration::from_secs(30), &never))
+        .await;
+    let result = second
+        .timer_wait_until(&mut timer, second.now(), &never)
+        .await;
     assert!(
         matches!(result, Err(OperationError::Io(error)) if error.kind() == std::io::ErrorKind::InvalidInput)
     );
@@ -196,6 +209,19 @@ fn rejects_incompatible_schedulers() {
     let one = core_scheduler_tokio::TokioScheduler::new(rt1.handle().clone());
     let two = core_scheduler_tokio::TokioScheduler::new(rt2.handle().clone());
     rt1.block_on(incompatible(&one, &two));
+
+    // Separate adapters for one runtime remain compatible.
+    let compatible = core_scheduler_tokio::TokioScheduler::new(rt1.handle().clone());
+    rt1.block_on(async {
+        let never = Cancellation::never();
+        let mut timer = one.timer();
+        pending_once(one.timer_wait_until(&mut timer, one.now() + Duration::from_secs(30), &never))
+            .await;
+        compatible
+            .timer_wait_until(&mut timer, one.now() + Duration::from_millis(2), &never)
+            .await
+            .unwrap();
+    });
 }
 
 #[test]
@@ -214,10 +240,14 @@ fn native_resource_moves_between_tasks_and_executors() {
         .block_on(
             scheduler
                 .spawn(async move {
-                    let mut timer = core_scheduler_native::NativeTimer::default();
+                    let mut timer = instance.timer();
                     let deadline = instance.now() + Duration::from_secs(30);
-                    pending_once(instance.timer_wait(&mut timer, deadline, &Cancellation::never()))
-                        .await;
+                    pending_once(instance.timer_wait_until(
+                        &mut timer,
+                        deadline,
+                        &Cancellation::never(),
+                    ))
+                    .await;
                     (timer, deadline)
                 })
                 .unwrap(),
@@ -229,7 +259,7 @@ fn native_resource_moves_between_tasks_and_executors() {
         futures_lite::future::block_on(async move {
             let (mut timer, deadline) = timer;
             let never = Cancellation::never();
-            let mut waiting = pin!(instance.timer_wait(&mut timer, deadline, &never));
+            let mut waiting = pin!(instance.timer_wait_until(&mut timer, deadline, &never));
             assert!(
                 futures_lite::future::poll_once(waiting.as_mut())
                     .await
@@ -258,27 +288,26 @@ fn native_capacity_and_resource_drop() {
         let capacity =
             core_scheduler_timers::local::TimerQueue::<std::task::Waker>::with_capacity(1)
                 .capacity();
-        let mut first: Vec<_> = (0..capacity)
-            .map(|_| core_scheduler_native::NativeTimer::default())
-            .collect();
-        let mut second = core_scheduler_native::NativeTimer::default();
+        let mut first: Vec<_> = (0..capacity).map(|_| scheduler.timer()).collect();
+        // Extra resources do not reserve queue entries until their waits are polled.
+        let mut second = scheduler.timer();
         for timer in &mut first {
-            pending_once(scheduler.timer_wait(timer, far, &never)).await;
+            pending_once(scheduler.timer_wait_until(timer, far, &never)).await;
         }
         assert_eq!(
             scheduler
-                .timer_wait(&mut second, far, &never)
+                .timer_wait_until(&mut second, far, &never)
                 .await
                 .unwrap_err()
                 .kind(),
             std::io::ErrorKind::WouldBlock
         );
         drop(first);
-        pending_once(scheduler.timer_wait(&mut second, far, &never)).await;
+        pending_once(scheduler.timer_wait_until(&mut second, far, &never)).await;
         scheduler.close();
         assert_eq!(
             scheduler
-                .timer_wait(&mut second, far, &never)
+                .timer_wait_until(&mut second, far, &never)
                 .await
                 .unwrap_err()
                 .kind(),
@@ -295,8 +324,8 @@ fn closed_backends_reject_pending_timers() {
     futures_lite::future::block_on(async {
         assert_eq!(
             direct
-                .timer_wait(
-                    &mut Default::default(),
+                .timer_wait_until(
+                    &mut direct.timer(),
                     direct.now() + Duration::from_secs(1),
                     &Cancellation::never()
                 )
@@ -316,8 +345,8 @@ fn closed_backends_reject_pending_timers() {
     runtime.block_on(async {
         assert_eq!(
             tokio
-                .timer_wait(
-                    &mut Default::default(),
+                .timer_wait_until(
+                    &mut tokio.timer(),
                     tokio.now() + Duration::from_secs(1),
                     &Cancellation::never()
                 )
@@ -350,19 +379,19 @@ fn native_local_capacity_and_drop() {
                     let never = Cancellation::never();
                     let far = instance.now() + Duration::from_secs(30);
                     let capacity = core_scheduler_timers::local::TimerQueue::<std::task::Waker>::with_capacity(1).capacity();
-                    let mut first: Vec<_> = (0..capacity).map(|_| core_scheduler_native::NativeTimer::default()).collect();
-                    let mut second = core_scheduler_native::NativeTimer::default();
-                    for timer in &mut first { pending_once(instance.timer_wait(timer, far, &never)).await; }
+                    let mut first: Vec<_> = (0..capacity).map(|_| instance.timer()).collect();
+                    let mut second = instance.timer();
+                    for timer in &mut first { pending_once(instance.timer_wait_until(timer, far, &never)).await; }
                     assert_eq!(
                         instance
-                            .timer_wait(&mut second, far, &never)
+                            .timer_wait_until(&mut second, far, &never)
                             .await
                             .unwrap_err()
                             .kind(),
                         std::io::ErrorKind::WouldBlock
                     );
                     drop(first);
-                    pending_once(instance.timer_wait(&mut second, far, &never)).await;
+                    pending_once(instance.timer_wait_until(&mut second, far, &never)).await;
                 })
                 .unwrap(),
         )

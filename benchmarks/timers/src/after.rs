@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::{Cancellation, OperationResult, TimerClock};
+use core_scheduler::{Cancellation, OperationResult, Timers};
 use std::time::Instant;
 
 /// Experimental timeout state. Later deadlines retain the existing wake; earlier deadlines replace it immediately. No scheduler is stored here.
@@ -9,16 +9,11 @@ pub struct After<T> {
     timer: T,
     armed: Option<Instant>,
 }
-impl<T: Default> Default for After<T> {
-    fn default() -> Self {
-        Self {
-            timer: T::default(),
-            armed: None,
-        }
-    }
-}
 impl<T> After<T> {
-    pub async fn wait<S: TimerClock<Timer = T>>(
+    pub fn new(timer: T) -> Self {
+        Self { timer, armed: None }
+    }
+    pub async fn wait<S: Timers<Timer = T>>(
         &mut self,
         scheduler: &S,
         deadline: Instant,
@@ -30,7 +25,7 @@ impl<T> After<T> {
             let armed = self.armed.map_or(deadline, |armed| armed.min(deadline));
             self.armed = Some(armed);
             let result = scheduler
-                .timer_wait(&mut self.timer, armed, cancellation)
+                .timer_wait_until(&mut self.timer, armed, cancellation)
                 .await;
             self.armed = None;
             result?;

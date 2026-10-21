@@ -4,7 +4,7 @@
 use super::{Command, Registration};
 use crate::worker_timers;
 use crate::{NativeScheduler, Selector, task_service::Shared, worker};
-use core_scheduler::{Cancellation, Clock, OperationResult, TimerClock};
+use core_scheduler::{Cancellation, Clock, OperationResult, Timers};
 use futures_channel::oneshot;
 use std::{
     future::{Future, poll_fn},
@@ -15,10 +15,9 @@ use std::{
     time::Instant,
 };
 
-/// Experimental timer resource. Pending registrations retain their original worker when the waiting task moves.
-#[derive(Default)]
+/// Experimental timer resource, constructed through `NativeScheduler::timer`. Pending registrations retain their original worker when the waiting task moves.
 pub struct NativeTimer {
-    shared: Option<Arc<Shared>>,
+    shared: Arc<Shared>,
     armed: Option<Instant>,
     registration: Option<Registration>,
     pending: Option<oneshot::Receiver<io::Result<Registration>>>,
@@ -90,9 +89,20 @@ impl NativeTimer {
         Poll::Pending
     }
 }
-impl<S: Selector> TimerClock for NativeScheduler<S> {
+impl<S: Selector> Timers for NativeScheduler<S> {
     type Timer = NativeTimer;
-    async fn timer_wait(
+
+    fn timer(&self) -> NativeTimer {
+        NativeTimer {
+            shared: Arc::clone(&self.tasks.shared),
+            armed: None,
+            registration: None,
+            pending: None,
+            waker: None,
+        }
+    }
+
+    async fn timer_wait_until(
         &self,
         timer: &mut NativeTimer,
         deadline: Instant,
@@ -100,19 +110,12 @@ impl<S: Selector> TimerClock for NativeScheduler<S> {
     ) -> OperationResult<()> {
         cancellation.check()?;
         let shared = &self.tasks.shared;
-        if timer
-            .shared
-            .as_ref()
-            .is_some_and(|owner| !Arc::ptr_eq(owner, shared))
-        {
+        if !Arc::ptr_eq(&timer.shared, shared) {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "timer belongs to another scheduler",
             )
             .into());
-        }
-        if timer.shared.is_none() {
-            timer.shared = Some(Arc::clone(shared));
         }
         let mut cancelled = pin!(cancellation.cancelled());
         let result = poll_fn(|context| {

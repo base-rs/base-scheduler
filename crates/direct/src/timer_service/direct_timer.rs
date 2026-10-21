@@ -3,36 +3,38 @@
 
 use super::*;
 
-/// Experimental reusable Direct timer. The timer service remains the reference implementation's dedicated thread.
-#[derive(Default)]
+/// Experimental reusable Direct timer, constructed through `DirectScheduler::timer`. The timer service remains the reference implementation's dedicated thread.
 pub struct DirectTimer {
-    shared: Option<Arc<Shared>>,
+    shared: Arc<Shared>,
     registration: Option<Registration>,
     armed: Option<Instant>,
     waker: Option<Waker>,
 }
-impl core_scheduler::TimerClock for DirectScheduler {
+impl core_scheduler::Timers for DirectScheduler {
     type Timer = DirectTimer;
-    async fn timer_wait(
+
+    fn timer(&self) -> DirectTimer {
+        DirectTimer {
+            shared: Arc::clone(&self.timers.shared),
+            registration: None,
+            armed: None,
+            waker: None,
+        }
+    }
+
+    async fn timer_wait_until(
         &self,
         timer: &mut DirectTimer,
         deadline: Instant,
         cancellation: &Cancellation,
     ) -> OperationResult<()> {
         cancellation.check()?;
-        if timer
-            .shared
-            .as_ref()
-            .is_some_and(|shared| !Arc::ptr_eq(shared, &self.timers.shared))
-        {
+        if !Arc::ptr_eq(&timer.shared, &self.timers.shared) {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "timer belongs to another scheduler",
             )
             .into());
-        }
-        if timer.shared.is_none() {
-            timer.shared = Some(Arc::clone(&self.timers.shared));
         }
         if self.now() >= deadline {
             timer.registration = None;

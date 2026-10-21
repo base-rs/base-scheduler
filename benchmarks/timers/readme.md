@@ -4,11 +4,11 @@ An experimental reusable timer inspired by C++ `Async::After`, compared with the
 
 ## Design
 
-`TimerClock` is an optional capability alongside `Clock`. Its associated `Timer` is a reusable, single-waiter resource. A default timer has no backend registration. Every wait receives its scheduler, absolute deadline and cancellation explicitly:
+`Timers` is an optional capability alongside `Clock`. Its associated `Timer` is a reusable, single-waiter resource, constructed through the scheduler to establish compatibility. Construction registers no deadline and selects no worker. Every wait receives its scheduler, absolute deadline and cancellation explicitly:
 
 ```rust,ignore
-let mut timer = S::Timer::default();
-scheduler.timer_wait(&mut timer, deadline, &cancellation).await?;
+let mut timer = scheduler.timer();
+scheduler.timer_wait_until(&mut timer, deadline, &cancellation).await?;
 ```
 
 A wait begins on first poll. Dropping the wait retains registration state in the resource, so the next wait can replace its deadline and waker. Dropping the resource retires the registration. Cancellation observed after admission disarms it; pre-cancellation leaves existing state unchanged. A completed timer can be reused. Backends reject incompatible scheduler/resource pairings. Retained registrations can issue a wake after the previous wait was abandoned, and retain capacity until the resource is reused or dropped. Forgotten resources may leak capacity, without retaining access to borrowed application memory.
@@ -66,7 +66,7 @@ Use `--backends tokio native direct` on macOS. Process CPU time is available on 
 
 The initial eager-replacement experiment is recorded at `5ff562f`; [its retained samples](results/initial-policy.jsonl) and [full summary](results/initial-policy.md) separate resource reuse from the portable `After` wrapper. Native's eager resource reuse alone did little for continually changing deadlines and was slower for the one-task yield case. Keeping the earlier wake was the useful optimization.
 
-The final backend-deferral implementation was measured at `9a63e72` in the experimental checkout and incorporated here in `b417fa3`. Subsequent commits add test coverage, documentation, and consistent runtime binding for an already elapsed first Tokio wait; the timed refresh path is unchanged. [Raw final samples](results/backend-deferral.jsonl) and the [full paired summary](results/backend-deferral.md) preserve all workloads and repeat ranges.
+The final backend-deferral implementation was measured at `9a63e72` in the experimental checkout and incorporated here in `b417fa3`. Subsequent commits add test coverage and documentation, rename the capability to `Timers`, and move owner binding into `scheduler.timer()`. The measurements describe the earlier first-wait-binding implementation; the current source retains its queue and rearming policy. [Raw final samples](results/backend-deferral.jsonl) and the [full paired summary](results/backend-deferral.md) preserve all workloads and repeat ranges.
 
 ### Refreshing an idle timeout
 
@@ -112,7 +112,7 @@ On this Linux build, the timer resources occupy 80 bytes for Native, 56 for Dire
 
 A reusable timer resource is useful for connection idle timeouts and repeated waits. Keep the existing one-shot sleep operation for occasional delays. Prefer an optional associated timer resource which receives the scheduler and cancellation at each wait. Backend state can handle later deadlines privately; earlier deadlines must remain prompt. This preserves the explicit execution model and avoids making a portable protocol choose a timer-rearming algorithm.
 
-The most important costs to settle before productionizing are retention of queue capacity and an old task's waker after an abandoned wait, the explicit disarm/reset API, and whether caller-pinned Tokio storage is useful enough to avoid the initial box. Conservative instance affinity is implemented here: Native and Direct reject another instance; Tokio permits adapters of the same runtime. A resource can be replaced with a new default value to disarm and unbind it. No network-request throughput gain has been established by this timer-only benchmark.
+The most important costs to settle before productionizing are retention of queue capacity and an old task's waker after an abandoned wait, the explicit disarm/reset API, and whether caller-pinned Tokio storage is useful enough to avoid the initial box. Conservative instance affinity is established at construction: Native and Direct reject another instance; Tokio permits adapters of the same runtime. A resource can be replaced with a newly constructed timer to disarm it and explicitly select an owner. No network-request throughput gain has been established by this timer-only benchmark.
 
 ## Validation
 

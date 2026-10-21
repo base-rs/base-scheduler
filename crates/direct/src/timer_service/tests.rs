@@ -202,15 +202,25 @@ fn timer_waker_callbacks_run_outside_the_registry_lock() {
 
 #[test]
 fn reusable_timer_startup_and_identifier_exhaustion() {
-    use core_scheduler::TimerClock;
+    use core_scheduler::Timers;
     run(async |scheduler| {
         scheduler.timers.shared.state.lock().unwrap().paused = None;
-        let mut timer = DirectTimer::default();
+        let mut timer = scheduler.timer();
         let never = Cancellation::never();
         let far = scheduler.now() + Duration::from_secs(30);
         thread::FAIL_AFTER.set(Some(0));
-        assert!(scheduler.timer_wait(&mut timer, far, &never).await.is_err());
+        assert!(
+            scheduler
+                .timer_wait_until(&mut timer, far, &never)
+                .await
+                .is_err()
+        );
         scheduler.timers.shared.state.lock().unwrap().next = usize::MAX;
-        assert!(scheduler.timer_wait(&mut timer, far, &never).await.is_err());
+        assert!(
+            scheduler
+                .timer_wait_until(&mut timer, far, &never)
+                .await
+                .is_err()
+        );
     });
 }

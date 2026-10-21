@@ -5,7 +5,7 @@ mod after;
 mod allocation;
 pub use after::After;
 
-use core_scheduler::{Cancellation, Spawn, TimerClock};
+use core_scheduler::{Cancellation, Spawn, Timers};
 use std::{
     future::{Future, poll_fn},
     hint::black_box,
@@ -44,7 +44,7 @@ pub async fn pending_once(future: impl Future) {
     .await;
 }
 
-pub async fn workload<S: TimerClock>(
+pub async fn workload<S: Timers>(
     scheduler: &S,
     mode: Mode,
     workload: &str,
@@ -52,8 +52,8 @@ pub async fn workload<S: TimerClock>(
     delay: Duration,
 ) -> (usize, Vec<u64>, usize) {
     let never = Cancellation::new();
-    let mut timer = S::Timer::default();
-    let mut after = After::<S::Timer>::default();
+    let mut timer = scheduler.timer();
+    let mut after = After::new(scheduler.timer());
     let mut overshoot = Vec::new();
     let mut refresh_expirations = 0;
     if workload == "expire" || workload == "cycle" {
@@ -78,7 +78,7 @@ pub async fn workload<S: TimerClock>(
             match mode {
                 Mode::Sleep => scheduler.sleep_until(deadline, &never).await.unwrap(),
                 Mode::Reuse => scheduler
-                    .timer_wait(&mut timer, deadline, &never)
+                    .timer_wait_until(&mut timer, deadline, &never)
                     .await
                     .unwrap(),
                 Mode::After => after.wait(scheduler, deadline, &never).await.unwrap(),
@@ -99,7 +99,9 @@ pub async fn workload<S: TimerClock>(
                 };
                 let expired = match mode {
                     Mode::Sleep => probe(scheduler.sleep_until(refreshed, &never)).await,
-                    Mode::Reuse => probe(scheduler.timer_wait(&mut timer, refreshed, &never)).await,
+                    Mode::Reuse => {
+                        probe(scheduler.timer_wait_until(&mut timer, refreshed, &never)).await
+                    }
                     Mode::After => probe(after.wait(scheduler, refreshed, &never)).await,
                 };
                 refresh_expirations += usize::from(expired);
@@ -112,7 +114,7 @@ pub async fn workload<S: TimerClock>(
                 match mode {
                     Mode::Sleep => scheduler.sleep_until(last, &never).await.unwrap(),
                     Mode::Reuse => scheduler
-                        .timer_wait(&mut timer, last, &never)
+                        .timer_wait_until(&mut timer, last, &never)
                         .await
                         .unwrap(),
                     Mode::After => after.wait(scheduler, last, &never).await.unwrap(),
@@ -129,7 +131,7 @@ pub async fn workload<S: TimerClock>(
     )
 }
 
-pub async fn run<S: TimerClock + Spawn + Send + Sync + 'static>(
+pub async fn run<S: Timers + Spawn + Send + Sync + 'static>(
     scheduler: Arc<S>,
     mode: Mode,
     workload_name: String,

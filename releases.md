@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Prototype optional `TimerClock` resources in Native, Direct, and Tokio, retaining timer state across explicitly scheduled waits. Add a timer benchmark comparing refresh, expiry, and allocation costs; the reusable capability and its retention policy remain experimental.
+- Prototype optional `Timers` resources in Native, Direct, and Tokio, constructed through `scheduler.timer()` and reused with `timer_wait_until`. Add a timer benchmark comparing refresh, expiry, and allocation costs; the reusable capability and its retention policy remain experimental.
 
 - Keep Direct timer waker callbacks outside the registry lock, so reentrant callbacks cannot deadlock the clock.
 

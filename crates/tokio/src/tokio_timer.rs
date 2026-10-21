@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::TokioScheduler;
-use core_scheduler::{Cancellation, Clock, OperationResult, TimerClock};
+use core_scheduler::{Cancellation, Clock, OperationResult, Timers};
 use std::{
     future::{Future, poll_fn},
     io,
@@ -11,16 +11,22 @@ use std::{
     time::Instant,
 };
 
-/// Experimental retained Tokio sleep. Its pinning allocation is made on first use, then reused.
-#[derive(Default)]
+/// Experimental retained Tokio sleep, constructed through `TokioScheduler::timer`. Its pinning allocation is made on first pending use, then reused.
 pub struct TokioTimer {
     sleep: Option<Pin<Box<tokio::time::Sleep>>>,
-    runtime: Option<tokio::runtime::Id>,
+    runtime: tokio::runtime::Id,
 }
-impl TimerClock for TokioScheduler {
+impl Timers for TokioScheduler {
     type Timer = TokioTimer;
 
-    async fn timer_wait(
+    fn timer(&self) -> TokioTimer {
+        TokioTimer {
+            sleep: None,
+            runtime: self.runtime.id(),
+        }
+    }
+
+    async fn timer_wait_until(
         &self,
         timer: &mut TokioTimer,
         deadline: Instant,
@@ -28,17 +34,13 @@ impl TimerClock for TokioScheduler {
     ) -> OperationResult<()> {
         cancellation.check()?;
         self.check_open()?;
-        if timer
-            .runtime
-            .is_some_and(|runtime| runtime != self.runtime.id())
-        {
+        if timer.runtime != self.runtime.id() {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "timer belongs to another runtime",
             )
             .into());
         }
-        timer.runtime = Some(self.runtime.id());
         if self.now() >= deadline {
             timer.sleep = None;
             return Ok(());

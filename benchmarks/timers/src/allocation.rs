@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::{After, Mode};
-use core_scheduler::{Cancellation, TimerClock};
+use core_scheduler::{Cancellation, Timers};
 use std::{
     future::{Future, poll_fn},
     pin::pin,
@@ -14,14 +14,10 @@ fn pending(future: impl Future, context: &mut Context<'_>) {
     assert!(pin!(future).as_mut().poll(context).is_pending());
 }
 
-pub async fn measure<S: TimerClock>(
-    scheduler: &S,
-    mode: Mode,
-    iterations: usize,
-) -> serde_json::Value {
+pub async fn measure<S: Timers>(scheduler: &S, mode: Mode, iterations: usize) -> serde_json::Value {
     let token = Cancellation::new();
-    let mut timer = S::Timer::default();
-    let mut after = After::<S::Timer>::default();
+    let mut timer = scheduler.timer();
+    let mut after = After::new(scheduler.timer());
     let waker = poll_fn(|context| Poll::Ready(context.waker().clone())).await;
     let mut context = Context::from_waker(&waker);
     let mut step = || {
@@ -29,7 +25,7 @@ pub async fn measure<S: TimerClock>(
         match mode {
             Mode::Sleep => pending(scheduler.sleep_until(deadline, &token), &mut context),
             Mode::Reuse => pending(
-                scheduler.timer_wait(&mut timer, deadline, &token),
+                scheduler.timer_wait_until(&mut timer, deadline, &token),
                 &mut context,
             ),
             Mode::After => pending(after.wait(scheduler, deadline, &token), &mut context),
