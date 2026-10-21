@@ -63,7 +63,7 @@ Operation futures use static dispatch and are `Send`. File and socket resources 
 
 ## Reusable file monitors
 
-`FileMonitoring` is an experimental capability for sequential owned-buffer reads and writes. Construct one monitor per sequential execution; separate monitors support concurrent operations on the same file. Retain it across operations to reuse backend request state:
+`FileMonitoring` is an experimental capability for sequential owned-buffer reads and writes. Construct one monitor per sequential execution; separate monitors support concurrent operations on the same file. Retain it across operations to reuse backend request state. io_uring also caches optional fixed-file registrations on visited rings; completed operations can change workers without discarding those registrations:
 
 ```rust
 use core_scheduler::{Cancellation, FileMonitoring, OperationResult};

@@ -80,10 +80,36 @@ fn execute(args: &[String]) -> serde_json::Value {
             result
         }
         #[cfg(target_os = "linux")]
-        "iouring" => {
-            let (selector, drivers) =
-                core_scheduler_iouring::IoUringSelector::with_workers(Default::default(), workers)
-                    .unwrap();
+        "iouring-migration" | "iouring-unregistered-migration" => {
+            assert_eq!(tasks, 1, "migration benchmark uses one external caller");
+            let write = match workload.as_str() {
+                "read-at" => false,
+                "write-at" => true,
+                _ => panic!("unknown workload"),
+            };
+            core_scheduler_file_benchmark::run_migration(
+                backend == "iouring-migration",
+                monitor,
+                write,
+                iterations,
+                workers,
+                size,
+            )
+        }
+        #[cfg(target_os = "linux")]
+        "iouring" | "iouring-unregistered" => {
+            let (selector, drivers) = core_scheduler_iouring::IoUringSelector::with_workers(
+                core_scheduler_iouring::IoUringOptions {
+                    fixed_files: if backend == "iouring-unregistered" {
+                        0
+                    } else {
+                        256
+                    },
+                    ..Default::default()
+                },
+                workers,
+            )
+            .unwrap();
             let scheduler = Arc::new(
                 core_scheduler_native::NativeScheduler::with_drivers(
                     selector,
@@ -129,7 +155,13 @@ mod tests {
     #[test]
     fn matched_workloads_run_on_each_backend() {
         #[cfg(target_os = "linux")]
-        let backends = ["native", "tokio", "direct", "iouring"];
+        let backends = [
+            "native",
+            "tokio",
+            "direct",
+            "iouring",
+            "iouring-unregistered",
+        ];
         #[cfg(not(target_os = "linux"))]
         let backends = ["native", "tokio", "direct"];
         for backend in backends {
@@ -144,6 +176,39 @@ mod tests {
             }
         }
         assert_eq!(execute(&[])["mode"], "monitor");
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn migration_workloads_run_with_registered_and_unregistered_files() {
+        for backend in ["iouring-migration", "iouring-unregistered-migration"] {
+            for mode in ["ordinary", "monitor"] {
+                for workload in ["read-at", "write-at"] {
+                    let args = ["files", backend, mode, workload, "1", "4", "2", "4096"]
+                        .map(str::to_owned);
+                    assert_eq!(execute(&args)["operations"], 4);
+                }
+            }
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    #[should_panic(expected = "unknown workload")]
+    fn migration_rejects_unknown_workloads() {
+        execute(
+            &[
+                "files",
+                "iouring-migration",
+                "monitor",
+                "unknown",
+                "1",
+                "1",
+                "1",
+                "1",
+            ]
+            .map(str::to_owned),
+        );
     }
 
     #[test]

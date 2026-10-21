@@ -38,8 +38,22 @@ The io_uring monitor keeps a typed request allocation and completion slot betwee
 
 Direct, Tokio, and readiness preserve their existing operation implementations and add a reusable retirement guard. They do not gain the io_uring request cache. Their expected benefit is explicit sequential state and retirement, with a small tracking cost; the monitor is not an unconditional throughput optimization.
 
-The monitor retains a file and admits one operation at a time. Multiple monitors may share a file, but share its OS cursor too; explicit offsets provide independent positions. Neither fixed-file registration nor registered buffers are part of this prototype. See the [interface design](../../context/design.md) for lifecycle and compatibility rules.
+The monitor retains a file and admits one operation at a time. Multiple monitors may share a file, but share its OS cursor too; explicit offsets provide independent positions. The io_uring backend now optionally caches fixed-file registrations per visited ring. Registered buffers are not implemented. See the [interface design](../../context/design.md) for lifecycle and compatibility rules.
 
 ## Measurements
 
 See [results](results.md) for the measured comparison, source identity, and raw samples.
+
+## Persistent ring state experiments
+
+Compare fixed-file caching with registration disabled in the same binary, and optionally the original monitor executable:
+
+```sh
+TMPDIR=/dev/shm flock /tmp/core-scheduler-perf.lock python3 benchmarks/files/registration.py --baseline-binary /path/to/original/core-scheduler-file-benchmark --output /tmp/registration.jsonl
+```
+
+`iouring` uses the default fixed-file cache; `iouring-unregistered` sets its capacity to zero while retaining the same ring-cache and request implementation. The optional original executable measures the previous monitor implementation before ring-cache changes. Registering files does not change application I/O semantics, and unavailable registration falls back to ordinary descriptors.
+
+The `iouring-migration` and `iouring-unregistered-migration` backends use one external caller and one or two standalone ring-driver threads. Routing is round-robin, so two drivers deliberately change rings on every operation. This measures repeated ring changes and remote submission/wakeup overhead, not the cost or frequency of executor work stealing. Warmup visits every ring before timing; wall throughput includes the operation loop and monitor close, excluding setup, file close, and scheduler shutdown. Its mean-operation latency excludes monitor close. The runner compares these variants within each routing configuration; local and external timings have different boundaries and should not be compared as identical workloads.
+
+See [ring-state research](ring-state-research.md) for the optimization inventory, migration policy, and measurements. The original [results](results.md) remain a record of the earlier implementation at their stated source commit.

@@ -90,7 +90,16 @@ fn repeated_notifications_retain_one_registration_without_allocations() {
             assert_eq!(counts.count_total, 0);
         }
         assert!(inspect.registration().status.lock().unwrap().pending);
-        let current = inspect.registration().status.lock().unwrap().generation;
+        let current = inspect
+            .registration()
+            .status
+            .lock()
+            .unwrap()
+            .binding
+            .as_ref()
+            .unwrap()
+            .state
+            .generation;
         if let Some(previous) = generation {
             assert_eq!(current, previous);
         }
@@ -542,7 +551,16 @@ fn cancelled_and_dropped_waiters_leave_the_registration_active() {
         block_on(waiting),
         Err(OperationError::Cancelled(_))
     ));
-    let generation = alias.registration().status.lock().unwrap().generation;
+    let generation = alias
+        .registration()
+        .status
+        .lock()
+        .unwrap()
+        .binding
+        .as_ref()
+        .unwrap()
+        .state
+        .generation;
     let mut pending = Box::pin(selector.socket_monitor_wait(&mut reader, &never));
     assert!(pending.as_mut().poll(&mut context).is_pending());
     drop(pending);
@@ -557,7 +575,16 @@ fn cancelled_and_dropped_waiters_leave_the_registration_active() {
     ));
     drive(&mut worker, &mut context, read.as_mut()).unwrap();
     assert_eq!(
-        alias.registration().status.lock().unwrap().generation,
+        alias
+            .registration()
+            .status
+            .lock()
+            .unwrap()
+            .binding
+            .as_ref()
+            .unwrap()
+            .state
+            .generation,
         generation
     );
 }
@@ -706,8 +733,13 @@ fn registrations_do_not_consume_transient_operation_capacity() {
 fn staged(selector: &IoUringSelector, storage: &Storage) -> Submission {
     let generation = selector.controllers[0].next_identifier().unwrap();
     let mut status = storage.registration().status.lock().unwrap();
-    status.generation = generation;
-    status.controller = Some(Arc::clone(&selector.controllers[0]));
+    status.binding = Some(RingBinding::new(
+        &selector.controllers[0],
+        PollRegistration {
+            generation,
+            token: storage.as_ptr() as u64 | MONITOR_TAG,
+        },
+    ));
     status.pending = true;
     Submission::new(
         storage.retained(),
@@ -1055,9 +1087,9 @@ fn a_later_wait_rebinds_to_its_new_workers_ring_after_retirement() {
                 }
                 let status = inspect.registration().status.lock().unwrap();
                 status
-                    .controller
+                    .binding
                     .as_ref()
-                    .is_some_and(|controller| Arc::ptr_eq(controller, &selector.controllers[1]))
+                    .is_some_and(|binding| binding.matches(&selector.controllers[1]))
             });
             peer.write_all(b"x").unwrap();
             drive(&mut worker, &mut context, waiting.as_mut()).unwrap();
@@ -1112,7 +1144,7 @@ fn an_active_monitor_future_can_move_to_another_workers_thread() {
             {
                 let status = inspect.registration().status.lock().unwrap();
                 assert!(Arc::ptr_eq(
-                    status.controller.as_ref().unwrap(),
+                    &status.binding.as_ref().unwrap().controller,
                     &selector.controllers[0]
                 ));
             }
@@ -1253,7 +1285,16 @@ fn datagram_boundaries_including_empty_messages_reuse_one_registration() {
             );
         }
         assert_eq!(&[first[0], second[0], second[1]][..payload.len()], payload);
-        let current = inspect.registration().status.lock().unwrap().generation;
+        let current = inspect
+            .registration()
+            .status
+            .lock()
+            .unwrap()
+            .binding
+            .as_ref()
+            .unwrap()
+            .state
+            .generation;
         if let Some(previous) = generation {
             assert_eq!(current, previous);
         }

@@ -239,6 +239,7 @@ pub(crate) enum Command {
     Submit(Box<dyn PendingRequest>),
     MonitorSubmit(monitor::Submission),
     MonitorCancel(u64, u64),
+    FileRelease(registered_file::Release),
     Recycle(Arc<multishot::pool::Pool>, u16),
     Rearm(u64),
     Cancel(u64),
@@ -265,6 +266,7 @@ pub(crate) struct Controller {
     notification: Arc<OwnedFd>,
     next_identifier: AtomicU64,
     buffer_groups: Arc<std::sync::Mutex<Vec<bool>>>,
+    files: std::sync::Mutex<registered_file::Files>,
     closed: AtomicBool,
     shutdown: Arc<Shutdown>,
 }
@@ -544,6 +546,7 @@ impl IoUringSelector {
             notification,
             next_identifier: AtomicU64::new(0),
             buffer_groups: Arc::new(std::sync::Mutex::new(Vec::new())),
+            files: std::sync::Mutex::new(registered_file::Files::new(options.fixed_files)),
             closed: AtomicBool::new(false),
             shutdown: Arc::clone(&shutdown),
         });
@@ -1063,6 +1066,9 @@ impl Reactor {
                 }
                 Command::Submit(request) if !self.closing => self.pending.push_back(request),
                 Command::Submit(request) => request.finish(Err(io::ErrorKind::Interrupted.into())),
+                Command::FileRelease(release) => {
+                    release.finish(&self.ring.submitter(), &self.controller);
+                }
                 Command::Recycle(pool, buffer) => {
                     pool.recycle(buffer);
                     if let Some(request) = self.dormant.remove(&pool.identifier) {
@@ -1264,6 +1270,8 @@ mod message;
 pub(crate) mod monitor;
 pub(crate) mod multishot;
 mod readiness;
+mod registered_file;
+mod ring_binding;
 mod socket;
 
 #[cfg(test)]

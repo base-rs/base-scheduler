@@ -2,6 +2,10 @@
 // Copyright, 2026, by Samuel Williams.
 
 use super::*;
+use super::{
+    registered_file::RegisteredFile,
+    ring_binding::{RingBinding, RingCache},
+};
 use std::{any::Any, sync::Mutex};
 
 /// Reusable file request storage associated with one io_uring selector group. The request can select a different worker between completed operations.
@@ -9,7 +13,9 @@ pub struct IoUringFileRegistration {
     owner: Weak<DriverGroup>,
     shared: Arc<Shared>,
     cached: Option<Box<dyn Any + Send>>,
-    running: Option<(Arc<Controller>, u64)>,
+    running: Option<RingBinding<u64>>,
+    file: Arc<StdFile>,
+    files: RingCache<Arc<RegisteredFile>>,
     closed: bool,
     failed: bool,
 }
@@ -41,7 +47,7 @@ impl Shared {
 struct FileRequest<B: IoBuf> {
     identifier: u64,
     permit: Option<Permit>,
-    file: Option<Arc<StdFile>>,
+    file: Option<Arc<RegisteredFile>>,
     offset: Option<u64>,
     buffer: Option<B>,
     pointer: fn(&mut B) -> *mut u8,
@@ -55,20 +61,37 @@ impl<B: IoBuf> PendingRequest for FileRequest<B> {
         self.identifier
     }
 
+    fn prepare(&mut self, ring: &io_uring::Submitter<'_>) -> io::Result<()> {
+        self.file.as_ref().unwrap().prepare(ring);
+        Ok(())
+    }
+
     fn entry(&mut self) -> squeue::Entry {
         let buffer = self.buffer.as_mut().unwrap();
         let length = buffer.as_ref().len().min(i32::MAX as usize) as u32;
         let pointer = (self.pointer)(buffer);
-        let descriptor = types::Fd(self.file.as_ref().unwrap().as_raw_fd());
+        let file = self.file.as_ref().unwrap();
+        let descriptor = types::Fd(file.file.as_raw_fd());
+        let fixed = file.index();
         let offset = self.offset.unwrap_or(u64::MAX);
         let entry = if self.write {
-            opcode::Write::new(descriptor, pointer, length)
-                .offset(offset)
-                .build()
+            match fixed {
+                Some(fixed) => opcode::Write::new(fixed, pointer, length)
+                    .offset(offset)
+                    .build(),
+                None => opcode::Write::new(descriptor, pointer, length)
+                    .offset(offset)
+                    .build(),
+            }
         } else {
-            opcode::Read::new(descriptor, pointer, length)
-                .offset(offset)
-                .build()
+            match fixed {
+                Some(fixed) => opcode::Read::new(fixed, pointer, length)
+                    .offset(offset)
+                    .build(),
+                None => opcode::Read::new(descriptor, pointer, length)
+                    .offset(offset)
+                    .build(),
+            }
         };
         entry.user_data(self.identifier)
     }
@@ -221,7 +244,13 @@ impl IoUringSelector {
         drop(request.buffer.take());
         request.identifier = identifier;
         request.permit = Some(permit);
-        request.file = Some(retain_file(monitor.file()));
+        let registration = monitor.registration_mut();
+        let file = &registration.file;
+        request.file = Some(Arc::clone(
+            registration
+                .files
+                .get_or_insert(&controller, || RegisteredFile::new(&controller, file)),
+        ));
         request.offset = offset;
         request.buffer = Some(buffer);
         request.pointer = pointer;
@@ -229,7 +258,7 @@ impl IoUringSelector {
         request.reply.set(Some(Arc::clone(&shared)));
         request.cancelling.set(false);
         shared.ready.store(false, Ordering::Relaxed);
-        monitor.registration_mut().running = Some((Arc::clone(&controller), identifier));
+        monitor.registration_mut().running = Some(RingBinding::new(&controller, identifier));
         if let Err(mpsc::SendError(Command::Submit(request))) =
             controller.send(Command::Submit(request))
         {
@@ -293,6 +322,8 @@ impl FileMonitoring for IoUringSelector {
                 owner: Arc::downgrade(&self.group),
                 cached: None,
                 running: None,
+                file: retain_file(file),
+                files: RingCache::default(),
                 closed: false,
                 failed: false,
                 shared: Arc::new(Shared {
@@ -387,9 +418,9 @@ impl FileMonitoring for IoUringSelector {
             )
             .into());
         }
-        if let Some((controller, identifier)) = &registration.running {
+        if let Some(binding) = &registration.running {
             if !registration.shared.ready.load(Ordering::Acquire) {
-                let _ = controller.send(Command::Cancel(*identifier));
+                let _ = binding.controller.send(Command::Cancel(binding.state));
             }
             let mut cancelled = pin!(cancellation.cancelled());
             poll_fn(|context| {
@@ -416,6 +447,12 @@ impl FileMonitoring for IoUringSelector {
             drop(completion);
         }
         drop(registration.cached.take());
+        for file in registration.files.values() {
+            file.retire();
+        }
+        for file in registration.files.values() {
+            file.closed(cancellation).await?;
+        }
         Ok(())
     }
 }
