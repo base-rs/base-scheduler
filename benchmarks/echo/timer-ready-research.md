@@ -1,5 +1,7 @@
 # Publishing expired timers into ready queues
 
+This archived experiment predates the [production worker-local timer integration](worker-local-timers.md). Its baseline and candidate descriptions apply to the measurements below.
+
 Queuing stealable timer-delivery actions costs more than immediately waking their tasks in the tested Aiko workloads. Batching publication and allowing the stealing worker to keep the resulting task reduce the penalty, but do not produce a win. Keep timer queues worker-owned and immediately publish the resulting runnable tasks through their registered wakers.
 
 This extends the [worker-owned timer experiment](local-timers-research.md). The baseline here is that archived worker-local prototype, rather than the production shared timer service. The [patches, scripts, raw data, and generated tables](results/timer-ready/readme.md) preserve five implementations and 171 samples. Production source remains unchanged.
