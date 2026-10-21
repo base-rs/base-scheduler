@@ -9,22 +9,8 @@ use std::{cell::UnsafeCell, sync::Mutex, task::Context};
 pub(super) mod pool;
 use pool::Pool;
 
-/// A bounded provided-buffer pool for one persistent receive.
-#[derive(Clone, Copy, Debug)]
-pub struct RecvMsgMultishotOptions {
-    /// Power of two in 1..=32768. Held messages consume buffers until dropped.
-    pub buffers: u16,
-    /// Maximum payload bytes per receive; metadata storage is added separately.
-    pub buffer_size: usize,
-}
-impl Default for RecvMsgMultishotOptions {
-    fn default() -> Self {
-        Self {
-            buffers: 8,
-            buffer_size: 65536,
-        }
-    }
-}
+pub use core_scheduler::RecvMsgMultishotOptions;
+pub type RecvMsgMultishotMessage = core_scheduler::RecvMsgMultishotMessage<RecvMsgBuffer>;
 
 /// Counters for verifying persistent submissions and pool pressure.
 #[derive(Clone, Copy, Debug, Default)]
@@ -32,12 +18,6 @@ pub struct RecvMsgMultishotStatistics {
     pub submissions: u64,
     pub messages: u64,
     pub buffer_exhaustions: u64,
-}
-
-/// One received message, retaining its buffer until dropped or consumed by an owned write.
-pub struct RecvMsgMultishotMessage {
-    pub result: SocketRecvResult,
-    pub buffer: RecvMsgBuffer,
 }
 
 /// An immutable lease of a completed receive buffer. Drop returns it to its original ring.
@@ -101,11 +81,10 @@ impl RecvMsgMultishot {
     /// Receive the next message; `None` is terminal stream EOF. Empty datagrams are messages.
     /// Successful queued progress wins concurrent cancellation. Cancellation with no
     /// queued message closes and drains the persistent receive before returning.
-    pub async fn recv(
+    async fn receive(
         &mut self,
         cancellation: &Cancellation,
     ) -> OperationResult<Option<RecvMsgMultishotMessage>> {
-        cancellation.check()?;
         let mut cancelled = pin!(cancellation.cancelled());
         loop {
             let was_cancelled = {
@@ -133,7 +112,7 @@ impl RecvMsgMultishot {
                 .await
             };
             if was_cancelled {
-                self.close().await?;
+                self.retire().await?;
                 return Err(Cancelled.into());
             }
         }
@@ -145,7 +124,7 @@ impl RecvMsgMultishot {
 
     /// Stop receiving, await original-request retirement, and discard unread messages.
     /// Already returned buffer leases remain valid, including after scheduler shutdown.
-    pub async fn close(&mut self) -> io::Result<()> {
+    async fn retire(&mut self) -> io::Result<()> {
         self.cancel.request();
         loop {
             event_listener::listener!(self.state.changed => listener);
@@ -177,7 +156,45 @@ impl RecvMsgMultishot {
     }
 }
 
-impl IoUringSelector {
+impl core_scheduler::SocketRecvMsgReceiver<IoUringSelector> for RecvMsgMultishot {
+    type Buffer = RecvMsgBuffer;
+
+    async fn recv(
+        &mut self,
+        scheduler: &IoUringSelector,
+        cancellation: &Cancellation,
+    ) -> OperationResult<Option<RecvMsgMultishotMessage>> {
+        cancellation.check()?;
+        self.check_selector(scheduler)?;
+        self.receive(cancellation).await
+    }
+
+    async fn close(&mut self, scheduler: &IoUringSelector) -> io::Result<()> {
+        self.check_selector(scheduler)?;
+        self.retire().await
+    }
+}
+
+impl RecvMsgMultishot {
+    fn check_selector(&self, selector: &IoUringSelector) -> io::Result<()> {
+        if selector
+            .controllers
+            .iter()
+            .any(|controller| Arc::ptr_eq(controller, &self.cancel.controller))
+        {
+            Ok(())
+        } else {
+            Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "receiver belongs to another io_uring selector",
+            ))
+        }
+    }
+}
+
+impl core_scheduler::SocketRecvMsgMultishot for IoUringSelector {
+    type Receiver = RecvMsgMultishot;
+
     /// Start a bounded multishot `recvmsg` receive (Linux 6.0+, provided rings 5.19+).
     ///
     /// This lazy operation selects one ring and retains the socket through final
@@ -187,7 +204,7 @@ impl IoUringSelector {
     /// additional capacity for sends and other operations which may need the ring.
     /// Peeking is rejected: a persistent peek can repeatedly consume the whole pool
     /// with copies of the same datagram. Unsupported kernels fail explicitly.
-    pub async fn socket_recvmsg_multishot(
+    async fn socket_recvmsg_multishot(
         &self,
         socket: &NativeSocket,
         options: RecvMsgMultishotOptions,

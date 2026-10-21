@@ -326,3 +326,145 @@ pub async fn abandoned_operation<F: SocketIoFixture>(fixture: &F) {
     guard.retired().await;
     fixture.assert_released();
 }
+
+/// A bounded portable receiver preserves datagrams, metadata, empty messages,
+/// truncation, and lease lifetime across cancellation and close.
+pub async fn multishot_messages<S: SocketScheduler + SocketSendMsg + SocketRecvMsgMultishot>(
+    scheduler: &S,
+) {
+    let never = Cancellation::never();
+    let sender = scheduler
+        .socket_open(SocketDomain::Ipv4, SocketType::Datagram, None, &never)
+        .await
+        .unwrap();
+    let socket = scheduler
+        .socket_open(SocketDomain::Ipv4, SocketType::Datagram, None, &never)
+        .await
+        .unwrap();
+    for socket in [&sender, &socket] {
+        scheduler
+            .socket_bind(socket, "127.0.0.1:0".parse().unwrap(), &never)
+            .await
+            .unwrap();
+    }
+    let address = scheduler.socket_local_address(&socket).unwrap();
+    let source = scheduler.socket_local_address(&sender).unwrap();
+    let options = RecvMsgMultishotOptions {
+        buffers: 1,
+        buffer_size: 4,
+    };
+    let cancelled = Cancellation::new();
+    cancelled.cancel();
+    self::cancelled(
+        scheduler
+            .socket_recvmsg_multishot(&socket, options, SocketRecvFlags::default(), &cancelled)
+            .await,
+    );
+    assert!(
+        scheduler
+            .socket_recvmsg_multishot(&socket, options, SocketRecvFlags { peek: true }, &never)
+            .await
+            .is_err()
+    );
+    drop(scheduler.socket_recvmsg_multishot(&socket, options, SocketRecvFlags::default(), &never));
+    let mut receiver = scheduler
+        .socket_recvmsg_multishot(&socket, options, SocketRecvFlags::default(), &never)
+        .await
+        .unwrap();
+    // Pre-cancellation must leave a persistent receiver usable.
+    self::cancelled(receiver.recv(scheduler, &cancelled).await);
+    let (sent, _) = scheduler
+        .socket_sendmsg(
+            &sender,
+            SocketMessage {
+                buffers: [b"abcdef".to_vec()],
+                address: Some(address),
+            },
+            SocketSendFlags::default(),
+            &never,
+        )
+        .await;
+    assert_eq!(sent.unwrap(), 6);
+    let first = receiver.recv(scheduler, &never).await.unwrap().unwrap();
+    assert_eq!(first.buffer.as_ref(), b"abcd");
+    assert_eq!(first.result.bytes, 4);
+    assert_eq!(first.result.address, Some(source));
+    assert!(first.result.truncated);
+    let (sent, _) = scheduler
+        .socket_sendmsg(
+            &sender,
+            SocketMessage {
+                buffers: [Vec::<u8>::new()],
+                address: Some(address),
+            },
+            SocketSendFlags::default(),
+            &never,
+        )
+        .await;
+    assert_eq!(sent.unwrap(), 0);
+    let mut waiting = Box::pin(receiver.recv(scheduler, &never));
+    assert!(poll_once(&mut waiting).await.is_none());
+    assert_eq!(first.buffer.as_ref(), b"abcd");
+    drop(first);
+    let empty = waiting.await.unwrap().unwrap();
+    assert!(empty.buffer.as_ref().is_empty());
+    // Cancellation while capacity is exhausted closes the receiver, without
+    // invalidating the returned lease or requiring it to be released first.
+    let token = Cancellation::new();
+    let mut waiting = Box::pin(receiver.recv(scheduler, &token));
+    assert!(poll_once(&mut waiting).await.is_none());
+    token.cancel();
+    self::cancelled(waiting.await);
+    assert!(receiver.recv(scheduler, &never).await.unwrap().is_none());
+    receiver.close(scheduler).await.unwrap();
+    receiver.close(scheduler).await.unwrap();
+    drop(receiver);
+    assert!(empty.buffer.as_ref().is_empty());
+    drop(empty);
+    scheduler.socket_close(socket).await.unwrap();
+    scheduler.socket_close(sender).await.unwrap();
+}
+
+/// Stream receivers preserve ordering across leases, EOF, and explicit close.
+/// Non-power-of-two buffer counts are portable, even when a kernel ring rounds up.
+pub async fn multishot_stream<S: SocketScheduler + SocketRecvMsgMultishot>(scheduler: &S) {
+    let never = Cancellation::never();
+    let (sender, socket) = stream_pair(scheduler, SocketDomain::Ipv4).await;
+    let mut receiver = scheduler
+        .socket_recvmsg_multishot(
+            &socket,
+            RecvMsgMultishotOptions {
+                buffers: 3,
+                buffer_size: 4,
+            },
+            SocketRecvFlags::default(),
+            &never,
+        )
+        .await
+        .unwrap();
+    let mut sent = 0;
+    while sent < 9 {
+        let (result, _) = scheduler
+            .socket_write(&sender, b"abcdefghi"[sent..].to_vec(), &never)
+            .await;
+        let count = result.unwrap();
+        assert!(count > 0);
+        sent += count;
+    }
+    scheduler
+        .socket_shutdown(&sender, Shutdown::Write)
+        .await
+        .unwrap();
+    let mut payload = Vec::new();
+    while let Some(message) = receiver.recv(scheduler, &never).await.unwrap() {
+        assert!(!message.buffer.as_ref().is_empty());
+        assert_eq!(message.result.bytes, message.buffer.as_ref().len());
+        assert!(!message.result.truncated);
+        payload.extend_from_slice(message.buffer.as_ref());
+    }
+    assert_eq!(payload, b"abcdefghi");
+    assert!(receiver.recv(scheduler, &never).await.unwrap().is_none());
+    receiver.close(scheduler).await.unwrap();
+    scheduler.socket_close(socket).await.unwrap();
+    scheduler.socket_close(sender).await.unwrap();
+}

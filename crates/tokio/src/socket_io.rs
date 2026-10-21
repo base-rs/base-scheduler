@@ -22,6 +22,29 @@ use std::os::windows::io::{AsRawSocket, IntoRawSocket};
 #[cfg(windows)]
 use windows_sys::Win32::Networking::WinSock::*;
 
+// A one-shot local shim tests a failed SO_TYPE query without invalidating an owned socket.
+#[cfg(test)]
+thread_local! {
+    pub(crate) static SOCKET_TYPE_ERROR: std::cell::Cell<Option<io::ErrorKind>> = const { std::cell::Cell::new(None) };
+}
+
+fn socket_type(socket: &Socket) -> io::Result<Type> {
+    #[cfg(test)]
+    if let Some(error) = SOCKET_TYPE_ERROR.with(|slot| slot.take()) {
+        return Err(error.into());
+    }
+    socket.r#type()
+}
+
+pub(crate) fn recvmsg_socket_type(socket: &Socket) -> io::Result<SocketType> {
+    let kind = socket_type(socket)?;
+    Ok(if kind == Type::STREAM {
+        SocketType::Stream
+    } else {
+        SocketType::Other(kind.into())
+    })
+}
+
 pub(crate) fn open(
     domain: SocketDomain,
     kind: SocketType,

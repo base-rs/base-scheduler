@@ -161,3 +161,8 @@ fn every_client_field_is_validated_and_server_connection_count_must_be_positive(
     }
     Process::new(&["server", "tokio", "1", "0"]).finish(false);
 }
+
+#[test]
+fn tokio_adapter_multishot() {
+    smoke("tokio-adapter-multishot");
+}

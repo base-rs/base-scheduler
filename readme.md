@@ -93,3 +93,5 @@ Please open an issue or pull request on [GitHub](https://github.com/core-rs/core
 ### Agent Context
 
 Run `cargo bake agent:context:install` to install shared context and skills. Use `cargo bake agent:context:list` and `cargo bake agent:context:show` to discover guidance. Follow `agents.md` and the relevant skills under `.agents/skills/`.
+
+`SocketRecvMsgMultishot` is an optional bounded receive capability. Its receiver returns owned `IoBuf` message leases via `recv(scheduler, cancellation)`, with metadata, truncation, and stream EOF semantics. io_uring uses kernel multishot receives; readiness backends use on-demand nonblocking receives and a fixed reusable buffer pool. Neither a background task nor a payload allocation per message is required. Receivers retain resources, while each receive and close takes its scheduler explicitly.

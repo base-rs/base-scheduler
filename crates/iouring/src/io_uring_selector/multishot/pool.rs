@@ -48,6 +48,7 @@ pub(crate) struct Pool {
     layout: Layout,
     buffers: Box<[UnsafeCell<u8>]>,
     count: u16,
+    entries: u16,
     buffer_size: usize,
     available: AtomicUsize,
     rearm: AtomicBool,
@@ -62,25 +63,22 @@ impl Pool {
         options: RecvMsgMultishotOptions,
         identifier: u64,
     ) -> io::Result<Arc<Self>> {
+        options.validate()?;
+        let entries = options.buffers.next_power_of_two();
         let overhead = 16 + std::mem::size_of::<libc::sockaddr_storage>();
         let buffer_size = options.buffer_size.saturating_add(overhead);
         let length = buffer_size.saturating_mul(options.buffers as usize);
-        if !options.buffers.is_power_of_two()
-            || options.buffers > 32768
-            || options.buffer_size == 0
-            || buffer_size > i32::MAX as usize
-            || length > isize::MAX as usize
-        {
+        if buffer_size > i32::MAX as usize || length > isize::MAX as usize {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                "multishot requires a power-of-two pool of 1..=32768 buffers and a nonzero payload fitting i32",
+                "multishot requires metadata and payload sizes fitting the kernel buffer limits",
             ));
         }
         let group = Group::new(controller)?;
         // SAFETY: _SC_PAGESIZE is a supported, nonnegative constant on Linux.
         let page = unsafe { libc::sysconf(libc::_SC_PAGESIZE) } as usize;
         let layout = Layout::from_size_align(
-            options.buffers as usize * std::mem::size_of::<types::BufRingEntry>(),
+            entries as usize * std::mem::size_of::<types::BufRingEntry>(),
             page,
         )
         .expect("Linux page size is a power of two and the ring has at most 32768 entries");
@@ -97,6 +95,7 @@ impl Pool {
             layout,
             buffers: (0..length).map(|_| UnsafeCell::new(0)).collect(),
             count: options.buffers,
+            entries,
             buffer_size,
             available: AtomicUsize::new(0),
             rearm: AtomicBool::new(false),
@@ -115,7 +114,7 @@ impl Pool {
             unsafe {
                 ring.register_buf_ring_with_flags(
                     self.ring.as_ptr() as u64,
-                    self.count,
+                    self.entries,
                     self.group(),
                     0,
                 )
@@ -159,7 +158,7 @@ impl Pool {
                 (&entry as *const types::BufRingEntry).cast::<u8>(),
                 self.ring
                     .as_ptr()
-                    .add((position & (self.count - 1)) as usize)
+                    .add((position & (self.entries - 1)) as usize)
                     .cast(),
                 14,
             );

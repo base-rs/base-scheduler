@@ -4,6 +4,8 @@
 
 On this closed-loop TCP echo workload, multishot does **not beat pure Tokio**. Median throughput is 2.4–4.7% lower in six configurations and 9.0–9.6% lower with one worker and 32 connections. Against Native `_poll`, multishot improves the 64-byte, single-connection cases by 5.8–14.2% and the one-worker, 32-connection cases by 8.0–11.9%; the other configurations are 1.0–3.3% lower. These are results for this experiment, not a universal ranking of the I/O mechanisms.
 
+These measurements predate the portable `SocketRecvMsgMultishot` interface. The same generic echo loop now also runs as `tokio-adapter-multishot` using polling emulation; that backend is smoke-tested but is not measured in this report.
+
 ## Method
 
 Measured on Aiko on 2026-10-21 from clean implementation commit `7b3e925d4ca02e66afed13cdda84f3dc17c8c606`. The machine is an AMD Ryzen 9 9950X3D with Linux 7.2.6-arch2-1, Rust 1.99.0, and LLVM 23.1.1. Server CPUs 0–3 and client CPUs 4–7 are separate physical cores sharing one last-level cache; the client has four Tokio workers. All builds, tests, and measurements ran under the exclusive `/tmp/core-scheduler-perf.lock`.

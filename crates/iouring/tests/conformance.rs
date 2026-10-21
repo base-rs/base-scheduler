@@ -336,6 +336,18 @@ macro_rules! socket_suites {
                     scheduler.socket_close(receiver).await.unwrap();
                 });
             }
+            #[test]
+            fn portable_multishot_messages() {
+                $run(async move |fixture| {
+                    core_scheduler_conformance::socket::multishot_messages(&fixture.scheduler).await;
+                });
+            }
+            #[test]
+            fn portable_multishot_stream() {
+                $run(async move |fixture| {
+                    core_scheduler_conformance::socket::multishot_stream(&fixture.scheduler).await;
+                });
+            }
             mod scalar { use super::*; core_scheduler_conformance::socket_tests!(run: streams); }
             mod message { use super::*; core_scheduler_conformance::socket_message_tests!(run: streams); }
             mod datagram { use super::*; core_scheduler_conformance::socket_datagram_tests!(run: datagrams); }

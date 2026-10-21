@@ -378,6 +378,46 @@ impl<S: Selector + SocketRecvMsgPoll> SocketRecvMsgPoll for NativeScheduler<S> {
     }
 }
 
+/// A receive resource advanced through the Native scheduler's explicit selector.
+pub struct NativeRecvMsgReceiver<R>(R);
+
+impl<S: Selector + SocketRecvMsgMultishot> SocketRecvMsgMultishot for NativeScheduler<S> {
+    type Receiver = NativeRecvMsgReceiver<S::Receiver>;
+
+    async fn socket_recvmsg_multishot(
+        &self,
+        socket: &Self::Socket,
+        options: RecvMsgMultishotOptions,
+        flags: SocketRecvFlags,
+        cancellation: &Cancellation,
+    ) -> OperationResult<Self::Receiver> {
+        self.selector()
+            .socket_recvmsg_multishot(socket, options, flags, cancellation)
+            .await
+            .map(NativeRecvMsgReceiver)
+    }
+}
+
+impl<S, R> SocketRecvMsgReceiver<NativeScheduler<S>> for NativeRecvMsgReceiver<R>
+where
+    S: Selector,
+    R: SocketRecvMsgReceiver<S>,
+{
+    type Buffer = R::Buffer;
+
+    async fn recv(
+        &mut self,
+        scheduler: &NativeScheduler<S>,
+        cancellation: &Cancellation,
+    ) -> OperationResult<Option<RecvMsgMultishotMessage<Self::Buffer>>> {
+        self.0.recv(scheduler.selector(), cancellation).await
+    }
+
+    async fn close(&mut self, scheduler: &NativeScheduler<S>) -> io::Result<()> {
+        self.0.close(scheduler.selector()).await
+    }
+}
+
 impl<S: Selector + SocketSendMsgPoll> SocketSendMsgPoll for NativeScheduler<S> {
     async fn socket_sendmsg_poll(
         &self,
