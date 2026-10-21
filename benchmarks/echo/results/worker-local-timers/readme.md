@@ -3,6 +3,7 @@
 The baseline is `1689f8d6d7014a3dcd983b5e88036dc40aa4f527`. The candidate's runtime implementation is `eb0954c7afb566d92173124183f2a860846548fb`; the subsequent report commit adds evidence without changing runtime code. Measurements were collected on Aiko with the standard optimized Cargo profile, no compiler or profile overrides, and `/tmp/core-scheduler-perf.lock` held exclusively. `build.json` records the compiler, build commands, binary hashes, and original cache locations. The candidate was built from an uncommitted patch on the baseline; `eb0954c` commits that implementation. Documentation and test-only additions made afterward do not change the benchmark's runtime code.
 
 - `measurements.json` preserves all 72 echo samples, 18 timer samples, measurement settings, and build metadata.
+- `host.json` records the CPU topology and kernel. CPUs 0–7 are distinct physical cores in the same last-level cache.
 - `measure.py` is the exact measurement runner, including the randomized order and process CPU accounting. Its SHA-256 is recorded in the raw results.
 - `timers.rs` is the identical periodic-timer diagnostic compiled into both variants. It lives outside Cargo targets here; copy it into the private benchmark package to reproduce it.
 - `build.py` rebuilds both variants into a separate cache directory and produces the `build.json` consumed by the measurement runner. It refuses a dirty existing worktree except for its own diagnostic source.
