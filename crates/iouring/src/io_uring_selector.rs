@@ -1268,3 +1268,5 @@ mod socket;
 
 #[cfg(test)]
 mod tests;
+
+pub(crate) mod file_monitor;

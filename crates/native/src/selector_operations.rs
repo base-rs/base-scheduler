@@ -610,3 +610,64 @@ where
             .await
     }
 }
+
+impl<S: Selector + FileMonitoring> FileMonitoring for NativeScheduler<S> {
+    type FileRegistration = S::FileRegistration;
+    fn file_monitor(
+        &self,
+        file: &Self::File,
+    ) -> io::Result<FileMonitor<Self::File, Self::FileRegistration>> {
+        self.selector().file_monitor(file)
+    }
+    async fn file_monitor_read<B: IoBufMut>(
+        &self,
+        monitor: &mut FileMonitor<Self::File, Self::FileRegistration>,
+        buffer: B,
+        cancellation: &Cancellation,
+    ) -> BufferResult<B> {
+        self.selector()
+            .file_monitor_read(monitor, buffer, cancellation)
+            .await
+    }
+    async fn file_monitor_write<B: IoBuf>(
+        &self,
+        monitor: &mut FileMonitor<Self::File, Self::FileRegistration>,
+        buffer: B,
+        cancellation: &Cancellation,
+    ) -> BufferResult<B> {
+        self.selector()
+            .file_monitor_write(monitor, buffer, cancellation)
+            .await
+    }
+    async fn file_monitor_read_at<B: IoBufMut>(
+        &self,
+        monitor: &mut FileMonitor<Self::File, Self::FileRegistration>,
+        buffer: B,
+        offset: u64,
+        cancellation: &Cancellation,
+    ) -> BufferResult<B> {
+        self.selector()
+            .file_monitor_read_at(monitor, buffer, offset, cancellation)
+            .await
+    }
+    async fn file_monitor_write_at<B: IoBuf>(
+        &self,
+        monitor: &mut FileMonitor<Self::File, Self::FileRegistration>,
+        buffer: B,
+        offset: u64,
+        cancellation: &Cancellation,
+    ) -> BufferResult<B> {
+        self.selector()
+            .file_monitor_write_at(monitor, buffer, offset, cancellation)
+            .await
+    }
+    async fn file_monitor_close(
+        &self,
+        monitor: &mut FileMonitor<Self::File, Self::FileRegistration>,
+        cancellation: &Cancellation,
+    ) -> OperationResult<()> {
+        self.selector()
+            .file_monitor_close(monitor, cancellation)
+            .await
+    }
+}
