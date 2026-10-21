@@ -22,8 +22,7 @@ fn record() {
     });
 }
 
-// SAFETY: every operation forwards its unchanged pointer/layout to System.
-// The thread-local counters have constant initialization and never allocate.
+// SAFETY: every operation forwards its unchanged pointer/layout to System. The thread-local counters have constant initialization and never allocate.
 unsafe impl GlobalAlloc for CountingAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         record();
@@ -70,8 +69,7 @@ fn reserved_timer_lifecycles_and_reuse_allocate_nothing() {
     let capacity = timers.capacity();
     let calls = allocations(|| {
         for _ in 0..3 {
-            // Pending cancellation, compaction with a simultaneous new batch,
-            // expiry, and slot reuse all run inside the counting window.
+            // Pending cancellation, compaction with a simultaneous new batch, expiry, and slot reuse all run inside the counting window.
             for index in 0..256 {
                 handles.push(
                     timers
@@ -176,8 +174,7 @@ fn bounded_driver_lifecycles_allocate_nothing() {
             assert_eq!(driver.poll(now, &mut output), 1);
             output.clear();
         }
-        // Keep a resident heap while staged cancellations are filtered and
-        // sparse heap cancellations accumulate into one batch repair.
+        // Keep a resident heap while staged cancellations are filtered and sparse heap cancellations accumulate into one batch repair.
         for index in 0..256 {
             handles.push(
                 producer

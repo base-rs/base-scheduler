@@ -1,8 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2021, by Wander Hillen.
 // Copyright, 2021-2026, by Samuel Williams.
-// Based on IO::Event::Timers by Samuel Williams and IO::Event::PriorityHeap
-// by Wander Hillen and Samuel Williams (MIT).
+// Based on IO::Event::Timers by Samuel Williams and IO::Event::PriorityHeap by Wander Hillen and Samuel Williams (MIT).
 
 use crate::TimerHandle;
 use std::cmp::Ordering;
@@ -263,8 +262,7 @@ impl<Value> State<Value> {
     }
 
     fn flush(&mut self) {
-        // Nothing changed since the previous flush. This also avoids moving the pending
-        // buffer for each individual expiry in a populated queue.
+        // Nothing changed since the previous flush. This also avoids moving the pending buffer for each individual expiry in a populated queue.
         if self.scheduled.is_empty() && self.cancelled == 0 {
             return;
         }
