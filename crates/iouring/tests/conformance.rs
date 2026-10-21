@@ -393,3 +393,27 @@ socket_suites!(
     NativeScheduler<IoUringSelector>,
     SocketDomain::Ipv6
 );
+
+#[test]
+fn directional_monitors_work_with_an_independent_driver() {
+    run_selector(async |fixture| {
+        let scheduler = &fixture.scheduler;
+        let (sender, receiver) =
+            core_scheduler_conformance::socket::stream_pair(scheduler, SocketDomain::Ipv4).await;
+        core_scheduler_conformance::socket_monitoring::stream(scheduler, &sender, &receiver).await;
+        scheduler.socket_close(sender).await.unwrap();
+        scheduler.socket_close(receiver).await.unwrap();
+    });
+}
+
+#[test]
+fn directional_monitors_work_through_the_native_scheduler() {
+    run_native(async |fixture| {
+        let scheduler = &fixture.scheduler;
+        let (sender, receiver) =
+            core_scheduler_conformance::socket::stream_pair(scheduler, SocketDomain::Ipv4).await;
+        core_scheduler_conformance::socket_monitoring::stream(scheduler, &sender, &receiver).await;
+        scheduler.socket_close(sender).await.unwrap();
+        scheduler.socket_close(receiver).await.unwrap();
+    });
+}

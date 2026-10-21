@@ -3,9 +3,10 @@
 
 use crate::Result;
 use core_scheduler::{
-    Cancellation, IoBuf, RecvMsgMultishotOptions, SocketAccept, SocketRead, SocketRecvFlags,
-    SocketRecvMsgMultishot, SocketRecvMsgReceiver, SocketRecvPoll, SocketRegistration,
-    SocketSendFlags, SocketSendPoll, SocketSetOption, SocketWrite, Spawn, TcpNoDelay,
+    Cancellation, IoBuf, RecvMsgMultishotOptions, SocketAccept, SocketMonitoring, SocketRead,
+    SocketRecvFlags, SocketRecvMsgMultishot, SocketRecvMsgReceiver, SocketRecvPoll,
+    SocketRegistration, SocketSendFlags, SocketSendPoll, SocketSetOption, SocketWrite, Spawn,
+    TcpNoDelay,
 };
 use core_scheduler_tokio::TokioScheduler;
 use std::{
@@ -102,6 +103,43 @@ async fn echo_poll<S: SocketRecvPoll + SocketSendPoll>(scheduler: &S, socket: S:
     }
 }
 
+async fn echo_monitor<S: SocketMonitoring>(scheduler: &S, socket: S::Socket)
+where
+    S::Socket: 'static,
+{
+    let never = Cancellation::never();
+    let mut reader = scheduler
+        .socket_stream_monitor(&socket, core_scheduler::Interest::Readable)
+        .expect("read monitor");
+    let mut writer = scheduler
+        .socket_stream_monitor(&socket, core_scheduler::Interest::Writable)
+        .expect("write monitor");
+    let mut buffer = vec![0; BUFFER_SIZE];
+    loop {
+        let count = scheduler
+            .socket_monitor_recv_poll(&mut reader, &mut buffer, SocketRecvFlags::default(), &never)
+            .await
+            .expect("monitor receive");
+        if count == 0 {
+            return;
+        }
+        let mut sent = 0;
+        while sent < count {
+            let written = scheduler
+                .socket_monitor_send_poll(
+                    &mut writer,
+                    &buffer[sent..count],
+                    SocketSendFlags::default(),
+                    &never,
+                )
+                .await
+                .expect("monitor send");
+            assert!(written != 0, "monitor write made zero progress");
+            sent += written;
+        }
+    }
+}
+
 async fn multishot_server<S>(scheduler: Arc<S>, listener: TcpListener, connections: usize)
 where
     S: SocketRegistration
@@ -182,6 +220,7 @@ async fn scheduler_server<S>(
     listener: TcpListener,
     connections: usize,
     poll: bool,
+    monitors: bool,
 ) where
     S: SocketRegistration
         + SocketAccept
@@ -189,6 +228,7 @@ async fn scheduler_server<S>(
         + SocketWrite
         + SocketRecvPoll
         + SocketSendPoll
+        + SocketMonitoring
         + SocketSetOption<TcpNoDelay>
         + Spawn
         + Send
@@ -210,7 +250,9 @@ async fn scheduler_server<S>(
             .await
             .expect("TCP_NODELAY");
         let shared = Arc::clone(&scheduler);
-        let task = if poll {
+        let task = if monitors {
+            scheduler.spawn(async move { echo_monitor(shared.as_ref(), socket).await })
+        } else if poll {
             scheduler.spawn(async move { echo_poll(shared.as_ref(), socket).await })
         } else {
             scheduler.spawn(async move { echo(shared.as_ref(), socket).await })
@@ -230,7 +272,10 @@ pub(crate) fn run(backend: &str, workers: usize, connections: usize) -> Result<(
             ready(&listener);
             runtime.block_on(tokio_server(listener, connections));
         }
-        "tokio-adapter" | "tokio-adapter-poll" | "tokio-adapter-multishot" => {
+        "tokio-adapter"
+        | "tokio-adapter-poll"
+        | "tokio-adapter-multishot"
+        | "tokio-adapter-monitor" => {
             let runtime = crate::runtime(workers);
             let scheduler = Arc::new(TokioScheduler::new(runtime.handle().clone()));
             ready(&listener);
@@ -246,12 +291,13 @@ pub(crate) fn run(backend: &str, workers: usize, connections: usize) -> Result<(
                     listener,
                     connections,
                     backend == "tokio-adapter-poll",
+                    backend == "tokio-adapter-monitor",
                 ));
             }
             runtime.block_on(scheduler.shutdown());
         }
         #[cfg(target_os = "linux")]
-        "iouring" | "iouring-poll" | "iouring-multishot" => {
+        "iouring" | "iouring-poll" | "iouring-multishot" | "iouring-monitor" => {
             use core_scheduler_iouring::{IoUringOptions, IoUringSelector};
             use core_scheduler_native::{NativeExecutorOptions, NativeScheduler};
             let (selector, drivers) = IoUringSelector::with_workers(
@@ -286,6 +332,7 @@ pub(crate) fn run(backend: &str, workers: usize, connections: usize) -> Result<(
                     listener,
                     connections,
                     backend == "iouring-poll",
+                    backend == "iouring-monitor",
                 ));
             }
             scheduler.block_on(scheduler.shutdown());

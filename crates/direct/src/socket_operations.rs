@@ -366,3 +366,18 @@ impl SocketShutdown for DirectScheduler {
 
 #[cfg(test)]
 mod tests;
+
+impl SocketMonitoring for DirectScheduler {
+    type MonitorRegistration = ();
+    fn socket_monitor_state(
+        &self,
+        socket: &Self::Socket,
+        interest: Interest,
+    ) -> io::Result<SocketMonitor<Self::Socket, ()>> {
+        Ok(SocketMonitor::new(
+            DirectSocket(socket.retain()),
+            interest,
+            (),
+        ))
+    }
+}

@@ -166,3 +166,13 @@ fn every_client_field_is_validated_and_server_connection_count_must_be_positive(
 fn tokio_adapter_multishot() {
     smoke("tokio-adapter-multishot");
 }
+
+#[test]
+fn tokio_adapter_monitor() {
+    smoke("tokio-adapter-monitor");
+}
+#[cfg(target_os = "linux")]
+#[test]
+fn native_iouring_monitor() {
+    smoke("iouring-monitor");
+}

@@ -12,6 +12,7 @@ mod io_uring_selector;
 pub use io_uring_driver::IoUringDriver;
 pub use io_uring_options::IoUringOptions;
 pub use io_uring_selector::IoUringSelector;
+pub use io_uring_selector::monitor::IoUringMonitorRegistration;
 pub use io_uring_selector::multishot::{
     RecvMsgBuffer, RecvMsgMultishot, RecvMsgMultishotMessage, RecvMsgMultishotOptions,
     RecvMsgMultishotStatistics,

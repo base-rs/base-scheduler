@@ -60,6 +60,33 @@ Require individual operations, such as `FileRead`, `SocketRead + SocketWrite`, o
 
 Operation futures use static dispatch and are `Send`. File and socket resources are `Send + Sync`; spawned futures and outputs are `Send + 'static`. Local-only execution is outside this initial contract. Independent capabilities can be implemented separately without runtime-selection features.
 
+## Reusable socket monitors
+
+`SocketMonitoring` supplies reusable directional readiness state. Use `socket_monitor` for general socket I/O, including UDP, or `socket_stream_monitor` to enable backend-specific byte-stream optimizations. Both use the same operations:
+
+```rust
+use core_scheduler::{Cancellation, Interest, OperationResult, SocketMonitoring, SocketRecvFlags};
+
+async fn receive<S: SocketMonitoring>(
+    scheduler: &S,
+    socket: &S::Socket,
+    buffer: &mut [u8],
+    cancellation: &Cancellation,
+) -> OperationResult<usize>
+where
+    S::Socket: 'static,
+{
+    let mut reader = scheduler.socket_stream_monitor(socket, Interest::Readable)?;
+    let result = scheduler
+        .socket_monitor_recv_poll(&mut reader, buffer, SocketRecvFlags::default(), cancellation)
+        .await;
+    scheduler.socket_monitor_close(&mut reader, &Cancellation::never()).await?;
+    result
+}
+```
+
+Retain the monitor across operations to reuse its registration. Create separate readable and writable monitors for concurrent tasks. `SocketStreamMonitor` wraps the common state without another allocation; `socket_stream_monitor_state` and `MonitorStorage::from_arc` also let you embed it in shared connection state. It does not imply connectedness or a universal rule for short reads. Scheduler and cancellation remain explicit operation arguments.
+
 ## Cancellation, ownership, and completion
 
 `Cancellation` is a runtime-independent cooperative signal. Clones share state, children inherit ancestor cancellation, and dropping a signal does not cancel it. Cancellation requests and completed cleanup are separate events.

@@ -319,3 +319,10 @@ fn aggregate_socket_helpers_remain_compatible() {
         core_scheduler_conformance::socket_messages::datagrams(scheduler, sender, receiver).await;
     });
 }
+
+#[test]
+fn directional_socket_monitors_reuse_caller_owned_storage() {
+    run_stream(SocketDomain::Ipv4, async |scheduler, sender, receiver| {
+        core_scheduler_conformance::socket_monitoring::stream(scheduler, sender, receiver).await;
+    });
+}

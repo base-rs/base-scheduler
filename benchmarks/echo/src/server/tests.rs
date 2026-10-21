@@ -120,3 +120,76 @@ fn poll_zero_progress_is_an_error_instead_of_an_infinite_loop() {
         std::panic::catch_unwind(|| crate::runtime(1).block_on(echo_poll(&scheduler, ()))).is_err()
     );
 }
+
+impl core_scheduler::SocketWait for PartialSocket {
+    async fn socket_wait(
+        &self,
+        _: &(),
+        _: core_scheduler::Interest,
+        _: &Cancellation,
+    ) -> OperationResult<()> {
+        Ok(())
+    }
+}
+impl core_scheduler::SocketRecvMsgPoll for PartialSocket {
+    async fn socket_recvmsg_poll(
+        &self,
+        _: &(),
+        _: &mut [std::io::IoSliceMut<'_>],
+        _: SocketRecvFlags,
+        _: &Cancellation,
+    ) -> OperationResult<core_scheduler::SocketRecvResult> {
+        Err(std::io::Error::from(std::io::ErrorKind::Unsupported).into())
+    }
+}
+impl core_scheduler::SocketSendMsgPoll for PartialSocket {
+    async fn socket_sendmsg_poll(
+        &self,
+        _: &(),
+        _: &[std::io::IoSlice<'_>],
+        _: Option<core_scheduler::SocketAddress>,
+        _: SocketSendFlags,
+        _: &Cancellation,
+    ) -> OperationResult<usize> {
+        Err(std::io::Error::from(std::io::ErrorKind::Unsupported).into())
+    }
+}
+impl SocketMonitoring for PartialSocket {
+    type MonitorRegistration = ();
+    fn socket_monitor_state(
+        &self,
+        _: &(),
+        interest: core_scheduler::Interest,
+    ) -> std::io::Result<core_scheduler::SocketMonitor<(), ()>> {
+        Ok(core_scheduler::SocketMonitor::new((), interest, ()))
+    }
+}
+
+#[test]
+fn monitor_echo_reuses_payload_storage_and_completes_partial_writes() {
+    let scheduler = PartialSocket {
+        input: Mutex::new([b"abcdef".to_vec(), b"xyz".to_vec()].into()),
+        output: Mutex::new(Vec::new()),
+        reads: Mutex::new(Vec::new()),
+        max_write: 2,
+    };
+    crate::runtime(1).block_on(echo_monitor(&scheduler, ()));
+    assert_eq!(&*scheduler.output.lock().unwrap(), b"abcdefxyz");
+    let reads = scheduler.reads.lock().unwrap();
+    assert_eq!(reads.len(), 3);
+    assert!(reads.iter().all(|pointer| *pointer == reads[0]));
+}
+
+#[test]
+fn monitor_echo_rejects_zero_progress() {
+    let scheduler = PartialSocket {
+        input: Mutex::new([b"x".to_vec()].into()),
+        output: Mutex::new(Vec::new()),
+        reads: Mutex::new(Vec::new()),
+        max_write: 0,
+    };
+    assert!(
+        std::panic::catch_unwind(|| crate::runtime(1).block_on(echo_monitor(&scheduler, ())))
+            .is_err()
+    );
+}

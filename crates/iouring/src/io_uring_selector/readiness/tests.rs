@@ -81,7 +81,7 @@ fn ready_scalar_and_vector_io_allocate_nothing_even_when_ring_capacity_is_full()
         selector.controllers[0]
             .next_identifier
             .load(Ordering::Relaxed),
-        1
+        2
     );
     drop(waiting);
     drain(&selector, &mut driver);
