@@ -147,6 +147,12 @@ impl IoUringSelector {
                 "file monitor belongs to a different selector",
             ));
         }
+        if !monitor.file().owns_native(&monitor.registration().file) {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "file monitor registration belongs to a different file",
+            ));
+        }
         Ok(())
     }
 
