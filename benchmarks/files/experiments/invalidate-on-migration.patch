@@ -1,0 +1,255 @@
+diff --git a/crates/iouring/src/io_uring_selector/file_monitor.rs b/crates/iouring/src/io_uring_selector/file_monitor.rs
+index 2f4303f..064b2be 100644
+--- a/crates/iouring/src/io_uring_selector/file_monitor.rs
++++ b/crates/iouring/src/io_uring_selector/file_monitor.rs
+@@ -16,6 +16,7 @@ pub struct IoUringFileRegistration {
+     running: Option<RingBinding<u64>>,
+     file: Arc<StdFile>,
+     files: RingCache<Arc<RegisteredFile>>,
++    retiring: Vec<Arc<RegisteredFile>>,
+     closed: bool,
+     failed: bool,
+ }
+@@ -251,6 +252,14 @@ impl IoUringSelector {
+         request.identifier = identifier;
+         request.permit = Some(permit);
+         let registration = monitor.registration_mut();
++        // Experimental policy: retain only the current registration, keeping unfinished or failed releases observable until close.
++        registration.retiring.retain(|file| !file.released());
++        if !registration.files.matches(&controller) {
++            if let Some(previous) = registration.files.take_current() {
++                previous.retire();
++                registration.retiring.push(previous);
++            }
++        }
+         let file = &registration.file;
+         request.file = Some(Arc::clone(
+             registration
+@@ -330,6 +339,7 @@ impl FileMonitoring for IoUringSelector {
+                 running: None,
+                 file: retain_file(file),
+                 files: RingCache::default(),
++                retiring: Vec::new(),
+                 closed: false,
+                 failed: false,
+                 shared: Arc::new(Shared {
+@@ -459,6 +469,9 @@ impl FileMonitoring for IoUringSelector {
+         for file in registration.files.values() {
+             file.closed(cancellation).await?;
+         }
++        for file in &registration.retiring {
++            file.closed(cancellation).await?;
++        }
+         Ok(())
+     }
+ }
+diff --git a/crates/iouring/src/io_uring_selector/file_monitor/tests.rs b/crates/iouring/src/io_uring_selector/file_monitor/tests.rs
+index 8213c37..28ad37d 100644
+--- a/crates/iouring/src/io_uring_selector/file_monitor/tests.rs
++++ b/crates/iouring/src/io_uring_selector/file_monitor/tests.rs
+@@ -450,7 +450,7 @@ fn disposal_of_an_abandoned_owner_can_close_admission_before_publication() {
+ }
+ 
+ #[test]
+-fn passive_registrations_survive_repeated_ring_changes_without_allocating() {
++fn migration_invalidates_old_registrations_and_reuses_request_storage() {
+     let (selector, mut drivers) = IoUringSelector::with_workers(Default::default(), 2).unwrap();
+     let (_directory, file) = super::super::tests::file(&selector);
+     let mut monitor = selector.file_monitor(&file).unwrap();
+@@ -480,9 +480,9 @@ fn passive_registrations_survive_repeated_ring_changes_without_allocating() {
+             }
+         });
+         if iteration >= 2 {
+-            assert_eq!(
+-                counts.count_total, 0,
+-                "returning to a visited ring allocated"
++            assert!(
++                counts.count_total >= 2,
++                "migration constructs a new lease and retirement state"
+             );
+         }
+         let current = monitor
+@@ -497,7 +497,7 @@ fn passive_registrations_survive_repeated_ring_changes_without_allocating() {
+         }
+         request_address = Some(current);
+     }
+-    assert_eq!(monitor.registration().files.values().count(), 2);
++    assert_eq!(monitor.registration().files.values().count(), 1);
+     for file in monitor.registration().files.values() {
+         assert_eq!(file.index().unwrap().0, 0);
+     }
+@@ -556,7 +556,7 @@ fn active_request_keeps_its_ring_when_polling_moves_to_another_worker() {
+             .0
+             .unwrap();
+     }
+-    assert_eq!(monitor.registration().files.values().count(), 2);
++    assert_eq!(monitor.registration().files.values().count(), 1);
+     let mut close = pin!(selector.file_monitor_close(&mut monitor, &never));
+     loop {
+         if let Poll::Ready(result) = close.as_mut().poll(&mut context) {
+@@ -722,3 +722,50 @@ fn release_errors_and_driver_exit_remain_observable_on_repeated_close() {
+         }
+     }
+ }
++
++#[test]
++fn failed_eviction_remains_observable_after_another_migration() {
++    let (selector, mut drivers) = IoUringSelector::with_workers(Default::default(), 2).unwrap();
++    let (_directory, file) = super::super::tests::file(&selector);
++    let mut monitor = selector.file_monitor(&file).unwrap();
++    let never = Cancellation::never();
++    let wake = drivers[0].waker();
++    let mut context = Context::from_waker(&wake);
++    for iteration in 0..3 {
++        let _failures = super::super::tests::Failures::new(
++            (iteration == 1)
++                .then_some(("fixed-file-release", io::ErrorKind::PermissionDenied.into())),
++        );
++        let mut operation =
++            pin!(selector.file_monitor_read_at(&mut monitor, vec![0; 6], 0, &never));
++        loop {
++            if let Poll::Ready((result, buffer)) = operation.as_mut().poll(&mut context) {
++                assert_eq!(result.unwrap(), 6);
++                assert_eq!(buffer, b"abcdef");
++                break;
++            }
++            for driver in &mut drivers {
++                driver.turn(Some(Duration::ZERO)).unwrap();
++            }
++        }
++    }
++    assert!(
++        monitor
++            .registration()
++            .retiring
++            .iter()
++            .any(|file| !file.released())
++    );
++    for _ in 0..2 {
++        let mut close = pin!(selector.file_monitor_close(&mut monitor, &never));
++        loop {
++            if let Poll::Ready(result) = close.as_mut().poll(&mut context) {
++                assert_eq!(result.unwrap_err().kind(), io::ErrorKind::PermissionDenied);
++                break;
++            }
++            for driver in &mut drivers {
++                driver.turn(Some(Duration::ZERO)).unwrap();
++            }
++        }
++    }
++}
+diff --git a/crates/iouring/src/io_uring_selector/registered_file.rs b/crates/iouring/src/io_uring_selector/registered_file.rs
+index 25340e2..3387638 100644
+--- a/crates/iouring/src/io_uring_selector/registered_file.rs
++++ b/crates/iouring/src/io_uring_selector/registered_file.rs
+@@ -88,6 +88,7 @@ impl RegisteredFile {
+             index: AtomicU32::new(UNREGISTERED),
+             retirement: Arc::new(Retirement {
+                 result: Mutex::new(None),
++                ready: AtomicBool::new(false),
+                 finished: CompletionEvent::new(),
+             }),
+         })
+@@ -124,6 +125,17 @@ impl RegisteredFile {
+         }
+     }
+ 
++    pub fn released(&self) -> bool {
++        self.retirement.ready.load(Ordering::Acquire)
++            && self
++                .retirement
++                .result
++                .lock()
++                .unwrap()
++                .as_ref()
++                .is_some_and(Result::is_ok)
++    }
++
+     pub async fn closed(&self, cancellation: &Cancellation) -> OperationResult<()> {
+         loop {
+             event_listener::listener!(self.retirement.finished => listener);
+@@ -157,11 +169,13 @@ impl Drop for RegisteredFile {
+ 
+ struct Retirement {
+     result: Mutex<Option<io::Result<()>>>,
++    ready: AtomicBool,
+     finished: CompletionEvent,
+ }
+ impl Retirement {
+     fn publish(&self, result: io::Result<()>) {
+         *self.result.lock().unwrap() = Some(result);
++        self.ready.store(true, Ordering::Release);
+         self.finished.notify(usize::MAX);
+     }
+ }
+diff --git a/crates/iouring/src/io_uring_selector/ring_binding.rs b/crates/iouring/src/io_uring_selector/ring_binding.rs
+index 20262ad..2a05194 100644
+--- a/crates/iouring/src/io_uring_selector/ring_binding.rs
++++ b/crates/iouring/src/io_uring_selector/ring_binding.rs
+@@ -23,51 +23,40 @@ impl<T> RingBinding<T> {
+     }
+ }
+ 
+-// Passive registrations can coexist on different rings. Keep the current ring inline; returning to an already visited ring reuses its state without registration syscalls or allocations.
++// Experimental single-ring cache. Replaced registrations retire through their original owner.
+ pub(super) struct RingCache<T> {
+     current: Option<RingBinding<T>>,
+-    others: Vec<RingBinding<T>>,
+ }
+ 
+ impl<T> Default for RingCache<T> {
+     fn default() -> Self {
+-        Self {
+-            current: None,
+-            others: Vec::new(),
+-        }
++        Self { current: None }
+     }
+ }
+ 
+ impl<T> RingCache<T> {
++    pub fn matches(&self, controller: &Arc<Controller>) -> bool {
++        self.current
++            .as_ref()
++            .is_some_and(|binding| binding.matches(controller))
++    }
++
++    pub fn take_current(&mut self) -> Option<T> {
++        self.current.take().map(|binding| binding.state)
++    }
++
+     pub fn get_or_insert(
+         &mut self,
+         controller: &Arc<Controller>,
+         create: impl FnOnce() -> T,
+     ) -> &T {
+-        if !self
+-            .current
+-            .as_ref()
+-            .is_some_and(|binding| binding.matches(controller))
+-        {
+-            let next = match self
+-                .others
+-                .iter()
+-                .position(|binding| binding.matches(controller))
+-            {
+-                Some(index) => self.others.swap_remove(index),
+-                None => RingBinding::new(controller, create()),
+-            };
+-            if let Some(previous) = self.current.replace(next) {
+-                self.others.push(previous);
+-            }
++        if !self.matches(controller) {
++            self.current = Some(RingBinding::new(controller, create()));
+         }
+         &self.current.as_ref().unwrap().state
+     }
+ 
+     pub fn values(&self) -> impl Iterator<Item = &T> {
+-        self.current
+-            .iter()
+-            .chain(&self.others)
+-            .map(|binding| &binding.state)
++        self.current.iter().map(|binding| &binding.state)
+     }
+ }
