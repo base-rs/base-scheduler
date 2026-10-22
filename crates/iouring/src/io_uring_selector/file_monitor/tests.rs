@@ -459,9 +459,11 @@ fn migration_invalidates_old_registrations_and_reuses_request_storage() {
     let mut context = Context::from_waker(&wake);
     let mut buffer = Some(vec![0; 6]);
     let mut request_address = None;
+    let mut previous_registration: Option<Arc<RegisteredFile>> = None;
+    let mut retired_registration: Option<Weak<RegisteredFile>> = None;
     // Polling outside entered workers deliberately alternates routes between the two rings.
-    for iteration in 0..34 {
-        let counts = allocation_counter::measure(|| {
+    for _ in 0..34 {
+        {
             let mut operation = pin!(selector.file_monitor_read_at(
                 &mut monitor,
                 buffer.take().unwrap(),
@@ -478,12 +480,15 @@ fn migration_invalidates_old_registrations_and_reuses_request_storage() {
                     driver.turn(Some(Duration::ZERO)).unwrap();
                 }
             }
-        });
-        if iteration >= 2 {
-            assert!(
-                counts.count_total >= 2,
-                "migration constructs a new lease and retirement state"
-            );
+        }
+        if let Some(retired) = retired_registration.take() {
+            assert!(retired.upgrade().is_none());
+        }
+        let registration = monitor.registration().files.values().next().unwrap();
+        if let Some(previous) = previous_registration.replace(Arc::clone(registration)) {
+            assert!(!Arc::ptr_eq(&previous, registration));
+            assert!(previous.released());
+            retired_registration = Some(Arc::downgrade(&previous));
         }
         let current = monitor
             .registration()
@@ -513,6 +518,7 @@ fn migration_invalidates_old_registrations_and_reuses_request_storage() {
             }
         }
     }
+    drop(previous_registration);
     drop(monitor);
     block_on(selector.file_close(file)).unwrap();
 }
@@ -768,4 +774,44 @@ fn failed_eviction_remains_observable_after_another_migration() {
             }
         }
     }
+}
+
+#[test]
+fn close_waits_for_migration_release_on_the_original_ring_after_cancellation() {
+    let (selector, mut drivers) = IoUringSelector::with_workers(Default::default(), 2).unwrap();
+    let (_directory, file) = super::super::tests::file(&selector);
+    let mut monitor = selector.file_monitor(&file).unwrap();
+    let never = Cancellation::never();
+    let wake = drivers[0].waker();
+    let mut context = Context::from_waker(&wake);
+    // External routing selects each ring in turn. Leave the first ring idle after migration.
+    for driver in &mut drivers {
+        super::super::tests::drive(
+            driver,
+            selector.file_monitor_read_at(&mut monitor, vec![0; 6], 0, &never),
+        )
+        .0
+        .unwrap();
+    }
+    assert_eq!(monitor.registration().retiring.len(), 1);
+    assert!(!monitor.registration().retiring[0].released());
+    let cancellation = Cancellation::new();
+    {
+        let mut close = pin!(selector.file_monitor_close(&mut monitor, &cancellation));
+        assert!(close.as_mut().poll(&mut context).is_pending());
+        drivers[1].turn(Some(Duration::ZERO)).unwrap();
+        assert!(close.as_mut().poll(&mut context).is_pending());
+        cancellation.cancel();
+        assert!(matches!(block_on(close), Err(OperationError::Cancelled(_))));
+    }
+    assert!(!monitor.registration().retiring[0].released());
+    {
+        let mut close = pin!(selector.file_monitor_close(&mut monitor, &never));
+        assert!(close.as_mut().poll(&mut context).is_pending());
+        drivers[0].turn(Some(Duration::ZERO)).unwrap();
+        block_on(close).unwrap();
+    }
+    assert!(monitor.registration().retiring[0].released());
+    drop(monitor);
+    block_on(selector.file_close(file)).unwrap();
 }
