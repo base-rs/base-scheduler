@@ -36,3 +36,20 @@ fn benchmark_binaries_emit_parseable_samples() {
         assert_eq!(sample[field], value);
     }
 }
+
+#[cfg(target_os = "linux")]
+#[test]
+fn registered_buffer_binary_emits_a_parseable_sample() {
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_registered"))
+        .args(["fixed", "tcp", "read", "64", "1", "3", "retained"])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let sample: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(sample["mode"], "fixed");
+    assert_eq!(sample["bytes"], 192);
+}

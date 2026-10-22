@@ -272,6 +272,8 @@ dependencies = [
  "core-scheduler-native",
  "core-scheduler-tokio",
  "futures-lite",
+ "io-uring",
+ "libc",
  "serde_json",
  "tempfile",
  "tokio",
