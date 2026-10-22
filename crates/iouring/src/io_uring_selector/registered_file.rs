@@ -128,7 +128,7 @@ impl RegisteredFile {
         loop {
             event_listener::listener!(self.retirement.finished => listener);
             if let Some(result) = self.retirement.result.lock().unwrap().as_ref() {
-                return result.as_ref().map(|()| ()).map_err(|error| {
+                return result.as_ref().copied().map_err(|error| {
                     error
                         .raw_os_error()
                         .map(io::Error::from_raw_os_error)

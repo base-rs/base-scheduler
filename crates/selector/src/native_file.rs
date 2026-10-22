@@ -32,6 +32,11 @@ use std::{fs::File, sync::Arc};
 pub struct NativeFile(pub(crate) Arc<File>);
 
 impl NativeFile {
+    /// Whether a retained native owner refers to this exact file handle. Backends can validate cached registrations without retaining another owner or inspecting the handle.
+    pub fn owns_native(&self, file: &Arc<File>) -> bool {
+        Arc::ptr_eq(&self.0, file)
+    }
+
     /// Retain the native file for another I/O backend.
     ///
     /// # Safety
@@ -66,6 +71,9 @@ mod tests {
         let file = NativeFile::from_std(File::open(path).unwrap());
         // SAFETY: This simulated backend only observes metadata, makes no raw-handle or flag changes, and releases its owner before exclusive close.
         let retained = unsafe { file.retain_native() };
+        assert!(file.owns_native(&retained));
+        let other = Arc::new(File::open(directory.path().join("file")).unwrap());
+        assert!(!file.owns_native(&other));
         assert_eq!(Arc::strong_count(&file.0), 2);
         assert_eq!(retained.metadata().unwrap().len(), 8);
         drop(retained);

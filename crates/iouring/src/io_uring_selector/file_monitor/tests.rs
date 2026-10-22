@@ -153,6 +153,82 @@ fn abandoned_and_forgotten_operations_can_be_retired_and_reused() {
 }
 
 #[test]
+fn swapped_registrations_cannot_redirect_file_operations() {
+    let (selector, driver) = IoUringSelector::new(Default::default()).unwrap();
+    let mut worker = driver.enter();
+    let waker = worker.waker();
+    let mut context = Context::from_waker(&waker);
+    let directory = tempfile::tempdir().unwrap();
+    let never = Cancellation::never();
+    let mut monitors = Vec::new();
+    let mut files = Vec::new();
+    for (name, contents) in [("first", b"first"), ("other", b"other")] {
+        let path = directory.path().join(name);
+        std::fs::write(&path, contents).unwrap();
+        let file = block_on(selector.file_open(
+            &path,
+            FileOptions {
+                write: true,
+                ..FileOptions::READ
+            },
+            &never,
+        ))
+        .unwrap();
+        let mut monitor = selector.file_monitor(&file).unwrap();
+        let (result, buffer) = drive(
+            &mut worker,
+            &mut context,
+            pin!(selector.file_monitor_read_at(&mut monitor, vec![0; 5], 0, &never)),
+        );
+        assert_eq!(result.unwrap(), 5);
+        assert_eq!(buffer, contents);
+        monitors.push(monitor);
+        files.push(file);
+    }
+    let [first, other] = monitors.as_mut_slice() else {
+        unreachable!("two monitors were created")
+    };
+    std::mem::swap(first.registration_mut(), other.registration_mut());
+    for monitor in [&mut *first, &mut *other] {
+        let (result, buffer) =
+            block_on(selector.file_monitor_read_at(monitor, vec![42; 5], 0, &never));
+        assert_eq!(result.unwrap_err().kind(), io::ErrorKind::InvalidInput);
+        assert_eq!(buffer, [42; 5]);
+        let (result, buffer) =
+            block_on(selector.file_monitor_write_at(monitor, vec![7; 5], 0, &never));
+        assert_eq!(result.unwrap_err().kind(), io::ErrorKind::InvalidInput);
+        assert_eq!(buffer, [7; 5]);
+        assert_eq!(
+            block_on(selector.file_monitor_close(monitor, &never))
+                .unwrap_err()
+                .kind(),
+            io::ErrorKind::InvalidInput
+        );
+        assert!(!monitor.registration().closed);
+    }
+    std::mem::swap(first.registration_mut(), other.registration_mut());
+    for (monitor, contents) in [first, other].into_iter().zip([b"first", b"other"]) {
+        let (result, buffer) = drive(
+            &mut worker,
+            &mut context,
+            pin!(selector.file_monitor_read_at(monitor, vec![0; 5], 0, &never)),
+        );
+        assert_eq!(result.unwrap(), 5);
+        assert_eq!(buffer, contents);
+        drive(
+            &mut worker,
+            &mut context,
+            pin!(selector.file_monitor_close(monitor, &never)),
+        )
+        .unwrap();
+    }
+    drop(monitors);
+    for file in files {
+        block_on(selector.file_close(file)).unwrap();
+    }
+}
+
+#[test]
 fn incompatible_and_closed_selectors_reject_monitor_operations() {
     let (first, _driver) = IoUringSelector::new(Default::default()).unwrap();
     let (second, _other) = IoUringSelector::new(Default::default()).unwrap();
