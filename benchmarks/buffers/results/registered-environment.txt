@@ -1,0 +1,17 @@
+Linux aiko 7.2.6-arch2-1 #1 SMP PREEMPT_DYNAMIC Mon, 14 Sep 2026 22:41:30 +0000 x86_64 GNU/Linux
+rustc 1.99.0 (b940084d7 2026-09-28) (Arch Linux rust 1:1.99.0-1)
+binary: rustc
+commit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4
+commit-date: 2026-09-28
+host: x86_64-unknown-linux-gnu
+release: 1.99.0
+LLVM version: 23.1.1
+cargo 1.99.0 (5f94df478 2026-08-27) (Arch Linux rust 1:1.99.0-1)
+TARGET SOURCE         FSTYPE OPTIONS
+/      /dev/nvme0n1p2 ext4   rw,relatime
+NAME    MODEL                   TRAN SIZE
+nvme1n1 Samsung SSD 990 PRO 2TB nvme 1.8T
+nvme0n1 Samsung SSD 990 PRO 2TB nvme 1.8T
+8192
+[always] madvise never
+Thu 22 Oct 2026 03:21:27 UTC

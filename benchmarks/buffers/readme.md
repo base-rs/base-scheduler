@@ -4,6 +4,8 @@ Use bounded reusable storage and independently owned completed chunks. For a fil
 
 The prototype implements these choices across Direct, the Tokio adapter, Native readiness, and Native io_uring. It does not yet connect the shared pool to io_uring registered buffers or provided-buffer rings.
 
+Subsequent experiments measure [receive fast paths and shared-pool contention](fast-path.md) and [fixed registered buffers](registered.md). The latter isolates ordinary versus fixed io_uring reads/writes with the same leases, rather than integrating registration into the scheduler.
+
 ## Ownership and use
 
 `BufferPool::new(count, size)` reserves stable initialized storage. Acquisition returns a unique writable `BufferLease`; pool exhaustion waits with cancellation. A file or socket receiver returns completed leases independently of the receiver, allowing subsequent receives while application code retains earlier chunks.
