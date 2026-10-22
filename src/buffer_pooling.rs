@@ -6,6 +6,8 @@ use std::io;
 
 /// Construct a backend-selected pool with portable ownership semantics. Applications choose the payload budget and alignment; implementations choose allocation and registration strategy. Pool construction performs no I/O on application resources.
 ///
+/// `options.buffers` is the exact shared payload capacity, independent of worker count. Clones use that same budget. Internal worker caches must make returned capacity available to acquisitions on other workers; they must not silently partition the pool or multiply its capacity. Receivers and accepted I/O may retain slots, including while idle, so use a separate pool for independently required scratch storage.
+///
 /// Pools may retain backend resources for registration lifetime, but operations still receive their scheduler and cancellation explicitly. Backends document instance affinity and reject incompatible resources before submitting I/O. Closing a scheduler does not invalidate completed buffers or their retained views.
 ///
 /// ```
@@ -30,14 +32,4 @@ use std::io;
 pub trait BufferPooling {
     type Pool: BufferPool;
     fn buffer_pool(&self, options: BufferPoolOptions) -> io::Result<Self::Pool>;
-
-    /// Provision `options.buffers` slots for every I/O worker. Construction reserves every worker's storage and schedules its registration independently of the first receive. `capacity()` reports the total across workers. Acquisition and receivers use their selected worker's capacity; exhaustion waits there even when another worker has free slots. Completed leases can move between workers and always return to their original storage.
-    ///
-    /// This is an explicit locality policy, rather than a larger shared budget. A synchronous constructor does not wait for other workers: drivers perform registration on their next turn, including startup, and report setup errors when preparing receivers. Backends without worker-owned pools return `Unsupported`.
-    fn buffer_pool_per_worker(&self, _options: BufferPoolOptions) -> io::Result<Self::Pool> {
-        Err(io::Error::new(
-            io::ErrorKind::Unsupported,
-            "worker-owned buffer pools are unavailable",
-        ))
-    }
 }

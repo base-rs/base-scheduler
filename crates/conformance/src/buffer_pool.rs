@@ -40,7 +40,15 @@ pub async fn bounded<S: BufferPooling>(scheduler: &S) {
     })
     .join()
     .unwrap();
-    let first = pool.acquire(&never).await.unwrap();
+    // A portable pool's returned capacity is available from another thread, even while its other slot remains held.
+    let acquiring = pool.clone();
+    let first = std::thread::spawn(move || {
+        acquiring
+            .try_acquire()
+            .expect("returned shared capacity is available on another thread")
+    })
+    .join()
+    .unwrap();
     assert_eq!(first.as_ref().len(), options.buffer_size);
     drop((pool, other));
     assert_eq!(first.as_ref().len(), options.buffer_size);

@@ -17,7 +17,7 @@ fn receiver(
         &Cancellation::never(),
     ))
     .unwrap();
-    let IoUringReceiver::Provided(receiving) = receiving else {
+    let IoUringReceiver(Strategy::Provided(receiving)) = receiving else {
         panic!("a worker pool selects provided-buffer reception")
     };
     receiving

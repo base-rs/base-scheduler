@@ -8,8 +8,10 @@ use core_scheduler::*;
 use core_scheduler_selector::NativeSocket;
 use std::io;
 
-/// A demand-driven portable receiver or a worker-affine provided-buffer receive sequence. Pool construction selects the strategy once, without a per-message pool lookup.
-pub enum IoUringReceiver {
+/// An owned receive sequence whose buffer and I/O strategies are private to the backend. Pool construction selects the strategy once, without a per-message pool lookup.
+pub struct IoUringReceiver(pub(crate) Strategy);
+
+pub(crate) enum Strategy {
     Demand(
         SocketReceiver<SocketMonitor<NativeSocket, IoUringMonitorRegistration>, IoUringBufferPool>,
     ),
@@ -22,15 +24,15 @@ impl SocketRecvMsgReceiver<IoUringSelector> for IoUringReceiver {
         scheduler: &IoUringSelector,
         cancellation: &Cancellation,
     ) -> OperationResult<Option<RecvMsgMultishotMessage<Self::Buffer>>> {
-        match self {
-            Self::Demand(receiver) => receiver.recv(scheduler, cancellation).await,
-            Self::Provided(receiver) => receiver.recv(scheduler, cancellation).await,
+        match &mut self.0 {
+            Strategy::Demand(receiver) => receiver.recv(scheduler, cancellation).await,
+            Strategy::Provided(receiver) => receiver.recv(scheduler, cancellation).await,
         }
     }
     async fn close(&mut self, scheduler: &IoUringSelector) -> io::Result<()> {
-        match self {
-            Self::Demand(receiver) => SocketRecvMsgReceiver::close(receiver, scheduler).await,
-            Self::Provided(receiver) => receiver.close(scheduler).await,
+        match &mut self.0 {
+            Strategy::Demand(receiver) => SocketRecvMsgReceiver::close(receiver, scheduler).await,
+            Strategy::Provided(receiver) => receiver.close(scheduler).await,
         }
     }
 }

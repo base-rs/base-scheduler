@@ -14,7 +14,7 @@ pub trait SocketRecvMsgReceiver<S: ?Sized>: Send {
     ///
     /// Holding every lease pauses reception until a buffer returns. Waiting must not spin, allocate another payload buffer, or discard incoming datagrams in userspace. The OS may still drop datagrams when its own queues fill. Cancel outstanding capacity waits before shutdown: backend admission closure alone need not wake a wait for an application-held buffer.
     ///
-    /// Futures are lazy. Pre-cancellation leaves the receiver unchanged. Once waiting, observed successful progress wins cancellation; otherwise cancellation closes and retires the receive before returning. A terminal error is returned once, followed by `None`. Incompatible scheduler arguments are rejected before progress, preserving the receiver. Dropping a wait is safe but is not rollback.
+    /// Futures are lazy. Pre-cancellation leaves the receiver unchanged. Once waiting, observed successful progress wins cancellation. Otherwise cancellation ends the wait, but need not stop reception or retire backend requests; the construction capability specifies whether reception can continue. Use `close` to establish retirement. A terminal error is returned once, followed by `None`. Incompatible scheduler arguments are rejected before progress, preserving the receiver. Dropping a wait is safe but is not rollback.
     fn recv(
         &mut self,
         scheduler: &S,

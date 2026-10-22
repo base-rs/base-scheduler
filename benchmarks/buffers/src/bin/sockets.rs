@@ -21,8 +21,6 @@ struct Workload {
     window: usize,
     receive_only: bool,
     connections: usize,
-    #[cfg(target_os = "linux")]
-    workers: usize,
     pool_layout: String,
 }
 
@@ -303,7 +301,7 @@ where
     serde_json::json!({"transport":transport,"mode":mode,"size":size,"iterations":iterations,"seconds":elapsed.as_secs_f64(),"round_trips_per_second":iterations as f64/elapsed.as_secs_f64(),"window":window,"messages_per_second":(iterations * window) as f64 / elapsed.as_secs_f64(),"receive_calls":receive_calls,"short_receives":short_receives,"bytes_received":iterations * window * size})
 }
 
-async fn run_group<S>(scheduler: Arc<S>, workload: Workload) -> serde_json::Value
+async fn run_group<S>(scheduler: Arc<S>, workload: Workload, pool: S::Pool) -> serde_json::Value
 where
     S: SocketScheduler
         + SocketMonitoring
@@ -317,26 +315,6 @@ where
     S::Socket: 'static,
 {
     assert!(workload.connections > 0);
-    let total = 8 * workload.connections;
-    let options = BufferPoolOptions::new(total, workload.size);
-    let pool = match workload.pool_layout.as_str() {
-        "total" => scheduler.buffer_pool(options),
-        #[cfg(target_os = "linux")]
-        "worker-equal" => {
-            assert!(
-                total % workload.workers == 0,
-                "equal budgets require a whole number of buffers per worker"
-            );
-            scheduler.buffer_pool_per_worker(BufferPoolOptions {
-                buffers: total / workload.workers,
-                ..options
-            })
-        }
-        #[cfg(target_os = "linux")]
-        "worker-scaled" => scheduler.buffer_pool_per_worker(options),
-        _ => unreachable!("The pool layout was validated before execution"),
-    }
-    .unwrap();
     let capacity = pool.capacity();
     let group = Arc::new(ConnectionGroup {
         pool,
@@ -421,10 +399,12 @@ fn execute(args: &[String]) -> serde_json::Value {
         .contains(&pool_layout),
         "unknown pool layout"
     );
+    assert!(
+        backend == "iouring" || pool_layout == "total",
+        "worker pool layouts require the io_uring backend"
+    );
     let workload = Workload {
         mode: mode.to_owned(),
-        #[cfg(target_os = "linux")]
-        workers,
         pool_layout: pool_layout.to_owned(),
         size,
         iterations,
@@ -433,6 +413,7 @@ fn execute(args: &[String]) -> serde_json::Value {
         receive_only: traffic == "receive",
         connections: args.get(9).map(|s| s.parse().unwrap()).unwrap_or(1),
     };
+    let options = BufferPoolOptions::new(8 * workload.connections, size);
     let mut result = match backend {
         "direct" => {
             let scheduler = Arc::new(
@@ -442,8 +423,9 @@ fn execute(args: &[String]) -> serde_json::Value {
                 })
                 .unwrap(),
             );
+            let pool = scheduler.buffer_pool(options).unwrap();
             let result =
-                futures_lite::future::block_on(run_group(Arc::clone(&scheduler), workload));
+                futures_lite::future::block_on(run_group(Arc::clone(&scheduler), workload, pool));
             futures_lite::future::block_on(scheduler.shutdown());
             result
         }
@@ -456,7 +438,8 @@ fn execute(args: &[String]) -> serde_json::Value {
             let scheduler = Arc::new(core_scheduler_tokio::TokioScheduler::new(
                 runtime.handle().clone(),
             ));
-            let result = runtime.block_on(run_group(Arc::clone(&scheduler), workload));
+            let pool = scheduler.buffer_pool(options).unwrap();
+            let result = runtime.block_on(run_group(Arc::clone(&scheduler), workload, pool));
             runtime.block_on(scheduler.shutdown());
             result
         }
@@ -470,7 +453,8 @@ fn execute(args: &[String]) -> serde_json::Value {
                 )
                 .unwrap(),
             );
-            let result = scheduler.block_on(run_group(Arc::clone(&scheduler), workload));
+            let pool = scheduler.buffer_pool(options).unwrap();
+            let result = scheduler.block_on(run_group(Arc::clone(&scheduler), workload, pool));
             scheduler.block_on(scheduler.shutdown());
             result
         }
@@ -490,7 +474,26 @@ fn execute(args: &[String]) -> serde_json::Value {
                 )
                 .unwrap(),
             );
-            let result = scheduler.block_on(run_group(Arc::clone(&scheduler), workload));
+            // Backend policy comparisons stay in this benchmark; the generic receive loop accepts any scheduler-created pool.
+            let pool = match pool_layout {
+                "total" => scheduler.buffer_pool(options),
+                "worker-equal" => {
+                    assert!(
+                        options.buffers % workers == 0,
+                        "equal budgets require a whole number of buffers per worker"
+                    );
+                    scheduler
+                        .selector()
+                        .buffer_pool_per_worker(BufferPoolOptions {
+                            buffers: options.buffers / workers,
+                            ..options
+                        })
+                }
+                "worker-scaled" => scheduler.selector().buffer_pool_per_worker(options),
+                _ => unreachable!("The pool layout was validated before execution"),
+            }
+            .unwrap();
+            let result = scheduler.block_on(run_group(Arc::clone(&scheduler), workload, pool));
             scheduler.block_on(scheduler.shutdown());
             result
         }
@@ -586,6 +589,28 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    #[should_panic(expected = "worker pool layouts require the io_uring backend")]
+    fn worker_pool_experiments_do_not_become_portable_requirements() {
+        execute(
+            &[
+                "sockets",
+                "native",
+                "pool",
+                "64",
+                "2",
+                "1",
+                "tcp",
+                "1",
+                "echo",
+                "1",
+                "worker-equal",
+            ]
+            .map(str::to_owned),
+        );
     }
 
     #[test]

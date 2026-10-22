@@ -11,6 +11,8 @@ use std::future::Future;
 ///
 /// Readiness backends can receive directly into reusable buffers on demand. This capability requires neither kernel rearming, a background task, receive-ahead, nor a heap allocation per message. Successful creation permits receive-ahead, including before the first `recv`, so callers must not assume demand-only I/O. Concrete receiver and buffer types retain static dispatch. Socket metadata and truncation follow [`SocketRecvResult`](crate::SocketRecvResult). Peeking is rejected because a sequence could repeatedly return the same bytes.
 ///
+/// Pre-cancellation leaves the receiver unchanged. During a pending `recv`, observed successful progress wins cancellation; otherwise cancellation closes and retires reception before returning. This is stricter than the cancellation contract of pooled receivers constructed through [`SocketReceiving`](crate::SocketReceiving).
+///
 /// ```
 /// use core_scheduler::{Cancellation, OperationResult, RecvMsgMultishotOptions,
 ///     SocketRecvFlags, SocketRecvMsgMultishot, SocketRecvMsgReceiver};

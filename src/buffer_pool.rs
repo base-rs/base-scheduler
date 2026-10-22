@@ -6,7 +6,7 @@ use std::future::Future;
 
 /// A bounded, shareable source of exclusively writable, stable receive storage. Clones share the same capacity. Completed buffers and their frozen views retain storage independently of pool handles, receivers, and polling threads; the final owner makes that slot reusable.
 ///
-/// An explicitly worker-owned pool may partition capacity by worker; acquisition then waits for its selected shard even when another shard has free slots. Published receive buffers count against capacity, including while an accepted receive is idle. Use a separate ordinary pool for independently required scratch buffers or file pipelines.
+/// Published receive buffers count against capacity, including while an accepted receive is idle. Use a separate pool for independently required scratch buffers or file pipelines. The scheduler's portable factory supplies a shared total budget; concrete backend experiments may document a different capacity distribution.
 ///
 /// Acquisition returns a fully initialized `buffer_size()` prefix with at least `alignment()` alignment. Its previous contents are unspecified. Exhaustion waits with cancellation instead of growing the pool. Retained views and accepted I/O count against capacity until their access retires, including after future abandonment. Kernel registration and publication are implementation details; neither may grant concurrent access to a leased buffer.
 pub trait BufferPool: Clone + Send + Sync + 'static {

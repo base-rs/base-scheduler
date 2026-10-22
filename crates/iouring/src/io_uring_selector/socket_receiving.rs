@@ -3,6 +3,7 @@
 
 use super::provided_buffers::WorkerBuffers;
 use super::*;
+use crate::io_uring_receiver::Strategy;
 use crate::{IoUringBuffer, IoUringReceiver};
 use std::cell::UnsafeCell;
 impl SocketReceiving for IoUringSelector {
@@ -43,7 +44,7 @@ impl SocketReceiving for IoUringSelector {
             return self
                 .socket_monitor(socket, Interest::Readable)
                 .and_then(|monitor| SocketReceiver::new(monitor, pool, kind, flags))
-                .map(IoUringReceiver::Demand)
+                .map(|receiver| IoUringReceiver(Strategy::Demand(receiver)))
                 .map_err(Into::into);
         };
         let buffers = Arc::clone(buffers);
@@ -71,15 +72,17 @@ impl SocketReceiving for IoUringSelector {
             finished: false,
         };
         controller.submit(Box::new(request));
-        Ok(IoUringReceiver::Provided(multishot::RecvMsgMultishot {
-            cancel_on_wait: false,
-            state,
-            cancel: CancelOnDrop {
-                controller,
-                identifier,
-                armed: true,
+        Ok(IoUringReceiver(Strategy::Provided(
+            multishot::RecvMsgMultishot {
+                cancel_on_wait: false,
+                state,
+                cancel: CancelOnDrop {
+                    controller,
+                    identifier,
+                    armed: true,
+                },
             },
-        }))
+        )))
     }
 }
 

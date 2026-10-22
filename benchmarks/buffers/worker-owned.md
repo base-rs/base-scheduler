@@ -1,10 +1,12 @@
 # Eager worker-owned receive pools
 
+The measurements below describe the implementation at their recorded source revisions. The current portable `BufferPooling` interface exposes only `buffer_pool(options)`; the per-worker comparison is now a concrete `IoUringSelector::buffer_pool_per_worker(options)` experiment accessed through the Native scheduler's selector. Moving that control does not change the measured receive algorithms.
+
 Worker-owned storage removes cross-worker buffer reclamation and makes receive capacity predictable per worker. Ordinary shared pools retain the simpler syscall-first monitor receive path. Across the longer equal-budget run, worker pools improve the multiworker aggregate by 11.4% over the previous shared provided-ring implementation, but remain 6.7% behind monitor receives and 14.6% behind the Tokio adapter. Keep receive-ahead explicit; local storage alone does not make it the universally faster default.
 
 ## Design
 
-`buffer_pool(options)` retains an exact total payload budget and portable monitor receives. `buffer_pool_per_worker(options)` explicitly reserves that many slots for every I/O worker. Unsupported backends return `Unsupported`; Native forwards the request to its selector. `capacity()` reports total slots, including all workers.
+`buffer_pool(options)` retains an exact total payload budget and portable monitor receives. The concrete `IoUringSelector::buffer_pool_per_worker(options)` experiment explicitly reserves that many slots for every I/O worker, and Native callers access it through `scheduler.selector()`. At the measured revisions this experimental control was exposed on `BufferPooling`, forwarded by Native, and returned `Unsupported` on other backends; it has since been removed from that portable capability. `capacity()` reports total slots, including all workers.
 
 For worker-owned io_uring pools, construction allocates every worker's contiguous payload slab, buffer-ID table, vacant-index list, and provided-ring storage before publishing initialization commands. Each driver registers its group on its next turn, including startup. A synchronous constructor never waits for workers that may not have started. Payload slabs and provided-ring storage require no first-use allocation; receiver bookkeeping and the reusable capacity listener can still allocate when first needed. Registration errors are cached for the affected shard and reported when preparing a receiver, without stopping unrelated scheduler work.
 

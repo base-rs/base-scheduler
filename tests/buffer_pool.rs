@@ -346,7 +346,7 @@ fn aligned_slots_share_one_slab_without_aliasing_other_live_slots() {
 }
 
 #[test]
-fn worker_pools_require_explicit_backend_support() {
+fn portable_pool_factories_need_only_the_ownership_contract() {
     use core_scheduler::BufferPooling;
     struct Portable;
     impl BufferPooling for Portable {
@@ -358,12 +358,4 @@ fn worker_pools_require_explicit_backend_support() {
     let portable = Portable;
     let options = BufferPoolOptions::new(2, 8);
     assert_eq!(portable.buffer_pool(options).unwrap().capacity(), 2);
-    assert_eq!(
-        portable
-            .buffer_pool_per_worker(options)
-            .err()
-            .unwrap()
-            .kind(),
-        std::io::ErrorKind::Unsupported
-    );
 }
