@@ -81,7 +81,7 @@ impl IoUringBufferPool {
                 )
             })?;
         let identifier = Arc::new(Group::new(&controllers[0])?);
-        // Complete all fallible allocation before publishing anything to workers. No first-use allocation or pool-to-worker directory is needed.
+        // Allocate payload slabs and provided-ring storage before publishing anything to workers. Neither needs first-use allocation or a pool-to-worker directory.
         let workers = controllers
             .iter()
             .map(|controller| {

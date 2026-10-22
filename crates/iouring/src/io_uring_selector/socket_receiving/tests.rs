@@ -684,9 +684,34 @@ fn failed_empty_reregistration_is_reported_without_republishing_storage() {
     worker.prepare(&submitter).unwrap();
     worker.abandon(0);
     let _failures = Failures::new([("register-buffer-ring", io::ErrorKind::Unsupported.into())]);
-    assert!(worker.service(&submitter).is_err());
+    assert!(!worker.service(&submitter).unwrap());
     assert!(worker.heap.try_acquire().is_some());
-    assert!(worker.prepare(&submitter).is_err());
+    assert_eq!(
+        worker.prepare(&submitter).unwrap_err().kind(),
+        io::ErrorKind::Unsupported
+    );
+    drain(&selector, &mut driver);
+}
+
+#[test]
+fn failed_empty_reregistration_does_not_fail_completed_detach() {
+    let (selector, mut driver) = pair(2);
+    let pool = selector
+        .buffer_pool_per_worker(BufferPoolOptions::new(1, 32))
+        .unwrap();
+    let worker = pool.worker(&selector.controllers[0]).unwrap();
+    let submitter = driver.reactor.as_ref().unwrap().ring.submitter();
+    worker.attach(0);
+    worker.prepare(&submitter).unwrap();
+    let _failures = Failures::new([("register-buffer-ring", io::ErrorKind::Unsupported.into())]);
+    worker.detach(0, &submitter).unwrap();
+    assert!(worker.heap.try_acquire().is_some());
+    assert_eq!(
+        worker.prepare(&submitter).unwrap_err().kind(),
+        io::ErrorKind::Unsupported
+    );
+    assert!(!worker.service(&submitter).unwrap());
+    driver.turn(Some(Duration::ZERO)).unwrap();
     drain(&selector, &mut driver);
 }
 

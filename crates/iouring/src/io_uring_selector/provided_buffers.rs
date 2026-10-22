@@ -290,8 +290,8 @@ impl WorkerBuffers {
         if state.users.is_empty() {
             state.reset(submitter)?;
             if !self.released.load(Ordering::Acquire) {
-                // Restore an initialized empty registration. Ordinary acquisitions can now use all unconsumed capacity without competing with a dormant receive.
-                state.ring.register(submitter)?;
+                // Restore an initialized empty registration for future receivers, caching setup errors for their prepare calls. This receiver's cleanup already succeeded.
+                let _ = state.ring.register(submitter);
             }
         }
         Ok(())
@@ -323,7 +323,8 @@ impl WorkerBuffers {
         if state.users.is_empty() {
             if state.available != 0 || state.acquisition.is_some() {
                 state.reset(submitter)?;
-                state.ring.register(submitter)?;
+                // Cache a failed empty registration for the next receiver, just as for initial registration. Unregistration failures above still require driver shutdown.
+                let _ = state.ring.register(submitter);
             }
             return Ok(false);
         }

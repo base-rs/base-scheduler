@@ -19,6 +19,7 @@ def main():
     parser.add_argument("--candidate-revision", required=True)
     parser.add_argument("--repeats", type=int, default=7)
     parser.add_argument("--iterations", type=int, default=10000)
+    parser.add_argument("--cpus", default="2-9")
     args = parser.parse_args()
     binaries = {"before": args.baseline.resolve() / "sockets", "after": args.candidate.resolve() / "sockets"}
     hashes = {key: hashlib.sha256(path.read_bytes()).hexdigest() for key, path in binaries.items()}
@@ -41,12 +42,12 @@ def main():
                               "8", "receive", str(connections)]
                 if version == "after":
                     parameters.append(layout)
-                command = ["taskset", "-c", "2-9", str(binaries[version]), *parameters]
+                command = ["taskset", "-c", args.cpus, str(binaries[version]), *parameters]
                 result = subprocess.run(command, text=True, capture_output=True, timeout=120)
                 if result.returncode:
                     raise RuntimeError(f"{command!r} exited {result.returncode}:\n{result.stderr}")
                 row = json.loads(result.stdout)
-                row.update(strategy=strategy, repeat=repeat, parameters=parameters, cpus="2-9",
+                row.update(strategy=strategy, repeat=repeat, parameters=parameters, cpus=args.cpus,
                            binary_sha256=hashes[version],
                            revision="fd47abe0c0ba939e64ad1538cbc50e343064897c" if version == "before" else args.candidate_revision,
                            payload_budget=8 * connections * size * (workers if layout == "worker-scaled" else 1))
