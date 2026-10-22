@@ -359,3 +359,32 @@ fn portable_pool_factories_need_only_the_ownership_contract() {
     let options = BufferPoolOptions::new(2, 8);
     assert_eq!(portable.buffer_pool(options).unwrap().capacity(), 2);
 }
+
+#[test]
+fn leases_and_views_keep_their_send_and_sync_contracts() {
+    fn send_and_sync<T: Send + Sync>() {}
+    fn send<T: Send>(_: T) {}
+    send_and_sync::<HeapBufferPool>();
+    send_and_sync::<core_scheduler::BufferLease>();
+    send_and_sync::<core_scheduler::FrozenBuffer>();
+    let pool = HeapBufferPool::new(1, 8).unwrap();
+    send(pool.acquire(&Cancellation::never()));
+}
+
+#[test]
+fn forgetting_a_frozen_view_never_recycles_its_slot() {
+    let pool = HeapBufferPool::new(2, 8).unwrap();
+    let mut lease = pool.try_acquire().unwrap();
+    lease.as_mut().fill(42);
+    let frozen = lease.freeze();
+    std::mem::forget(frozen.view(..4));
+    let borrowed = frozen.as_ref();
+    for value in 0..8 {
+        let mut other = pool.try_acquire().unwrap();
+        assert!(pool.try_acquire().is_none());
+        other.as_mut().fill(value);
+        assert_eq!(borrowed, [42; 8]);
+    }
+    drop(pool);
+    assert_eq!(borrowed, [42; 8]);
+}

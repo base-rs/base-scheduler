@@ -4,6 +4,8 @@
 
 - Distribute new Native tasks round-robin across worker queues before their first poll, reusing the admission lock and removing the shared unassigned-task queue. Preserve worker-local wakes and idle stealing without adding per-operation load counters.
 
+- Reuse persistent slab ownership claims across heap buffer checkout, freezing, and return. Notify only while capacity waiters are registered, preserving the public buffer interface, stable storage, and cross-thread teardown safety.
+
 - Prototype backend-selected buffer pools with writable completed leases and retained immutable views. Ordinary shared pools use portable monitor receives; the concrete io_uring `buffer_pool_per_worker` experiment allocates every worker's contiguous slab and provided-ring metadata up front. Keep worker policy out of the portable capability and make the backend's receiver strategy opaque. Use one selector-wide group ID across rings, return leases to their home slab, and remove cross-worker reclamation. Worker receive-ahead requires Linux 6.0 or later; its locality and throughput remain experimental.
 
 - Replace the shared receive-buffer pool's free-list mutex with atomic availability words, and wake a distinct capacity waiter for every returned slot. Avoid listener registration for queued io_uring multishot messages and redundant ownership increments on local buffer returns; allow retained leases to be released safely during thread-local teardown. Correct buffer benchmarks to execute Native and Tokio I/O on their task workers and add burst and pool-contention measurements.
