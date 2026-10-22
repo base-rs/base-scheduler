@@ -69,6 +69,10 @@ mod linux {
             .filter(|cpu| unsafe { libc::CPU_ISSET(*cpu, &mask) })
             .collect();
         let restore = RestoreAffinity(mask);
+        let worker_offset = usize::from(cpus.len() > 1);
+        let worker_cpus: Vec<_> = (0..workers)
+            .map(|index| cpus[worker_offset + index % (cpus.len() - worker_offset)])
+            .collect();
         let (selector, drivers) = IoUringSelector::with_workers(
             IoUringOptions {
                 fixed_files: if registered { 256 } else { 0 },
@@ -88,8 +92,7 @@ mod linux {
             let selector = Arc::clone(&selector);
             let reply = reply.clone();
             let started = started.clone();
-            let cpu =
-                cpus[(index % cpus.len().saturating_sub(1).max(1) + usize::from(cpus.len() > 1))];
+            let cpu = worker_cpus[index];
             threads.push(std::thread::spawn(move || {
                 pin_thread(cpu);
                 let mut worker = driver.enter();
@@ -181,7 +184,6 @@ mod linux {
             times.push(batch_start.elapsed().as_nanos() as u64);
         }
         let loop_elapsed = start.elapsed();
-        drop(exchange);
         let (mut monitor, buffer) = payload.take().unwrap();
         block_on(selector.file_monitor_close(&mut monitor, &never)).unwrap();
         let elapsed = start.elapsed();
@@ -195,7 +197,7 @@ mod linux {
         drop(restore);
         let migrations = if workers == 1 { 0 } else { rounds - 1 };
         serde_json::json!({
-            "coordinator_cpu": cpus[0], "worker_cpus": (0..workers).map(|index| cpus[(index % cpus.len().saturating_sub(1).max(1) + usize::from(cpus.len() > 1))]).collect::<Vec<_>>(),
+            "coordinator_cpu": cpus[0], "worker_cpus": worker_cpus,
             "workers": workers, "burst": burst, "rounds": rounds, "size": size,
             "write": write, "registered": registered, "operations": rounds * burst,
             "migrations": migrations, "seconds": elapsed.as_secs_f64(),
