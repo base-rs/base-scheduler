@@ -1,0 +1,50 @@
+{
+  "revision": "c461fe8ff281d6d694c390d0f97d0096df730534",
+  "build": {
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "profile": "release"
+  },
+  "host": "aiko.local",
+  "cpu": "AMD Ryzen 9 9950X3D",
+  "os": "Linux 7.2.6-arch2-1",
+  "rust": "1.99.0",
+  "cpus": "2-15",
+  "datasets": {
+    "receive-cost-topology-control.jsonl": {
+      "patch": "counts.patch",
+      "sha256": "a284bff5f9fdf75f157c8dd045088dd98b06e4a458e2a1902441405c4298f4d7",
+      "seed": 17329,
+      "samples": 42
+    },
+    "receive-cost-isolation.jsonl": {
+      "patch": "experiments.patch",
+      "sha256": "baf6726f6dd5542e60dadcd38919c94e4742f480355b7f821bb229bb6ba359ea",
+      "seed": 73284,
+      "samples": 63
+    },
+    "receive-cost-cache.jsonl": {
+      "patch": "cache.patch",
+      "sha256": "9b897553896f06c416896163c224ab64e3da92ff1667fc4f202ded4a416b3da1",
+      "seed": 62849,
+      "samples": 56
+    },
+    "receive-cost-cache-stat-complete.jsonl": {
+      "patch": "cache.patch",
+      "sha256": "9b897553896f06c416896163c224ab64e3da92ff1667fc4f202ded4a416b3da1",
+      "seed": 84309,
+      "samples": 15
+    },
+    "receive-cost-balance.jsonl": {
+      "patch": "balance.patch",
+      "sha256": "3586516d5cf8a1834d5f4dacc038849819fe60e873919c9f74a267f83553fd3e",
+      "seed": 32047,
+      "samples": 56
+    },
+    "receive-cost-cursor.jsonl": {
+      "patch": "cursor.patch",
+      "sha256": "c04347b8968e578a22113a1f0e513b70dbde933e0993fdcb38eb18780067ba5d",
+      "seed": 94501,
+      "samples": 28
+    }
+  }
+}

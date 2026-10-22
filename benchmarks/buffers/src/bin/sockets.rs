@@ -175,9 +175,13 @@ where
     let mut raw = vec![0; size];
     let mut retained = None;
     let mut retained_multi = None;
+    let mut receive_calls = 0_u64;
+    let mut short_receives = 0_u64;
     let mut start = Instant::now();
     for index in 0..iterations + warmup {
         if index == warmup {
+            receive_calls = 0;
+            short_receives = 0;
             if group.warming.fetch_sub(1, Ordering::AcqRel) == 1 {
                 group.started.set(Instant::now()).unwrap();
                 group.ready.cancel();
@@ -266,6 +270,8 @@ where
                 _ => unreachable!("The receiver mode was validated before execution"),
             };
             assert!(count > 0);
+            receive_calls += 1;
+            short_receives += u64::from(count < size);
             if udp {
                 assert_eq!(count, size);
             }
@@ -294,7 +300,7 @@ where
     drop((readable, writable));
     scheduler.socket_close(socket).await.unwrap();
     peer.join().unwrap();
-    serde_json::json!({"transport":transport,"mode":mode,"size":size,"iterations":iterations,"seconds":elapsed.as_secs_f64(),"round_trips_per_second":iterations as f64/elapsed.as_secs_f64(),"window":window,"messages_per_second":(iterations * window) as f64 / elapsed.as_secs_f64()})
+    serde_json::json!({"transport":transport,"mode":mode,"size":size,"iterations":iterations,"seconds":elapsed.as_secs_f64(),"round_trips_per_second":iterations as f64/elapsed.as_secs_f64(),"window":window,"messages_per_second":(iterations * window) as f64 / elapsed.as_secs_f64(),"receive_calls":receive_calls,"short_receives":short_receives,"bytes_received":iterations * window * size})
 }
 
 async fn run_group<S>(scheduler: Arc<S>, workload: Workload) -> serde_json::Value
@@ -356,7 +362,19 @@ where
         .iter()
         .map(|result| result["seconds"].as_f64().unwrap())
         .fold(0.0_f64, f64::max);
+    let counters = ["receive_calls", "short_receives", "bytes_received"].map(|field| {
+        (
+            field,
+            results
+                .iter()
+                .map(|result| result[field].as_u64().unwrap())
+                .sum::<u64>(),
+        )
+    });
     let mut result = results.remove(0);
+    for (field, total) in counters {
+        result[field] = total.into();
+    }
     result["seconds"] = seconds.into();
     result["connections"] = workload.connections.into();
     result["pool_layout"] = workload.pool_layout.clone().into();
@@ -511,6 +529,12 @@ mod tests {
                         assert_eq!(result["transport"], transport);
                         assert_eq!(result["traffic"], traffic);
                         assert_eq!(result["window"], 4);
+                        assert_eq!(result["bytes_received"], 2 * 4 * 64);
+                        assert!(result["receive_calls"].as_u64().unwrap() >= 8);
+                        if transport == "udp" {
+                            assert_eq!(result["receive_calls"], 8);
+                            assert_eq!(result["short_receives"], 0);
+                        }
                     }
                 }
             }
@@ -534,6 +558,8 @@ mod tests {
                     let result = execute(&args);
                     assert_eq!(result["connections"], 4);
                     assert_eq!(result["iterations"], 2);
+                    assert_eq!(result["bytes_received"], 4 * 2 * 4 * 64);
+                    assert!(result["receive_calls"].as_u64().unwrap() >= 32);
                     assert!(result["messages_per_second"].as_f64().unwrap() > 0.0);
                 }
             }
