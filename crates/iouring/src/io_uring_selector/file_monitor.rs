@@ -16,6 +16,7 @@ pub struct IoUringFileRegistration {
     running: Option<RingBinding<u64>>,
     file: Arc<StdFile>,
     files: RingCache<Arc<RegisteredFile>>,
+    retiring: Vec<Arc<RegisteredFile>>,
     closed: bool,
     failed: bool,
 }
@@ -251,6 +252,14 @@ impl IoUringSelector {
         request.identifier = identifier;
         request.permit = Some(permit);
         let registration = monitor.registration_mut();
+        // Keep only the current registration; unfinished or failed releases remain observable until close.
+        registration.retiring.retain(|file| !file.released());
+        if !registration.files.matches(&controller) {
+            if let Some(previous) = registration.files.take_current() {
+                previous.retire();
+                registration.retiring.push(previous);
+            }
+        }
         let file = &registration.file;
         request.file = Some(Arc::clone(
             registration
@@ -330,6 +339,7 @@ impl FileMonitoring for IoUringSelector {
                 running: None,
                 file: retain_file(file),
                 files: RingCache::default(),
+                retiring: Vec::new(),
                 closed: false,
                 failed: false,
                 shared: Arc::new(Shared {
@@ -457,6 +467,9 @@ impl FileMonitoring for IoUringSelector {
             file.retire();
         }
         for file in registration.files.values() {
+            file.closed(cancellation).await?;
+        }
+        for file in &registration.retiring {
             file.closed(cancellation).await?;
         }
         Ok(())

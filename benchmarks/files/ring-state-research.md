@@ -1,5 +1,7 @@
 # Persistent ring state
 
+This report describes the retained-registration prototype at its recorded source commit. The current implementation instead invalidates the passive file registration when a subsequent operation changes rings; see the [migration comparison](migration-cost.md) for the measured tradeoff.
+
 Persistent state has two distinct uses: retaining an operation until it retires, and keeping reusable registrations between operations. The prototype gives both an explicit ring owner, adds a passive per-ring file cache, and preserves existing socket, timer, and buffer ownership contracts. This is a measured file optimization and a common migration vocabulary, not a claim that every kind of persistent state should migrate identically.
 
 ## Ownership and migration

@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Prototype sequential `FileMonitor` resources with explicit cancellation and retirement across Direct, Tokio, Native readiness, and io_uring. io_uring reuses typed request storage and caches optional fixed-file registrations per visited ring, with shared ring-binding conventions for file and socket monitors; add positioned-file benchmarks comparing ordinary and monitored operations.
+- Prototype sequential `FileMonitor` resources with explicit cancellation and retirement across Direct, Tokio, Native readiness, and io_uring. io_uring reuses typed request storage and caches an optional fixed-file registration for the current ring, releasing and replacing it when a subsequent operation changes workers, with shared ring-binding conventions for file and socket monitors; add positioned-file benchmarks comparing ordinary and monitored operations.
 
 - Prototype optional `Timers` resources in Native, Direct, and Tokio, constructed through `scheduler.timer()` and reused with `timer_wait_until`. Add a timer benchmark comparing refresh, expiry, and allocation costs; the reusable capability and its retention policy remain experimental.
 

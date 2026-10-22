@@ -38,7 +38,7 @@ The io_uring monitor keeps a typed request allocation and completion slot betwee
 
 Direct, Tokio, and readiness preserve their existing operation implementations and add a reusable retirement guard. They do not gain the io_uring request cache. Their expected benefit is explicit sequential state and retirement, with a small tracking cost; the monitor is not an unconditional throughput optimization.
 
-The monitor retains a file and admits one operation at a time. Multiple monitors may share a file, but share its OS cursor too; explicit offsets provide independent positions. The io_uring backend now optionally caches fixed-file registrations per visited ring. Registered buffers are not implemented. See the [interface design](../../context/design.md) for lifecycle and compatibility rules.
+The monitor retains a file and admits one operation at a time. Multiple monitors may share a file, but share its OS cursor too; explicit offsets provide independent positions. The io_uring backend optionally caches a fixed-file registration for the current ring, invalidating it when a subsequent operation changes rings. Registered buffers are not implemented. See the [interface design](../../context/design.md) for lifecycle and compatibility rules.
 
 ## Measurements
 
