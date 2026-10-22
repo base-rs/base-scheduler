@@ -16,7 +16,7 @@ The [cursor-control dataset](results/receive-cost-cursor.jsonl) has seven random
 | --- | ---: | ---: | ---: |
 | Monitor, normal reuse | 1,042,973 | — | — |
 | Monitor, extra atomic cursor only | 1,029,283 | −0.6% | −2.4% to +1.4% |
-| Monitor, rotating buffers | 897,954 | −13.7% | −16.4% to −8.5% |
+| Monitor, rotating buffers | 897,954 | −13.7% | −16.3% to −8.5% |
 | Provided-buffer multishot | 892,332 | −14.7% | −35.5% to −11.0% |
 
 Changing reuse policy alone reproduces a substantial slowdown without adding kernel receive operations, completion queues, provided-ring publication, or lease-return machinery. The cursor-only control argues against its additional shared atomic being the main explanation. This does not establish an exact additive partition of the provided path's costs.
@@ -46,7 +46,7 @@ The [placement experiment](results/receive-cost-balance.jsonl) records each rece
 | 1 | All eight on the only ring | 524,905 | −6.6% | −9.5% to −4.3% |
 | 2 | Current worker | 788,805 | −25.5% | −33.3% to −12.9% |
 | 2 | Four receivers per ring | 895,346 | −14.9% | −18.3% to −13.3% |
-| 4 | Current worker | 1,052,287 | −0.6% | −20.9% to +7.9% |
+| 4 | Current worker | 1,052,287 | −0.6% | −20.9% to +8.0% |
 | 4 | Two receivers per ring | 1,176,472 | +9.0% | −2.2% to +19.1% |
 
 In the two-worker normal-route samples, all three 4/4 assignments reach roughly 898–905 thousand payloads/s. The 6/2 assignments reach roughly 691–739 thousand. Round-robin makes the connection count even and removes that source of variation. It does not prove equivalent byte or CPU load for a real server with heterogeneous connections, and routing away from the constructing worker can introduce remote coordination. It is a diagnostic policy, not a proposed universal scheduler change.
