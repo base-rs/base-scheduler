@@ -98,7 +98,8 @@ mod linux {
         }
         drop((reply, started));
         let mut wakers = vec![None; workers];
-        for (index, waker) in startup {
+        for _ in 0..workers {
+            let (index, waker) = startup.recv().unwrap();
             wakers[index] = Some(waker);
         }
         let wakers: Vec<_> = wakers.into_iter().map(Option::unwrap).collect();
