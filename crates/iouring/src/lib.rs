@@ -27,3 +27,6 @@ mod io_uring_buffer;
 mod io_uring_buffer_pool;
 pub use io_uring_buffer::IoUringBuffer;
 pub use io_uring_buffer_pool::IoUringBufferPool;
+
+mod io_uring_receiver;
+pub use io_uring_receiver::IoUringReceiver;

@@ -1,10 +1,10 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-//! Worker-local publication of leases from one shared payload budget. Only driver calls access registered rings; the mutex also permits cold pressure requests from other threads.
+//! Worker-owned storage and publication. Pool construction allocates every slab and ring; only the owning driver registers and publishes them. Leases return directly to their original slab from any thread.
 
 use super::*;
-use crate::io_uring_buffer_pool::{RECEIVE_METADATA, SharedPool};
+use crate::io_uring_buffer_pool::RECEIVE_METADATA;
 use std::{
     alloc::{Layout, alloc_zeroed, dealloc},
     pin::Pin,
@@ -57,19 +57,19 @@ impl Acquisition {
 }
 
 struct Ring {
-    group: multishot::pool::Group,
+    group: Arc<multishot::pool::Group>,
     pointer: NonNull<types::BufRingEntry>,
     layout: Layout,
     entries: u16,
     registered: bool,
+    failure: Option<io::Error>,
 }
 // SAFETY: The allocation is stable. Registered access is confined to its owning driver; other threads only inspect worker state under its mutex.
 unsafe impl Send for Ring {}
 
 impl Ring {
-    fn new(controller: &Controller, buffers: usize) -> io::Result<Self> {
-        let group = multishot::pool::Group::new(controller)?;
-        let entries = buffers.min(8).next_power_of_two() as u16;
+    fn new(group: Arc<multishot::pool::Group>, buffers: usize) -> io::Result<Self> {
+        let entries = buffers.next_power_of_two() as u16;
         // SAFETY: Linux supports _SC_PAGESIZE and returns a positive power of two.
         let page = unsafe { libc::sysconf(libc::_SC_PAGESIZE) } as usize;
         let layout = Layout::from_size_align(
@@ -88,11 +88,12 @@ impl Ring {
             layout,
             entries,
             registered: false,
+            failure: None,
         })
     }
     fn register(&mut self, submitter: &io_uring::Submitter<'_>) -> io::Result<()> {
-        if !self.registered {
-            syscall("register-buffer-ring", || {
+        if !self.registered && self.failure.is_none() {
+            match syscall("register-buffer-ring", || {
                 // SAFETY: WorkerState retains this page-aligned ring and every published lease until all original receives retire and registration is removed.
                 unsafe {
                     submitter.register_buf_ring_with_flags(
@@ -102,10 +103,18 @@ impl Ring {
                         0,
                     )
                 }
-            })?;
-            self.registered = true;
+            }) {
+                Ok(()) => self.registered = true,
+                Err(error) => self.failure = Some(error),
+            }
         }
-        Ok(())
+        match &self.failure {
+            Some(error) => Err(match error.raw_os_error() {
+                Some(code) => io::Error::from_raw_os_error(code),
+                None => io::Error::new(error.kind(), error.to_string()),
+            }),
+            None => Ok(()),
+        }
     }
     fn unregister(&mut self, submitter: &io_uring::Submitter<'_>) -> io::Result<()> {
         if self.registered {
@@ -158,12 +167,28 @@ impl Drop for Ring {
 struct WorkerState {
     ring: Ring,
     buffers: Box<[Option<BufferLease>]>,
+    vacant: Vec<usize>,
     users: Vec<u64>,
     active: usize,
     available: usize,
-    demand: bool,
-    reclaiming: bool,
     acquisition: Option<Acquisition>,
+}
+impl WorkerState {
+    fn reset(&mut self, submitter: &io_uring::Submitter<'_>) -> io::Result<()> {
+        assert_eq!(
+            self.active, 0,
+            "original receives retire before unpublishing storage"
+        );
+        self.ring.unregister(submitter)?;
+        for buffer in &mut self.buffers {
+            drop(buffer.take());
+        }
+        self.vacant.clear();
+        self.vacant.extend((0..self.buffers.len()).rev());
+        self.available = 0;
+        self.acquisition = None;
+        Ok(())
+    }
 }
 impl Drop for WorkerState {
     fn drop(&mut self) {
@@ -178,32 +203,43 @@ impl Drop for WorkerState {
 
 pub(crate) struct WorkerBuffers {
     pub(crate) controller: Weak<Controller>,
-    pool: Arc<SharedPool>,
+    pub(crate) heap: HeapBufferPool,
+    options: BufferPoolOptions,
+    identifier: u16,
+    released: AtomicBool,
     state: Mutex<WorkerState>,
-    reclaim_requested: AtomicBool,
 }
 impl WorkerBuffers {
     pub(crate) fn new(
-        pool: Arc<SharedPool>,
+        heap: HeapBufferPool,
+        options: BufferPoolOptions,
+        group: Arc<multishot::pool::Group>,
         controller: &Arc<Controller>,
     ) -> io::Result<Arc<Self>> {
-        let ring = Ring::new(controller, pool.options.buffers)?;
-        let buffers = (0..ring.entries).map(|_| None).collect();
+        let identifier = group.identifier;
+        let ring = Ring::new(group, options.buffers)?;
         Ok(Arc::new(Self {
             controller: Arc::downgrade(controller),
-            pool,
+            heap,
+            options,
+            identifier,
+            released: AtomicBool::new(false),
             state: Mutex::new(WorkerState {
                 ring,
-                buffers,
+                buffers: (0..options.buffers).map(|_| None).collect(),
+                vacant: (0..options.buffers).rev().collect(),
                 users: Vec::new(),
                 active: 0,
                 available: 0,
-                demand: false,
-                reclaiming: false,
                 acquisition: None,
             }),
-            reclaim_requested: AtomicBool::new(false),
         }))
+    }
+    pub(crate) fn release(&self) {
+        self.released.store(true, Ordering::Release);
+        if let Some(controller) = self.controller.upgrade() {
+            Waker::from(controller).wake();
+        }
     }
     pub(super) fn attach(&self, identifier: u64) {
         self.state.lock().unwrap().users.push(identifier);
@@ -215,17 +251,11 @@ impl WorkerBuffers {
             .users
             .retain(|user| *user != identifier);
     }
-    pub(super) fn group(&self) -> u16 {
-        self.state.lock().unwrap().ring.group.identifier
+    pub(crate) fn group(&self) -> u16 {
+        self.identifier
     }
     pub(super) fn has_buffers(&self) -> bool {
         self.state.lock().unwrap().available != 0
-    }
-    pub(super) fn reclaiming(&self) -> bool {
-        self.state.lock().unwrap().reclaiming
-    }
-    pub(super) fn demand(&self) {
-        self.state.lock().unwrap().demand = true;
     }
     pub(super) fn submitted(&self) {
         self.state.lock().unwrap().active += 1;
@@ -235,23 +265,19 @@ impl WorkerBuffers {
     }
     pub(super) fn take(&self, identifier: u16) -> BufferLease {
         let mut state = self.state.lock().unwrap();
-        let buffer = state.buffers[identifier as usize]
+        let index = identifier as usize;
+        let buffer = state.buffers[index]
             .take()
             .expect("a selected ID owns its published lease");
+        state.vacant.push(index);
         state.available -= 1;
         buffer
     }
-    pub(crate) fn request_reclaim(&self) -> bool {
-        self.has_buffers() && !self.reclaim_requested.swap(true, Ordering::AcqRel)
-    }
-    pub(super) fn begin_reclaim(&self) {
-        self.state.lock().unwrap().reclaiming = true;
-    }
     pub(super) fn empty(&self) -> bool {
-        self.state.lock().unwrap().users.is_empty()
+        self.released.load(Ordering::Acquire) && self.state.lock().unwrap().users.is_empty()
     }
     pub(super) fn publish_offset(&self) -> usize {
-        let alignment = self.pool.options.alignment;
+        let alignment = self.options.alignment;
         ((RECEIVE_METADATA + alignment - 1) & !(alignment - 1)) - RECEIVE_METADATA
     }
     pub(super) fn detach(
@@ -262,60 +288,53 @@ impl WorkerBuffers {
         let mut state = self.state.lock().unwrap();
         state.users.retain(|user| *user != identifier);
         if state.users.is_empty() {
-            assert_eq!(
-                state.active, 0,
-                "the final receive retires before releasing publication"
-            );
-            state.ring.unregister(submitter)?;
-            for buffer in &mut state.buffers {
-                drop(buffer.take());
+            state.reset(submitter)?;
+            if !self.released.load(Ordering::Acquire) {
+                // Restore an initialized empty registration. Ordinary acquisitions can now use all unconsumed capacity without competing with a dormant receive.
+                state.ring.register(submitter)?;
             }
-            state.available = 0;
-            state.acquisition = None;
         }
         Ok(())
     }
-    /// Drive the cold refill/rebalance path on the ring owner. Returns true when dormant receives may retry.
-    pub(super) fn service(
-        self: &Arc<Self>,
-        submitter: &io_uring::Submitter<'_>,
-    ) -> io::Result<bool> {
+    pub(super) fn shutdown(&self, submitter: &io_uring::Submitter<'_>) -> io::Result<()> {
         let mut state = self.state.lock().unwrap();
-        if state.users.is_empty() {
-            state.ring.unregister(submitter)?;
-            for buffer in &mut state.buffers {
-                drop(buffer.take());
-            }
-            state.available = 0;
-            state.acquisition = None;
-            return Ok(false);
+        if state.active == 0 {
+            state.reset(submitter)?;
         }
-        if state.reclaiming {
-            if state.active != 0 {
-                return Ok(false);
-            }
-            state.ring.unregister(submitter)?;
-            for buffer in &mut state.buffers {
-                drop(buffer.take());
-            }
-            state.available = 0;
-            state.demand = false;
-            state.reclaiming = false;
-            state.acquisition = None;
-            self.reclaim_requested.store(false, Ordering::Release);
-            return Ok(true);
-        }
-        if !state.demand {
-            return Ok(false);
-        }
+        Ok(())
+    }
+    pub(super) fn prepare(&self, submitter: &io_uring::Submitter<'_>) -> io::Result<()> {
+        let mut state = self.state.lock().unwrap();
         state.ring.register(submitter)?;
-        let offset = self.publish_offset();
-        for index in 0..state.buffers.len() {
-            if state.buffers[index].is_some() {
-                continue;
+        self.refill(&mut state);
+        Ok(())
+    }
+    /// Initialize even before the first receiver, then refill from this worker's own slab. No other worker's registrations or free capacity participate.
+    pub(super) fn service(&self, submitter: &io_uring::Submitter<'_>) -> io::Result<bool> {
+        let mut state = self.state.lock().unwrap();
+        if self.empty_without_lock(&state) {
+            state.reset(submitter)?;
+            return Ok(false);
+        }
+        // Registration failures belong to this pool, not the entire scheduler. Preserve the original error for every receiver's prepare call.
+        if state.ring.register(submitter).is_err() {
+            return Ok(false);
+        }
+        if state.users.is_empty() {
+            if state.available != 0 || state.acquisition.is_some() {
+                state.reset(submitter)?;
+                state.ring.register(submitter)?;
             }
-            let buffer = self.pool.heap.try_acquire().or_else(|| {
-                // A partially stocked ring needs no new capacity listener. Once exhausted, reuse its waiter through future refills.
+            return Ok(false);
+        }
+        self.refill(&mut state);
+        // Availability remains observable even when prepare() performed the refill or another receive left unused entries. Only the reactor consumes dormant requests.
+        Ok(state.available != 0)
+    }
+    fn refill(&self, state: &mut WorkerState) {
+        let offset = self.publish_offset();
+        while let Some(&index) = state.vacant.last() {
+            let buffer = self.heap.try_acquire().or_else(|| {
                 if state.available != 0 && state.acquisition.is_none() {
                     return None;
                 }
@@ -325,22 +344,38 @@ impl WorkerBuffers {
                     .expect("a driven pool retains its controller");
                 state
                     .acquisition
-                    .get_or_insert_with(|| Acquisition::new(self.pool.heap.clone()))
+                    .get_or_insert_with(|| Acquisition::new(self.heap.clone()))
                     .next(&Waker::from(controller))
             });
-            let Some(mut buffer) = buffer else {
-                break;
-            };
+            let Some(mut buffer) = buffer else { break };
             state.ring.publish(index, &mut buffer, offset);
             state.buffers[index] = Some(buffer);
+            state.vacant.pop();
             state.available += 1;
         }
-        let available = state.available != 0;
-        if !available {
-            drop(state);
-            // A capacity wake does not reserve a lease. Another worker can publish the returned slot before this waiter runs, so exhausted retries must recall peers again.
-            self.pool.reclaim(Some(self));
-        }
-        Ok(available)
+    }
+    fn empty_without_lock(&self, state: &WorkerState) -> bool {
+        self.released.load(Ordering::Acquire) && state.users.is_empty()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn capacity_waiter_reuses_its_listener_after_delivering_a_lease() {
+        let heap = HeapBufferPool::new(2, 8).unwrap();
+        let first = heap.try_acquire().unwrap();
+        let second = heap.try_acquire().unwrap();
+        let mut acquisition = Acquisition::new(heap);
+        assert!(acquisition.next(Waker::noop()).is_none());
+        drop(first);
+        let first = acquisition.next(Waker::noop()).unwrap();
+        drop(second);
+        let second = acquisition.next(Waker::noop()).unwrap();
+        assert_eq!(first.as_ref().len(), 8);
+        assert_eq!(second.as_ref().len(), 8);
+        assert!(acquisition.next(Waker::noop()).is_none());
     }
 }

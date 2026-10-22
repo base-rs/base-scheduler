@@ -21,6 +21,9 @@ struct Workload {
     window: usize,
     receive_only: bool,
     connections: usize,
+    #[cfg(target_os = "linux")]
+    workers: usize,
+    pool_layout: String,
 }
 
 struct ConnectionGroup<P> {
@@ -308,13 +311,29 @@ where
     S::Socket: 'static,
 {
     assert!(workload.connections > 0);
+    let total = 8 * workload.connections;
+    let options = BufferPoolOptions::new(total, workload.size);
+    let pool = match workload.pool_layout.as_str() {
+        "total" => scheduler.buffer_pool(options),
+        #[cfg(target_os = "linux")]
+        "worker-equal" => {
+            assert!(
+                total % workload.workers == 0,
+                "equal budgets require a whole number of buffers per worker"
+            );
+            scheduler.buffer_pool_per_worker(BufferPoolOptions {
+                buffers: total / workload.workers,
+                ..options
+            })
+        }
+        #[cfg(target_os = "linux")]
+        "worker-scaled" => scheduler.buffer_pool_per_worker(options),
+        _ => unreachable!("The pool layout was validated before execution"),
+    }
+    .unwrap();
+    let capacity = pool.capacity();
     let group = Arc::new(ConnectionGroup {
-        pool: scheduler
-            .buffer_pool(BufferPoolOptions::new(
-                8 * workload.connections,
-                workload.size,
-            ))
-            .unwrap(),
+        pool,
         warming: AtomicUsize::new(workload.connections),
         ready: Cancellation::new(),
         started: OnceLock::new(),
@@ -340,6 +359,8 @@ where
     let mut result = results.remove(0);
     result["seconds"] = seconds.into();
     result["connections"] = workload.connections.into();
+    result["pool_layout"] = workload.pool_layout.clone().into();
+    result["pool_capacity"] = capacity.into();
     result["round_trips_per_second"] =
         (workload.connections as f64 * workload.iterations as f64 / seconds).into();
     result["messages_per_second"] =
@@ -370,8 +391,23 @@ fn execute(args: &[String]) -> serde_json::Value {
         matches!(traffic, "echo" | "receive"),
         "unknown traffic pattern"
     );
+    let pool_layout = args.get(10).map(String::as_str).unwrap_or("total");
+    assert!(
+        [
+            "total",
+            #[cfg(target_os = "linux")]
+            "worker-equal",
+            #[cfg(target_os = "linux")]
+            "worker-scaled"
+        ]
+        .contains(&pool_layout),
+        "unknown pool layout"
+    );
     let workload = Workload {
         mode: mode.to_owned(),
+        #[cfg(target_os = "linux")]
+        workers,
+        pool_layout: pool_layout.to_owned(),
         size,
         iterations,
         transport,
@@ -502,6 +538,61 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn worker_pools_preserve_data_with_equal_and_scaled_budgets() {
+        for layout in ["worker-equal", "worker-scaled"] {
+            for mode in ["pool", "shared"] {
+                for transport in ["tcp", "udp"] {
+                    let args = [
+                        "sockets", "iouring", mode, "64", "2", "2", transport, "4", "receive", "4",
+                        layout,
+                    ]
+                    .map(str::to_owned);
+                    let result = execute(&args);
+                    assert_eq!(
+                        result["pool_capacity"],
+                        if layout == "worker-equal" { 32 } else { 64 }
+                    );
+                    assert_eq!(result["pool_layout"], layout);
+                }
+            }
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "unknown pool layout")]
+    fn rejects_unknown_pool_layout() {
+        execute(
+            &[
+                "sockets", "native", "pool", "64", "2", "1", "tcp", "1", "echo", "1", "unknown",
+            ]
+            .map(str::to_owned),
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    #[should_panic(expected = "equal budgets require")]
+    fn rejects_unequal_worker_budgets() {
+        execute(
+            &[
+                "sockets",
+                "iouring",
+                "pool",
+                "64",
+                "2",
+                "3",
+                "tcp",
+                "1",
+                "echo",
+                "1",
+                "worker-equal",
+            ]
+            .map(str::to_owned),
+        );
     }
 
     #[test]

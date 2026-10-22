@@ -30,4 +30,14 @@ use std::io;
 pub trait BufferPooling {
     type Pool: BufferPool;
     fn buffer_pool(&self, options: BufferPoolOptions) -> io::Result<Self::Pool>;
+
+    /// Provision `options.buffers` slots for every I/O worker. Construction reserves every worker's storage and schedules its registration independently of the first receive. `capacity()` reports the total across workers. Acquisition and receivers use their selected worker's capacity; exhaustion waits there even when another worker has free slots. Completed leases can move between workers and always return to their original storage.
+    ///
+    /// This is an explicit locality policy, rather than a larger shared budget. A synchronous constructor does not wait for other workers: drivers perform registration on their next turn, including startup, and report setup errors when preparing receivers. Backends without worker-owned pools return `Unsupported`.
+    fn buffer_pool_per_worker(&self, _options: BufferPoolOptions) -> io::Result<Self::Pool> {
+        Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "worker-owned buffer pools are unavailable",
+        ))
+    }
 }

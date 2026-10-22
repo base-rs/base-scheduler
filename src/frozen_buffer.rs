@@ -34,9 +34,11 @@ impl Clone for FrozenBuffer {
 impl AsRef<[u8]> for FrozenBuffer {
     fn as_ref(&self) -> &[u8] {
         // SAFETY: Every view retains the slot's reader count and pool ownership. No mutable lease can exist until the final view releases it.
-        let slot = &self.pool.slots[self.index];
         unsafe {
-            &(&*slot.bytes.get())[slot.offset + self.range.start..slot.offset + self.range.end]
+            std::slice::from_raw_parts(
+                self.pool.pointer(self.index).add(self.range.start),
+                self.range.len(),
+            )
         }
     }
 }

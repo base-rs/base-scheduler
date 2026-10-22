@@ -9,4 +9,8 @@ impl BufferPooling for IoUringSelector {
         self.check_open()?;
         crate::IoUringBufferPool::new(&self.group, options)
     }
+    fn buffer_pool_per_worker(&self, options: BufferPoolOptions) -> std::io::Result<Self::Pool> {
+        self.check_open()?;
+        crate::IoUringBufferPool::per_worker(&self.group, &self.controllers, options)
+    }
 }

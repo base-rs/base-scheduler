@@ -287,3 +287,24 @@ fn custom_signal_capability_preserves_the_selectors_signal_and_subscription_type
     );
     scheduler.block_on(scheduler.shutdown());
 }
+
+#[test]
+fn unsupported_worker_pool_policy_is_forwarded_without_changing_the_budget() {
+    use core_scheduler::{BufferPoolOptions, BufferPooling};
+    let scheduler = NativeScheduler::with_options(core_scheduler_native::NativeOptions {
+        workers: 1,
+        ..Default::default()
+    })
+    .unwrap();
+    let options = BufferPoolOptions::new(3, 64);
+    assert_eq!(scheduler.buffer_pool(options).unwrap().capacity(), 3);
+    assert_eq!(
+        scheduler
+            .buffer_pool_per_worker(options)
+            .err()
+            .unwrap()
+            .kind(),
+        std::io::ErrorKind::Unsupported
+    );
+    scheduler.block_on(scheduler.shutdown());
+}

@@ -47,15 +47,15 @@ impl BufferLease {
 impl AsRef<[u8]> for BufferLease {
     fn as_ref(&self) -> &[u8] {
         // SAFETY: This lease exclusively owns its slot; the box and initialized prefix remain stable until release.
-        let slot = &self.pool.as_ref().unwrap().slots[self.index];
-        unsafe { &(&*slot.bytes.get())[slot.offset..slot.offset + self.length] }
+        let pool = self.pool.as_ref().unwrap();
+        unsafe { std::slice::from_raw_parts(pool.pointer(self.index), self.length) }
     }
 }
 impl AsMut<[u8]> for BufferLease {
     fn as_mut(&mut self) -> &mut [u8] {
         // SAFETY: The unique lease and exclusive borrow prevent other accesses to this slot. Frozen views cannot coexist with a mutable lease.
-        let slot = &self.pool.as_ref().unwrap().slots[self.index];
-        unsafe { &mut (&mut *slot.bytes.get())[slot.offset..slot.offset + self.length] }
+        let pool = self.pool.as_ref().unwrap();
+        unsafe { std::slice::from_raw_parts_mut(pool.pointer(self.index), self.length) }
     }
 }
 impl Drop for BufferLease {

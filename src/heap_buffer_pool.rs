@@ -15,20 +15,21 @@ use std::{
     task::Poll,
 };
 
-/// A bounded, shareable collection of stable initialized allocations. Construction reserves all payload storage; acquiring, freezing, slicing, and returning leases allocate no payload or reference-count wrappers.
+/// A bounded, shareable collection of stable initialized slots in one contiguous slab. Construction reserves all payload storage; acquiring, freezing, slicing, and returning leases allocate no payload or reference-count wrappers.
 ///
-/// Pools may be shared across connections and file pipelines. Exhaustion waits with cancellation instead of growing the pool. Retained views count against capacity. This portable implementation of `BufferPool` uses heap allocations. Backends may supply another pool implementation with the same ownership contract.
+/// Pools may be shared across connections and file pipelines. Exhaustion waits with cancellation instead of growing the pool. Retained views count against capacity. This portable implementation of `BufferPool` uses a heap allocation. Backends may supply another pool implementation with the same ownership contract.
 #[derive(Clone)]
 pub struct HeapBufferPool(pub(crate) Arc<Pool>);
 
 pub(crate) struct Slot {
-    pub(crate) bytes: UnsafeCell<Box<[u8]>>,
     pub(crate) readers: AtomicUsize,
-    pub(crate) offset: usize,
 }
 
 pub(crate) struct Pool {
     pub(crate) slots: Box<[Slot]>,
+    bytes: Box<[UnsafeCell<u8>]>,
+    offset: usize,
+    stride: usize,
     // One bit per stable slot; the final word never advertises unused indices.
     free: Box<[AtomicUsize]>,
     returned: Event,
@@ -36,7 +37,7 @@ pub(crate) struct Pool {
     alignment: usize,
 }
 
-// SAFETY: A set availability bit, one mutable lease, or immutable views counted in readers exclusively owns each slot. Only the mutable lease can mutate bytes. Clearing an availability bit acquires the final owner's release before accessing that slot. Slots and byte allocations never move or resize.
+// SAFETY: A set availability bit, one mutable lease, or immutable views counted in readers exclusively owns each slot. Only the mutable lease can mutate bytes. Clearing an availability bit acquires the final owner's release before accessing that slot. Slots and the byte slab never move or resize.
 unsafe impl Sync for Pool {}
 
 impl HeapBufferPool {
@@ -44,7 +45,7 @@ impl HeapBufferPool {
         Self::with_options(crate::BufferPoolOptions::new(buffers, buffer_size))
     }
 
-    /// Reserve initialized storage with the requested alignment. Each allocation includes at most `alignment - 1` bytes of padding, outside the usable payload budget.
+    /// Reserve one contiguous initialized allocation. Slot starts satisfy the requested alignment; padding is outside the usable payload budget.
     pub fn with_options(options: crate::BufferPoolOptions) -> io::Result<Self> {
         options.validate()?;
         let crate::BufferPoolOptions {
@@ -52,7 +53,12 @@ impl HeapBufferPool {
             buffer_size,
             alignment,
         } = options;
-        let allocation_size = buffer_size + alignment - 1;
+        let stride = (buffer_size + alignment - 1) & !(alignment - 1);
+        let allocation_size = (buffers - 1) * stride + buffer_size + alignment - 1;
+        let bytes = vec![0u8; allocation_size].into_boxed_slice();
+        let offset = (bytes.as_ptr() as usize).wrapping_neg() & (alignment - 1);
+        // SAFETY: UnsafeCell<u8> has exactly u8's layout and drop behavior. The allocation remains owned, initialized, and fixed in size; references are created only for individually owned slots.
+        let bytes = unsafe { Box::from_raw(Box::into_raw(bytes) as *mut [UnsafeCell<u8>]) };
         let returned = Event::new();
         returned.notify(0);
         let width = usize::BITS as usize;
@@ -64,16 +70,13 @@ impl HeapBufferPool {
             .collect();
         Ok(Self(Arc::new(Pool {
             slots: (0..buffers)
-                .map(|_| {
-                    let bytes = vec![0; allocation_size].into_boxed_slice();
-                    let offset = (bytes.as_ptr() as usize).wrapping_neg() & (alignment - 1);
-                    Slot {
-                        bytes: UnsafeCell::new(bytes),
-                        readers: AtomicUsize::new(0),
-                        offset,
-                    }
+                .map(|_| Slot {
+                    readers: AtomicUsize::new(0),
                 })
                 .collect(),
+            bytes,
+            offset,
+            stride,
             free,
             returned,
             size: buffer_size,
@@ -140,6 +143,18 @@ impl HeapBufferPool {
 }
 
 impl Pool {
+    pub(crate) fn pointer(&self, index: usize) -> *mut u8 {
+        assert!(index < self.slots.len());
+        // SAFETY: Every slot's complete payload fits in this stable allocation. UnsafeCell permits mutation of the individually leased range without forming a mutable reference covering other slots.
+        unsafe {
+            self.bytes
+                .as_ptr()
+                .cast::<u8>()
+                .cast_mut()
+                .add(self.offset + index * self.stride)
+        }
+    }
+
     pub(crate) fn release(&self, index: usize) {
         let width = usize::BITS as usize;
         // Use an RMW to preserve release sequences for other slots in the same word.

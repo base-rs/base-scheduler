@@ -187,9 +187,6 @@ pub(crate) trait PendingRequest: Send {
     fn buffer_pool(&self) -> Option<&Arc<provided_buffers::WorkerBuffers>> {
         None
     }
-    fn suspend_for(&self, _pool: &Arc<provided_buffers::WorkerBuffers>) -> bool {
-        false
-    }
     fn entry(&mut self) -> squeue::Entry;
     // Buffer accessors may run arbitrary user code, including waking tasks. Such requests must return to the executor after preparation instead of waiting.
     fn entry_may_wake(&self) -> bool {
@@ -261,7 +258,6 @@ pub(crate) enum Command {
     FileRelease(registered_file::Release),
     Recycle(Arc<multishot::pool::Pool>, u16),
     PoolReady(Arc<provided_buffers::WorkerBuffers>),
-    PoolReclaim(Arc<provided_buffers::WorkerBuffers>),
     Rearm(u64),
     Cancel(u64),
     CancelAfterSubmission(u64),
@@ -282,6 +278,7 @@ impl Drop for SignalCompletion {
 }
 
 pub(crate) struct Controller {
+    pub(crate) worker: usize,
     capacity: Arc<Capacity>,
     commands: mpsc::Sender<Command>,
     notification: Arc<OwnedFd>,
@@ -294,8 +291,10 @@ pub(crate) struct Controller {
 
 impl Controller {
     pub(crate) fn send(&self, command: Command) -> Result<(), mpsc::SendError<Command>> {
-        if matches!(&command, Command::Submit(_) | Command::MonitorSubmit(_))
-            && self.closed.load(Ordering::Acquire)
+        if matches!(
+            &command,
+            Command::Submit(_) | Command::MonitorSubmit(_) | Command::PoolReady(_)
+        ) && self.closed.load(Ordering::Acquire)
         {
             return Err(mpsc::SendError(command));
         }
@@ -333,6 +332,13 @@ impl Controller {
                 Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
                 _ => break,
             }
+        }
+    }
+
+    fn submit(&self, request: Box<dyn PendingRequest>) {
+        if let Err(mpsc::SendError(Command::Submit(request))) = self.send(Command::Submit(request))
+        {
+            request.finish(Err(io::ErrorKind::BrokenPipe.into()));
         }
     }
 
@@ -449,6 +455,7 @@ impl Capacity {
     }
 }
 pub(crate) struct DriverGroup {
+    buffer_groups: Arc<std::sync::Mutex<Vec<bool>>>,
     controllers: OnceLock<Vec<Weak<Controller>>>,
     fallback: Arc<ReadinessSelector>,
     closed: AtomicBool,
@@ -501,14 +508,15 @@ impl IoUringSelector {
         }
         let fallback = Arc::new(ReadinessSelector::with_options(options.fallback)?);
         let group = Arc::new(DriverGroup {
+            buffer_groups: Arc::new(std::sync::Mutex::new(Vec::new())),
             controllers: OnceLock::new(),
             fallback: Arc::clone(&fallback),
             closed: AtomicBool::new(false),
         });
         let mut controllers = Vec::with_capacity(workers);
         let mut drivers = Vec::with_capacity(workers);
-        for _ in 0..workers {
-            let driver = Self::driver(options, Arc::clone(&group))?;
+        for worker in 0..workers {
+            let driver = Self::driver(options, Arc::clone(&group), worker)?;
             controllers.push(Arc::clone(&driver.controller));
             drivers.push(driver);
         }
@@ -526,7 +534,11 @@ impl IoUringSelector {
         ))
     }
 
-    fn driver(options: IoUringOptions, group: Arc<DriverGroup>) -> io::Result<IoUringDriver> {
+    fn driver(
+        options: IoUringOptions,
+        group: Arc<DriverGroup>,
+        worker: usize,
+    ) -> io::Result<IoUringDriver> {
         let ring = syscall("ring", || IoUring::new(options.entries))?;
         syscall("completion-support", || {
             validate_completion_support(
@@ -562,11 +574,12 @@ impl IoUringSelector {
             limit: options.capacity,
         });
         let controller = Arc::new(Controller {
+            worker,
             capacity,
             commands,
             notification,
             next_identifier: AtomicU64::new(0),
-            buffer_groups: Arc::new(std::sync::Mutex::new(Vec::new())),
+            buffer_groups: Arc::clone(&group.buffer_groups),
             files: std::sync::Mutex::new(registered_file::Files::new(options.fixed_files)),
             closed: AtomicBool::new(false),
             shutdown: Arc::clone(&shutdown),
@@ -855,7 +868,7 @@ pub(crate) struct Reactor {
     dormant: HashMap<u64, Box<dyn PendingRequest>>,
     monitors: monitor::Monitors,
     pending_monitors: VecDeque<monitor::Submission>,
-    buffer_pools: Vec<Arc<provided_buffers::WorkerBuffers>>,
+    buffer_pools: Vec<Option<Arc<provided_buffers::WorkerBuffers>>>,
     pool_ready: Vec<u64>,
     in_flight: InFlight,
     cancellations: VecDeque<u64>,
@@ -1114,25 +1127,15 @@ impl Reactor {
                     }
                 }
                 Command::PoolReady(pool) => {
-                    if !self
-                        .buffer_pools
-                        .iter()
-                        .any(|known| Arc::ptr_eq(known, &pool))
-                    {
-                        self.buffer_pools.push(pool);
+                    let index = pool.group() as usize;
+                    if self.buffer_pools.len() <= index {
+                        self.buffer_pools.resize_with(index + 1, || None);
                     }
-                }
-                Command::PoolReclaim(pool) => {
-                    pool.begin_reclaim();
-                    // Move unsubmitted requests aside. In-flight receives retain their published leases until their terminal original CQEs arrive.
-                    for request in &self.pending {
-                        request.suspend_for(&pool);
-                    }
-                    for (identifier, request) in &self.in_flight.0 {
-                        if request.suspend_for(&pool) {
-                            self.cancellations.push_back(*identifier);
-                        }
-                    }
+                    assert!(
+                        self.buffer_pools[index].is_none(),
+                        "a live pool owns its group ID across all rings"
+                    );
+                    self.buffer_pools[index] = Some(pool);
                 }
                 Command::Rearm(identifier) => {
                     if let Some(request) = self.dormant.remove(&identifier) {
@@ -1166,9 +1169,10 @@ impl Reactor {
 
         progressed |= self.collect_completions()?;
 
-        // Refill and rebalance only from this ring's owner. Completed payloads have already left their ring tables and may be retained by application tasks on any worker.
-        for pool in &self.buffer_pools {
-            if pool.service(&self.ring.submitter())? {
+        // Initialize and refill on the ring owner. Each indexed entry owns only this worker's storage; completed payloads may be retained on any thread.
+        for slot in &mut self.buffer_pools {
+            let Some(pool) = slot else { continue };
+            if pool.service(&self.ring.submitter())? && !self.dormant.is_empty() {
                 for (identifier, request) in &self.dormant {
                     if request
                         .buffer_pool()
@@ -1178,8 +1182,10 @@ impl Reactor {
                     }
                 }
             }
+            if pool.empty() {
+                *slot = None;
+            }
         }
-        self.buffer_pools.retain(|pool| !pool.empty());
         for identifier in self.pool_ready.drain(..) {
             self.pending.push_back(
                 self.dormant
@@ -1336,6 +1342,10 @@ impl Reactor {
 impl Drop for Reactor {
     fn drop(&mut self) {
         self.retire_pending(io::ErrorKind::BrokenPipe);
+        for pool in self.buffer_pools.iter().flatten() {
+            // Only proven-idle registrations can be released. Unknown in-flight payloads remain retained on driver failure.
+            let _ = pool.shutdown(&self.ring.submitter());
+        }
         // Pop without retaining a queue borrow: returning a buffer or waking its owner can reenter local routing.
         while let Some(command) = crate::io_uring_worker::pop(&self.controller) {
             discard(command);

@@ -273,11 +273,7 @@ impl core_scheduler::SocketRecvMsgMultishot for IoUringSelector {
             eof: Cell::new(false),
             finished: false,
         };
-        if let Err(mpsc::SendError(Command::Submit(request))) =
-            controller.send(Command::Submit(Box::new(request)))
-        {
-            request.finish(Err(io::ErrorKind::BrokenPipe.into()));
-        }
+        controller.submit(Box::new(request));
         Ok(RecvMsgMultishot {
             cancel_on_wait: true,
             state,

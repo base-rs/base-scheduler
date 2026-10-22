@@ -309,3 +309,61 @@ fn generic_pool_operations_allocate_nothing_after_setup() {
     });
     assert_eq!(allocations.count_total, 0);
 }
+
+#[test]
+fn aligned_slots_share_one_slab_without_aliasing_other_live_slots() {
+    for alignment in [1, 8, 4096] {
+        let pool = HeapBufferPool::with_options(BufferPoolOptions {
+            alignment,
+            ..BufferPoolOptions::new(3, 257)
+        })
+        .unwrap();
+        let mut first = pool.try_acquire().unwrap();
+        let mut second = pool.try_acquire().unwrap();
+        let mut third = pool.try_acquire().unwrap();
+        let stride = (257 + alignment - 1) & !(alignment - 1);
+        assert_eq!(
+            second.as_ref().as_ptr() as usize - first.as_ref().as_ptr() as usize,
+            stride
+        );
+        assert_eq!(
+            third.as_ref().as_ptr() as usize - second.as_ref().as_ptr() as usize,
+            stride
+        );
+        first.as_mut().fill(1);
+        second.as_mut().fill(2);
+        third.as_mut().fill(3);
+        let retained = first.freeze();
+        let borrowed = retained.as_ref();
+        let writable = second.as_mut();
+        writable.fill(4);
+        assert_eq!(borrowed, [1; 257]);
+        assert_eq!(third.as_ref(), [3; 257]);
+        drop(pool);
+        assert_eq!(writable, [4; 257]);
+        assert_eq!(retained.view(0..1).as_ref(), [1]);
+    }
+}
+
+#[test]
+fn worker_pools_require_explicit_backend_support() {
+    use core_scheduler::BufferPooling;
+    struct Portable;
+    impl BufferPooling for Portable {
+        type Pool = HeapBufferPool;
+        fn buffer_pool(&self, options: BufferPoolOptions) -> std::io::Result<Self::Pool> {
+            HeapBufferPool::with_options(options)
+        }
+    }
+    let portable = Portable;
+    let options = BufferPoolOptions::new(2, 8);
+    assert_eq!(portable.buffer_pool(options).unwrap().capacity(), 2);
+    assert_eq!(
+        portable
+            .buffer_pool_per_worker(options)
+            .err()
+            .unwrap()
+            .kind(),
+        std::io::ErrorKind::Unsupported
+    );
+}

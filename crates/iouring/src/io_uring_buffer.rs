@@ -4,7 +4,7 @@
 use core_scheduler::{BufferLease, BufferSlice, FrozenBuffer, IoBuf, IoBufMut, ReceiveBuffer};
 use std::ops::Range;
 
-/// An exclusive initialized payload in a shared io_uring pool. Receive metadata stays outside the exposed range. Completed storage has no ring affinity and its final owner returns it to the shared pool on any thread.
+/// An exclusive initialized payload in an io_uring pool. Receive metadata stays outside the exposed range. Completed storage can move between threads; its final owner returns it directly to its original slab.
 #[derive(Debug)]
 pub struct IoUringBuffer {
     buffer: BufferLease,

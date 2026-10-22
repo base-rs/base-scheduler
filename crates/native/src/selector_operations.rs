@@ -742,4 +742,8 @@ impl<S: Selector + BufferPooling> BufferPooling for NativeScheduler<S> {
     fn buffer_pool(&self, options: BufferPoolOptions) -> io::Result<Self::Pool> {
         self.selector().buffer_pool(options)
     }
+
+    fn buffer_pool_per_worker(&self, options: BufferPoolOptions) -> io::Result<Self::Pool> {
+        self.selector().buffer_pool_per_worker(options)
+    }
 }

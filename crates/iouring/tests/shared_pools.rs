@@ -47,13 +47,13 @@ fn run(future: impl std::future::Future<Output = ()>) {
 }
 
 #[test]
-fn busy_workers_reclaim_idle_capacity_without_copying_retained_payloads() {
+fn worker_pools_preserve_independent_capacity_and_retained_payloads() {
     let fixture = Fixture::new(4);
     let scheduler = &*fixture.selector;
     run(async {
         let never = Cancellation::never();
         let pool = scheduler
-            .buffer_pool(BufferPoolOptions::new(2, 64))
+            .buffer_pool_per_worker(BufferPoolOptions::new(2, 64))
             .unwrap();
         let sender = UdpSocket::bind("127.0.0.1:0").unwrap();
         let mut sockets = Vec::new();
@@ -112,10 +112,12 @@ fn busy_workers_reclaim_idle_capacity_without_copying_retained_payloads() {
         for socket in sockets {
             scheduler.socket_close(socket).await.unwrap();
         }
-        let a = pool.acquire(&never).await.unwrap();
-        let b = pool.acquire(&never).await.unwrap();
+        let mut buffers = Vec::new();
+        for _ in 0..pool.capacity() {
+            buffers.push(pool.acquire(&never).await.unwrap());
+        }
         assert!(pool.try_acquire().is_none());
-        drop((a, b));
+        drop(buffers);
     });
 }
 
@@ -126,7 +128,7 @@ fn shared_receive_preserves_alignment_empty_datagrams_and_wait_cancellation() {
     run(async {
         let never = Cancellation::never();
         let pool = scheduler
-            .buffer_pool(BufferPoolOptions {
+            .buffer_pool_per_worker(BufferPoolOptions {
                 alignment: 4096,
                 ..BufferPoolOptions::new(1, 3)
             })

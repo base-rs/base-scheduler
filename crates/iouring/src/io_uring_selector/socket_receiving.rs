@@ -3,10 +3,10 @@
 
 use super::provided_buffers::WorkerBuffers;
 use super::*;
-use crate::IoUringBuffer;
+use crate::{IoUringBuffer, IoUringReceiver};
 use std::cell::UnsafeCell;
 impl SocketReceiving for IoUringSelector {
-    type PooledReceiver = multishot::RecvMsgMultishot<IoUringBuffer>;
+    type PooledReceiver = IoUringReceiver;
     async fn socket_receiver(
         &self,
         socket: &Self::Socket,
@@ -30,22 +30,35 @@ impl SocketReceiving for IoUringSelector {
             )
             .into());
         }
-        let socket = super::socket::retain_socket(socket);
-        let stream = syscall("socket-type", || socket.get_ref().r#type())? == socket2::Type::STREAM;
+        let retained = super::socket::retain_socket(socket);
+        let stream =
+            syscall("socket-type", || retained.get_ref().r#type())? == socket2::Type::STREAM;
         let controller = self.route();
+        let Some(buffers) = pool.worker(&controller) else {
+            let kind = if stream {
+                SocketType::Stream
+            } else {
+                SocketType::Datagram
+            };
+            return self
+                .socket_monitor(socket, Interest::Readable)
+                .and_then(|monitor| SocketReceiver::new(monitor, pool, kind, flags))
+                .map(IoUringReceiver::Demand)
+                .map_err(Into::into);
+        };
+        let buffers = Arc::clone(buffers);
+        let socket = retained;
         let permit = operation_result(
             controller.capacity.acquire(cancellation).await,
             cancellation,
         )?;
         let identifier = controller.next_identifier()?;
-        let buffers = pool.worker(&controller)?;
         let state = Arc::new(multishot::State::default());
         // SAFETY: Multishot receive uses this immutable boxed header only for name/control capacities.
         let mut header: libc::msghdr = unsafe { std::mem::zeroed() };
         header.msg_namelen = std::mem::size_of::<libc::sockaddr_storage>() as _;
         buffers.attach(identifier);
-        let _ = controller.send(Command::PoolReady(Arc::clone(&buffers)));
-        let request = SharedReceive {
+        let request = PooledReceive {
             identifier,
             _permit: permit,
             socket: Some(socket),
@@ -53,19 +66,12 @@ impl SocketReceiving for IoUringSelector {
             state: Arc::clone(&state),
             header: UnsafeCell::new(header),
             stream,
-            polling: Cell::new(false),
-            ready: Cell::new(false),
-            suspended: Cell::new(false),
             cancelling: Cell::new(false),
             eof: Cell::new(false),
             finished: false,
         };
-        if let Err(mpsc::SendError(Command::Submit(request))) =
-            controller.send(Command::Submit(Box::new(request)))
-        {
-            request.finish(Err(io::ErrorKind::BrokenPipe.into()));
-        }
-        Ok(multishot::RecvMsgMultishot {
+        controller.submit(Box::new(request));
+        Ok(IoUringReceiver::Provided(multishot::RecvMsgMultishot {
             cancel_on_wait: false,
             state,
             cancel: CancelOnDrop {
@@ -73,11 +79,11 @@ impl SocketReceiving for IoUringSelector {
                 identifier,
                 armed: true,
             },
-        })
+        }))
     }
 }
 
-struct SharedReceive {
+struct PooledReceive {
     identifier: u64,
     _permit: Permit,
     socket: Option<RegisteredSocket>,
@@ -85,46 +91,25 @@ struct SharedReceive {
     state: Arc<multishot::State<IoUringBuffer>>,
     header: UnsafeCell<libc::msghdr>,
     stream: bool,
-    polling: Cell<bool>,
-    ready: Cell<bool>,
-    suspended: Cell<bool>,
     cancelling: Cell<bool>,
     eof: Cell<bool>,
     finished: bool,
 }
 // SAFETY: The stable boxed header is immutable after publication. One ring owner drives the request; completed payloads move into independent owning leases.
-unsafe impl Send for SharedReceive {}
+unsafe impl Send for PooledReceive {}
 
-impl PendingRequest for SharedReceive {
+impl PendingRequest for PooledReceive {
     fn identifier(&self) -> u64 {
         self.identifier
     }
     fn buffer_pool(&self) -> Option<&Arc<WorkerBuffers>> {
         Some(&self.buffers)
     }
-    fn suspend_for(&self, pool: &Arc<WorkerBuffers>) -> bool {
-        if Arc::ptr_eq(&self.buffers, pool) {
-            self.suspended.set(true);
-            true
-        } else {
-            false
-        }
-    }
     fn ready(&mut self, submitter: &io_uring::Submitter<'_>) -> io::Result<bool> {
-        if self.buffers.reclaiming() {
-            return Ok(false);
-        }
-        // An empty group waits for socket readiness before requesting storage. Idle connections cannot repeatedly recall buffers from busy workers.
-        if !self.ready.get() && !self.buffers.has_buffers() {
-            self.polling.set(true);
-            return Ok(true);
-        }
-        self.buffers.demand();
-        self.buffers.service(submitter)?;
+        self.buffers.prepare(submitter)?;
         if !self.buffers.has_buffers() {
             return Ok(false);
         }
-        self.polling.set(false);
         self.buffers.submitted();
         self.state.received.lock().unwrap().statistics.submissions += 1;
         Ok(true)
@@ -137,21 +122,14 @@ impl PendingRequest for SharedReceive {
                 .get_ref()
                 .as_raw_fd(),
         );
-        let entry = if self.polling.get() {
-            opcode::PollAdd::new(descriptor, libc::POLLIN as u32).build()
-        } else {
-            opcode::RecvMsgMulti::new(descriptor, self.header.get(), self.buffers.group()).build()
-        };
+        let entry =
+            opcode::RecvMsgMulti::new(descriptor, self.header.get(), self.buffers.group()).build();
         entry.user_data(self.identifier)
     }
     fn entry_may_wake(&self) -> bool {
         false
     }
     fn completion(&self, result: i32, flags: u32) {
-        if self.polling.get() {
-            self.ready.set(result >= 0);
-            return;
-        }
         if !io_uring::cqueue::more(flags) {
             self.buffers.completed();
         }
@@ -229,15 +207,7 @@ impl PendingRequest for SharedReceive {
         if self.cancelling.get() || self.eof.get() {
             return None;
         }
-        if self.suspended.replace(false) {
-            self.ready.set(false);
-            return Some(true);
-        }
-        if self.polling.get() && result >= 0 {
-            return Some(true);
-        }
         if result >= 0 || result == -libc::ENOBUFS {
-            self.ready.set(true);
             return Some(self.buffers.has_buffers());
         }
         None
@@ -271,7 +241,7 @@ impl PendingRequest for SharedReceive {
         Some(Box::new(Failed(Arc::clone(&self.state))))
     }
 }
-impl Drop for SharedReceive {
+impl Drop for PooledReceive {
     fn drop(&mut self) {
         if !self.finished {
             self.buffers.abandon(self.identifier);
