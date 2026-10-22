@@ -94,7 +94,7 @@ The transport patterns exercise reusable storage and retained chunks. They do no
 
 Keep the simple pool and owned-chunk interface, and make joined file pipelines the ordinary example. Keep explicit submission optional for control over bounded acceptance, lifecycle, or polling order. Avoid exposing registration decisions in protocol code before measuring a concrete specialized backend.
 
-The [worker-pool experiment](worker-pools.md) connects the backend-associated receiver to shared provided-buffer rings. It preserves independent writable leases and cross-worker returns, but its multi-connection regressions need profiling before it can be recommended as the faster strategy. File fixed-buffer registration additionally requires retaining backing allocations through registration retirement. Neither optimization follows merely from reusing a stable address.
+The [worker-owned pool experiment](worker-owned.md) connects the backend-associated receiver to eagerly provisioned local slabs and provided-buffer rings. It preserves independent writable leases and cross-worker returns while removing the [earlier shared-budget reclamation](worker-pools.md) design. Ordinary shared pools keep monitor receives; worker-owned receive-ahead remains an explicit experimental choice pending a consistent performance advantage. File fixed-buffer registration additionally requires retaining backing allocations through registration retirement. Neither optimization follows merely from reusing a stable address.
 
 ## Reproduce
 
