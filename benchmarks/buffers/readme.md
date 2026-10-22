@@ -2,7 +2,7 @@
 
 Use bounded reusable storage and independently owned completed chunks. For a file pipeline, poll the output write and next input read concurrently. Separating submission from completion is useful when admission itself matters, but it is not a generally faster replacement for joining ordinary operations.
 
-The prototype implements these choices across Direct, the Tokio adapter, Native readiness, and Native io_uring. It does not yet connect the shared pool to io_uring registered buffers or provided-buffer rings.
+The scheduler implementations support these choices across Direct, the Tokio adapter, Native readiness, and Native io_uring. Their receivers do not yet connect the shared pool to io_uring registered buffers or provided-buffer rings. The standalone [zero-copy pipeline experiment](pipeline.md) tests registered storage through parsing and sending before scheduler integration.
 
 Subsequent experiments measure [receive fast paths and shared-pool contention](fast-path.md) and [fixed registered buffers](registered.md). The latter isolates ordinary versus fixed io_uring reads/writes with the same leases, rather than integrating registration into the scheduler.
 

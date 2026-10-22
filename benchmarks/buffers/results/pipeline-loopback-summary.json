@@ -1,0 +1,4038 @@
+{
+  "samples": 960,
+  "binary_sha256": "ff99a941d496568f8d30cdfcafeb811d0b9cb969ad788f46a43c49027e077ff1",
+  "cells": [
+    {
+      "network": "loopback",
+      "transport": "tcp",
+      "size": 64,
+      "depth": 1,
+      "ownership": "pooled",
+      "placement": "handoff",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 0.00815958358730186,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 0.9830168830565306,
+          "throughput_ratio_range": [
+            0.9628104919172394,
+            1.0252702292857403
+          ],
+          "cpu_ratio": 1.0480996746524696,
+          "cpu_ratio_range": [
+            1.0228132809710817,
+            1.1352760009476426
+          ],
+          "gib_per_second": 0.00802032247225259,
+          "notifications": 30000,
+          "copied_notifications": 30000,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 0.962924805775413,
+          "throughput_ratio_range": [
+            0.9208516842415937,
+            1.00576571102149
+          ],
+          "cpu_ratio": 0.985876959479444,
+          "cpu_ratio_range": [
+            0.9625559334168606,
+            1.089512753691858
+          ],
+          "gib_per_second": 0.007776191328374329,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 0.9693859580967875,
+          "throughput_ratio_range": [
+            0.958232801142513,
+            1.031943838629363
+          ],
+          "cpu_ratio": 1.0629964695498677,
+          "cpu_ratio_range": [
+            1.0543377365226705,
+            1.146371318013109
+          ],
+          "gib_per_second": 0.007952313245767987,
+          "notifications": 30000,
+          "copied_notifications": 30000,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 1.0082436502756387
+    },
+    {
+      "network": "loopback",
+      "transport": "tcp",
+      "size": 64,
+      "depth": 1,
+      "ownership": "pooled",
+      "placement": "local",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 0.011816245423291176,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 0.8837495203071324,
+          "throughput_ratio_range": [
+            0.7667952408782504,
+            0.9489311252270499
+          ],
+          "cpu_ratio": 1.0849539406345956,
+          "cpu_ratio_range": [
+            1.0353711265914003,
+            1.127254817459829
+          ],
+          "gib_per_second": 0.010288502948805676,
+          "notifications": 30000,
+          "copied_notifications": 30000,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 1.0187292031633164,
+          "throughput_ratio_range": [
+            0.9845224744613696,
+            1.0291228928436191
+          ],
+          "cpu_ratio": 0.9886206273707023,
+          "cpu_ratio_range": [
+            0.9830418025496591,
+            1.0115901993754504
+          ],
+          "gib_per_second": 0.011922222383737623,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 0.8917354312570681,
+          "throughput_ratio_range": [
+            0.8334055974214111,
+            0.9492437796856699
+          ],
+          "cpu_ratio": 1.0958197450340943,
+          "cpu_ratio_range": [
+            1.0248132980004818,
+            1.12304828248859
+          ],
+          "gib_per_second": 0.01038361009792266,
+          "notifications": 30000,
+          "copied_notifications": 30000,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 0.9310037518494721
+    },
+    {
+      "network": "loopback",
+      "transport": "tcp",
+      "size": 64,
+      "depth": 1,
+      "ownership": "retained",
+      "placement": "handoff",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 0.007628662396652985,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 1.0319534472000116,
+          "throughput_ratio_range": [
+            0.9341253170704391,
+            1.0613929419372359
+          ],
+          "cpu_ratio": 1.0632550759133037,
+          "cpu_ratio_range": [
+            1.0175521305530373,
+            1.083853470054986
+          ],
+          "gib_per_second": 0.0077845598377402105,
+          "notifications": 30000,
+          "copied_notifications": 30000,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 1.0125935333533378,
+          "throughput_ratio_range": [
+            0.9722915581090141,
+            1.0714433756201713
+          ],
+          "cpu_ratio": 1.0019252424715754,
+          "cpu_ratio_range": [
+            0.9533340545998774,
+            1.039344627730718
+          ],
+          "gib_per_second": 0.007884831099009176,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 1.0069379511383003,
+          "throughput_ratio_range": [
+            0.9375894095754461,
+            1.0532699709033442
+          ],
+          "cpu_ratio": 1.0902991840435179,
+          "cpu_ratio_range": [
+            1.0455840455840457,
+            1.1109748848268688
+          ],
+          "gib_per_second": 0.007681589683611553,
+          "notifications": 30000,
+          "copied_notifications": 30000,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 1.0111611575469823
+    },
+    {
+      "network": "loopback",
+      "transport": "tcp",
+      "size": 64,
+      "depth": 1,
+      "ownership": "retained",
+      "placement": "local",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 0.01182348608859517,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 0.8605384030541583,
+          "throughput_ratio_range": [
+            0.8096609287359199,
+            0.875136026370651
+          ],
+          "cpu_ratio": 1.111038342462491,
+          "cpu_ratio_range": [
+            1.0946222329162658,
+            1.1211441730804192
+          ],
+          "gib_per_second": 0.01006948762124895,
+          "notifications": 30000,
+          "copied_notifications": 30000,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 0.9965211927293367,
+          "throughput_ratio_range": [
+            0.9827813759702826,
+            1.0205892971447101
+          ],
+          "cpu_ratio": 1.0058950914340712,
+          "cpu_ratio_range": [
+            0.9821765816808312,
+            1.0165975103734441
+          ],
+          "gib_per_second": 0.011716122285348943,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 0.8568435986754579,
+          "throughput_ratio_range": [
+            0.7733708822990125,
+            0.8730585545751437
+          ],
+          "cpu_ratio": 1.123362705406049,
+          "cpu_ratio_range": [
+            1.1154390934844194,
+            1.1678080116356582
+          ],
+          "gib_per_second": 0.010193281459423461,
+          "notifications": 30000,
+          "copied_notifications": 30000,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 0.9925912434146986
+    },
+    {
+      "network": "loopback",
+      "transport": "tcp",
+      "size": 64,
+      "depth": 8,
+      "ownership": "pooled",
+      "placement": "handoff",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 0.02865564295514281,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 0.8864700589351555,
+          "throughput_ratio_range": [
+            0.8752854522682322,
+            0.9708227777650169
+          ],
+          "cpu_ratio": 1.0252114917497277,
+          "cpu_ratio_range": [
+            1.013228385395203,
+            1.0429094274536201
+          ],
+          "gib_per_second": 0.025408758450620173,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 0.9832547413430701,
+          "throughput_ratio_range": [
+            0.9493659505644938,
+            1.1380258999414437
+          ],
+          "cpu_ratio": 0.982661864477762,
+          "cpu_ratio_range": [
+            0.9417447306791569,
+            1.018057733881565
+          ],
+          "gib_per_second": 0.028636460489996338,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 0.8774690666207695,
+          "throughput_ratio_range": [
+            0.828953001139461,
+            0.9472714932186292
+          ],
+          "cpu_ratio": 1.0473502019286245,
+          "cpu_ratio_range": [
+            1.021830043492807,
+            1.079634849185983
+          ],
+          "gib_per_second": 0.02435910399623306,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 1.0465059188243142
+    },
+    {
+      "network": "loopback",
+      "transport": "tcp",
+      "size": 64,
+      "depth": 8,
+      "ownership": "pooled",
+      "placement": "local",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 0.03021968903121281,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 0.8444851253889353,
+          "throughput_ratio_range": [
+            0.8105332008729781,
+            0.86290295062059
+          ],
+          "cpu_ratio": 1.027123483226267,
+          "cpu_ratio_range": [
+            1.0151675093060726,
+            1.0680217578013167
+          ],
+          "gib_per_second": 0.02511176311933616,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 0.9852133106745654,
+          "throughput_ratio_range": [
+            0.9203273753188295,
+            1.0009204752084093
+          ],
+          "cpu_ratio": 1.0085256930750495,
+          "cpu_ratio_range": [
+            0.9745236918684457,
+            1.0482107071285427
+          ],
+          "gib_per_second": 0.02929648200527179,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 0.7919641874834202,
+          "throughput_ratio_range": [
+            0.7858538332448128,
+            0.8629923978388342
+          ],
+          "cpu_ratio": 1.0805044724706927,
+          "cpu_ratio_range": [
+            1.0267391423708339,
+            1.1015543440436144
+          ],
+          "gib_per_second": 0.023994958542971633,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 1.0234467841892745
+    },
+    {
+      "network": "loopback",
+      "transport": "tcp",
+      "size": 64,
+      "depth": 8,
+      "ownership": "retained",
+      "placement": "handoff",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 0.025850812437431328,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 0.9903421503905679,
+          "throughput_ratio_range": [
+            0.8160940114307639,
+            1.0725884976867432
+          ],
+          "cpu_ratio": 1.0718730423888079,
+          "cpu_ratio_range": [
+            1.039918928445541,
+            1.2012792977869082
+          ],
+          "gib_per_second": 0.02402429681857673,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 1.0873288044199927,
+          "throughput_ratio_range": [
+            0.8851434801458624,
+            1.2399568272119468
+          ],
+          "cpu_ratio": 1.0191663729291507,
+          "cpu_ratio_range": [
+            0.9864689914387138,
+            1.113315902511906
+          ],
+          "gib_per_second": 0.026982889281018153,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 0.9779008174823866,
+          "throughput_ratio_range": [
+            0.8205883658521821,
+            1.0893947211021897
+          ],
+          "cpu_ratio": 1.0810607642514096,
+          "cpu_ratio_range": [
+            1.0528286922805783,
+            1.1774721978681186
+          ],
+          "gib_per_second": 0.024188087811631124,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 0.9945230098202149
+    },
+    {
+      "network": "loopback",
+      "transport": "tcp",
+      "size": 64,
+      "depth": 8,
+      "ownership": "retained",
+      "placement": "local",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 0.028505325334105935,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 0.8671553097408288,
+          "throughput_ratio_range": [
+            0.8246387488558161,
+            0.9013079936134887
+          ],
+          "cpu_ratio": 1.0097303761687324,
+          "cpu_ratio_range": [
+            1.000819896146488,
+            1.0627253064167268
+          ],
+          "gib_per_second": 0.02465908803458897,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 0.9906911927306354,
+          "throughput_ratio_range": [
+            0.9525857951974005,
+            1.0484978339505253
+          ],
+          "cpu_ratio": 1.0069325051300537,
+          "cpu_ratio_range": [
+            0.9829125362834769,
+            1.0127745161991737
+          ],
+          "gib_per_second": 0.02836746526325897,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 0.8439711168993316,
+          "throughput_ratio_range": [
+            0.8103360316166536,
+            0.9058810799635856
+          ],
+          "cpu_ratio": 1.048195410482502,
+          "cpu_ratio_range": [
+            1.0131353206090499,
+            1.0986634130109254
+          ],
+          "gib_per_second": 0.024057671259804198,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 1.0176503532869297
+    },
+    {
+      "network": "loopback",
+      "transport": "tcp",
+      "size": 1200,
+      "depth": 1,
+      "ownership": "pooled",
+      "placement": "handoff",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 0.18680795672987655,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 1.0433783690432008,
+          "throughput_ratio_range": [
+            0.9942560823202897,
+            1.088621675053376
+          ],
+          "cpu_ratio": 1.0410313666655038,
+          "cpu_ratio_range": [
+            0.992767374413692,
+            1.1100708789750977
+          ],
+          "gib_per_second": 0.19092540063891247,
+          "notifications": 30000,
+          "copied_notifications": 30000,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 1.0017143031047182,
+          "throughput_ratio_range": [
+            0.9398923728296712,
+            1.0216679666875925
+          ],
+          "cpu_ratio": 1.0043144424131627,
+          "cpu_ratio_range": [
+            0.9773200975023846,
+            1.0745176818405793
+          ],
+          "gib_per_second": 0.18247941812556479,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 1.009080596668711,
+          "throughput_ratio_range": [
+            0.9667453766070707,
+            1.0398814728983956
+          ],
+          "cpu_ratio": 1.0735507118380614,
+          "cpu_ratio_range": [
+            1.059209378598095,
+            1.150892620247887
+          ],
+          "gib_per_second": 0.18644749277080117,
+          "notifications": 30000,
+          "copied_notifications": 30000,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 1.0284570336501342
+    },
+    {
+      "network": "loopback",
+      "transport": "tcp",
+      "size": 1200,
+      "depth": 1,
+      "ownership": "pooled",
+      "placement": "local",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 0.28874288449837665,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 0.9442303325113552,
+          "throughput_ratio_range": [
+            0.9399713872361816,
+            0.9621644022183575
+          ],
+          "cpu_ratio": 1.0191853600944512,
+          "cpu_ratio_range": [
+            1.0165322814548408,
+            1.0308671065032988
+          ],
+          "gib_per_second": 0.27425458008002074,
+          "notifications": 30000,
+          "copied_notifications": 30000,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 0.9873629519682864,
+          "throughput_ratio_range": [
+            0.9766108698363029,
+            0.9957880730608374
+          ],
+          "cpu_ratio": 1.013400236127509,
+          "cpu_ratio_range": [
+            1.001514621927065,
+            1.019670791501284
+          ],
+          "gib_per_second": 0.2862134014172057,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 0.9025048276598827,
+          "throughput_ratio_range": [
+            0.8299489760870105,
+            0.9343128467701863
+          ],
+          "cpu_ratio": 1.0623978519729163,
+          "cpu_ratio_range": [
+            1.0421718197111203,
+            1.0755183788878415
+          ],
+          "gib_per_second": 0.2646543409101326,
+          "notifications": 30000,
+          "copied_notifications": 30000,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 1.0471648845027572
+    },
+    {
+      "network": "loopback",
+      "transport": "tcp",
+      "size": 1200,
+      "depth": 1,
+      "ownership": "retained",
+      "placement": "handoff",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 0.18278028629888873,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 1.0351937408010976,
+          "throughput_ratio_range": [
+            0.9375181046107967,
+            1.0965849876559157
+          ],
+          "cpu_ratio": 1.0318378152431378,
+          "cpu_ratio_range": [
+            1.0056003424413213,
+            1.1666926555434274
+          ],
+          "gib_per_second": 0.19036258951520277,
+          "notifications": 30000,
+          "copied_notifications": 30000,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 1.003467591342906,
+          "throughput_ratio_range": [
+            0.9010558176030823,
+            1.1142838381814484
+          ],
+          "cpu_ratio": 0.9660200948925481,
+          "cpu_ratio_range": [
+            0.9150411035251498,
+            1.1158584125994073
+          ],
+          "gib_per_second": 0.1858810201899437,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 1.0195894943183657,
+          "throughput_ratio_range": [
+            0.9298214034279054,
+            1.0529967185466245
+          ],
+          "cpu_ratio": 1.0631019476350145,
+          "cpu_ratio_range": [
+            1.0392827239743232,
+            1.1830656479026975
+          ],
+          "gib_per_second": 0.18585762172944295,
+          "notifications": 30000,
+          "copied_notifications": 30000,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 1.0205598396831805
+    },
+    {
+      "network": "loopback",
+      "transport": "tcp",
+      "size": 1200,
+      "depth": 1,
+      "ownership": "retained",
+      "placement": "local",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 0.2856210435341878,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 0.9292340937248112,
+          "throughput_ratio_range": [
+            0.9089733439059554,
+            0.9531943733604817
+          ],
+          "cpu_ratio": 1.0336698371943749,
+          "cpu_ratio_range": [
+            1.02133639231431,
+            1.0621205044371789
+          ],
+          "gib_per_second": 0.26800610546084336,
+          "notifications": 30000,
+          "copied_notifications": 30000,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 0.9967491315395044,
+          "throughput_ratio_range": [
+            0.9842232411142484,
+            1.0172926084622795
+          ],
+          "cpu_ratio": 1.0003501196242048,
+          "cpu_ratio_range": [
+            0.9854889589905361,
+            1.0075587098263228
+          ],
+          "gib_per_second": 0.2885226537597347,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 0.9061054258693415,
+          "throughput_ratio_range": [
+            0.9002181065278603,
+            0.9123386839594225
+          ],
+          "cpu_ratio": 1.07019898465309,
+          "cpu_ratio_range": [
+            1.0553479682391405,
+            1.0779317453046269
+          ],
+          "gib_per_second": 0.25996798591310744,
+          "notifications": 30000,
+          "copied_notifications": 30000,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 1.0322321746102905
+    },
+    {
+      "network": "loopback",
+      "transport": "tcp",
+      "size": 1200,
+      "depth": 8,
+      "ownership": "pooled",
+      "placement": "handoff",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 0.6615046578541267,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 0.9173322225226486,
+          "throughput_ratio_range": [
+            0.8738991559616414,
+            1.2274181923994931
+          ],
+          "cpu_ratio": 1.0206988920004871,
+          "cpu_ratio_range": [
+            1.010640019419047,
+            1.0433587056151117
+          ],
+          "gib_per_second": 0.6148972445578267,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 1.0717238703713143,
+          "throughput_ratio_range": [
+            0.924807935338249,
+            1.2835232452142205
+          ],
+          "cpu_ratio": 0.9935838680109991,
+          "cpu_ratio_range": [
+            0.9824419451411927,
+            1.0397690270481483
+          ],
+          "gib_per_second": 0.707875465960126,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 0.9035520929346399,
+          "throughput_ratio_range": [
+            0.8630075024356474,
+            1.1626194671019858
+          ],
+          "cpu_ratio": 1.0365274564714477,
+          "cpu_ratio_range": [
+            1.0254254174470967,
+            1.0623453306125992
+          ],
+          "gib_per_second": 0.6086263850216646,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 1.0152510626623112
+    },
+    {
+      "network": "loopback",
+      "transport": "tcp",
+      "size": 1200,
+      "depth": 8,
+      "ownership": "pooled",
+      "placement": "local",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 0.664615602916629,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 0.9073358277787668,
+          "throughput_ratio_range": [
+            0.8626829225992365,
+            0.9184178399879119
+          ],
+          "cpu_ratio": 1.004439277032026,
+          "cpu_ratio_range": [
+            0.9728275069237604,
+            1.0278445075343965
+          ],
+          "gib_per_second": 0.5976257950577101,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 1.0019854657355614,
+          "throughput_ratio_range": [
+            0.9747182636466087,
+            1.03698694473739
+          ],
+          "cpu_ratio": 1.010790396547073,
+          "cpu_ratio_range": [
+            0.9805089616972358,
+            1.0165429132998474
+          ],
+          "gib_per_second": 0.6752385633344526,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 0.8732171373730229,
+          "throughput_ratio_range": [
+            0.848159637204641,
+            0.8884419592559748
+          ],
+          "cpu_ratio": 1.0361080629147725,
+          "cpu_ratio_range": [
+            1.0168623596958568,
+            1.052904564315353
+          ],
+          "gib_per_second": 0.5747567583944846,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 1.0299245143588498
+    },
+    {
+      "network": "loopback",
+      "transport": "tcp",
+      "size": 1200,
+      "depth": 8,
+      "ownership": "retained",
+      "placement": "handoff",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 0.5880256977733457,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 0.9193672852674707,
+          "throughput_ratio_range": [
+            0.8082310527974015,
+            1.1480787544812714
+          ],
+          "cpu_ratio": 1.0220238329334959,
+          "cpu_ratio_range": [
+            0.9578135536075522,
+            1.1147330045035384
+          ],
+          "gib_per_second": 0.5862153002948267,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 1.03156217834845,
+          "throughput_ratio_range": [
+            0.9640875470437477,
+            1.0789526385514079
+          ],
+          "cpu_ratio": 1.0087631447170755,
+          "cpu_ratio_range": [
+            0.9844735149045678,
+            1.0507838840188808
+          ],
+          "gib_per_second": 0.629125124137323,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 0.9455052378380183,
+          "throughput_ratio_range": [
+            0.8587862520760927,
+            1.2013204094739016
+          ],
+          "cpu_ratio": 1.0924224544841539,
+          "cpu_ratio_range": [
+            1.0099893813662641,
+            1.1063261559005175
+          ],
+          "gib_per_second": 0.5859614182736138,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 0.9556807205032448
+    },
+    {
+      "network": "loopback",
+      "transport": "tcp",
+      "size": 1200,
+      "depth": 8,
+      "ownership": "retained",
+      "placement": "local",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 0.6703831518379014,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 0.895288879136453,
+          "throughput_ratio_range": [
+            0.8854153027121192,
+            0.9286214596813079
+          ],
+          "cpu_ratio": 0.9855191537434529,
+          "cpu_ratio_range": [
+            0.9635047736372034,
+            0.9916118071777444
+          ],
+          "gib_per_second": 0.6064214584450203,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 1.0056974620691084,
+          "throughput_ratio_range": [
+            0.9823860871252139,
+            1.0186862392315257
+          ],
+          "cpu_ratio": 0.9964960713527287,
+          "cpu_ratio_range": [
+            0.97800796812749,
+            1.0009730117273519
+          ],
+          "gib_per_second": 0.666080440550589,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 0.9009749871554511,
+          "throughput_ratio_range": [
+            0.8663868115516272,
+            0.9092406747455944
+          ],
+          "cpu_ratio": 0.9984124545501101,
+          "cpu_ratio_range": [
+            0.9767990966019915,
+            1.0312699086854957
+          ],
+          "gib_per_second": 0.5873925676844344,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 1.0178279765385239
+    },
+    {
+      "network": "loopback",
+      "transport": "tcp",
+      "size": 16384,
+      "depth": 1,
+      "ownership": "pooled",
+      "placement": "handoff",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 1.9589711366905127,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 20480,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 1.0121865322847652,
+          "throughput_ratio_range": [
+            0.9861776093517549,
+            1.099819471468231
+          ],
+          "cpu_ratio": 0.9085415585378513,
+          "cpu_ratio_range": [
+            0.8840681995468221,
+            0.9231167677963592
+          ],
+          "gib_per_second": 1.9919852479545923,
+          "notifications": 20480,
+          "copied_notifications": 20480,
+          "copied_bytes": 0,
+          "sends": 20480,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 1.006720504188001,
+          "throughput_ratio_range": [
+            0.9627766404569419,
+            1.0807572004904544
+          ],
+          "cpu_ratio": 0.9711780375906466,
+          "cpu_ratio_range": [
+            0.9441699788269381,
+            0.9993709760970917
+          ],
+          "gib_per_second": 1.9721364104188142,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 20480,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 0.9805111036685814,
+          "throughput_ratio_range": [
+            0.9570002252198347,
+            1.039043821824534
+          ],
+          "cpu_ratio": 0.9477170132465035,
+          "cpu_ratio_range": [
+            0.941941235466736,
+            0.9634092088677987
+          ],
+          "gib_per_second": 1.92079295129131,
+          "notifications": 20480,
+          "copied_notifications": 20480,
+          "copied_bytes": 0,
+          "sends": 20480,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 1.0457274430250554
+    },
+    {
+      "network": "loopback",
+      "transport": "tcp",
+      "size": 16384,
+      "depth": 1,
+      "ownership": "pooled",
+      "placement": "local",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 2.4034998387792266,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 20480,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 0.9596356155591399,
+          "throughput_ratio_range": [
+            0.8311959297106332,
+            1.1275391406391866
+          ],
+          "cpu_ratio": 0.8929478413752688,
+          "cpu_ratio_range": [
+            0.7968482356971565,
+            0.9934879469896036
+          ],
+          "gib_per_second": 2.3468499010409003,
+          "notifications": 20480,
+          "copied_notifications": 20480,
+          "copied_bytes": 0,
+          "sends": 20480,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 1.000182572771681,
+          "throughput_ratio_range": [
+            0.8072802518202339,
+            1.0812305128846014
+          ],
+          "cpu_ratio": 1.003765918438135,
+          "cpu_ratio_range": [
+            0.9515489649097049,
+            1.1727978978635896
+          ],
+          "gib_per_second": 2.4091643307565063,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 20480,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 0.9541130998379631,
+          "throughput_ratio_range": [
+            0.8863344739546486,
+            0.9724339988655011
+          ],
+          "cpu_ratio": 0.9247311827956988,
+          "cpu_ratio_range": [
+            0.9006998482846374,
+            0.9751411202778983
+          ],
+          "gib_per_second": 2.3051398139484314,
+          "notifications": 20480,
+          "copied_notifications": 20480,
+          "copied_bytes": 0,
+          "sends": 20480,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 1.0038346668605966
+    },
+    {
+      "network": "loopback",
+      "transport": "tcp",
+      "size": 16384,
+      "depth": 1,
+      "ownership": "retained",
+      "placement": "handoff",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 1.9923379501441387,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 20480,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 0.991337777764817,
+          "throughput_ratio_range": [
+            0.957010496920087,
+            1.0158692985118276
+          ],
+          "cpu_ratio": 0.9383051872001208,
+          "cpu_ratio_range": [
+            0.9205984741870973,
+            0.9728380731282648
+          ],
+          "gib_per_second": 1.9560315673063013,
+          "notifications": 20480,
+          "copied_notifications": 20480,
+          "copied_bytes": 0,
+          "sends": 20480,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 0.9970154706794375,
+          "throughput_ratio_range": [
+            0.9697921452132265,
+            1.0127705695872304
+          ],
+          "cpu_ratio": 1.0000386787344318,
+          "cpu_ratio_range": [
+            0.981705058884527,
+            1.02422131940414
+          ],
+          "gib_per_second": 1.9507843333971318,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 20480,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 0.986117729635927,
+          "throughput_ratio_range": [
+            0.9517387356031105,
+            0.9926292300037349
+          ],
+          "cpu_ratio": 0.971522538208551,
+          "cpu_ratio_range": [
+            0.9587067624620397,
+            0.9813568500038677
+          ],
+          "gib_per_second": 1.9119883702313296,
+          "notifications": 20480,
+          "copied_notifications": 20480,
+          "copied_bytes": 0,
+          "sends": 20480,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 1.023412637675404
+    },
+    {
+      "network": "loopback",
+      "transport": "tcp",
+      "size": 16384,
+      "depth": 1,
+      "ownership": "retained",
+      "placement": "local",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 2.3964160337686105,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 20480,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 0.9718537011251243,
+          "throughput_ratio_range": [
+            0.8110520516388972,
+            0.9827317415683106
+          ],
+          "cpu_ratio": 0.8929813390801783,
+          "cpu_ratio_range": [
+            0.8860444704505559,
+            1.0305226796534344
+          ],
+          "gib_per_second": 2.326358173582953,
+          "notifications": 20480,
+          "copied_notifications": 20480,
+          "copied_bytes": 0,
+          "sends": 20480,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 0.9923281550563318,
+          "throughput_ratio_range": [
+            0.836796188200051,
+            1.1589427067725029
+          ],
+          "cpu_ratio": 1.0061162079510704,
+          "cpu_ratio_range": [
+            0.8885242689915266,
+            1.151763973044906
+          ],
+          "gib_per_second": 2.3946909099934133,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 20480,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 0.9811212570431087,
+          "throughput_ratio_range": [
+            0.9292483686421987,
+            1.1051178066784257
+          ],
+          "cpu_ratio": 0.9064318832001579,
+          "cpu_ratio_range": [
+            0.8145601716403356,
+            0.9425222266266492
+          ],
+          "gib_per_second": 2.6251562010126865,
+          "notifications": 20480,
+          "copied_notifications": 20480,
+          "copied_bytes": 0,
+          "sends": 20480,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 0.8817464341511252
+    },
+    {
+      "network": "loopback",
+      "transport": "tcp",
+      "size": 16384,
+      "depth": 8,
+      "ownership": "pooled",
+      "placement": "handoff",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 7.003321721560509,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 0.9119955980904804,
+          "throughput_ratio_range": [
+            0.8266360596243186,
+            0.9972536716262792
+          ],
+          "cpu_ratio": 0.9035931453841902,
+          "cpu_ratio_range": [
+            0.8617121354656632,
+            0.9338948591344758
+          ],
+          "gib_per_second": 6.671803272838627,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 1.0317335883754999,
+          "throughput_ratio_range": [
+            0.968708996637091,
+            1.1459230431258427
+          ],
+          "cpu_ratio": 0.9987562189054727,
+          "cpu_ratio_range": [
+            0.9716973525063836,
+            1.0201858844031368
+          ],
+          "gib_per_second": 7.409502402519245,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 0.8881411770701506,
+          "throughput_ratio_range": [
+            0.7712704527436958,
+            0.9465558210843561
+          ],
+          "cpu_ratio": 0.9176064123825318,
+          "cpu_ratio_range": [
+            0.9040720333288536,
+            0.9670055184432181
+          ],
+          "gib_per_second": 6.309832762769003,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 1.0535603388755717
+    },
+    {
+      "network": "loopback",
+      "transport": "tcp",
+      "size": 16384,
+      "depth": 8,
+      "ownership": "pooled",
+      "placement": "local",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 6.622445559887231,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 0.8523924752277615,
+          "throughput_ratio_range": [
+            0.8480884043721979,
+            0.8748341763836818
+          ],
+          "cpu_ratio": 0.8817043478260869,
+          "cpu_ratio_range": [
+            0.8780657263947753,
+            0.8916706623741353
+          ],
+          "gib_per_second": 5.784018004541289,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 1.016933659358892,
+          "throughput_ratio_range": [
+            0.9849738529293304,
+            1.0361665835829497
+          ],
+          "cpu_ratio": 0.9899759841286415,
+          "cpu_ratio_range": [
+            0.983286526474416,
+            1.0086608695652173
+          ],
+          "gib_per_second": 6.774208491889255,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 0.8121444224821418,
+          "throughput_ratio_range": [
+            0.7875893359911007,
+            0.8488994324673785
+          ],
+          "cpu_ratio": 0.9322334760363371,
+          "cpu_ratio_range": [
+            0.8968591691995949,
+            0.93528103939415
+          ],
+          "gib_per_second": 5.398354603946921,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 1.0756867982214882
+    },
+    {
+      "network": "loopback",
+      "transport": "tcp",
+      "size": 16384,
+      "depth": 8,
+      "ownership": "retained",
+      "placement": "handoff",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 6.722565892839863,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 0.976348316964486,
+          "throughput_ratio_range": [
+            0.926116656917253,
+            1.0955712011745653
+          ],
+          "cpu_ratio": 0.9064446212516117,
+          "cpu_ratio_range": [
+            0.8858878762772716,
+            0.976907660554575
+          ],
+          "gib_per_second": 6.605503518729871,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 1.0788652477861875,
+          "throughput_ratio_range": [
+            0.9203604653047142,
+            1.164174581925857
+          ],
+          "cpu_ratio": 1.001003064920591,
+          "cpu_ratio_range": [
+            0.975559237779619,
+            1.08611767521163
+          ],
+          "gib_per_second": 6.7669311975761355,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 0.960697101432083,
+          "throughput_ratio_range": [
+            0.9128320646843557,
+            1.03411038774674
+          ],
+          "cpu_ratio": 0.9244407622203812,
+          "cpu_ratio_range": [
+            0.8917117067683613,
+            0.9970386766773354
+          ],
+          "gib_per_second": 6.321100238341381,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 1.050268537423671
+    },
+    {
+      "network": "loopback",
+      "transport": "tcp",
+      "size": 16384,
+      "depth": 8,
+      "ownership": "retained",
+      "placement": "local",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 6.713103447104731,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 0.8404274161519405,
+          "throughput_ratio_range": [
+            0.8214902080548044,
+            0.8588268713029037
+          ],
+          "cpu_ratio": 0.8889573281319509,
+          "cpu_ratio_range": [
+            0.8561069097689837,
+            0.9168359128790532
+          ],
+          "gib_per_second": 5.618146629603169,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 1.0132278958538292,
+          "throughput_ratio_range": [
+            0.9780505120133921,
+            1.034857757386353
+          ],
+          "cpu_ratio": 0.9882508342602893,
+          "cpu_ratio_range": [
+            0.9808695051624711,
+            1.027943133272638
+          ],
+          "gib_per_second": 6.71849603187834,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 0.8068649029297082,
+          "throughput_ratio_range": [
+            0.7889436502544487,
+            0.8306854926103558
+          ],
+          "cpu_ratio": 0.9226223581757509,
+          "cpu_ratio_range": [
+            0.9053489416070997,
+            0.9310876111772532
+          ],
+          "gib_per_second": 5.406278399515315,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 1.048231870768778
+    },
+    {
+      "network": "loopback",
+      "transport": "tcp",
+      "size": 65536,
+      "depth": 1,
+      "ownership": "pooled",
+      "placement": "handoff",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 4.194456381227923,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 5120,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 0.8556554676782805,
+          "throughput_ratio_range": [
+            0.8382009124275911,
+            0.8561803563278946
+          ],
+          "cpu_ratio": 0.9140318400592374,
+          "cpu_ratio_range": [
+            0.8966957842764907,
+            0.9296428843371658
+          ],
+          "gib_per_second": 3.5752504336943787,
+          "notifications": 5120,
+          "copied_notifications": 5120,
+          "copied_bytes": 0,
+          "sends": 5120,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 0.9960304799893617,
+          "throughput_ratio_range": [
+            0.988931465448916,
+            1.0043710453305825
+          ],
+          "cpu_ratio": 1.0042947056645686,
+          "cpu_ratio_range": [
+            0.9964112149532709,
+            1.0108124571689636
+          ],
+          "gib_per_second": 4.212790540207421,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 5120,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 0.8383337504279041,
+          "throughput_ratio_range": [
+            0.8250574596783887,
+            0.8734260785793884
+          ],
+          "cpu_ratio": 0.9419065420560748,
+          "cpu_ratio_range": [
+            0.9049981488337653,
+            0.947993603898576
+          ],
+          "gib_per_second": 3.5372803328175095,
+          "notifications": 5120,
+          "copied_notifications": 5120,
+          "copied_bytes": 0,
+          "sends": 5120,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 1.0118583638774472
+    },
+    {
+      "network": "loopback",
+      "transport": "tcp",
+      "size": 65536,
+      "depth": 1,
+      "ownership": "pooled",
+      "placement": "local",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 4.967629083240469,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 5120,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 0.8470376217990081,
+          "throughput_ratio_range": [
+            0.827789703859922,
+            0.8638486699690348
+          ],
+          "cpu_ratio": 0.9175643600511227,
+          "cpu_ratio_range": [
+            0.9030745649625822,
+            0.932832443197248
+          ],
+          "gib_per_second": 4.207638844639439,
+          "notifications": 5120,
+          "copied_notifications": 5120,
+          "copied_bytes": 0,
+          "sends": 5120,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 1.0074289361436906,
+          "throughput_ratio_range": [
+            1.0031127607800436,
+            1.0099180503431417
+          ],
+          "cpu_ratio": 0.9926336849763551,
+          "cpu_ratio_range": [
+            0.9876889653299538,
+            1.006299068833303
+          ],
+          "gib_per_second": 4.995661604380937,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 5120,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 0.8286940980534381,
+          "throughput_ratio_range": [
+            0.8270340370886317,
+            0.8401799121308516
+          ],
+          "cpu_ratio": 0.952935821574875,
+          "cpu_ratio_range": [
+            0.952294740653571,
+            0.957732335220011
+          ],
+          "gib_per_second": 4.117662993073816,
+          "notifications": 5120,
+          "copied_notifications": 5120,
+          "copied_bytes": 0,
+          "sends": 5120,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 1.018652539913308
+    },
+    {
+      "network": "loopback",
+      "transport": "tcp",
+      "size": 65536,
+      "depth": 1,
+      "ownership": "retained",
+      "placement": "handoff",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 4.204586689868475,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 5120,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 0.8551781863066666,
+          "throughput_ratio_range": [
+            0.8359023069492755,
+            0.8772597778130996
+          ],
+          "cpu_ratio": 0.9184629106585401,
+          "cpu_ratio_range": [
+            0.9108521377672208,
+            0.9249813014210919
+          ],
+          "gib_per_second": 3.5687569674685484,
+          "notifications": 5120,
+          "copied_notifications": 5120,
+          "copied_bytes": 0,
+          "sends": 5120,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 0.9929197907449665,
+          "throughput_ratio_range": [
+            0.9699490787995597,
+            1.0107075347046197
+          ],
+          "cpu_ratio": 1.00428926179547,
+          "cpu_ratio_range": [
+            0.987603919239905,
+            1.035751449383083
+          ],
+          "gib_per_second": 4.212333299914351,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 5120,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 0.8293995937418428,
+          "throughput_ratio_range": [
+            0.806437487258592,
+            0.8675781331611704
+          ],
+          "cpu_ratio": 0.9416058394160584,
+          "cpu_ratio_range": [
+            0.9183933933933933,
+            1.0015608740894901
+          ],
+          "gib_per_second": 3.5162178142308056,
+          "notifications": 5120,
+          "copied_notifications": 5120,
+          "copied_bytes": 0,
+          "sends": 5120,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 1.0180401036060351
+    },
+    {
+      "network": "loopback",
+      "transport": "tcp",
+      "size": 65536,
+      "depth": 1,
+      "ownership": "retained",
+      "placement": "local",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 4.977946788682236,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 5120,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 0.8226516980182982,
+          "throughput_ratio_range": [
+            0.6680175252504668,
+            0.8515630425157944
+          ],
+          "cpu_ratio": 0.9408450704225353,
+          "cpu_ratio_range": [
+            0.9042638777152051,
+            1.320398396067779
+          ],
+          "gib_per_second": 4.151031142790051,
+          "notifications": 5120,
+          "copied_notifications": 5120,
+          "copied_bytes": 0,
+          "sends": 5120,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 0.9917390945257134,
+          "throughput_ratio_range": [
+            0.7988494688966672,
+            1.0143190939607263
+          ],
+          "cpu_ratio": 1.010886469673406,
+          "cpu_ratio_range": [
+            0.9797085903280593,
+            1.415987582460225
+          ],
+          "gib_per_second": 4.951182980739197,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 5120,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 0.8216243689929136,
+          "throughput_ratio_range": [
+            0.6534621413124763,
+            0.8353061658888471
+          ],
+          "cpu_ratio": 0.9548387096774195,
+          "cpu_ratio_range": [
+            0.9382318762849736,
+            1.359461906609753
+          ],
+          "gib_per_second": 4.0774088500032954,
+          "notifications": 5120,
+          "copied_notifications": 5120,
+          "copied_bytes": 0,
+          "sends": 5120,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 1.0110055096638346
+    },
+    {
+      "network": "loopback",
+      "transport": "tcp",
+      "size": 65536,
+      "depth": 8,
+      "ownership": "pooled",
+      "placement": "handoff",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 14.59530185220319,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 0.7420391866940147,
+          "throughput_ratio_range": [
+            0.7173147181771085,
+            0.7920866533055398
+          ],
+          "cpu_ratio": 0.8744592697430748,
+          "cpu_ratio_range": [
+            0.8548934162941667,
+            0.8882858641370031
+          ],
+          "gib_per_second": 10.737771065071295,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 0.9978150613938943,
+          "throughput_ratio_range": [
+            0.9514141934827309,
+            1.0376923720341522
+          ],
+          "cpu_ratio": 1.0162837593686984,
+          "cpu_ratio_range": [
+            0.9804916425330078,
+            1.0391950966180816
+          ],
+          "gib_per_second": 14.107322029907571,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 0.6958573630122564,
+          "throughput_ratio_range": [
+            0.6777166014458177,
+            0.7436287802214974
+          ],
+          "cpu_ratio": 0.9016470158538115,
+          "cpu_ratio_range": [
+            0.8892647240608177,
+            0.9222995419099906
+          ],
+          "gib_per_second": 10.076084912260121,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 1.0663667960368264
+    },
+    {
+      "network": "loopback",
+      "transport": "tcp",
+      "size": 65536,
+      "depth": 8,
+      "ownership": "pooled",
+      "placement": "local",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 10.468954502903328,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 0.7637164174242984,
+          "throughput_ratio_range": [
+            0.7560633191997841,
+            0.7697687736730541
+          ],
+          "cpu_ratio": 0.8525553674416044,
+          "cpu_ratio_range": [
+            0.8460873858306591,
+            0.8602985566105044
+          ],
+          "gib_per_second": 7.978133845063955,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 0.9947453493549306,
+          "throughput_ratio_range": [
+            0.9904761402580516,
+            1.00268851182905
+          ],
+          "cpu_ratio": 1.000987410515922,
+          "cpu_ratio_range": [
+            1.0005492920998063,
+            1.0083071582079683
+          ],
+          "gib_per_second": 10.444123290598156,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 0.7468800730350011,
+          "throughput_ratio_range": [
+            0.7449966254305566,
+            0.7600673736072229
+          ],
+          "cpu_ratio": 0.8913435465444387,
+          "cpu_ratio_range": [
+            0.8893451064940058,
+            0.8970766517881744
+          ],
+          "gib_per_second": 7.887590425692672,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 1.014854689795181
+    },
+    {
+      "network": "loopback",
+      "transport": "tcp",
+      "size": 65536,
+      "depth": 8,
+      "ownership": "retained",
+      "placement": "handoff",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 10.851088476600532,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 1.0034558453491476,
+          "throughput_ratio_range": [
+            0.7898778057466461,
+            1.1028475978276628
+          ],
+          "cpu_ratio": 0.8563574900121789,
+          "cpu_ratio_range": [
+            0.8288080339561544,
+            0.9257010696733159
+          ],
+          "gib_per_second": 10.870327588174169,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 1.1191441767529842,
+          "throughput_ratio_range": [
+            1.0689536966951818,
+            1.3008696940236495
+          ],
+          "cpu_ratio": 1.001308945217797,
+          "cpu_ratio_range": [
+            0.9509911171399816,
+            1.0404861713404643
+          ],
+          "gib_per_second": 12.739618529419213,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 0.9611831544305629,
+          "throughput_ratio_range": [
+            0.7583705376796356,
+            1.0507669216309024
+          ],
+          "cpu_ratio": 0.9009676443906864,
+          "cpu_ratio_range": [
+            0.8656522119634183,
+            0.9444083068324179
+          ],
+          "gib_per_second": 10.290323317091948,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 1.04774395550987
+    },
+    {
+      "network": "loopback",
+      "transport": "tcp",
+      "size": 65536,
+      "depth": 8,
+      "ownership": "retained",
+      "placement": "local",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 10.352368427546983,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 0.7695922472336287,
+          "throughput_ratio_range": [
+            0.7561129421927107,
+            0.7793610047571716
+          ],
+          "cpu_ratio": 0.8457681017612525,
+          "cpu_ratio_range": [
+            0.8346986659515989,
+            0.857730795171436
+          ],
+          "gib_per_second": 7.969390340766566,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 1.0049105067730484,
+          "throughput_ratio_range": [
+            0.9905393701903051,
+            1.0219456479245936
+          ],
+          "cpu_ratio": 0.9961801557737895,
+          "cpu_ratio_range": [
+            0.989783468525843,
+            1.0151133501259446
+          ],
+          "gib_per_second": 10.476732938202218,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 0.7510162623013679,
+          "throughput_ratio_range": [
+            0.7362583656534042,
+            0.7642001240459598
+          ],
+          "cpu_ratio": 0.8824246528953608,
+          "cpu_ratio_range": [
+            0.8742508547295033,
+            0.897042022821434
+          ],
+          "gib_per_second": 7.763666319322657,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 1.0269668603652284
+    },
+    {
+      "network": "loopback",
+      "transport": "tcp",
+      "size": 131072,
+      "depth": 1,
+      "ownership": "pooled",
+      "placement": "handoff",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 5.680809152395048,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 5000,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 0.8628624348101271,
+          "throughput_ratio_range": [
+            0.8060099813083761,
+            0.899190714121748
+          ],
+          "cpu_ratio": 0.8805176796856945,
+          "cpu_ratio_range": [
+            0.8202795071618268,
+            0.890280959281941
+          ],
+          "gib_per_second": 4.901756816927245,
+          "notifications": 5000,
+          "copied_notifications": 5000,
+          "copied_bytes": 0,
+          "sends": 5000,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 1.0271203762340237,
+          "throughput_ratio_range": [
+            0.95159784173077,
+            1.1090267624394123
+          ],
+          "cpu_ratio": 0.9658778453910299,
+          "cpu_ratio_range": [
+            0.9261178109626017,
+            1.0402973213033517
+          ],
+          "gib_per_second": 5.8348748339216865,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 5000,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 0.862482748942472,
+          "throughput_ratio_range": [
+            0.8512913404230454,
+            0.8891553659496616
+          ],
+          "cpu_ratio": 0.908766895019441,
+          "cpu_ratio_range": [
+            0.8510165875745571,
+            0.9170211771305689
+          ],
+          "gib_per_second": 4.938584269139985,
+          "notifications": 5000,
+          "copied_notifications": 5000,
+          "copied_bytes": 0,
+          "sends": 5000,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 1.007457086931343
+    },
+    {
+      "network": "loopback",
+      "transport": "tcp",
+      "size": 131072,
+      "depth": 1,
+      "ownership": "pooled",
+      "placement": "local",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 7.021703744689294,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 5000,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 0.841150485922221,
+          "throughput_ratio_range": [
+            0.8193236525526139,
+            0.8695873049775266
+          ],
+          "cpu_ratio": 0.9148705048310559,
+          "cpu_ratio_range": [
+            0.8802630183476509,
+            1.0022290154120495
+          ],
+          "gib_per_second": 5.755939795246939,
+          "notifications": 5000,
+          "copied_notifications": 5000,
+          "copied_bytes": 0,
+          "sends": 5000,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 0.9930544283554765,
+          "throughput_ratio_range": [
+            0.9268617269805783,
+            1.18772834697388
+          ],
+          "cpu_ratio": 1.0126350694642958,
+          "cpu_ratio_range": [
+            0.6933094852160305,
+            1.1250796076932874
+          ],
+          "gib_per_second": 6.7290317994158295,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 5000,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 0.8369116805627214,
+          "throughput_ratio_range": [
+            0.773723116385748,
+            0.8846971392699944
+          ],
+          "cpu_ratio": 0.9213309702132526,
+          "cpu_ratio_range": [
+            0.8643546505461874,
+            1.0615845115271942
+          ],
+          "gib_per_second": 5.831373766737338,
+          "notifications": 5000,
+          "copied_notifications": 5000,
+          "copied_bytes": 0,
+          "sends": 5000,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 0.9838228785506961
+    },
+    {
+      "network": "loopback",
+      "transport": "tcp",
+      "size": 131072,
+      "depth": 1,
+      "ownership": "retained",
+      "placement": "handoff",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 5.923504585904779,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 5000,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 0.8337295455717424,
+          "throughput_ratio_range": [
+            0.7923057709339152,
+            0.8875699640966792
+          ],
+          "cpu_ratio": 0.8619006733245969,
+          "cpu_ratio_range": [
+            0.8472548411397174,
+            0.921478281737461
+          ],
+          "gib_per_second": 4.810924517745658,
+          "notifications": 5000,
+          "copied_notifications": 5000,
+          "copied_bytes": 0,
+          "sends": 5000,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 0.9913054915728349,
+          "throughput_ratio_range": [
+            0.9596157328124787,
+            1.0472235972410444
+          ],
+          "cpu_ratio": 0.9747390302318226,
+          "cpu_ratio_range": [
+            0.9417840375586852,
+            1.044828413726902
+          ],
+          "gib_per_second": 5.87200262536428,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 5000,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 0.8188705441774927,
+          "throughput_ratio_range": [
+            0.8033695932043893,
+            0.9158343857232124
+          ],
+          "cpu_ratio": 0.90184825342311,
+          "cpu_ratio_range": [
+            0.8782472613458527,
+            0.9395248380129589
+          ],
+          "gib_per_second": 4.9722272919956,
+          "notifications": 5000,
+          "copied_notifications": 5000,
+          "copied_bytes": 0,
+          "sends": 5000,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 0.9691380646248464
+    },
+    {
+      "network": "loopback",
+      "transport": "tcp",
+      "size": 131072,
+      "depth": 1,
+      "ownership": "retained",
+      "placement": "local",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 6.954868541934782,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 5000,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 0.8292786515337578,
+          "throughput_ratio_range": [
+            0.7808224672535499,
+            0.8786485380013799
+          ],
+          "cpu_ratio": 0.9097003154574133,
+          "cpu_ratio_range": [
+            0.8329925365504549,
+            0.9205487282080596
+          ],
+          "gib_per_second": 5.805599629010147,
+          "notifications": 5000,
+          "copied_notifications": 5000,
+          "copied_bytes": 0,
+          "sends": 5000,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 0.9972420979213532,
+          "throughput_ratio_range": [
+            0.9483690910904973,
+            1.0987236796521873
+          ],
+          "cpu_ratio": 0.9520225776105364,
+          "cpu_ratio_range": [
+            0.887537061650138,
+            1.0172374943668316
+          ],
+          "gib_per_second": 7.127545128196174,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 5000,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 0.8295914751586325,
+          "throughput_ratio_range": [
+            0.8101177633933953,
+            0.86873483520985
+          ],
+          "cpu_ratio": 0.9482137753643898,
+          "cpu_ratio_range": [
+            0.8792556998261936,
+            0.951723749436683
+          ],
+          "gib_per_second": 5.769699653238043,
+          "notifications": 5000,
+          "copied_notifications": 5000,
+          "copied_bytes": 0,
+          "sends": 5000,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 1.0089334252104254
+    },
+    {
+      "network": "loopback",
+      "transport": "tcp",
+      "size": 131072,
+      "depth": 8,
+      "ownership": "pooled",
+      "placement": "handoff",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 15.720912697795729,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 0.7344444835316086,
+          "throughput_ratio_range": [
+            0.7272593116503847,
+            0.7401572959920519
+          ],
+          "cpu_ratio": 0.8362313082196532,
+          "cpu_ratio_range": [
+            0.8224887237330228,
+            0.8676527703721258
+          ],
+          "gib_per_second": 11.56174515444398,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 1.0076245147330851,
+          "throughput_ratio_range": [
+            0.9350356179756077,
+            1.0672782629741548
+          ],
+          "cpu_ratio": 0.9999747727975076,
+          "cpu_ratio_range": [
+            0.9538017990796868,
+            1.0658260791528316
+          ],
+          "gib_per_second": 15.73975952652004,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 0.7146853739496976,
+          "throughput_ratio_range": [
+            0.6978406455412547,
+            0.7192765931583814
+          ],
+          "cpu_ratio": 0.8610843578267519,
+          "cpu_ratio_range": [
+            0.8566459596243954,
+            0.8915615064083576
+          ],
+          "gib_per_second": 11.235709260334515,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 1.029030143664181
+    },
+    {
+      "network": "loopback",
+      "transport": "tcp",
+      "size": 131072,
+      "depth": 8,
+      "ownership": "pooled",
+      "placement": "local",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 12.250069524097231,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 0.7576621932751586,
+          "throughput_ratio_range": [
+            0.7423831602997806,
+            0.7819959179350037
+          ],
+          "cpu_ratio": 0.8328667641882812,
+          "cpu_ratio_range": [
+            0.8199726763915207,
+            0.8434040452396625
+          ],
+          "gib_per_second": 9.274207745375826,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 0.975193883350623,
+          "throughput_ratio_range": [
+            0.9422726376593784,
+            1.0132551296075756
+          ],
+          "cpu_ratio": 1.0105070876432194,
+          "cpu_ratio_range": [
+            1.0099378608258778,
+            1.0243626952306863
+          ],
+          "gib_per_second": 11.764022233286738,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 0.7482853945248582,
+          "throughput_ratio_range": [
+            0.7247354702281888,
+            0.7619278471408489
+          ],
+          "cpu_ratio": 0.8614029746567562,
+          "cpu_ratio_range": [
+            0.8450707328896918,
+            0.8742669499132306
+          ],
+          "gib_per_second": 9.030299535465597,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 1.0243505262217056
+    },
+    {
+      "network": "loopback",
+      "transport": "tcp",
+      "size": 131072,
+      "depth": 8,
+      "ownership": "retained",
+      "placement": "handoff",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 13.128304553030684,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 0.8877251624721485,
+          "throughput_ratio_range": [
+            0.8200053035444804,
+            0.9049823833024246
+          ],
+          "cpu_ratio": 0.8573893453830427,
+          "cpu_ratio_range": [
+            0.8469155246867758,
+            0.8769921781147387
+          ],
+          "gib_per_second": 11.693980221815405,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 1.0358943556137226,
+          "throughput_ratio_range": [
+            0.9528374799544209,
+            1.1734757957350976
+          ],
+          "cpu_ratio": 1.0013347927066927,
+          "cpu_ratio_range": [
+            0.9952664956441342,
+            1.0635687878035718
+          ],
+          "gib_per_second": 13.6025373640907,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 0.8545937912424033,
+          "throughput_ratio_range": [
+            0.7840824463202465,
+            0.8673268865211882
+          ],
+          "cpu_ratio": 0.8880106259685128,
+          "cpu_ratio_range": [
+            0.872312336176676,
+            0.9207466830401239
+          ],
+          "gib_per_second": 11.19345277970838,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 1.0434155764872817
+    },
+    {
+      "network": "loopback",
+      "transport": "tcp",
+      "size": 131072,
+      "depth": 8,
+      "ownership": "retained",
+      "placement": "local",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 11.789870247151514,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 0.7920895472841206,
+          "throughput_ratio_range": [
+            0.7666754670786656,
+            0.7952325930252098
+          ],
+          "cpu_ratio": 0.8199850409174902,
+          "cpu_ratio_range": [
+            0.7970544094098047,
+            0.829014929796614
+          ],
+          "gib_per_second": 9.276909335261381,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 1.0166637380349668,
+          "throughput_ratio_range": [
+            0.9958108605206667,
+            1.0483836867375629
+          ],
+          "cpu_ratio": 0.9970558455826913,
+          "cpu_ratio_range": [
+            0.9711724753068817,
+            1.0091221071774261
+          ],
+          "gib_per_second": 12.154038850030071,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 0.7710791077980886,
+          "throughput_ratio_range": [
+            0.7537914504916816,
+            0.7808775227915714
+          ],
+          "cpu_ratio": 0.8560307565644387,
+          "cpu_ratio_range": [
+            0.825978931343755,
+            0.8633275293594636
+          ],
+          "gib_per_second": 9.067423844496092,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 1.0272480985070778
+    },
+    {
+      "network": "loopback",
+      "transport": "udp",
+      "size": 1200,
+      "depth": 1,
+      "ownership": "pooled",
+      "placement": "handoff",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 0.22578640344814996,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 0.9686181753215093,
+          "throughput_ratio_range": [
+            0.9089079989593335,
+            1.0533809679055475
+          ],
+          "cpu_ratio": 1.0035077583360845,
+          "cpu_ratio_range": [
+            0.9631223357194563,
+            1.0508831442273951
+          ],
+          "gib_per_second": 0.21931487805905878,
+          "notifications": 30000,
+          "copied_notifications": 30000,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 1.034383026663403,
+          "throughput_ratio_range": [
+            0.9474787305948319,
+            1.087281864910306
+          ],
+          "cpu_ratio": 0.9662899973366813,
+          "cpu_ratio_range": [
+            0.9408027024853213,
+            1.0453945196434469
+          ],
+          "gib_per_second": 0.22631206609689514,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 0.9786322017312835,
+          "throughput_ratio_range": [
+            0.9294351573486029,
+            1.0019471722017168
+          ],
+          "cpu_ratio": 0.9908727464735612,
+          "cpu_ratio_range": [
+            0.9794899306701883,
+            1.0828038285208719
+          ],
+          "gib_per_second": 0.2150732986992603,
+          "notifications": 30000,
+          "copied_notifications": 30000,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 0.9801182103142209
+    },
+    {
+      "network": "loopback",
+      "transport": "udp",
+      "size": 1200,
+      "depth": 1,
+      "ownership": "pooled",
+      "placement": "local",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 0.31764350516885964,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 1.0402924601622143,
+          "throughput_ratio_range": [
+            0.9447761075058712,
+            1.2504142237116027
+          ],
+          "cpu_ratio": 1.0222279162129269,
+          "cpu_ratio_range": [
+            0.958932481211906,
+            1.063199947606261
+          ],
+          "gib_per_second": 0.3291855437165224,
+          "notifications": 30000,
+          "copied_notifications": 30000,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 1.027820178744251,
+          "throughput_ratio_range": [
+            1.0212200100554691,
+            1.324951011652605
+          ],
+          "cpu_ratio": 0.9857227061366167,
+          "cpu_ratio_range": [
+            0.912775903899639,
+            0.9918647107808596
+          ],
+          "gib_per_second": 0.3435793545686017,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 0.9270710325634293,
+          "throughput_ratio_range": [
+            0.9191975448923261,
+            1.1975780970840912
+          ],
+          "cpu_ratio": 1.0571300620561705,
+          "cpu_ratio_range": [
+            0.967101291802487,
+            1.0668759208250593
+          ],
+          "gib_per_second": 0.3086103954206096,
+          "notifications": 30000,
+          "copied_notifications": 30000,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 1.0744353307787537
+    },
+    {
+      "network": "loopback",
+      "transport": "udp",
+      "size": 1200,
+      "depth": 1,
+      "ownership": "retained",
+      "placement": "handoff",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 0.21292601056805033,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 0.962068376932861,
+          "throughput_ratio_range": [
+            0.9338153623853096,
+            1.0079858765950953
+          ],
+          "cpu_ratio": 1.0268410706184787,
+          "cpu_ratio_range": [
+            1.0035423047120031,
+            1.047962648556876
+          ],
+          "gib_per_second": 0.2059863061372031,
+          "notifications": 30000,
+          "copied_notifications": 30000,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 1.0167418076647068,
+          "throughput_ratio_range": [
+            0.9976759807030077,
+            1.057787570270082
+          ],
+          "cpu_ratio": 0.9885639222655797,
+          "cpu_ratio_range": [
+            0.9491900667872034,
+            1.0012853470437018
+          ],
+          "gib_per_second": 0.21893464971343785,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 0.9562708429243364,
+          "throughput_ratio_range": [
+            0.9312211482789378,
+            0.9803169599586853
+          ],
+          "cpu_ratio": 1.0404506275517917,
+          "cpu_ratio_range": [
+            1.006272831260839,
+            1.076439265318722
+          ],
+          "gib_per_second": 0.20300306647308763,
+          "notifications": 30000,
+          "copied_notifications": 30000,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 1.0060626485178565
+    },
+    {
+      "network": "loopback",
+      "transport": "udp",
+      "size": 1200,
+      "depth": 1,
+      "ownership": "retained",
+      "placement": "local",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 0.3228717225173111,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 0.8726663793059731,
+          "throughput_ratio_range": [
+            0.8301466264492343,
+            1.2208034078678163
+          ],
+          "cpu_ratio": 1.06530433695788,
+          "cpu_ratio_range": [
+            0.965137293767854,
+            1.0823788546255506
+          ],
+          "gib_per_second": 0.2844205423906607,
+          "notifications": 30000,
+          "copied_notifications": 30000,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 1.0603900351590623,
+          "throughput_ratio_range": [
+            0.9808176795601894,
+            1.3606481742378553
+          ],
+          "cpu_ratio": 0.9814398200224971,
+          "cpu_ratio_range": [
+            0.9142424065761091,
+            1.0117594427046719
+          ],
+          "gib_per_second": 0.3339357078022927,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 0.8882137801166108,
+          "throughput_ratio_range": [
+            0.7422472837374778,
+            1.0595407333554667
+          ],
+          "cpu_ratio": 1.061179852518435,
+          "cpu_ratio_range": [
+            1.0287413280475717,
+            1.117786157090816
+          ],
+          "gib_per_second": 0.257388270896437,
+          "notifications": 30000,
+          "copied_notifications": 30000,
+          "copied_bytes": 0,
+          "sends": 30000,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 1.0790600691010084
+    },
+    {
+      "network": "loopback",
+      "transport": "udp",
+      "size": 1200,
+      "depth": 8,
+      "ownership": "pooled",
+      "placement": "handoff",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 0.8015089292990081,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 0.9499620440303413,
+          "throughput_ratio_range": [
+            0.9185071135490424,
+            0.9941350539078067
+          ],
+          "cpu_ratio": 1.0212775693236935,
+          "cpu_ratio_range": [
+            0.9991854466467553,
+            1.0702988505747129
+          ],
+          "gib_per_second": 0.7721100166446389,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 1.0092532008820887,
+          "throughput_ratio_range": [
+            0.837299297206611,
+            1.0332549996845624
+          ],
+          "cpu_ratio": 0.9845732992510875,
+          "cpu_ratio_range": [
+            0.9182758305115767,
+            1.0228505747126437
+          ],
+          "gib_per_second": 0.8045118965384108,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 0.923346106759015,
+          "throughput_ratio_range": [
+            0.8643077618206396,
+            1.0236114477405962
+          ],
+          "cpu_ratio": 1.0509885057471267,
+          "cpu_ratio_range": [
+            0.9902074763011982,
+            1.0573350416399743
+          ],
+          "gib_per_second": 0.7400701494008257,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 1.0627083940727704
+    },
+    {
+      "network": "loopback",
+      "transport": "udp",
+      "size": 1200,
+      "depth": 8,
+      "ownership": "pooled",
+      "placement": "local",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 0.8540996820668644,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 0.8909410342308759,
+          "throughput_ratio_range": [
+            0.8485911543162091,
+            0.9221285251184991
+          ],
+          "cpu_ratio": 1.0049499045801529,
+          "cpu_ratio_range": [
+            0.9696293250308406,
+            1.0310792764355954
+          ],
+          "gib_per_second": 0.7609524540769144,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 1.0324431126459426,
+          "throughput_ratio_range": [
+            0.9353529056504722,
+            1.0729327517396758
+          ],
+          "cpu_ratio": 0.9932609732824428,
+          "cpu_ratio_range": [
+            0.9756212183516417,
+            1.0031564890129903
+          ],
+          "gib_per_second": 0.8735874978382169,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 0.884537263021921,
+          "throughput_ratio_range": [
+            0.8544194497767651,
+            0.9425356871621909
+          ],
+          "cpu_ratio": 1.0036975190839696,
+          "cpu_ratio_range": [
+            0.9833754332373846,
+            1.025212674146221
+          ],
+          "gib_per_second": 0.7584492368559836,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 0.9975104143196422
+    },
+    {
+      "network": "loopback",
+      "transport": "udp",
+      "size": 1200,
+      "depth": 8,
+      "ownership": "retained",
+      "placement": "handoff",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 0.843326300753236,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 0.856080415870123,
+          "throughput_ratio_range": [
+            0.743483965035663,
+            0.9354029701983273
+          ],
+          "cpu_ratio": 1.0331431676174951,
+          "cpu_ratio_range": [
+            0.9438151945203027,
+            1.0561970746728253
+          ],
+          "gib_per_second": 0.7053436948674598,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 0.9768117666218682,
+          "throughput_ratio_range": [
+            0.8081471870920921,
+            1.0620304975204755
+          ],
+          "cpu_ratio": 0.9922102341406636,
+          "cpu_ratio_range": [
+            0.9368455194143266,
+            1.0104138368197049
+          ],
+          "gib_per_second": 0.8283341119260481,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 0.8875830426723131,
+          "throughput_ratio_range": [
+            0.8803282643418076,
+            0.9400545216377537
+          ],
+          "cpu_ratio": 1.0432608598598152,
+          "cpu_ratio_range": [
+            1.00606987304235,
+            1.067463551571131
+          ],
+          "gib_per_second": 0.7485221239881436,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 0.970382648943637
+    },
+    {
+      "network": "loopback",
+      "transport": "udp",
+      "size": 1200,
+      "depth": 8,
+      "ownership": "retained",
+      "placement": "local",
+      "repetitions": 5,
+      "modes": {
+        "copy": {
+          "throughput_ratio": 1.0,
+          "throughput_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "cpu_ratio": 1.0,
+          "cpu_ratio_range": [
+            1.0,
+            1.0
+          ],
+          "gib_per_second": 0.8406052735139745,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "fixed-zc": {
+          "throughput_ratio": 0.8628073947057204,
+          "throughput_ratio_range": [
+            0.8188083458145037,
+            0.9681778965776275
+          ],
+          "cpu_ratio": 0.9932337020475408,
+          "cpu_ratio_range": [
+            0.9580559646539025,
+            1.0058757196272776
+          ],
+          "gib_per_second": 0.754683848207664,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "registered-copy": {
+          "throughput_ratio": 0.9852771086068964,
+          "throughput_ratio_range": [
+            0.9742586126002483,
+            1.0384811262485563
+          ],
+          "cpu_ratio": 0.984702282890092,
+          "cpu_ratio_range": [
+            0.9740043919520446,
+            1.006449686473574
+          ],
+          "gib_per_second": 0.8608391851508822,
+          "notifications": 0,
+          "copied_notifications": 0,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        },
+        "zc": {
+          "throughput_ratio": 0.8944163163378582,
+          "throughput_ratio_range": [
+            0.8238183337523763,
+            0.9260816362265886
+          ],
+          "cpu_ratio": 0.9915862555895506,
+          "cpu_ratio_range": [
+            0.9730780559646538,
+            1.0134132589471183
+          ],
+          "gib_per_second": 0.7542321729200222,
+          "notifications": 40000,
+          "copied_notifications": 40000,
+          "copied_bytes": 0,
+          "sends": 40000,
+          "pool_stalls": 0
+        }
+      },
+      "fixed_vs_unregistered_zc": 0.993918576787369
+    }
+  ]
+}

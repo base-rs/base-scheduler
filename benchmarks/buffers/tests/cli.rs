@@ -53,3 +53,52 @@ fn registered_buffer_binary_emits_a_parseable_sample() {
     assert_eq!(sample["mode"], "fixed");
     assert_eq!(sample["bytes"], 192);
 }
+
+#[cfg(target_os = "linux")]
+#[test]
+fn remote_pipeline_client_verifies_frozen_payloads() {
+    use std::io::BufRead;
+    for transport in ["tcp", "udp"] {
+        let mut server = std::process::Command::new(env!("CARGO_BIN_EXE_pipeline"))
+            .args([
+                "fixed-zc",
+                transport,
+                "4096",
+                "1",
+                "4",
+                "retained",
+                "handoff",
+                "127.0.0.1:0",
+            ])
+            .stdout(std::process::Stdio::piped())
+            .spawn()
+            .unwrap();
+        let mut output = std::io::BufReader::new(server.stdout.take().unwrap());
+        let mut line = String::new();
+        output.read_line(&mut line).unwrap();
+        let ready: serde_json::Value = serde_json::from_str(&line).unwrap();
+        let client = std::process::Command::new(env!("CARGO_BIN_EXE_pipeline"))
+            .args([
+                "client",
+                transport,
+                ready["ready"].as_str().unwrap(),
+                "4096",
+                "1",
+                "4",
+            ])
+            .output()
+            .unwrap();
+        assert!(
+            client.status.success(),
+            "{}",
+            String::from_utf8_lossy(&client.stderr)
+        );
+        let verified: serde_json::Value = serde_json::from_slice(&client.stdout).unwrap();
+        assert_eq!(verified["client_verified"], true);
+        line.clear();
+        output.read_line(&mut line).unwrap();
+        let sample: serde_json::Value = serde_json::from_str(&line).unwrap();
+        assert_eq!(sample["bytes"], (4096 - 16) * 4);
+        assert!(server.wait().unwrap().success());
+    }
+}
