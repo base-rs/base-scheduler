@@ -310,6 +310,7 @@ dependencies = [
  "core-scheduler-direct",
  "core-scheduler-iouring",
  "core-scheduler-native",
+ "core-scheduler-selector",
  "core-scheduler-tokio",
  "futures-lite",
  "libc",
