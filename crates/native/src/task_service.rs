@@ -8,7 +8,7 @@ use crate::{
     worker::{self, WorkerState},
 };
 use core_scheduler::SpawnError;
-use crossbeam_deque::{Injector, Worker};
+use crossbeam_deque::Worker;
 use event_listener::Event;
 use std::{
     future::Future,
@@ -19,20 +19,18 @@ use std::{
     },
 };
 
-pub(crate) const UNASSIGNED_WORKER: usize = usize::MAX;
 pub(crate) struct TaskState {
     pub(crate) worker: AtomicUsize,
 }
 pub(crate) type Runnable = async_task::Runnable<TaskState>;
 pub(crate) struct Shared {
-    // Serialize registration with closure; task ownership itself needs only a count.
-    admission: Mutex<()>,
+    // Serialize registration with closure and distribute new tasks using a round-robin worker cursor. Task ownership itself needs only a count.
+    admission: Mutex<usize>,
     pub(crate) timer_capacity: usize,
     pub(crate) timer_next: AtomicUsize,
     #[cfg(test)]
     pub(crate) paused: Mutex<Option<std::time::Instant>>,
     workers_remaining: AtomicUsize,
-    pub(crate) ready: Injector<Runnable>,
     pub(crate) workers: Vec<WorkerState>,
     closed: AtomicBool,
     pub(crate) idle_workers: AtomicUsize,
@@ -76,13 +74,12 @@ impl Drop for TaskRegistration {
 impl Shared {
     pub(crate) fn new(queues: &[[Worker<Runnable>; 2]], timer_capacity: usize) -> Self {
         Self {
-            admission: Mutex::new(()),
+            admission: Mutex::new(0),
             timer_capacity,
             timer_next: AtomicUsize::new(0),
             #[cfg(test)]
             paused: Mutex::new(None),
             workers_remaining: AtomicUsize::new(0),
-            ready: Injector::new(),
             workers: queues
                 .iter()
                 .map(|queues| WorkerState::new(queues.each_ref().map(Worker::stealer)))
@@ -195,11 +192,14 @@ impl TaskService {
         F: Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        let admission = self.shared.admission.lock().unwrap();
+        let mut admission = self.shared.admission.lock().unwrap();
         if self.shared.closed.load(Ordering::Acquire) {
             drop(admission);
             return Err(SpawnError::SchedulerClosed);
         }
+        // Choose placement before the first poll can attach persistent I/O state. Later wakes follow the task's last polling worker, and idle workers can still steal it.
+        let worker = *admission;
+        *admission = (worker + 1) % self.shared.workers.len();
         // Publish ownership while admission is locked, before close can let the workers exit.
         self.shared.remaining.fetch_add(1, Ordering::Release);
         let registration = TaskRegistration {
@@ -208,7 +208,7 @@ impl TaskService {
         let shared = Arc::clone(&self.shared);
         let (runnable, task) = async_task::Builder::new()
             .metadata(TaskState {
-                worker: AtomicUsize::new(UNASSIGNED_WORKER),
+                worker: AtomicUsize::new(worker),
             })
             .spawn(
                 move |_| TaskFuture::new(future, registration),

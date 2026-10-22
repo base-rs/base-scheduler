@@ -1,8 +1,8 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
+use crate::task_service::Runnable;
 use crate::task_service::Shared;
-use crate::task_service::{Runnable, UNASSIGNED_WORKER};
 use crossbeam_deque::{Injector, Steal, Stealer, Worker};
 use std::cell::RefCell;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -98,7 +98,7 @@ pub(crate) fn schedule(shared: &Arc<Shared>, runnable: Runnable) {
         let current = current.borrow();
         if let Some(worker) = current.as_ref() {
             if std::ptr::eq(worker.scheduler.as_ptr(), Arc::as_ptr(shared))
-                && (preferred == UNASSIGNED_WORKER || preferred == worker.identifier)
+                && preferred == worker.identifier
             {
                 worker.ready.push(runnable);
                 return None;
@@ -107,11 +107,7 @@ pub(crate) fn schedule(shared: &Arc<Shared>, runnable: Runnable) {
         Some(runnable)
     });
     if let Some(runnable) = remote {
-        if let Some(worker) = shared.workers.get(preferred) {
-            worker.incoming.push(runnable);
-        } else {
-            shared.ready.push(runnable);
-        }
+        shared.workers[preferred].incoming.push(runnable);
     }
     // Publication precedes the sleeping flag exchange. A worker publishes its sleeping flag before rechecking queues, so a racing wake is retained.
     shared.wake_idle(preferred);
@@ -121,10 +117,8 @@ fn search(shared: &Shared, local: &LocalWorker, iteration: usize) -> Steal<Runna
     let incoming = &shared.workers[local.identifier].incoming;
     let mut retry = false;
     // Admit external wakes at each batch boundary, even while local tasks keep waking themselves.
-    for queue in [&shared.ready, incoming] {
-        if !queue.is_empty() {
-            let _ = take_stolen(queue.steal_batch(&local.ready), &mut retry);
-        }
+    if !incoming.is_empty() {
+        let _ = take_stolen(incoming.steal_batch(&local.ready), &mut retry);
     }
     if let Some(runnable) = local.ready.pop() {
         return Steal::Success(runnable);
@@ -328,7 +322,7 @@ fn run_ready_batch(shared: &Shared, first: Runnable) {
         (local.identifier, !local.current.is_empty())
     });
     if has_more {
-        shared.wake_idle(UNASSIGNED_WORKER);
+        shared.wake_idle(usize::MAX);
     }
     let mut runnable = Some(first);
     while let Some(task) = runnable {

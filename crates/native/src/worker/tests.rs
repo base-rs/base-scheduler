@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use super::{WorkerState, finish_idle_search, search_result, take_stolen, yield_on_retry};
-use crate::task_service::{Runnable, TaskState, UNASSIGNED_WORKER};
+use crate::task_service::{Runnable, TaskState};
 use crossbeam_deque::{Steal, Worker};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
@@ -83,7 +83,7 @@ fn worker_state() -> WorkerState {
 
 fn runnable() -> Runnable {
     let state = TaskState {
-        worker: AtomicUsize::new(UNASSIGNED_WORKER),
+        worker: AtomicUsize::new(0),
     };
     let (runnable, _task) = async_task::Builder::new()
         .metadata(state)
@@ -198,7 +198,7 @@ fn idle_empty_search_parks_while_scheduler_is_running() {
 }
 
 #[test]
-fn batch_search_checks_both_external_queues_before_local_work() {
+fn batch_search_admits_incoming_tasks_before_local_work() {
     use super::{LocalWorker, search};
     use crate::task_service::Shared;
     use std::sync::Arc;
@@ -212,11 +212,69 @@ fn batch_search_checks_both_external_queues_before_local_work() {
         current,
         timers: core_scheduler_timers::local::TimerQueue::with_capacity(8),
     };
-    for source in [&shared.ready, &shared.workers[0].incoming] {
-        source.push(runnable());
-        assert!(matches!(search(&shared, &local, 1), Steal::Success(_)));
-    }
+    shared.workers[0].incoming.push(runnable());
+    assert!(matches!(search(&shared, &local, 1), Steal::Success(_)));
     assert!(matches!(search(&shared, &local, 1), Steal::Empty));
+}
+
+#[test]
+fn nested_admission_distributes_tasks_instead_of_inheriting_the_worker() {
+    use super::{CURRENT_WORKER, LocalWorker};
+    use crate::task_service::{Shared, TaskService};
+    use futures_lite::future::block_on;
+    use std::sync::Arc;
+
+    struct WorkerContext;
+    impl Drop for WorkerContext {
+        fn drop(&mut self) {
+            CURRENT_WORKER.with(|current| current.take());
+        }
+    }
+
+    let mut queues = (0..3)
+        .map(|_| std::array::from_fn(|_| Worker::new_fifo()))
+        .collect::<Vec<_>>();
+    let shared = Arc::new(Shared::new(&queues, 8));
+    let service = TaskService {
+        shared: Arc::clone(&shared),
+    };
+    let [ready, current] = queues.remove(0);
+    CURRENT_WORKER.with(|context| {
+        assert!(context.borrow().is_none());
+        context.replace(Some(LocalWorker {
+            identifier: 0,
+            scheduler: Arc::downgrade(&shared),
+            ready,
+            current,
+            timers: core_scheduler_timers::local::TimerQueue::with_capacity(8),
+        }));
+    });
+    let context = WorkerContext;
+    let tasks = (0..6)
+        .map(|_| service.spawn(async { 42 }).unwrap())
+        .collect::<Vec<_>>();
+    for _ in 0..2 {
+        let runnable =
+            CURRENT_WORKER.with(|current| current.borrow().as_ref().unwrap().ready.pop().unwrap());
+        runnable.run();
+        shared.retire_runnable();
+        for worker in &shared.workers[1..] {
+            worker.incoming.steal().success().unwrap().run();
+            shared.retire_runnable();
+        }
+    }
+    assert!(
+        shared
+            .workers
+            .iter()
+            .all(|worker| worker.incoming.is_empty())
+    );
+    assert!(CURRENT_WORKER.with(|current| current.borrow().as_ref().unwrap().ready.is_empty()));
+    drop(context);
+    for task in tasks {
+        assert_eq!(block_on(task).unwrap(), 42);
+    }
+    block_on(service.drain());
 }
 
 #[test]
@@ -282,6 +340,11 @@ fn idle_wake_falls_back_when_the_preferred_worker_is_busy() {
     assert_eq!(shared.idle_workers.load(Ordering::SeqCst), 1);
     // A concurrent wake may clear sleeping before the worker decrements the idle count. Repeating the scan in that interval must also be harmless.
     shared.wake_idle(0);
+    assert!(!idle.sleeping.load(Ordering::SeqCst));
+
+    // A ready batch can request help without preferring a worker.
+    idle.sleeping.store(true, Ordering::SeqCst);
+    shared.wake_idle(usize::MAX);
     assert!(!idle.sleeping.load(Ordering::SeqCst));
 }
 
