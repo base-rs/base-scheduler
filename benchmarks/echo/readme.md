@@ -34,6 +34,8 @@ The [timer wake-delivery research](timer-ready-research.md) compares immediate d
 
 The [worker hot-path measurements](worker-hotpath-research.md) and [worker-loop follow-up](worker-loop-followup.md) record the empty admission-queue and unchanged timer-flush improvements, plus the rejected combined-wait and completion-collection experiments.
 
+The [task-admission comparison](task-admission.md) measures round-robin initial worker placement with unchanged idle stealing, including matched echo controls and persistent receiver ring assignments.
+
 The [readiness submission research](readiness-submission-research.md) measures bounded staging of readiness requests and immediate completion publication after ring waits, including the rejected worker-order change and the retained combined variant.
 
 The [multishot receive comparison](multishot-performance.md) measures persistent io_uring `recvmsg` with provided-buffer leases against pure Tokio and Native `_poll`.
