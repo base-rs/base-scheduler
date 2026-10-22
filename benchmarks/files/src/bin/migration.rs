@@ -24,6 +24,37 @@ mod linux {
         count: usize,
     }
 
+    fn affinity() -> libc::cpu_set_t {
+        // SAFETY: The syscall initializes exactly the supplied cpu_set_t storage.
+        let mut mask = unsafe { std::mem::zeroed::<libc::cpu_set_t>() };
+        assert_eq!(
+            unsafe { libc::sched_getaffinity(0, std::mem::size_of_val(&mask), &mut mask) },
+            0
+        );
+        mask
+    }
+    fn pin_thread(cpu: usize) {
+        // SAFETY: Both libc helpers receive valid cpu_set_t storage and the CPU comes from the process's allowed set.
+        let mut mask = unsafe { std::mem::zeroed::<libc::cpu_set_t>() };
+        unsafe {
+            libc::CPU_SET(cpu, &mut mask);
+        }
+        assert_eq!(
+            unsafe { libc::sched_setaffinity(0, std::mem::size_of_val(&mask), &mask) },
+            0
+        );
+    }
+    struct RestoreAffinity(libc::cpu_set_t);
+    impl Drop for RestoreAffinity {
+        fn drop(&mut self) {
+            // SAFETY: Restore the calling thread's previously obtained affinity mask.
+            assert_eq!(
+                unsafe { libc::sched_setaffinity(0, std::mem::size_of_val(&self.0), &self.0) },
+                0
+            );
+        }
+    }
+
     pub fn run(
         workers: usize,
         burst: usize,
@@ -33,6 +64,11 @@ mod linux {
         registered: bool,
     ) -> serde_json::Value {
         assert!(workers > 0 && burst > 0 && rounds > 0 && size > 0);
+        let mask = affinity();
+        let cpus: Vec<_> = (0..libc::CPU_SETSIZE as usize)
+            .filter(|cpu| unsafe { libc::CPU_ISSET(*cpu, &mask) })
+            .collect();
+        let restore = RestoreAffinity(mask);
         let (selector, drivers) = IoUringSelector::with_workers(
             IoUringOptions {
                 fixed_files: if registered { 256 } else { 0 },
@@ -52,7 +88,10 @@ mod linux {
             let selector = Arc::clone(&selector);
             let reply = reply.clone();
             let started = started.clone();
+            let cpu =
+                cpus[(index % cpus.len().saturating_sub(1).max(1) + usize::from(cpus.len() > 1))];
             threads.push(std::thread::spawn(move || {
+                pin_thread(cpu);
                 let mut worker = driver.enter();
                 let waker = worker.waker();
                 started.send((index, waker.clone())).unwrap();
@@ -103,6 +142,7 @@ mod linux {
             wakers[index] = Some(waker);
         }
         let wakers: Vec<_> = wakers.into_iter().map(Option::unwrap).collect();
+        pin_thread(cpus[0]);
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join("data");
         std::fs::write(&path, vec![42; size]).unwrap();
@@ -152,8 +192,10 @@ mod linux {
             thread.join().unwrap();
         }
         times.sort_unstable();
+        drop(restore);
         let migrations = if workers == 1 { 0 } else { rounds - 1 };
         serde_json::json!({
+            "coordinator_cpu": cpus[0], "worker_cpus": (0..workers).map(|index| cpus[(index % cpus.len().saturating_sub(1).max(1) + usize::from(cpus.len() > 1))]).collect::<Vec<_>>(),
             "workers": workers, "burst": burst, "rounds": rounds, "size": size,
             "write": write, "registered": registered, "operations": rounds * burst,
             "migrations": migrations, "seconds": elapsed.as_secs_f64(),
