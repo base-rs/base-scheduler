@@ -9,6 +9,8 @@ pub mod clock;
 pub mod file;
 pub mod file_advice;
 pub mod file_allocate;
+mod file_monitor_tests;
+pub mod file_monitoring;
 pub mod signals;
 pub mod socket;
 pub mod socket_messages;
