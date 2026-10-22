@@ -605,34 +605,46 @@ impl IoUringSelector {
         pointer: fn(&mut B) -> *mut u8,
         cancellation: &Cancellation,
     ) -> RawBufferResult<B> {
+        match self
+            .operation_submit(controller, resource, buffer, write, pointer, cancellation)
+            .await
+        {
+            Ok(completion) => completion.await,
+            Err((error, buffer)) => (Err(error), buffer),
+        }
+    }
+
+    async fn operation_submit<B: IoBuf>(
+        &self,
+        controller: Arc<Controller>,
+        resource: Resource,
+        buffer: B,
+        write: bool,
+        pointer: fn(&mut B) -> *mut u8,
+        cancellation: &Cancellation,
+    ) -> Result<impl Future<Output = RawBufferResult<B>> + Send, (io::Error, B)> {
         if cancellation.is_cancelled() {
-            return (
-                Err(io::Error::new(
-                    io::ErrorKind::Interrupted,
-                    core_scheduler::Cancelled,
-                )),
+            return Err((
+                io::Error::new(io::ErrorKind::Interrupted, core_scheduler::Cancelled),
                 buffer,
-            );
+            ));
         }
         if let Err(error) = self.check_open() {
-            return (Err(error), buffer);
+            return Err((error, buffer));
         }
         if matches!(&resource, Resource::File(_, Some(offset)) if *offset > i64::MAX as u64) {
-            return (
-                Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "file offset exceeds i64::MAX",
-                )),
+            return Err((
+                io::Error::new(io::ErrorKind::InvalidInput, "file offset exceeds i64::MAX"),
                 buffer,
-            );
+            ));
         }
         let permit = match controller.capacity.acquire(cancellation).await {
             Ok(permit) => permit,
-            Err(error) => return (Err(error), buffer),
+            Err(error) => return Err((error, buffer)),
         };
         let identifier = match controller.next_identifier() {
             Ok(identifier) => identifier,
-            Err(error) => return (Err(error), buffer),
+            Err(error) => return Err((error, buffer)),
         };
         let (reply, result) = oneshot::channel();
         let request = Request {
@@ -645,15 +657,20 @@ impl IoUringSelector {
             reply: Cell::new(Some(reply)),
             cancelling: Cell::new(false),
         };
-        Self::submit(controller, Box::new(request), result, cancellation).await
+        Ok(Self::submit(
+            controller,
+            Box::new(request),
+            result,
+            cancellation,
+        ))
     }
 
-    async fn submit<T>(
+    fn submit<T: Send>(
         controller: Arc<Controller>,
         request: Box<dyn PendingRequest>,
         result: oneshot::Receiver<T>,
         cancellation: &Cancellation,
-    ) -> T {
+    ) -> impl Future<Output = T> + Send {
         let identifier = request.identifier();
         if let Err(mpsc::SendError(Command::Submit(request))) =
             controller.send(Command::Submit(request))
@@ -669,23 +686,26 @@ impl IoUringSelector {
             identifier,
             armed: true,
         };
-        // A disconnected reply is an unexpected selector failure. Resources whose kernel completion cannot be established are deliberately retained.
-        let mut result = pin!(result);
-        let mut cancelled = pin!(cancellation.cancelled());
-        let result = poll_fn(|context| {
-            // Original completion wins the race. Cancellation never releases resources; continue waiting for the original CQE.
-            if let Poll::Ready(result) = result.as_mut().poll(context) {
-                return Poll::Ready(result);
-            }
-            if cancel_request.armed && cancelled.as_mut().poll(context).is_ready() {
-                cancel_request.request();
-            }
-            Poll::Pending
-        })
-        .await
-        .expect("io_uring selector failed with an operation in flight");
-        cancel_request.armed = false;
-        result
+        async move {
+            // A disconnected reply is an unexpected selector failure. Resources whose kernel completion cannot be established are deliberately retained.
+            let mut result = pin!(result);
+            let mut cancelled = pin!(cancellation.cancelled());
+            let result = poll_fn(|context| {
+                // Original completion wins the race. Cancellation never releases resources; continue waiting for the original CQE.
+                if let Poll::Ready(result) = result.as_mut().poll(context) {
+                    return Poll::Ready(result);
+                }
+                if cancel_request.armed && cancelled.as_mut().poll(context).is_ready() {
+                    cancel_request.request();
+                }
+                Poll::Pending
+            })
+            .await
+            .expect("io_uring selector failed with an operation in flight");
+            cancel_request.armed = false;
+            drop(cancel_request);
+            result
+        }
     }
 }
 
@@ -1278,3 +1298,7 @@ mod socket;
 mod tests;
 
 pub(crate) mod file_monitor;
+
+mod file_submission;
+
+mod socket_receiving;

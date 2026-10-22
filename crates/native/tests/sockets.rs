@@ -123,6 +123,18 @@ mod ipv4 {
     ) {
         run_datagram(SocketDomain::Ipv4, test);
     }
+    #[test]
+    fn pooled_stream_receiver() {
+        run_stream_case(async |scheduler, sender, socket| {
+            core_scheduler_conformance::socket_receiving::stream(scheduler, sender, socket).await;
+        });
+    }
+    #[test]
+    fn pooled_datagram_receiver() {
+        run_datagram_case(async |scheduler, sender, socket| {
+            core_scheduler_conformance::socket_receiving::datagram(scheduler, sender, socket).await;
+        });
+    }
     mod borrowed_scalar {
         use super::*;
         core_scheduler_conformance::socket_poll_tests!(run: run_stream_case);
@@ -160,6 +172,18 @@ mod ipv6 {
         test: impl AsyncFnOnce(&NativeScheduler, &NativeSocket, &NativeSocket) + Send + 'static,
     ) {
         run_datagram(SocketDomain::Ipv6, test);
+    }
+    #[test]
+    fn pooled_stream_receiver() {
+        run_stream_case(async |scheduler, sender, socket| {
+            core_scheduler_conformance::socket_receiving::stream(scheduler, sender, socket).await;
+        });
+    }
+    #[test]
+    fn pooled_datagram_receiver() {
+        run_datagram_case(async |scheduler, sender, socket| {
+            core_scheduler_conformance::socket_receiving::datagram(scheduler, sender, socket).await;
+        });
     }
     mod borrowed_scalar {
         use super::*;

@@ -671,3 +671,68 @@ impl<S: Selector + FileMonitoring> FileMonitoring for NativeScheduler<S> {
             .await
     }
 }
+
+impl<S: Selector + FileSubmission> FileSubmission for NativeScheduler<S> {
+    async fn file_read_submit<B: IoBufMut>(
+        &self,
+        file: &Self::File,
+        buffer: B,
+        cancellation: &Cancellation,
+    ) -> Result<impl std::future::Future<Output = BufferResult<B>> + Send, (OperationError, B)>
+    {
+        self.selector()
+            .file_read_submit(file, buffer, cancellation)
+            .await
+    }
+    async fn file_write_submit<B: IoBuf>(
+        &self,
+        file: &Self::File,
+        buffer: B,
+        cancellation: &Cancellation,
+    ) -> Result<impl std::future::Future<Output = BufferResult<B>> + Send, (OperationError, B)>
+    {
+        self.selector()
+            .file_write_submit(file, buffer, cancellation)
+            .await
+    }
+    async fn file_read_at_submit<B: IoBufMut>(
+        &self,
+        file: &Self::File,
+        buffer: B,
+        offset: u64,
+        cancellation: &Cancellation,
+    ) -> Result<impl std::future::Future<Output = BufferResult<B>> + Send, (OperationError, B)>
+    {
+        self.selector()
+            .file_read_at_submit(file, buffer, offset, cancellation)
+            .await
+    }
+    async fn file_write_at_submit<B: IoBuf>(
+        &self,
+        file: &Self::File,
+        buffer: B,
+        offset: u64,
+        cancellation: &Cancellation,
+    ) -> Result<impl std::future::Future<Output = BufferResult<B>> + Send, (OperationError, B)>
+    {
+        self.selector()
+            .file_write_at_submit(file, buffer, offset, cancellation)
+            .await
+    }
+}
+
+impl<S: Selector + SocketReceiving> SocketReceiving for NativeScheduler<S> {
+    type PooledReceiver = NativeRecvMsgReceiver<S::PooledReceiver>;
+    async fn socket_receiver(
+        &self,
+        socket: &Self::Socket,
+        pool: BufferPool,
+        flags: SocketRecvFlags,
+        cancellation: &Cancellation,
+    ) -> OperationResult<Self::PooledReceiver> {
+        self.selector()
+            .socket_receiver(socket, pool, flags, cancellation)
+            .await
+            .map(NativeRecvMsgReceiver)
+    }
+}

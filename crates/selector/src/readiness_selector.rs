@@ -99,6 +99,33 @@ impl ReadinessSelector {
         self.signals.drain().await;
     }
 
+    pub(crate) async fn buffer_operation_submit<B: IoBuf>(
+        &self,
+        file: &NativeFile,
+        buffer: B,
+        cancellation: &Cancellation,
+        operation: impl FnOnce(&std::fs::File, &mut B) -> io::Result<usize> + Send + 'static,
+    ) -> Result<
+        impl std::future::Future<Output = BufferResult<B>> + Send,
+        (core_scheduler::OperationError, B),
+    > {
+        match self
+            .work
+            .execute_submit(
+                (file.retain(), buffer),
+                cancellation,
+                move |(file, buffer)| operation(file, buffer),
+            )
+            .await
+        {
+            Ok(completion) => Ok(async move {
+                let (result, (_, buffer)) = completion.await;
+                (result, buffer)
+            }),
+            Err((error, (_, buffer))) => Err((error, buffer)),
+        }
+    }
+
     async fn buffer_operation<B: IoBuf>(
         &self,
         file: &NativeFile,

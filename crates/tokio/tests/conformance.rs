@@ -79,6 +79,7 @@ mod files {
     mod std {}
     conformance::file_tests!(run: run_file);
     conformance::file_monitor_tests!(run: run_file);
+    conformance::file_submission_tests!(run: run_file);
 }
 
 #[test]

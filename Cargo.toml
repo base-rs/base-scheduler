@@ -15,6 +15,7 @@ members = [
     "benchmarks/echo",
     "benchmarks/timers",
     "benchmarks/files",
+    "benchmarks/buffers",
     "crates/conformance",
     "crates/direct",
     "crates/tokio",
