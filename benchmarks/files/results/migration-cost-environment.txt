@@ -1,0 +1,16 @@
+Thu 22 Oct 2026 00:27:26 UTC
+Linux aiko 7.2.6-arch2-1 #1 SMP PREEMPT_DYNAMIC Mon, 14 Sep 2026 22:41:30 +0000 x86_64 GNU/Linux
+rustc 1.99.0 (b940084d7 2026-09-28) (Arch Linux rust 1:1.99.0-1)
+binary: rustc
+commit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4
+commit-date: 2026-09-28
+host: x86_64-unknown-linux-gnu
+release: 1.99.0
+LLVM version: 23.1.1
+524183e7ae34b4d092092d622ffd04642f792d9212ad5c3e2c97fdd6d2fd055a  /tmp/migration-cost-retain
+accbc27b3a0f963c3cae369135d70e477c0626a19913de8f3d99ff5ef699eca9  /tmp/migration-cost-invalidate
+9416296ac5c804dd8a662c2bc17323a370cdf9e6187d98686259b900fcf71d81  /tmp/migration-cost-retain-files
+9d52573fc5ec0d20fa1cf2b3361041772ed7adcd812c1dd73a8255db928372ae  /tmp/migration-cost-invalidate-files
+8637021711580e9348ce7648be325d6a3fae4080bf491e14a9f7024e3abf266a  Cargo.lock
+ba1ad067ec75b9dc7c1965ef5aa4988d60d2f307c47f802969921ebee1ef0232  benchmarks/files/experiments/invalidate-on-migration.patch
+powersave

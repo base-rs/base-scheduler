@@ -171,7 +171,8 @@ mod linux {
             wakers[index].wake_by_ref();
             payload = Some(returned.recv().unwrap());
         };
-        // Visit every ring before timing. Registration, request storage, and driver queues are warm.
+        // Visit every ring to initialize its table and queues and reuse request storage.
+        // Invalidation intentionally replaces registrations at each migration; only retention keeps every lease warm.
         for index in 0..workers {
             exchange(index, burst);
         }

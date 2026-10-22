@@ -57,3 +57,7 @@ TMPDIR=/dev/shm flock /tmp/core-scheduler-perf.lock python3 benchmarks/files/reg
 The `iouring-migration` and `iouring-unregistered-migration` backends use one external caller and one or two standalone ring-driver threads. Routing is round-robin, so two drivers deliberately change rings on every operation. This measures repeated ring changes and remote submission/wakeup overhead, not the cost or frequency of executor work stealing. Warmup visits every ring before timing; wall throughput includes the operation loop and monitor close, excluding setup, file close, and scheduler shutdown. Its mean-operation latency excludes monitor close. The runner compares these variants within each routing configuration; local and external timings have different boundaries and should not be compared as identical workloads.
 
 See [ring-state research](ring-state-research.md) for the optimization inventory, migration policy, and measurements. The original [results](results.md) remain a record of the earlier implementation at their stated source commit.
+
+## Registration invalidation on migration
+
+The [migration cost experiment](migration-cost.md) compares retaining passive registrations on every visited ring with invalidating the previous registration on each switch. It includes a controlled ownership-handoff benchmark, reproducible candidate patch, full raw samples, and the costs and lifetime limits of each policy.
