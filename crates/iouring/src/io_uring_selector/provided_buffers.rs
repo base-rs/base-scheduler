@@ -315,13 +315,18 @@ impl WorkerBuffers {
                 continue;
             }
             let buffer = self.pool.heap.try_acquire().or_else(|| {
-                state.acquisition.as_mut().and_then(|acquisition| {
-                    let controller = self
-                        .controller
-                        .upgrade()
-                        .expect("a driven pool retains its controller");
-                    acquisition.next(&Waker::from(controller))
-                })
+                // A partially stocked ring needs no new capacity listener. Once exhausted, reuse its waiter through future refills.
+                if state.available != 0 && state.acquisition.is_none() {
+                    return None;
+                }
+                let controller = self
+                    .controller
+                    .upgrade()
+                    .expect("a driven pool retains its controller");
+                state
+                    .acquisition
+                    .get_or_insert_with(|| Acquisition::new(self.pool.heap.clone()))
+                    .next(&Waker::from(controller))
             });
             let Some(mut buffer) = buffer else {
                 break;
@@ -332,23 +337,9 @@ impl WorkerBuffers {
         }
         let available = state.available != 0;
         if !available {
-            if state.acquisition.is_none() {
-                let mut acquisition = Acquisition::new(self.pool.heap.clone());
-                let controller = self
-                    .controller
-                    .upgrade()
-                    .expect("a driven pool retains its controller");
-                if let Some(mut buffer) = acquisition.next(&Waker::from(controller)) {
-                    state.ring.publish(0, &mut buffer, offset);
-                    state.buffers[0] = Some(buffer);
-                    state.available += 1;
-                }
-                state.acquisition = Some(acquisition);
-            }
             drop(state);
             // A capacity wake does not reserve a lease. Another worker can publish the returned slot before this waiter runs, so exhausted retries must recall peers again.
             self.pool.reclaim(Some(self));
-            return Ok(self.has_buffers());
         }
         Ok(available)
     }
