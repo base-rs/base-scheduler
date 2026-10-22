@@ -45,6 +45,105 @@ mod dispatch {
     core_scheduler_conformance::spawn_dispatch_tests!(run: super::run);
 }
 
+// Keep workers at their admission boundary so stealing cannot obscure initial placement.
+fn queued_service(workers: usize) -> (TaskService, Vec<[Worker<Runnable>; 2]>) {
+    let queues = (0..workers)
+        .map(|_| std::array::from_fn(|_| Worker::new_fifo()))
+        .collect::<Vec<_>>();
+    let service = TaskService {
+        shared: Arc::new(Shared::new(&queues, 8)),
+    };
+    (service, queues)
+}
+
+#[test]
+fn initial_tasks_are_distributed_before_their_first_poll() {
+    for workers in [1, 3] {
+        let (service, _queues) = queued_service(workers);
+        let tasks = (0..workers * 3)
+            .map(|index| service.spawn(async move { index }).unwrap())
+            .collect::<Vec<_>>();
+        for (index, worker) in service.shared.workers.iter().enumerate() {
+            for _ in 0..3 {
+                let runnable = worker.incoming.steal().success().unwrap();
+                assert_eq!(runnable.metadata().worker.load(Ordering::Relaxed), index);
+                runnable.run();
+                service.shared.retire_runnable();
+            }
+            assert!(worker.incoming.is_empty());
+        }
+        for (expected, task) in tasks.into_iter().enumerate() {
+            assert_eq!(block_on(task).unwrap(), expected);
+        }
+        block_on(service.drain());
+    }
+}
+
+#[test]
+fn concurrent_spawners_share_initial_distribution() {
+    let (service, _queues) = queued_service(3);
+    let tasks = std::thread::scope(|scope| {
+        (0..6)
+            .map(|_| {
+                scope.spawn(|| {
+                    (0..4)
+                        .map(|_| service.spawn(async { 42 }).unwrap())
+                        .collect::<Vec<_>>()
+                })
+            })
+            .collect::<Vec<_>>()
+            .into_iter()
+            .flat_map(|thread| thread.join().unwrap())
+            .collect::<Vec<_>>()
+    });
+    for worker in &service.shared.workers {
+        for _ in 0..8 {
+            worker.incoming.steal().success().unwrap().run();
+            service.shared.retire_runnable();
+        }
+        assert!(worker.incoming.is_empty());
+    }
+    for task in tasks {
+        assert_eq!(block_on(task).unwrap(), 42);
+    }
+    block_on(service.drain());
+}
+
+#[test]
+fn task_wakes_retain_placement_without_advancing_admission() {
+    let (service, _queues) = queued_service(2);
+    let mut polled = false;
+    let task = service
+        .spawn(std::future::poll_fn(move |context| {
+            if polled {
+                return Poll::Ready(42);
+            }
+            polled = true;
+            context.waker().wake_by_ref();
+            Poll::Pending
+        }))
+        .unwrap();
+    let first = &service.shared.workers[0].incoming;
+    first.steal().success().unwrap().run();
+    service.shared.retire_runnable();
+    assert!(service.shared.workers[1].incoming.is_empty());
+    first.steal().success().unwrap().run();
+    service.shared.retire_runnable();
+    assert_eq!(block_on(task).unwrap(), 42);
+
+    let next = service.spawn(async { 73 }).unwrap();
+    assert!(first.is_empty());
+    service.shared.workers[1]
+        .incoming
+        .steal()
+        .success()
+        .unwrap()
+        .run();
+    service.shared.retire_runnable();
+    assert_eq!(block_on(next).unwrap(), 73);
+    block_on(service.drain());
+}
+
 #[test]
 fn worker_startup_failures_are_reported() {
     for fail_after in [0, 1] {
@@ -218,17 +317,27 @@ fn local_work_can_be_stolen_while_its_worker_is_busy() {
         let task = scheduler
             .spawn(async move {
                 let (done, completion) = std::sync::mpsc::channel();
-                let child = inner
-                    .spawn(async move {
-                        done.send(std::thread::current().id()).unwrap();
-                        42
+                // A full admission round places one child on this worker, regardless of where the parent was first polled. It must be stolen while this poll blocks.
+                let children = (0..2)
+                    .map(|_| {
+                        let done = done.clone();
+                        inner
+                            .spawn(async move {
+                                done.send(std::thread::current().id()).unwrap();
+                                42
+                            })
+                            .unwrap()
                     })
-                    .unwrap();
-                let other_thread = completion
-                    .recv_timeout(std::time::Duration::from_secs(5))
-                    .unwrap();
-                assert_ne!(other_thread, std::thread::current().id());
-                assert_eq!(child.await.unwrap(), 42);
+                    .collect::<Vec<_>>();
+                for _ in 0..2 {
+                    let other_thread = completion
+                        .recv_timeout(std::time::Duration::from_secs(5))
+                        .unwrap();
+                    assert_ne!(other_thread, std::thread::current().id());
+                }
+                for child in children {
+                    assert_eq!(child.await.unwrap(), 42);
+                }
             })
             .unwrap();
         block_on(task).unwrap();
