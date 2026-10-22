@@ -4,7 +4,9 @@
 use crate::io_uring_selector::{Command, Controller, DriverGroup, provided_buffers::WorkerBuffers};
 use core_scheduler::*;
 use std::{
+    future::{Future, poll_fn},
     io,
+    pin::pin,
     sync::{Arc, Mutex, Weak},
 };
 
@@ -116,10 +118,16 @@ impl BufferPool for IoUringBufferPool {
         if let Some(buffer) = self.try_acquire() {
             return Ok(buffer);
         }
-        self.0
-            .heap
-            .acquire(cancellation)
-            .await
-            .map(|buffer| crate::IoUringBuffer::new(buffer, 0, self.buffer_size()))
+        let mut acquiring = pin!(self.0.heap.acquire(cancellation));
+        poll_fn(|context| {
+            let result = acquiring.as_mut().poll(context);
+            if result.is_pending() {
+                // A previously returned slot may have been published by another worker before this waiter could claim it.
+                self.0.reclaim(None);
+            }
+            result
+        })
+        .await
+        .map(|buffer| crate::IoUringBuffer::new(buffer, 0, self.buffer_size()))
     }
 }

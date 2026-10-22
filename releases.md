@@ -4,6 +4,8 @@
 
 - Distribute new Native tasks round-robin across worker queues before their first poll, reusing the admission lock and removing the shared unassigned-task queue. Preserve worker-local wakes and idle stealing without adding per-operation load counters.
 
+- Prototype backend-selected buffer pools and shared io_uring receive storage with worker-local provided-buffer rings, writable completed leases, and cross-worker recycling within one payload budget. The shared io_uring receiver requires Linux 6.0 or later without an automatic fallback; current measurements show multi-connection regressions, so performance and fallback policy remain experimental.
+
 - Replace the shared receive-buffer pool's free-list mutex with atomic availability words, and wake a distinct capacity waiter for every returned slot. Avoid listener registration for queued io_uring multishot messages and redundant ownership increments on local buffer returns; allow retained leases to be released safely during thread-local teardown. Correct buffer benchmarks to execute Native and Tokio I/O on their task workers and add burst and pool-contention measurements.
 
 - Prototype bounded shared `BufferPool` storage, unique writable receive leases, retained immutable views, monitor-based file/socket receivers, and separate file submission/completion waits across Direct, Tokio, Native readiness, and io_uring. Add owned write-all helpers and matched file/TCP/UDP buffer benchmarks; kernel buffer registration remains a separate optimization.

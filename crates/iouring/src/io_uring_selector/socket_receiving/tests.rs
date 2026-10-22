@@ -244,6 +244,83 @@ fn pool_acquisition_waits_cancels_and_recovers_after_a_return() {
 }
 
 #[test]
+fn exhausted_worker_reclaims_a_return_published_before_its_capacity_wake() {
+    let (selector, mut drivers) = IoUringSelector::with_workers(Default::default(), 2).unwrap();
+    let pool = selector.buffer_pool(BufferPoolOptions::new(1, 32)).unwrap();
+    let donor = pool.worker(&selector.controllers[0]).unwrap();
+    let waiting = pool.worker(&selector.controllers[1]).unwrap();
+    donor.attach(1);
+    waiting.attach(2);
+    let held = pool.try_acquire().unwrap();
+    waiting.demand();
+    assert!(
+        !waiting
+            .service(&drivers[1].reactor.as_ref().unwrap().ring.submitter())
+            .unwrap()
+    );
+
+    // A different worker claims and publishes the return before the capacity waiter runs. Waking a waiter does not reserve storage for it.
+    drop(held);
+    donor.demand();
+    let reactor = drivers[0].reactor.as_ref().unwrap();
+    assert!(donor.service(&reactor.ring.submitter()).unwrap());
+    assert!(
+        !waiting
+            .service(&drivers[1].reactor.as_ref().unwrap().ring.submitter())
+            .unwrap()
+    );
+    let Command::PoolReclaim(reclaimed) = reactor.incoming.try_recv().unwrap() else {
+        panic!("the exhausted retry must recall the donor's published storage")
+    };
+    assert!(Arc::ptr_eq(&reclaimed, &donor));
+    donor.begin_reclaim();
+    assert!(donor.service(&reactor.ring.submitter()).unwrap());
+    assert!(
+        waiting
+            .service(&drivers[1].reactor.as_ref().unwrap().ring.submitter())
+            .unwrap()
+    );
+    donor.detach(1, &reactor.ring.submitter()).unwrap();
+    waiting
+        .detach(2, &drivers[1].reactor.as_ref().unwrap().ring.submitter())
+        .unwrap();
+    selector.close();
+    for driver in &mut drivers {
+        while !driver.turn(Some(Duration::ZERO)).unwrap() {}
+    }
+    block_on(selector.shutdown());
+}
+
+#[test]
+fn public_acquisition_reclaims_a_return_published_before_its_capacity_wake() {
+    use futures_lite::future::poll_once;
+    let (selector, mut driver) = pair(2);
+    let pool = selector.buffer_pool(BufferPoolOptions::new(1, 32)).unwrap();
+    let donor = pool.worker(&selector.controllers[0]).unwrap();
+    donor.attach(1);
+    let held = pool.try_acquire().unwrap();
+    let never = Cancellation::never();
+    let mut acquiring = Box::pin(pool.acquire(&never));
+    assert!(block_on(poll_once(&mut acquiring)).is_none());
+    drop(held);
+    donor.demand();
+    let reactor = driver.reactor.as_ref().unwrap();
+    assert!(donor.service(&reactor.ring.submitter()).unwrap());
+    assert!(block_on(poll_once(&mut acquiring)).is_none());
+    let Command::PoolReclaim(reclaimed) = reactor.incoming.try_recv().unwrap() else {
+        panic!("the exhausted retry must recall the donor's published storage")
+    };
+    assert!(Arc::ptr_eq(&reclaimed, &donor));
+    donor.begin_reclaim();
+    assert!(donor.service(&reactor.ring.submitter()).unwrap());
+    let buffer = block_on(poll_once(&mut acquiring)).unwrap().unwrap();
+    assert_eq!(buffer.as_ref().len(), 32);
+    drop(buffer);
+    donor.detach(1, &reactor.ring.submitter()).unwrap();
+    drain(&selector, &mut driver);
+}
+
+#[test]
 fn reclaim_suspends_pending_receives_but_leaves_other_requests_alone() {
     use futures_lite::future::poll_once;
     let (selector, mut driver) = pair(8);
