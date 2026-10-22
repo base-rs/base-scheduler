@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use crate::{FrozenBuffer, IoBuf, IoBufMut, buffer_pool::Pool};
+use crate::{FrozenBuffer, IoBuf, IoBufMut, heap_buffer_pool::Pool};
 use std::{
     ops::Range,
     sync::{Arc, atomic::Ordering},
@@ -47,15 +47,15 @@ impl BufferLease {
 impl AsRef<[u8]> for BufferLease {
     fn as_ref(&self) -> &[u8] {
         // SAFETY: This lease exclusively owns its slot; the box and initialized prefix remain stable until release.
-        unsafe { &(&*self.pool.as_ref().unwrap().slots[self.index].bytes.get())[..self.length] }
+        let slot = &self.pool.as_ref().unwrap().slots[self.index];
+        unsafe { &(&*slot.bytes.get())[slot.offset..slot.offset + self.length] }
     }
 }
 impl AsMut<[u8]> for BufferLease {
     fn as_mut(&mut self) -> &mut [u8] {
         // SAFETY: The unique lease and exclusive borrow prevent other accesses to this slot. Frozen views cannot coexist with a mutable lease.
-        unsafe {
-            &mut (&mut *self.pool.as_ref().unwrap().slots[self.index].bytes.get())[..self.length]
-        }
+        let slot = &self.pool.as_ref().unwrap().slots[self.index];
+        unsafe { &mut (&mut *slot.bytes.get())[slot.offset..slot.offset + self.length] }
     }
 }
 impl Drop for BufferLease {
@@ -81,6 +81,9 @@ impl std::fmt::Debug for BufferLease {
 
 impl crate::ReceiveBuffer for BufferLease {
     type Frozen = FrozenBuffer;
+    fn truncate(&mut self, length: usize) {
+        BufferLease::truncate(self, length);
+    }
     fn freeze(self) -> FrozenBuffer {
         BufferLease::freeze(self)
     }

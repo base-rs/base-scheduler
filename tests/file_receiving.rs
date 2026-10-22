@@ -2,7 +2,10 @@
 // Copyright, 2026, by Samuel Williams.
 
 use core_scheduler::*;
+#[path = "support/buffer_pool.rs"]
+mod pool_support;
 use futures_lite::future::block_on;
+use pool_support::TestPool;
 use std::{
     future::{Future, ready},
     io,
@@ -223,7 +226,7 @@ fn receiver_distinguishes_retryable_rejection_from_terminal_io_failure() {
         let never = Cancellation::never();
         let mut receiver = FileReceiver::new(
             scheduler.file_monitor(&file).unwrap(),
-            BufferPool::new(1, 8).unwrap(),
+            TestPool(HeapBufferPool::new(1, 8).unwrap()),
         );
         for state in [2, 3] {
             file.store(state, Ordering::Relaxed);
@@ -260,7 +263,7 @@ fn cancellation_during_capacity_wait_preserves_file_reception() {
         let never = Cancellation::never();
         let mut receiver = FileReceiver::new(
             scheduler.file_monitor(&file).unwrap(),
-            BufferPool::new(1, 8).unwrap(),
+            TestPool(HeapBufferPool::new(1, 8).unwrap()),
         );
         let held = receiver.recv(&scheduler, &never).await.unwrap().unwrap();
         let token = Cancellation::new();

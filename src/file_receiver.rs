@@ -1,16 +1,19 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use crate::{BufferLease, BufferPool, Cancellation, FileMonitor, FileMonitoring, OperationResult};
+use crate::{
+    BufferPool, Cancellation, FileMonitor, FileMonitoring, HeapBufferPool, OperationResult,
+    ReceiveBuffer,
+};
 
 /// A sequential file reader composed from reusable monitor state and a bounded pool. Completed chunks own their leases independently of this receiver, allowing an output write to overlap the next read. Scheduler and cancellation remain explicit on every operation.
-pub struct FileReceiver<File, Registration = ()> {
+pub struct FileReceiver<File, Registration = (), Pool: BufferPool = HeapBufferPool> {
     monitor: FileMonitor<File, Registration>,
-    pool: BufferPool,
+    pool: Pool,
     terminal: bool,
 }
-impl<File, Registration> FileReceiver<File, Registration> {
-    pub fn new(monitor: FileMonitor<File, Registration>, pool: BufferPool) -> Self {
+impl<File, Registration, P: BufferPool> FileReceiver<File, Registration, P> {
+    pub fn new(monitor: FileMonitor<File, Registration>, pool: P) -> Self {
         Self {
             monitor,
             pool,
@@ -23,7 +26,7 @@ impl<File, Registration> FileReceiver<File, Registration> {
         &mut self,
         scheduler: &S,
         cancellation: &Cancellation,
-    ) -> OperationResult<Option<BufferLease>>
+    ) -> OperationResult<Option<P::Buffer>>
     where
         S: FileMonitoring<File = File, FileRegistration = Registration>,
         Registration: Send,

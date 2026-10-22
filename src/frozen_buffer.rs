@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use crate::{BufferSlice, IoBuf, buffer_pool::Pool};
+use crate::{BufferSlice, IoBuf, heap_buffer_pool::Pool};
 use std::{
     ops::{Range, RangeBounds},
     sync::Arc,
@@ -34,7 +34,10 @@ impl Clone for FrozenBuffer {
 impl AsRef<[u8]> for FrozenBuffer {
     fn as_ref(&self) -> &[u8] {
         // SAFETY: Every view retains the slot's reader count and pool ownership. No mutable lease can exist until the final view releases it.
-        unsafe { &(&*self.pool.slots[self.index].bytes.get())[self.range.clone()] }
+        let slot = &self.pool.slots[self.index];
+        unsafe {
+            &(&*slot.bytes.get())[slot.offset + self.range.start..slot.offset + self.range.end]
+        }
     }
 }
 impl Drop for FrozenBuffer {

@@ -1286,6 +1286,7 @@ impl std::task::Wake for Controller {
     }
 }
 
+mod buffer_pooling;
 mod message;
 pub(crate) mod monitor;
 pub(crate) mod multishot;

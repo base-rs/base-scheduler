@@ -726,7 +726,7 @@ impl<S: Selector + SocketReceiving> SocketReceiving for NativeScheduler<S> {
     async fn socket_receiver(
         &self,
         socket: &Self::Socket,
-        pool: BufferPool,
+        pool: Self::Pool,
         flags: SocketRecvFlags,
         cancellation: &Cancellation,
     ) -> OperationResult<Self::PooledReceiver> {
@@ -734,5 +734,12 @@ impl<S: Selector + SocketReceiving> SocketReceiving for NativeScheduler<S> {
             .socket_receiver(socket, pool, flags, cancellation)
             .await
             .map(NativeRecvMsgReceiver)
+    }
+}
+
+impl<S: Selector + BufferPooling> BufferPooling for NativeScheduler<S> {
+    type Pool = S::Pool;
+    fn buffer_pool(&self, options: BufferPoolOptions) -> io::Result<Self::Pool> {
+        self.selector().buffer_pool(options)
     }
 }

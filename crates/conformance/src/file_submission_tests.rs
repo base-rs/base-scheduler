@@ -133,7 +133,7 @@ macro_rules! file_submission_tests {
             receiver_chunks_survive_the_next_read_and_pool_exhaustion_is_cancellable => |fixture, scheduler, file| {
                 use $crate::__core_scheduler::FileMonitoring as _;
                 let never = $crate::__core_scheduler::Cancellation::never();
-                let pool = $crate::__core_scheduler::BufferPool::new(2, 3).unwrap();
+                let pool = $crate::__core_scheduler::HeapBufferPool::new(2, 3).unwrap();
                 let mut receiver =
                     $crate::__core_scheduler::FileReceiver::new(scheduler.file_monitor(&file).unwrap(), pool.clone());
                 let first = receiver.recv(scheduler, &never).await.unwrap().unwrap();
@@ -155,7 +155,7 @@ macro_rules! file_submission_tests {
             dropping_an_unpolled_accepted_completion_releases_only_after_retirement => |fixture, scheduler, file| {
                 use $crate::__core_scheduler::FileSubmission as _;
                 let never = $crate::__core_scheduler::Cancellation::never();
-                let pool = $crate::__core_scheduler::BufferPool::new(1, 6).unwrap();
+                let pool = $crate::__core_scheduler::HeapBufferPool::new(1, 6).unwrap();
                 let buffer = pool.try_acquire().unwrap();
                 let completion = scheduler
                     .file_write_at_submit(&file, buffer, 0, &never)
@@ -177,7 +177,7 @@ macro_rules! file_submission_tests {
                     )
                     .await
                     .unwrap();
-                let pool = $crate::__core_scheduler::BufferPool::new(2, 3).unwrap();
+                let pool = $crate::__core_scheduler::HeapBufferPool::new(2, 3).unwrap();
                 let mut receiver =
                     $crate::__core_scheduler::FileReceiver::new(scheduler.file_monitor(&file).unwrap(), pool);
                 let first = receiver.recv(scheduler, &never).await.unwrap().unwrap();

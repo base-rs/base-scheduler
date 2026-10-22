@@ -6,7 +6,11 @@ use std::{sync::Arc, time::Instant};
 
 async fn run<S>(scheduler: &S, mode: &str, size: usize, bytes: usize) -> serde_json::Value
 where
-    S: FileMonitoring + FileSubmission + FileOpen + FileClose,
+    S: FileMonitoring
+        + FileSubmission
+        + FileOpen
+        + FileClose
+        + BufferPooling<Pool = HeapBufferPool>,
 {
     assert!(size > 0, "buffer size must be positive");
     let directory = tempfile::tempdir().unwrap();
@@ -36,7 +40,9 @@ where
             )
             .await
             .unwrap();
-        let pool = BufferPool::new(2, size).unwrap();
+        let pool = scheduler
+            .buffer_pool(BufferPoolOptions::new(2, size))
+            .unwrap();
         let mut receiver = FileReceiver::new(scheduler.file_monitor(&input).unwrap(), pool);
         let started = Instant::now();
         let mut next = if mode == "vec-join" || mode == "vec-serial" {

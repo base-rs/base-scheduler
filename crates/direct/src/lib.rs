@@ -9,6 +9,7 @@ compile_error!("core-scheduler-direct currently supports Unix and Windows");
 
 mod blocking_pool;
 mod blocking_task;
+mod buffer_pooling;
 mod direct_file;
 mod direct_options;
 mod direct_scheduler;

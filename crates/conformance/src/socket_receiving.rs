@@ -10,8 +10,9 @@ pub async fn stream<S>(scheduler: &S, sender: &S::Socket, socket: &S::Socket)
 where
     S: SocketReceiving + SocketWrite + SocketShutdown,
 {
+    crate::buffer_pool::bounded(scheduler).await;
     let never = Cancellation::never();
-    let pool = BufferPool::new(2, 3).unwrap();
+    let pool = scheduler.buffer_pool(BufferPoolOptions::new(2, 3)).unwrap();
     let mut receiver = scheduler
         .socket_receiver(socket, pool.clone(), SocketRecvFlags::default(), &never)
         .await
@@ -59,7 +60,7 @@ where
     S: SocketReceiving + SocketSendMsg + SocketLocalAddress,
 {
     let never = Cancellation::never();
-    let pool = BufferPool::new(2, 3).unwrap();
+    let pool = scheduler.buffer_pool(BufferPoolOptions::new(2, 3)).unwrap();
     let mut receiver = scheduler
         .socket_receiver(socket, pool.clone(), SocketRecvFlags::default(), &never)
         .await

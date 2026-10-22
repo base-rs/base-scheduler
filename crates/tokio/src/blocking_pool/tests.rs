@@ -713,7 +713,7 @@ fn submitted_io_retains_its_buffer_and_capacity_after_unpolled_completion_drop()
             threads: 1,
             capacity: 1,
         });
-        let buffers = core_scheduler::BufferPool::new(1, 8).unwrap();
+        let buffers = core_scheduler::HeapBufferPool::new(1, 8).unwrap();
         let buffer = buffers.try_acquire().unwrap();
         let (started, running) = mpsc::channel();
         let (release, released) = mpsc::channel();
@@ -755,7 +755,7 @@ fn forgetting_an_accepted_completion_can_leak_storage_but_does_not_block_retirem
             threads: 1,
             capacity: 1,
         });
-        let buffers = core_scheduler::BufferPool::new(1, 8).unwrap();
+        let buffers = core_scheduler::HeapBufferPool::new(1, 8).unwrap();
         let buffer = buffers.try_acquire().unwrap();
         let completion = pool
             .execute_submit(buffer, &NEVER, |buffer| {

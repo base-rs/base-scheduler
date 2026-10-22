@@ -2,24 +2,24 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::{
-    BufferLease, BufferPool, Cancellation, MonitorStorage, OperationResult,
+    BufferPool, Cancellation, HeapBufferPool, MonitorStorage, OperationResult, ReceiveBuffer,
     RecvMsgMultishotMessage, SocketMonitorState, SocketMonitoring, SocketRecvFlags, SocketType,
 };
 use std::io::{self, IoSliceMut};
 
 /// A demand-driven receiver composed from a readable socket monitor and a shared pool. Works with general and stream monitors; it does not spawn a task, receive ahead, or allocate per message. Backends offering kernel receive-ahead retain their separate receiver implementation.
-pub struct SocketReceiver<Monitor: crate::MonitorState> {
+pub struct SocketReceiver<Monitor: crate::MonitorState, Pool: BufferPool = HeapBufferPool> {
     monitor: MonitorStorage<Monitor>,
-    pool: BufferPool,
+    pool: Pool,
     flags: SocketRecvFlags,
     stream: bool,
     terminal: bool,
 }
-impl<M: crate::MonitorState> SocketReceiver<M> {
+impl<M: crate::MonitorState, P: BufferPool> SocketReceiver<M, P> {
     /// `kind` must describe the socket: empty datagrams are messages, whereas a zero-length stream receive is EOF. Peeking is rejected because a receiver must consume its messages.
     pub fn new(
         monitor: MonitorStorage<M>,
-        pool: BufferPool,
+        pool: P,
         kind: SocketType,
         flags: SocketRecvFlags,
     ) -> io::Result<Self> {
@@ -43,7 +43,7 @@ impl<M: crate::MonitorState> SocketReceiver<M> {
         &mut self,
         scheduler: &S,
         cancellation: &Cancellation,
-    ) -> OperationResult<Option<RecvMsgMultishotMessage<BufferLease>>>
+    ) -> OperationResult<Option<RecvMsgMultishotMessage<P::Buffer>>>
     where
         S: SocketMonitoring,
         S::Socket: 'static,
@@ -104,18 +104,19 @@ impl<M: crate::MonitorState> SocketReceiver<M> {
     }
 }
 
-impl<S, M> crate::SocketRecvMsgReceiver<S> for SocketReceiver<M>
+impl<S, M, P> crate::SocketRecvMsgReceiver<S> for SocketReceiver<M, P>
 where
+    P: BufferPool,
     S: SocketMonitoring,
     S::Socket: 'static,
     M: SocketMonitorState<S::Socket, S::MonitorRegistration>,
 {
-    type Buffer = BufferLease;
+    type Buffer = P::Buffer;
     async fn recv(
         &mut self,
         scheduler: &S,
         cancellation: &Cancellation,
-    ) -> OperationResult<Option<RecvMsgMultishotMessage<BufferLease>>> {
+    ) -> OperationResult<Option<RecvMsgMultishotMessage<P::Buffer>>> {
         SocketReceiver::recv(self, scheduler, cancellation).await
     }
     async fn close(&mut self, scheduler: &S) -> io::Result<()> {

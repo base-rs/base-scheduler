@@ -117,3 +117,7 @@ target/release/sockets iouring shared 1200 10000 2 udp
 ```
 
 Direct, Native readiness, and the Tokio adapter are also supported on macOS and Windows by the Rust binaries. The matched measurement script uses Linux `taskset` and includes io_uring. Binary smoke tests verify copying partial tails and TCP/UDP behavior on each available backend. Conformance tests verify separate admission, independent progress before polling completion, retained owners, cancellation, and safe abandonment; deterministic blocking-pool tests additionally exercise forgotten completions and capacity retirement. Miri checks the pool's unsafe aliasing and reuse model. Linux and macOS workspace coverage reached 100% of measured source regions; Windows validation remains for CI.
+
+## Common pool contract
+
+`BufferPool` defines bounded acquisition, stable writable owners, alignment, and retention through immutable views. `BufferPooling::buffer_pool` lets the selected scheduler choose the implementation; the portable implementation is `HeapBufferPool`. Socket and file receiver compositions accept generic pools without dynamic dispatch. Registration is an implementation choice, independent of this ownership contract. See [the pool contract comparison](pool-contract.md) for validation and optimized before/after measurements.

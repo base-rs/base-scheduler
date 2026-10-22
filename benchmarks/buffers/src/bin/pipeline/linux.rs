@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::{BufferLease, BufferPool, BufferSlice, Cancellation, FrozenBuffer, IoBuf};
+use core_scheduler::{BufferLease, BufferSlice, Cancellation, FrozenBuffer, HeapBufferPool, IoBuf};
 use io_uring::{IoUring, cqueue, opcode, types};
 use std::{
     collections::VecDeque,
@@ -44,12 +44,12 @@ struct Region {
     offset: usize,
 }
 struct Storage {
-    pool: BufferPool,
+    pool: HeapBufferPool,
     regions: Vec<Region>,
 }
 impl Storage {
     fn new(work: &Workload) -> Arc<Self> {
-        let pool = BufferPool::new(work.depth * 4 + 1, work.size + ALIGNMENT - 1).unwrap();
+        let pool = HeapBufferPool::new(work.depth * 4 + 1, work.size + ALIGNMENT - 1).unwrap();
         let mut leases: Vec<_> = (0..pool.capacity())
             .map(|_| pool.try_acquire().unwrap())
             .collect();

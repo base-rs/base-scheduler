@@ -9,6 +9,7 @@ compile_error!("core-scheduler-tokio currently supports Unix and Windows");
 
 mod blocking_pool;
 mod blocking_task;
+mod buffer_pooling;
 mod clock;
 #[cfg(target_os = "linux")]
 mod file_extensions;

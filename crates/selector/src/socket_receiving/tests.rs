@@ -14,7 +14,14 @@ fn factory_checks_cancellation_socket_type_peeking_and_shutdown() {
             .socket_open(SocketDomain::Ipv4, SocketType::Stream, None, &never)
             .await
             .unwrap();
-        let pool = BufferPool::new(2, 16).unwrap();
+        assert!(
+            scheduler
+                .buffer_pool(BufferPoolOptions::new(0, 16))
+                .is_err()
+        );
+        let pool = scheduler
+            .buffer_pool(BufferPoolOptions::new(2, 16))
+            .unwrap();
         assert!(
             scheduler
                 .socket_receiver(
@@ -51,6 +58,11 @@ fn factory_checks_cancellation_socket_type_peeking_and_shutdown() {
             .unwrap();
         drop(receiver);
         scheduler.shutdown().await;
+        assert!(
+            scheduler
+                .buffer_pool(BufferPoolOptions::new(2, 16))
+                .is_err()
+        );
         assert!(
             scheduler
                 .socket_receiver(&socket, pool, SocketRecvFlags::default(), &never)

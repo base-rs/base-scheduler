@@ -14,7 +14,8 @@ fn factory_preserves_admission_errors_and_socket_type_failure() {
     let socket =
         block_on(selector.socket_open(SocketDomain::Ipv4, SocketType::Stream, None, &never))
             .unwrap();
-    let pool = BufferPool::new(2, 16).unwrap();
+    assert!(selector.buffer_pool(BufferPoolOptions::new(0, 16)).is_err());
+    let pool = selector.buffer_pool(BufferPoolOptions::new(2, 16)).unwrap();
     assert!(
         block_on(selector.socket_receiver(
             &socket,
@@ -50,6 +51,7 @@ fn factory_preserves_admission_errors_and_socket_type_failure() {
         .is_err()
     );
     selector.close();
+    assert!(selector.buffer_pool(BufferPoolOptions::new(2, 16)).is_err());
     assert!(
         block_on(selector.socket_receiver(&socket, pool, SocketRecvFlags::default(), &never))
             .is_err()

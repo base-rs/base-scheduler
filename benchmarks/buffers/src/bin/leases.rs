@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::BufferPool;
+use core_scheduler::HeapBufferPool;
 use std::{
     hint::black_box,
     sync::{Arc, Barrier},
@@ -9,14 +9,14 @@ use std::{
 };
 
 fn measure(threads: usize, iterations: usize, shared: bool, frozen: bool) -> serde_json::Value {
-    let pool = BufferPool::new(threads.max(8), 4096).unwrap();
+    let pool = HeapBufferPool::new(threads.max(8), 4096).unwrap();
     let barrier = Arc::new(Barrier::new(threads + 1));
     let mut workers = Vec::new();
     for _ in 0..threads {
         let pool = if shared {
             pool.clone()
         } else {
-            BufferPool::new(8, 4096).unwrap()
+            HeapBufferPool::new(8, 4096).unwrap()
         };
         let barrier = Arc::clone(&barrier);
         workers.push(std::thread::spawn(move || {

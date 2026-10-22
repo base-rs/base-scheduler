@@ -2,7 +2,10 @@
 // Copyright, 2026, by Samuel Williams.
 
 use core_scheduler::*;
+#[path = "support/buffer_pool.rs"]
+mod pool_support;
 use futures_lite::future::block_on;
+use pool_support::TestPool;
 use std::{
     io::{self, IoSlice, IoSliceMut},
     sync::{
@@ -108,10 +111,10 @@ impl SocketMonitoring for Sockets {
 fn receiver(
     socket: Arc<AtomicUsize>,
     kind: SocketType,
-) -> SocketReceiver<SocketMonitor<Arc<AtomicUsize>, ()>> {
+) -> SocketReceiver<SocketMonitor<Arc<AtomicUsize>, ()>, TestPool> {
     SocketReceiver::new(
         Sockets.socket_monitor(&socket, Interest::Readable).unwrap(),
-        BufferPool::new(2, 8).unwrap(),
+        TestPool(HeapBufferPool::new(2, 8).unwrap()),
         kind,
         SocketRecvFlags::default(),
     )
@@ -163,7 +166,9 @@ fn receiver_reports_terminal_errors_once_and_close_keeps_completed_chunks_alive(
         assert_eq!(message.buffer.as_ref(), b"");
     });
 }
-fn super_receiver(socket: Arc<AtomicUsize>) -> SocketReceiver<SocketMonitor<Arc<AtomicUsize>, ()>> {
+fn super_receiver(
+    socket: Arc<AtomicUsize>,
+) -> SocketReceiver<SocketMonitor<Arc<AtomicUsize>, ()>, TestPool> {
     receiver(socket, SocketType::Datagram)
 }
 
@@ -173,7 +178,7 @@ fn receiver_rejects_peeking_without_consuming_a_message() {
     assert!(
         SocketReceiver::new(
             Sockets.socket_monitor(&socket, Interest::Readable).unwrap(),
-            BufferPool::new(1, 8).unwrap(),
+            TestPool(HeapBufferPool::new(1, 8).unwrap()),
             SocketType::Stream,
             SocketRecvFlags { peek: true }
         )

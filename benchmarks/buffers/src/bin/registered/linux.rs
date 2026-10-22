@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::{BufferLease, BufferPool, BufferSlice, FrozenBuffer};
+use core_scheduler::{BufferLease, BufferSlice, FrozenBuffer, HeapBufferPool};
 use io_uring::{IoUring, opcode, types};
 use std::{
     fs::File,
@@ -49,7 +49,7 @@ struct Flight {
 struct Driver {
     // Close the ring before releasing its registered pool or file owners.
     ring: IoUring,
-    pool: BufferPool,
+    pool: HeapBufferPool,
     regions: Vec<Region>,
     files: Vec<OwnedFd>,
     pending: Vec<Option<Flight>>,
@@ -67,7 +67,7 @@ impl Drop for Driver {
 
 impl Driver {
     fn new(work: Workload) -> (Self, Vec<JoinHandle<()>>, f64) {
-        let pool = BufferPool::new(work.depth * 2 + 1, work.size + ALIGNMENT - 1).unwrap();
+        let pool = HeapBufferPool::new(work.depth * 2 + 1, work.size + ALIGNMENT - 1).unwrap();
         let mut leases: Vec<_> = (0..pool.capacity())
             .map(|_| pool.try_acquire().unwrap())
             .collect();

@@ -1,16 +1,20 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::{BufferPool, Cancellation, IoBuf};
+use core_scheduler::{
+    BufferPool, BufferPoolOptions, Cancellation, HeapBufferPool, IoBuf, ReceiveBuffer,
+};
+#[path = "support/buffer_pool.rs"]
+mod pool_support;
 use futures_lite::future::{block_on, poll_once};
 use std::pin::pin;
 
 #[test]
 fn pools_validate_capacity_and_recycle_stable_initialized_storage() {
     for (count, size) in [(0, 1), (1, 0), (usize::MAX, 2)] {
-        assert!(BufferPool::new(count, size).is_err());
+        assert!(HeapBufferPool::new(count, size).is_err());
     }
-    let pool = BufferPool::new(1, 16).unwrap();
+    let pool = HeapBufferPool::new(1, 16).unwrap();
     assert_eq!(pool.capacity(), 1);
     assert_eq!(pool.buffer_size(), 16);
     let mut buffer = pool.try_acquire().unwrap();
@@ -25,7 +29,7 @@ fn pools_validate_capacity_and_recycle_stable_initialized_storage() {
 
 #[test]
 fn frozen_views_hold_storage_until_the_final_cross_thread_return() {
-    let pool = BufferPool::new(1, 16).unwrap();
+    let pool = HeapBufferPool::new(1, 16).unwrap();
     let mut buffer = pool.try_acquire().unwrap();
     buffer.as_mut()[..6].copy_from_slice(b"abcdef");
     buffer.truncate(6);
@@ -51,7 +55,7 @@ fn frozen_views_hold_storage_until_the_final_cross_thread_return() {
 
 #[test]
 fn leases_outlive_the_pool_handle_and_can_be_used_as_owned_ranges() {
-    let pool = BufferPool::new(1, 16).unwrap();
+    let pool = HeapBufferPool::new(1, 16).unwrap();
     let buffer = pool.try_acquire().unwrap();
     drop(pool);
     let range = buffer.slice(4..8);
@@ -65,7 +69,7 @@ fn leases_outlive_the_pool_handle_and_can_be_used_as_owned_ranges() {
 #[test]
 fn exhaustion_waits_for_capacity_and_cancellation_does_not_take_a_buffer() {
     block_on(async {
-        let pool = BufferPool::new(1, 16).unwrap();
+        let pool = HeapBufferPool::new(1, 16).unwrap();
         let lease = pool.try_acquire().unwrap();
         let token = Cancellation::new();
         let mut waiting = pin!(pool.acquire(&token));
@@ -87,7 +91,7 @@ fn exhaustion_waits_for_capacity_and_cancellation_does_not_take_a_buffer() {
 
 #[test]
 fn abandoning_waits_and_forgetting_owners_are_safe() {
-    let pool = BufferPool::new(1, 16).unwrap();
+    let pool = HeapBufferPool::new(1, 16).unwrap();
     let lease = pool.try_acquire().unwrap();
     let token = Cancellation::never();
     {
@@ -103,7 +107,7 @@ fn abandoning_waits_and_forgetting_owners_are_safe() {
 #[cfg(not(miri))]
 #[test]
 fn steady_state_acquire_freeze_views_and_return_allocate_nothing() {
-    let pool = BufferPool::new(2, 64).unwrap();
+    let pool = HeapBufferPool::new(2, 64).unwrap();
     let info = allocation_counter::measure(|| {
         for _ in 0..128 {
             let mut lease = pool.try_acquire().unwrap();
@@ -121,13 +125,13 @@ fn steady_state_acquire_freeze_views_and_return_allocate_nothing() {
 #[test]
 #[should_panic(expected = "buffer length out of bounds")]
 fn leases_cannot_expose_bytes_outside_the_initialized_prefix() {
-    let mut lease = BufferPool::new(1, 16).unwrap().try_acquire().unwrap();
+    let mut lease = HeapBufferPool::new(1, 16).unwrap().try_acquire().unwrap();
     lease.truncate(17);
 }
 
 #[test]
 fn many_readers_return_each_slot_once() {
-    let pool = BufferPool::new(4, 64).unwrap();
+    let pool = HeapBufferPool::new(4, 64).unwrap();
     for _ in 0..20 {
         let buffers: Vec<_> = (0..4)
             .map(|_| pool.try_acquire().unwrap().freeze())
@@ -151,7 +155,7 @@ fn many_readers_return_each_slot_once() {
 #[test]
 fn availability_words_preserve_exact_capacity_and_stable_storage() {
     for count in [usize::BITS as usize, usize::BITS as usize + 3] {
-        let pool = BufferPool::new(count, 8).unwrap();
+        let pool = HeapBufferPool::new(count, 8).unwrap();
         let buffers: Vec<_> = (0..count).map(|_| pool.try_acquire().unwrap()).collect();
         let pointers: std::collections::HashSet<_> = buffers
             .iter()
@@ -172,7 +176,7 @@ fn availability_words_preserve_exact_capacity_and_stable_storage() {
 
 #[test]
 fn concurrent_checkouts_exclusively_own_their_slots() {
-    let pool = BufferPool::new(8, 64).unwrap();
+    let pool = HeapBufferPool::new(8, 64).unwrap();
     let barrier = std::sync::Barrier::new(8);
     std::thread::scope(|scope| {
         for value in 0..8 {
@@ -199,7 +203,7 @@ fn concurrent_checkouts_exclusively_own_their_slots() {
 #[test]
 fn each_return_wakes_a_distinct_waiter_before_either_is_polled() {
     block_on(async {
-        let pool = BufferPool::new(2, 16).unwrap();
+        let pool = HeapBufferPool::new(2, 16).unwrap();
         let first = pool.try_acquire().unwrap();
         let second = pool.try_acquire().unwrap();
         let never = Cancellation::never();
@@ -214,4 +218,94 @@ fn each_return_wakes_a_distinct_waiter_before_either_is_polled() {
         assert!(pool.try_acquire().is_none());
         drop((first, second));
     });
+}
+
+#[test]
+fn pool_contract_preserves_alignment_prefixes_and_shared_capacity() {
+    async fn check<P: BufferPool>(pool: P, alignment: usize) {
+        assert_eq!(pool.capacity(), 2);
+        assert_eq!(pool.buffer_size(), 257);
+        assert_eq!(pool.alignment(), alignment);
+        let mut first = pool.try_acquire().unwrap();
+        assert_eq!(first.as_ref().as_ptr() as usize % alignment, 0);
+        first.as_mut()[..6].copy_from_slice(b"abcdef");
+        ReceiveBuffer::truncate(&mut first, 6);
+        let frozen = first.freeze();
+        let view = frozen.clone().slice(1..5);
+        drop(frozen);
+        let other = pool.clone();
+        let second = other.acquire(&Cancellation::never()).await.unwrap();
+        assert_eq!(second.as_ref().as_ptr() as usize % alignment, 0);
+        assert!(pool.try_acquire().is_none());
+        drop(second);
+        let token = Cancellation::new();
+        token.cancel();
+        assert!(other.acquire(&token).await.is_err());
+        let second = other.try_acquire().unwrap();
+        let never = Cancellation::never();
+        let mut waiting = pin!(pool.acquire(&never));
+        assert!(poll_once(waiting.as_mut()).await.is_none());
+        std::thread::spawn(move || {
+            assert_eq!(view.as_ref(), b"bcde");
+            drop(view);
+        })
+        .join()
+        .unwrap();
+        let first = waiting.await.unwrap();
+        assert_eq!(first.as_ref().len(), 257);
+        assert_eq!(&first.as_ref()[..6], b"abcdef");
+        drop((first, second));
+    }
+    for alignment in [1, 8, 4096, 65536] {
+        let pool = HeapBufferPool::with_options(BufferPoolOptions {
+            alignment,
+            ..BufferPoolOptions::new(2, 257)
+        })
+        .unwrap();
+        block_on(check(pool.clone(), alignment));
+        block_on(check(pool_support::TestPool(pool), alignment));
+    }
+}
+
+#[test]
+fn invalid_alignment_and_unrepresentable_padded_capacity_are_rejected() {
+    for (buffers, buffer_size, alignment) in [
+        (1, 8, 0),
+        (1, 8, 3),
+        (0, 8, 4096),
+        (1, 0, 4096),
+        (1, usize::MAX, 4096),
+        (usize::MAX, 1, 1),
+        (2, isize::MAX as usize, 1),
+        (usize::MAX, 8, 4096),
+    ] {
+        assert!(matches!(HeapBufferPool::with_options(BufferPoolOptions {
+            buffers, buffer_size, alignment,
+        }), Err(error) if error.kind() == std::io::ErrorKind::InvalidInput));
+    }
+}
+
+#[cfg(not(miri))]
+#[test]
+fn generic_pool_operations_allocate_nothing_after_setup() {
+    fn exercise<P: BufferPool>(pool: &P) {
+        for _ in 0..128 {
+            let mut buffer = pool.try_acquire().unwrap();
+            buffer.as_mut().fill(42);
+            buffer.truncate(16);
+            let frozen = buffer.freeze();
+            std::hint::black_box(frozen.clone().slice(2..8));
+        }
+    }
+    let pool = HeapBufferPool::with_options(BufferPoolOptions {
+        alignment: 4096,
+        ..BufferPoolOptions::new(2, 64)
+    })
+    .unwrap();
+    let alternate = pool_support::TestPool(pool.clone());
+    let allocations = allocation_counter::measure(|| {
+        exercise(&pool);
+        exercise(&alternate);
+    });
+    assert_eq!(allocations.count_total, 0);
 }

@@ -9,7 +9,7 @@ impl SocketReceiving for TokioScheduler {
     async fn socket_receiver(
         &self,
         socket: &Self::Socket,
-        pool: BufferPool,
+        pool: Self::Pool,
         flags: SocketRecvFlags,
         cancellation: &Cancellation,
     ) -> OperationResult<Self::PooledReceiver> {

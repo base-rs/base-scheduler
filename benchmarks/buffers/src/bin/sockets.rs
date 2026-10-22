@@ -24,7 +24,7 @@ struct Workload {
 }
 
 struct ConnectionGroup {
-    pool: BufferPool,
+    pool: HeapBufferPool,
     warming: AtomicUsize,
     ready: Cancellation,
     started: OnceLock<Instant>,
@@ -34,7 +34,7 @@ async fn run<S>(scheduler: &S, workload: &Workload, group: &ConnectionGroup) -> 
 where
     S: SocketScheduler
         + SocketMonitoring
-        + SocketReceiving
+        + SocketReceiving<Pool = HeapBufferPool>
         + SocketRecvMsgMultishot
         + SocketSetOption<TcpNoDelay>,
     S::Socket: 'static,
@@ -281,7 +281,7 @@ async fn run_group<S>(scheduler: Arc<S>, workload: Workload) -> serde_json::Valu
 where
     S: SocketScheduler
         + SocketMonitoring
-        + SocketReceiving
+        + SocketReceiving<Pool = HeapBufferPool>
         + SocketRecvMsgMultishot
         + SocketSetOption<TcpNoDelay>
         + Spawn
@@ -293,7 +293,12 @@ where
 {
     assert!(workload.connections > 0);
     let group = Arc::new(ConnectionGroup {
-        pool: BufferPool::new(8 * workload.connections, workload.size).unwrap(),
+        pool: scheduler
+            .buffer_pool(BufferPoolOptions::new(
+                8 * workload.connections,
+                workload.size,
+            ))
+            .unwrap(),
         warming: AtomicUsize::new(workload.connections),
         ready: Cancellation::new(),
         started: OnceLock::new(),
