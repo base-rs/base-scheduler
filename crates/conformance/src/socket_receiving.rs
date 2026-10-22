@@ -9,7 +9,6 @@ use std::pin::pin;
 pub async fn stream<S>(scheduler: &S, sender: &S::Socket, socket: &S::Socket)
 where
     S: SocketReceiving + SocketWrite + SocketShutdown,
-    S::PooledReceiver: SocketRecvMsgReceiver<S, Buffer = BufferLease>,
 {
     let never = Cancellation::never();
     let pool = BufferPool::new(2, 3).unwrap();
@@ -40,7 +39,7 @@ where
     }
     // Capacity-wait cancellation does not consume the receiver.
     let frozen = first.buffer.freeze();
-    let view = frozen.view(1..);
+    let view = frozen.clone().slice(1..);
     drop(frozen);
     drop(second);
     scheduler
@@ -58,7 +57,6 @@ where
 pub async fn datagram<S>(scheduler: &S, sender: &S::Socket, socket: &S::Socket)
 where
     S: SocketReceiving + SocketSendMsg + SocketLocalAddress,
-    S::PooledReceiver: SocketRecvMsgReceiver<S, Buffer = BufferLease>,
 {
     let never = Cancellation::never();
     let pool = BufferPool::new(2, 3).unwrap();
