@@ -33,9 +33,17 @@ A separately driven selector composes with `NativeScheduler::with_selector`. The
 
 ## Owned I/O
 
-Admission bounds queued plus in-flight original ring requests. Synchronous socket attempts do not consume ring capacity. This initial extraction uses one boxed request and completion channel per ring request; it does not yet pool request records. Setup probes required kernel support and reports unavailable rings explicitly. Unexpected driver failure retains memory whose kernel access cannot be proven complete and causes affected operation futures to panic when polled, because their original buffers cannot safely be returned. Queued requests that never reached the kernel return errors and their buffers. Graceful shutdown drains instead.
+Admission bounds queued plus in-flight original ring requests. Synchronous socket attempts do not consume ring capacity. Ordinary operations use one boxed request and completion channel per ring request; file monitors reuse those allocations. Setup probes required kernel support and reports unavailable rings explicitly. Unexpected driver failure retains memory whose kernel access cannot be proven complete and causes affected operation futures to panic when polled, because their original buffers cannot safely be returned. Queued requests that never reached the kernel return errors and their buffers. Graceful shutdown drains instead.
 
 Owned scalar socket writes first attempt a synchronous nonblocking send after checking cancellation and admission closure. Ready writes return their original buffer without allocating a ring request; `WouldBlock` and `Interrupted` fall through to completion I/O. Scalar reads submit directly to the ring. Ring socket transfers use `Recv`, `Send`, `RecvMsg`, and `SendMsg`. An `EAGAIN` completion retires that attempt before a readiness wait and retry on the original ring. Message requests retain their header, address, iovec array, and complete sequence owner until original completion. Prepared `IoBuffers` packages supply their existing vectors directly; ordinary sequences use request-owned vectors.
+
+## Reusable file state
+
+`FileMonitoring` retains typed request and completion storage for one sequential stream of owned reads or writes. Reusing the buffer-owner type avoids fresh request/channel allocations after warmup. Independent monitors can share a file for concurrent operations; use positioned operations for independent offsets.
+
+Each monitor also caches optional fixed-file registrations on visited rings. `IoUringOptions::fixed_files` limits each ring's sparse table and defaults to 256; zero disables registration. Unsupported setup, insertion failure, or exhaustion falls back to ordinary descriptors. A future moving threads keeps its accepted operation on the original ring. After retirement, a later operation can use the new worker and reuse its cached registration if previously visited. This cache does not implement registered buffers.
+
+Call `file_monitor_close` while the drivers remain active, then drop the monitor before exclusively closing the file. Close retires accepted I/O and waits for every cached ring registration to be released. Cancelling close stops waiting while release continues; another close observes its result. Drop queues release without waiting. See the [ring-state research](../../benchmarks/files/ring-state-research.md) for measured benefits, costs, and further opportunities.
 
 ## Borrowed I/O
 
@@ -63,7 +71,7 @@ Completion processing publishes results and wakes tasks without polling applicat
 
 Drivers implement `SelectorDriver`: entering consumes the movable driver and returns a thread-bound `IoUringWorker`, implementing `SelectorWorker`. This keeps local routing and queue storage on the owning thread. Native workers keep driving accepted I/O after task abandonment. Stopping or failing any ring closes admission for the entire selector group, including its shared fallback; surviving drivers continue retiring their accepted work. Applications coordinate cancellation and await their tasks before shutting down the scheduler.
 
-Request records and completion channels still allocate per ring request, and external notifications currently write to each ring's interrupt eventfd. These are implementation costs rather than interface requirements. Native task ownership and executor counters also remain shared; per-worker rings remove shared I/O admission and submission contention, rather than every source of executor contention.
+Ordinary request records and completion channels still allocate per ring request; file monitors reuse their storage. External notifications currently write to each ring's interrupt eventfd. These are implementation costs rather than interface requirements. Native task ownership and executor counters also remain shared; per-worker rings remove shared I/O admission and submission contention, rather than every source of executor contention.
 
 ## Releasing
 

@@ -1,5 +1,7 @@
 # File monitor performance
 
+This records the original request-reuse prototype. The later [ring-state experiment](ring-state-research.md) adds fixed-file registrations and compares against this executable separately.
+
 The prototype removes per-operation io_uring request and completion-channel allocations and modestly improves small warm reads. It is not a general throughput improvement: larger transfers barely change, writes are mixed, and fallback backends usually pay a small retirement-tracking cost. Keep this capability optional and experimental while its state can also support future backend-specific registration.
 
 ## Environment and source
