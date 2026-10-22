@@ -48,13 +48,15 @@ Admission means bounded backend acceptance, not necessarily kernel submission or
 
 ## Aiko measurements
 
+**Execution-context correction:** The original samples below ran Native and Tokio operations in root futures polled by `block_on`, outside their task workers. An earlier version of this report incorrectly stated that Native/io_uring work ran as worker tasks. These measurements remain records of external-root execution, including its cross-thread dispatch and buffer returns; they do not establish the worker-local fast path. The corrected worker benchmarks, contention measurements, and resulting implementation changes are documented in [Receive fast paths](fast-path.md).
+
 The [raw samples](results/aiko.jsonl) contain 1,218 measurements from runtime/benchmark commit `3b2e5418772db12f98a91524c0158549fdc70009`. Subsequent changes generalize conformance tests, format the test macro, and document the measurements; they do not change timed runtime paths. [Environment details](results/environment.txt) record the machine and compiler.
 
 All binaries use Cargo's optimized release profile. Each matched group randomizes mode order, and group order is randomized with a fixed seed. Seven repeats use CPU affinity 2–5 on Aiko's Ryzen 9 9950X3D. No other builds or benchmark runs were started during timing. Ratios below are medians of per-repeat matched ratios, rather than ratios of independently aggregated medians. They remain point estimates from one host, not confidence bounds.
 
 ### Files
 
-Each sample copies 64 MiB with 4, 64, or 128 KiB chunks. An untimed warm pass precedes the measured pass. Input and prepopulated output pages are cached; full contents are verified after timing. The output is not synchronized to durable storage. Two vector-buffer modes provide serial and joined controls; three pooled modes provide serial, joined, and explicitly submitted copies. Native/io_uring work runs as a scheduler task on its workers.
+Each sample copies 64 MiB with 4, 64, or 128 KiB chunks. An untimed warm pass precedes the measured pass. Input and prepopulated output pages are cached; full contents are verified after timing. The output is not synchronized to durable storage. Two vector-buffer modes provide serial and joined controls; three pooled modes provide serial, joined, and explicitly submitted copies. Native/io_uring work in this original dataset runs on the calling thread and dispatches to the ring workers.
 
 Median throughput at **64 KiB, one worker**, GiB/s:
 
