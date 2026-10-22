@@ -47,20 +47,36 @@ impl Drop for RecvMsgBuffer {
     }
 }
 
-#[derive(Default)]
-struct Received {
-    messages: VecDeque<RecvMsgMultishotMessage>,
+pub(super) struct Received<B: IoBuf = RecvMsgBuffer> {
+    pub(super) messages: VecDeque<core_scheduler::RecvMsgMultishotMessage<B>>,
     retired: bool,
     error: Option<io::Error>,
-    statistics: RecvMsgMultishotStatistics,
+    pub(super) statistics: RecvMsgMultishotStatistics,
 }
-#[derive(Default)]
-struct State {
-    received: Mutex<Received>,
-    changed: CompletionEvent,
+impl<B: IoBuf> Default for Received<B> {
+    fn default() -> Self {
+        Self {
+            messages: VecDeque::new(),
+            retired: false,
+            error: None,
+            statistics: Default::default(),
+        }
+    }
 }
-impl State {
-    fn next(&self) -> Option<OperationResult<Option<RecvMsgMultishotMessage>>> {
+pub(super) struct State<B: IoBuf = RecvMsgBuffer> {
+    pub(super) received: Mutex<Received<B>>,
+    pub(super) changed: CompletionEvent,
+}
+impl<B: IoBuf> Default for State<B> {
+    fn default() -> Self {
+        Self {
+            received: Mutex::new(Received::default()),
+            changed: CompletionEvent::new(),
+        }
+    }
+}
+impl<B: IoBuf> State<B> {
+    fn next(&self) -> Option<OperationResult<Option<core_scheduler::RecvMsgMultishotMessage<B>>>> {
         let mut received = self.received.lock().unwrap();
         if let Some(message) = received.messages.pop_front() {
             Some(Ok(Some(message)))
@@ -76,7 +92,7 @@ impl State {
         }
     }
 
-    fn finish(&self, result: io::Result<usize>) {
+    pub(super) fn finish(&self, result: io::Result<usize>) {
         {
             let mut received = self.received.lock().unwrap();
             received.retired = true;
@@ -89,16 +105,17 @@ impl State {
 /// A persistent receive on its original ring, even if the consumer moves threads.
 ///
 /// `recv` returns completed messages without resubmitting the receive. Retaining all buffers pauses reception; returning a buffer rearms an exhausted request. TCP byte ordering and datagram boundaries are preserved. Do not run other receives concurrently on this socket unless your protocol permits competing readers. Drop requests cancellation; `close` waits for terminal original completion.
-pub struct RecvMsgMultishot {
-    state: Arc<State>,
-    cancel: CancelOnDrop,
+pub struct RecvMsgMultishot<B: IoBuf = RecvMsgBuffer> {
+    pub(super) state: Arc<State<B>>,
+    pub(super) cancel: CancelOnDrop,
+    pub(super) cancel_on_wait: bool,
 }
-impl RecvMsgMultishot {
-    /// Receive the next message; `None` is terminal stream EOF. Empty datagrams are messages. Successful queued progress wins concurrent cancellation. Cancellation with no queued message closes and drains the persistent receive before returning.
+impl<B: IoBuf> RecvMsgMultishot<B> {
+    /// Receive the next message; `None` is terminal stream EOF. Empty datagrams are messages. Successful queued progress wins concurrent cancellation. Cancellation with no queued message closes and drains an explicit multishot receiver; shared pooled receivers cancel only the wait.
     async fn receive(
         &mut self,
         cancellation: &Cancellation,
-    ) -> OperationResult<Option<RecvMsgMultishotMessage>> {
+    ) -> OperationResult<Option<core_scheduler::RecvMsgMultishotMessage<B>>> {
         let mut cancelled = pin!(cancellation.cancelled());
         loop {
             // Completed batches need no listener registration. Listen and recheck only when the queue is empty, closing the race with completion publication.
@@ -121,7 +138,9 @@ impl RecvMsgMultishot {
                 .await
             };
             if was_cancelled {
-                self.retire().await?;
+                if self.cancel_on_wait {
+                    self.retire().await?;
+                }
                 return Err(Cancelled.into());
             }
         }
@@ -164,14 +183,14 @@ impl RecvMsgMultishot {
     }
 }
 
-impl core_scheduler::SocketRecvMsgReceiver<IoUringSelector> for RecvMsgMultishot {
-    type Buffer = RecvMsgBuffer;
+impl<B: IoBuf> core_scheduler::SocketRecvMsgReceiver<IoUringSelector> for RecvMsgMultishot<B> {
+    type Buffer = B;
 
     async fn recv(
         &mut self,
         scheduler: &IoUringSelector,
         cancellation: &Cancellation,
-    ) -> OperationResult<Option<RecvMsgMultishotMessage>> {
+    ) -> OperationResult<Option<core_scheduler::RecvMsgMultishotMessage<B>>> {
         cancellation.check()?;
         self.check_selector(scheduler)?;
         self.receive(cancellation).await
@@ -183,7 +202,7 @@ impl core_scheduler::SocketRecvMsgReceiver<IoUringSelector> for RecvMsgMultishot
     }
 }
 
-impl RecvMsgMultishot {
+impl<B: IoBuf> RecvMsgMultishot<B> {
     fn check_selector(&self, selector: &IoUringSelector) -> io::Result<()> {
         if selector
             .controllers
@@ -260,6 +279,7 @@ impl core_scheduler::SocketRecvMsgMultishot for IoUringSelector {
             request.finish(Err(io::ErrorKind::BrokenPipe.into()));
         }
         Ok(RecvMsgMultishot {
+            cancel_on_wait: true,
             state,
             cancel: CancelOnDrop {
                 controller,
@@ -421,6 +441,9 @@ impl PendingRequest for MultiRequest {
         };
         self.finish(result);
     }
+    fn retire_completion(self: Box<Self>, ring: &io_uring::Submitter<'_>, result: i32) {
+        self.retire(ring, retirement(result));
+    }
     fn finish(mut self: Box<Self>, result: io::Result<usize>) {
         let state = Arc::clone(&self.state);
         self.finished = true;
@@ -440,6 +463,15 @@ impl PendingRequest for MultiRequest {
             }
         }
         Some(Box::new(Failed(Arc::clone(&self.state))))
+    }
+}
+
+/// Exhaustion normally rearms the receive. If close or shutdown prevents rearming, its terminal CQE still represents successful retirement, not a transport failure. Apply before cleanup so registration failures remain observable.
+pub(super) fn retirement(result: i32) -> io::Result<usize> {
+    match result {
+        result if result == -libc::ENOBUFS => Ok(0),
+        result if result < 0 => Err(io::Error::from_raw_os_error(-result)),
+        result => Ok(result as usize),
     }
 }
 

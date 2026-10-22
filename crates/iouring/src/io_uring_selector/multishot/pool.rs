@@ -8,12 +8,12 @@ use std::{
     sync::atomic::AtomicU16,
 };
 
-struct Group {
-    identifier: u16,
+pub(in crate::io_uring_selector) struct Group {
+    pub(in crate::io_uring_selector) identifier: u16,
     groups: Arc<Mutex<Vec<bool>>>,
 }
 impl Group {
-    fn new(controller: &Controller) -> io::Result<Self> {
+    pub(in crate::io_uring_selector) fn new(controller: &Controller) -> io::Result<Self> {
         let mut groups = controller.buffer_groups.lock().unwrap();
         let identifier = if let Some(index) = groups.iter().position(|used| !used) {
             groups[index] = true;

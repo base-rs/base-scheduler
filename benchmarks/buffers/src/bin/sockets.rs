@@ -23,22 +23,25 @@ struct Workload {
     connections: usize,
 }
 
-struct ConnectionGroup {
-    pool: HeapBufferPool,
+struct ConnectionGroup<P> {
+    pool: P,
     warming: AtomicUsize,
     ready: Cancellation,
     started: OnceLock<Instant>,
 }
 
-async fn run<S>(scheduler: &S, workload: &Workload, group: &ConnectionGroup) -> serde_json::Value
+async fn run<S>(
+    scheduler: &S,
+    workload: &Workload,
+    group: &ConnectionGroup<S::Pool>,
+) -> serde_json::Value
 where
     S: SocketScheduler
         + SocketMonitoring
-        + SocketReceiving<Pool = HeapBufferPool>
+        + SocketReceiving
         + SocketRecvMsgMultishot
         + SocketSetOption<TcpNoDelay>,
     S::Socket: 'static,
-    S::PooledReceiver: SocketRecvMsgReceiver<S, Buffer = BufferLease>,
 {
     let mode = workload.mode.as_str();
     let size = workload.size;
@@ -126,15 +129,21 @@ where
             .await
             .unwrap();
     }
-    let mut receiver = scheduler
-        .socket_receiver(
-            &socket,
-            group.pool.clone(),
-            SocketRecvFlags::default(),
-            &never,
+    let mut receiver = if matches!(mode, "pool" | "shared") {
+        Some(
+            scheduler
+                .socket_receiver(
+                    &socket,
+                    group.pool.clone(),
+                    SocketRecvFlags::default(),
+                    &never,
+                )
+                .await
+                .unwrap(),
         )
-        .await
-        .unwrap();
+    } else {
+        None
+    };
     let mut readable = scheduler
         .socket_monitor(&socket, Interest::Readable)
         .unwrap();
@@ -216,13 +225,19 @@ where
                     result.bytes
                 }
                 "pool" | "shared" => {
-                    let message = receiver.recv(scheduler, &never).await.unwrap().unwrap();
+                    let message = receiver
+                        .as_mut()
+                        .unwrap()
+                        .recv(scheduler, &never)
+                        .await
+                        .unwrap()
+                        .unwrap();
                     assert!(!message.result.truncated);
                     let count = message.buffer.as_ref().len();
                     assert_eq!(message.buffer.as_ref()[0], 42);
                     if mode == "shared" {
                         let frozen = message.buffer.freeze();
-                        retained = Some(frozen.view(..count));
+                        retained = Some(frozen.slice(..count));
                     } else {
                         std::hint::black_box(message.buffer.as_ref());
                     }
@@ -261,7 +276,9 @@ where
     if let Some(mut multishot) = multishot {
         multishot.close(scheduler).await.unwrap();
     }
-    receiver.close(scheduler).await.unwrap();
+    if let Some(receiver) = receiver.as_mut() {
+        receiver.close(scheduler).await.unwrap();
+    }
     drop(receiver);
     scheduler
         .socket_monitor_close(&mut readable, &never)
@@ -281,7 +298,7 @@ async fn run_group<S>(scheduler: Arc<S>, workload: Workload) -> serde_json::Valu
 where
     S: SocketScheduler
         + SocketMonitoring
-        + SocketReceiving<Pool = HeapBufferPool>
+        + SocketReceiving
         + SocketRecvMsgMultishot
         + SocketSetOption<TcpNoDelay>
         + Spawn
@@ -289,7 +306,6 @@ where
         + Sync
         + 'static,
     S::Socket: 'static,
-    S::PooledReceiver: SocketRecvMsgReceiver<S, Buffer = BufferLease>,
 {
     assert!(workload.connections > 0);
     let group = Arc::new(ConnectionGroup {

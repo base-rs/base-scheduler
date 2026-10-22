@@ -6,11 +6,8 @@ use std::{sync::Arc, time::Instant};
 
 async fn run<S>(scheduler: &S, mode: &str, size: usize, bytes: usize) -> serde_json::Value
 where
-    S: FileMonitoring
-        + FileSubmission
-        + FileOpen
-        + FileClose
-        + BufferPooling<Pool = HeapBufferPool>,
+    S: FileMonitoring + FileSubmission + FileOpen + FileClose + BufferPooling,
+    <S::Pool as BufferPool>::Buffer: std::fmt::Debug,
 {
     assert!(size > 0, "buffer size must be positive");
     let directory = tempfile::tempdir().unwrap();

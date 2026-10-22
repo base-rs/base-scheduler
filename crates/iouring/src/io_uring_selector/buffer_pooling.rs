@@ -4,9 +4,9 @@
 use super::*;
 
 impl BufferPooling for IoUringSelector {
-    type Pool = HeapBufferPool;
+    type Pool = crate::IoUringBufferPool;
     fn buffer_pool(&self, options: BufferPoolOptions) -> std::io::Result<Self::Pool> {
         self.check_open()?;
-        HeapBufferPool::with_options(options)
+        crate::IoUringBufferPool::new(&self.group, options)
     }
 }

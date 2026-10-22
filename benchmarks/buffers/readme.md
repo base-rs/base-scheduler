@@ -2,19 +2,19 @@
 
 Use bounded reusable storage and independently owned completed chunks. For a file pipeline, poll the output write and next input read concurrently. Separating submission from completion is useful when admission itself matters, but it is not a generally faster replacement for joining ordinary operations.
 
-The scheduler implementations support these choices across Direct, the Tokio adapter, Native readiness, and Native io_uring. Their receivers do not yet connect the shared pool to io_uring registered buffers or provided-buffer rings. The standalone [zero-copy pipeline experiment](pipeline.md) tests registered storage through parsing and sending before scheduler integration.
+The scheduler implementations support these choices across Direct, the Tokio adapter, Native readiness, and Native io_uring. The io_uring prototype connects the shared pool to worker-local provided-buffer rings; its [ownership model and measurements](worker-pools.md) include multi-connection regressions that need further profiling. Fixed-buffer registration remains separate. The standalone [zero-copy pipeline experiment](pipeline.md) tests registered storage through parsing and sending before scheduler integration.
 
 Subsequent experiments measure [receive fast paths and shared-pool contention](fast-path.md) and [fixed registered buffers](registered.md). The latter isolates ordinary versus fixed io_uring reads/writes with the same leases, rather than integrating registration into the scheduler.
 
 ## Ownership and use
 
-`BufferPool::new(count, size)` reserves stable initialized storage. Acquisition returns a unique writable `BufferLease`; pool exhaustion waits with cancellation. A file or socket receiver returns completed leases independently of the receiver, allowing subsequent receives while application code retains earlier chunks.
+`scheduler.buffer_pool(BufferPoolOptions::new(count, size))` reserves stable initialized storage. Acquisition returns a unique writable `BufferLease`; pool exhaustion waits with cancellation. A file or socket receiver returns completed leases independently of the receiver, allowing subsequent receives while application code retains earlier chunks.
 
 Parse or decrypt in place while the lease is unique. `freeze()` consumes writable access and produces a cloneable immutable `FrozenBuffer`; `view(range)` retains a zero-copy range. The final lease or view returns the slot. Setup allocates storage and bookkeeping once; the allocation test checks that steady-state acquisition, freeze, views, and return allocate nothing.
 
 A parser owns framing and compaction: retain views of complete frames and copy a partial tail when contiguous storage is needed. Retaining one small view keeps its entire slot unavailable, so selectively copying long-lived fragments can reduce memory pressure. The receiver does not hide a growing receive queue.
 
-`SocketReceiving::socket_receiver` is the backend-associated construction interface using a supplied pool. Its completed buffers implement `ReceiveBuffer`, allowing a future backend to specialize storage without changing generic consumers. Current implementations use persistent readable monitors and syscall-first borrowed message receives. Existing explicit multishot receivers retain their own separate provided-buffer pools.
+`SocketReceiving::socket_receiver` is the backend-associated construction interface using a supplied pool. Its completed buffers implement `ReceiveBuffer`, allowing a future backend to specialize storage without changing generic consumers. Direct, readiness-native, and Tokio use persistent readable monitors and syscall-first borrowed message receives. The io_uring prototype uses multishot receive-ahead into shared storage. Existing explicit multishot receivers retain their own separate provided-buffer pools.
 
 For a shared pool, drive both branches and release each completed write's returned owner inside that branch:
 
@@ -94,7 +94,7 @@ The transport patterns exercise reusable storage and retained chunks. They do no
 
 Keep the simple pool and owned-chunk interface, and make joined file pipelines the ordinary example. Keep explicit submission optional for control over bounded acceptance, lifecycle, or polling order. Avoid exposing registration decisions in protocol code before measuring a concrete specialized backend.
 
-The next performance experiment should connect the backend-associated receiver to a ring-owned shared provided-buffer strategy, preserving independent writable leases and delayed cross-worker returns. File fixed-buffer registration additionally requires retaining backing allocations through registration retirement. Neither optimization follows merely from reusing a stable address.
+The [worker-pool experiment](worker-pools.md) connects the backend-associated receiver to shared provided-buffer rings. It preserves independent writable leases and cross-worker returns, but its multi-connection regressions need profiling before it can be recommended as the faster strategy. File fixed-buffer registration additionally requires retaining backing allocations through registration retirement. Neither optimization follows merely from reusing a stable address.
 
 ## Reproduce
 

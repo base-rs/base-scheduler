@@ -181,6 +181,15 @@ pub(crate) trait PendingRequest: Send {
     fn prepare(&mut self, _ring: &io_uring::Submitter<'_>) -> io::Result<()> {
         Ok(())
     }
+    fn ready(&mut self, ring: &io_uring::Submitter<'_>) -> io::Result<bool> {
+        self.prepare(ring).map(|()| true)
+    }
+    fn buffer_pool(&self) -> Option<&Arc<provided_buffers::WorkerBuffers>> {
+        None
+    }
+    fn suspend_for(&self, _pool: &Arc<provided_buffers::WorkerBuffers>) -> bool {
+        false
+    }
     fn entry(&mut self) -> squeue::Entry;
     // Buffer accessors may run arbitrary user code, including waking tasks. Such requests must return to the executor after preparation instead of waiting.
     fn entry_may_wake(&self) -> bool {
@@ -194,6 +203,16 @@ pub(crate) trait PendingRequest: Send {
     }
     fn retire(self: Box<Self>, _ring: &io_uring::Submitter<'_>, result: io::Result<usize>) {
         self.finish(result);
+    }
+    fn retire_completion(self: Box<Self>, ring: &io_uring::Submitter<'_>, result: i32) {
+        self.retire(
+            ring,
+            if result < 0 {
+                Err(io::Error::from_raw_os_error(-result))
+            } else {
+                Ok(result as usize)
+            },
+        );
     }
     // Return true only for the transition which first requests cancellation.
     fn begin_cancellation(&self) -> bool;
@@ -241,6 +260,8 @@ pub(crate) enum Command {
     MonitorCancel(u64, u64),
     FileRelease(registered_file::Release),
     Recycle(Arc<multishot::pool::Pool>, u16),
+    PoolReady(Arc<provided_buffers::WorkerBuffers>),
+    PoolReclaim(Arc<provided_buffers::WorkerBuffers>),
     Rearm(u64),
     Cancel(u64),
     CancelAfterSubmission(u64),
@@ -834,6 +855,8 @@ pub(crate) struct Reactor {
     dormant: HashMap<u64, Box<dyn PendingRequest>>,
     monitors: monitor::Monitors,
     pending_monitors: VecDeque<monitor::Submission>,
+    buffer_pools: Vec<Arc<provided_buffers::WorkerBuffers>>,
+    pool_ready: Vec<u64>,
     in_flight: InFlight,
     cancellations: VecDeque<u64>,
     closing: bool,
@@ -853,6 +876,8 @@ impl Reactor {
             ring,
             monitors,
             pending_monitors,
+            buffer_pools: Vec::new(),
+            pool_ready: Vec::new(),
             started: false,
             notification,
             incoming,
@@ -969,14 +994,7 @@ impl Reactor {
                     self.dormant.insert(identifier, request);
                 }
             } else {
-                request.retire(
-                    &submitter,
-                    if result < 0 {
-                        Err(io::Error::from_raw_os_error(-result))
-                    } else {
-                        Ok(result as usize)
-                    },
-                );
+                request.retire_completion(&submitter, result);
             }
         }
 
@@ -1095,6 +1113,27 @@ impl Reactor {
                         self.pending.push_back(request);
                     }
                 }
+                Command::PoolReady(pool) => {
+                    if !self
+                        .buffer_pools
+                        .iter()
+                        .any(|known| Arc::ptr_eq(known, &pool))
+                    {
+                        self.buffer_pools.push(pool);
+                    }
+                }
+                Command::PoolReclaim(pool) => {
+                    pool.begin_reclaim();
+                    // Move unsubmitted requests aside. In-flight receives retain their published leases until their terminal original CQEs arrive.
+                    for request in &self.pending {
+                        request.suspend_for(&pool);
+                    }
+                    for (identifier, request) in &self.in_flight.0 {
+                        if request.suspend_for(&pool) {
+                            self.cancellations.push_back(*identifier);
+                        }
+                    }
+                }
                 Command::Rearm(identifier) => {
                     if let Some(request) = self.dormant.remove(&identifier) {
                         self.pending.push_back(request);
@@ -1127,6 +1166,28 @@ impl Reactor {
 
         progressed |= self.collect_completions()?;
 
+        // Refill and rebalance only from this ring's owner. Completed payloads have already left their ring tables and may be retained by application tasks on any worker.
+        for pool in &self.buffer_pools {
+            if pool.service(&self.ring.submitter())? {
+                for (identifier, request) in &self.dormant {
+                    if request
+                        .buffer_pool()
+                        .is_some_and(|known| Arc::ptr_eq(known, pool))
+                    {
+                        self.pool_ready.push(*identifier);
+                    }
+                }
+            }
+        }
+        self.buffer_pools.retain(|pool| !pool.empty());
+        for identifier in self.pool_ready.drain(..) {
+            self.pending.push_back(
+                self.dormant
+                    .remove(&identifier)
+                    .expect("a ready pool retains its dormant request"),
+            );
+        }
+
         let defer_submission;
         {
             let (submitter, mut submissions, _) = self.ring.split();
@@ -1146,10 +1207,17 @@ impl Reactor {
                 let Some(mut request) = self.pending.pop_front() else {
                     break;
                 };
-                if let Err(error) = request.prepare(&submitter) {
-                    request.retire(&submitter, Err(error));
-                    progressed = true;
-                    continue;
+                match request.ready(&submitter) {
+                    Ok(true) => {}
+                    Ok(false) => {
+                        self.dormant.insert(request.identifier(), request);
+                        continue;
+                    }
+                    Err(error) => {
+                        request.retire(&submitter, Err(error));
+                        progressed = true;
+                        continue;
+                    }
                 }
                 let identifier = request.identifier();
                 let request = self.in_flight.0.entry(identifier).or_insert(request);
@@ -1303,3 +1371,5 @@ pub(crate) mod file_monitor;
 mod file_submission;
 
 mod socket_receiving;
+
+pub(crate) mod provided_buffers;

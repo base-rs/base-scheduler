@@ -19,6 +19,7 @@ def main():
     parser.add_argument("--repeats", type=int, default=5)
     parser.add_argument("--validation", action="store_true", help="Longer samples for noisy or slower first-pass cases")
     parser.add_argument("--match", help="Keep cases whose binary and arguments match this regular expression")
+    parser.add_argument("--socket-iterations", type=int, help="Override socket iterations per connection for longer samples")
     args = parser.parse_args()
     directories = {"concrete": args.before.resolve(), "contract": args.after.resolve()}
     hashes = {(version, binary): hashlib.sha256((directory / binary).read_bytes()).hexdigest()
@@ -57,6 +58,10 @@ def main():
     if args.match:
         cases = [(binary, parameters) for binary, parameters in cases
                  if re.search(args.match, " ".join([binary, *parameters]))]
+    if args.socket_iterations is not None:
+        for binary, parameters in cases:
+            if binary == "sockets":
+                parameters[3] = str(args.socket_iterations)
     randomizer = random.Random(648971)
     groups = list(itertools.product(range(args.repeats), cases))
     randomizer.shuffle(groups)
@@ -67,7 +72,9 @@ def main():
             randomizer.shuffle(order)
             for version in order:
                 command = ["taskset", "-c", "2-9", str(directories[version] / binary), *parameters]
-                result = subprocess.run(command, check=True, text=True, capture_output=True, timeout=120)
+                result = subprocess.run(command, text=True, capture_output=True, timeout=120)
+                if result.returncode:
+                    raise RuntimeError(f"{command!r} exited {result.returncode}:\n{result.stderr}")
                 row = json.loads(result.stdout)
                 row.update(binary=binary, parameters=parameters, repeat=repeat, version=version,
                            binary_sha256=hashes[version, binary], cpus="2-9")
