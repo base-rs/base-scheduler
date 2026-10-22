@@ -5,19 +5,32 @@ use core_scheduler::*;
 use std::{
     io::{IoSliceMut, Read, Write},
     net::{TcpListener, UdpSocket},
-    sync::Arc,
+    sync::{
+        Arc, OnceLock,
+        atomic::{AtomicUsize, Ordering},
+    },
     time::Instant,
 };
 
-async fn run<S>(
-    scheduler: &S,
-    mode: &str,
+#[derive(Clone)]
+struct Workload {
+    mode: String,
     size: usize,
     iterations: usize,
-    transport: &str,
+    transport: String,
     window: usize,
     receive_only: bool,
-) -> serde_json::Value
+    connections: usize,
+}
+
+struct ConnectionGroup {
+    pool: BufferPool,
+    warming: AtomicUsize,
+    ready: Cancellation,
+    started: OnceLock<Instant>,
+}
+
+async fn run<S>(scheduler: &S, workload: &Workload, group: &ConnectionGroup) -> serde_json::Value
 where
     S: SocketScheduler
         + SocketMonitoring
@@ -27,6 +40,12 @@ where
     S::Socket: 'static,
     S::PooledReceiver: SocketRecvMsgReceiver<S, Buffer = BufferLease>,
 {
+    let mode = workload.mode.as_str();
+    let size = workload.size;
+    let iterations = workload.iterations;
+    let transport = workload.transport.as_str();
+    let window = workload.window;
+    let receive_only = workload.receive_only;
     let udp = transport == "udp";
     assert!(size > 0 && iterations > 0 && window > 0 && (!udp || size <= 65507));
     let warmup = 1000;
@@ -107,9 +126,13 @@ where
             .await
             .unwrap();
     }
-    let pool = BufferPool::new(8, size).unwrap();
     let mut receiver = scheduler
-        .socket_receiver(&socket, pool, SocketRecvFlags::default(), &never)
+        .socket_receiver(
+            &socket,
+            group.pool.clone(),
+            SocketRecvFlags::default(),
+            &never,
+        )
         .await
         .unwrap();
     let mut readable = scheduler
@@ -143,7 +166,12 @@ where
     let mut start = Instant::now();
     for index in 0..iterations + warmup {
         if index == warmup {
-            start = Instant::now();
+            if group.warming.fetch_sub(1, Ordering::AcqRel) == 1 {
+                group.started.set(Instant::now()).unwrap();
+                group.ready.cancel();
+            }
+            group.ready.cancelled().await;
+            start = *group.started.get().unwrap();
         }
         let outgoing = if receive_only {
             &payload[..1]
@@ -249,6 +277,57 @@ where
     serde_json::json!({"transport":transport,"mode":mode,"size":size,"iterations":iterations,"seconds":elapsed.as_secs_f64(),"round_trips_per_second":iterations as f64/elapsed.as_secs_f64(),"window":window,"messages_per_second":(iterations * window) as f64 / elapsed.as_secs_f64()})
 }
 
+async fn run_group<S>(scheduler: Arc<S>, workload: Workload) -> serde_json::Value
+where
+    S: SocketScheduler
+        + SocketMonitoring
+        + SocketReceiving
+        + SocketRecvMsgMultishot
+        + SocketSetOption<TcpNoDelay>
+        + Spawn
+        + Send
+        + Sync
+        + 'static,
+    S::Socket: 'static,
+    S::PooledReceiver: SocketRecvMsgReceiver<S, Buffer = BufferLease>,
+{
+    assert!(workload.connections > 0);
+    let group = Arc::new(ConnectionGroup {
+        pool: BufferPool::new(8 * workload.connections, workload.size).unwrap(),
+        warming: AtomicUsize::new(workload.connections),
+        ready: Cancellation::new(),
+        started: OnceLock::new(),
+    });
+    let tasks: Vec<_> = (0..workload.connections)
+        .map(|_| {
+            let owned = Arc::clone(&scheduler);
+            let group = Arc::clone(&group);
+            let workload = workload.clone();
+            scheduler
+                .spawn(async move { run(owned.as_ref(), &workload, &group).await })
+                .unwrap()
+        })
+        .collect();
+    let mut results = Vec::new();
+    for task in tasks {
+        results.push(task.await.unwrap());
+    }
+    let seconds = results
+        .iter()
+        .map(|result| result["seconds"].as_f64().unwrap())
+        .fold(0.0_f64, f64::max);
+    let mut result = results.remove(0);
+    result["seconds"] = seconds.into();
+    result["connections"] = workload.connections.into();
+    result["round_trips_per_second"] =
+        (workload.connections as f64 * workload.iterations as f64 / seconds).into();
+    result["messages_per_second"] =
+        (workload.connections as f64 * workload.iterations as f64 * workload.window as f64
+            / seconds)
+            .into();
+    result
+}
+
 fn execute(args: &[String]) -> serde_json::Value {
     let backend = args.get(1).map(String::as_str).unwrap_or("native");
     let mode = args.get(2).map(String::as_str).unwrap_or("pool");
@@ -270,24 +349,26 @@ fn execute(args: &[String]) -> serde_json::Value {
         matches!(traffic, "echo" | "receive"),
         "unknown traffic pattern"
     );
-    let receive_only = traffic == "receive";
+    let workload = Workload {
+        mode: mode.to_owned(),
+        size,
+        iterations,
+        transport,
+        window,
+        receive_only: traffic == "receive",
+        connections: args.get(9).map(|s| s.parse().unwrap()).unwrap_or(1),
+    };
     let mut result = match backend {
         "direct" => {
-            let scheduler =
+            let scheduler = Arc::new(
                 core_scheduler_direct::DirectScheduler::new(core_scheduler_direct::DirectOptions {
                     threads: workers,
                     capacity: 64,
                 })
-                .unwrap();
-            let result = futures_lite::future::block_on(run(
-                &scheduler,
-                mode,
-                size,
-                iterations,
-                &transport,
-                window,
-                receive_only,
-            ));
+                .unwrap(),
+            );
+            let result =
+                futures_lite::future::block_on(run_group(Arc::clone(&scheduler), workload));
             futures_lite::future::block_on(scheduler.shutdown());
             result
         }
@@ -300,22 +381,7 @@ fn execute(args: &[String]) -> serde_json::Value {
             let scheduler = Arc::new(core_scheduler_tokio::TokioScheduler::new(
                 runtime.handle().clone(),
             ));
-            let owned = scheduler.clone();
-            let mode = mode.to_owned();
-            let result = runtime
-                .block_on(runtime.spawn(async move {
-                    run(
-                        owned.as_ref(),
-                        &mode,
-                        size,
-                        iterations,
-                        &transport,
-                        window,
-                        receive_only,
-                    )
-                    .await
-                }))
-                .unwrap();
+            let result = runtime.block_on(run_group(Arc::clone(&scheduler), workload));
             runtime.block_on(scheduler.shutdown());
             result
         }
@@ -329,26 +395,7 @@ fn execute(args: &[String]) -> serde_json::Value {
                 )
                 .unwrap(),
             );
-            let owned = Arc::clone(&scheduler);
-            let mode = mode.to_owned();
-            let result = scheduler
-                .block_on(
-                    scheduler
-                        .spawn(async move {
-                            run(
-                                owned.as_ref(),
-                                &mode,
-                                size,
-                                iterations,
-                                &transport,
-                                window,
-                                receive_only,
-                            )
-                            .await
-                        })
-                        .unwrap(),
-                )
-                .unwrap();
+            let result = scheduler.block_on(run_group(Arc::clone(&scheduler), workload));
             scheduler.block_on(scheduler.shutdown());
             result
         }
@@ -368,26 +415,7 @@ fn execute(args: &[String]) -> serde_json::Value {
                 )
                 .unwrap(),
             );
-            let owned = Arc::clone(&scheduler);
-            let mode = mode.to_owned();
-            let result = scheduler
-                .block_on(
-                    scheduler
-                        .spawn(async move {
-                            run(
-                                owned.as_ref(),
-                                &mode,
-                                size,
-                                iterations,
-                                &transport,
-                                window,
-                                receive_only,
-                            )
-                            .await
-                        })
-                        .unwrap(),
-                )
-                .unwrap();
+            let result = scheduler.block_on(run_group(Arc::clone(&scheduler), workload));
             scheduler.block_on(scheduler.shutdown());
             result
         }
@@ -431,6 +459,28 @@ mod tests {
             }
         }
         assert_eq!(execute(&[])["mode"], "pool");
+    }
+
+    #[test]
+    fn receivers_share_capacity_across_concurrent_connections() {
+        #[cfg(target_os = "linux")]
+        let backends = ["direct", "tokio", "native", "iouring"];
+        #[cfg(not(target_os = "linux"))]
+        let backends = ["direct", "tokio", "native"];
+        for backend in backends {
+            for mode in ["pool", "shared"] {
+                for transport in ["tcp", "udp"] {
+                    let args = [
+                        "sockets", backend, mode, "64", "2", "2", transport, "4", "receive", "4",
+                    ]
+                    .map(str::to_owned);
+                    let result = execute(&args);
+                    assert_eq!(result["connections"], 4);
+                    assert_eq!(result["iterations"], 2);
+                    assert!(result["messages_per_second"].as_f64().unwrap() > 0.0);
+                }
+            }
+        }
     }
 
     #[test]
