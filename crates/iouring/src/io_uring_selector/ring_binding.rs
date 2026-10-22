@@ -23,51 +23,40 @@ impl<T> RingBinding<T> {
     }
 }
 
-// Passive registrations can coexist on different rings. Keep the current ring inline; returning to an already visited ring reuses its state without registration syscalls or allocations.
+// Cache only the current ring. Replaced registrations retire through their original owner.
 pub(super) struct RingCache<T> {
     current: Option<RingBinding<T>>,
-    others: Vec<RingBinding<T>>,
 }
 
 impl<T> Default for RingCache<T> {
     fn default() -> Self {
-        Self {
-            current: None,
-            others: Vec::new(),
-        }
+        Self { current: None }
     }
 }
 
 impl<T> RingCache<T> {
+    pub fn matches(&self, controller: &Arc<Controller>) -> bool {
+        self.current
+            .as_ref()
+            .is_some_and(|binding| binding.matches(controller))
+    }
+
+    pub fn take_current(&mut self) -> Option<T> {
+        self.current.take().map(|binding| binding.state)
+    }
+
     pub fn get_or_insert(
         &mut self,
         controller: &Arc<Controller>,
         create: impl FnOnce() -> T,
     ) -> &T {
-        if !self
-            .current
-            .as_ref()
-            .is_some_and(|binding| binding.matches(controller))
-        {
-            let next = match self
-                .others
-                .iter()
-                .position(|binding| binding.matches(controller))
-            {
-                Some(index) => self.others.swap_remove(index),
-                None => RingBinding::new(controller, create()),
-            };
-            if let Some(previous) = self.current.replace(next) {
-                self.others.push(previous);
-            }
+        if !self.matches(controller) {
+            self.current = Some(RingBinding::new(controller, create()));
         }
         &self.current.as_ref().unwrap().state
     }
 
     pub fn values(&self) -> impl Iterator<Item = &T> {
-        self.current
-            .iter()
-            .chain(&self.others)
-            .map(|binding| &binding.state)
+        self.current.iter().map(|binding| &binding.state)
     }
 }

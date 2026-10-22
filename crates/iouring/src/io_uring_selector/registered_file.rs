@@ -88,6 +88,7 @@ impl RegisteredFile {
             index: AtomicU32::new(UNREGISTERED),
             retirement: Arc::new(Retirement {
                 result: Mutex::new(None),
+                ready: AtomicBool::new(false),
                 finished: CompletionEvent::new(),
             }),
         })
@@ -124,6 +125,17 @@ impl RegisteredFile {
         }
     }
 
+    pub fn released(&self) -> bool {
+        self.retirement.ready.load(Ordering::Acquire)
+            && self
+                .retirement
+                .result
+                .lock()
+                .unwrap()
+                .as_ref()
+                .is_some_and(Result::is_ok)
+    }
+
     pub async fn closed(&self, cancellation: &Cancellation) -> OperationResult<()> {
         loop {
             event_listener::listener!(self.retirement.finished => listener);
@@ -157,11 +169,13 @@ impl Drop for RegisteredFile {
 
 struct Retirement {
     result: Mutex<Option<io::Result<()>>>,
+    ready: AtomicBool,
     finished: CompletionEvent,
 }
 impl Retirement {
     fn publish(&self, result: io::Result<()>) {
         *self.result.lock().unwrap() = Some(result);
+        self.ready.store(true, Ordering::Release);
         self.finished.notify(usize::MAX);
     }
 }

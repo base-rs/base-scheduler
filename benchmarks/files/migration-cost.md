@@ -1,6 +1,6 @@
 # File registration migration cost
 
-Keeping only the current ring's passive file registration looks reasonable when migration is infrequent. It avoids retaining monitor state on every visited worker. The cost is measurable under deliberate migration on every operation, and falls substantially when several operations run before the next migration. This experiment leaves the implementation in the parent prototype unchanged and preserves the invalidation candidate as a reproducible patch.
+Keeping only the current ring's passive file registration looks reasonable when migration is infrequent. It avoids retaining monitor state on every visited worker. The cost is measurable under deliberate migration on every operation, and falls substantially when several operations run before the next migration. The implementation now adopts the invalidation policy. This report preserves the original measured baseline and candidate patch for reproduction at their recorded source commit.
 
 ## Policies and lifetime
 
@@ -38,7 +38,7 @@ Measured on Aiko on 22 October 2026: Ryzen 9 9950X3D, Linux 7.2.6-arch2-1, Rust 
 
 Harness and retained source: `bd9aba9729318a9350b764555859d138409ff33b`, based on the file-monitor prototype `803622acaa969ea8019ccf436ea9c459638447ea`. The [candidate patch](experiments/invalidate-on-migration.patch) has SHA-256 `ba1ad067ec75b9dc7c1965ef5aa4988d60d2f307c47f802969921ebee1ef0232`. The [environment snapshot](results/migration-cost-environment.txt) records compiler, lockfile, and executable hashes; [raw results](results/migration-cost.jsonl) preserve every sample. Later wording and report changes do not affect the measured executable.
 
-From a clean worktree at that source commit, build the two binaries:
+From a clean worktree at the recorded harness source commit (`bd9aba9729318a9350b764555859d138409ff33b`), build the two binaries. The patch is already incorporated into the current implementation; do not apply it again to the current branch:
 
 ```sh
 cargo build --release --locked -p core-scheduler-file-benchmark --bin migration
