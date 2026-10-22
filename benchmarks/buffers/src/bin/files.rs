@@ -169,8 +169,16 @@ fn execute(args: &[String]) -> serde_json::Value {
                 .enable_all()
                 .build()
                 .unwrap();
-            let scheduler = core_scheduler_tokio::TokioScheduler::new(runtime.handle().clone());
-            let result = runtime.block_on(run(&scheduler, mode, size, bytes));
+            let scheduler = Arc::new(core_scheduler_tokio::TokioScheduler::new(
+                runtime.handle().clone(),
+            ));
+            let owned = scheduler.clone();
+            let mode = mode.to_owned();
+            let result = runtime
+                .block_on(
+                    runtime.spawn(async move { run(owned.as_ref(), &mode, size, bytes).await }),
+                )
+                .unwrap();
             runtime.block_on(scheduler.shutdown());
             result
         }
@@ -186,8 +194,13 @@ fn execute(args: &[String]) -> serde_json::Value {
             );
             let owned = Arc::clone(&scheduler);
             let mode = mode.to_owned();
-            let result =
-                scheduler.block_on(async move { run(owned.as_ref(), &mode, size, bytes).await });
+            let result = scheduler
+                .block_on(
+                    scheduler
+                        .spawn(async move { run(owned.as_ref(), &mode, size, bytes).await })
+                        .unwrap(),
+                )
+                .unwrap();
             scheduler.block_on(scheduler.shutdown());
             result
         }
@@ -209,8 +222,13 @@ fn execute(args: &[String]) -> serde_json::Value {
             );
             let owned = Arc::clone(&scheduler);
             let mode = mode.to_owned();
-            let result =
-                scheduler.block_on(async move { run(owned.as_ref(), &mode, size, bytes).await });
+            let result = scheduler
+                .block_on(
+                    scheduler
+                        .spawn(async move { run(owned.as_ref(), &mode, size, bytes).await })
+                        .unwrap(),
+                )
+                .unwrap();
             scheduler.block_on(scheduler.shutdown());
             result
         }

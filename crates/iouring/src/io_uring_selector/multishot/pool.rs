@@ -42,7 +42,7 @@ impl Drop for Group {
 
 pub(crate) struct Pool {
     pub(crate) identifier: u64,
-    pub(super) controller: Weak<Controller>,
+    pub(crate) controller: Weak<Controller>,
     group: Group,
     ring: NonNull<types::BufRingEntry>,
     layout: Layout,

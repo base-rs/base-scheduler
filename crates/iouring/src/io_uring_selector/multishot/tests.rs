@@ -6,6 +6,20 @@ use super::super::tests::{drain, drive, pair};
 use super::*;
 use futures_lite::future::{block_on, poll_once};
 
+use core_scheduler_selector::{SelectorDriver, SelectorWorker};
+
+fn driven<F: Future>(worker: &mut crate::IoUringWorker, future: F) -> F::Output {
+    let mut future = pin!(future);
+    let deadline = std::time::Instant::now() + Duration::from_secs(3);
+    loop {
+        if let Some(output) = block_on(poll_once(future.as_mut())) {
+            return output;
+        }
+        worker.turn(Some(Duration::from_millis(1))).unwrap();
+        assert!(std::time::Instant::now() < deadline);
+    }
+}
+
 fn receiver(
     selector: &IoUringSelector,
     socket: &NativeSocket,
@@ -451,17 +465,6 @@ fn selected_error_and_eof_buffers_are_returned_without_reading_a_header() {
 #[test]
 fn local_returns_publish_directly_and_only_exhaustion_queues_a_rearm() {
     use core_scheduler_selector::{SelectorDriver, SelectorWorker};
-    fn driven<F: Future>(worker: &mut crate::IoUringWorker, future: F) -> F::Output {
-        let mut future = pin!(future);
-        let deadline = std::time::Instant::now() + Duration::from_secs(3);
-        loop {
-            if let Some(output) = block_on(poll_once(future.as_mut())) {
-                return output;
-            }
-            worker.turn(Some(Duration::from_millis(1))).unwrap();
-            assert!(std::time::Instant::now() < deadline);
-        }
-    }
     for exhaust in [false, true] {
         let (selector, driver) = pair(1);
         let (sender, socket) = block_on(core_scheduler_conformance::socket::stream_pair(
@@ -831,4 +834,79 @@ fn incompatible_selector_preserves_receiver_and_queued_data() {
     drop(receiving);
     drain(&selector, &mut driver);
     drain(&other, &mut other_driver);
+}
+
+#[test]
+fn retained_leases_can_be_released_after_worker_thread_locals_are_destroyed() {
+    thread_local! {
+        static HELD: std::cell::RefCell<Option<(RecvMsgBuffer, Option<IoUringSelector>)>> = const { std::cell::RefCell::new(None) };
+    }
+    for keep_selector in [false, true] {
+        std::thread::spawn(move || {
+            // Initialize the lease holder first, so ROUTES is destroyed before the retained lease at thread exit.
+            HELD.with(|held| assert!(held.borrow().is_none()));
+            let (selector, driver) = pair(2);
+            let (sender, socket) = block_on(core_scheduler_conformance::socket::stream_pair(
+                &selector,
+                SocketDomain::Ipv4,
+            ));
+            let mut worker = driver.enter();
+            let mut receiving = receiver(&selector, &socket, 2, 16);
+            sender
+                .try_send(b"retained", SocketSendFlags::default())
+                .unwrap();
+            let message = driven(
+                &mut worker,
+                receiving.recv(&selector, &Cancellation::never()),
+            )
+            .unwrap()
+            .unwrap();
+            assert_eq!(message.buffer.as_ref(), b"retained");
+            let controller = message.buffer.pool.controller.clone();
+            driven(&mut worker, receiving.close(&selector)).unwrap();
+            drop(receiving);
+            selector.close();
+            while !worker.turn(Some(Duration::from_millis(1))).unwrap() {}
+            drop(worker);
+            let retained_selector = if keep_selector {
+                Some(selector)
+            } else {
+                drop(selector);
+                None
+            };
+            assert_eq!(controller.strong_count() != 0, keep_selector);
+            HELD.with(|held| *held.borrow_mut() = Some((message.buffer, retained_selector)));
+        })
+        .join()
+        .unwrap();
+    }
+}
+
+#[test]
+fn concurrent_completion_publication_preserves_receive_wakeups() {
+    let (selector, driver) = pair(2);
+    let driver = std::thread::spawn(move || driver.run().unwrap());
+    let (sender, socket) = block_on(core_scheduler_conformance::socket::stream_pair(
+        &selector,
+        SocketDomain::Ipv4,
+    ));
+    let mut receiving = receiver(&selector, &socket, 8, 4);
+    let never = Cancellation::never();
+    for index in 0u32..10_000 {
+        let bytes = index.to_ne_bytes();
+        assert_eq!(
+            sender.try_send(&bytes, SocketSendFlags::default()).unwrap(),
+            bytes.len()
+        );
+        if index % 2 == 0 {
+            std::thread::yield_now();
+        }
+        let message = block_on(receiving.recv(&selector, &never))
+            .unwrap()
+            .unwrap();
+        assert_eq!(message.buffer.as_ref(), bytes);
+    }
+    block_on(receiving.close(&selector)).unwrap();
+    selector.close();
+    driver.join().unwrap();
 }

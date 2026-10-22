@@ -9,7 +9,7 @@ use std::{
     io,
     pin::pin,
     sync::{
-        Arc, Mutex,
+        Arc,
         atomic::{AtomicUsize, Ordering},
     },
     task::Poll,
@@ -28,12 +28,13 @@ pub(crate) struct Slot {
 
 pub(crate) struct Pool {
     pub(crate) slots: Box<[Slot]>,
-    free: Mutex<Vec<usize>>,
+    // One bit per stable slot; the final word never advertises unused indices.
+    free: Box<[AtomicUsize]>,
     returned: Event,
     size: usize,
 }
 
-// SAFETY: A slot is either on the free list, held exclusively by one mutable lease, or held by immutable views counted in readers. Only the exclusive lease can mutate its bytes. Final release synchronizes through the free-list mutex before another lease can access that slot. Slots and byte allocations never move or resize.
+// SAFETY: A set availability bit, one mutable lease, or immutable views counted in readers exclusively owns each slot. Only the mutable lease can mutate bytes. Clearing an availability bit acquires the final owner's release before accessing that slot. Slots and byte allocations never move or resize.
 unsafe impl Sync for Pool {}
 
 impl BufferPool {
@@ -46,9 +47,13 @@ impl BufferPool {
         }
         let returned = Event::new();
         returned.notify(0);
-        let free = Mutex::new((0..buffers).rev().collect());
-        // Initialize native mutex state during pool setup rather than the first checkout.
-        drop(free.lock().unwrap());
+        let width = usize::BITS as usize;
+        let free = (0..buffers.div_ceil(width))
+            .map(|word| {
+                let bits = (buffers - word * width).min(width);
+                AtomicUsize::new(usize::MAX >> (width - bits))
+            })
+            .collect();
         Ok(Self(Arc::new(Pool {
             slots: (0..buffers)
                 .map(|_| Slot {
@@ -71,12 +76,25 @@ impl BufferPool {
 
     /// Acquire exclusive writable storage immediately, or return `None` without allocating.
     pub fn try_acquire(&self) -> Option<BufferLease> {
-        self.0
-            .free
-            .lock()
-            .unwrap()
-            .pop()
-            .map(|index| BufferLease::new(Arc::clone(&self.0), index, self.0.size))
+        for (word_index, word) in self.0.free.iter().enumerate() {
+            let mut available = word.load(Ordering::Relaxed);
+            while available != 0 {
+                match word.compare_exchange_weak(
+                    available,
+                    available & (available - 1),
+                    Ordering::Acquire,
+                    Ordering::Relaxed,
+                ) {
+                    Ok(_) => {
+                        let index =
+                            word_index * usize::BITS as usize + available.trailing_zeros() as usize;
+                        return Some(BufferLease::new(Arc::clone(&self.0), index, self.0.size));
+                    }
+                    Err(current) => available = current,
+                }
+            }
+        }
+        None
     }
 
     /// Wait for one lease. Pre-cancellation leaves capacity unchanged; a successfully acquired lease wins a later cancellation race.
@@ -105,8 +123,10 @@ impl BufferPool {
 
 impl Pool {
     pub(crate) fn release(&self, index: usize) {
-        self.free.lock().unwrap().push(index);
-        self.returned.notify(1);
+        let width = usize::BITS as usize;
+        // Use an RMW to preserve release sequences for other slots in the same word.
+        self.free[index / width].fetch_or(1 << (index % width), Ordering::Release);
+        self.returned.notify_additional(1);
     }
 
     pub(crate) fn retain(&self, index: usize) {

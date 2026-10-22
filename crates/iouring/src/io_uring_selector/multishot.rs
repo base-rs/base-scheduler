@@ -6,7 +6,7 @@
 use super::*;
 use std::{cell::UnsafeCell, sync::Mutex, task::Context};
 
-pub(super) mod pool;
+pub(crate) mod pool;
 use pool::Pool;
 
 pub use core_scheduler::RecvMsgMultishotOptions;
@@ -37,8 +37,12 @@ impl AsRef<[u8]> for RecvMsgBuffer {
 unsafe impl IoBuf for RecvMsgBuffer {}
 impl Drop for RecvMsgBuffer {
     fn drop(&mut self) {
+        if crate::io_uring_worker::recycle(&self.pool, self.identifier) {
+            return;
+        }
         if let Some(controller) = self.pool.controller.upgrade() {
-            let _ = controller.send(Command::Recycle(Arc::clone(&self.pool), self.identifier));
+            let _ =
+                controller.send_remote(Command::Recycle(Arc::clone(&self.pool), self.identifier));
         }
     }
 }
@@ -56,6 +60,22 @@ struct State {
     changed: CompletionEvent,
 }
 impl State {
+    fn next(&self) -> Option<OperationResult<Option<RecvMsgMultishotMessage>>> {
+        let mut received = self.received.lock().unwrap();
+        if let Some(message) = received.messages.pop_front() {
+            Some(Ok(Some(message)))
+        } else if received.retired {
+            Some(
+                received
+                    .error
+                    .take()
+                    .map_or(Ok(None), |error| Err(error.into())),
+            )
+        } else {
+            None
+        }
+    }
+
     fn finish(&self, result: io::Result<usize>) {
         {
             let mut received = self.received.lock().unwrap();
@@ -81,19 +101,14 @@ impl RecvMsgMultishot {
     ) -> OperationResult<Option<RecvMsgMultishotMessage>> {
         let mut cancelled = pin!(cancellation.cancelled());
         loop {
+            // Completed batches need no listener registration. Listen and recheck only when the queue is empty, closing the race with completion publication.
+            if let Some(result) = self.state.next() {
+                return result;
+            }
             let was_cancelled = {
                 event_listener::listener!(self.state.changed => listener);
-                {
-                    let mut received = self.state.received.lock().unwrap();
-                    if let Some(message) = received.messages.pop_front() {
-                        return Ok(Some(message));
-                    }
-                    if received.retired {
-                        return received
-                            .error
-                            .take()
-                            .map_or(Ok(None), |error| Err(error.into()));
-                    }
+                if let Some(result) = self.state.next() {
+                    return result;
                 }
                 let mut listener = pin!(listener);
                 poll_fn(|context: &mut Context<'_>| {
@@ -376,12 +391,16 @@ impl PendingRequest for MultiRequest {
             },
             buffer,
         };
-        {
+        let notify = {
             let mut received = self.state.received.lock().unwrap();
+            let empty = received.messages.is_empty();
             received.statistics.messages += 1;
             received.messages.push_back(message);
+            empty
+        };
+        if notify {
+            self.state.changed.notify(1);
         }
-        self.state.changed.notify(1);
     }
     fn retry(&self, result: i32) -> Option<bool> {
         (!self.cancelling.get() && !self.eof.get() && (result >= 0 || result == -libc::ENOBUFS))

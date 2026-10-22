@@ -147,3 +147,71 @@ fn many_readers_return_each_slot_once() {
     assert!(pool.try_acquire().is_none());
     drop(leases);
 }
+
+#[test]
+fn availability_words_preserve_exact_capacity_and_stable_storage() {
+    for count in [usize::BITS as usize, usize::BITS as usize + 3] {
+        let pool = BufferPool::new(count, 8).unwrap();
+        let buffers: Vec<_> = (0..count).map(|_| pool.try_acquire().unwrap()).collect();
+        let pointers: std::collections::HashSet<_> = buffers
+            .iter()
+            .map(|buffer| buffer.as_ref().as_ptr() as usize)
+            .collect();
+        assert_eq!(pointers.len(), count);
+        assert!(pool.try_acquire().is_none());
+        std::thread::spawn(move || drop(buffers)).join().unwrap();
+        let buffers: Vec<_> = (0..count).map(|_| pool.try_acquire().unwrap()).collect();
+        assert!(
+            buffers
+                .iter()
+                .all(|buffer| pointers.contains(&(buffer.as_ref().as_ptr() as usize)))
+        );
+        assert!(pool.try_acquire().is_none());
+    }
+}
+
+#[test]
+fn concurrent_checkouts_exclusively_own_their_slots() {
+    let pool = BufferPool::new(8, 64).unwrap();
+    let barrier = std::sync::Barrier::new(8);
+    std::thread::scope(|scope| {
+        for value in 0..8 {
+            let pool = &pool;
+            let barrier = &barrier;
+            scope.spawn(move || {
+                barrier.wait();
+                for _ in 0..if cfg!(miri) { 10 } else { 1000 } {
+                    let mut buffer = pool.try_acquire().unwrap();
+                    buffer.as_mut().fill(value);
+                    std::thread::yield_now();
+                    assert_eq!(buffer.as_ref(), [value; 64]);
+                    let frozen = buffer.freeze();
+                    assert_eq!(frozen.view(..8).as_ref(), [value; 8]);
+                }
+            });
+        }
+    });
+    let buffers: Vec<_> = (0..8).map(|_| pool.try_acquire().unwrap()).collect();
+    assert!(pool.try_acquire().is_none());
+    drop(buffers);
+}
+
+#[test]
+fn each_return_wakes_a_distinct_waiter_before_either_is_polled() {
+    block_on(async {
+        let pool = BufferPool::new(2, 16).unwrap();
+        let first = pool.try_acquire().unwrap();
+        let second = pool.try_acquire().unwrap();
+        let never = Cancellation::never();
+        let mut first_waiter = pin!(pool.acquire(&never));
+        let mut second_waiter = pin!(pool.acquire(&never));
+        assert!(poll_once(first_waiter.as_mut()).await.is_none());
+        assert!(poll_once(second_waiter.as_mut()).await.is_none());
+        drop((first, second));
+        let first = poll_once(first_waiter.as_mut()).await.unwrap().unwrap();
+        // Keep this lease: a second free slot must wake the second waiter independently.
+        let second = poll_once(second_waiter.as_mut()).await.unwrap().unwrap();
+        assert!(pool.try_acquire().is_none());
+        drop((first, second));
+    });
+}

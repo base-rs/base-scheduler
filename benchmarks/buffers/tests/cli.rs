@@ -16,6 +16,12 @@ fn benchmark_binaries_emit_parseable_samples() {
             "iterations",
             2,
         ),
+        (
+            env!("CARGO_BIN_EXE_leases"),
+            ["2", "100", "local", "frozen", "", ""],
+            "threads",
+            2,
+        ),
     ] {
         let output = std::process::Command::new(binary)
             .args(arguments)
