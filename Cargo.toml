@@ -35,6 +35,9 @@ reviewers = ["core-rs/maintainers"]
 [dependencies]
 event-listener = "5.4.2"
 
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage)'] }
+
 [dev-dependencies]
 allocation-counter = "0.8.1"
 futures-channel = "0.3.31"

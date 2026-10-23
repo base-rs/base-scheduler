@@ -3,6 +3,8 @@
 
 use crate::{BufferLease, Cancellation, Cancelled};
 use event_listener::Event;
+#[cfg(not(test))]
+use std::process::abort;
 use std::{
     cell::UnsafeCell,
     future::{Future, poll_fn},
@@ -15,6 +17,8 @@ use std::{
     },
     task::Poll,
 };
+#[cfg(test)]
+use tests::abort;
 
 /// A bounded, shareable collection of stable initialized slots in one contiguous slab. Construction reserves all payload storage; acquiring, freezing, slicing, and returning leases allocate no payload or reference-count wrappers.
 ///
@@ -36,6 +40,12 @@ const CLOSED: usize = 1 << (usize::BITS - 1);
 const WAITING: usize = CLOSED >> 1;
 const AVAILABLE: usize = WAITING - 1;
 const WIDTH: usize = usize::BITS as usize - 2;
+
+// Unit tests reach the ownership limit through real acquisitions and clones. Production keeps the same conservative ceiling as Arc's reference count.
+#[cfg(not(test))]
+const COUNT_LIMIT: usize = isize::MAX as usize;
+#[cfg(test)]
+const COUNT_LIMIT: usize = 128;
 
 // Each physical slot has one persistent strong ownership claim. Its availability bit, mutable lease, or complete group of frozen views owns that claim. Pool handles retain a separate owner while acquisition is possible. Closing the pool retires idle claims; outstanding leases retire theirs when returned.
 pub(crate) struct Slab {
@@ -190,8 +200,8 @@ impl<'a> PoolWaiter<'a> {
                 word.fetch_or(WAITING, Ordering::Release);
             }
         }
-        if *waiters >= isize::MAX as usize {
-            std::process::abort();
+        if *waiters >= COUNT_LIMIT {
+            abort();
         }
         *waiters += 1;
         Self(pool)
@@ -263,8 +273,8 @@ impl Slab {
 
     pub(crate) fn retain(&self, index: usize) {
         // Frozen views share their slot's one slab claim, so guard their own count.
-        if self.slots[index].readers.fetch_add(1, Ordering::Relaxed) >= isize::MAX as usize {
-            std::process::abort();
+        if self.slots[index].readers.fetch_add(1, Ordering::Relaxed) >= COUNT_LIMIT {
+            abort();
         }
     }
 

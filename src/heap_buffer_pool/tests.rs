@@ -5,6 +5,104 @@ use super::*;
 use futures_lite::future::{block_on, poll_once};
 use std::sync::Barrier;
 
+const AT_LIMIT: &str = "pool counter reached its limit and reused a released owner";
+
+// Aborting skips the normal coverage runtime shutdown. Save the child's counters before delegating to the real process abort; a failed flush must not change termination behavior.
+pub(super) fn abort() -> ! {
+    #[cfg(coverage)]
+    unsafe {
+        unsafe extern "C" {
+            fn __llvm_profile_write_file() -> std::ffi::c_int;
+        }
+        // SAFETY: Coverage-instrumented test binaries link this LLVM profiling-runtime entry point, which takes no arguments and retains no Rust references.
+        let _ = __llvm_profile_write_file();
+    }
+    std::process::abort();
+}
+
+fn assert_aborts(name: &str, operation: impl FnOnce()) {
+    const CHILD: &str = "CORE_SCHEDULER_POOL_OVERFLOW_TEST";
+    if std::env::var(CHILD).as_deref() == Ok(name) {
+        #[cfg(unix)]
+        {
+            let limit = libc::rlimit {
+                rlim_cur: 0,
+                rlim_max: 0,
+            };
+            // SAFETY: This valid limit only disables core dumps in the isolated child process.
+            assert_eq!(unsafe { libc::setrlimit(libc::RLIMIT_CORE, &limit) }, 0);
+        }
+        operation();
+        panic!("counter overflow did not abort");
+    }
+    let output = std::process::Command::new(std::env::current_exe().unwrap())
+        .args(["--exact", name, "--nocapture"])
+        .env(CHILD, name)
+        .output()
+        .unwrap();
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains(AT_LIMIT),
+        "the child aborted before reaching the checked boundary: {output:?}"
+    );
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::ExitStatusExt;
+        assert_eq!(output.status.signal(), Some(libc::SIGABRT), "{output:?}");
+    }
+    #[cfg(windows)]
+    assert_eq!(
+        output.status.code().map(|code| code as u32),
+        Some(0xC0000409), // Windows fast-fail termination from std::process::abort.
+        "{output:?}"
+    );
+}
+
+#[test]
+#[cfg_attr(miri, ignore = "requires subprocess termination")]
+fn frozen_reader_limit_aborts_before_the_count_can_wrap() {
+    assert_aborts(
+        "heap_buffer_pool::tests::frozen_reader_limit_aborts_before_the_count_can_wrap",
+        || {
+            let pool = HeapBufferPool::new(1, 8).unwrap();
+            let frozen = pool.try_acquire().unwrap().freeze();
+            let mut readers: Vec<_> = (1..COUNT_LIMIT).map(|_| frozen.clone()).collect();
+            assert!(pool.try_acquire().is_none());
+            drop(readers.pop().unwrap());
+            readers.push(frozen.clone());
+            assert_eq!(readers.len() + 1, COUNT_LIMIT);
+            eprintln!("{AT_LIMIT}");
+            drop(frozen.clone());
+        },
+    );
+}
+
+#[test]
+#[cfg_attr(miri, ignore = "requires subprocess termination")]
+fn waiter_limit_aborts_before_the_count_can_wrap() {
+    assert_aborts(
+        "heap_buffer_pool::tests::waiter_limit_aborts_before_the_count_can_wrap",
+        || {
+            let pool = HeapBufferPool::new(1, 8).unwrap();
+            let _lease = pool.try_acquire().unwrap();
+            let never = Cancellation::never();
+            let mut waiters = Vec::new();
+            for _ in 0..COUNT_LIMIT {
+                let mut waiter = Box::pin(pool.acquire(&never));
+                assert!(block_on(poll_once(waiter.as_mut())).is_none());
+                waiters.push(waiter);
+            }
+            drop(waiters.pop().unwrap());
+            let mut replacement = Box::pin(pool.acquire(&never));
+            assert!(block_on(poll_once(replacement.as_mut())).is_none());
+            waiters.push(replacement);
+            assert_eq!(waiters.len(), COUNT_LIMIT);
+            eprintln!("{AT_LIMIT}");
+            let mut excess = pin!(pool.acquire(&never));
+            let _ = block_on(poll_once(excess.as_mut()));
+        },
+    );
+}
+
 #[test]
 fn closing_retires_idle_tokens_across_availability_words() {
     for capacity in [1, WIDTH, WIDTH + 1, WIDTH * 2 + 3] {
