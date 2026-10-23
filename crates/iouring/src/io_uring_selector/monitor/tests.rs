@@ -162,6 +162,9 @@ fn short_stream_reads_clear_readiness_only_on_would_block_and_preserve_eof() {
         assert_eq!(attempts.load(Ordering::Relaxed), 1);
         worker.turn(Some(Duration::ZERO)).unwrap();
         peer.write_all(b"two").unwrap();
+        until(&mut worker, || {
+            inspect.registration().readiness.load(Ordering::Acquire) & READY != 0
+        });
         assert_eq!(
             drive(&mut worker, &mut context, receive.as_mut()).unwrap(),
             3
@@ -1036,6 +1039,9 @@ fn one_shot_compatibility_waits_rearm_after_each_terminal_completion() {
         ));
         assert!(read.as_mut().poll(&mut context).is_pending());
         peer.write_all(b"x").unwrap();
+        until(&mut worker, || {
+            !inspect.registration().status.lock().unwrap().pending
+        });
         assert_eq!(drive(&mut worker, &mut context, read.as_mut()).unwrap(), 1);
         assert!(!inspect.registration().status.lock().unwrap().pending);
     }
@@ -1101,8 +1107,7 @@ fn a_later_wait_rebinds_to_its_new_workers_ring_after_retirement() {
     });
 }
 
-#[test]
-fn an_active_monitor_future_can_move_to_another_workers_thread() {
+fn move_active_monitor_future(receive_payload: bool) {
     let (selector, mut drivers) = IoUringSelector::with_workers(options(), 2).unwrap();
     let (socket, mut peer) = sockets(&selector);
     let mut reader = selector
@@ -1110,7 +1115,23 @@ fn an_active_monitor_future_can_move_to_another_workers_thread() {
         .unwrap();
     let never = Cancellation::never();
     let inspect = reader.retained();
-    let waiting = Box::pin(selector.socket_monitor_wait(&mut reader, &never));
+    let mut byte = [0];
+    let waiting: Pin<Box<dyn Future<Output = OperationResult<usize>> + Send + '_>> =
+        if receive_payload {
+            Box::pin(selector.socket_monitor_recv_poll(
+                &mut reader,
+                &mut byte,
+                SocketRecvFlags::default(),
+                &never,
+            ))
+        } else {
+            Box::pin(async {
+                selector
+                    .socket_monitor_wait(&mut reader, &never)
+                    .await
+                    .map(|()| 0)
+            })
+        };
     let second_driver = drivers.pop().unwrap();
     let first_driver = drivers.pop().unwrap();
     let (handoff, receive) = mpsc::channel();
@@ -1149,10 +1170,26 @@ fn an_active_monitor_future_can_move_to_another_workers_thread() {
                 ));
             }
             peer.write_all(b"x").unwrap();
-            drive(&mut worker, &mut context, waiting.as_mut()).unwrap();
+            assert_eq!(
+                drive(&mut worker, &mut context, Pin::new(&mut waiting)).unwrap(),
+                usize::from(receive_payload)
+            );
             finished.store(true, Ordering::Release);
         });
     });
+    if receive_payload {
+        assert_eq!(byte, [b'x']);
+    }
+}
+
+#[test]
+fn an_active_monitor_future_can_move_to_another_workers_thread() {
+    move_active_monitor_future(false);
+}
+
+#[test]
+fn an_active_monitor_receive_can_move_to_another_workers_thread() {
+    move_active_monitor_future(true);
 }
 
 #[test]

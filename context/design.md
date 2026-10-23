@@ -204,7 +204,7 @@ io_uring allocates shared retirement status once per monitor, independently of i
 
 Persistent registrations do not consume permits reserved for transient I/O operations: otherwise enough idle sockets could prevent another connection from making progress. Worker tables reserve initial capacity and can grow when a new registration needs space. Ordinary reuse allocates nothing after capacity exists. A directional record has at most one waiter, and independent reader/writer records support simultaneous tasks.
 
-A suspended wait retains its original ring even if its polling task changes threads. At a subsequent readiness wait without cached readiness, a changed compatible worker retires the former registration before rebinding the record to its own ring. This fixup is confined to migration; normal repeated waits keep their registration. Neither permanent task pinning nor a new stealing policy is introduced. Timers retain their existing worker-owned registration contract.
+A suspended wait retains its original ring even if its polling task changes threads. A borrowed monitor operation likewise keeps the route selected by its first readiness wait through every retry, and retries the nonblocking syscall on each poll before consulting readiness. A later operation without cached readiness can select a changed compatible worker, retiring the former registration before rebinding the record to its own ring. This fixup is confined to migration; normal repeated waits keep their registration. Neither permanent task pinning nor a new stealing policy is introduced. Timers retain their existing worker-owned registration contract.
 
 ## Experimental sequential file monitors
 

@@ -173,6 +173,7 @@ impl IoUringSelector {
             if cancelled.as_mut().poll(context).is_ready() {
                 return Poll::Ready(Err(core_scheduler::Cancelled.into()));
             }
+            self.check_monitor(state)?;
             self.poll_monitor_wait(monitor, &controller, context)
         })
         .await
@@ -186,7 +187,6 @@ impl IoUringSelector {
     ) -> Poll<OperationResult<()>> {
         let state = monitor.as_ref();
         let registration = state.registration();
-        self.check_monitor(state)?;
         let replacement = context.waker().clone();
         let (previous, submission, retirement) = {
             let mut status = registration.status.lock().unwrap();
@@ -278,15 +278,13 @@ impl IoUringSelector {
     ) -> OperationResult<T> {
         let state = monitor.as_ref();
         let registration = state.registration();
-        cancellation.check()?;
-        self.check_monitor(state)?;
-        state.check_interest(interest)?;
         let mut wait = None;
         let mut cancelled = pin!(cancellation.cancelled());
         poll_fn(|context| {
             loop {
                 cancellation.check()?;
                 self.check_monitor(state)?;
+                state.check_interest(interest)?;
                 let readiness = registration.readiness.load(Ordering::Acquire);
                 match operation(state.socket()) {
                     Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
