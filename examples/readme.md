@@ -9,7 +9,7 @@ These executable examples share their loops with correctness tests and a standar
 | `datagrams` | [`datagrams::receive`](src/datagrams.rs) | Transfer whole messages and peer metadata to bounded worker tasks. |
 | `files` | [`files::copy`](src/files.rs) | Alternate two owned buffers while joining the next read with the current write. |
 
-The frame decoder is deliberately a small fixed-record example, not an HTTP implementation. The driver retains two frames over later receives and keeps them valid after receiver close. The UDP loop bounds task ownership and waits for every accepted task even after an error. Applications retaining data beyond these handlers must budget for that additional ownership.
+The frame decoder is deliberately a small fixed-record byte-stream example, not an HTTP implementation or a datagram parser. The driver retains two frames over later receives and checks their contents again during processing and after receiver close. The UDP loop bounds task ownership and waits for every accepted task even after an error. It collects handler results in submission order: an error is observed at collection, so callers must cancel a receive wait when ending a sequence early. Handlers must finish independently of further receives. Applications retaining data beyond these handlers must budget for that additional ownership.
 
 Run from the workspace root:
 
@@ -30,6 +30,12 @@ TCP has one sender thread and one scheduler-side receive sequence. UDP has a win
 
 Compare each recipe across backends. Different recipes perform different application work: the frame and packet cases deliberately pay for ownership and processing. Their throughput is not a direct comparison of pooled versus borrowed syscalls. Existing mechanism comparisons remain in the [buffer benchmarks](../benchmarks/buffers/readme.md).
 
-For a repeatable matrix, build once, run `target/release/core-scheduler-examples` for each backend/recipe/worker combination in alternating order, keep the JSON samples, and report medians with the compiler, kernel, CPU, source revision, and timing boundaries. See [results](results.md).
+Run the standard matrix with:
+
+```sh
+python3 examples/benchmark.py --repeats 5 --output /tmp/core-scheduler-examples.jsonl
+```
+
+The script builds once, obtains the executable path from Cargo (including custom target directories), and shuffles each repetition with a fixed seed. It records JSON samples and a neighboring metadata file with compiler, platform, source revision, and workload provenance. See [results](results.md) for the measured baseline and machine details.
 
 The installed [I/O context guide](../context/io.md) records the recommendations for protocol authors and agents. The [interface reference](../context/interface.md) describes the complete capabilities and ownership contracts.

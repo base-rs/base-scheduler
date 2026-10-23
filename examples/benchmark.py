@@ -25,7 +25,10 @@ def main():
     def command(*arguments):
         return subprocess.check_output(arguments, cwd=root, text=True).strip()
 
-    subprocess.run(["cargo", "build", "--release", "--locked", "-p", "core-scheduler-examples"], cwd=root, check=True)
+    artifacts = command("cargo", "build", "--release", "--locked", "-p", "core-scheduler-examples", "--message-format=json")
+    binary = next(Path(artifact["executable"]) for line in artifacts.splitlines()
+                  if (artifact := json.loads(line)).get("executable")
+                  and artifact["target"]["name"] == "core-scheduler-examples")
     metadata = {
         "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "platform": platform.platform(),
@@ -43,7 +46,6 @@ def main():
     if platform.system() == "Linux":
         backends.append("iouring")
     workloads = [("stream", 65536, 4096), ("frames", 4093, 32768), ("datagrams", 1200, 16384), ("files", 65536, 4096)]
-    binary = root / "target" / "release" / ("core-scheduler-examples.exe" if os.name == "nt" else "core-scheduler-examples")
     generator = random.Random(0)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.with_suffix(".metadata.json").write_text(json.dumps(metadata, indent=2) + "\n")

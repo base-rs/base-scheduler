@@ -8,6 +8,8 @@ use core_scheduler::{
 use std::{collections::VecDeque, io};
 
 /// Transfer complete messages, including peer metadata, to bounded independent tasks. The receiver never copies payloads for handoff.
+///
+/// This finite packet sequence collects task handles in submission order. A handler error is observed at collection, not immediately while waiting for another packet; the caller's cancellation can end that wait. Handlers must finish without requiring another receive from this sequence.
 pub async fn receive<S, F>(
     scheduler: &S,
     socket: &S::Socket,

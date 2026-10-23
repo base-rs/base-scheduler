@@ -121,9 +121,15 @@ where
         }
         "frames" => {
             frames::receive(scheduler, &socket, pool, size, &cancellation, |frame| {
+                for (offset, retained) in &retained {
+                    assert_eq!(
+                        frames::Frame::as_ref(retained),
+                        &data[*offset..*offset + size]
+                    );
+                }
                 assert_eq!(frame.as_ref(), &data[position..position + size]);
+                retained.push_back((position, frame));
                 position += size;
-                retained.push_back(frame);
                 // Keep views alive over subsequent receives without monopolizing the pool.
                 if retained.len() > 2 {
                     std::hint::black_box(retained.pop_front());
@@ -137,6 +143,7 @@ where
         "datagrams" => {
             let received = Arc::new(std::sync::Mutex::new(vec![false; packets]));
             let seen = Arc::clone(&received);
+            let packet_data = Arc::clone(&data);
             datagrams::receive(
                 scheduler,
                 &socket,
@@ -149,7 +156,10 @@ where
                     // Payloads contain a sequence number so reordering is valid but loss and duplication are detected.
                     let index =
                         u64::from_le_bytes(message.payload()[..8].try_into().unwrap()) as usize;
-                    assert_eq!(message.payload(), &data[index * size..(index + 1) * size]);
+                    assert_eq!(
+                        message.payload(),
+                        &packet_data[index * size..(index + 1) * size]
+                    );
                     assert!(!std::mem::replace(&mut seen.lock().unwrap()[index], true));
                     acknowledge.send(()).unwrap();
                     Ok(())
@@ -163,8 +173,8 @@ where
     }
     let elapsed = began.elapsed();
     // These owners deliberately survive receiver shutdown.
-    for frame in retained {
-        std::hint::black_box(frame.as_ref());
+    for (offset, frame) in retained {
+        assert_eq!(frame.as_ref(), &data[offset..offset + size]);
     }
     scheduler.socket_close(socket).await.unwrap();
     peer.join().unwrap();

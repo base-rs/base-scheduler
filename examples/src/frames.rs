@@ -76,7 +76,7 @@ impl FrameDecoder {
     }
 }
 
-/// The consumer may retain frames across receives. Bound retention so at least one pool slot can progress.
+/// Receive fixed-size records from a byte stream. The consumer may retain frames across receives; bound retention so at least one pool slot can progress. Datagram boundaries and truncation need a message-aware parser instead.
 pub async fn receive<S, B, F>(
     scheduler: &S,
     socket: &S::Socket,
