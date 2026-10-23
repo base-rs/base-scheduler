@@ -42,3 +42,9 @@ impl ReceiveBuffer for IoUringBuffer {
 // SAFETY: The range retains its unique stable heap lease; moving the wrapper changes neither storage nor initialized length. Freezing consumes mutable access and retains the same allocation.
 unsafe impl IoBuf for IoUringBuffer {}
 unsafe impl IoBufMut for IoUringBuffer {}
+
+impl crate::io_uring_recv_message::MessageStorage for IoUringBuffer {
+    fn storage(&self) -> &[u8] {
+        self.buffer.as_ref()
+    }
+}

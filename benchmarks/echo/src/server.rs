@@ -1,6 +1,8 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
+use core_scheduler::SocketRecvMessage;
+
 use crate::Result;
 use core_scheduler::{
     Cancellation, IoBuf, RecvMsgMultishotOptions, SocketAccept, SocketMonitoring, SocketRead,
@@ -185,7 +187,7 @@ where
                         .await
                         .expect("multishot receive")
                     {
-                        let mut bytes = message.buffer.as_ref();
+                        let mut bytes = message.payload();
                         while !bytes.is_empty() {
                             let sent = shared
                                 .socket_send_poll(

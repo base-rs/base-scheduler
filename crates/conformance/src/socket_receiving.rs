@@ -42,12 +42,12 @@ where
         let (sent, _) = scheduler.socket_write(sender, b"a".to_vec(), &never).await;
         assert_eq!(sent.unwrap(), 1);
         let message = active.recv(scheduler, &never).await.unwrap().unwrap();
-        assert_eq!(message.buffer.as_ref(), b"a");
+        assert_eq!(message.payload(), b"a");
         drop(message);
         let (sent, _) = scheduler.socket_write(socket, b"b".to_vec(), &never).await;
         assert_eq!(sent.unwrap(), 1);
         let message = waiting.await.unwrap().unwrap();
-        assert_eq!(message.buffer.as_ref(), b"b");
+        assert_eq!(message.payload(), b"b");
     }
     SocketRecvMsgReceiver::close(&mut idle, scheduler)
         .await
@@ -81,8 +81,8 @@ where
     assert_eq!(result.unwrap(), 6);
     let first = receiver.recv(scheduler, &never).await.unwrap().unwrap();
     let second = receiver.recv(scheduler, &never).await.unwrap().unwrap();
-    assert_eq!(first.buffer.as_ref(), b"abc");
-    assert_eq!(second.buffer.as_ref(), b"def");
+    assert_eq!(first.payload(), b"abc");
+    assert_eq!(second.payload(), b"def");
     let token = Cancellation::new();
     {
         let mut waiting = pin!(receiver.recv(scheduler, &token));
@@ -91,7 +91,7 @@ where
         assert!(waiting.await.is_err());
     }
     // Capacity-wait cancellation does not consume the receiver.
-    let frozen = first.buffer.freeze();
+    let frozen = first.into_payload().freeze();
     let view = frozen.clone().slice(1..);
     drop(frozen);
     drop(second);
@@ -127,10 +127,24 @@ where
             .socket_sendmsg(sender, message, SocketSendFlags::default(), &never)
             .await;
         assert_eq!(result.unwrap(), bytes.len());
-        let message = receiver.recv(scheduler, &never).await.unwrap().unwrap();
-        assert_eq!(message.buffer.as_ref(), &bytes[..bytes.len().min(3)]);
-        assert_eq!(message.result.truncated, bytes.len() > 3);
-        assert!(message.result.address.is_some());
+        let mut message = receiver.recv(scheduler, &never).await.unwrap().unwrap();
+        assert_eq!(message.payload(), &bytes[..bytes.len().min(3)]);
+        assert_eq!(message.truncated(), bytes.len() > 3);
+        let source = message.address().map(|address| address.to_socket_address());
+        assert!(source.is_some());
+        if !message.payload().is_empty() {
+            message.payload_mut()[0] = b'X';
+        }
+        assert_eq!(
+            message.address().map(|address| address.to_socket_address()),
+            source
+        );
+        assert_eq!(message.truncated(), bytes.len() > 3);
+        let payload = message.into_payload();
+        assert_eq!(payload.as_ref().len(), bytes.len().min(3));
+        if !bytes.is_empty() {
+            assert_eq!(payload.as_ref(), b"Xbc");
+        }
     }
     receiver.close(scheduler).await.unwrap();
     assert!(receiver.recv(scheduler, &never).await.unwrap().is_none());

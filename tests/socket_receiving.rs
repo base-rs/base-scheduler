@@ -160,7 +160,7 @@ fn receiver_preserves_retryable_rejections_and_distinguishes_cancellation_phases
         assert!(receiver.recv(&Sockets, &cancelled).await.is_err());
         assert!(receiver.close(&Sockets, &cancelled).await.is_err());
         let message = receiver.recv(&Sockets, &never).await.unwrap().unwrap();
-        let frozen = ReceiveBuffer::freeze(message.buffer);
+        let frozen = ReceiveBuffer::freeze(message.into_payload());
         assert_eq!(frozen.as_ref(), [42; 8]);
         socket.store(5, Ordering::Relaxed);
         assert!(receiver.recv(&Sockets, &Cancellation::new()).await.is_err());
@@ -183,10 +183,10 @@ fn receiver_reports_terminal_errors_once_and_close_keeps_completed_chunks_alive(
         let mut packets = super_receiver(socket.clone());
         socket.store(0, Ordering::Relaxed);
         let message = packets.recv(&Sockets, &never).await.unwrap().unwrap();
-        assert_eq!(message.buffer.as_ref(), b"");
+        assert_eq!(message.payload(), b"");
         packets.close(&Sockets, &never).await.unwrap();
         drop(packets);
-        assert_eq!(message.buffer.as_ref(), b"");
+        assert_eq!(message.payload(), b"");
     });
 }
 fn super_receiver(
@@ -239,7 +239,7 @@ fn idle_receiver_returns_capacity_for_another_connection() {
             assert!(poll_once(waiting.as_mut()).await.is_none());
             // The idle receive is still alive and pending. Its slot can serve an active connection.
             let message = active.recv(&Sockets, &never).await.unwrap().unwrap();
-            assert_eq!(message.buffer.as_ref(), [42; 8]);
+            assert_eq!(message.payload(), [42; 8]);
             assert!(pool.try_acquire().is_none());
             drop(message);
             assert!(pool.try_acquire().is_some());
@@ -257,7 +257,7 @@ fn receiver_retries_after_readiness_without_retaining_an_old_buffer() {
         let mut receiver = receiver(socket, SocketType::Stream);
         let never = Cancellation::never();
         let message = receiver.recv(&Sockets, &never).await.unwrap().unwrap();
-        assert_eq!(message.buffer.as_ref(), [42; 8]);
+        assert_eq!(message.payload(), [42; 8]);
         receiver.close(&Sockets, &never).await.unwrap();
     });
 }

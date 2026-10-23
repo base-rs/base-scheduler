@@ -75,7 +75,7 @@ fn receive_failures_and_abandonment_preserve_retained_storage() {
             assert!(pool.try_acquire().is_none());
         }
         drop(pool);
-        assert_eq!(message.buffer.as_ref(), b"retained");
+        assert_eq!(message.payload(), b"retained");
     }
 }
 
@@ -251,7 +251,7 @@ fn repeated_unregister_failure_stops_the_driver_without_recycling_unknown_storag
     }
     assert!(failed);
     assert!(block_on(closing).is_err());
-    assert_eq!(message.buffer.as_ref(), b"held");
+    assert_eq!(message.payload(), b"held");
     drop((receiving, driver));
     assert!(pool.try_acquire().is_none());
 }
@@ -637,7 +637,7 @@ fn exhausted_receivers_resume_from_their_own_groups_only() {
     let message = drive(&mut driver, pooled.recv(&selector, &never))
         .unwrap()
         .unwrap();
-    assert_eq!(message.buffer.as_ref(), b"b");
+    assert_eq!(message.payload(), b"b");
     drop(message);
     driver.turn(Some(Duration::ZERO)).unwrap();
     assert!(block_on(poll_once(legacy.recv(&selector, &never))).is_none());

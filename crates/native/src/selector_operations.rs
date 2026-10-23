@@ -403,13 +403,13 @@ where
     S: Selector,
     R: SocketRecvMsgReceiver<S>,
 {
-    type Buffer = R::Buffer;
+    type Message = R::Message;
 
     async fn recv(
         &mut self,
         scheduler: &NativeScheduler<S>,
         cancellation: &Cancellation,
-    ) -> OperationResult<Option<SocketRecvMessage<Self::Buffer>>> {
+    ) -> OperationResult<Option<Self::Message>> {
         self.0.recv(scheduler.selector(), cancellation).await
     }
 

@@ -385,10 +385,13 @@ pub async fn multishot_messages<S: SocketScheduler + SocketSendMsg + SocketRecvM
         .await;
     assert_eq!(sent.unwrap(), 6);
     let first = receiver.recv(scheduler, &never).await.unwrap().unwrap();
-    assert_eq!(first.buffer.as_ref(), b"abcd");
-    assert_eq!(first.result.bytes, 4);
-    assert_eq!(first.result.address, Some(source));
-    assert!(first.result.truncated);
+    assert_eq!(first.payload(), b"abcd");
+    assert_eq!(first.payload().len(), 4);
+    assert_eq!(
+        first.address().map(|address| address.to_socket_address()),
+        Some(source)
+    );
+    assert!(first.truncated());
     let (sent, _) = scheduler
         .socket_sendmsg(
             &sender,
@@ -403,10 +406,10 @@ pub async fn multishot_messages<S: SocketScheduler + SocketSendMsg + SocketRecvM
     assert_eq!(sent.unwrap(), 0);
     let mut waiting = Box::pin(receiver.recv(scheduler, &never));
     assert!(poll_once(&mut waiting).await.is_none());
-    assert_eq!(first.buffer.as_ref(), b"abcd");
+    assert_eq!(first.payload(), b"abcd");
     drop(first);
     let empty = waiting.await.unwrap().unwrap();
-    assert!(empty.buffer.as_ref().is_empty());
+    assert!(empty.payload().is_empty());
     // Cancellation while capacity is exhausted closes the receiver, without invalidating the returned lease or requiring it to be released first.
     let token = Cancellation::new();
     let mut waiting = Box::pin(receiver.recv(scheduler, &token));
@@ -417,7 +420,7 @@ pub async fn multishot_messages<S: SocketScheduler + SocketSendMsg + SocketRecvM
     receiver.close(scheduler).await.unwrap();
     receiver.close(scheduler).await.unwrap();
     drop(receiver);
-    assert!(empty.buffer.as_ref().is_empty());
+    assert!(empty.payload().is_empty());
     drop(empty);
     scheduler.socket_close(socket).await.unwrap();
     scheduler.socket_close(sender).await.unwrap();
@@ -454,10 +457,9 @@ pub async fn multishot_stream<S: SocketScheduler + SocketRecvMsgMultishot>(sched
         .unwrap();
     let mut payload = Vec::new();
     while let Some(message) = receiver.recv(scheduler, &never).await.unwrap() {
-        assert!(!message.buffer.as_ref().is_empty());
-        assert_eq!(message.result.bytes, message.buffer.as_ref().len());
-        assert!(!message.result.truncated);
-        payload.extend_from_slice(message.buffer.as_ref());
+        assert!(!message.payload().is_empty());
+        assert!(!message.truncated());
+        payload.extend_from_slice(message.payload());
     }
     assert_eq!(payload, b"abcdefghi");
     assert!(receiver.recv(scheduler, &never).await.unwrap().is_none());

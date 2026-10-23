@@ -204,6 +204,15 @@ pub use socket_receiver::SocketReceiver;
 pub use socket_receiving::SocketReceiving;
 pub use socket_recv_flags::SocketRecvFlags;
 pub use socket_recv_message::SocketRecvMessage;
+
+mod socket_recv_message_mut;
+pub use socket_recv_message_mut::SocketRecvMessageMut;
+
+mod socket_address_view;
+pub use socket_address_view::SocketAddressView;
+
+mod owned_socket_recv_message;
+pub use owned_socket_recv_message::OwnedSocketRecvMessage;
 pub use socket_recv_msg::SocketRecvMsg;
 pub use socket_recv_msg_multishot::SocketRecvMsgMultishot;
 pub use socket_recv_msg_poll::SocketRecvMsgPoll;

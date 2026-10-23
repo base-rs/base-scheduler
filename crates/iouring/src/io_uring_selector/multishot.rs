@@ -9,8 +9,8 @@ use std::{cell::UnsafeCell, sync::Mutex, task::Context};
 pub(crate) mod pool;
 use pool::Pool;
 
+use crate::io_uring_recv_message::{IoUringRecvMessage, MessageStorage};
 pub use core_scheduler::RecvMsgMultishotOptions;
-pub type SocketRecvMessage = core_scheduler::SocketRecvMessage<RecvMsgBuffer>;
 
 /// Counters for verifying persistent submissions and pool pressure.
 #[derive(Clone, Copy, Debug, Default)]
@@ -33,6 +33,15 @@ impl AsRef<[u8]> for RecvMsgBuffer {
         unsafe { self.pool.bytes(self.identifier, self.offset, self.length) }
     }
 }
+impl MessageStorage for RecvMsgBuffer {
+    fn storage(&self) -> &[u8] {
+        // SAFETY: The selected buffer remains exclusively retained through the initialized prefix containing its metadata and completed payload.
+        unsafe {
+            self.pool
+                .bytes(self.identifier, 0, self.offset + self.length)
+        }
+    }
+}
 // SAFETY: The lease exclusively retains this completed, initialized range at a stable allocation. Moving it cannot change its pointer or length.
 unsafe impl IoBuf for RecvMsgBuffer {}
 impl Drop for RecvMsgBuffer {
@@ -48,7 +57,7 @@ impl Drop for RecvMsgBuffer {
 }
 
 pub(super) struct Received<B: IoBuf = RecvMsgBuffer> {
-    pub(super) messages: VecDeque<core_scheduler::SocketRecvMessage<B>>,
+    pub(super) messages: VecDeque<IoUringRecvMessage<B>>,
     retired: bool,
     error: Option<io::Error>,
     pub(super) statistics: RecvMsgMultishotStatistics,
@@ -76,7 +85,7 @@ impl<B: IoBuf> Default for State<B> {
     }
 }
 impl<B: IoBuf> State<B> {
-    fn next(&self) -> Option<OperationResult<Option<core_scheduler::SocketRecvMessage<B>>>> {
+    fn next(&self) -> Option<OperationResult<Option<IoUringRecvMessage<B>>>> {
         let mut received = self.received.lock().unwrap();
         if let Some(message) = received.messages.pop_front() {
             Some(Ok(Some(message)))
@@ -115,7 +124,7 @@ impl<B: IoBuf> RecvMsgMultishot<B> {
     async fn receive(
         &mut self,
         cancellation: &Cancellation,
-    ) -> OperationResult<Option<core_scheduler::SocketRecvMessage<B>>> {
+    ) -> OperationResult<Option<IoUringRecvMessage<B>>> {
         let mut cancelled = pin!(cancellation.cancelled());
         loop {
             // Completed batches need no listener registration. Listen and recheck only when the queue is empty, closing the race with completion publication.
@@ -183,14 +192,16 @@ impl<B: IoBuf> RecvMsgMultishot<B> {
     }
 }
 
-impl<B: IoBuf> core_scheduler::SocketRecvMsgReceiver<IoUringSelector> for RecvMsgMultishot<B> {
-    type Buffer = B;
+impl<B: MessageStorage> core_scheduler::SocketRecvMsgReceiver<IoUringSelector>
+    for RecvMsgMultishot<B>
+{
+    type Message = IoUringRecvMessage<B>;
 
     async fn recv(
         &mut self,
         scheduler: &IoUringSelector,
         cancellation: &Cancellation,
-    ) -> OperationResult<Option<core_scheduler::SocketRecvMessage<B>>> {
+    ) -> OperationResult<Option<IoUringRecvMessage<B>>> {
         cancellation.check()?;
         self.check_selector(scheduler)?;
         self.receive(cancellation).await
@@ -383,30 +394,14 @@ impl PendingRequest for MultiRequest {
             drop(buffer);
             return;
         }
-        let address = if parsed.name_data().is_empty() {
-            None
-        } else {
-            let mut address = socket2::SockAddrStorage::zeroed();
-            // SAFETY: The kernel name is bounded by the supplied sockaddr_storage capacity. SockAddr receives the reported initialized length.
-            unsafe {
-                std::ptr::copy_nonoverlapping(
-                    parsed.name_data().as_ptr(),
-                    (&mut address as *mut socket2::SockAddrStorage).cast(),
-                    parsed.name_data().len(),
-                );
-                socket2::SockAddr::new(address, parsed.name_data().len() as _)
-            }
-            .as_socket()
-        };
-        let message = SocketRecvMessage {
-            result: SocketRecvResult {
-                bytes: payload.len(),
-                address,
-                truncated: parsed.is_payload_truncated(),
-                control_truncated: parsed.is_control_data_truncated(),
-            },
+        let name = parsed.name_data();
+        let name_offset = name.as_ptr() as usize - bytes.as_ptr() as usize;
+        let message = IoUringRecvMessage::native(
             buffer,
-        };
+            name_offset..name_offset + name.len(),
+            parsed.is_payload_truncated(),
+            parsed.is_control_data_truncated(),
+        );
         let notify = {
             let mut received = self.state.received.lock().unwrap();
             let empty = received.messages.is_empty();

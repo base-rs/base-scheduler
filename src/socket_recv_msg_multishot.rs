@@ -15,7 +15,7 @@ use std::future::Future;
 ///
 /// ```
 /// use core_scheduler::{Cancellation, OperationResult, RecvMsgMultishotOptions,
-///     SocketRecvFlags, SocketRecvMsgMultishot, SocketRecvMsgReceiver};
+///     SocketRecvFlags, SocketRecvMsgMultishot, SocketRecvMsgReceiver, SocketRecvMessage};
 ///
 /// async fn consume<S: SocketRecvMsgMultishot>(
 ///     scheduler: &S, socket: &S::Socket, cancellation: &Cancellation,
@@ -24,8 +24,8 @@ use std::future::Future;
 ///         socket, RecvMsgMultishotOptions::default(), SocketRecvFlags::default(), cancellation,
 ///     ).await?;
 ///     while let Some(message) = receiver.recv(scheduler, cancellation).await? {
-///         // Parse or forward message.buffer.as_ref(); drop returns its storage.
-///         let _payload = message.buffer.as_ref();
+///         // Parse or forward message.payload(); drop returns its storage.
+///         let _payload = message.payload();
 ///     }
 ///     receiver.close(scheduler).await?;
 ///     Ok(())

@@ -12,7 +12,7 @@ use std::io;
 ///
 /// ```
 /// use core_scheduler::{BufferPoolOptions, BufferPooling, Cancellation, IoBuf,
-///     OperationResult, ReceiveBuffer, SocketReceiving, SocketRecvFlags, SocketRecvMsgReceiver};
+///     OperationResult, ReceiveBuffer, SocketReceiving, SocketRecvFlags, SocketRecvMsgReceiver, SocketRecvMessage};
 ///
 /// async fn receive<S: SocketReceiving>(scheduler: &S, socket: &S::Socket,
 ///     cancellation: &Cancellation) -> OperationResult<()> {
@@ -22,8 +22,8 @@ use std::io;
 ///     // Retire reception even when the receive wait was cancelled or failed.
 ///     receiver.close(scheduler).await?;
 ///     if let Some(message) = received? {
-///         // Parse or decrypt through message.buffer.as_mut() before freezing.
-///         let frozen = message.buffer.freeze();
+///         // Parse or decrypt through message.payload_mut() before freezing.
+///         let frozen = message.into_payload().freeze();
 ///         let frame = frozen.clone().slice(..);
 ///         // Either owner can move to another worker; the slot stays unavailable until both retire.
 ///         drop((frame, frozen));

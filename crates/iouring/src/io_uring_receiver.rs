@@ -18,14 +18,17 @@ pub(crate) enum Strategy {
     Provided(RecvMsgMultishot<IoUringBuffer>),
 }
 impl SocketRecvMsgReceiver<IoUringSelector> for IoUringReceiver {
-    type Buffer = IoUringBuffer;
+    type Message = crate::IoUringRecvMessage;
     async fn recv(
         &mut self,
         scheduler: &IoUringSelector,
         cancellation: &Cancellation,
-    ) -> OperationResult<Option<SocketRecvMessage<Self::Buffer>>> {
+    ) -> OperationResult<Option<Self::Message>> {
         match &mut self.0 {
-            Strategy::Demand(receiver) => receiver.recv(scheduler, cancellation).await,
+            Strategy::Demand(receiver) => receiver
+                .recv(scheduler, cancellation)
+                .await
+                .map(|message| message.map(crate::IoUringRecvMessage::portable)),
             Strategy::Provided(receiver) => receiver.recv(scheduler, cancellation).await,
         }
     }

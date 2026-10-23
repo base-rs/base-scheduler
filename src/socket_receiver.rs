@@ -2,8 +2,9 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::{
-    BufferPool, Cancellation, HeapBufferPool, MonitorStorage, OperationResult, ReceiveBuffer,
-    SocketMonitorState, SocketMonitoring, SocketRecvFlags, SocketRecvMessage, SocketType,
+    BufferPool, Cancellation, HeapBufferPool, MonitorStorage, OperationResult,
+    OwnedSocketRecvMessage, ReceiveBuffer, SocketMonitorState, SocketMonitoring, SocketRecvFlags,
+    SocketType,
 };
 use std::{
     future::poll_fn,
@@ -48,7 +49,7 @@ impl<M: crate::MonitorState, P: BufferPool> SocketReceiver<M, P> {
         &mut self,
         scheduler: &S,
         cancellation: &Cancellation,
-    ) -> OperationResult<Option<SocketRecvMessage<P::Buffer>>>
+    ) -> OperationResult<Option<OwnedSocketRecvMessage<P::Buffer>>>
     where
         S: SocketMonitoring,
         S::Socket: 'static,
@@ -85,7 +86,7 @@ impl<M: crate::MonitorState, P: BufferPool> SocketReceiver<M, P> {
         match result {
             Ok((result, mut buffer)) if !self.stream || result.bytes != 0 => {
                 buffer.truncate(result.bytes);
-                Ok(Some(SocketRecvMessage { result, buffer }))
+                Ok(Some(OwnedSocketRecvMessage::new(result, buffer)))
             }
             Ok(_) => {
                 self.terminal = true;
@@ -131,12 +132,12 @@ where
     S::Socket: 'static,
     M: SocketMonitorState<S::Socket, S::MonitorRegistration>,
 {
-    type Buffer = P::Buffer;
+    type Message = OwnedSocketRecvMessage<P::Buffer>;
     async fn recv(
         &mut self,
         scheduler: &S,
         cancellation: &Cancellation,
-    ) -> OperationResult<Option<SocketRecvMessage<P::Buffer>>> {
+    ) -> OperationResult<Option<OwnedSocketRecvMessage<P::Buffer>>> {
         SocketReceiver::recv(self, scheduler, cancellation).await
     }
     async fn close(&mut self, scheduler: &S) -> io::Result<()> {

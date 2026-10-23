@@ -1,9 +1,9 @@
-use core_scheduler::{SocketRecvMsgMultishot, SocketRecvMsgReceiver};
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
 use super::super::tests::{drain, drive, pair};
 use super::*;
+use core_scheduler::{SocketRecvMsgMultishot, SocketRecvMsgReceiver};
 use futures_lite::future::{block_on, poll_once};
 
 use core_scheduler_selector::{SelectorDriver, SelectorWorker};
@@ -54,7 +54,7 @@ fn persistent_stream_reuses_one_submission_and_keeps_leases_alive_after_shutdown
         let message = drive(&mut driver, receiving.recv(&selector, &never))
             .unwrap()
             .unwrap();
-        assert_eq!(message.buffer.as_ref(), &bytes);
+        assert_eq!(message.payload(), &bytes);
         if index == 0 {
             saved = Some(message);
         }
@@ -69,7 +69,7 @@ fn persistent_stream_reuses_one_submission_and_keeps_leases_alive_after_shutdown
     drop(driver);
     drop(selector);
     let saved = saved.unwrap();
-    assert_eq!(saved.buffer.as_ref(), &[0; 4]);
+    assert_eq!(saved.payload(), &[0; 4]);
     drop(saved);
 }
 
@@ -107,9 +107,12 @@ fn empty_datagrams_truncation_and_exhaustion_preserve_message_boundaries() {
     )
     .unwrap()
     .unwrap();
-    assert_eq!(first.buffer.as_ref(), b"abcd");
-    assert!(first.result.truncated);
-    assert_eq!(first.result.address, Some(sender.local_addr().unwrap()));
+    assert_eq!(first.payload(), b"abcd");
+    assert!(first.truncated());
+    assert_eq!(
+        first.address().map(|address| address.to_socket_address()),
+        Some(sender.local_addr().unwrap())
+    );
     sender.send_to(b"", socket.local_addr().unwrap()).unwrap();
     let deadline = std::time::Instant::now() + Duration::from_secs(3);
     while receiving.statistics().buffer_exhaustions == 0 {
@@ -124,8 +127,8 @@ fn empty_datagrams_truncation_and_exhaustion_preserve_message_boundaries() {
     )
     .unwrap()
     .unwrap();
-    assert!(second.buffer.as_ref().is_empty());
-    assert!(!second.result.truncated);
+    assert!(second.payload().is_empty());
+    assert!(!second.truncated());
     assert!(receiving.statistics().submissions >= 2);
     drop(second);
     drive(&mut driver, receiving.close(&selector)).unwrap();
@@ -245,10 +248,10 @@ fn eof_follows_data_and_leases_support_owned_writes() {
     )
     .unwrap()
     .unwrap();
-    let pointer = message.buffer.as_ref().as_ptr();
+    let pointer = message.payload().as_ptr();
     let (result, returned) = drive(
         &mut driver,
-        selector.socket_write(&socket, message.buffer, &Cancellation::never()),
+        selector.socket_write(&socket, message.into_payload(), &Cancellation::never()),
     );
     assert_eq!(result.unwrap(), 4);
     assert_eq!(returned.as_ref().as_ptr(), pointer);
@@ -299,7 +302,7 @@ fn remote_return_rearms_the_original_pool_and_forgotten_receivers_drain_on_shutd
     )
     .unwrap()
     .unwrap();
-    assert_eq!(first.buffer.as_ref(), b"firs");
+    assert_eq!(first.payload(), b"firs");
     std::thread::spawn(move || drop(first)).join().unwrap();
     let second = drive(
         &mut driver,
@@ -307,7 +310,7 @@ fn remote_return_rearms_the_original_pool_and_forgotten_receivers_drain_on_shutd
     )
     .unwrap()
     .unwrap();
-    assert_eq!(second.buffer.as_ref(), b"t");
+    assert_eq!(second.payload(), b"t");
     drop(second);
     std::mem::forget(receiving);
     drain(&selector, &mut driver);
@@ -419,7 +422,7 @@ fn dormant_close_and_shutdown_leave_held_leases_valid() {
             );
             drain(&selector, &mut driver);
         }
-        assert_eq!(message.buffer.as_ref(), b"abcd");
+        assert_eq!(message.payload(), b"abcd");
     }
 }
 
@@ -503,7 +506,7 @@ fn local_returns_publish_directly_and_only_exhaustion_queues_a_rearm() {
             )
             .unwrap()
             .unwrap();
-            assert_eq!(second.buffer.as_ref(), b"efgh");
+            assert_eq!(second.payload(), b"efgh");
             Some(second)
         } else {
             assert!(command.is_none());
@@ -518,7 +521,7 @@ fn local_returns_publish_directly_and_only_exhaustion_queues_a_rearm() {
                 )
                 .unwrap()
                 .unwrap();
-                assert_eq!(message.buffer.as_ref(), b"next");
+                assert_eq!(message.payload(), b"next");
                 drop(message);
                 assert!(crate::io_uring_worker::pop(&selector.controllers[0]).is_none());
             }
@@ -570,7 +573,7 @@ fn precancelled_receive_preserves_a_live_stream_and_admission_cancels_without_su
     )
     .unwrap()
     .unwrap();
-    assert_eq!(message.buffer.as_ref(), b"live");
+    assert_eq!(message.payload(), b"live");
     assert_eq!(receiving.statistics().submissions, 1);
     drive(&mut driver, receiving.close(&selector)).unwrap();
     drain(&selector, &mut driver);
@@ -694,7 +697,7 @@ fn terminal_decoding_preserves_payload_before_rearm_and_accepts_eof_without_a_bu
     request.completion((overhead + 4) as i32, 1); // BUFFER, without MORE.
     assert_eq!(request.retry((overhead + 4) as i32), Some(false));
     let message = state.received.lock().unwrap().messages.pop_front().unwrap();
-    assert_eq!(message.buffer.as_ref(), b"last");
+    assert_eq!(message.payload(), b"last");
     drop(message);
     driver.turn(Some(Duration::ZERO)).unwrap();
     assert_eq!(request.retry((overhead + 4) as i32), Some(true));
@@ -749,7 +752,7 @@ fn dropping_pending_dormant_and_prepared_requests_notifies_receivers() {
             Err(OperationError::Io(_))
         ));
         if let Some(message) = held {
-            assert_eq!(message.buffer.as_ref(), b"abcd");
+            assert_eq!(message.payload(), b"abcd");
         }
     }
 }
@@ -771,7 +774,7 @@ fn a_returned_buffer_before_terminal_collection_allows_immediate_resubmission() 
     )
     .unwrap()
     .unwrap();
-    assert_eq!(first.buffer.as_ref(), b"abcd");
+    assert_eq!(first.payload(), b"abcd");
     sender
         .try_send(b"efgh", SocketSendFlags::default())
         .unwrap();
@@ -795,7 +798,7 @@ fn a_returned_buffer_before_terminal_collection_allows_immediate_resubmission() 
     )
     .unwrap()
     .unwrap();
-    assert_eq!(second.buffer.as_ref(), b"efgh");
+    assert_eq!(second.payload(), b"efgh");
     drop(second);
     drive(&mut driver, receiving.close(&selector)).unwrap();
     drain(&selector, &mut driver);
@@ -828,7 +831,7 @@ fn incompatible_selector_preserves_receiver_and_queued_data() {
     )
     .unwrap()
     .unwrap();
-    assert_eq!(message.buffer.as_ref(), b"safe");
+    assert_eq!(message.payload(), b"safe");
     drive(&mut driver, receiving.close(&selector)).unwrap();
     drop(message);
     drop(receiving);
@@ -861,8 +864,9 @@ fn retained_leases_can_be_released_after_worker_thread_locals_are_destroyed() {
             )
             .unwrap()
             .unwrap();
-            assert_eq!(message.buffer.as_ref(), b"retained");
-            let controller = message.buffer.pool.controller.clone();
+            assert_eq!(message.payload(), b"retained");
+            let payload = message.into_payload();
+            let controller = payload.pool.controller.clone();
             driven(&mut worker, receiving.close(&selector)).unwrap();
             drop(receiving);
             selector.close();
@@ -875,7 +879,7 @@ fn retained_leases_can_be_released_after_worker_thread_locals_are_destroyed() {
                 None
             };
             assert_eq!(controller.strong_count() != 0, keep_selector);
-            HELD.with(|held| *held.borrow_mut() = Some((message.buffer, retained_selector)));
+            HELD.with(|held| *held.borrow_mut() = Some((payload, retained_selector)));
         })
         .join()
         .unwrap();
@@ -904,7 +908,7 @@ fn concurrent_completion_publication_preserves_receive_wakeups() {
         let message = block_on(receiving.recv(&selector, &never))
             .unwrap()
             .unwrap();
-        assert_eq!(message.buffer.as_ref(), bytes);
+        assert_eq!(message.payload(), bytes);
     }
     block_on(receiving.close(&selector)).unwrap();
     selector.close();

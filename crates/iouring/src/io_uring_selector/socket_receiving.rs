@@ -168,33 +168,18 @@ impl PendingRequest for PooledReceive {
             return;
         }
         let offset = payload.as_ptr() as usize - buffer.as_ref().as_ptr() as usize;
-        let address = if parsed.name_data().is_empty() {
-            None
-        } else {
-            let mut address = socket2::SockAddrStorage::zeroed();
-            // SAFETY: The initialized kernel name is bounded by the header's sockaddr_storage capacity.
-            unsafe {
-                std::ptr::copy_nonoverlapping(
-                    parsed.name_data().as_ptr(),
-                    (&mut address as *mut socket2::SockAddrStorage).cast(),
-                    parsed.name_data().len(),
-                );
-                socket2::SockAddr::new(address, parsed.name_data().len() as _)
-            }
-            .as_socket()
-        };
+        let name = parsed.name_data();
+        let name_offset = name.as_ptr() as usize - buffer.as_ref().as_ptr() as usize;
+        let name_range = name_offset..name_offset + name.len();
         let length = payload.len();
         let truncated = parsed.is_payload_truncated();
         let control_truncated = parsed.is_control_data_truncated();
-        let message = core_scheduler::SocketRecvMessage {
-            result: SocketRecvResult {
-                bytes: length,
-                address,
-                truncated,
-                control_truncated,
-            },
-            buffer: IoUringBuffer::new(buffer, offset, length),
-        };
+        let message = crate::IoUringRecvMessage::native(
+            IoUringBuffer::new(buffer, offset, length),
+            name_range,
+            truncated,
+            control_truncated,
+        );
         let notify = {
             let mut received = self.state.received.lock().unwrap();
             let empty = received.messages.is_empty();

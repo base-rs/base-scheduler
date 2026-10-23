@@ -2,8 +2,8 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::{
-    Cancellation, Cancelled, IoBuf, OperationResult, RecvMsgMultishotOptions, SocketRecvFlags,
-    SocketRecvMessage, SocketRecvMsgPoll, SocketRecvMsgReceiver, SocketType,
+    Cancellation, Cancelled, IoBuf, OperationResult, OwnedSocketRecvMessage,
+    RecvMsgMultishotOptions, SocketRecvFlags, SocketRecvMsgPoll, SocketRecvMsgReceiver, SocketType,
 };
 use event_listener::Event;
 use std::{
@@ -146,13 +146,13 @@ where
     Socket: Send + Sync,
     Check: Fn(&S, &Socket) -> io::Result<()> + Send,
 {
-    type Buffer = PollingRecvMsgBuffer;
+    type Message = OwnedSocketRecvMessage<PollingRecvMsgBuffer>;
 
     async fn recv(
         &mut self,
         scheduler: &S,
         cancellation: &Cancellation,
-    ) -> OperationResult<Option<SocketRecvMessage<Self::Buffer>>> {
+    ) -> OperationResult<Option<Self::Message>> {
         cancellation.check()?;
         let Some(receiving) = &self.receiving else {
             return Ok(None);
@@ -174,13 +174,15 @@ where
             )
             .await;
         match result {
-            Ok(result) if !self.stream || result.bytes != 0 => Ok(Some(SocketRecvMessage {
-                result,
-                buffer: PollingRecvMsgBuffer {
-                    lease,
-                    length: result.bytes,
-                },
-            })),
+            Ok(result) if !self.stream || result.bytes != 0 => {
+                Ok(Some(OwnedSocketRecvMessage::new(
+                    result,
+                    PollingRecvMsgBuffer {
+                        lease,
+                        length: result.bytes,
+                    },
+                )))
+            }
             Ok(_) => {
                 self.retire();
                 Ok(None)

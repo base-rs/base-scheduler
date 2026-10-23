@@ -11,7 +11,10 @@ use std::future::Future;
 ///
 /// Cancel and await an outstanding receive wait, then await [`SocketRecvMsgReceiver::close`] to establish retirement before exclusively closing the socket. Successful delivery may win cancellation and must still be handled. Cancellation alone does not establish retirement, and close never invalidates delivered buffers.
 pub trait SocketReceiving: SocketOperation + BufferPooling {
-    type PooledReceiver: SocketRecvMsgReceiver<Self, Buffer: crate::ReceiveBuffer>;
+    type PooledReceiver: SocketRecvMsgReceiver<
+            Self,
+            Message: crate::SocketRecvMessageMut<Payload: crate::ReceiveBuffer>,
+        >;
 
     /// Lazy construction, with no receive before successful admission. An admitted receiver may receive ahead within the pool budget, and waiting-call cancellation does not roll back data already received. Pre-cancellation and cancellation while acquiring pool capacity preserve the receiver. Cancellation after I/O starts may end the receive sequence or cancel only the wait; it does not guarantee backend retirement. Close stops reception and waits for retirement without invalidating delivered buffers. Retire the receiver before exclusively closing its socket.
     ///

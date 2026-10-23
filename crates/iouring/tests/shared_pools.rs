@@ -82,8 +82,8 @@ fn worker_pools_preserve_independent_capacity_and_retained_payloads() {
             )
             .unwrap();
         let first = receivers[0].recv(scheduler, &never).await.unwrap().unwrap();
-        let address = first.buffer.as_ref().as_ptr() as usize;
-        let retained = first.buffer.freeze();
+        let address = first.payload().as_ptr() as usize;
+        let retained = first.into_payload().freeze();
         for index in 1..4 {
             sender
                 .send_to(
@@ -96,9 +96,12 @@ fn worker_pools_preserve_independent_capacity_and_retained_payloads() {
                 .await
                 .unwrap()
                 .unwrap();
-            assert_eq!(message.buffer.as_ref(), &[index as u8]);
-            assert_eq!(message.result.address, Some(sender.local_addr().unwrap()));
-            assert!(!message.result.truncated);
+            assert_eq!(message.payload(), &[index as u8]);
+            assert_eq!(
+                message.address().map(|address| address.to_socket_address()),
+                Some(sender.local_addr().unwrap())
+            );
+            assert!(!message.truncated());
             assert_eq!(retained.as_ref().as_ptr() as usize, address);
             assert_eq!(retained.as_ref(), b"retained");
         }
@@ -157,11 +160,11 @@ fn shared_receive_preserves_alignment_empty_datagrams_and_wait_cancellation() {
         for (bytes, expected) in [(b"abcdef".as_slice(), b"abc".as_slice()), (b"", b"")] {
             sender.send_to(bytes, address).unwrap();
             let mut message = receiver.recv(scheduler, &never).await.unwrap().unwrap();
-            assert_eq!(message.buffer.as_ref(), expected);
-            assert_eq!(message.buffer.as_ref().as_ptr() as usize % 4096, 0);
-            assert_eq!(message.result.truncated, bytes.len() > 3);
+            assert_eq!(message.payload(), expected);
+            assert_eq!(message.payload().as_ptr() as usize % 4096, 0);
+            assert_eq!(message.truncated(), bytes.len() > 3);
             if !expected.is_empty() {
-                message.buffer.as_mut()[0] = b'X';
+                message.payload_mut()[0] = b'X';
             }
         }
         receiver.close(scheduler).await.unwrap();

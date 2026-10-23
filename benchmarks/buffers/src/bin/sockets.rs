@@ -237,14 +237,14 @@ where
                         .await
                         .unwrap()
                         .unwrap();
-                    assert!(!message.result.truncated);
-                    let count = message.buffer.as_ref().len();
-                    assert_eq!(message.buffer.as_ref()[0], 42);
+                    assert!(!message.truncated());
+                    let count = message.payload().len();
+                    assert_eq!(message.payload()[0], 42);
                     if mode == "shared" {
-                        let frozen = message.buffer.freeze();
+                        let frozen = message.into_payload().freeze();
                         retained = Some(frozen.slice(..count));
                     } else {
-                        std::hint::black_box(message.buffer.as_ref());
+                        std::hint::black_box(message.payload());
                     }
                     count
                 }
@@ -256,12 +256,12 @@ where
                         .await
                         .unwrap()
                         .unwrap();
-                    assert!(!message.result.truncated);
-                    let count = message.buffer.as_ref().len();
-                    assert_eq!(message.buffer.as_ref()[0], 42);
-                    std::hint::black_box(message.buffer.as_ref());
+                    assert!(!message.truncated());
+                    let count = message.payload().len();
+                    assert_eq!(message.payload()[0], 42);
+                    std::hint::black_box(message.payload());
                     if mode == "multi-retain" {
-                        retained_multi = Some(message.buffer);
+                        retained_multi = Some(message.into_payload());
                     }
                     count
                 }

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Expose backend-associated receive messages with borrowed address views, payload access, and owned payload extraction. Keep writable payload access optional for immutable receivers, and retain io_uring native address metadata until conversion is requested. Specify ownership and lifetime semantics without imposing copying or allocation costs.
+
 - Name owned receive results `SocketRecvMessage` across polling and multishot backends. Return pooled socket buffers before readiness waits so idle connections cannot reserve the shared budget, reuse Tokio's registered readiness without extra native probes, and document cancellation, explicit retirement, and future pool growth and caching boundaries.
 
 - Distribute new Native tasks round-robin across worker queues before their first poll, reusing the admission lock and removing the shared unassigned-task queue. Preserve worker-local wakes and idle stealing without adding per-operation load counters.
