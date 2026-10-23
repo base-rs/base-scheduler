@@ -2,7 +2,9 @@
 // Copyright, 2026, by Samuel Williams.
 
 use super::*;
-use crate::{OperationError, SocketOperation, SocketRecvResult};
+use crate::{
+    OperationError, SocketAddressView, SocketOperation, SocketRecvMessage, SocketRecvResult,
+};
 use futures_lite::future::{block_on, poll_once};
 use std::{
     collections::VecDeque,
@@ -131,15 +133,15 @@ fn completed_prefix_metadata_and_pool_reuse_do_not_allocate() {
             else {
                 panic!("queued receive must complete immediately");
             };
-            assert_eq!(message.buffer.as_ref(), b"abcd");
-            assert_eq!(message.result.bytes, 4);
+            assert_eq!(message.payload(), b"abcd");
+            assert_eq!(message.payload().len(), 4);
             assert_eq!(
-                message.result.address,
+                message.address().map(|address| address.to_socket_address()),
                 Some("127.0.0.1:4567".parse().unwrap())
             );
-            assert!(message.result.truncated);
-            assert!(!message.result.control_truncated);
-            let pointer = message.buffer.as_ref().as_ptr();
+            assert!(message.truncated());
+            assert!(!message.control_truncated());
+            let pointer = message.payload().as_ptr();
             assert_eq!(*original.get_or_insert(pointer), pointer);
             drop(message);
         }
@@ -166,12 +168,12 @@ fn exhaustion_waits_for_a_returned_lease_and_can_move_between_schedulers_and_thr
     assert_eq!(second_scheduler.calls.load(Ordering::Relaxed), 0);
     std::thread::spawn(move || drop(first)).join().unwrap();
     let second = block_on(next).unwrap().unwrap();
-    assert_eq!(second.buffer.as_ref(), b"two");
+    assert_eq!(second.payload(), b"two");
     assert_eq!(first_scheduler.calls.load(Ordering::Relaxed), 1);
     assert_eq!(second_scheduler.calls.load(Ordering::Relaxed), 1);
     block_on(receiving.close(&second_scheduler)).unwrap();
     drop(receiving);
-    assert_eq!(second.buffer.as_ref(), b"two");
+    assert_eq!(second.payload(), b"two");
 }
 
 #[test]
@@ -208,7 +210,7 @@ fn pending_cancellation_closes_both_pool_and_socket_waits_but_precancellation_pr
                 .is_none()
         );
         if let Some(held) = held {
-            assert_eq!(held.buffer.as_ref(), b"held");
+            assert_eq!(held.payload(), b"held");
         }
     }
 }
@@ -235,8 +237,7 @@ fn dropping_pending_receives_returns_capacity_without_closing_or_independent_io(
         block_on(receiving.recv(&scheduler, &never))
             .unwrap()
             .unwrap()
-            .buffer
-            .as_ref(),
+            .payload(),
         b"last"
     );
     let lazy = receiving.recv(&scheduler, &never);
@@ -260,14 +261,13 @@ fn stream_eof_is_terminal_while_an_empty_datagram_remains_a_message() {
                     .is_none()
             );
         } else {
-            assert!(result.unwrap().buffer.as_ref().is_empty());
+            assert!(result.unwrap().payload().is_empty());
             send(&state, Ok(b"more"));
             assert_eq!(
                 block_on(receiving.recv(&scheduler, &Cancellation::never()))
                     .unwrap()
                     .unwrap()
-                    .buffer
-                    .as_ref(),
+                    .payload(),
                 b"more"
             );
         }
@@ -298,7 +298,7 @@ fn errors_retire_once_and_explicit_close_is_idempotent() {
         .unwrap();
     block_on(receiving.close(&scheduler)).unwrap();
     drop(receiving);
-    assert_eq!(held.buffer.as_ref(), b"keep");
+    assert_eq!(held.payload(), b"keep");
 }
 
 #[test]
@@ -335,7 +335,7 @@ fn incompatible_schedulers_do_not_consume_capacity_data_or_close_the_receiver() 
     let held = block_on(receiving.recv(&scheduler, &Cancellation::never()))
         .unwrap()
         .unwrap();
-    assert_eq!(held.buffer.as_ref(), b"keep");
+    assert_eq!(held.payload(), b"keep");
     // Validation also precedes a full-pool wait; rejection must be immediate.
     assert!(
         matches!(block_on(receiving.recv(&incompatible, &Cancellation::never())), Err(OperationError::Io(error)) if error.kind() == io::ErrorKind::InvalidInput)

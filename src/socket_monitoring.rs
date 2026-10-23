@@ -14,7 +14,7 @@ use std::{
 
 /// Optional reusable directional socket operations. Existing polling capabilities remain unchanged.
 ///
-/// The default implementation uses the backend's ordinary polling operations. Completion backends may override it to reuse stable registration and completion storage. Separate monitors support simultaneous reads and writes. Cloned storage aliases the same registration; a backend may reject overlapping waits on that registration with `WouldBlock`. Dropping or cancelling a wait removes its waiter without requiring a persistent registration to close. Close a monitor explicitly to await retirement, or drop its final application handle to request retirement in the background. Borrowed payload storage never remains in the kernel between polls.
+/// The default implementation uses the backend's ordinary polling operations. Completion backends may override it to reuse stable registration and completion storage. Separate monitors support simultaneous reads and writes. Cloned storage aliases the same registration; a backend may reject overlapping waits on that registration with `WouldBlock`. Dropping or cancelling a wait removes its waiter without requiring a persistent registration to close. Close a monitor explicitly to await retirement, or drop its final application handle to request retirement in the background. Borrowed payload storage never remains in the kernel between polls. Receive overrides preserve the ordinary polling contract: consumed bytes, empty datagrams, and EOF return `Ready` in the same poll, and `Pending` consumes nothing.
 pub trait SocketMonitoring:
     SocketRecvPoll + SocketSendPoll + SocketRecvMsgPoll + SocketSendMsgPoll + SocketWait
 {
@@ -132,6 +132,7 @@ pub trait SocketMonitoring:
         }
     }
 
+    /// Receive with reusable monitor state, preserving [`SocketRecvMsgPoll`]'s syscall-first contract: after synchronous preflight, attempt the nonblocking receive on the first poll, and return any consumed message in that poll. A caller may drop a pending attempt, return its buffer, then use `socket_monitor_wait` before constructing another attempt.
     fn socket_monitor_recvmsg_poll<M>(
         &self,
         monitor: &mut MonitorStorage<M>,

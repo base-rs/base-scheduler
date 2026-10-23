@@ -1,0 +1,431 @@
+diff --git a/benchmarks/buffers/src/bin/sockets.rs b/benchmarks/buffers/src/bin/sockets.rs
+index 2378972..d17f307 100644
+--- a/benchmarks/buffers/src/bin/sockets.rs
++++ b/benchmarks/buffers/src/bin/sockets.rs
+@@ -61,51 +61,57 @@ where
+             .set_read_timeout(Some(std::time::Duration::from_secs(10)))
+             .unwrap();
+         let address = socket.local_addr().unwrap();
+-        let peer = std::thread::spawn(move || {
+-            let mut bytes = vec![0; size];
+-            for _ in 0..iterations + warmup {
+-                if receive_only {
+-                    let (length, remote) = socket.recv_from(&mut bytes).unwrap();
+-                    assert_eq!(length, 1);
+-                    bytes.fill(42);
+-                    for _ in 0..window {
+-                        assert_eq!(socket.send_to(&bytes, remote).unwrap(), size);
+-                    }
+-                } else {
+-                    for _ in 0..window {
++        let peer = std::thread::Builder::new()
++            .name("buffer-peer".into())
++            .spawn(move || {
++                let mut bytes = vec![0; size];
++                for _ in 0..iterations + warmup {
++                    if receive_only {
+                         let (length, remote) = socket.recv_from(&mut bytes).unwrap();
+-                        assert_eq!(length, size);
+-                        assert_eq!(socket.send_to(&bytes, remote).unwrap(), size);
++                        assert_eq!(length, 1);
++                        bytes.fill(42);
++                        for _ in 0..window {
++                            assert_eq!(socket.send_to(&bytes, remote).unwrap(), size);
++                        }
++                    } else {
++                        for _ in 0..window {
++                            let (length, remote) = socket.recv_from(&mut bytes).unwrap();
++                            assert_eq!(length, size);
++                            assert_eq!(socket.send_to(&bytes, remote).unwrap(), size);
++                        }
+                     }
+                 }
+-            }
+-        });
++            })
++            .unwrap();
+         (address, peer)
+     } else {
+         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+         let address = listener.local_addr().unwrap();
+-        let peer = std::thread::spawn(move || {
+-            let (mut socket, _) = listener.accept().unwrap();
+-            socket.set_nodelay(true).unwrap();
+-            socket
+-                .set_read_timeout(Some(std::time::Duration::from_secs(10)))
+-                .unwrap();
+-            let mut bytes = vec![0; size];
+-            for _ in 0..iterations + warmup {
+-                if receive_only {
+-                    socket.read_exact(&mut [0]).unwrap();
+-                    bytes.fill(42);
+-                    for _ in 0..window {
+-                        socket.write_all(&bytes).unwrap();
+-                    }
+-                } else {
+-                    for _ in 0..window {
+-                        socket.read_exact(&mut bytes).unwrap();
+-                        socket.write_all(&bytes).unwrap();
++        let peer = std::thread::Builder::new()
++            .name("buffer-peer".into())
++            .spawn(move || {
++                let (mut socket, _) = listener.accept().unwrap();
++                socket.set_nodelay(true).unwrap();
++                socket
++                    .set_read_timeout(Some(std::time::Duration::from_secs(10)))
++                    .unwrap();
++                let mut bytes = vec![0; size];
++                for _ in 0..iterations + warmup {
++                    if receive_only {
++                        socket.read_exact(&mut [0]).unwrap();
++                        bytes.fill(42);
++                        for _ in 0..window {
++                            socket.write_all(&bytes).unwrap();
++                        }
++                    } else {
++                        for _ in 0..window {
++                            socket.read_exact(&mut bytes).unwrap();
++                            socket.write_all(&bytes).unwrap();
++                        }
+                     }
+                 }
+-            }
+-        });
++            })
++            .unwrap();
+         (address, peer)
+     };
+     let never = Cancellation::never();
+@@ -159,7 +165,12 @@ where
+                 .socket_recvmsg_multishot(
+                     &socket,
+                     RecvMsgMultishotOptions {
+-                        buffers: (window + 2).max(8).try_into().unwrap(),
++                        buffers: std::env::var("MULTI_BUFFERS")
++                            .ok()
++                            .map(|v| v.parse().unwrap())
++                            .unwrap_or((window + 2).max(8))
++                            .try_into()
++                            .unwrap(),
+                         buffer_size: size,
+                     },
+                     SocketRecvFlags::default(),
+@@ -175,9 +186,13 @@ where
+     let mut raw = vec![0; size];
+     let mut retained = None;
+     let mut retained_multi = None;
++    let mut receive_calls = 0_u64;
++    let mut short_receives = 0_u64;
+     let mut start = Instant::now();
+     for index in 0..iterations + warmup {
+         if index == warmup {
++            receive_calls = 0;
++            short_receives = 0;
+             if group.warming.fetch_sub(1, Ordering::AcqRel) == 1 {
+                 group.started.set(Instant::now()).unwrap();
+                 group.ready.cancel();
+@@ -266,6 +281,8 @@ where
+                 _ => unreachable!("The receiver mode was validated before execution"),
+             };
+             assert!(count > 0);
++            receive_calls += 1;
++            short_receives += u64::from(count < size);
+             if udp {
+                 assert_eq!(count, size);
+             }
+@@ -294,7 +311,7 @@ where
+     drop((readable, writable));
+     scheduler.socket_close(socket).await.unwrap();
+     peer.join().unwrap();
+-    serde_json::json!({"transport":transport,"mode":mode,"size":size,"iterations":iterations,"seconds":elapsed.as_secs_f64(),"round_trips_per_second":iterations as f64/elapsed.as_secs_f64(),"window":window,"messages_per_second":(iterations * window) as f64 / elapsed.as_secs_f64()})
++    serde_json::json!({"transport":transport,"mode":mode,"size":size,"iterations":iterations,"seconds":elapsed.as_secs_f64(),"round_trips_per_second":iterations as f64/elapsed.as_secs_f64(),"window":window,"messages_per_second":(iterations * window) as f64 / elapsed.as_secs_f64(),"receive_calls":receive_calls,"short_receives":short_receives,"bytes_received":iterations * window * size})
+ }
+ 
+ async fn run_group<S>(scheduler: Arc<S>, workload: Workload) -> serde_json::Value
+@@ -311,8 +328,15 @@ where
+     S::Socket: 'static,
+ {
+     assert!(workload.connections > 0);
+-    let total = 8 * workload.connections;
+-    let options = BufferPoolOptions::new(total, workload.size);
++    let total = std::env::var("POOL_TOTAL")
++        .ok()
++        .map(|v| v.parse().unwrap())
++        .unwrap_or(8 * workload.connections);
++    let mut options = BufferPoolOptions::new(total, workload.size);
++    options.alignment = std::env::var("POOL_ALIGNMENT")
++        .ok()
++        .map(|v| v.parse().unwrap())
++        .unwrap_or(options.alignment);
+     let pool = match workload.pool_layout.as_str() {
+         "total" => scheduler.buffer_pool(options),
+         #[cfg(target_os = "linux")]
+@@ -356,7 +380,21 @@ where
+         .iter()
+         .map(|result| result["seconds"].as_f64().unwrap())
+         .fold(0.0_f64, f64::max);
++    let counters: Vec<_> = ["receive_calls", "short_receives", "bytes_received"]
++        .map(|field| {
++            (
++                field,
++                results
++                    .iter()
++                    .map(|result| result[field].as_u64().unwrap())
++                    .sum::<u64>(),
++            )
++        })
++        .into();
+     let mut result = results.remove(0);
++    for (field, total) in counters {
++        result[field] = total.into();
++    }
+     result["seconds"] = seconds.into();
+     result["connections"] = workload.connections.into();
+     result["pool_layout"] = workload.pool_layout.clone().into();
+diff --git a/crates/iouring/src/io_uring_selector/multishot.rs b/crates/iouring/src/io_uring_selector/multishot.rs
+index 84c4e6b..7d8969c 100644
+--- a/crates/iouring/src/io_uring_selector/multishot.rs
++++ b/crates/iouring/src/io_uring_selector/multishot.rs
+@@ -18,6 +18,7 @@ pub struct RecvMsgMultishotStatistics {
+     pub submissions: u64,
+     pub messages: u64,
+     pub buffer_exhaustions: u64,
++    pub deliveries: u64,
+ }
+ 
+ /// An immutable lease of a completed receive buffer. Drop returns it to its original ring.
+@@ -168,6 +169,11 @@ impl<B: IoBuf> RecvMsgMultishot<B> {
+             if let Some((messages, error)) = retired {
+                 // Recycling can wake the owner; never drop leases while holding the result lock.
+                 drop(messages);
++                eprintln!(
++                    "RECEIVE_STATISTICS worker={} {:?}",
++                    self.cancel.controller.worker,
++                    self.statistics()
++                );
+                 return match error {
+                     Some(error)
+                         if error.raw_os_error() != Some(libc::ECANCELED)
+diff --git a/crates/iouring/src/io_uring_selector/provided_buffers.rs b/crates/iouring/src/io_uring_selector/provided_buffers.rs
+index 3968373..278e16d 100644
+--- a/crates/iouring/src/io_uring_selector/provided_buffers.rs
++++ b/crates/iouring/src/io_uring_selector/provided_buffers.rs
+@@ -251,6 +251,9 @@ impl WorkerBuffers {
+             .users
+             .retain(|user| *user != identifier);
+     }
++    pub(super) fn payload_size(&self) -> usize {
++        self.options.buffer_size
++    }
+     pub(crate) fn group(&self) -> u16 {
+         self.identifier
+     }
+diff --git a/crates/iouring/src/io_uring_selector/socket_receiving.rs b/crates/iouring/src/io_uring_selector/socket_receiving.rs
+index c8881cf..c6bc284 100644
+--- a/crates/iouring/src/io_uring_selector/socket_receiving.rs
++++ b/crates/iouring/src/io_uring_selector/socket_receiving.rs
+@@ -33,7 +33,15 @@ impl SocketReceiving for IoUringSelector {
+         let retained = super::socket::retain_socket(socket);
+         let stream =
+             syscall("socket-type", || retained.get_ref().r#type())? == socket2::Type::STREAM;
+-        let controller = self.route();
++        static NEXT_RECEIVER: AtomicUsize = AtomicUsize::new(0);
++        let controller = if std::env::var_os("RECEIVE_BALANCED").is_some() {
++            Arc::clone(
++                &self.controllers
++                    [NEXT_RECEIVER.fetch_add(1, Ordering::Relaxed) % self.controllers.len()],
++            )
++        } else {
++            self.route()
++        };
+         let Some(buffers) = pool.worker(&controller) else {
+             let kind = if stream {
+                 SocketType::Stream
+@@ -59,6 +67,7 @@ impl SocketReceiving for IoUringSelector {
+         header.msg_namelen = std::mem::size_of::<libc::sockaddr_storage>() as _;
+         buffers.attach(identifier);
+         let request = PooledReceive {
++            raw: stream && std::env::var_os("RECEIVE_RAW").is_some(),
+             identifier,
+             _permit: permit,
+             socket: Some(socket),
+@@ -84,6 +93,7 @@ impl SocketReceiving for IoUringSelector {
+ }
+ 
+ struct PooledReceive {
++    raw: bool,
+     identifier: u64,
+     _permit: Permit,
+     socket: Option<RegisteredSocket>,
+@@ -98,6 +108,22 @@ struct PooledReceive {
+ // SAFETY: The stable boxed header is immutable after publication. One ring owner drives the request; completed payloads move into independent owning leases.
+ unsafe impl Send for PooledReceive {}
+ 
++impl PooledReceive {
++    fn deliver(&self, message: core_scheduler::RecvMsgMultishotMessage<IoUringBuffer>) {
++        let notify = {
++            let mut received = self.state.received.lock().unwrap();
++            let empty = received.messages.is_empty();
++            received.statistics.deliveries += u64::from(empty);
++            received.statistics.messages += 1;
++            received.messages.push_back(message);
++            empty
++        };
++        if notify {
++            self.state.changed.notify(1);
++        }
++    }
++}
++
+ impl PendingRequest for PooledReceive {
+     fn identifier(&self) -> u64 {
+         self.identifier
+@@ -122,8 +148,13 @@ impl PendingRequest for PooledReceive {
+                 .get_ref()
+                 .as_raw_fd(),
+         );
+-        let entry =
+-            opcode::RecvMsgMulti::new(descriptor, self.header.get(), self.buffers.group()).build();
++        let entry = if self.raw {
++            opcode::RecvMulti::new(descriptor, self.buffers.group())
++                .len(self.buffers.payload_size() as u32)
++                .build()
++        } else {
++            opcode::RecvMsgMulti::new(descriptor, self.header.get(), self.buffers.group()).build()
++        };
+         entry.user_data(self.identifier)
+     }
+     fn entry_may_wake(&self) -> bool {
+@@ -154,6 +185,18 @@ impl PendingRequest for PooledReceive {
+             }
+             return;
+         }
++        if self.raw {
++            self.deliver(core_scheduler::RecvMsgMultishotMessage {
++                result: SocketRecvResult {
++                    bytes: result as usize,
++                    address: None,
++                    truncated: false,
++                    control_truncated: false,
++                },
++                buffer: IoUringBuffer::new(buffer, self.buffers.publish_offset(), result as usize),
++            });
++            return;
++        }
+         let start = self.buffers.publish_offset();
+         let bytes = &buffer.as_ref()[start..start + result as usize];
+         // SAFETY: The boxed header remains immutable throughout kernel and completion access.
+@@ -192,16 +235,7 @@ impl PendingRequest for PooledReceive {
+             },
+             buffer: IoUringBuffer::new(buffer, offset, length),
+         };
+-        let notify = {
+-            let mut received = self.state.received.lock().unwrap();
+-            let empty = received.messages.is_empty();
+-            received.statistics.messages += 1;
+-            received.messages.push_back(message);
+-            empty
+-        };
+-        if notify {
+-            self.state.changed.notify(1);
+-        }
++        self.deliver(message);
+     }
+     fn retry(&self, result: i32) -> Option<bool> {
+         if self.cancelling.get() || self.eof.get() {
+diff --git a/crates/native/src/worker.rs b/crates/native/src/worker.rs
+index 14246a0..5c6731d 100644
+--- a/crates/native/src/worker.rs
++++ b/crates/native/src/worker.rs
+@@ -52,6 +52,7 @@ impl WorkerState {
+ }
+ 
+ struct LocalWorker {
++    polls: std::cell::Cell<u64>,
+     identifier: usize,
+     scheduler: Weak<Shared>,
+     ready: Worker<Runnable>,
+@@ -265,6 +266,7 @@ fn run_loop(
+         .expect("worker thread registered once");
+     CURRENT_WORKER.with(|context| {
+         context.replace(Some(LocalWorker {
++            polls: std::cell::Cell::new(0),
+             identifier,
+             scheduler: Arc::downgrade(&shared),
+             ready,
+@@ -315,7 +317,11 @@ fn run_loop(
+         // Publish the available completion batch before starting the next task batch.
+         drive(&mut driver, Some(Duration::ZERO));
+     }
+-    CURRENT_WORKER.with(|current| current.take());
++    CURRENT_WORKER.with(|current| {
++        if let Some(worker) = current.take() {
++            eprintln!("WORKER_POLLS {} {}", worker.identifier, worker.polls.get());
++        }
++    });
+ }
+ 
+ #[inline(always)]
+@@ -332,6 +338,11 @@ fn run_ready_batch(shared: &Shared, first: Runnable) {
+     }
+     let mut runnable = Some(first);
+     while let Some(task) = runnable {
++        CURRENT_WORKER.with(|current| {
++            let current = current.borrow();
++            let worker = current.as_ref().unwrap();
++            worker.polls.set(worker.polls.get() + 1);
++        });
+         task.metadata().worker.store(identifier, Ordering::Relaxed);
+         // Contain task-machinery panics as well as the guarded future's panics.
+         crate::panic::contain(|| {
+diff --git a/src/heap_buffer_pool.rs b/src/heap_buffer_pool.rs
+index 37f44ac..42b6e6a 100644
+--- a/src/heap_buffer_pool.rs
++++ b/src/heap_buffer_pool.rs
+@@ -26,6 +26,8 @@ pub(crate) struct Slot {
+ }
+ 
+ pub(crate) struct Pool {
++    rotate: bool,
++    cursor: AtomicUsize,
+     pub(crate) slots: Box<[Slot]>,
+     bytes: Box<[UnsafeCell<u8>]>,
+     offset: usize,
+@@ -69,6 +71,8 @@ impl HeapBufferPool {
+             })
+             .collect();
+         Ok(Self(Arc::new(Pool {
++            rotate: std::env::var_os("POOL_ROTATE").is_some(),
++            cursor: AtomicUsize::new(0),
+             slots: (0..buffers)
+                 .map(|_| Slot {
+                     readers: AtomicUsize::new(0),
+@@ -97,18 +101,25 @@ impl HeapBufferPool {
+ 
+     /// Acquire exclusive writable storage immediately, or return `None` without allocating.
+     pub fn try_acquire(&self) -> Option<BufferLease> {
++        let width = usize::BITS as usize;
++        let shift = if self.0.rotate {
++            self.0.cursor.fetch_add(1, Ordering::Relaxed) % width
++        } else {
++            0
++        };
+         for (word_index, word) in self.0.free.iter().enumerate() {
+             let mut available = word.load(Ordering::Relaxed);
+             while available != 0 {
++                let bit = (available.rotate_right(shift as u32).trailing_zeros() as usize + shift)
++                    % width;
+                 match word.compare_exchange_weak(
+                     available,
+-                    available & (available - 1),
++                    available & !(1 << bit),
+                     Ordering::Acquire,
+                     Ordering::Relaxed,
+                 ) {
+                     Ok(_) => {
+-                        let index =
+-                            word_index * usize::BITS as usize + available.trailing_zeros() as usize;
++                        let index = word_index * usize::BITS as usize + bit;
+                         return Some(BufferLease::new(Arc::clone(&self.0), index, self.0.size));
+                     }
+                     Err(current) => available = current,

@@ -1,0 +1,49 @@
+{
+  "samples": 44,
+  "totals": [
+    {
+      "binary": "files",
+      "cells": 1,
+      "geometric_mean": 1.022047417091522
+    },
+    {
+      "binary": "sockets",
+      "cells": 1,
+      "geometric_mean": 1.0374791675139088
+    }
+  ],
+  "cells": [
+    {
+      "binary": "files",
+      "parameters": [
+        "tokio",
+        "submit",
+        "65536",
+        "536870912",
+        "1"
+      ],
+      "pairs": 11,
+      "median_ratio": 1.022047417091522,
+      "minimum": 0.6258552013626878,
+      "maximum": 1.1730867484124106
+    },
+    {
+      "binary": "sockets",
+      "parameters": [
+        "native",
+        "shared",
+        "64",
+        "20000",
+        "2",
+        "tcp",
+        "8",
+        "receive",
+        "8"
+      ],
+      "pairs": 11,
+      "median_ratio": 1.0374791675139088,
+      "minimum": 0.4361386424255501,
+      "maximum": 2.3094075720928027
+    }
+  ]
+}

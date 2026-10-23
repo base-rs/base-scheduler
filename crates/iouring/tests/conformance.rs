@@ -129,16 +129,19 @@ mod native_worker_rings {
     use super::*;
     core_scheduler_conformance::file_tests!(run: run_native_workers);
     core_scheduler_conformance::file_monitor_tests!(run: run_native_workers);
+    core_scheduler_conformance::file_submission_tests!(run: run_native_workers);
 }
 mod independent_selector {
     use super::*;
     core_scheduler_conformance::file_tests!(run: run_selector);
     core_scheduler_conformance::file_monitor_tests!(run: run_selector);
+    core_scheduler_conformance::file_submission_tests!(run: run_selector);
 }
 mod native_composition {
     use super::*;
     core_scheduler_conformance::file_tests!(run: run_native);
     core_scheduler_conformance::file_monitor_tests!(run: run_native);
+    core_scheduler_conformance::file_submission_tests!(run: run_native);
 }
 
 #[test]
@@ -417,5 +420,71 @@ fn directional_monitors_work_through_the_native_scheduler() {
         core_scheduler_conformance::socket_monitoring::stream(scheduler, &sender, &receiver).await;
         scheduler.socket_close(sender).await.unwrap();
         scheduler.socket_close(receiver).await.unwrap();
+    });
+}
+
+#[test]
+fn pooled_socket_receivers_work_on_worker_owned_rings() {
+    watchdog(|| {
+        let (selector, drivers) = IoUringSelector::with_workers(options(), 2).unwrap();
+        let scheduler = std::sync::Arc::new(
+            NativeScheduler::with_drivers(
+                selector,
+                drivers,
+                NativeExecutorOptions {
+                    workers: 2,
+                    ..Default::default()
+                },
+            )
+            .unwrap(),
+        );
+        let owned = scheduler.clone();
+        scheduler.block_on(async move {
+            let (sender, socket) =
+                core_scheduler_conformance::socket::stream_pair(owned.as_ref(), SocketDomain::Ipv4)
+                    .await;
+            core_scheduler_conformance::socket_receiving::demand_driven(
+                owned.as_ref(),
+                &sender,
+                &socket,
+            )
+            .await;
+            core_scheduler_conformance::socket_receiving::stream(owned.as_ref(), &sender, &socket)
+                .await;
+            owned.socket_close(sender).await.unwrap();
+            owned.socket_close(socket).await.unwrap();
+            let never = Cancellation::never();
+            let sender = owned
+                .socket_open(SocketDomain::Ipv4, SocketType::Datagram, None, &never)
+                .await
+                .unwrap();
+            let socket = owned
+                .socket_open(SocketDomain::Ipv4, SocketType::Datagram, None, &never)
+                .await
+                .unwrap();
+            owned
+                .socket_bind(&sender, "127.0.0.1:0".parse().unwrap(), &never)
+                .await
+                .unwrap();
+            owned
+                .socket_bind(&socket, "127.0.0.1:0".parse().unwrap(), &never)
+                .await
+                .unwrap();
+            core_scheduler_conformance::socket_poll::datagram_first_poll(
+                owned.as_ref(),
+                &sender,
+                &socket,
+            )
+            .await;
+            core_scheduler_conformance::socket_receiving::datagram(
+                owned.as_ref(),
+                &sender,
+                &socket,
+            )
+            .await;
+            owned.socket_close(sender).await.unwrap();
+            owned.socket_close(socket).await.unwrap();
+        });
+        scheduler.block_on(scheduler.shutdown());
     });
 }

@@ -705,3 +705,69 @@ fn panicking_unobserved_payloads_preserve_native_capacity_and_shutdown() {
         }
     });
 }
+
+#[test]
+fn submitted_io_retains_its_buffer_and_capacity_after_unpolled_completion_drop() {
+    block_on(async {
+        let pool = BlockingPool::new(TokioOptions {
+            threads: 1,
+            capacity: 1,
+        });
+        let buffers = core_scheduler::HeapBufferPool::new(1, 8).unwrap();
+        let buffer = buffers.try_acquire().unwrap();
+        let (started, running) = mpsc::channel();
+        let (release, released) = mpsc::channel();
+        let completion = pool
+            .execute_submit(buffer, &NEVER, move |buffer| {
+                started.send(()).unwrap();
+                released.recv_timeout(TIMEOUT).unwrap();
+                buffer.as_mut().fill(42);
+                Ok(8)
+            })
+            .await
+            .unwrap();
+        running.recv_timeout(TIMEOUT).unwrap();
+        assert!(buffers.try_acquire().is_none());
+        drop(completion);
+        assert!(buffers.try_acquire().is_none());
+        let cancellation = Cancellation::new();
+        let mut waiting = pin!(pool.execute_submit(
+            vec![7; 3],
+            &cancellation,
+            |_| -> io::Result<usize> { panic!("cancelled admission must not execute") }
+        ));
+        assert!(poll_once(waiting.as_mut()).await.is_none());
+        cancellation.cancel();
+        let (error, input) = waiting.await.err().unwrap();
+        assert!(matches!(error, OperationError::Cancelled(_)));
+        assert_eq!(input, [7; 3]);
+        release.send(()).unwrap();
+        let returned = buffers.acquire(&NEVER).await.unwrap();
+        assert_eq!(returned.as_ref(), [42; 8]);
+        pool.drain().await;
+    });
+}
+
+#[test]
+fn forgetting_an_accepted_completion_can_leak_storage_but_does_not_block_retirement() {
+    block_on(async {
+        let pool = BlockingPool::new(TokioOptions {
+            threads: 1,
+            capacity: 1,
+        });
+        let buffers = core_scheduler::HeapBufferPool::new(1, 8).unwrap();
+        let buffer = buffers.try_acquire().unwrap();
+        let completion = pool
+            .execute_submit(buffer, &NEVER, |buffer| {
+                buffer.as_mut().fill(42);
+                Ok(8)
+            })
+            .await
+            .unwrap();
+        std::mem::forget(completion);
+        pool.drain().await;
+        assert!(buffers.try_acquire().is_none());
+        // The forgotten completion still owns the returned input. Capacity belongs to live jobs, not result collection.
+        assert_eq!(pool.execute((), &NEVER, |_| Ok(42)).await.0.unwrap(), 42);
+    });
+}

@@ -5,7 +5,7 @@ use crate::{IoBuf, IoBufMut};
 use std::ops::{Bound, Range, RangeBounds};
 
 /// An owned view into initialized storage. Dropping it drops its owner; `into_inner` recovers the complete buffer after an operation returns it.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BufferSlice<B> {
     buffer: B,
     range: Range<usize>,

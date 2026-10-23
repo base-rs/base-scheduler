@@ -10,7 +10,7 @@ use std::future::Future;
 ///
 /// Every I/O attempt must be nonblocking regardless of the socket's initial mode. Unix backends can use `MSG_DONTWAIT`; Windows backends may set `FIONBIO` before each attempt and leave nonblocking mode enabled. External aliases must not concurrently change blocking mode. Semantic flags do not control this requirement.
 ///
-/// Futures are lazy, pre-cancellation prevents I/O, and successful progress wins concurrent cancellation. Pending operations arrange wakeups for readiness and cancellation. Receives preserve short transfers and do not resize storage. For datagrams, an undersized buffer can truncate and discard the remainder of a message.
+/// Futures are lazy, pre-cancellation prevents I/O, and successful progress wins concurrent cancellation. A successful receive, including EOF or an empty datagram, returns `Ready` in the same poll; `Pending` must not consume bytes or datagrams. Pending operations arrange wakeups for readiness and cancellation. Receives preserve short transfers and do not resize storage. For datagrams, an undersized buffer can truncate and discard the remainder of a message.
 ///
 /// ```
 /// use core_scheduler::{Cancellation, OperationResult, SocketRecvPoll, SocketRecvFlags};

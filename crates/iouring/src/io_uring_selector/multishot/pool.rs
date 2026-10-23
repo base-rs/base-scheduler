@@ -8,12 +8,12 @@ use std::{
     sync::atomic::AtomicU16,
 };
 
-struct Group {
-    identifier: u16,
+pub(crate) struct Group {
+    pub(crate) identifier: u16,
     groups: Arc<Mutex<Vec<bool>>>,
 }
 impl Group {
-    fn new(controller: &Controller) -> io::Result<Self> {
+    pub(crate) fn new(controller: &Controller) -> io::Result<Self> {
         let mut groups = controller.buffer_groups.lock().unwrap();
         let identifier = if let Some(index) = groups.iter().position(|used| !used) {
             groups[index] = true;
@@ -42,7 +42,7 @@ impl Drop for Group {
 
 pub(crate) struct Pool {
     pub(crate) identifier: u64,
-    pub(super) controller: Weak<Controller>,
+    pub(crate) controller: Weak<Controller>,
     group: Group,
     ring: NonNull<types::BufRingEntry>,
     layout: Layout,
@@ -105,7 +105,7 @@ impl Pool {
         }
         Ok(pool)
     }
-    pub(in crate::io_uring_selector) fn group(&self) -> u16 {
+    pub(crate) fn group(&self) -> u16 {
         self.group.identifier
     }
     pub(super) fn register(&self, ring: &io_uring::Submitter<'_>) -> io::Result<()> {
@@ -211,6 +211,9 @@ mod tests {
         );
         assert!(
             matches!(Pool::new(controller, RecvMsgMultishotOptions { buffers: 1, buffer_size: 8 }, 0), Err(error) if error.kind() == io::ErrorKind::WouldBlock)
+        );
+        assert!(
+            matches!(selector.buffer_pool_per_worker(BufferPoolOptions::new(1, 8)), Err(error) if error.kind() == io::ErrorKind::WouldBlock)
         );
         let released = groups.swap_remove(7);
         drop(released);

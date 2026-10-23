@@ -2,7 +2,19 @@
 
 ## Unreleased
 
+- Expose backend-associated receive messages with borrowed address views, payload access, and owned payload extraction. Keep writable payload access optional for immutable receivers, and retain io_uring native address metadata until conversion is requested. Specify ownership and lifetime semantics without imposing copying or allocation costs.
+
+- Name owned receive results `SocketRecvMessage` across polling and multishot backends. Return pooled socket buffers before readiness waits so idle connections cannot reserve the shared budget, reuse Tokio's registered readiness without extra native probes, and document cancellation, explicit retirement, and future pool growth and caching boundaries.
+
 - Distribute new Native tasks round-robin across worker queues before their first poll, reusing the admission lock and removing the shared unassigned-task queue. Preserve worker-local wakes and idle stealing without adding per-operation load counters.
+
+- Reuse persistent slab ownership claims across heap buffer checkout, freezing, and return. Notify only while capacity waiters are registered, preserving the public buffer interface, stable storage, and cross-thread teardown safety.
+
+- Prototype backend-selected buffer pools with writable completed leases and retained immutable views. Ordinary shared pools use portable monitor receives; the concrete io_uring `buffer_pool_per_worker` experiment allocates every worker's contiguous slab and provided-ring metadata up front. Keep worker policy out of the portable capability and make the backend's receiver strategy opaque. Use one selector-wide group ID across rings, return leases to their home slab, and remove cross-worker reclamation. Worker receive-ahead requires Linux 6.0 or later; its locality and throughput remain experimental.
+
+- Replace the shared receive-buffer pool's free-list mutex with atomic availability words, and wake a distinct capacity waiter for every returned slot. Avoid listener registration for queued io_uring multishot messages and redundant ownership increments on local buffer returns; allow retained leases to be released safely during thread-local teardown. Correct buffer benchmarks to execute Native and Tokio I/O on their task workers and add burst and pool-contention measurements.
+
+- Prototype bounded shared `BufferPool` storage, unique writable receive leases, retained immutable views, monitor-based file/socket receivers, and separate file submission/completion waits across Direct, Tokio, Native readiness, and io_uring. Add owned write-all helpers and matched file/TCP/UDP buffer benchmarks; kernel buffer registration remains a separate optimization.
 
 - Prototype sequential `FileMonitor` resources with explicit cancellation and retirement across Direct, Tokio, Native readiness, and io_uring. io_uring reuses typed request storage and caches an optional fixed-file registration for the current ring, releasing and replacing it when a subsequent operation changes workers, with shared ring-binding conventions for file and socket monitors; add positioned-file benchmarks comparing ordinary and monitored operations.
 

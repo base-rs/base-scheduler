@@ -181,6 +181,12 @@ pub(crate) trait PendingRequest: Send {
     fn prepare(&mut self, _ring: &io_uring::Submitter<'_>) -> io::Result<()> {
         Ok(())
     }
+    fn ready(&mut self, ring: &io_uring::Submitter<'_>) -> io::Result<bool> {
+        self.prepare(ring).map(|()| true)
+    }
+    fn buffer_pool(&self) -> Option<&Arc<provided_buffers::WorkerBuffers>> {
+        None
+    }
     fn entry(&mut self) -> squeue::Entry;
     // Buffer accessors may run arbitrary user code, including waking tasks. Such requests must return to the executor after preparation instead of waiting.
     fn entry_may_wake(&self) -> bool {
@@ -194,6 +200,16 @@ pub(crate) trait PendingRequest: Send {
     }
     fn retire(self: Box<Self>, _ring: &io_uring::Submitter<'_>, result: io::Result<usize>) {
         self.finish(result);
+    }
+    fn retire_completion(self: Box<Self>, ring: &io_uring::Submitter<'_>, result: i32) {
+        self.retire(
+            ring,
+            if result < 0 {
+                Err(io::Error::from_raw_os_error(-result))
+            } else {
+                Ok(result as usize)
+            },
+        );
     }
     // Return true only for the transition which first requests cancellation.
     fn begin_cancellation(&self) -> bool;
@@ -241,6 +257,7 @@ pub(crate) enum Command {
     MonitorCancel(u64, u64),
     FileRelease(registered_file::Release),
     Recycle(Arc<multishot::pool::Pool>, u16),
+    PoolReady(Arc<provided_buffers::WorkerBuffers>),
     Rearm(u64),
     Cancel(u64),
     CancelAfterSubmission(u64),
@@ -261,6 +278,7 @@ impl Drop for SignalCompletion {
 }
 
 pub(crate) struct Controller {
+    pub(crate) worker: usize,
     capacity: Arc<Capacity>,
     commands: mpsc::Sender<Command>,
     notification: Arc<OwnedFd>,
@@ -273,8 +291,10 @@ pub(crate) struct Controller {
 
 impl Controller {
     pub(crate) fn send(&self, command: Command) -> Result<(), mpsc::SendError<Command>> {
-        if matches!(&command, Command::Submit(_) | Command::MonitorSubmit(_))
-            && self.closed.load(Ordering::Acquire)
+        if matches!(
+            &command,
+            Command::Submit(_) | Command::MonitorSubmit(_) | Command::PoolReady(_)
+        ) && self.closed.load(Ordering::Acquire)
         {
             return Err(mpsc::SendError(command));
         }
@@ -312,6 +332,13 @@ impl Controller {
                 Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
                 _ => break,
             }
+        }
+    }
+
+    fn submit(&self, request: Box<dyn PendingRequest>) {
+        if let Err(mpsc::SendError(Command::Submit(request))) = self.send(Command::Submit(request))
+        {
+            request.finish(Err(io::ErrorKind::BrokenPipe.into()));
         }
     }
 
@@ -428,6 +455,7 @@ impl Capacity {
     }
 }
 pub(crate) struct DriverGroup {
+    buffer_groups: Arc<std::sync::Mutex<Vec<bool>>>,
     controllers: OnceLock<Vec<Weak<Controller>>>,
     fallback: Arc<ReadinessSelector>,
     closed: AtomicBool,
@@ -480,14 +508,15 @@ impl IoUringSelector {
         }
         let fallback = Arc::new(ReadinessSelector::with_options(options.fallback)?);
         let group = Arc::new(DriverGroup {
+            buffer_groups: Arc::new(std::sync::Mutex::new(Vec::new())),
             controllers: OnceLock::new(),
             fallback: Arc::clone(&fallback),
             closed: AtomicBool::new(false),
         });
         let mut controllers = Vec::with_capacity(workers);
         let mut drivers = Vec::with_capacity(workers);
-        for _ in 0..workers {
-            let driver = Self::driver(options, Arc::clone(&group))?;
+        for worker in 0..workers {
+            let driver = Self::driver(options, Arc::clone(&group), worker)?;
             controllers.push(Arc::clone(&driver.controller));
             drivers.push(driver);
         }
@@ -505,7 +534,11 @@ impl IoUringSelector {
         ))
     }
 
-    fn driver(options: IoUringOptions, group: Arc<DriverGroup>) -> io::Result<IoUringDriver> {
+    fn driver(
+        options: IoUringOptions,
+        group: Arc<DriverGroup>,
+        worker: usize,
+    ) -> io::Result<IoUringDriver> {
         let ring = syscall("ring", || IoUring::new(options.entries))?;
         syscall("completion-support", || {
             validate_completion_support(
@@ -541,11 +574,12 @@ impl IoUringSelector {
             limit: options.capacity,
         });
         let controller = Arc::new(Controller {
+            worker,
             capacity,
             commands,
             notification,
             next_identifier: AtomicU64::new(0),
-            buffer_groups: Arc::new(std::sync::Mutex::new(Vec::new())),
+            buffer_groups: Arc::clone(&group.buffer_groups),
             files: std::sync::Mutex::new(registered_file::Files::new(options.fixed_files)),
             closed: AtomicBool::new(false),
             shutdown: Arc::clone(&shutdown),
@@ -605,34 +639,46 @@ impl IoUringSelector {
         pointer: fn(&mut B) -> *mut u8,
         cancellation: &Cancellation,
     ) -> RawBufferResult<B> {
+        match self
+            .operation_submit(controller, resource, buffer, write, pointer, cancellation)
+            .await
+        {
+            Ok(completion) => completion.await,
+            Err((error, buffer)) => (Err(error), buffer),
+        }
+    }
+
+    async fn operation_submit<B: IoBuf>(
+        &self,
+        controller: Arc<Controller>,
+        resource: Resource,
+        buffer: B,
+        write: bool,
+        pointer: fn(&mut B) -> *mut u8,
+        cancellation: &Cancellation,
+    ) -> Result<impl Future<Output = RawBufferResult<B>> + Send, (io::Error, B)> {
         if cancellation.is_cancelled() {
-            return (
-                Err(io::Error::new(
-                    io::ErrorKind::Interrupted,
-                    core_scheduler::Cancelled,
-                )),
+            return Err((
+                io::Error::new(io::ErrorKind::Interrupted, core_scheduler::Cancelled),
                 buffer,
-            );
+            ));
         }
         if let Err(error) = self.check_open() {
-            return (Err(error), buffer);
+            return Err((error, buffer));
         }
         if matches!(&resource, Resource::File(_, Some(offset)) if *offset > i64::MAX as u64) {
-            return (
-                Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "file offset exceeds i64::MAX",
-                )),
+            return Err((
+                io::Error::new(io::ErrorKind::InvalidInput, "file offset exceeds i64::MAX"),
                 buffer,
-            );
+            ));
         }
         let permit = match controller.capacity.acquire(cancellation).await {
             Ok(permit) => permit,
-            Err(error) => return (Err(error), buffer),
+            Err(error) => return Err((error, buffer)),
         };
         let identifier = match controller.next_identifier() {
             Ok(identifier) => identifier,
-            Err(error) => return (Err(error), buffer),
+            Err(error) => return Err((error, buffer)),
         };
         let (reply, result) = oneshot::channel();
         let request = Request {
@@ -645,15 +691,20 @@ impl IoUringSelector {
             reply: Cell::new(Some(reply)),
             cancelling: Cell::new(false),
         };
-        Self::submit(controller, Box::new(request), result, cancellation).await
+        Ok(Self::submit(
+            controller,
+            Box::new(request),
+            result,
+            cancellation,
+        ))
     }
 
-    async fn submit<T>(
+    fn submit<T: Send>(
         controller: Arc<Controller>,
         request: Box<dyn PendingRequest>,
         result: oneshot::Receiver<T>,
         cancellation: &Cancellation,
-    ) -> T {
+    ) -> impl Future<Output = T> + Send {
         let identifier = request.identifier();
         if let Err(mpsc::SendError(Command::Submit(request))) =
             controller.send(Command::Submit(request))
@@ -669,23 +720,26 @@ impl IoUringSelector {
             identifier,
             armed: true,
         };
-        // A disconnected reply is an unexpected selector failure. Resources whose kernel completion cannot be established are deliberately retained.
-        let mut result = pin!(result);
-        let mut cancelled = pin!(cancellation.cancelled());
-        let result = poll_fn(|context| {
-            // Original completion wins the race. Cancellation never releases resources; continue waiting for the original CQE.
-            if let Poll::Ready(result) = result.as_mut().poll(context) {
-                return Poll::Ready(result);
-            }
-            if cancel_request.armed && cancelled.as_mut().poll(context).is_ready() {
-                cancel_request.request();
-            }
-            Poll::Pending
-        })
-        .await
-        .expect("io_uring selector failed with an operation in flight");
-        cancel_request.armed = false;
-        result
+        async move {
+            // A disconnected reply is an unexpected selector failure. Resources whose kernel completion cannot be established are deliberately retained.
+            let mut result = pin!(result);
+            let mut cancelled = pin!(cancellation.cancelled());
+            let result = poll_fn(|context| {
+                // Original completion wins the race. Cancellation never releases resources; continue waiting for the original CQE.
+                if let Poll::Ready(result) = result.as_mut().poll(context) {
+                    return Poll::Ready(result);
+                }
+                if cancel_request.armed && cancelled.as_mut().poll(context).is_ready() {
+                    cancel_request.request();
+                }
+                Poll::Pending
+            })
+            .await
+            .expect("io_uring selector failed with an operation in flight");
+            cancel_request.armed = false;
+            drop(cancel_request);
+            result
+        }
     }
 }
 
@@ -814,6 +868,8 @@ pub(crate) struct Reactor {
     dormant: HashMap<u64, Box<dyn PendingRequest>>,
     monitors: monitor::Monitors,
     pending_monitors: VecDeque<monitor::Submission>,
+    buffer_pools: Vec<Option<Arc<provided_buffers::WorkerBuffers>>>,
+    pool_ready: Vec<u64>,
     in_flight: InFlight,
     cancellations: VecDeque<u64>,
     closing: bool,
@@ -833,6 +889,8 @@ impl Reactor {
             ring,
             monitors,
             pending_monitors,
+            buffer_pools: Vec::new(),
+            pool_ready: Vec::new(),
             started: false,
             notification,
             incoming,
@@ -949,14 +1007,7 @@ impl Reactor {
                     self.dormant.insert(identifier, request);
                 }
             } else {
-                request.retire(
-                    &submitter,
-                    if result < 0 {
-                        Err(io::Error::from_raw_os_error(-result))
-                    } else {
-                        Ok(result as usize)
-                    },
-                );
+                request.retire_completion(&submitter, result);
             }
         }
 
@@ -1075,6 +1126,17 @@ impl Reactor {
                         self.pending.push_back(request);
                     }
                 }
+                Command::PoolReady(pool) => {
+                    let index = pool.group() as usize;
+                    if self.buffer_pools.len() <= index {
+                        self.buffer_pools.resize_with(index + 1, || None);
+                    }
+                    assert!(
+                        self.buffer_pools[index].is_none(),
+                        "a live pool owns its group ID across all rings"
+                    );
+                    self.buffer_pools[index] = Some(pool);
+                }
                 Command::Rearm(identifier) => {
                     if let Some(request) = self.dormant.remove(&identifier) {
                         self.pending.push_back(request);
@@ -1107,6 +1169,31 @@ impl Reactor {
 
         progressed |= self.collect_completions()?;
 
+        // Initialize and refill on the ring owner. Each indexed entry owns only this worker's storage; completed payloads may be retained on any thread.
+        for slot in &mut self.buffer_pools {
+            let Some(pool) = slot else { continue };
+            if pool.service(&self.ring.submitter())? && !self.dormant.is_empty() {
+                for (identifier, request) in &self.dormant {
+                    if request
+                        .buffer_pool()
+                        .is_some_and(|known| Arc::ptr_eq(known, pool))
+                    {
+                        self.pool_ready.push(*identifier);
+                    }
+                }
+            }
+            if pool.empty() {
+                *slot = None;
+            }
+        }
+        for identifier in self.pool_ready.drain(..) {
+            self.pending.push_back(
+                self.dormant
+                    .remove(&identifier)
+                    .expect("a ready pool retains its dormant request"),
+            );
+        }
+
         let defer_submission;
         {
             let (submitter, mut submissions, _) = self.ring.split();
@@ -1126,10 +1213,17 @@ impl Reactor {
                 let Some(mut request) = self.pending.pop_front() else {
                     break;
                 };
-                if let Err(error) = request.prepare(&submitter) {
-                    request.retire(&submitter, Err(error));
-                    progressed = true;
-                    continue;
+                match request.ready(&submitter) {
+                    Ok(true) => {}
+                    Ok(false) => {
+                        self.dormant.insert(request.identifier(), request);
+                        continue;
+                    }
+                    Err(error) => {
+                        request.retire(&submitter, Err(error));
+                        progressed = true;
+                        continue;
+                    }
                 }
                 let identifier = request.identifier();
                 let request = self.in_flight.0.entry(identifier).or_insert(request);
@@ -1248,6 +1342,10 @@ impl Reactor {
 impl Drop for Reactor {
     fn drop(&mut self) {
         self.retire_pending(io::ErrorKind::BrokenPipe);
+        for pool in self.buffer_pools.iter().flatten() {
+            // Only proven-idle registrations can be released. Unknown in-flight payloads remain retained on driver failure.
+            let _ = pool.shutdown(&self.ring.submitter());
+        }
         // Pop without retaining a queue borrow: returning a buffer or waking its owner can reenter local routing.
         while let Some(command) = crate::io_uring_worker::pop(&self.controller) {
             discard(command);
@@ -1266,6 +1364,7 @@ impl std::task::Wake for Controller {
     }
 }
 
+mod buffer_pooling;
 mod message;
 pub(crate) mod monitor;
 pub(crate) mod multishot;
@@ -1278,3 +1377,9 @@ mod socket;
 mod tests;
 
 pub(crate) mod file_monitor;
+
+mod file_submission;
+
+mod socket_receiving;
+
+pub(crate) mod provided_buffers;

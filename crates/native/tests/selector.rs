@@ -287,3 +287,18 @@ fn custom_signal_capability_preserves_the_selectors_signal_and_subscription_type
     );
     scheduler.block_on(scheduler.shutdown());
 }
+
+#[test]
+fn portable_pool_capacity_is_independent_of_worker_count() {
+    use core_scheduler::{BufferPoolOptions, BufferPooling};
+    for workers in [1, 3] {
+        let scheduler = NativeScheduler::with_options(core_scheduler_native::NativeOptions {
+            workers,
+            ..Default::default()
+        })
+        .unwrap();
+        let options = BufferPoolOptions::new(3, 64);
+        assert_eq!(scheduler.buffer_pool(options).unwrap().capacity(), 3);
+        scheduler.block_on(scheduler.shutdown());
+    }
+}

@@ -1,0 +1,184 @@
+{
+  "samples": 220,
+  "totals": [
+    {
+      "binary": "files",
+      "cells": 2,
+      "geometric_mean": 0.9723100914661131
+    },
+    {
+      "binary": "leases",
+      "cells": 2,
+      "geometric_mean": 0.9998320046090217
+    },
+    {
+      "binary": "sockets",
+      "cells": 6,
+      "geometric_mean": 0.9742002233643483
+    }
+  ],
+  "cells": [
+    {
+      "binary": "files",
+      "parameters": [
+        "tokio",
+        "join",
+        "65536",
+        "536870912",
+        "1"
+      ],
+      "pairs": 11,
+      "median_ratio": 1.0094966432823327,
+      "minimum": 0.7634817185291088,
+      "maximum": 1.302652894310857
+    },
+    {
+      "binary": "files",
+      "parameters": [
+        "tokio",
+        "submit",
+        "65536",
+        "536870912",
+        "1"
+      ],
+      "pairs": 11,
+      "median_ratio": 0.9364933704910188,
+      "minimum": 0.5940971936989198,
+      "maximum": 1.5502352624800466
+    },
+    {
+      "binary": "leases",
+      "parameters": [
+        "1",
+        "5000000",
+        "local",
+        "mutable"
+      ],
+      "pairs": 11,
+      "median_ratio": 0.9861401011021126,
+      "minimum": 0.9724408323514195,
+      "maximum": 1.000367715668405
+    },
+    {
+      "binary": "leases",
+      "parameters": [
+        "8",
+        "1000000",
+        "local",
+        "frozen"
+      ],
+      "pairs": 11,
+      "median_ratio": 1.0137140111463552,
+      "minimum": 0.6519364691784129,
+      "maximum": 1.400002555815562
+    },
+    {
+      "binary": "sockets",
+      "parameters": [
+        "iouring",
+        "pool",
+        "1200",
+        "20000",
+        "2",
+        "udp",
+        "8",
+        "receive",
+        "8"
+      ],
+      "pairs": 11,
+      "median_ratio": 0.995650059598846,
+      "minimum": 0.4219311189442627,
+      "maximum": 2.4879554885986455
+    },
+    {
+      "binary": "sockets",
+      "parameters": [
+        "iouring",
+        "pool",
+        "65536",
+        "20000",
+        "2",
+        "tcp",
+        "8",
+        "receive",
+        "8"
+      ],
+      "pairs": 11,
+      "median_ratio": 1.0032769646154365,
+      "minimum": 0.4258450327675836,
+      "maximum": 2.1111358025104594
+    },
+    {
+      "binary": "sockets",
+      "parameters": [
+        "iouring",
+        "shared",
+        "1200",
+        "20000",
+        "2",
+        "udp",
+        "8",
+        "receive",
+        "8"
+      ],
+      "pairs": 11,
+      "median_ratio": 1.0404603271434292,
+      "minimum": 0.41892777345073573,
+      "maximum": 2.2195655048001948
+    },
+    {
+      "binary": "sockets",
+      "parameters": [
+        "native",
+        "shared",
+        "64",
+        "20000",
+        "1",
+        "tcp",
+        "8",
+        "receive",
+        "1"
+      ],
+      "pairs": 11,
+      "median_ratio": 1.013053421297612,
+      "minimum": 0.9172273707895132,
+      "maximum": 1.1954288497427232
+    },
+    {
+      "binary": "sockets",
+      "parameters": [
+        "native",
+        "shared",
+        "64",
+        "20000",
+        "2",
+        "tcp",
+        "8",
+        "receive",
+        "8"
+      ],
+      "pairs": 11,
+      "median_ratio": 0.8157048711961197,
+      "minimum": 0.4271029883645675,
+      "maximum": 2.366848960041748
+    },
+    {
+      "binary": "sockets",
+      "parameters": [
+        "tokio",
+        "shared",
+        "64",
+        "20000",
+        "2",
+        "tcp",
+        "8",
+        "receive",
+        "8"
+      ],
+      "pairs": 11,
+      "median_ratio": 0.9953386197906491,
+      "minimum": 0.4691996660347856,
+      "maximum": 2.1852477176758485
+    }
+  ]
+}

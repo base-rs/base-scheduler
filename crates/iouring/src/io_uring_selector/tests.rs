@@ -16,28 +16,32 @@ pub(super) fn syscall<T>(
     name: &'static str,
     operation: impl FnOnce() -> io::Result<T>,
 ) -> io::Result<T> {
-    let hook = BEFORE_SYSCALL.with(|hook| {
-        let mut hook = hook.borrow_mut();
-        if hook.as_ref().is_some_and(|(expected, _)| *expected == name) {
-            hook.take().map(|(_, callback)| callback)
-        } else {
-            None
-        }
-    });
+    let hook = BEFORE_SYSCALL
+        .try_with(|hook| {
+            let mut hook = hook.borrow_mut();
+            if hook.as_ref().is_some_and(|(expected, _)| *expected == name) {
+                hook.take().map(|(_, callback)| callback)
+            } else {
+                None
+            }
+        })
+        .unwrap_or(None);
     if let Some(hook) = hook {
         hook();
     }
-    let failure = FAILURES.with(|failures| {
-        let mut failures = failures.borrow_mut();
-        if failures
-            .front()
-            .is_some_and(|(expected, _)| *expected == name)
-        {
-            failures.pop_front().and_then(|(_, error)| error)
-        } else {
-            None
-        }
-    });
+    let failure = FAILURES
+        .try_with(|failures| {
+            let mut failures = failures.borrow_mut();
+            if failures
+                .front()
+                .is_some_and(|(expected, _)| *expected == name)
+            {
+                failures.pop_front().and_then(|(_, error)| error)
+            } else {
+                None
+            }
+        })
+        .unwrap_or(None);
     match failure {
         Some(error) => Err(error),
         None => operation(),

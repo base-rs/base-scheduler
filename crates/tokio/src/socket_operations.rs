@@ -34,34 +34,46 @@ impl TokioScheduler {
         mut operation: impl FnMut(&Socket, &mut Input) -> io::Result<Output> + Send,
         read_nonempty: bool,
     ) -> (OperationResult<Output>, Input) {
+        let result = self
+            .socket_result(
+                socket,
+                cancellation,
+                socket.io_with(
+                    interest,
+                    |socket| operation(socket, &mut input),
+                    read_nonempty,
+                ),
+            )
+            .await;
+        (result, input)
+    }
+
+    async fn socket_result<Output: Send>(
+        &self,
+        socket: &TokioSocket,
+        cancellation: &Cancellation,
+        operation: impl std::future::Future<Output = io::Result<Output>> + Send,
+    ) -> OperationResult<Output> {
         use std::{
             future::{Future, poll_fn},
             pin::pin,
             task::Poll,
         };
-        let result = async {
-            cancellation.check()?;
-            self.check_socket(socket)?;
-            let mut operation = pin!(socket.io_with(
-                interest,
-                |socket| operation(socket, &mut input),
-                read_nonempty
-            ));
-            let mut cancelled = pin!(cancellation.cancelled());
-            poll_fn(|context| {
-                match operation.as_mut().poll(context) {
-                    Poll::Ready(result) => return Poll::Ready(result.map_err(Into::into)),
-                    Poll::Pending => (),
-                }
-                if cancelled.as_mut().poll(context).is_ready() {
-                    return Poll::Ready(Err(Cancelled.into()));
-                }
-                Poll::Pending
-            })
-            .await
-        }
-        .await;
-        (result, input)
+        cancellation.check()?;
+        self.check_socket(socket)?;
+        let mut operation = pin!(operation);
+        let mut cancelled = pin!(cancellation.cancelled());
+        poll_fn(|context| {
+            match operation.as_mut().poll(context) {
+                Poll::Ready(result) => return Poll::Ready(result.map_err(Into::into)),
+                Poll::Pending => (),
+            }
+            if cancelled.as_mut().poll(context).is_ready() {
+                return Poll::Ready(Err(Cancelled.into()));
+            }
+            Poll::Pending
+        })
+        .await
     }
 }
 
@@ -319,11 +331,8 @@ impl SocketWait for TokioScheduler {
         interest: Interest,
         cancellation: &Cancellation,
     ) -> OperationResult<()> {
-        self.socket_operation(socket, (), cancellation, interest, move |socket, _| {
-            socket_io::wait(socket, interest)
-        })
-        .await
-        .0
+        self.socket_result(socket, cancellation, socket.wait(interest))
+            .await
     }
 }
 

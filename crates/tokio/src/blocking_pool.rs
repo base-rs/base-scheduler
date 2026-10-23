@@ -182,6 +182,25 @@ impl BlockingPool {
         Input: Send + 'static,
         Output: Send + 'static,
     {
+        match self.execute_submit(input, cancellation, operation).await {
+            Ok(completion) => completion.await,
+            Err((error, input)) => (Err(error), input),
+        }
+    }
+
+    pub(crate) async fn execute_submit<Input, Output>(
+        &self,
+        input: Input,
+        cancellation: &Cancellation,
+        operation: impl FnOnce(&mut Input) -> io::Result<Output> + Send + 'static,
+    ) -> Result<
+        impl Future<Output = (OperationResult<Output>, Input)> + Send,
+        (OperationError, Input),
+    >
+    where
+        Input: Send + 'static,
+        Output: Send + 'static,
+    {
         let mut input = Some(input);
         let admitted = self
             .admit(cancellation, || {
@@ -205,11 +224,11 @@ impl BlockingPool {
             })
             .await;
         match admitted {
-            Ok(result) => finish_io(result).await,
-            Err(error) => (
-                Err(admission_error(error)),
+            Ok(result) => Ok(finish_io(result)),
+            Err(error) => Err((
+                admission_error(error),
                 input.expect("failed admission retains its input"),
-            ),
+            )),
         }
     }
 

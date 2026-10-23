@@ -57,9 +57,14 @@ Require individual operations, such as `FileRead`, `SocketRead + SocketWrite`, o
 | `Blocking` | Optional bounded admission of owned synchronous work. |
 | `Signals` | Optional notification subscriptions with implementation-associated guards and signal identifiers. |
 | Borrowed socket I/O | Optional `SocketRecvPoll`, `SocketSendPoll`, `SocketRecvMsgPoll`, and `SocketSendMsgPoll`, accepting stack buffers and I/O vectors. |
+| `BufferPooling` and `SocketReceiving` | Experimental bounded reusable storage and owned received chunks, with retained parser views and backend-selected receive strategies. |
 | Extension capabilities | Typed socket options, scatter/gather messages, address resolution, standard TCP resource registration, file advice, and allocation. |
 
 Operation futures use static dispatch and are `Send`. File and socket resources are `Send + Sync`; spawned futures and outputs are `Send + 'static`. Local-only execution is outside this initial contract. Independent capabilities can be implemented separately without runtime-selection features.
+
+Buffer consumers choose a shared payload budget and alignment through `scheduler.buffer_pool(options)`, then pass that pool to `scheduler.socket_receiver(socket, pool, flags, cancellation)`. Completed chunks are uniquely writable and can freeze into immutable views that outlive the receiver and move between workers. Retained views prevent reuse; exhaustion waits with cancellation. The backend owns allocation, hot-buffer reuse, registration, publication depth, and receive strategy. Changing worker count does not multiply the portable pool's capacity. Admitted receivers may receive ahead within the budget, so close them explicitly before exclusively closing their sockets. See the [buffer ownership design](context/design.md#experimental-shared-buffer-pools-and-receivers) and [buffer experiments](benchmarks/buffers/readme.md).
+
+Received messages expose `address()` and `payload()` while owning their backend's storage and metadata. Convert an address view with `to_socket_address()` when a portable endpoint is needed. Pooled messages support `payload_mut()` for parsing or decryption and `into_payload()` to transfer an owned buffer into a write or freeze it into retained views. These accessors specify contents and ownership; allocation, copying, and native metadata representation remain implementation choices.
 
 ## Reusable file monitors
 

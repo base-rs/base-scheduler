@@ -3,7 +3,7 @@
 
 use crate::{
     IoUringDriver,
-    io_uring_selector::{Command, Controller, DriverGroup},
+    io_uring_selector::{Command, Controller, DriverGroup, multishot::pool::Pool},
 };
 use core_scheduler_selector::SelectorWorker;
 use std::{
@@ -22,6 +22,18 @@ struct LocalRoute {
     commands: RefCell<VecDeque<Command>>,
     notified: Cell<bool>,
 }
+impl LocalRoute {
+    fn recycle(&self, pool: &Pool, buffer: u16) {
+        // This thread exclusively owns the provided ring. Returning a lease needs no queued work while its receive remains armed.
+        pool.recycle(buffer);
+        if pool.needs_rearm() {
+            self.commands
+                .borrow_mut()
+                .push_back(Command::Rearm(pool.identifier));
+        }
+    }
+}
+
 thread_local! {
     static ROUTES: RefCell<Vec<Rc<LocalRoute>>> = const { RefCell::new(Vec::new()) };
 }
@@ -89,24 +101,29 @@ pub(crate) fn enqueue(controller: &Controller, command: Command) -> Result<(), C
             .rev()
             .find(|route| std::ptr::eq(Arc::as_ptr(&route.controller), controller))
         {
-            if let Command::Recycle(pool, buffer) = command {
-                // This thread exclusively owns the provided ring. Returning a lease needs no queued work while its receive remains armed.
-                pool.recycle(buffer);
-                if pool.needs_rearm() {
-                    route
-                        .commands
-                        .borrow_mut()
-                        .push_back(Command::Rearm(pool.identifier));
-                }
-            } else {
-                route.commands.borrow_mut().push_back(command);
-            }
+            route.commands.borrow_mut().push_back(command);
             Ok(())
         } else {
             Err(command)
         }
     })
 }
+pub(crate) fn recycle(pool: &Pool, buffer: u16) -> bool {
+    ROUTES
+        .try_with(|routes| {
+            let routes = routes.borrow();
+            if let Some(route) = routes.iter().rev().find(|route| {
+                std::ptr::eq(Arc::as_ptr(&route.controller), pool.controller.as_ptr())
+            }) {
+                route.recycle(pool, buffer);
+                true
+            } else {
+                false
+            }
+        })
+        .unwrap_or(false)
+}
+
 pub(crate) fn pop(controller: &Controller) -> Option<Command> {
     ROUTES.with(|routes| {
         routes

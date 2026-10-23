@@ -403,13 +403,13 @@ where
     S: Selector,
     R: SocketRecvMsgReceiver<S>,
 {
-    type Buffer = R::Buffer;
+    type Message = R::Message;
 
     async fn recv(
         &mut self,
         scheduler: &NativeScheduler<S>,
         cancellation: &Cancellation,
-    ) -> OperationResult<Option<RecvMsgMultishotMessage<Self::Buffer>>> {
+    ) -> OperationResult<Option<Self::Message>> {
         self.0.recv(scheduler.selector(), cancellation).await
     }
 
@@ -669,5 +669,77 @@ impl<S: Selector + FileMonitoring> FileMonitoring for NativeScheduler<S> {
         self.selector()
             .file_monitor_close(monitor, cancellation)
             .await
+    }
+}
+
+impl<S: Selector + FileSubmission> FileSubmission for NativeScheduler<S> {
+    async fn file_read_submit<B: IoBufMut>(
+        &self,
+        file: &Self::File,
+        buffer: B,
+        cancellation: &Cancellation,
+    ) -> Result<impl std::future::Future<Output = BufferResult<B>> + Send, (OperationError, B)>
+    {
+        self.selector()
+            .file_read_submit(file, buffer, cancellation)
+            .await
+    }
+    async fn file_write_submit<B: IoBuf>(
+        &self,
+        file: &Self::File,
+        buffer: B,
+        cancellation: &Cancellation,
+    ) -> Result<impl std::future::Future<Output = BufferResult<B>> + Send, (OperationError, B)>
+    {
+        self.selector()
+            .file_write_submit(file, buffer, cancellation)
+            .await
+    }
+    async fn file_read_at_submit<B: IoBufMut>(
+        &self,
+        file: &Self::File,
+        buffer: B,
+        offset: u64,
+        cancellation: &Cancellation,
+    ) -> Result<impl std::future::Future<Output = BufferResult<B>> + Send, (OperationError, B)>
+    {
+        self.selector()
+            .file_read_at_submit(file, buffer, offset, cancellation)
+            .await
+    }
+    async fn file_write_at_submit<B: IoBuf>(
+        &self,
+        file: &Self::File,
+        buffer: B,
+        offset: u64,
+        cancellation: &Cancellation,
+    ) -> Result<impl std::future::Future<Output = BufferResult<B>> + Send, (OperationError, B)>
+    {
+        self.selector()
+            .file_write_at_submit(file, buffer, offset, cancellation)
+            .await
+    }
+}
+
+impl<S: Selector + SocketReceiving> SocketReceiving for NativeScheduler<S> {
+    type PooledReceiver = NativeRecvMsgReceiver<S::PooledReceiver>;
+    async fn socket_receiver(
+        &self,
+        socket: &Self::Socket,
+        pool: Self::Pool,
+        flags: SocketRecvFlags,
+        cancellation: &Cancellation,
+    ) -> OperationResult<Self::PooledReceiver> {
+        self.selector()
+            .socket_receiver(socket, pool, flags, cancellation)
+            .await
+            .map(NativeRecvMsgReceiver)
+    }
+}
+
+impl<S: Selector + BufferPooling> BufferPooling for NativeScheduler<S> {
+    type Pool = S::Pool;
+    fn buffer_pool(&self, options: BufferPoolOptions) -> io::Result<Self::Pool> {
+        self.selector().buffer_pool(options)
     }
 }

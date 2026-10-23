@@ -15,6 +15,7 @@ members = [
     "benchmarks/echo",
     "benchmarks/timers",
     "benchmarks/files",
+    "benchmarks/buffers",
     "crates/conformance",
     "crates/direct",
     "crates/tokio",
@@ -33,6 +34,9 @@ reviewers = ["core-rs/maintainers"]
 
 [dependencies]
 event-listener = "5.4.2"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage)'] }
 
 [dev-dependencies]
 allocation-counter = "0.8.1"

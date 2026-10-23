@@ -263,6 +263,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "core-scheduler-buffer-benchmark"
+version = "0.0.0"
+dependencies = [
+ "core-scheduler",
+ "core-scheduler-direct",
+ "core-scheduler-iouring",
+ "core-scheduler-native",
+ "core-scheduler-tokio",
+ "futures-lite",
+ "io-uring",
+ "libc",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
 name = "core-scheduler-conformance"
 version = "0.0.0"
 dependencies = [
