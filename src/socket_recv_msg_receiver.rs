@@ -8,6 +8,8 @@ use std::{future::Future, io};
 ///
 /// Receivers retain socket, buffer, and registration state, without caching a scheduler. Resource compatibility follows [`SocketOperation`](crate::SocketOperation). A submitted completion operation may remain attached to its original driver.
 ///
+/// Once close is first polled, callers must stop receiving, including after a close error or an abandoned close wait. Only close retries remain valid; successful close establishes retirement. An incompatible scheduler is rejected without submitting backend work, but does not authorize resuming reception.
+///
 /// Portable shutdown is: cancel the pending `recv`, await that wait's result, then call `close(scheduler).await` and drop the receiver before exclusively closing the socket. Cancellation ends a wait; it is not proof that reception stopped or backend access retired. Successful close establishes retirement, and all delivered buffers remain valid. A closed receiver may still retain its socket owner until dropped. To continue receiving after cancellation, follow the construction capability's guarantee; portable code may instead close and construct a new receiver, accounting for data already consumed.
 pub trait SocketRecvMsgReceiver<S: ?Sized>: Send {
     type Message: SocketRecvMessage;

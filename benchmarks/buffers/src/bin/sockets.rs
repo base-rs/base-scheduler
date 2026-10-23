@@ -2,8 +2,12 @@
 // Copyright, 2026, by Samuel Williams.
 
 use core_scheduler::*;
+#[cfg(target_os = "linux")]
 #[path = "../multishot.rs"]
 mod multishot;
+#[cfg(not(target_os = "linux"))]
+use core_scheduler::SocketReceiving as Multishot;
+#[cfg(target_os = "linux")]
 use multishot::Multishot;
 use std::{
     io::{IoSliceMut, Read, Write},
@@ -40,11 +44,7 @@ async fn run<S>(
     group: &ConnectionGroup<S::Pool>,
 ) -> serde_json::Value
 where
-    S: SocketScheduler
-        + SocketMonitoring
-        + SocketReceiving
-        + Multishot
-        + SocketSetOption<TcpNoDelay>,
+    S: SocketScheduler + SocketMonitoring + Multishot + SocketSetOption<TcpNoDelay>,
     S::Socket: 'static,
 {
     let mode = workload.mode.as_str();
@@ -154,6 +154,7 @@ where
     let mut writable = scheduler
         .socket_monitor(&socket, Interest::Writable)
         .unwrap();
+    #[cfg(target_os = "linux")]
     let mut multishot = if matches!(mode, "multi" | "multi-retain") {
         Some(
             scheduler
@@ -167,6 +168,7 @@ where
     let payload = vec![42; size];
     let mut raw = vec![0; size];
     let mut retained = None;
+    #[cfg(target_os = "linux")]
     let mut retained_multi = None;
     let mut receive_calls = 0_u64;
     let mut short_receives = 0_u64;
@@ -243,6 +245,7 @@ where
                     }
                     count
                 }
+                #[cfg(target_os = "linux")]
                 "multi" | "multi-retain" => {
                     let message = multishot
                         .as_mut()
@@ -274,7 +277,9 @@ where
     }
     let elapsed = start.elapsed();
     drop(retained);
+    #[cfg(target_os = "linux")]
     drop(retained_multi);
+    #[cfg(target_os = "linux")]
     if let Some(mut multishot) = multishot {
         multishot.close(scheduler).await.unwrap();
     }
@@ -294,7 +299,6 @@ async fn run_group<S>(scheduler: Arc<S>, workload: Workload, pool: S::Pool) -> s
 where
     S: SocketScheduler
         + SocketMonitoring
-        + SocketReceiving
         + Multishot
         + SocketSetOption<TcpNoDelay>
         + Spawn
@@ -359,7 +363,12 @@ fn execute(args: &[String]) -> serde_json::Value {
     let backend = args.get(1).map(String::as_str).unwrap_or("native");
     let mode = args.get(2).map(String::as_str).unwrap_or("pool");
     assert!(
-        matches!(mode, "raw" | "pool" | "shared" | "multi" | "multi-retain"),
+        match mode {
+            "raw" | "pool" | "shared" => true,
+            #[cfg(target_os = "linux")]
+            "multi" | "multi-retain" => backend == "iouring",
+            _ => false,
+        },
         "unknown receiver mode"
     );
     let size: usize = args.get(3).map(|s| s.parse().unwrap()).unwrap_or(65536);
@@ -501,6 +510,12 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    #[should_panic(expected = "unknown receiver mode")]
+    fn rejects_multishot_on_portable_backends() {
+        execute(&["sockets", "tokio", "multi"].map(str::to_owned));
+    }
 
     #[test]
     fn receivers_preserve_tcp_and_udp_data_on_each_backend() {

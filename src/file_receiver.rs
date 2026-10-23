@@ -63,18 +63,13 @@ impl<File, Registration, P: BufferPool> FileReceiver<File, Registration, P> {
         }
     }
 
-    /// Stop admission and await accepted I/O retirement without cancellation. Repeated close is safe; completed leases remain valid. Dropping a pending close does not establish retirement. Drop the receiver after successful close to release its retained file before exclusive file close. Does not close the underlying file.
+    /// Stop admission and await accepted I/O retirement without cancellation. Reception stops on the first poll, including after an error or an abandoned wait. Repeated close is safe; completed leases remain valid. Dropping a pending close does not establish retirement. Drop the receiver after successful close to release its retained file before exclusive file close. Does not close the underlying file.
     pub async fn close<S>(&mut self, scheduler: &S) -> std::io::Result<()>
     where
         S: FileMonitoring<File = File, FileRegistration = Registration>,
         Registration: Send,
     {
-        // Stop reception before a close can suspend. An incompatible scheduler rejects without progress, so that one error preserves the previous receive state.
-        let terminal = std::mem::replace(&mut self.terminal, true);
-        let result = scheduler.file_monitor_close(&mut self.monitor).await;
-        if matches!(&result, Err(error) if error.kind() == std::io::ErrorKind::InvalidInput) {
-            self.terminal = terminal;
-        }
-        result
+        self.terminal = true;
+        scheduler.file_monitor_close(&mut self.monitor).await
     }
 }

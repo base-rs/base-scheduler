@@ -107,20 +107,15 @@ impl<M: crate::MonitorState, P: BufferPool> SocketReceiver<M, P> {
         }
     }
 
-    /// Stop reception and await monitor retirement without cancellation. Repeated close is safe; returned buffers remain valid. Drop the receiver after success to release its socket owner before exclusive socket close.
+    /// Stop reception and await monitor retirement without cancellation. Reception stops on the first poll, including after an error or an abandoned wait. Repeated close is safe; returned buffers remain valid. Drop the receiver after success to release its socket owner before exclusive socket close.
     pub async fn close<S>(&mut self, scheduler: &S) -> std::io::Result<()>
     where
         S: SocketMonitoring,
         S::Socket: 'static,
         M: SocketMonitorState<S::Socket, S::MonitorRegistration>,
     {
-        // Stop reception before a close can suspend. An incompatible scheduler rejects without progress, so that one error preserves the previous receive state.
-        let terminal = std::mem::replace(&mut self.terminal, true);
-        let result = scheduler.socket_monitor_close(&mut self.monitor).await;
-        if matches!(&result, Err(error) if error.kind() == std::io::ErrorKind::InvalidInput) {
-            self.terminal = terminal;
-        }
-        result
+        self.terminal = true;
+        scheduler.socket_monitor_close(&mut self.monitor).await
     }
 }
 

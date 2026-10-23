@@ -4,7 +4,7 @@
 use super::*;
 
 #[test]
-fn receiver_creation_is_lazy_and_foreign_close_preserves_reception() {
+fn receiver_creation_is_lazy_and_close_checks_runtime_compatibility() {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -31,14 +31,15 @@ fn receiver_creation_is_lazy_and_foreign_close_preserves_reception() {
             receiver.recv(&foreign, &never).await.err().unwrap().kind(),
             std::io::ErrorKind::InvalidInput
         );
-        assert_eq!(
-            receiver.close(&foreign).await.unwrap_err().kind(),
-            std::io::ErrorKind::InvalidInput
-        );
         let (written, _) = scheduler.socket_write(&peer, vec![42], &never).await;
         assert_eq!(written.unwrap(), 1);
         let message = receiver.recv(&scheduler, &never).await.unwrap().unwrap();
         assert_eq!(message.payload(), &[42]);
+        assert_eq!(
+            receiver.close(&foreign).await.unwrap_err().kind(),
+            std::io::ErrorKind::InvalidInput
+        );
+        // A failed close may be retried with the owning scheduler, never used to resume reception.
         scheduler.close();
         receiver.close(&scheduler).await.unwrap();
         receiver.close(&scheduler).await.unwrap();

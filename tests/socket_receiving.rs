@@ -144,10 +144,10 @@ impl SocketMonitoring for Sockets {
 }
 
 #[test]
-fn close_abandonment_stops_receiving_but_incompatible_close_preserves_it() {
+fn close_abandonment_and_errors_never_restart_reception() {
     block_on(async {
         let never = Cancellation::never();
-        let socket = Arc::new(AtomicUsize::new(101));
+        let socket = Arc::new(AtomicUsize::new(1));
         let pool = TestPool(HeapBufferPool::new(1, 8).unwrap());
         let mut receiver = SocketReceiver::new(
             Sockets.socket_monitor(&socket, Interest::Readable).unwrap(),
@@ -156,10 +156,6 @@ fn close_abandonment_stops_receiving_but_incompatible_close_preserves_it() {
             SocketRecvFlags::default(),
         )
         .unwrap();
-        assert_eq!(
-            receiver.close(&Sockets).await.unwrap_err().kind(),
-            io::ErrorKind::InvalidInput
-        );
         socket.store(1, Ordering::Relaxed);
         let held = receiver.recv(&Sockets, &never).await.unwrap().unwrap();
         assert_eq!(held.payload(), &[42; 8]);

@@ -106,20 +106,16 @@ impl FileMonitoring for Files {
 }
 
 #[test]
-fn close_abandonment_stops_receiving_but_incompatible_close_preserves_it() {
+fn close_abandonment_and_errors_never_restart_reception() {
     block_on(async {
         let scheduler = Files {
             written: Mutex::new(Vec::new()),
             limit: 8,
         };
         let never = Cancellation::never();
-        let file = Arc::new(AtomicUsize::new(101));
+        let file = Arc::new(AtomicUsize::new(1));
         let pool = TestPool(HeapBufferPool::new(1, 8).unwrap());
         let mut receiver = FileReceiver::new(scheduler.file_monitor(&file).unwrap(), pool.clone());
-        assert_eq!(
-            receiver.close(&scheduler).await.unwrap_err().kind(),
-            io::ErrorKind::InvalidInput
-        );
         file.store(1, Ordering::Relaxed);
         let held = receiver.recv(&scheduler, &never).await.unwrap().unwrap();
         assert_eq!(held.as_ref(), &[42; 8]);
