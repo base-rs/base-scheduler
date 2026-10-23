@@ -84,10 +84,7 @@ where
             assert_eq!(&target[..payload.len()], payload);
         }
     }
-    scheduler
-        .socket_monitor_close(&mut monitor, &never)
-        .await
-        .unwrap();
+    scheduler.socket_monitor_close(&mut monitor).await.unwrap();
 }
 
 /// Pre-cancelled scalar operations leave storage and the receive queue unchanged. Unpolled operations perform no I/O.

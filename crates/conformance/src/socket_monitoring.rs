@@ -283,25 +283,15 @@ async fn monitor<S, M>(
     assert_eq!(read.unwrap(), 1);
     assert_eq!(write.unwrap(), 1);
     assert_eq!(data, [b'z']);
-    cancelled(
-        scheduler
-            .socket_monitor_close(&mut reader, &cancellation)
-            .await,
-    );
+    drop(scheduler.socket_monitor_close(&mut reader));
+    scheduler.socket_monitor_close(&mut reader).await.unwrap();
+    scheduler.socket_monitor_close(&mut writer).await.unwrap();
     scheduler
-        .socket_monitor_close(&mut reader, &never)
+        .socket_monitor_close(&mut sender_read)
         .await
         .unwrap();
     scheduler
-        .socket_monitor_close(&mut writer, &never)
-        .await
-        .unwrap();
-    scheduler
-        .socket_monitor_close(&mut sender_read, &never)
-        .await
-        .unwrap();
-    scheduler
-        .socket_monitor_close(&mut sender_write, &never)
+        .socket_monitor_close(&mut sender_write)
         .await
         .unwrap();
 }

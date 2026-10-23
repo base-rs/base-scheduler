@@ -4,14 +4,13 @@
 use crate::file_monitor::{Activity, MonitoredBuffer, Retirement};
 use crate::{
     BufferResult, Cancellation, FileMonitor, FileRead, FileReadAt, FileWrite, FileWriteAt, IoBuf,
-    IoBufMut, OperationResult,
+    IoBufMut,
 };
 use std::{
     future::{Future, poll_fn},
     io,
     pin::pin,
     sync::{Arc, atomic::Ordering},
-    task::Poll,
 };
 
 /// Optional reusable file operations. A monitor admits one operation at a time, including after abandonment until the backend retires the previous operation. Busy reuse returns `WouldBlock`; it never overwrites kernel-accessible storage.
@@ -93,14 +92,12 @@ pub trait FileMonitoring: FileRead + FileWrite + FileReadAt + FileWriteAt {
         }
     }
 
-    /// Stop monitor admission and await retirement of its accepted operation. Cancellation stops waiting but does not reopen the monitor. Drop the monitor after this completes to release its retained file before exclusive file close. This does not close the file or affect other monitors.
+    /// Stop monitor admission and await retirement of its accepted operation. This lazy cleanup takes no cancellation token and remains available after ordinary work is cancelled or scheduler admission closes. Dropping a pending close leaves retirement in progress; await close again to establish completion. Repeated close is safe. Drop the monitor after successful completion to release its retained file before exclusive file close. This does not close the file or affect other monitors.
     fn file_monitor_close(
         &self,
         monitor: &mut FileMonitor<Self::File, Self::FileRegistration>,
-        cancellation: &Cancellation,
-    ) -> impl Future<Output = OperationResult<()>> + Send {
+    ) -> impl Future<Output = io::Result<()>> + Send {
         async move {
-            cancellation.check()?;
             monitor.closed = true;
             if let Some(activity) = &monitor.activity {
                 loop {
@@ -109,14 +106,7 @@ pub trait FileMonitoring: FileRead + FileWrite + FileReadAt + FileWriteAt {
                         break;
                     }
                     let mut listener = pin!(listener);
-                    let mut cancelled = pin!(cancellation.cancelled());
-                    poll_fn(|context| {
-                        if cancelled.as_mut().poll(context).is_ready() {
-                            return Poll::Ready(Err(crate::Cancelled));
-                        }
-                        listener.as_mut().poll(context).map(|_| Ok(()))
-                    })
-                    .await?;
+                    poll_fn(|context| listener.as_mut().poll(context)).await;
                 }
             }
             Ok(())

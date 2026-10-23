@@ -186,7 +186,7 @@ mod linux {
         }
         let loop_elapsed = start.elapsed();
         let (mut monitor, buffer) = payload.take().unwrap();
-        block_on(selector.file_monitor_close(&mut monitor, &never)).unwrap();
+        block_on(selector.file_monitor_close(&mut monitor)).unwrap();
         let elapsed = start.elapsed();
         drop((monitor, buffer));
         block_on(selector.file_close(file)).unwrap();

@@ -136,7 +136,7 @@ impl RegisteredFile {
                 .is_some_and(Result::is_ok)
     }
 
-    pub async fn closed(&self, cancellation: &Cancellation) -> OperationResult<()> {
+    pub async fn closed(&self) -> io::Result<()> {
         loop {
             event_listener::listener!(self.retirement.finished => listener);
             if let Some(result) = self.retirement.result.lock().unwrap().as_ref() {
@@ -145,18 +145,9 @@ impl RegisteredFile {
                         .raw_os_error()
                         .map(io::Error::from_raw_os_error)
                         .unwrap_or_else(|| io::Error::new(error.kind(), error.to_string()))
-                        .into()
                 });
             }
-            let mut listener = pin!(listener);
-            let mut cancelled = pin!(cancellation.cancelled());
-            poll_fn(|context| {
-                if cancelled.as_mut().poll(context).is_ready() {
-                    return Poll::Ready(Err(Cancelled));
-                }
-                listener.as_mut().poll(context).map(|_| Ok(()))
-            })
-            .await?;
+            listener.await;
         }
     }
 }

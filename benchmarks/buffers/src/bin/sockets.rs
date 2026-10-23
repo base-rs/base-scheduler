@@ -2,6 +2,9 @@
 // Copyright, 2026, by Samuel Williams.
 
 use core_scheduler::*;
+#[path = "../multishot.rs"]
+mod multishot;
+use multishot::Multishot;
 use std::{
     io::{IoSliceMut, Read, Write},
     net::{TcpListener, UdpSocket},
@@ -40,7 +43,7 @@ where
     S: SocketScheduler
         + SocketMonitoring
         + SocketReceiving
-        + SocketRecvMsgMultishot
+        + Multishot
         + SocketSetOption<TcpNoDelay>,
     S::Socket: 'static,
 {
@@ -154,15 +157,7 @@ where
     let mut multishot = if matches!(mode, "multi" | "multi-retain") {
         Some(
             scheduler
-                .socket_recvmsg_multishot(
-                    &socket,
-                    RecvMsgMultishotOptions {
-                        buffers: (window + 2).max(8).try_into().unwrap(),
-                        buffer_size: size,
-                    },
-                    SocketRecvFlags::default(),
-                    &never,
-                )
+                .multishot(&socket, (window + 2).max(8), size, &never)
                 .await
                 .unwrap(),
         )
@@ -287,14 +282,8 @@ where
         receiver.close(scheduler).await.unwrap();
     }
     drop(receiver);
-    scheduler
-        .socket_monitor_close(&mut readable, &never)
-        .await
-        .unwrap();
-    scheduler
-        .socket_monitor_close(&mut writable, &never)
-        .await
-        .unwrap();
+    scheduler.socket_monitor_close(&mut readable).await.unwrap();
+    scheduler.socket_monitor_close(&mut writable).await.unwrap();
     drop((readable, writable));
     scheduler.socket_close(socket).await.unwrap();
     peer.join().unwrap();
@@ -306,7 +295,7 @@ where
     S: SocketScheduler
         + SocketMonitoring
         + SocketReceiving
-        + SocketRecvMsgMultishot
+        + Multishot
         + SocketSetOption<TcpNoDelay>
         + Spawn
         + Send
@@ -521,6 +510,9 @@ mod tests {
         let backends = ["direct", "tokio", "native"];
         for backend in backends {
             for mode in ["raw", "pool", "shared", "multi", "multi-retain"] {
+                if mode.starts_with("multi") && backend != "iouring" {
+                    continue;
+                }
                 for transport in ["tcp", "udp"] {
                     for traffic in ["echo", "receive"] {
                         let args = [

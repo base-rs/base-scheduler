@@ -81,17 +81,16 @@ pub trait SocketMonitoring:
         }
     }
 
-    /// Retire a persistent registration before dropping its handles and exclusively closing the socket. No waiter may be active on this monitor. Backends without persistent registrations need no additional work.
+    /// Retire a persistent registration before dropping its handles and exclusively closing the socket. No waiter may be active on this monitor. This lazy cleanup takes no cancellation token and remains available after ordinary work is cancelled or scheduler admission closes. Dropping a pending close does not establish retirement; await close again to finish. Repeated close is safe. Stop using this monitor and its aliases for I/O once close is first polled; fallback implementations need not reject subsequent use. Backends without persistent registrations need no additional work.
     fn socket_monitor_close<M>(
         &self,
         _monitor: &mut MonitorStorage<M>,
-        cancellation: &Cancellation,
-    ) -> impl Future<Output = OperationResult<()>> + Send
+    ) -> impl Future<Output = io::Result<()>> + Send
     where
         Self::Socket: 'static,
         M: SocketMonitorState<Self::Socket, Self::MonitorRegistration>,
     {
-        async move { cancellation.check().map_err(Into::into) }
+        async move { Ok(()) }
     }
 
     fn socket_monitor_recv_poll<M>(

@@ -3,7 +3,7 @@
 
 use super::super::tests::{drain, drive, pair};
 use super::*;
-use core_scheduler::{SocketRecvMsgMultishot, SocketRecvMsgReceiver};
+use core_scheduler::SocketRecvMsgReceiver;
 use futures_lite::future::{block_on, poll_once};
 
 use core_scheduler_selector::{SelectorDriver, SelectorWorker};

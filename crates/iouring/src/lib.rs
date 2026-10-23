@@ -14,7 +14,7 @@ pub use io_uring_options::IoUringOptions;
 pub use io_uring_selector::IoUringSelector;
 pub use io_uring_selector::monitor::IoUringMonitorRegistration;
 pub use io_uring_selector::multishot::{
-    RecvMsgBuffer, RecvMsgMultishot, RecvMsgMultishotOptions, RecvMsgMultishotStatistics,
+    RecvMsgBuffer, RecvMsgMultishot, RecvMsgMultishotStatistics,
 };
 
 mod io_uring_worker;
@@ -32,3 +32,6 @@ pub use io_uring_receiver::IoUringReceiver;
 
 mod io_uring_recv_message;
 pub use io_uring_recv_message::IoUringRecvMessage;
+
+mod recv_msg_multishot_options;
+pub use recv_msg_multishot_options::RecvMsgMultishotOptions;

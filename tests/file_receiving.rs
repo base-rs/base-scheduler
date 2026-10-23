@@ -244,12 +244,12 @@ fn receiver_distinguishes_retryable_rejection_from_terminal_io_failure() {
         );
         let cancelled = Cancellation::new();
         cancelled.cancel();
-        assert!(receiver.close(&scheduler, &cancelled).await.is_err());
+        drop(receiver.close(&scheduler));
         assert!(receiver.recv(&scheduler, &never).await.unwrap().is_some());
         file.store(4, Ordering::Relaxed);
         assert!(receiver.recv(&scheduler, &never).await.is_err());
         assert!(receiver.recv(&scheduler, &never).await.unwrap().is_none());
-        receiver.close(&scheduler, &never).await.unwrap();
+        receiver.close(&scheduler).await.unwrap();
     });
 }
 
@@ -275,6 +275,6 @@ fn cancellation_during_capacity_wait_preserves_file_reception() {
         }
         drop(held);
         assert!(receiver.recv(&scheduler, &never).await.unwrap().is_some());
-        receiver.close(&scheduler, &never).await.unwrap();
+        receiver.close(&scheduler).await.unwrap();
     });
 }

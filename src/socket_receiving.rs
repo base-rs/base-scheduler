@@ -9,7 +9,7 @@ use std::future::Future;
 
 /// Construct an owned receive resource backed by a server-shared bounded pool. Applications choose the memory budget and retain completed buffers; the backend chooses allocation, reuse order, registration, publication depth, and receive strategy. Applications need not select a kernel mechanism to use this capability.
 ///
-/// Cancel and await an outstanding receive wait, then await [`SocketRecvMsgReceiver::close`] to establish retirement before exclusively closing the socket. Successful delivery may win cancellation and must still be handled. Cancellation alone does not establish retirement, and close never invalidates delivered buffers.
+/// Cancel and await an outstanding receive wait, then await [`SocketRecvMsgReceiver::close`] to establish retirement and drop the receiver before exclusively closing the socket. Successful delivery may win cancellation and must still be handled. Cancellation alone does not establish retirement, and close never invalidates delivered buffers.
 pub trait SocketReceiving: SocketOperation + BufferPooling {
     type PooledReceiver: SocketRecvMsgReceiver<
             Self,

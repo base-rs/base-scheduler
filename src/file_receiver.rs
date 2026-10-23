@@ -63,20 +63,14 @@ impl<File, Registration, P: BufferPool> FileReceiver<File, Registration, P> {
         }
     }
 
-    /// Stop admission and await accepted I/O retirement; completed leases remain valid. Does not close the underlying file.
-    pub async fn close<S>(
-        &mut self,
-        scheduler: &S,
-        cancellation: &Cancellation,
-    ) -> OperationResult<()>
+    /// Stop admission and await accepted I/O retirement without cancellation. Repeated close is safe; completed leases remain valid. Dropping a pending close does not establish retirement. Drop the receiver after successful close to release its retained file before exclusive file close. Does not close the underlying file.
+    pub async fn close<S>(&mut self, scheduler: &S) -> std::io::Result<()>
     where
         S: FileMonitoring<File = File, FileRegistration = Registration>,
         Registration: Send,
     {
-        cancellation.check()?;
+        scheduler.file_monitor_close(&mut self.monitor).await?;
         self.terminal = true;
-        scheduler
-            .file_monitor_close(&mut self.monitor, cancellation)
-            .await
+        Ok(())
     }
 }

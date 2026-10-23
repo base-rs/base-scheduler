@@ -1,14 +1,14 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::SocketRecvMessage;
+#[cfg(target_os = "linux")]
+use core_scheduler::{SocketRecvMessage, SocketRecvMsgReceiver};
 
 use crate::Result;
 use core_scheduler::{
-    Cancellation, IoBuf, RecvMsgMultishotOptions, SocketAccept, SocketMonitoring, SocketRead,
-    SocketRecvFlags, SocketRecvMsgMultishot, SocketRecvMsgReceiver, SocketRecvPoll,
-    SocketRegistration, SocketSendFlags, SocketSendPoll, SocketSetOption, SocketWrite, Spawn,
-    TcpNoDelay,
+    Cancellation, IoBuf, SocketAccept, SocketMonitoring, SocketRead, SocketRecvFlags,
+    SocketRecvPoll, SocketRegistration, SocketSendFlags, SocketSendPoll, SocketSetOption,
+    SocketWrite, Spawn, TcpNoDelay,
 };
 use core_scheduler_tokio::TokioScheduler;
 use std::{
@@ -142,18 +142,12 @@ where
     }
 }
 
-async fn multishot_server<S>(scheduler: Arc<S>, listener: TcpListener, connections: usize)
-where
-    S: SocketRegistration
-        + SocketAccept
-        + SocketSetOption<TcpNoDelay>
-        + SocketRecvMsgMultishot
-        + SocketSendPoll
-        + Spawn
-        + Send
-        + Sync
-        + 'static,
-{
+#[cfg(target_os = "linux")]
+async fn multishot_server(
+    scheduler: Arc<core_scheduler_native::NativeScheduler<core_scheduler_iouring::IoUringSelector>>,
+    listener: TcpListener,
+    connections: usize,
+) {
     let listener = scheduler
         .register_listener(listener)
         .expect("register listener");
@@ -174,16 +168,17 @@ where
                 .spawn(async move {
                     let never = Cancellation::never();
                     let mut receiving = shared
+                        .selector()
                         .socket_recvmsg_multishot(
                             &socket,
-                            RecvMsgMultishotOptions::default(),
+                            core_scheduler_iouring::RecvMsgMultishotOptions::default(),
                             SocketRecvFlags::default(),
                             &never,
                         )
                         .await
                         .expect("start multishot receive");
                     while let Some(message) = receiving
-                        .recv(shared.as_ref(), &never)
+                        .recv(shared.selector(), &never)
                         .await
                         .expect("multishot receive")
                     {
@@ -205,7 +200,7 @@ where
                         drop(message);
                     }
                     receiving
-                        .close(shared.as_ref())
+                        .close(shared.selector())
                         .await
                         .expect("retire multishot receive");
                 })
@@ -274,28 +269,17 @@ pub(crate) fn run(backend: &str, workers: usize, connections: usize) -> Result<(
             ready(&listener);
             runtime.block_on(tokio_server(listener, connections));
         }
-        "tokio-adapter"
-        | "tokio-adapter-poll"
-        | "tokio-adapter-multishot"
-        | "tokio-adapter-monitor" => {
+        "tokio-adapter" | "tokio-adapter-poll" | "tokio-adapter-monitor" => {
             let runtime = crate::runtime(workers);
             let scheduler = Arc::new(TokioScheduler::new(runtime.handle().clone()));
             ready(&listener);
-            if backend == "tokio-adapter-multishot" {
-                runtime.block_on(multishot_server(
-                    Arc::clone(&scheduler),
-                    listener,
-                    connections,
-                ));
-            } else {
-                runtime.block_on(scheduler_server(
-                    Arc::clone(&scheduler),
-                    listener,
-                    connections,
-                    backend == "tokio-adapter-poll",
-                    backend == "tokio-adapter-monitor",
-                ));
-            }
+            runtime.block_on(scheduler_server(
+                Arc::clone(&scheduler),
+                listener,
+                connections,
+                backend == "tokio-adapter-poll",
+                backend == "tokio-adapter-monitor",
+            ));
             runtime.block_on(scheduler.shutdown());
         }
         #[cfg(target_os = "linux")]

@@ -381,23 +381,6 @@ impl<S: Selector + SocketRecvMsgPoll> SocketRecvMsgPoll for NativeScheduler<S> {
 /// A receive resource advanced through the Native scheduler's explicit selector.
 pub struct NativeRecvMsgReceiver<R>(R);
 
-impl<S: Selector + SocketRecvMsgMultishot> SocketRecvMsgMultishot for NativeScheduler<S> {
-    type Receiver = NativeRecvMsgReceiver<S::Receiver>;
-
-    async fn socket_recvmsg_multishot(
-        &self,
-        socket: &Self::Socket,
-        options: RecvMsgMultishotOptions,
-        flags: SocketRecvFlags,
-        cancellation: &Cancellation,
-    ) -> OperationResult<Self::Receiver> {
-        self.selector()
-            .socket_recvmsg_multishot(socket, options, flags, cancellation)
-            .await
-            .map(NativeRecvMsgReceiver)
-    }
-}
-
 impl<S, R> SocketRecvMsgReceiver<NativeScheduler<S>> for NativeRecvMsgReceiver<R>
 where
     S: Selector,
@@ -550,11 +533,8 @@ where
     >(
         &self,
         monitor: &mut MonitorStorage<M>,
-        cancellation: &Cancellation,
-    ) -> OperationResult<()> {
-        self.selector()
-            .socket_monitor_close(monitor, cancellation)
-            .await
+    ) -> io::Result<()> {
+        self.selector().socket_monitor_close(monitor).await
     }
     async fn socket_monitor_recv_poll<
         M: SocketMonitorState<Self::Socket, Self::MonitorRegistration>,
@@ -664,11 +644,8 @@ impl<S: Selector + FileMonitoring> FileMonitoring for NativeScheduler<S> {
     async fn file_monitor_close(
         &self,
         monitor: &mut FileMonitor<Self::File, Self::FileRegistration>,
-        cancellation: &Cancellation,
-    ) -> OperationResult<()> {
-        self.selector()
-            .file_monitor_close(monitor, cancellation)
-            .await
+    ) -> io::Result<()> {
+        self.selector().file_monitor_close(monitor).await
     }
 }
 

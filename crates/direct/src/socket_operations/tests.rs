@@ -522,90 +522,11 @@ fn borrowed_retry_handles_interruption_startup_errors_and_successful_cancellatio
 }
 
 #[test]
-fn multishot_creation_is_lazy_cancellable_and_releases_its_socket_on_close() {
-    let scheduler = scheduler(2);
-    let socket = socket();
-    let never = Cancellation::never();
-    let options = RecvMsgMultishotOptions {
-        buffers: 3,
-        buffer_size: 32,
-    };
-    let weak = Arc::downgrade(&socket.0);
-    let lazy =
-        scheduler.socket_recvmsg_multishot(&socket, options, SocketRecvFlags::default(), &never);
-    assert_eq!(weak.strong_count(), 1);
-    drop(lazy);
-    let cancelled = Cancellation::new();
-    cancelled.cancel();
-    let error = block_on(scheduler.socket_recvmsg_multishot(
-        &socket,
-        options,
-        SocketRecvFlags::default(),
-        &cancelled,
-    ))
-    .err()
-    .unwrap();
-    assert!(matches!(error, OperationError::Cancelled(_)));
-    assert_eq!(weak.strong_count(), 1);
-    for (options, flags) in [
-        (
-            RecvMsgMultishotOptions {
-                buffers: 0,
-                ..options
-            },
-            SocketRecvFlags::default(),
-        ),
-        (options, SocketRecvFlags { peek: true }),
-    ] {
-        let error = block_on(scheduler.socket_recvmsg_multishot(&socket, options, flags, &never))
-            .err()
-            .unwrap();
-        assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
-        assert_eq!(weak.strong_count(), 1);
-    }
-    socket_io::SOCKET_TYPE_ERROR.with(|slot| slot.set(Some(io::ErrorKind::PermissionDenied)));
-    let error = block_on(scheduler.socket_recvmsg_multishot(
-        &socket,
-        options,
-        SocketRecvFlags::default(),
-        &never,
-    ))
-    .err()
-    .unwrap();
-    assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
-    assert_eq!(weak.strong_count(), 1);
-    let mut receiver = block_on(scheduler.socket_recvmsg_multishot(
-        &socket,
-        options,
-        SocketRecvFlags::default(),
-        &never,
-    ))
-    .unwrap();
-    assert_eq!(weak.strong_count(), 2);
-    scheduler.close();
-    let compatible = self::scheduler(1);
-    block_on(receiver.close(&compatible)).unwrap();
-    block_on(receiver.close(&scheduler)).unwrap();
-    assert_eq!(weak.strong_count(), 1);
-    block_on(compatible.shutdown());
-    let error = block_on(scheduler.socket_recvmsg_multishot(
-        &socket,
-        options,
-        SocketRecvFlags::default(),
-        &never,
-    ))
-    .err()
-    .unwrap();
-    assert_eq!(error.kind(), io::ErrorKind::BrokenPipe);
-    block_on(scheduler.shutdown());
-}
-
-#[test]
-fn multishot_polling_runs_the_portable_message_and_stream_contracts() {
+fn pooled_receivers_preserve_messages_and_stream_eof() {
     block_on(async {
         let scheduler = scheduler(4);
-        core_scheduler_conformance::socket::multishot_messages(&scheduler).await;
-        core_scheduler_conformance::socket::multishot_stream(&scheduler).await;
+        core_scheduler_conformance::socket_receiving::messages(&scheduler).await;
+        core_scheduler_conformance::socket_receiving::stream_eof(&scheduler).await;
         scheduler.shutdown().await;
     });
 }

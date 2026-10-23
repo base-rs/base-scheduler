@@ -158,14 +158,14 @@ fn receiver_preserves_retryable_rejections_and_distinguishes_cancellation_phases
         let cancelled = Cancellation::new();
         cancelled.cancel();
         assert!(receiver.recv(&Sockets, &cancelled).await.is_err());
-        assert!(receiver.close(&Sockets, &cancelled).await.is_err());
+        drop(receiver.close(&Sockets));
         let message = receiver.recv(&Sockets, &never).await.unwrap().unwrap();
         let frozen = ReceiveBuffer::freeze(message.into_payload());
         assert_eq!(frozen.as_ref(), [42; 8]);
         socket.store(5, Ordering::Relaxed);
         assert!(receiver.recv(&Sockets, &Cancellation::new()).await.is_err());
         assert!(receiver.recv(&Sockets, &never).await.unwrap().is_none());
-        receiver.close(&Sockets, &never).await.unwrap();
+        receiver.close(&Sockets).await.unwrap();
     });
 }
 
@@ -184,7 +184,7 @@ fn receiver_reports_terminal_errors_once_and_close_keeps_completed_chunks_alive(
         socket.store(0, Ordering::Relaxed);
         let message = packets.recv(&Sockets, &never).await.unwrap().unwrap();
         assert_eq!(message.payload(), b"");
-        packets.close(&Sockets, &never).await.unwrap();
+        packets.close(&Sockets).await.unwrap();
         drop(packets);
         assert_eq!(message.payload(), b"");
     });
@@ -244,8 +244,8 @@ fn idle_receiver_returns_capacity_for_another_connection() {
             drop(message);
             assert!(pool.try_acquire().is_some());
         }
-        idle.close(&Sockets, &never).await.unwrap();
-        active.close(&Sockets, &never).await.unwrap();
+        idle.close(&Sockets).await.unwrap();
+        active.close(&Sockets).await.unwrap();
         assert!(pool.try_acquire().is_some());
     });
 }
@@ -258,7 +258,7 @@ fn receiver_retries_after_readiness_without_retaining_an_old_buffer() {
         let never = Cancellation::never();
         let message = receiver.recv(&Sockets, &never).await.unwrap().unwrap();
         assert_eq!(message.payload(), [42; 8]);
-        receiver.close(&Sockets, &never).await.unwrap();
+        receiver.close(&Sockets).await.unwrap();
     });
 }
 

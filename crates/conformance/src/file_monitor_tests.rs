@@ -29,7 +29,7 @@ macro_rules! file_monitor_tests {
                 let (result, buffer) = scheduler.file_monitor_write(&mut monitor, ::std::vec![42], &never).await;
                 assert!(result.is_err());
                 assert_eq!(buffer, [42]);
-                scheduler.file_monitor_close(&mut monitor, &never).await.unwrap();
+                scheduler.file_monitor_close(&mut monitor).await.unwrap();
                 drop(monitor);
                 scheduler.file_close(read_only).await.unwrap();
             },

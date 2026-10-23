@@ -107,21 +107,16 @@ impl<M: crate::MonitorState, P: BufferPool> SocketReceiver<M, P> {
         }
     }
 
-    pub async fn close<S>(
-        &mut self,
-        scheduler: &S,
-        cancellation: &Cancellation,
-    ) -> OperationResult<()>
+    /// Stop reception and await monitor retirement without cancellation. Repeated close is safe; returned buffers remain valid. Drop the receiver after success to release its socket owner before exclusive socket close.
+    pub async fn close<S>(&mut self, scheduler: &S) -> std::io::Result<()>
     where
         S: SocketMonitoring,
         S::Socket: 'static,
         M: SocketMonitorState<S::Socket, S::MonitorRegistration>,
     {
-        cancellation.check()?;
+        scheduler.socket_monitor_close(&mut self.monitor).await?;
         self.terminal = true;
-        scheduler
-            .socket_monitor_close(&mut self.monitor, cancellation)
-            .await
+        Ok(())
     }
 }
 
@@ -141,8 +136,6 @@ where
         SocketReceiver::recv(self, scheduler, cancellation).await
     }
     async fn close(&mut self, scheduler: &S) -> io::Result<()> {
-        SocketReceiver::close(self, scheduler, &Cancellation::never())
-            .await
-            .map_err(Into::into)
+        SocketReceiver::close(self, scheduler).await
     }
 }

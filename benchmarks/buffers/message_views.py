@@ -47,7 +47,7 @@ def main():
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with args.output.open("x") as output:
         for repeat, backend, workers, mode, (transport, size, window) in cases:
-            if mode == "provided" and backend != "iouring":
+            if mode in ("provided", "multi") and backend != "iouring":
                 continue
             order = list(binaries)
             randomizer.shuffle(order)

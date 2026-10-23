@@ -147,7 +147,7 @@ macro_rules! file_submission_tests {
                 drop(first);
                 assert!(receiver.recv(scheduler, &never).await.unwrap().is_none());
                 assert!(receiver.recv(scheduler, &never).await.unwrap().is_none());
-                receiver.close(scheduler, &never).await.unwrap();
+                receiver.close(scheduler).await.unwrap();
                 drop(receiver);
                 assert_eq!(second.as_ref(), b"def");
                 drop(second);
@@ -191,7 +191,7 @@ macro_rules! file_submission_tests {
                 let (result, second) = $crate::__core_scheduler::file_write_all(scheduler, &output, second, &never).await;
                 assert_eq!(result.unwrap(), 3);
                 drop(second);
-                receiver.close(scheduler, &never).await.unwrap();
+                receiver.close(scheduler).await.unwrap();
                 drop(receiver);
                 scheduler.file_close(output).await.unwrap();
                 assert_eq!(

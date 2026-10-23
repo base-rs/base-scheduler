@@ -233,25 +233,18 @@ impl IoUringSelector {
     async fn monitor_close<M: SocketMonitorState<NativeSocket, IoUringMonitorRegistration>>(
         &self,
         monitor: &MonitorStorage<M>,
-        cancellation: &Cancellation,
-    ) -> OperationResult<()> {
+    ) -> io::Result<()> {
         let state = monitor.as_ref();
         let registration = state.registration();
-        cancellation.check()?;
         if !Arc::ptr_eq(&self.group, &registration.group) {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "socket monitor belongs to another selector",
-            )
-            .into());
+            ));
         }
         let _wait = Wait::claim(state)?;
         registration.retire(true);
-        let mut cancelled = pin!(cancellation.cancelled());
         poll_fn(|context| {
-            if cancelled.as_mut().poll(context).is_ready() {
-                return Poll::Ready(Err(core_scheduler::Cancelled.into()));
-            }
             let replacement = context.waker().clone();
             let previous = {
                 let mut status = registration.status.lock().unwrap();
@@ -333,9 +326,8 @@ impl SocketMonitoring for IoUringSelector {
     >(
         &self,
         monitor: &mut MonitorStorage<M>,
-        cancellation: &Cancellation,
-    ) -> OperationResult<()> {
-        self.monitor_close(monitor, cancellation).await
+    ) -> io::Result<()> {
+        self.monitor_close(monitor).await
     }
     async fn socket_monitor_recv_poll<
         M: SocketMonitorState<NativeSocket, IoUringMonitorRegistration>,
