@@ -1,0 +1,607 @@
+0000000000099b00 00000000000004f7 t <core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_recv_poll::SocketRecvPoll>::socket_recv_poll::{closure#0}
+
+/home/samuel/Developer/core-rs/core-scheduler-echo-gap-factory/target/release/core-scheduler-echo-benchmark:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+0000000000099b00 <_RNCNvXs9_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_recv_poll14SocketRecvPoll16socket_recv_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark>:
+   99b00:	55                   	push   %rbp
+   99b01:	41 57                	push   %r15
+   99b03:	41 56                	push   %r14
+   99b05:	41 55                	push   %r13
+   99b07:	41 54                	push   %r12
+   99b09:	53                   	push   %rbx
+   99b0a:	48 83 ec 48          	sub    $0x48,%rsp
+   99b0e:	48 89 fb             	mov    %rdi,%rbx
+   99b11:	0f b6 87 39 02 00 00 	movzbl 0x239(%rdi),%eax
+   99b18:	48 8d 0d 69 38 fa ff 	lea    -0x5c797(%rip),%rcx        # 3d388 <anon.a0b25372121d65bc7f2d5e1c6859b17d.44.llvm.16430524231693522360+0x11a>
+   99b1f:	48 63 04 81          	movslq (%rcx,%rax,4),%rax
+   99b23:	48 01 c8             	add    %rcx,%rax
+   99b26:	ff e0                	jmp    *%rax
+   99b28:	48 89 74 24 08       	mov    %rsi,0x8(%rsp)
+   99b2d:	4c 8b 83 20 02 00 00 	mov    0x220(%rbx),%r8
+   99b34:	4c 8b ab 28 02 00 00 	mov    0x228(%rbx),%r13
+   99b3b:	48 8b 83 10 02 00 00 	mov    0x210(%rbx),%rax
+   99b42:	48 8b 93 18 02 00 00 	mov    0x218(%rbx),%rdx
+   99b49:	48 8d 8b 38 02 00 00 	lea    0x238(%rbx),%rcx
+   99b50:	0f b6 b3 3a 02 00 00 	movzbl 0x23a(%rbx),%esi
+   99b57:	40 88 b3 38 02 00 00 	mov    %sil,0x238(%rbx)
+   99b5e:	4c 8b a3 30 02 00 00 	mov    0x230(%rbx),%r12
+   99b65:	48 85 d2             	test   %rdx,%rdx
+   99b68:	40 0f 95 c6          	setne  %sil
+   99b6c:	48 89 83 d0 01 00 00 	mov    %rax,0x1d0(%rbx)
+   99b73:	48 89 93 d8 01 00 00 	mov    %rdx,0x1d8(%rbx)
+   99b7a:	4c 89 83 e8 01 00 00 	mov    %r8,0x1e8(%rbx)
+   99b81:	4c 89 ab f0 01 00 00 	mov    %r13,0x1f0(%rbx)
+   99b88:	4c 89 a3 f8 01 00 00 	mov    %r12,0x1f8(%rbx)
+   99b8f:	48 89 8b 00 02 00 00 	mov    %rcx,0x200(%rbx)
+   99b96:	66 c7 83 0b 02 00 00 	movw   $0x0,0x20b(%rbx)
+   99b9d:	00 00 
+   99b9f:	0f 95 83 0d 02 00 00 	setne  0x20d(%rbx)
+   99ba6:	31 ff                	xor    %edi,%edi
+   99ba8:	eb 54                	jmp    99bfe <_RNCNvXs9_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_recv_poll14SocketRecvPoll16socket_recv_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0xfe>
+   99baa:	0f b6 83 0b 02 00 00 	movzbl 0x20b(%rbx),%eax
+   99bb1:	48 8d 0d e0 37 fa ff 	lea    -0x5c820(%rip),%rcx        # 3d398 <anon.a0b25372121d65bc7f2d5e1c6859b17d.44.llvm.16430524231693522360+0x12a>
+   99bb8:	48 63 04 81          	movslq (%rcx,%rax,4),%rax
+   99bbc:	48 01 c8             	add    %rcx,%rax
+   99bbf:	ff e0                	jmp    *%rax
+   99bc1:	48 89 74 24 08       	mov    %rsi,0x8(%rsp)
+   99bc6:	4c 8b 83 e8 01 00 00 	mov    0x1e8(%rbx),%r8
+   99bcd:	4c 8b ab f0 01 00 00 	mov    0x1f0(%rbx),%r13
+   99bd4:	48 8b 83 d0 01 00 00 	mov    0x1d0(%rbx),%rax
+   99bdb:	48 8b 93 d8 01 00 00 	mov    0x1d8(%rbx),%rdx
+   99be2:	4c 8b a3 f8 01 00 00 	mov    0x1f8(%rbx),%r12
+   99be9:	0f b6 bb 0c 02 00 00 	movzbl 0x20c(%rbx),%edi
+   99bf0:	48 8b 8b 00 02 00 00 	mov    0x200(%rbx),%rcx
+   99bf7:	0f b6 b3 0d 02 00 00 	movzbl 0x20d(%rbx),%esi
+   99bfe:	c6 83 0a 02 00 00 01 	movb   $0x1,0x20a(%rbx)
+   99c05:	4c 8d 8b c0 01 00 00 	lea    0x1c0(%rbx),%r9
+   99c0c:	48 89 83 c0 01 00 00 	mov    %rax,0x1c0(%rbx)
+   99c13:	48 89 93 c8 01 00 00 	mov    %rdx,0x1c8(%rbx)
+   99c1a:	48 8d 83 08 02 00 00 	lea    0x208(%rbx),%rax
+   99c21:	40 88 bb 08 02 00 00 	mov    %dil,0x208(%rbx)
+   99c28:	48 8d ab e0 01 00 00 	lea    0x1e0(%rbx),%rbp
+   99c2f:	48 89 8b e0 01 00 00 	mov    %rcx,0x1e0(%rbx)
+   99c36:	4c 8d bb 09 02 00 00 	lea    0x209(%rbx),%r15
+   99c3d:	40 88 b3 09 02 00 00 	mov    %sil,0x209(%rbx)
+   99c44:	4c 89 ab 78 01 00 00 	mov    %r13,0x178(%rbx)
+   99c4b:	48 89 44 24 10       	mov    %rax,0x10(%rsp)
+   99c50:	48 89 83 80 01 00 00 	mov    %rax,0x180(%rbx)
+   99c57:	48 89 ab 88 01 00 00 	mov    %rbp,0x188(%rbx)
+   99c5e:	4c 89 4c 24 18       	mov    %r9,0x18(%rsp)
+   99c63:	4c 89 8b 90 01 00 00 	mov    %r9,0x190(%rbx)
+   99c6a:	4c 89 bb 98 01 00 00 	mov    %r15,0x198(%rbx)
+   99c71:	4c 89 44 24 20       	mov    %r8,0x20(%rsp)
+   99c76:	4c 89 83 a0 01 00 00 	mov    %r8,0x1a0(%rbx)
+   99c7d:	4c 89 ab a8 01 00 00 	mov    %r13,0x1a8(%rbx)
+   99c84:	4c 89 a3 b0 01 00 00 	mov    %r12,0x1b0(%rbx)
+   99c8b:	48 8d 83 b9 01 00 00 	lea    0x1b9(%rbx),%rax
+   99c92:	48 89 44 24 28       	mov    %rax,0x28(%rsp)
+   99c97:	c6 83 b9 01 00 00 00 	movb   $0x0,0x1b9(%rbx)
+   99c9e:	4d 89 ee             	mov    %r13,%r14
+   99ca1:	c6 83 b8 01 00 00 01 	movb   $0x1,0x1b8(%rbx)
+   99ca8:	4c 89 e7             	mov    %r12,%rdi
+   99cab:	ff 15 77 ba 12 00    	call   *0x12ba77(%rip)        # 1c5728 <_DYNAMIC+0x8f0>
+   99cb1:	84 c0                	test   %al,%al
+   99cb3:	74 04                	je     99cb9 <_RNCNvXs9_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_recv_poll14SocketRecvPoll16socket_recv_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x1b9>
+   99cb5:	31 c0                	xor    %eax,%eax
+   99cb7:	eb 17                	jmp    99cd0 <_RNCNvXs9_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_recv_poll14SocketRecvPoll16socket_recv_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x1d0>
+   99cb9:	48 8b 7c 24 20       	mov    0x20(%rsp),%rdi
+   99cbe:	4c 89 f6             	mov    %r14,%rsi
+   99cc1:	ff 15 69 ba 12 00    	call   *0x12ba69(%rip)        # 1c5730 <_DYNAMIC+0x8f8>
+   99cc7:	48 85 c0             	test   %rax,%rax
+   99cca:	0f 84 a4 00 00 00    	je     99d74 <_RNCNvXs9_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_recv_poll14SocketRecvPoll16socket_recv_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x274>
+   99cd0:	49 89 c7             	mov    %rax,%r15
+   99cd3:	c6 83 b8 01 00 00 00 	movb   $0x0,0x1b8(%rbx)
+   99cda:	41 be 01 00 00 00    	mov    $0x1,%r14d
+   99ce0:	b0 01                	mov    $0x1,%al
+   99ce2:	48 8b 4c 24 28       	mov    0x28(%rsp),%rcx
+   99ce7:	88 01                	mov    %al,(%rcx)
+   99ce9:	49 83 fe 02          	cmp    $0x2,%r14
+   99ced:	0f 85 17 01 00 00    	jne    99e0a <_RNCNvXs9_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_recv_poll14SocketRecvPoll16socket_recv_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x30a>
+   99cf3:	41 be 02 00 00 00    	mov    $0x2,%r14d
+   99cf9:	b0 03                	mov    $0x3,%al
+   99cfb:	e9 1b 01 00 00       	jmp    99e1b <_RNCNvXs9_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_recv_poll14SocketRecvPoll16socket_recv_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x31b>
+   99d00:	48 8d 93 b9 01 00 00 	lea    0x1b9(%rbx),%rdx
+   99d07:	0f b6 83 b9 01 00 00 	movzbl 0x1b9(%rbx),%eax
+   99d0e:	48 8d 0d 93 36 fa ff 	lea    -0x5c96d(%rip),%rcx        # 3d3a8 <anon.a0b25372121d65bc7f2d5e1c6859b17d.44.llvm.16430524231693522360+0x13a>
+   99d15:	48 63 04 81          	movslq (%rcx,%rax,4),%rax
+   99d19:	48 01 c8             	add    %rcx,%rax
+   99d1c:	48 89 54 24 28       	mov    %rdx,0x28(%rsp)
+   99d21:	ff e0                	jmp    *%rax
+   99d23:	48 89 74 24 08       	mov    %rsi,0x8(%rsp)
+   99d28:	48 8b 83 a0 01 00 00 	mov    0x1a0(%rbx),%rax
+   99d2f:	48 89 44 24 20       	mov    %rax,0x20(%rsp)
+   99d34:	4c 8b b3 a8 01 00 00 	mov    0x1a8(%rbx),%r14
+   99d3b:	4c 8b a3 b0 01 00 00 	mov    0x1b0(%rbx),%r12
+   99d42:	4c 8b ab 78 01 00 00 	mov    0x178(%rbx),%r13
+   99d49:	48 8b 83 80 01 00 00 	mov    0x180(%rbx),%rax
+   99d50:	48 89 44 24 10       	mov    %rax,0x10(%rsp)
+   99d55:	48 8b ab 88 01 00 00 	mov    0x188(%rbx),%rbp
+   99d5c:	48 8b 83 90 01 00 00 	mov    0x190(%rbx),%rax
+   99d63:	48 89 44 24 18       	mov    %rax,0x18(%rsp)
+   99d68:	4c 8b bb 98 01 00 00 	mov    0x198(%rbx),%r15
+   99d6f:	e9 2d ff ff ff       	jmp    99ca1 <_RNCNvXs9_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_recv_poll14SocketRecvPoll16socket_recv_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x1a1>
+   99d74:	c6 83 b8 01 00 00 00 	movb   $0x0,0x1b8(%rbx)
+   99d7b:	48 8b 44 24 10       	mov    0x10(%rsp),%rax
+   99d80:	0f b6 00             	movzbl (%rax),%eax
+   99d83:	41 0f b6 0f          	movzbl (%r15),%ecx
+   99d87:	48 8d 53 68          	lea    0x68(%rbx),%rdx
+   99d8b:	48 89 6b 78          	mov    %rbp,0x78(%rbx)
+   99d8f:	48 8b 74 24 18       	mov    0x18(%rsp),%rsi
+   99d94:	48 89 b3 80 00 00 00 	mov    %rsi,0x80(%rbx)
+   99d9b:	4c 89 ab 60 01 00 00 	mov    %r13,0x160(%rbx)
+   99da2:	c6 83 69 01 00 00 00 	movb   $0x0,0x169(%rbx)
+   99da9:	88 83 6a 01 00 00    	mov    %al,0x16a(%rbx)
+   99daf:	88 8b 6b 01 00 00    	mov    %cl,0x16b(%rbx)
+   99db5:	48 8d 43 60          	lea    0x60(%rbx),%rax
+   99db9:	48 89 53 60          	mov    %rdx,0x60(%rbx)
+   99dbd:	4c 89 23             	mov    %r12,(%rbx)
+   99dc0:	c6 43 08 00          	movb   $0x0,0x8(%rbx)
+   99dc4:	48 8d 8b 70 01 00 00 	lea    0x170(%rbx),%rcx
+   99dcb:	48 89 9b 70 01 00 00 	mov    %rbx,0x170(%rbx)
+   99dd2:	48 89 43 50          	mov    %rax,0x50(%rbx)
+   99dd6:	48 89 4b 58          	mov    %rcx,0x58(%rbx)
+   99dda:	48 8b 74 24 08       	mov    0x8(%rsp),%rsi
+   99ddf:	48 8d 7b 50          	lea    0x50(%rbx),%rdi
+   99de3:	e8 38 08 04 00       	call   da620 <_RNvXs0_NtNtCs3sPX1WnuliO_4core6future7poll_fnINtB5_6PollFnNCNCINvMNtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB14_15tokio_scheduler14TokioScheduler13socket_resultjNCINvMs0_NtB14_12tokio_socketNtB31_11TokioSocket7io_withjNCNCNCINvB11_21socket_operation_withQShjNCNCNvXs9_B12_B1X_NtNtCskHdHMewkLRk_14core_scheduler16socket_recv_poll14SocketRecvPoll16socket_recv_poll00E000E0NCB3R_0E00ENtNtB7_6future6Future4pollCs3OJGJjj4kxL_29core_scheduler_echo_benchmark>
+   99de8:	49 89 c6             	mov    %rax,%r14
+   99deb:	48 83 f8 02          	cmp    $0x2,%rax
+   99def:	75 4b                	jne    99e3c <_RNCNvXs9_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_recv_poll14SocketRecvPoll16socket_recv_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x33c>
+   99df1:	41 be 02 00 00 00    	mov    $0x2,%r14d
+   99df7:	b0 03                	mov    $0x3,%al
+   99df9:	48 8b 4c 24 28       	mov    0x28(%rsp),%rcx
+   99dfe:	88 01                	mov    %al,(%rcx)
+   99e00:	49 83 fe 02          	cmp    $0x2,%r14
+   99e04:	0f 84 e9 fe ff ff    	je     99cf3 <_RNCNvXs9_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_recv_poll14SocketRecvPoll16socket_recv_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x1f3>
+   99e0a:	48 89 df             	mov    %rbx,%rdi
+   99e0d:	e8 ee cb ff ff       	call   96a00 <_RINvNtCs3sPX1WnuliO_4core3ptr9drop_glueNCINvMNtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtBJ_15tokio_scheduler14TokioScheduler13socket_resultjNCINvMs0_NtBJ_12tokio_socketNtB2F_11TokioSocket7io_withjNCNCNCINvBG_21socket_operation_withINtNtCs5xahNnzoIEW_5alloc3vec3VechEjNCNCINvXs7_BH_B1C_NtNtCskHdHMewkLRk_14core_scheduler11socket_read10SocketRead11socket_readB3Z_E00E000E0NCB3u_0E0ECs3OJGJjj4kxL_29core_scheduler_echo_benchmark>
+   99e12:	c6 83 0a 02 00 00 00 	movb   $0x0,0x20a(%rbx)
+   99e19:	b0 01                	mov    $0x1,%al
+   99e1b:	88 83 0b 02 00 00    	mov    %al,0x20b(%rbx)
+   99e21:	88 83 39 02 00 00    	mov    %al,0x239(%rbx)
+   99e27:	4c 89 f0             	mov    %r14,%rax
+   99e2a:	4c 89 fa             	mov    %r15,%rdx
+   99e2d:	48 83 c4 48          	add    $0x48,%rsp
+   99e31:	5b                   	pop    %rbx
+   99e32:	41 5c                	pop    %r12
+   99e34:	41 5d                	pop    %r13
+   99e36:	41 5e                	pop    %r14
+   99e38:	41 5f                	pop    %r15
+   99e3a:	5d                   	pop    %rbp
+   99e3b:	c3                   	ret
+   99e3c:	49 89 d7             	mov    %rdx,%r15
+   99e3f:	80 7b 08 04          	cmpb   $0x4,0x8(%rbx)
+   99e43:	0f 85 82 00 00 00    	jne    99ecb <_RNCNvXs9_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_recv_poll14SocketRecvPoll16socket_recv_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x3cb>
+   99e49:	4c 8d 63 10          	lea    0x10(%rbx),%r12
+   99e4d:	48 8b 73 40          	mov    0x40(%rbx),%rsi
+   99e51:	48 8d 7c 24 30       	lea    0x30(%rsp),%rdi
+   99e56:	4c 89 e2             	mov    %r12,%rdx
+   99e59:	b9 01 00 00 00       	mov    $0x1,%ecx
+   99e5e:	e8 7d 50 00 00       	call   9eee0 <_RINvMs_NtCshL55zNO6Bjb_14event_listener3sysINtB7_5InneruE10with_innerINtNtCs3sPX1WnuliO_4core6option6OptionINtB7_5StateuEENCNvB2_6remove0ECs3OJGJjj4kxL_29core_scheduler_echo_benchmark.llvm.6069490910975296442>
+   99e63:	0f b6 44 24 30       	movzbl 0x30(%rsp),%eax
+   99e68:	3c ff                	cmp    $0xff,%al
+   99e6a:	74 2e                	je     99e9a <_RNCNvXs9_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_recv_poll14SocketRecvPoll16socket_recv_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x39a>
+   99e6c:	3c 02                	cmp    $0x2,%al
+   99e6e:	75 2a                	jne    99e9a <_RNCNvXs9_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_recv_poll14SocketRecvPoll16socket_recv_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x39a>
+   99e70:	48 8b 44 24 38       	mov    0x38(%rsp),%rax
+   99e75:	48 85 c0             	test   %rax,%rax
+   99e78:	74 0a                	je     99e84 <_RNCNvXs9_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_recv_poll14SocketRecvPoll16socket_recv_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x384>
+   99e7a:	48 8b 7c 24 40       	mov    0x40(%rsp),%rdi
+   99e7f:	ff 50 18             	call   *0x18(%rax)
+   99e82:	eb 16                	jmp    99e9a <_RNCNvXs9_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_recv_poll14SocketRecvPoll16socket_recv_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x39a>
+   99e84:	48 8b 44 24 40       	mov    0x40(%rsp),%rax
+   99e89:	f0 48 ff 08          	lock decq (%rax)
+   99e8d:	75 0b                	jne    99e9a <_RNCNvXs9_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_recv_poll14SocketRecvPoll16socket_recv_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x39a>
+   99e8f:	48 8d 7c 24 40       	lea    0x40(%rsp),%rdi
+   99e94:	ff 15 06 b3 12 00    	call   *0x12b306(%rip)        # 1c51a0 <_DYNAMIC+0x368>
+   99e9a:	49 83 3c 24 00       	cmpq   $0x0,(%r12)
+   99e9f:	74 2a                	je     99ecb <_RNCNvXs9_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_recv_poll14SocketRecvPoll16socket_recv_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x3cb>
+   99ea1:	80 7b 18 02          	cmpb   $0x2,0x18(%rbx)
+   99ea5:	75 24                	jne    99ecb <_RNCNvXs9_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_recv_poll14SocketRecvPoll16socket_recv_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x3cb>
+   99ea7:	48 8b 43 20          	mov    0x20(%rbx),%rax
+   99eab:	48 8d 7b 28          	lea    0x28(%rbx),%rdi
+   99eaf:	48 85 c0             	test   %rax,%rax
+   99eb2:	74 08                	je     99ebc <_RNCNvXs9_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_recv_poll14SocketRecvPoll16socket_recv_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x3bc>
+   99eb4:	48 8b 3f             	mov    (%rdi),%rdi
+   99eb7:	ff 50 18             	call   *0x18(%rax)
+   99eba:	eb 0f                	jmp    99ecb <_RNCNvXs9_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_recv_poll14SocketRecvPoll16socket_recv_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x3cb>
+   99ebc:	48 8b 07             	mov    (%rdi),%rax
+   99ebf:	f0 48 ff 08          	lock decq (%rax)
+   99ec3:	75 06                	jne    99ecb <_RNCNvXs9_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_recv_poll14SocketRecvPoll16socket_recv_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x3cb>
+   99ec5:	ff 15 d5 b2 12 00    	call   *0x12b2d5(%rip)        # 1c51a0 <_DYNAMIC+0x368>
+   99ecb:	48 8d 7b 68          	lea    0x68(%rbx),%rdi
+   99ecf:	e8 fc b5 ff ff       	call   954d0 <_RINvNtCs3sPX1WnuliO_4core3ptr9drop_glueINtNtB4_3pin14PinMacroHelperNCINvMs0_NtCs3tjYQotVroO_20core_scheduler_tokio12tokio_socketNtB1c_11TokioSocket7io_withjNCNCNCINvMNtB1e_17socket_operationsNtNtB1e_15tokio_scheduler14TokioScheduler21socket_operation_withINtNtCs5xahNnzoIEW_5alloc3vec3VechEjNCNCINvXs7_B2E_B33_NtNtCskHdHMewkLRk_14core_scheduler11socket_read10SocketRead11socket_readB45_E00E000E0EECs3OJGJjj4kxL_29core_scheduler_echo_benchmark>
+   99ed4:	c6 83 b8 01 00 00 00 	movb   $0x0,0x1b8(%rbx)
+   99edb:	e9 00 fe ff ff       	jmp    99ce0 <_RNCNvXs9_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_recv_poll14SocketRecvPoll16socket_recv_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x1e0>
+   99ee0:	48 8d 3d 09 10 12 00 	lea    0x121009(%rip),%rdi        # 1baef0 <anon.0299bd6eebd0350b0106d5f86d597573.74.llvm.16436233731751286210+0x48>
+   99ee7:	ff 15 9b b7 12 00    	call   *0x12b79b(%rip)        # 1c5688 <_DYNAMIC+0x850>
+   99eed:	48 8d 3d fc 0f 12 00 	lea    0x120ffc(%rip),%rdi        # 1baef0 <anon.0299bd6eebd0350b0106d5f86d597573.74.llvm.16436233731751286210+0x48>
+   99ef4:	ff 15 96 b7 12 00    	call   *0x12b796(%rip)        # 1c5690 <_DYNAMIC+0x858>
+   99efa:	48 8d 3d b7 0b 12 00 	lea    0x120bb7(%rip),%rdi        # 1baab8 <anon.a0b25372121d65bc7f2d5e1c6859b17d.45.llvm.16430524231693522360+0x48>
+   99f01:	ff 15 81 b7 12 00    	call   *0x12b781(%rip)        # 1c5688 <_DYNAMIC+0x850>
+   99f07:	eb 2b                	jmp    99f34 <_RNCNvXs9_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_recv_poll14SocketRecvPoll16socket_recv_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x434>
+   99f09:	48 8d 3d a8 0b 12 00 	lea    0x120ba8(%rip),%rdi        # 1baab8 <anon.a0b25372121d65bc7f2d5e1c6859b17d.45.llvm.16430524231693522360+0x48>
+   99f10:	ff 15 7a b7 12 00    	call   *0x12b77a(%rip)        # 1c5690 <_DYNAMIC+0x858>
+   99f16:	eb 1c                	jmp    99f34 <_RNCNvXs9_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_recv_poll14SocketRecvPoll16socket_recv_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x434>
+   99f18:	48 8d 3d 69 0b 12 00 	lea    0x120b69(%rip),%rdi        # 1baa88 <anon.a0b25372121d65bc7f2d5e1c6859b17d.45.llvm.16430524231693522360+0x18>
+   99f1f:	ff 15 63 b7 12 00    	call   *0x12b763(%rip)        # 1c5688 <_DYNAMIC+0x850>
+   99f25:	eb 0d                	jmp    99f34 <_RNCNvXs9_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_recv_poll14SocketRecvPoll16socket_recv_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x434>
+   99f27:	48 8d 3d 5a 0b 12 00 	lea    0x120b5a(%rip),%rdi        # 1baa88 <anon.a0b25372121d65bc7f2d5e1c6859b17d.45.llvm.16430524231693522360+0x18>
+   99f2e:	ff 15 5c b7 12 00    	call   *0x12b75c(%rip)        # 1c5690 <_DYNAMIC+0x858>
+   99f34:	0f 0b                	ud2
+   99f36:	49 89 c6             	mov    %rax,%r14
+   99f39:	eb 25                	jmp    99f60 <_RNCNvXs9_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_recv_poll14SocketRecvPoll16socket_recv_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x460>
+   99f3b:	49 89 c6             	mov    %rax,%r14
+   99f3e:	4c 89 e7             	mov    %r12,%rdi
+   99f41:	e8 1a ba ff ff       	call   95960 <_RINvNtCs3sPX1WnuliO_4core3ptr9drop_glueINtNtB4_6option6OptionINtNtCshL55zNO6Bjb_14event_listener3sys8ListeneruEEECs3OJGJjj4kxL_29core_scheduler_echo_benchmark>
+   99f46:	eb 18                	jmp    99f60 <_RNCNvXs9_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_recv_poll14SocketRecvPoll16socket_recv_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x460>
+   99f48:	ff 15 42 b1 12 00    	call   *0x12b142(%rip)        # 1c5090 <_DYNAMIC+0x258>
+   99f4e:	eb 75                	jmp    99fc5 <_RNCNvXs9_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_recv_poll14SocketRecvPoll16socket_recv_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x4c5>
+   99f50:	49 89 c6             	mov    %rax,%r14
+   99f53:	eb 7c                	jmp    99fd1 <_RNCNvXs9_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_recv_poll14SocketRecvPoll16socket_recv_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x4d1>
+   99f55:	49 89 c6             	mov    %rax,%r14
+   99f58:	48 89 df             	mov    %rbx,%rdi
+   99f5b:	e8 30 b6 ff ff       	call   95590 <_RINvNtCs3sPX1WnuliO_4core3ptr9drop_glueINtNtB4_3pin14PinMacroHelperNCNvMs0_NtCskHdHMewkLRk_14core_scheduler12cancellationNtB1b_12Cancellation9cancelled0EECs3OJGJjj4kxL_29core_scheduler_echo_benchmark>
+   99f60:	48 8d 7b 68          	lea    0x68(%rbx),%rdi
+   99f64:	e8 67 b5 ff ff       	call   954d0 <_RINvNtCs3sPX1WnuliO_4core3ptr9drop_glueINtNtB4_3pin14PinMacroHelperNCINvMs0_NtCs3tjYQotVroO_20core_scheduler_tokio12tokio_socketNtB1c_11TokioSocket7io_withjNCNCNCINvMNtB1e_17socket_operationsNtNtB1e_15tokio_scheduler14TokioScheduler21socket_operation_withINtNtCs5xahNnzoIEW_5alloc3vec3VechEjNCNCINvXs7_B2E_B33_NtNtCskHdHMewkLRk_14core_scheduler11socket_read10SocketRead11socket_readB45_E00E000E0EECs3OJGJjj4kxL_29core_scheduler_echo_benchmark>
+   99f69:	eb 5d                	jmp    99fc8 <_RNCNvXs9_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_recv_poll14SocketRecvPoll16socket_recv_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x4c8>
+   99f6b:	ff 15 1f b1 12 00    	call   *0x12b11f(%rip)        # 1c5090 <_DYNAMIC+0x258>
+   99f71:	eb 52                	jmp    99fc5 <_RNCNvXs9_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_recv_poll14SocketRecvPoll16socket_recv_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x4c5>
+   99f73:	49 89 c6             	mov    %rax,%r14
+   99f76:	66 c7 83 0a 02 00 00 	movw   $0x200,0x20a(%rbx)
+   99f7d:	00 02 
+   99f7f:	c6 83 39 02 00 00 02 	movb   $0x2,0x239(%rbx)
+   99f86:	4c 89 f7             	mov    %r14,%rdi
+   99f89:	e8 e2 f1 11 00       	call   1b9170 <_Unwind_Resume@plt>
+   99f8e:	49 89 c6             	mov    %rax,%r14
+   99f91:	80 bb 0b 02 00 00 03 	cmpb   $0x3,0x20b(%rbx)
+   99f98:	75 48                	jne    99fe2 <_RNCNvXs9_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_recv_poll14SocketRecvPoll16socket_recv_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x4e2>
+   99f9a:	48 89 df             	mov    %rbx,%rdi
+   99f9d:	e8 5e ca ff ff       	call   96a00 <_RINvNtCs3sPX1WnuliO_4core3ptr9drop_glueNCINvMNtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtBJ_15tokio_scheduler14TokioScheduler13socket_resultjNCINvMs0_NtBJ_12tokio_socketNtB2F_11TokioSocket7io_withjNCNCNCINvBG_21socket_operation_withINtNtCs5xahNnzoIEW_5alloc3vec3VechEjNCNCINvXs7_BH_B1C_NtNtCskHdHMewkLRk_14core_scheduler11socket_read10SocketRead11socket_readB3Z_E00E000E0NCB3u_0E0ECs3OJGJjj4kxL_29core_scheduler_echo_benchmark>
+   99fa2:	c6 83 0a 02 00 00 00 	movb   $0x0,0x20a(%rbx)
+   99fa9:	c6 83 39 02 00 00 02 	movb   $0x2,0x239(%rbx)
+   99fb0:	4c 89 f7             	mov    %r14,%rdi
+   99fb3:	e8 b8 f1 11 00       	call   1b9170 <_Unwind_Resume@plt>
+   99fb8:	c6 83 0a 02 00 00 00 	movb   $0x0,0x20a(%rbx)
+   99fbf:	ff 15 cb b0 12 00    	call   *0x12b0cb(%rip)        # 1c5090 <_DYNAMIC+0x258>
+   99fc5:	49 89 c6             	mov    %rax,%r14
+   99fc8:	66 c7 83 b8 01 00 00 	movw   $0x200,0x1b8(%rbx)
+   99fcf:	00 02 
+   99fd1:	48 89 df             	mov    %rbx,%rdi
+   99fd4:	e8 27 ca ff ff       	call   96a00 <_RINvNtCs3sPX1WnuliO_4core3ptr9drop_glueNCINvMNtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtBJ_15tokio_scheduler14TokioScheduler13socket_resultjNCINvMs0_NtBJ_12tokio_socketNtB2F_11TokioSocket7io_withjNCNCNCINvBG_21socket_operation_withINtNtCs5xahNnzoIEW_5alloc3vec3VechEjNCNCINvXs7_BH_B1C_NtNtCskHdHMewkLRk_14core_scheduler11socket_read10SocketRead11socket_readB3Z_E00E000E0NCB3u_0E0ECs3OJGJjj4kxL_29core_scheduler_echo_benchmark>
+   99fd9:	66 c7 83 0a 02 00 00 	movw   $0x200,0x20a(%rbx)
+   99fe0:	00 02 
+   99fe2:	c6 83 39 02 00 00 02 	movb   $0x2,0x239(%rbx)
+   99fe9:	4c 89 f7             	mov    %r14,%rdi
+   99fec:	e8 7f f1 11 00       	call   1b9170 <_Unwind_Resume@plt>
+   99ff1:	ff 15 99 b0 12 00    	call   *0x12b099(%rip)        # 1c5090 <_DYNAMIC+0x258>
+
+000000000009a000 00000000000005ed t <core_scheduler_tokio::tokio_scheduler::TokioScheduler as core_scheduler::socket_send_poll::SocketSendPoll>::socket_send_poll::{closure#0}
+
+/home/samuel/Developer/core-rs/core-scheduler-echo-gap-factory/target/release/core-scheduler-echo-benchmark:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+000000000009a000 <_RNCNvXsa_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_send_poll14SocketSendPoll16socket_send_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark>:
+   9a000:	55                   	push   %rbp
+   9a001:	41 57                	push   %r15
+   9a003:	41 56                	push   %r14
+   9a005:	41 55                	push   %r13
+   9a007:	41 54                	push   %r12
+   9a009:	53                   	push   %rbx
+   9a00a:	48 83 ec 58          	sub    $0x58,%rsp
+   9a00e:	48 89 fb             	mov    %rdi,%rbx
+   9a011:	0f b6 87 71 02 00 00 	movzbl 0x271(%rdi),%eax
+   9a018:	48 8d 0d 99 33 fa ff 	lea    -0x5cc67(%rip),%rcx        # 3d3b8 <anon.a0b25372121d65bc7f2d5e1c6859b17d.44.llvm.16430524231693522360+0x14a>
+   9a01f:	48 63 04 81          	movslq (%rcx,%rax,4),%rax
+   9a023:	48 01 c8             	add    %rcx,%rax
+   9a026:	48 89 74 24 38       	mov    %rsi,0x38(%rsp)
+   9a02b:	ff e0                	jmp    *%rax
+   9a02d:	4c 8b 83 58 02 00 00 	mov    0x258(%rbx),%r8
+   9a034:	48 8b ab 60 02 00 00 	mov    0x260(%rbx),%rbp
+   9a03b:	48 8b 03             	mov    (%rbx),%rax
+   9a03e:	48 8b 4b 08          	mov    0x8(%rbx),%rcx
+   9a042:	48 8d 93 70 02 00 00 	lea    0x270(%rbx),%rdx
+   9a049:	0f b6 b3 72 02 00 00 	movzbl 0x272(%rbx),%esi
+   9a050:	40 88 b3 70 02 00 00 	mov    %sil,0x270(%rbx)
+   9a057:	4c 8b a3 68 02 00 00 	mov    0x268(%rbx),%r12
+   9a05e:	48 89 83 20 02 00 00 	mov    %rax,0x220(%rbx)
+   9a065:	48 89 8b 28 02 00 00 	mov    %rcx,0x228(%rbx)
+   9a06c:	4c 89 83 30 02 00 00 	mov    %r8,0x230(%rbx)
+   9a073:	48 89 ab 38 02 00 00 	mov    %rbp,0x238(%rbx)
+   9a07a:	4c 89 a3 40 02 00 00 	mov    %r12,0x240(%rbx)
+   9a081:	48 89 93 48 02 00 00 	mov    %rdx,0x248(%rbx)
+   9a088:	48 8d bb 50 02 00 00 	lea    0x250(%rbx),%rdi
+   9a08f:	66 c7 83 50 02 00 00 	movw   $0x100,0x250(%rbx)
+   9a096:	00 01 
+   9a098:	4c 8d 73 10          	lea    0x10(%rbx),%r14
+   9a09c:	40 b6 01             	mov    $0x1,%sil
+   9a09f:	eb 53                	jmp    9a0f4 <_RNCNvXsa_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_send_poll14SocketSendPoll16socket_send_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0xf4>
+   9a0a1:	48 8d bb 50 02 00 00 	lea    0x250(%rbx),%rdi
+   9a0a8:	0f b6 83 50 02 00 00 	movzbl 0x250(%rbx),%eax
+   9a0af:	4c 8d 73 10          	lea    0x10(%rbx),%r14
+   9a0b3:	48 8d 0d 0e 33 fa ff 	lea    -0x5ccf2(%rip),%rcx        # 3d3c8 <anon.a0b25372121d65bc7f2d5e1c6859b17d.44.llvm.16430524231693522360+0x15a>
+   9a0ba:	48 63 04 81          	movslq (%rcx,%rax,4),%rax
+   9a0be:	48 01 c8             	add    %rcx,%rax
+   9a0c1:	ff e0                	jmp    *%rax
+   9a0c3:	4c 8b 83 30 02 00 00 	mov    0x230(%rbx),%r8
+   9a0ca:	48 8b ab 38 02 00 00 	mov    0x238(%rbx),%rbp
+   9a0d1:	48 8b 83 20 02 00 00 	mov    0x220(%rbx),%rax
+   9a0d8:	48 8b 8b 28 02 00 00 	mov    0x228(%rbx),%rcx
+   9a0df:	4c 8b a3 40 02 00 00 	mov    0x240(%rbx),%r12
+   9a0e6:	0f b6 b3 51 02 00 00 	movzbl 0x251(%rbx),%esi
+   9a0ed:	48 8b 93 48 02 00 00 	mov    0x248(%rbx),%rdx
+   9a0f4:	48 89 7c 24 10       	mov    %rdi,0x10(%rsp)
+   9a0f9:	4c 89 74 24 08       	mov    %r14,0x8(%rsp)
+   9a0fe:	48 89 83 e0 01 00 00 	mov    %rax,0x1e0(%rbx)
+   9a105:	48 89 8b e8 01 00 00 	mov    %rcx,0x1e8(%rbx)
+   9a10c:	4c 89 83 f8 01 00 00 	mov    %r8,0x1f8(%rbx)
+   9a113:	48 89 ab 00 02 00 00 	mov    %rbp,0x200(%rbx)
+   9a11a:	4c 89 a3 08 02 00 00 	mov    %r12,0x208(%rbx)
+   9a121:	48 89 93 10 02 00 00 	mov    %rdx,0x210(%rbx)
+   9a128:	c6 83 1b 02 00 00 00 	movb   $0x0,0x21b(%rbx)
+   9a12f:	40 88 b3 1c 02 00 00 	mov    %sil,0x21c(%rbx)
+   9a136:	c6 83 1d 02 00 00 00 	movb   $0x0,0x21d(%rbx)
+   9a13d:	31 ff                	xor    %edi,%edi
+   9a13f:	c6 83 1a 02 00 00 01 	movb   $0x1,0x21a(%rbx)
+   9a146:	4c 8d 8b d0 01 00 00 	lea    0x1d0(%rbx),%r9
+   9a14d:	48 89 83 d0 01 00 00 	mov    %rax,0x1d0(%rbx)
+   9a154:	48 89 8b d8 01 00 00 	mov    %rcx,0x1d8(%rbx)
+   9a15b:	48 8d 83 18 02 00 00 	lea    0x218(%rbx),%rax
+   9a162:	40 88 b3 18 02 00 00 	mov    %sil,0x218(%rbx)
+   9a169:	4c 8d ab f0 01 00 00 	lea    0x1f0(%rbx),%r13
+   9a170:	48 89 93 f0 01 00 00 	mov    %rdx,0x1f0(%rbx)
+   9a177:	4c 8d b3 19 02 00 00 	lea    0x219(%rbx),%r14
+   9a17e:	40 88 bb 19 02 00 00 	mov    %dil,0x219(%rbx)
+   9a185:	48 89 ab 88 01 00 00 	mov    %rbp,0x188(%rbx)
+   9a18c:	48 89 44 24 18       	mov    %rax,0x18(%rsp)
+   9a191:	48 89 83 90 01 00 00 	mov    %rax,0x190(%rbx)
+   9a198:	4c 89 ab 98 01 00 00 	mov    %r13,0x198(%rbx)
+   9a19f:	4c 89 4c 24 20       	mov    %r9,0x20(%rsp)
+   9a1a4:	4c 89 8b a0 01 00 00 	mov    %r9,0x1a0(%rbx)
+   9a1ab:	4c 89 b3 a8 01 00 00 	mov    %r14,0x1a8(%rbx)
+   9a1b2:	4c 89 44 24 28       	mov    %r8,0x28(%rsp)
+   9a1b7:	4c 89 83 b0 01 00 00 	mov    %r8,0x1b0(%rbx)
+   9a1be:	48 89 ab b8 01 00 00 	mov    %rbp,0x1b8(%rbx)
+   9a1c5:	4c 89 a3 c0 01 00 00 	mov    %r12,0x1c0(%rbx)
+   9a1cc:	48 8d 83 c9 01 00 00 	lea    0x1c9(%rbx),%rax
+   9a1d3:	48 89 44 24 30       	mov    %rax,0x30(%rsp)
+   9a1d8:	c6 83 c9 01 00 00 00 	movb   $0x0,0x1c9(%rbx)
+   9a1df:	49 89 ef             	mov    %rbp,%r15
+   9a1e2:	c6 83 c8 01 00 00 01 	movb   $0x1,0x1c8(%rbx)
+   9a1e9:	4c 89 e7             	mov    %r12,%rdi
+   9a1ec:	ff 15 36 b5 12 00    	call   *0x12b536(%rip)        # 1c5728 <_DYNAMIC+0x8f0>
+   9a1f2:	84 c0                	test   %al,%al
+   9a1f4:	74 04                	je     9a1fa <_RNCNvXsa_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_send_poll14SocketSendPoll16socket_send_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x1fa>
+   9a1f6:	31 c0                	xor    %eax,%eax
+   9a1f8:	eb 17                	jmp    9a211 <_RNCNvXsa_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_send_poll14SocketSendPoll16socket_send_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x211>
+   9a1fa:	48 8b 7c 24 28       	mov    0x28(%rsp),%rdi
+   9a1ff:	4c 89 fe             	mov    %r15,%rsi
+   9a202:	ff 15 28 b5 12 00    	call   *0x12b528(%rip)        # 1c5730 <_DYNAMIC+0x8f8>
+   9a208:	48 85 c0             	test   %rax,%rax
+   9a20b:	0f 84 c4 00 00 00    	je     9a2d5 <_RNCNvXsa_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_send_poll14SocketSendPoll16socket_send_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x2d5>
+   9a211:	49 89 c5             	mov    %rax,%r13
+   9a214:	c6 83 c8 01 00 00 00 	movb   $0x0,0x1c8(%rbx)
+   9a21b:	41 bf 01 00 00 00    	mov    $0x1,%r15d
+   9a221:	b0 01                	mov    $0x1,%al
+   9a223:	4c 8b 74 24 08       	mov    0x8(%rsp),%r14
+   9a228:	48 8b 4c 24 30       	mov    0x30(%rsp),%rcx
+   9a22d:	88 01                	mov    %al,(%rcx)
+   9a22f:	49 83 ff 02          	cmp    $0x2,%r15
+   9a233:	75 0a                	jne    9a23f <_RNCNvXsa_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_send_poll14SocketSendPoll16socket_send_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x23f>
+   9a235:	41 bf 02 00 00 00    	mov    $0x2,%r15d
+   9a23b:	b0 03                	mov    $0x3,%al
+   9a23d:	eb 11                	jmp    9a250 <_RNCNvXsa_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_send_poll14SocketSendPoll16socket_send_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x250>
+   9a23f:	4c 89 f7             	mov    %r14,%rdi
+   9a242:	e8 b9 c7 ff ff       	call   96a00 <_RINvNtCs3sPX1WnuliO_4core3ptr9drop_glueNCINvMNtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtBJ_15tokio_scheduler14TokioScheduler13socket_resultjNCINvMs0_NtBJ_12tokio_socketNtB2F_11TokioSocket7io_withjNCNCNCINvBG_21socket_operation_withINtNtCs5xahNnzoIEW_5alloc3vec3VechEjNCNCINvXs7_BH_B1C_NtNtCskHdHMewkLRk_14core_scheduler11socket_read10SocketRead11socket_readB3Z_E00E000E0NCB3u_0E0ECs3OJGJjj4kxL_29core_scheduler_echo_benchmark>
+   9a247:	c6 83 1a 02 00 00 00 	movb   $0x0,0x21a(%rbx)
+   9a24e:	b0 01                	mov    $0x1,%al
+   9a250:	88 83 1b 02 00 00    	mov    %al,0x21b(%rbx)
+   9a256:	88 83 50 02 00 00    	mov    %al,0x250(%rbx)
+   9a25c:	88 83 71 02 00 00    	mov    %al,0x271(%rbx)
+   9a262:	4c 89 f8             	mov    %r15,%rax
+   9a265:	4c 89 ea             	mov    %r13,%rdx
+   9a268:	48 83 c4 58          	add    $0x58,%rsp
+   9a26c:	5b                   	pop    %rbx
+   9a26d:	41 5c                	pop    %r12
+   9a26f:	41 5d                	pop    %r13
+   9a271:	41 5e                	pop    %r14
+   9a273:	41 5f                	pop    %r15
+   9a275:	5d                   	pop    %rbp
+   9a276:	c3                   	ret
+   9a277:	0f b6 83 1b 02 00 00 	movzbl 0x21b(%rbx),%eax
+   9a27e:	48 8d 0d 53 31 fa ff 	lea    -0x5cead(%rip),%rcx        # 3d3d8 <anon.a0b25372121d65bc7f2d5e1c6859b17d.44.llvm.16430524231693522360+0x16a>
+   9a285:	48 63 04 81          	movslq (%rcx,%rax,4),%rax
+   9a289:	48 01 c8             	add    %rcx,%rax
+   9a28c:	48 89 7c 24 10       	mov    %rdi,0x10(%rsp)
+   9a291:	ff e0                	jmp    *%rax
+   9a293:	4c 89 74 24 08       	mov    %r14,0x8(%rsp)
+   9a298:	4c 8b 83 f8 01 00 00 	mov    0x1f8(%rbx),%r8
+   9a29f:	48 8b ab 00 02 00 00 	mov    0x200(%rbx),%rbp
+   9a2a6:	48 8b 83 e0 01 00 00 	mov    0x1e0(%rbx),%rax
+   9a2ad:	48 8b 8b e8 01 00 00 	mov    0x1e8(%rbx),%rcx
+   9a2b4:	4c 8b a3 08 02 00 00 	mov    0x208(%rbx),%r12
+   9a2bb:	0f b6 b3 1c 02 00 00 	movzbl 0x21c(%rbx),%esi
+   9a2c2:	48 8b 93 10 02 00 00 	mov    0x210(%rbx),%rdx
+   9a2c9:	0f b6 bb 1d 02 00 00 	movzbl 0x21d(%rbx),%edi
+   9a2d0:	e9 6a fe ff ff       	jmp    9a13f <_RNCNvXsa_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_send_poll14SocketSendPoll16socket_send_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x13f>
+   9a2d5:	c6 83 c8 01 00 00 00 	movb   $0x0,0x1c8(%rbx)
+   9a2dc:	48 8b 44 24 18       	mov    0x18(%rsp),%rax
+   9a2e1:	0f b6 00             	movzbl (%rax),%eax
+   9a2e4:	41 0f b6 0e          	movzbl (%r14),%ecx
+   9a2e8:	48 8d 53 78          	lea    0x78(%rbx),%rdx
+   9a2ec:	4c 89 ab 88 00 00 00 	mov    %r13,0x88(%rbx)
+   9a2f3:	48 8b 74 24 20       	mov    0x20(%rsp),%rsi
+   9a2f8:	48 89 b3 90 00 00 00 	mov    %rsi,0x90(%rbx)
+   9a2ff:	48 89 ab 70 01 00 00 	mov    %rbp,0x170(%rbx)
+   9a306:	c6 83 79 01 00 00 00 	movb   $0x0,0x179(%rbx)
+   9a30d:	88 83 7a 01 00 00    	mov    %al,0x17a(%rbx)
+   9a313:	88 8b 7b 01 00 00    	mov    %cl,0x17b(%rbx)
+   9a319:	48 8d 43 70          	lea    0x70(%rbx),%rax
+   9a31d:	48 89 53 70          	mov    %rdx,0x70(%rbx)
+   9a321:	4c 89 63 10          	mov    %r12,0x10(%rbx)
+   9a325:	c6 43 18 00          	movb   $0x0,0x18(%rbx)
+   9a329:	48 8d 8b 80 01 00 00 	lea    0x180(%rbx),%rcx
+   9a330:	4c 8b 74 24 08       	mov    0x8(%rsp),%r14
+   9a335:	4c 89 b3 80 01 00 00 	mov    %r14,0x180(%rbx)
+   9a33c:	48 89 43 60          	mov    %rax,0x60(%rbx)
+   9a340:	48 89 4b 68          	mov    %rcx,0x68(%rbx)
+   9a344:	48 8b 74 24 38       	mov    0x38(%rsp),%rsi
+   9a349:	eb 74                	jmp    9a3bf <_RNCNvXsa_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_send_poll14SocketSendPoll16socket_send_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x3bf>
+   9a34b:	48 8d 93 c9 01 00 00 	lea    0x1c9(%rbx),%rdx
+   9a352:	0f b6 83 c9 01 00 00 	movzbl 0x1c9(%rbx),%eax
+   9a359:	48 8d 0d 88 30 fa ff 	lea    -0x5cf78(%rip),%rcx        # 3d3e8 <anon.a0b25372121d65bc7f2d5e1c6859b17d.44.llvm.16430524231693522360+0x17a>
+   9a360:	48 63 04 81          	movslq (%rcx,%rax,4),%rax
+   9a364:	48 01 c8             	add    %rcx,%rax
+   9a367:	48 89 54 24 30       	mov    %rdx,0x30(%rsp)
+   9a36c:	ff e0                	jmp    *%rax
+   9a36e:	4c 89 74 24 08       	mov    %r14,0x8(%rsp)
+   9a373:	48 8b 83 b0 01 00 00 	mov    0x1b0(%rbx),%rax
+   9a37a:	48 89 44 24 28       	mov    %rax,0x28(%rsp)
+   9a37f:	4c 8b bb b8 01 00 00 	mov    0x1b8(%rbx),%r15
+   9a386:	4c 8b a3 c0 01 00 00 	mov    0x1c0(%rbx),%r12
+   9a38d:	48 8b ab 88 01 00 00 	mov    0x188(%rbx),%rbp
+   9a394:	48 8b 83 90 01 00 00 	mov    0x190(%rbx),%rax
+   9a39b:	48 89 44 24 18       	mov    %rax,0x18(%rsp)
+   9a3a0:	4c 8b ab 98 01 00 00 	mov    0x198(%rbx),%r13
+   9a3a7:	48 8b 83 a0 01 00 00 	mov    0x1a0(%rbx),%rax
+   9a3ae:	48 89 44 24 20       	mov    %rax,0x20(%rsp)
+   9a3b3:	4c 8b b3 a8 01 00 00 	mov    0x1a8(%rbx),%r14
+   9a3ba:	e9 23 fe ff ff       	jmp    9a1e2 <_RNCNvXsa_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_send_poll14SocketSendPoll16socket_send_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x1e2>
+   9a3bf:	48 8d 7b 60          	lea    0x60(%rbx),%rdi
+   9a3c3:	e8 e8 09 04 00       	call   dadb0 <_RNvXs0_NtNtCs3sPX1WnuliO_4core6future7poll_fnINtB5_6PollFnNCNCINvMNtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB14_15tokio_scheduler14TokioScheduler13socket_resultjNCINvMs0_NtB14_12tokio_socketNtB31_11TokioSocket7io_withjNCNCNCINvB11_21socket_operation_withRShjNCNCNvXsa_B12_B1X_NtNtCskHdHMewkLRk_14core_scheduler16socket_send_poll14SocketSendPoll16socket_send_poll00E000E0NCB3R_0E00ENtNtB7_6future6Future4pollCs3OJGJjj4kxL_29core_scheduler_echo_benchmark>
+   9a3c8:	49 89 c7             	mov    %rax,%r15
+   9a3cb:	48 83 f8 02          	cmp    $0x2,%rax
+   9a3cf:	75 0d                	jne    9a3de <_RNCNvXsa_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_send_poll14SocketSendPoll16socket_send_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x3de>
+   9a3d1:	41 bf 02 00 00 00    	mov    $0x2,%r15d
+   9a3d7:	b0 03                	mov    $0x3,%al
+   9a3d9:	e9 4a fe ff ff       	jmp    9a228 <_RNCNvXsa_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_send_poll14SocketSendPoll16socket_send_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x228>
+   9a3de:	49 89 d5             	mov    %rdx,%r13
+   9a3e1:	80 7b 18 04          	cmpb   $0x4,0x18(%rbx)
+   9a3e5:	0f 85 82 00 00 00    	jne    9a46d <_RNCNvXsa_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_send_poll14SocketSendPoll16socket_send_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x46d>
+   9a3eb:	4c 8d 63 20          	lea    0x20(%rbx),%r12
+   9a3ef:	48 8b 73 50          	mov    0x50(%rbx),%rsi
+   9a3f3:	48 8d 7c 24 40       	lea    0x40(%rsp),%rdi
+   9a3f8:	4c 89 e2             	mov    %r12,%rdx
+   9a3fb:	b9 01 00 00 00       	mov    $0x1,%ecx
+   9a400:	e8 db 4a 00 00       	call   9eee0 <_RINvMs_NtCshL55zNO6Bjb_14event_listener3sysINtB7_5InneruE10with_innerINtNtCs3sPX1WnuliO_4core6option6OptionINtB7_5StateuEENCNvB2_6remove0ECs3OJGJjj4kxL_29core_scheduler_echo_benchmark.llvm.6069490910975296442>
+   9a405:	0f b6 44 24 40       	movzbl 0x40(%rsp),%eax
+   9a40a:	3c ff                	cmp    $0xff,%al
+   9a40c:	74 2e                	je     9a43c <_RNCNvXsa_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_send_poll14SocketSendPoll16socket_send_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x43c>
+   9a40e:	3c 02                	cmp    $0x2,%al
+   9a410:	75 2a                	jne    9a43c <_RNCNvXsa_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_send_poll14SocketSendPoll16socket_send_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x43c>
+   9a412:	48 8b 44 24 48       	mov    0x48(%rsp),%rax
+   9a417:	48 85 c0             	test   %rax,%rax
+   9a41a:	74 0a                	je     9a426 <_RNCNvXsa_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_send_poll14SocketSendPoll16socket_send_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x426>
+   9a41c:	48 8b 7c 24 50       	mov    0x50(%rsp),%rdi
+   9a421:	ff 50 18             	call   *0x18(%rax)
+   9a424:	eb 16                	jmp    9a43c <_RNCNvXsa_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_send_poll14SocketSendPoll16socket_send_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x43c>
+   9a426:	48 8b 44 24 50       	mov    0x50(%rsp),%rax
+   9a42b:	f0 48 ff 08          	lock decq (%rax)
+   9a42f:	75 0b                	jne    9a43c <_RNCNvXsa_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_send_poll14SocketSendPoll16socket_send_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x43c>
+   9a431:	48 8d 7c 24 50       	lea    0x50(%rsp),%rdi
+   9a436:	ff 15 64 ad 12 00    	call   *0x12ad64(%rip)        # 1c51a0 <_DYNAMIC+0x368>
+   9a43c:	49 83 3c 24 00       	cmpq   $0x0,(%r12)
+   9a441:	74 2a                	je     9a46d <_RNCNvXsa_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_send_poll14SocketSendPoll16socket_send_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x46d>
+   9a443:	80 7b 28 02          	cmpb   $0x2,0x28(%rbx)
+   9a447:	75 24                	jne    9a46d <_RNCNvXsa_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_send_poll14SocketSendPoll16socket_send_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x46d>
+   9a449:	48 8b 43 30          	mov    0x30(%rbx),%rax
+   9a44d:	48 8d 7b 38          	lea    0x38(%rbx),%rdi
+   9a451:	48 85 c0             	test   %rax,%rax
+   9a454:	74 08                	je     9a45e <_RNCNvXsa_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_send_poll14SocketSendPoll16socket_send_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x45e>
+   9a456:	48 8b 3f             	mov    (%rdi),%rdi
+   9a459:	ff 50 18             	call   *0x18(%rax)
+   9a45c:	eb 0f                	jmp    9a46d <_RNCNvXsa_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_send_poll14SocketSendPoll16socket_send_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x46d>
+   9a45e:	48 8b 07             	mov    (%rdi),%rax
+   9a461:	f0 48 ff 08          	lock decq (%rax)
+   9a465:	75 06                	jne    9a46d <_RNCNvXsa_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_send_poll14SocketSendPoll16socket_send_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x46d>
+   9a467:	ff 15 33 ad 12 00    	call   *0x12ad33(%rip)        # 1c51a0 <_DYNAMIC+0x368>
+   9a46d:	48 8d 7b 78          	lea    0x78(%rbx),%rdi
+   9a471:	e8 5a b0 ff ff       	call   954d0 <_RINvNtCs3sPX1WnuliO_4core3ptr9drop_glueINtNtB4_3pin14PinMacroHelperNCINvMs0_NtCs3tjYQotVroO_20core_scheduler_tokio12tokio_socketNtB1c_11TokioSocket7io_withjNCNCNCINvMNtB1e_17socket_operationsNtNtB1e_15tokio_scheduler14TokioScheduler21socket_operation_withINtNtCs5xahNnzoIEW_5alloc3vec3VechEjNCNCINvXs7_B2E_B33_NtNtCskHdHMewkLRk_14core_scheduler11socket_read10SocketRead11socket_readB45_E00E000E0EECs3OJGJjj4kxL_29core_scheduler_echo_benchmark>
+   9a476:	c6 83 c8 01 00 00 00 	movb   $0x0,0x1c8(%rbx)
+   9a47d:	b0 01                	mov    $0x1,%al
+   9a47f:	e9 a4 fd ff ff       	jmp    9a228 <_RNCNvXsa_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_send_poll14SocketSendPoll16socket_send_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x228>
+   9a484:	48 8d 3d 7d 0a 12 00 	lea    0x120a7d(%rip),%rdi        # 1baf08 <anon.0299bd6eebd0350b0106d5f86d597573.74.llvm.16436233731751286210+0x60>
+   9a48b:	ff 15 f7 b1 12 00    	call   *0x12b1f7(%rip)        # 1c5688 <_DYNAMIC+0x850>
+   9a491:	48 8d 3d 70 0a 12 00 	lea    0x120a70(%rip),%rdi        # 1baf08 <anon.0299bd6eebd0350b0106d5f86d597573.74.llvm.16436233731751286210+0x60>
+   9a498:	ff 15 f2 b1 12 00    	call   *0x12b1f2(%rip)        # 1c5690 <_DYNAMIC+0x858>
+   9a49e:	4c 89 74 24 08       	mov    %r14,0x8(%rsp)
+   9a4a3:	48 8d 3d f6 05 12 00 	lea    0x1205f6(%rip),%rdi        # 1baaa0 <anon.a0b25372121d65bc7f2d5e1c6859b17d.45.llvm.16430524231693522360+0x30>
+   9a4aa:	ff 15 d8 b1 12 00    	call   *0x12b1d8(%rip)        # 1c5688 <_DYNAMIC+0x850>
+   9a4b0:	eb 62                	jmp    9a514 <_RNCNvXsa_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_send_poll14SocketSendPoll16socket_send_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x514>
+   9a4b2:	4c 89 74 24 08       	mov    %r14,0x8(%rsp)
+   9a4b7:	48 8d 3d e2 05 12 00 	lea    0x1205e2(%rip),%rdi        # 1baaa0 <anon.a0b25372121d65bc7f2d5e1c6859b17d.45.llvm.16430524231693522360+0x30>
+   9a4be:	ff 15 cc b1 12 00    	call   *0x12b1cc(%rip)        # 1c5690 <_DYNAMIC+0x858>
+   9a4c4:	eb 4e                	jmp    9a514 <_RNCNvXsa_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_send_poll14SocketSendPoll16socket_send_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x514>
+   9a4c6:	4c 89 74 24 08       	mov    %r14,0x8(%rsp)
+   9a4cb:	48 8d 3d e6 05 12 00 	lea    0x1205e6(%rip),%rdi        # 1baab8 <anon.a0b25372121d65bc7f2d5e1c6859b17d.45.llvm.16430524231693522360+0x48>
+   9a4d2:	ff 15 b0 b1 12 00    	call   *0x12b1b0(%rip)        # 1c5688 <_DYNAMIC+0x850>
+   9a4d8:	eb 3a                	jmp    9a514 <_RNCNvXsa_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_send_poll14SocketSendPoll16socket_send_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x514>
+   9a4da:	4c 89 74 24 08       	mov    %r14,0x8(%rsp)
+   9a4df:	48 8d 3d d2 05 12 00 	lea    0x1205d2(%rip),%rdi        # 1baab8 <anon.a0b25372121d65bc7f2d5e1c6859b17d.45.llvm.16430524231693522360+0x48>
+   9a4e6:	ff 15 a4 b1 12 00    	call   *0x12b1a4(%rip)        # 1c5690 <_DYNAMIC+0x858>
+   9a4ec:	eb 26                	jmp    9a514 <_RNCNvXsa_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_send_poll14SocketSendPoll16socket_send_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x514>
+   9a4ee:	4c 89 74 24 08       	mov    %r14,0x8(%rsp)
+   9a4f3:	48 8d 3d 8e 05 12 00 	lea    0x12058e(%rip),%rdi        # 1baa88 <anon.a0b25372121d65bc7f2d5e1c6859b17d.45.llvm.16430524231693522360+0x18>
+   9a4fa:	ff 15 88 b1 12 00    	call   *0x12b188(%rip)        # 1c5688 <_DYNAMIC+0x850>
+   9a500:	eb 12                	jmp    9a514 <_RNCNvXsa_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_send_poll14SocketSendPoll16socket_send_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x514>
+   9a502:	4c 89 74 24 08       	mov    %r14,0x8(%rsp)
+   9a507:	48 8d 3d 7a 05 12 00 	lea    0x12057a(%rip),%rdi        # 1baa88 <anon.a0b25372121d65bc7f2d5e1c6859b17d.45.llvm.16430524231693522360+0x18>
+   9a50e:	ff 15 7c b1 12 00    	call   *0x12b17c(%rip)        # 1c5690 <_DYNAMIC+0x858>
+   9a514:	0f 0b                	ud2
+   9a516:	4c 89 74 24 08       	mov    %r14,0x8(%rsp)
+   9a51b:	49 89 c7             	mov    %rax,%r15
+   9a51e:	eb 34                	jmp    9a554 <_RNCNvXsa_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_send_poll14SocketSendPoll16socket_send_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x554>
+   9a520:	4c 89 74 24 08       	mov    %r14,0x8(%rsp)
+   9a525:	49 89 c7             	mov    %rax,%r15
+   9a528:	4c 89 e7             	mov    %r12,%rdi
+   9a52b:	e8 30 b4 ff ff       	call   95960 <_RINvNtCs3sPX1WnuliO_4core3ptr9drop_glueINtNtB4_6option6OptionINtNtCshL55zNO6Bjb_14event_listener3sys8ListeneruEEECs3OJGJjj4kxL_29core_scheduler_echo_benchmark>
+   9a530:	eb 22                	jmp    9a554 <_RNCNvXsa_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_send_poll14SocketSendPoll16socket_send_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x554>
+   9a532:	ff 15 58 ab 12 00    	call   *0x12ab58(%rip)        # 1c5090 <_DYNAMIC+0x258>
+   9a538:	4c 89 74 24 08       	mov    %r14,0x8(%rsp)
+   9a53d:	eb 62                	jmp    9a5a1 <_RNCNvXsa_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_send_poll14SocketSendPoll16socket_send_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x5a1>
+   9a53f:	49 89 c7             	mov    %rax,%r15
+   9a542:	eb 69                	jmp    9a5ad <_RNCNvXsa_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_send_poll14SocketSendPoll16socket_send_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x5ad>
+   9a544:	49 89 c7             	mov    %rax,%r15
+   9a547:	4c 89 74 24 08       	mov    %r14,0x8(%rsp)
+   9a54c:	4c 89 f7             	mov    %r14,%rdi
+   9a54f:	e8 3c b0 ff ff       	call   95590 <_RINvNtCs3sPX1WnuliO_4core3ptr9drop_glueINtNtB4_3pin14PinMacroHelperNCNvMs0_NtCskHdHMewkLRk_14core_scheduler12cancellationNtB1b_12Cancellation9cancelled0EECs3OJGJjj4kxL_29core_scheduler_echo_benchmark>
+   9a554:	48 8d 7b 78          	lea    0x78(%rbx),%rdi
+   9a558:	e8 73 af ff ff       	call   954d0 <_RINvNtCs3sPX1WnuliO_4core3ptr9drop_glueINtNtB4_3pin14PinMacroHelperNCINvMs0_NtCs3tjYQotVroO_20core_scheduler_tokio12tokio_socketNtB1c_11TokioSocket7io_withjNCNCNCINvMNtB1e_17socket_operationsNtNtB1e_15tokio_scheduler14TokioScheduler21socket_operation_withINtNtCs5xahNnzoIEW_5alloc3vec3VechEjNCNCINvXs7_B2E_B33_NtNtCskHdHMewkLRk_14core_scheduler11socket_read10SocketRead11socket_readB45_E00E000E0EECs3OJGJjj4kxL_29core_scheduler_echo_benchmark>
+   9a55d:	eb 45                	jmp    9a5a4 <_RNCNvXsa_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_send_poll14SocketSendPoll16socket_send_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x5a4>
+   9a55f:	ff 15 2b ab 12 00    	call   *0x12ab2b(%rip)        # 1c5090 <_DYNAMIC+0x258>
+   9a565:	49 89 c7             	mov    %rax,%r15
+   9a568:	80 bb 1b 02 00 00 03 	cmpb   $0x3,0x21b(%rbx)
+   9a56f:	75 4f                	jne    9a5c0 <_RNCNvXsa_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_send_poll14SocketSendPoll16socket_send_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x5c0>
+   9a571:	48 8d 7b 10          	lea    0x10(%rbx),%rdi
+   9a575:	e8 86 c4 ff ff       	call   96a00 <_RINvNtCs3sPX1WnuliO_4core3ptr9drop_glueNCINvMNtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtBJ_15tokio_scheduler14TokioScheduler13socket_resultjNCINvMs0_NtBJ_12tokio_socketNtB2F_11TokioSocket7io_withjNCNCNCINvBG_21socket_operation_withINtNtCs5xahNnzoIEW_5alloc3vec3VechEjNCNCINvXs7_BH_B1C_NtNtCskHdHMewkLRk_14core_scheduler11socket_read10SocketRead11socket_readB3Z_E00E000E0NCB3u_0E0ECs3OJGJjj4kxL_29core_scheduler_echo_benchmark>
+   9a57a:	c6 83 1a 02 00 00 00 	movb   $0x0,0x21a(%rbx)
+   9a581:	eb 3d                	jmp    9a5c0 <_RNCNvXsa_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_send_poll14SocketSendPoll16socket_send_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x5c0>
+   9a583:	c6 83 1a 02 00 00 00 	movb   $0x0,0x21a(%rbx)
+   9a58a:	ff 15 00 ab 12 00    	call   *0x12ab00(%rip)        # 1c5090 <_DYNAMIC+0x258>
+   9a590:	eb 0f                	jmp    9a5a1 <_RNCNvXsa_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_send_poll14SocketSendPoll16socket_send_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x5a1>
+   9a592:	4c 89 74 24 08       	mov    %r14,0x8(%rsp)
+   9a597:	49 89 c7             	mov    %rax,%r15
+   9a59a:	eb 1b                	jmp    9a5b7 <_RNCNvXsa_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_send_poll14SocketSendPoll16socket_send_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x5b7>
+   9a59c:	49 89 c7             	mov    %rax,%r15
+   9a59f:	eb 27                	jmp    9a5c8 <_RNCNvXsa_NtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtB9_15tokio_scheduler14TokioSchedulerNtNtCskHdHMewkLRk_14core_scheduler16socket_send_poll14SocketSendPoll16socket_send_poll0Cs3OJGJjj4kxL_29core_scheduler_echo_benchmark+0x5c8>
+   9a5a1:	49 89 c7             	mov    %rax,%r15
+   9a5a4:	66 c7 83 c8 01 00 00 	movw   $0x200,0x1c8(%rbx)
+   9a5ab:	00 02 
+   9a5ad:	48 8b 7c 24 08       	mov    0x8(%rsp),%rdi
+   9a5b2:	e8 49 c4 ff ff       	call   96a00 <_RINvNtCs3sPX1WnuliO_4core3ptr9drop_glueNCINvMNtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtBJ_15tokio_scheduler14TokioScheduler13socket_resultjNCINvMs0_NtBJ_12tokio_socketNtB2F_11TokioSocket7io_withjNCNCNCINvBG_21socket_operation_withINtNtCs5xahNnzoIEW_5alloc3vec3VechEjNCNCINvXs7_BH_B1C_NtNtCskHdHMewkLRk_14core_scheduler11socket_read10SocketRead11socket_readB3Z_E00E000E0NCB3u_0E0ECs3OJGJjj4kxL_29core_scheduler_echo_benchmark>
+   9a5b7:	66 c7 83 1a 02 00 00 	movw   $0x200,0x21a(%rbx)
+   9a5be:	00 02 
+   9a5c0:	48 8b 44 24 10       	mov    0x10(%rsp),%rax
+   9a5c5:	c6 00 02             	movb   $0x2,(%rax)
+   9a5c8:	48 8b 7c 24 08       	mov    0x8(%rsp),%rdi
+   9a5cd:	e8 fe c5 ff ff       	call   96bd0 <_RINvNtCs3sPX1WnuliO_4core3ptr9drop_glueNCINvMNtCs3tjYQotVroO_20core_scheduler_tokio17socket_operationsNtNtBJ_15tokio_scheduler14TokioScheduler16socket_operationRShjNCNCNvXsa_BH_B1C_NtNtCskHdHMewkLRk_14core_scheduler16socket_send_poll14SocketSendPoll16socket_send_poll00E0ECs3OJGJjj4kxL_29core_scheduler_echo_benchmark>
+   9a5d2:	c6 83 71 02 00 00 02 	movb   $0x2,0x271(%rbx)
+   9a5d9:	4c 89 ff             	mov    %r15,%rdi
+   9a5dc:	e8 8f eb 11 00       	call   1b9170 <_Unwind_Resume@plt>
+   9a5e1:	ff 15 a9 aa 12 00    	call   *0x12aaa9(%rip)        # 1c5090 <_DYNAMIC+0x258>
+   9a5e7:	ff 15 a3 aa 12 00    	call   *0x12aaa3(%rip)        # 1c5090 <_DYNAMIC+0x258>
+
