@@ -6,6 +6,8 @@ Compare pure Tokio, the Core Tokio adapter, Native readiness/io_uring, and Monoi
 
 The [initial Aiko results](results.md) include throughput, latency, variation across repetitions, and raw samples.
 
+The [current comparison with Tokio and Monoio](monoio-comparison.md) measures the recommended persistent monitor paths, owned io_uring, and both Monoio drivers on Aiko, with client-placement checks and complete raw results.
+
 The [performance investigation](profiling.md) compares compiler settings, identifies CPU and syscall costs, and measures isolated optimization prototypes.
 
 The [io_uring performance improvements](performance.md) describe the implemented fast paths, their relationship to `io-event`, and repeated before/after measurements.

@@ -37,8 +37,8 @@ def finish(process, started, timeout=40):
     raise TimeoutError("echo process did not finish")
 
 
-def sample(binary, backend, size, client_workers):
-    clients = list(range(4, 4 + client_workers))
+def sample(binary, backend, size, client_workers, client_cpu_start):
+    clients = list(range(client_cpu_start, client_cpu_start + client_workers))
     processes = []
     with tempfile.TemporaryFile(mode="w+") as errors:
         try:
@@ -77,6 +77,8 @@ def main():
     parser.add_argument("--binary", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--repeats", type=int, default=2)
+    parser.add_argument("--client-cpu-start", type=int, default=8, help="first client CPU; keep both client sizes within one L3 group")
+    parser.add_argument("--backends", nargs="+", default=["tokio", "tokio-adapter-monitor", "native-monitor", "iouring-monitor", "iouring", "monoio", "monoio-legacy"])
     args = parser.parse_args()
     binary = args.binary.resolve()
     report = {
@@ -88,10 +90,10 @@ def main():
     }
     generator = random.Random(20261023)
     for repeat in range(args.repeats):
-        cases = list(itertools.product(["tokio", "tokio-adapter-monitor", "native-monitor", "iouring-monitor", "iouring", "monoio", "monoio-legacy"], [64, 4096], [4, 8]))
+        cases = list(itertools.product(args.backends, [64, 4096], [4, 8]))
         generator.shuffle(cases)
         for backend, size, clients in cases:
-            result = sample(binary, backend, size, clients)
+            result = sample(binary, backend, size, clients, args.client_cpu_start)
             report["samples"].append(dict(result, repeat=repeat + 1))
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(json.dumps(report, indent=2) + "\n")
