@@ -1729,3 +1729,37 @@ fn cancelling_a_pending_receive_preserves_bytes_that_are_already_available() {
     let mut close = pin!(selector.socket_monitor_close(&mut reader));
     drive(&mut worker, &mut context, close.as_mut()).unwrap();
 }
+
+#[test]
+fn cancellation_racing_would_block_does_not_wait_for_readiness() {
+    let (selector, _driver) = IoUringSelector::new(options()).unwrap();
+    let (socket, _peer) = sockets(&selector);
+    let mut reader = selector
+        .socket_monitor(&socket, Interest::Readable)
+        .unwrap();
+    let cancellation = Cancellation::new();
+    let signal = cancellation.clone();
+    super::super::tests::BEFORE_SYSCALL.with(|hook| {
+        *hook.borrow_mut() = Some((
+            "monitor-recv",
+            Box::new(move || {
+                signal.cancel();
+            }),
+        ));
+    });
+    let mut byte = [0];
+    let result = block_on(poll_once(selector.socket_monitor_recv_poll(
+        &mut reader,
+        &mut byte,
+        SocketRecvFlags::default(),
+        &cancellation,
+    )));
+    assert!(matches!(result, Some(Err(OperationError::Cancelled(_)))));
+    // Cancellation released the claim even though it arrived between preflight and listener registration.
+    assert!(
+        block_on(poll_once(
+            selector.socket_monitor_wait(&mut reader, &Cancellation::never())
+        ))
+        .is_none()
+    );
+}
