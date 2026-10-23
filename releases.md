@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add installed I/O usage guidance and runnable, cross-backend recipes for reused borrowed stream storage, retained frames, bounded packet handoff, and overlapped file copies. Benchmark the same loops and demonstrate monitor cleanup on errors and cancellation.
+
 - Consolidate portable receives around explicit buffer pools, retaining multishot controls in the io_uring backend. Monitor and receiver close methods now take no cancellation token and return `io::Result<()>`; await close and drop retained handles before exclusively closing a resource. See the [interface reference](context/interface.md) for capability and lifecycle semantics.
 
 - Expose backend-associated receive messages with borrowed address views, payload access, and owned payload extraction. Keep writable payload access optional for immutable receivers, and retain io_uring native address metadata until conversion is requested. Specify ownership and lifetime semantics without imposing copying or allocation costs.

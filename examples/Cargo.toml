@@ -1,0 +1,19 @@
+[package]
+name = "core-scheduler-examples"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.85"
+publish = false
+
+[dependencies]
+core-scheduler = { path = ".." }
+core-scheduler-direct = { path = "../crates/direct" }
+core-scheduler-tokio = { path = "../crates/tokio" }
+core-scheduler-native = { path = "../crates/native" }
+futures-lite = "2.6.1"
+serde_json = "1"
+tempfile = "3"
+tokio = { version = "1.53.3", features = ["rt-multi-thread", "time"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+core-scheduler-iouring = { path = "../crates/iouring" }

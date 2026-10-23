@@ -42,6 +42,8 @@ impl<Socket> Body<Socket> {
 }
 ```
 
+This small example illustrates owned-buffer dispatch. The [runnable I/O examples](examples/readme.md) show complete loops that reuse monitors and storage, retain parsed frames, hand off packets, and overlap file operations.
+
 The body retains no scheduler. Its next operation can use a different compatible scheduler. Associated resource types and backend registration rules determine compatibility; passing a new scheduler does not rebind an outstanding future or an incompatible resource.
 
 ## Capabilities
@@ -56,7 +58,7 @@ Require individual operations, such as `FileRead`, `SocketRead + SocketWrite`, o
 | `Spawn` | Primitive task dispatch with implementation-associated, owning completion handles. |
 | `Blocking` | Optional bounded admission of owned synchronous work. |
 | `Signals` | Optional notification subscriptions with implementation-associated guards and signal identifiers. |
-| Borrowed socket I/O | Optional `SocketRecvPoll`, `SocketSendPoll`, `SocketRecvMsgPoll`, and `SocketSendMsgPoll`, accepting stack buffers and I/O vectors. |
+| Borrowed socket I/O | Optional `SocketRecvPoll`, `SocketSendPoll`, `SocketRecvMsgPoll`, and `SocketSendMsgPoll`, accepting borrowed slices and I/O vectors. |
 | `BufferPooling` and `SocketReceiving` | Experimental bounded reusable storage and owned received chunks, with retained parser views and backend-selected receive strategies. |
 | Extension capabilities | Typed socket options, scatter/gather messages, address resolution, standard TCP resource registration, file advice, and allocation. |
 
@@ -73,18 +75,29 @@ Received messages expose `address()` and `payload()` while owning their backend'
 ```rust
 use core_scheduler::{Cancellation, FileMonitoring, OperationResult};
 
-async fn read_chunk<S: FileMonitoring>(
+async fn read_file<S: FileMonitoring>(
     scheduler: &S,
     file: &S::File,
     cancellation: &Cancellation,
-) -> OperationResult<Vec<u8>> {
+    mut consume: impl FnMut(&[u8]),
+) -> OperationResult<()> {
     let mut reader = scheduler.file_monitor(file)?;
-    let (result, buffer) = scheduler
-        .file_monitor_read_at(&mut reader, vec![0; 4096], 0, cancellation)
-        .await;
+    let mut buffer = vec![0; 65536];
+    let result = async {
+        loop {
+            let (read, returned) = scheduler
+                .file_monitor_read(&mut reader, buffer, cancellation)
+                .await;
+            buffer = returned;
+            let count = read?;
+            if count == 0 {
+                return Ok(());
+            }
+            consume(&buffer[..count]);
+        }
+    }.await;
     scheduler.file_monitor_close(&mut reader).await?;
-    result?;
-    Ok(buffer)
+    result
 }
 ```
 
@@ -100,16 +113,25 @@ use core_scheduler::{Cancellation, Interest, OperationResult, SocketMonitoring, 
 async fn receive<S: SocketMonitoring>(
     scheduler: &S,
     socket: &S::Socket,
-    buffer: &mut [u8],
     cancellation: &Cancellation,
-) -> OperationResult<usize>
+    mut consume: impl FnMut(&[u8]),
+) -> OperationResult<()>
 where
     S::Socket: 'static,
 {
     let mut reader = scheduler.socket_stream_monitor(socket, Interest::Readable)?;
-    let result = scheduler
-        .socket_monitor_recv_poll(&mut reader, buffer, SocketRecvFlags::default(), cancellation)
-        .await;
+    let mut buffer = vec![0; 65536];
+    let result = async {
+        loop {
+            let count = scheduler
+                .socket_monitor_recv_poll(&mut reader, &mut buffer, SocketRecvFlags::default(), cancellation)
+                .await?;
+            if count == 0 {
+                return Ok(());
+            }
+            consume(&buffer[..count]);
+        }
+    }.await;
     scheduler.socket_monitor_close(&mut reader).await?;
     result
 }

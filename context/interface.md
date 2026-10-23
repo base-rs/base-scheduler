@@ -1,6 +1,6 @@
 # Scheduler interface reference
 
-This is an inventory of the portable `core-scheduler` capabilities and the separate selector integration hooks. The linked Rust traits define the exact signatures; [design](design.md) records the behavioral contracts and implementation decisions. Applications choose concrete schedulers. Protocol libraries request only the capabilities they use.
+This is an inventory of the portable `core-scheduler` capabilities and the separate selector integration hooks. The linked Rust traits define the exact signatures; [design](design.md) records the behavioral contracts and implementation decisions. Applications choose concrete schedulers. Protocol libraries request only the capabilities they use. Start with [I/O usage guidance](io.md) when choosing a composition; this reference inventories the available hooks.
 
 ## Reading the signatures
 
