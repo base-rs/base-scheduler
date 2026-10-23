@@ -1,6 +1,6 @@
 # Echo comparison with Tokio and Monoio
 
-The recommended Core monitor paths are close to pure Tokio across this fixed echo matrix, but the busy single-worker cases still miss a 5% throughput target. Monoio is broadly comparable to Tokio. The portable Native readiness selector remains substantially slower than the other fast paths.
+Core's Tokio and Native io_uring monitor paths are close to pure Tokio across this fixed echo matrix, but the busy single-worker cases still miss a 5% throughput target. Monoio is broadly comparable to Tokio. The portable Native readiness selector remains substantially slower than the other fast paths.
 
 These are closed-loop loopback workload measurements, including the shared client and networking. They are not independent measurements of server saturation or physical-network capacity. Three repetitions reveal repeatability for this run, not statistical equivalence across machines or workloads.
 
@@ -34,7 +34,7 @@ The important gaps are concentrated rather than uniform:
 
 - With one worker and 32 connections, the Core Tokio monitor adapter trails Tokio by 8.4% at 64 bytes and 7.1% at 4 KiB. Core Native io_uring monitors trail by 11.3% and 9.3%. Those repetitions do not overlap the Tokio throughput range.
 - With four workers and 32 connections, Core Native io_uring monitors are 2.1% behind Tokio at 64 bytes and 1.3% behind at 4 KiB. The Tokio adapter is 5.8% and 3.8% behind.
-- Single-connection monitor cases range from 3.2% behind to 0.2% ahead of Tokio. Differences this small should not be treated as a definitive ranking.
+- Single-connection cases for Core's Tokio and Native io_uring monitors range from 3.2% behind to 0.2% ahead of Tokio. Differences this small should not be treated as a definitive ranking.
 - Monoio io_uring is 0.8–1.3% ahead with one worker and 32 connections, and 4.7–4.8% behind with four workers and 32 connections. Monoio epoll is within 3% across this matrix.
 - Core Native readiness monitors trail by 22–41%. Core's owned io_uring path is also noticeably slower for a single connection sending 64-byte requests, despite being close for 4 KiB.
 
