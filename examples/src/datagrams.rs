@@ -1,0 +1,79 @@
+// Released under the MIT License.
+// Copyright, 2026, by Samuel Williams.
+
+use core_scheduler::{
+    Cancellation, OperationResult, SocketReceiving, SocketRecvFlags, SocketRecvMessage,
+    SocketRecvMsgReceiver, Spawn,
+};
+use std::{collections::VecDeque, io};
+
+/// Transfer complete messages, including peer metadata, to bounded independent tasks. The receiver never copies payloads for handoff.
+pub async fn receive<S, F>(
+    scheduler: &S,
+    socket: &S::Socket,
+    pool: S::Pool,
+    packets: usize,
+    concurrency: usize,
+    cancellation: &Cancellation,
+    process: F,
+) -> OperationResult<()>
+where
+    S: SocketReceiving + Spawn,
+    F: Fn(<S::PooledReceiver as SocketRecvMsgReceiver<S>>::Message) -> OperationResult<()>
+        + Clone
+        + Send
+        + 'static,
+{
+    if concurrency == 0 {
+        return Err(io::Error::new(io::ErrorKind::InvalidInput, "zero packet concurrency").into());
+    }
+    let mut receiver = scheduler
+        .socket_receiver(socket, pool, SocketRecvFlags::default(), cancellation)
+        .await?;
+    let mut tasks = VecDeque::with_capacity(concurrency);
+    let result: OperationResult<()> = async {
+        for _ in 0..packets {
+            if tasks.len() == concurrency {
+                let task: S::Handle<OperationResult<()>> = tasks.pop_front().unwrap();
+                task.await
+                    .map_err(|error| io::Error::other(error.to_string()))??;
+            }
+            let message = receiver
+                .recv(scheduler, cancellation)
+                .await?
+                .ok_or_else(|| {
+                    io::Error::new(
+                        io::ErrorKind::UnexpectedEof,
+                        "receiver ended before all packets arrived",
+                    )
+                })?;
+            if message.truncated() || message.control_truncated() {
+                return Err(
+                    io::Error::new(io::ErrorKind::InvalidData, "truncated datagram").into(),
+                );
+            }
+            let process = process.clone();
+            tasks.push_back(
+                scheduler
+                    .spawn(async move { process(message) })
+                    .map_err(io::Error::other)?,
+            );
+        }
+        Ok(())
+    }
+    .await;
+    let closed = receiver.close(scheduler).await;
+    // Owning task handles are awaited even after cancellation or a handler failure. Dropping them would abort accepted processing.
+    let mut drained = Ok(());
+    for task in tasks {
+        let result = task
+            .await
+            .map_err(|error| io::Error::other(error.to_string()))
+            .map_err(Into::into)
+            .and_then(|result| result);
+        drained = drained.and(result);
+    }
+    closed?;
+    result?;
+    drained
+}

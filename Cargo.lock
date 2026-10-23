@@ -320,6 +320,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "core-scheduler-examples"
+version = "0.0.0"
+dependencies = [
+ "core-scheduler",
+ "core-scheduler-direct",
+ "core-scheduler-iouring",
+ "core-scheduler-native",
+ "core-scheduler-tokio",
+ "futures-lite",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
 name = "core-scheduler-file-benchmark"
 version = "0.0.0"
 dependencies = [
