@@ -208,10 +208,4 @@ Drivers publish results and wake tasks; they never poll application futures from
 
 Constructors, `block_on`, worker counts, `selector()`, concrete admission `close`, and runtime `shutdown` belong to the chosen backend, not a universal scheduler trait. Tokio's adapter borrows an application-owned runtime which must remain alive and driven. Native owns its executor and composes selectors. Direct supplies a reference implementation. An application must keep execution services running while awaiting graceful cleanup.
 
-## Migration from the earlier receive interfaces
-
-Replace portable `socket_recvmsg_multishot(socket, options, flags, C)` with `buffer_pool(BufferPoolOptions::new(count, size))` followed by `socket_receiver(socket, pool, flags, C)`. A pool can be shared across connections. Use `SocketReceiving` as the construction bound and keep `SocketRecvMsgReceiver` for generic advancement. The portable path's capacity cancellation preserves usability; it does not inherit the old constructor's stronger cancellation-retirement guarantee.
-
-Explicit kernel experiments use `core_scheduler_iouring::RecvMsgMultishotOptions` and `scheduler.selector().socket_recvmsg_multishot(...)`. Advance and close that resource with the same selector. The concrete worker-provided pool factory is also backend-only. Neither mechanism is required of other schedulers.
-
-Remove cancellation arguments from `file_monitor_close`, `socket_monitor_close`, and concrete file/socket receiver `close`; their results are now `io::Result<()>`. Cancellation belongs to ordinary work. Graceful cleanup awaits successful retirement, drops retained resource handles, and then closes the exclusively owned file or socket.
+Concrete io_uring experiments expose `RecvMsgMultishotOptions` and `IoUringSelector::socket_recvmsg_multishot`. Native applications access the selector through `scheduler.selector()` and advance and close that resource with the same selector. The worker-provided pool factory is also backend-specific; neither mechanism is required of other schedulers.
