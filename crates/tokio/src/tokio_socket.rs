@@ -185,53 +185,7 @@ impl TokioSocket {
         }
         #[cfg(unix)]
         {
-            // Linux can report EPOLLHUP for an unconnected TCP socket; Tokio retains closed readiness permanently, which would spin after the socket later connects and a syscall returns WouldBlock. Register only after a syscall needs to wait, then reuse the registration on subsequent waits.
-            let registration = match self.inner.registration.get() {
-                Some(registration) => registration,
-                None => self.inner.registration().await?,
-            };
-            let interest = match interest {
-                Interest::Readable => tokio::io::Interest::READABLE,
-                Interest::Writable => tokio::io::Interest::WRITABLE,
-            };
-            // Tokio's poll methods keep one waker per direction. Reserve that slot for one operation until completion or drop; concurrent operations use Tokio's independent multi-waiter list. Forgetting a reservation only leaves later operations on the multi-waiter path.
-            let waiting = if interest == tokio::io::Interest::READABLE {
-                &self.inner.read_waiting
-            } else {
-                &self.inner.write_waiting
-            };
-            if waiting
-                .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
-                .is_err()
-            {
-                loop {
-                    let mut ready = registration.ready(interest).await?;
-                    if let Ok(result) = ready.try_io(|_| operation(self.inner.get_ref())) {
-                        if mark_connected && result.is_ok() {
-                            self.inner.connected_stream.store(true, Ordering::Relaxed);
-                        }
-                        return result;
-                    }
-                }
-            }
-            let _waiter = PollWaiter(waiting);
-            std::future::poll_fn(|context| {
-                loop {
-                    let mut ready =
-                        std::task::ready!(if interest == tokio::io::Interest::READABLE {
-                            registration.poll_read_ready(context)
-                        } else {
-                            registration.poll_write_ready(context)
-                        })?;
-                    if let Ok(result) = ready.try_io(|_| operation(self.inner.get_ref())) {
-                        if mark_connected && result.is_ok() {
-                            self.inner.connected_stream.store(true, Ordering::Relaxed);
-                        }
-                        return std::task::Poll::Ready(result);
-                    }
-                }
-            })
-            .await
+            self.ready_io(interest, operation, mark_connected).await
         }
 
         #[cfg(windows)]
@@ -246,6 +200,79 @@ impl TokioSocket {
                 Interest::Writable => self.inner.write_with(|socket| operation(socket)).await,
             }
         }
+    }
+
+    pub(super) async fn wait(&self, interest: Interest) -> io::Result<()> {
+        #[cfg(unix)]
+        if self.inner.registration.get().is_some() {
+            // A registered socket already has advisory readiness state. Waiting on it needs no extra poll(2) probe before or after Tokio wakes us.
+            return self.ready_io(interest, |_| Ok(()), false).await;
+        }
+        // Preserve syscall-first handling of unregistered sockets, including unconnected streams whose hangup must not become permanently cached readiness.
+        self.io_with(
+            interest,
+            |socket| crate::socket_io::wait(socket, interest),
+            false,
+        )
+        .await
+    }
+
+    #[cfg(unix)]
+    async fn ready_io<Output, Operation>(
+        &self,
+        interest: Interest,
+        mut operation: Operation,
+        mark_connected: bool,
+    ) -> io::Result<Output>
+    where
+        Operation: FnMut(&socket2::Socket) -> io::Result<Output> + Send,
+    {
+        // Linux can report EPOLLHUP for an unconnected TCP socket; Tokio retains closed readiness permanently, which would spin after the socket later connects and a syscall returns WouldBlock. Register only after a syscall needs to wait, then reuse the registration on subsequent waits.
+        let registration = match self.inner.registration.get() {
+            Some(registration) => registration,
+            None => self.inner.registration().await?,
+        };
+        let interest = match interest {
+            Interest::Readable => tokio::io::Interest::READABLE,
+            Interest::Writable => tokio::io::Interest::WRITABLE,
+        };
+        // Tokio's poll methods keep one waker per direction. Reserve that slot for one operation until completion or drop; concurrent operations use Tokio's independent multi-waiter list. Forgetting a reservation only leaves later operations on the multi-waiter path.
+        let waiting = if interest == tokio::io::Interest::READABLE {
+            &self.inner.read_waiting
+        } else {
+            &self.inner.write_waiting
+        };
+        if waiting
+            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+            .is_err()
+        {
+            loop {
+                let mut ready = registration.ready(interest).await?;
+                if let Ok(result) = ready.try_io(|_| operation(self.inner.get_ref())) {
+                    if mark_connected && result.is_ok() {
+                        self.inner.connected_stream.store(true, Ordering::Relaxed);
+                    }
+                    return result;
+                }
+            }
+        }
+        let _waiter = PollWaiter(waiting);
+        std::future::poll_fn(|context| {
+            loop {
+                let mut ready = std::task::ready!(if interest == tokio::io::Interest::READABLE {
+                    registration.poll_read_ready(context)
+                } else {
+                    registration.poll_write_ready(context)
+                })?;
+                if let Ok(result) = ready.try_io(|_| operation(self.inner.get_ref())) {
+                    if mark_connected && result.is_ok() {
+                        self.inner.connected_stream.store(true, Ordering::Relaxed);
+                    }
+                    return std::task::Poll::Ready(result);
+                }
+            }
+        })
+        .await
     }
 
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
