@@ -3,11 +3,16 @@
 
 use crate::{
     BufferPool, Cancellation, HeapBufferPool, MonitorStorage, OperationResult, ReceiveBuffer,
-    RecvMsgMultishotMessage, SocketMonitorState, SocketMonitoring, SocketRecvFlags, SocketType,
+    SocketMonitorState, SocketMonitoring, SocketRecvFlags, SocketRecvMessage, SocketType,
 };
-use std::io::{self, IoSliceMut};
+use std::{
+    future::poll_fn,
+    io::{self, IoSliceMut},
+    pin::pin,
+    task::Poll,
+};
 
-/// A demand-driven receiver composed from a readable socket monitor and a shared pool. Works with general and stream monitors; it does not spawn a task, receive ahead, or allocate per message. Backends offering kernel receive-ahead retain their separate receiver implementation.
+/// A demand-driven receiver composed from a readable socket monitor and a shared pool. Works with general and stream monitors; it does not spawn a task, receive ahead, or allocate per message. A pending socket receive returns its buffer before waiting for readiness, so idle connections do not reserve pool capacity. Backends offering kernel receive-ahead retain their separate receiver implementation.
 pub struct SocketReceiver<Monitor: crate::MonitorState, Pool: BufferPool = HeapBufferPool> {
     monitor: MonitorStorage<Monitor>,
     pool: Pool,
@@ -43,7 +48,7 @@ impl<M: crate::MonitorState, P: BufferPool> SocketReceiver<M, P> {
         &mut self,
         scheduler: &S,
         cancellation: &Cancellation,
-    ) -> OperationResult<Option<RecvMsgMultishotMessage<P::Buffer>>>
+    ) -> OperationResult<Option<SocketRecvMessage<P::Buffer>>>
     where
         S: SocketMonitoring,
         S::Socket: 'static,
@@ -53,19 +58,34 @@ impl<M: crate::MonitorState, P: BufferPool> SocketReceiver<M, P> {
         if self.terminal {
             return Ok(None);
         }
-        let mut buffer = self.pool.acquire(cancellation).await?;
-        let result = scheduler
-            .socket_monitor_recvmsg_poll(
-                &mut self.monitor,
-                &mut [IoSliceMut::new(buffer.as_mut())],
-                self.flags,
-                cancellation,
-            )
-            .await;
+        let result = loop {
+            let mut buffer = self.pool.acquire(cancellation).await?;
+            let result = {
+                let mut buffers = [IoSliceMut::new(buffer.as_mut())];
+                let mut receiving = pin!(scheduler.socket_monitor_recvmsg_poll(
+                    &mut self.monitor,
+                    &mut buffers,
+                    self.flags,
+                    cancellation,
+                ));
+                poll_fn(|context| Poll::Ready(receiving.as_mut().poll(context))).await
+            };
+            match result {
+                Poll::Ready(result) => break result.map(|result| (result, buffer)),
+                Poll::Pending => drop(buffer),
+            }
+            // No message was consumed. Return scarce storage before waiting, and retry after advisory readiness without reserving a buffer for an idle connection.
+            if let Err(error) = scheduler
+                .socket_monitor_wait(&mut self.monitor, cancellation)
+                .await
+            {
+                break Err(error);
+            }
+        };
         match result {
-            Ok(result) if !self.stream || result.bytes != 0 => {
+            Ok((result, mut buffer)) if !self.stream || result.bytes != 0 => {
                 buffer.truncate(result.bytes);
-                Ok(Some(RecvMsgMultishotMessage { result, buffer }))
+                Ok(Some(SocketRecvMessage { result, buffer }))
             }
             Ok(_) => {
                 self.terminal = true;
@@ -116,7 +136,7 @@ where
         &mut self,
         scheduler: &S,
         cancellation: &Cancellation,
-    ) -> OperationResult<Option<RecvMsgMultishotMessage<P::Buffer>>> {
+    ) -> OperationResult<Option<SocketRecvMessage<P::Buffer>>> {
         SocketReceiver::recv(self, scheduler, cancellation).await
     }
     async fn close(&mut self, scheduler: &S) -> io::Result<()> {

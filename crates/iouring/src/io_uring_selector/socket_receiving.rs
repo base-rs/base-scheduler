@@ -186,7 +186,7 @@ impl PendingRequest for PooledReceive {
         let length = payload.len();
         let truncated = parsed.is_payload_truncated();
         let control_truncated = parsed.is_control_data_truncated();
-        let message = core_scheduler::RecvMsgMultishotMessage {
+        let message = core_scheduler::SocketRecvMessage {
             result: SocketRecvResult {
                 bytes: length,
                 address,

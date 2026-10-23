@@ -18,6 +18,78 @@ fn cancelled<T>(result: OperationResult<T>) {
     assert!(matches!(result, Err(OperationError::Cancelled(_))));
 }
 
+/// With a queued datagram, a fresh borrowed message receive must attempt and complete in its first poll. Empty datagrams also consume a message and cannot be withheld across `Pending`.
+pub async fn datagram_first_poll<S>(scheduler: &S, sender: &S::Socket, receiver: &S::Socket)
+where
+    S: SocketMonitoring + SocketSendMsgPoll + SocketLocalAddress,
+    S::Socket: 'static,
+{
+    let never = Cancellation::never();
+    let destination = scheduler.socket_local_address(receiver).unwrap();
+    let mut monitor = scheduler
+        .socket_monitor(receiver, Interest::Readable)
+        .unwrap();
+    for monitored in [false, true] {
+        for payload in [b"".as_slice(), b"x"] {
+            assert_eq!(
+                scheduler
+                    .socket_sendmsg_poll(
+                        sender,
+                        &[IoSlice::new(payload)],
+                        Some(destination),
+                        SocketSendFlags::default(),
+                        &never,
+                    )
+                    .await
+                    .unwrap(),
+                payload.len()
+            );
+            // Peek confirms that the actual datagram is queued; advisory readiness alone could be spurious.
+            let mut peek = [0];
+            assert_eq!(
+                scheduler
+                    .socket_recvmsg_poll(
+                        receiver,
+                        &mut [IoSliceMut::new(&mut peek)],
+                        SocketRecvFlags { peek: true },
+                        &never,
+                    )
+                    .await
+                    .unwrap()
+                    .bytes,
+                payload.len()
+            );
+            let mut target = [0x5a];
+            let mut buffers = [IoSliceMut::new(&mut target)];
+            let result = if monitored {
+                poll_once(pin!(scheduler.socket_monitor_recvmsg_poll(
+                    &mut monitor,
+                    &mut buffers,
+                    SocketRecvFlags::default(),
+                    &never,
+                )))
+                .await
+            } else {
+                poll_once(pin!(scheduler.socket_recvmsg_poll(
+                    receiver,
+                    &mut buffers,
+                    SocketRecvFlags::default(),
+                    &never,
+                )))
+                .await
+            }
+            .expect("a fresh borrowed receive deferred its first attempt on a readable socket")
+            .unwrap();
+            assert_eq!(result.bytes, payload.len());
+            assert_eq!(&target[..payload.len()], payload);
+        }
+    }
+    scheduler
+        .socket_monitor_close(&mut monitor, &never)
+        .await
+        .unwrap();
+}
+
 /// Pre-cancelled scalar operations leave storage and the receive queue unchanged. Unpolled operations perform no I/O.
 pub async fn scalar_pre_cancelled<S: SocketRecvPoll + SocketSendPoll>(
     scheduler: &S,

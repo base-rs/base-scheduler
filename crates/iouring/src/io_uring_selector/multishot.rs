@@ -10,7 +10,7 @@ pub(crate) mod pool;
 use pool::Pool;
 
 pub use core_scheduler::RecvMsgMultishotOptions;
-pub type RecvMsgMultishotMessage = core_scheduler::RecvMsgMultishotMessage<RecvMsgBuffer>;
+pub type SocketRecvMessage = core_scheduler::SocketRecvMessage<RecvMsgBuffer>;
 
 /// Counters for verifying persistent submissions and pool pressure.
 #[derive(Clone, Copy, Debug, Default)]
@@ -48,7 +48,7 @@ impl Drop for RecvMsgBuffer {
 }
 
 pub(super) struct Received<B: IoBuf = RecvMsgBuffer> {
-    pub(super) messages: VecDeque<core_scheduler::RecvMsgMultishotMessage<B>>,
+    pub(super) messages: VecDeque<core_scheduler::SocketRecvMessage<B>>,
     retired: bool,
     error: Option<io::Error>,
     pub(super) statistics: RecvMsgMultishotStatistics,
@@ -76,7 +76,7 @@ impl<B: IoBuf> Default for State<B> {
     }
 }
 impl<B: IoBuf> State<B> {
-    fn next(&self) -> Option<OperationResult<Option<core_scheduler::RecvMsgMultishotMessage<B>>>> {
+    fn next(&self) -> Option<OperationResult<Option<core_scheduler::SocketRecvMessage<B>>>> {
         let mut received = self.received.lock().unwrap();
         if let Some(message) = received.messages.pop_front() {
             Some(Ok(Some(message)))
@@ -115,7 +115,7 @@ impl<B: IoBuf> RecvMsgMultishot<B> {
     async fn receive(
         &mut self,
         cancellation: &Cancellation,
-    ) -> OperationResult<Option<core_scheduler::RecvMsgMultishotMessage<B>>> {
+    ) -> OperationResult<Option<core_scheduler::SocketRecvMessage<B>>> {
         let mut cancelled = pin!(cancellation.cancelled());
         loop {
             // Completed batches need no listener registration. Listen and recheck only when the queue is empty, closing the race with completion publication.
@@ -190,7 +190,7 @@ impl<B: IoBuf> core_scheduler::SocketRecvMsgReceiver<IoUringSelector> for RecvMs
         &mut self,
         scheduler: &IoUringSelector,
         cancellation: &Cancellation,
-    ) -> OperationResult<Option<core_scheduler::RecvMsgMultishotMessage<B>>> {
+    ) -> OperationResult<Option<core_scheduler::SocketRecvMessage<B>>> {
         cancellation.check()?;
         self.check_selector(scheduler)?;
         self.receive(cancellation).await
@@ -398,7 +398,7 @@ impl PendingRequest for MultiRequest {
             }
             .as_socket()
         };
-        let message = RecvMsgMultishotMessage {
+        let message = SocketRecvMessage {
             result: SocketRecvResult {
                 bytes: payload.len(),
                 address,

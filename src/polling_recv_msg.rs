@@ -2,8 +2,8 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::{
-    Cancellation, Cancelled, IoBuf, OperationResult, RecvMsgMultishotMessage,
-    RecvMsgMultishotOptions, SocketRecvFlags, SocketRecvMsgPoll, SocketRecvMsgReceiver, SocketType,
+    Cancellation, Cancelled, IoBuf, OperationResult, RecvMsgMultishotOptions, SocketRecvFlags,
+    SocketRecvMessage, SocketRecvMsgPoll, SocketRecvMsgReceiver, SocketType,
 };
 use event_listener::Event;
 use std::{
@@ -152,7 +152,7 @@ where
         &mut self,
         scheduler: &S,
         cancellation: &Cancellation,
-    ) -> OperationResult<Option<RecvMsgMultishotMessage<Self::Buffer>>> {
+    ) -> OperationResult<Option<SocketRecvMessage<Self::Buffer>>> {
         cancellation.check()?;
         let Some(receiving) = &self.receiving else {
             return Ok(None);
@@ -174,7 +174,7 @@ where
             )
             .await;
         match result {
-            Ok(result) if !self.stream || result.bytes != 0 => Ok(Some(RecvMsgMultishotMessage {
+            Ok(result) if !self.stream || result.bytes != 0 => Ok(Some(SocketRecvMessage {
                 result,
                 buffer: PollingRecvMsgBuffer {
                     lease,

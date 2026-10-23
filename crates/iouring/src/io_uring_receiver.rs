@@ -23,7 +23,7 @@ impl SocketRecvMsgReceiver<IoUringSelector> for IoUringReceiver {
         &mut self,
         scheduler: &IoUringSelector,
         cancellation: &Cancellation,
-    ) -> OperationResult<Option<RecvMsgMultishotMessage<Self::Buffer>>> {
+    ) -> OperationResult<Option<SocketRecvMessage<Self::Buffer>>> {
         match &mut self.0 {
             Strategy::Demand(receiver) => receiver.recv(scheduler, cancellation).await,
             Strategy::Provided(receiver) => receiver.recv(scheduler, cancellation).await,

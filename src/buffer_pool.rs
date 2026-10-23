@@ -12,6 +12,7 @@ use std::future::Future;
 pub trait BufferPool: Clone + Send + Sync + 'static {
     type Buffer: ReceiveBuffer;
 
+    /// Total slot capacity, including leased and published buffers, rather than the number currently free. Worker-local caches are part of this total.
     fn capacity(&self) -> usize;
     fn buffer_size(&self) -> usize;
     fn alignment(&self) -> usize;

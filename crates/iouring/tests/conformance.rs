@@ -443,6 +443,12 @@ fn pooled_socket_receivers_work_on_worker_owned_rings() {
             let (sender, socket) =
                 core_scheduler_conformance::socket::stream_pair(owned.as_ref(), SocketDomain::Ipv4)
                     .await;
+            core_scheduler_conformance::socket_receiving::demand_driven(
+                owned.as_ref(),
+                &sender,
+                &socket,
+            )
+            .await;
             core_scheduler_conformance::socket_receiving::stream(owned.as_ref(), &sender, &socket)
                 .await;
             owned.socket_close(sender).await.unwrap();
@@ -464,6 +470,12 @@ fn pooled_socket_receivers_work_on_worker_owned_rings() {
                 .socket_bind(&socket, "127.0.0.1:0".parse().unwrap(), &never)
                 .await
                 .unwrap();
+            core_scheduler_conformance::socket_poll::datagram_first_poll(
+                owned.as_ref(),
+                &sender,
+                &socket,
+            )
+            .await;
             core_scheduler_conformance::socket_receiving::datagram(
                 owned.as_ref(),
                 &sender,

@@ -6,6 +6,58 @@ use core_scheduler::*;
 use futures_lite::future::poll_once;
 use std::pin::pin;
 
+/// Demand-driven monitors must release storage while idle, share one slot across connections, and resume after their bufferless readiness wait is woken.
+pub async fn demand_driven<S>(scheduler: &S, sender: &S::Socket, socket: &S::Socket)
+where
+    S: SocketMonitoring + BufferPooling + SocketWrite,
+    S::Socket: 'static,
+{
+    let never = Cancellation::never();
+    let pool = scheduler.buffer_pool(BufferPoolOptions::new(1, 8)).unwrap();
+    let mut idle = SocketReceiver::new(
+        scheduler
+            .socket_monitor(sender, Interest::Readable)
+            .unwrap(),
+        pool.clone(),
+        SocketType::Stream,
+        SocketRecvFlags::default(),
+    )
+    .unwrap();
+    let mut active = SocketReceiver::new(
+        scheduler
+            .socket_monitor(socket, Interest::Readable)
+            .unwrap(),
+        pool.clone(),
+        SocketType::Stream,
+        SocketRecvFlags::default(),
+    )
+    .unwrap();
+    {
+        let mut waiting = pin!(idle.recv(scheduler, &never));
+        assert!(poll_once(waiting.as_mut()).await.is_none());
+        assert!(
+            pool.try_acquire().is_some(),
+            "an idle connection must not reserve storage"
+        );
+        let (sent, _) = scheduler.socket_write(sender, b"a".to_vec(), &never).await;
+        assert_eq!(sent.unwrap(), 1);
+        let message = active.recv(scheduler, &never).await.unwrap().unwrap();
+        assert_eq!(message.buffer.as_ref(), b"a");
+        drop(message);
+        let (sent, _) = scheduler.socket_write(socket, b"b".to_vec(), &never).await;
+        assert_eq!(sent.unwrap(), 1);
+        let message = waiting.await.unwrap().unwrap();
+        assert_eq!(message.buffer.as_ref(), b"b");
+    }
+    SocketRecvMsgReceiver::close(&mut idle, scheduler)
+        .await
+        .unwrap();
+    SocketRecvMsgReceiver::close(&mut active, scheduler)
+        .await
+        .unwrap();
+    assert!(pool.try_acquire().is_some());
+}
+
 pub async fn stream<S>(scheduler: &S, sender: &S::Socket, socket: &S::Socket)
 where
     S: SocketReceiving + SocketWrite + SocketShutdown,

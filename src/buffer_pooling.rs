@@ -18,14 +18,16 @@ use std::io;
 ///     cancellation: &Cancellation) -> OperationResult<()> {
 ///     let pool = scheduler.buffer_pool(BufferPoolOptions::new(128, 64 * 1024))?;
 ///     let mut receiver = scheduler.socket_receiver(socket, pool, SocketRecvFlags::default(), cancellation).await?;
-///     if let Some(message) = receiver.recv(scheduler, cancellation).await? {
+///     let received = receiver.recv(scheduler, cancellation).await;
+///     // Retire reception even when the receive wait was cancelled or failed.
+///     receiver.close(scheduler).await?;
+///     if let Some(message) = received? {
 ///         // Parse or decrypt through message.buffer.as_mut() before freezing.
 ///         let frozen = message.buffer.freeze();
 ///         let frame = frozen.clone().slice(..);
 ///         // Either owner can move to another worker; the slot stays unavailable until both retire.
 ///         drop((frame, frozen));
 ///     }
-///     receiver.close(scheduler).await?;
 ///     Ok(())
 /// }
 /// ```

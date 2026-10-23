@@ -136,12 +136,16 @@ mod ipv4 {
     #[test]
     fn pooled_stream_receiver() {
         run_stream_case(async |scheduler, sender, socket| {
+            core_scheduler_conformance::socket_receiving::demand_driven(scheduler, sender, socket)
+                .await;
             core_scheduler_conformance::socket_receiving::stream(scheduler, sender, socket).await;
         });
     }
     #[test]
     fn pooled_datagram_receiver() {
         run_datagram_case(async |scheduler, sender, socket| {
+            core_scheduler_conformance::socket_poll::datagram_first_poll(scheduler, sender, socket)
+                .await;
             core_scheduler_conformance::socket_receiving::datagram(scheduler, sender, socket).await;
         });
     }
@@ -186,12 +190,16 @@ mod ipv6 {
     #[test]
     fn pooled_stream_receiver() {
         run_stream_case(async |scheduler, sender, socket| {
+            core_scheduler_conformance::socket_receiving::demand_driven(scheduler, sender, socket)
+                .await;
             core_scheduler_conformance::socket_receiving::stream(scheduler, sender, socket).await;
         });
     }
     #[test]
     fn pooled_datagram_receiver() {
         run_datagram_case(async |scheduler, sender, socket| {
+            core_scheduler_conformance::socket_poll::datagram_first_poll(scheduler, sender, socket)
+                .await;
             core_scheduler_conformance::socket_receiving::datagram(scheduler, sender, socket).await;
         });
     }

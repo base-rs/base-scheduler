@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Name owned receive results `SocketRecvMessage` across polling and multishot backends. Return pooled socket buffers before readiness waits so idle connections cannot reserve the shared budget, and document cancellation, explicit retirement, and future pool growth and caching boundaries.
+
 - Distribute new Native tasks round-robin across worker queues before their first poll, reusing the admission lock and removing the shared unassigned-task queue. Preserve worker-local wakes and idle stealing without adding per-operation load counters.
 
 - Reuse persistent slab ownership claims across heap buffer checkout, freezing, and return. Notify only while capacity waiters are registered, preserving the public buffer interface, stable storage, and cross-thread teardown safety.

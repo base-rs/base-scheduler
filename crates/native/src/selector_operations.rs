@@ -409,7 +409,7 @@ where
         &mut self,
         scheduler: &NativeScheduler<S>,
         cancellation: &Cancellation,
-    ) -> OperationResult<Option<RecvMsgMultishotMessage<Self::Buffer>>> {
+    ) -> OperationResult<Option<SocketRecvMessage<Self::Buffer>>> {
         self.0.recv(scheduler.selector(), cancellation).await
     }
 
