@@ -542,6 +542,18 @@ fn cancelled_and_dropped_waiters_leave_the_registration_active() {
             .kind(),
         io::ErrorKind::WouldBlock
     );
+    let mut unavailable = [0];
+    assert_eq!(
+        block_on(selector.socket_monitor_recv_poll(
+            &mut alias,
+            &mut unavailable,
+            SocketRecvFlags::default(),
+            &never
+        ))
+        .unwrap_err()
+        .kind(),
+        io::ErrorKind::WouldBlock
+    );
     assert_eq!(
         block_on(selector.socket_monitor_close(&mut alias))
             .unwrap_err()
@@ -867,6 +879,17 @@ fn incompatible_closed_selectors_and_exhausted_ids_reject_waits() {
         block_on(selector.socket_monitor_wait(&mut reader, &Cancellation::never()))
             .unwrap_err()
             .kind(),
+        io::ErrorKind::Other
+    );
+    assert_eq!(
+        block_on(selector.socket_monitor_recv_poll(
+            &mut reader,
+            &mut byte,
+            SocketRecvFlags::default(),
+            &Cancellation::never()
+        ))
+        .unwrap_err()
+        .kind(),
         io::ErrorKind::Other
     );
     selector.close();
