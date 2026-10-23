@@ -1,0 +1,185 @@
+diff --git a/crates/iouring/src/io_uring_selector/monitor.rs b/crates/iouring/src/io_uring_selector/monitor.rs
+index 5ae89db..04729f3 100644
+--- a/crates/iouring/src/io_uring_selector/monitor.rs
++++ b/crates/iouring/src/io_uring_selector/monitor.rs
+@@ -163,7 +163,6 @@ impl IoUringSelector {
+         cancellation: &Cancellation,
+     ) -> OperationResult<()> {
+         let state = monitor.as_ref();
+-        let registration = state.registration();
+         cancellation.check()?;
+         self.check_monitor(state)?;
+         let _wait = Wait::claim(state)?;
+@@ -175,61 +174,72 @@ impl IoUringSelector {
+                 return Poll::Ready(Err(core_scheduler::Cancelled.into()));
+             }
+             self.check_monitor(state)?;
+-            let replacement = context.waker().clone();
+-            let (previous, submission, retirement) = {
+-                let mut status = registration.status.lock().unwrap();
+-                if !status.retiring {
+-                    if let Some(error) = status.error.take() {
+-                        return Poll::Ready(Err(error.into()));
+-                    }
+-                    if registration.readiness.load(Ordering::Acquire) & READY != 0 {
+-                        return Poll::Ready(Ok(()));
+-                    }
+-                }
+-                let mut submission = None;
+-                let mut retirement = None;
+-                if status.pending {
+-                    if !status.retiring && !status.binding.as_ref().unwrap().matches(&controller) {
+-                        status.retiring = true;
+-                        let binding = status.binding.as_ref().unwrap();
+-                        retirement = Some((
+-                            Arc::clone(&binding.controller),
+-                            binding.state.token,
+-                            binding.state.generation,
+-                        ));
+-                    }
+-                } else {
+-                    let generation = controller.next_identifier()?;
+-                    status.binding = Some(RingBinding::new(
+-                        &controller,
+-                        PollRegistration {
+-                            generation,
+-                            token: state as *const State as u64 | MONITOR_TAG,
+-                        },
+-                    ));
+-                    status.retiring = false;
+-                    status.pending = true;
+-                    submission = Some(Submission::new(
+-                        monitor.retained_project(AsRef::as_ref),
+-                        Arc::clone(&registration.status),
+-                        generation,
+-                    ));
+-                }
+-                (status.waker.replace(replacement), submission, retirement)
+-            };
+-            discard(previous);
+-            if let Some((controller, token, generation)) = retirement {
+-                discard(controller.send(Command::MonitorCancel(token, generation)));
+-            }
+-            // Rejection drops the submission, publishes BrokenPipe and releases backend retention.
+-            if let Some(submission) = submission {
+-                discard(controller.send(Command::MonitorSubmit(submission)));
+-            }
+-            Poll::Pending
++            self.poll_monitor_wait(monitor, &controller, context)
+         })
+         .await
+     }
+ 
++    fn poll_monitor_wait<M: SocketMonitorState<NativeSocket, IoUringMonitorRegistration>>(
++        &self,
++        monitor: &MonitorStorage<M>,
++        controller: &Arc<Controller>,
++        context: &mut std::task::Context<'_>,
++    ) -> Poll<OperationResult<()>> {
++        let state = monitor.as_ref();
++        let registration = state.registration();
++        let replacement = context.waker().clone();
++        let (previous, submission, retirement) = {
++            let mut status = registration.status.lock().unwrap();
++            if !status.retiring {
++                if let Some(error) = status.error.take() {
++                    return Poll::Ready(Err(error.into()));
++                }
++                if registration.readiness.load(Ordering::Acquire) & READY != 0 {
++                    return Poll::Ready(Ok(()));
++                }
++            }
++            let mut submission = None;
++            let mut retirement = None;
++            if status.pending {
++                if !status.retiring && !status.binding.as_ref().unwrap().matches(controller) {
++                    status.retiring = true;
++                    let binding = status.binding.as_ref().unwrap();
++                    retirement = Some((
++                        Arc::clone(&binding.controller),
++                        binding.state.token,
++                        binding.state.generation,
++                    ));
++                }
++            } else {
++                let generation = controller.next_identifier()?;
++                status.binding = Some(RingBinding::new(
++                    controller,
++                    PollRegistration {
++                        generation,
++                        token: state as *const State as u64 | MONITOR_TAG,
++                    },
++                ));
++                status.retiring = false;
++                status.pending = true;
++                submission = Some(Submission::new(
++                    monitor.retained_project(AsRef::as_ref),
++                    Arc::clone(&registration.status),
++                    generation,
++                ));
++            }
++            (status.waker.replace(replacement), submission, retirement)
++        };
++        discard(previous);
++        if let Some((controller, token, generation)) = retirement {
++            discard(controller.send(Command::MonitorCancel(token, generation)));
++        }
++        // Rejection drops the submission, publishes BrokenPipe and releases backend retention.
++        if let Some(submission) = submission {
++            discard(controller.send(Command::MonitorSubmit(submission)));
++        }
++        Poll::Pending
++    }
++
+     async fn monitor_close<M: SocketMonitorState<NativeSocket, IoUringMonitorRegistration>>(
+         &self,
+         monitor: &MonitorStorage<M>,
+@@ -268,23 +278,33 @@ impl IoUringSelector {
+     ) -> OperationResult<T> {
+         let state = monitor.as_ref();
+         let registration = state.registration();
+-        cancellation.check()?;
+-        self.check_monitor(state)?;
+-        state.check_interest(interest)?;
+-        loop {
+-            let readiness = registration.readiness.load(Ordering::Acquire);
+-            match operation(state.socket()) {
+-                Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+-                    registration.clear_readiness(readiness);
+-                    self.monitor_wait(monitor, cancellation).await?
++        let mut wait = None;
++        let mut cancelled = pin!(cancellation.cancelled());
++        poll_fn(|context| {
++            loop {
++                cancellation.check()?;
++                self.check_monitor(state)?;
++                state.check_interest(interest)?;
++                let readiness = registration.readiness.load(Ordering::Acquire);
++                match operation(state.socket()) {
++                    Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
++                        registration.clear_readiness(readiness);
++                        // Keep a single waiter and its original route until this operation completes. A wake retries the syscall before touching readiness bookkeeping.
++                        if wait.is_none() {
++                            wait = Some((Wait::claim(state)?, self.route()));
++                        }
++                        if cancelled.as_mut().poll(context).is_ready() {
++                            return Poll::Ready(Err(core_scheduler::Cancelled.into()));
++                        }
++                        let (_, controller) = wait.as_ref().unwrap();
++                        std::task::ready!(self.poll_monitor_wait(monitor, controller, context))?;
++                    }
++                    Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
++                    result => return Poll::Ready(result.map_err(Into::into)),
+                 }
+-                Err(error) if error.kind() == io::ErrorKind::Interrupted => {
+-                    cancellation.check()?;
+-                    self.check_monitor(state)?;
+-                }
+-                result => return result.map_err(Into::into),
+             }
+-        }
++        })
++        .await
+     }
+ }
+ 

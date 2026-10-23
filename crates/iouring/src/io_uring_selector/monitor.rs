@@ -179,6 +179,7 @@ impl IoUringSelector {
         .await
     }
 
+    // The caller holds the waiter claim and checks cancellation and monitor compatibility before attempting readiness.
     fn poll_monitor_wait<M: SocketMonitorState<NativeSocket, IoUringMonitorRegistration>>(
         &self,
         monitor: &MonitorStorage<M>,

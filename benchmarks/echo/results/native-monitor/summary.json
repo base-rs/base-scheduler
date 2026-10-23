@@ -1,0 +1,790 @@
+{
+  "cleanup.json": [
+    {
+      "workers": 1,
+      "connections": 32,
+      "bytes": 64,
+      "variants": {
+        "baseline": {
+          "samples": 5,
+          "median": 623925.0,
+          "minimum": 622293.0,
+          "maximum": 630440.3333333334,
+          "change_percent": 0.0,
+          "rtt_p99_us": 55.423
+        },
+        "tokio": {
+          "samples": 5,
+          "median": 711162.0,
+          "minimum": 704893.6666666666,
+          "maximum": 717779.6666666666,
+          "change_percent": 13.981968986657044,
+          "rtt_p99_us": 52.703
+        },
+        "cleanup": {
+          "samples": 5,
+          "median": 632576.3333333334,
+          "minimum": 630560.6666666666,
+          "maximum": 634949.3333333334,
+          "change_percent": 1.3865982823790368,
+          "rtt_p99_us": 54.879
+        }
+      }
+    },
+    {
+      "workers": 1,
+      "connections": 32,
+      "bytes": 4096,
+      "variants": {
+        "baseline": {
+          "samples": 5,
+          "median": 569690.0,
+          "minimum": 566864.3333333334,
+          "maximum": 572053.0,
+          "change_percent": 0.0,
+          "rtt_p99_us": 60.831
+        },
+        "tokio": {
+          "samples": 5,
+          "median": 632170.6666666666,
+          "minimum": 629972.6666666666,
+          "maximum": 640850.0,
+          "change_percent": 10.967485240510921,
+          "rtt_p99_us": 58.879
+        },
+        "cleanup": {
+          "samples": 5,
+          "median": 571252.6666666666,
+          "minimum": 568812.3333333334,
+          "maximum": 573599.6666666666,
+          "change_percent": 0.2743012281533064,
+          "rtt_p99_us": 60.735
+        }
+      }
+    }
+  ],
+  "fused.json": [
+    {
+      "workers": 1,
+      "connections": 1,
+      "bytes": 64,
+      "variants": {
+        "tokio": {
+          "samples": 5,
+          "median": 276785.6666666667,
+          "minimum": 275425.3333333333,
+          "maximum": 280428.3333333333,
+          "change_percent": 1.0295719039536744,
+          "rtt_p99_us": 4.231
+        },
+        "baseline": {
+          "samples": 5,
+          "median": 273965.0,
+          "minimum": 271234.6666666667,
+          "maximum": 277031.0,
+          "change_percent": 0.0,
+          "rtt_p99_us": 4.283
+        },
+        "fused": {
+          "samples": 5,
+          "median": 276003.6666666667,
+          "minimum": 274621.3333333333,
+          "maximum": 281221.6666666667,
+          "change_percent": 0.744133983051376,
+          "rtt_p99_us": 4.263
+        }
+      }
+    },
+    {
+      "workers": 1,
+      "connections": 1,
+      "bytes": 4096,
+      "variants": {
+        "tokio": {
+          "samples": 5,
+          "median": 241239.0,
+          "minimum": 240204.33333333334,
+          "maximum": 242550.33333333334,
+          "change_percent": -0.39705368275891884,
+          "rtt_p99_us": 5.291
+        },
+        "fused": {
+          "samples": 5,
+          "median": 242350.66666666666,
+          "minimum": 238506.33333333334,
+          "maximum": 249693.66666666666,
+          "change_percent": 0.061932116894802824,
+          "rtt_p99_us": 5.263
+        },
+        "baseline": {
+          "samples": 5,
+          "median": 242200.66666666666,
+          "minimum": 235614.0,
+          "maximum": 246375.66666666666,
+          "change_percent": 0.0,
+          "rtt_p99_us": 5.251
+        }
+      }
+    },
+    {
+      "workers": 1,
+      "connections": 32,
+      "bytes": 64,
+      "variants": {
+        "fused": {
+          "samples": 5,
+          "median": 635788.6666666666,
+          "minimum": 632340.0,
+          "maximum": 636992.0,
+          "change_percent": 0.9688395946352291,
+          "rtt_p99_us": 54.623
+        },
+        "tokio": {
+          "samples": 5,
+          "median": 709412.0,
+          "minimum": 705927.3333333334,
+          "maximum": 715651.3333333334,
+          "change_percent": 12.66087332139092,
+          "rtt_p99_us": 52.735
+        },
+        "baseline": {
+          "samples": 5,
+          "median": 629688.0,
+          "minimum": 628207.6666666666,
+          "maximum": 632220.6666666666,
+          "change_percent": 0.0,
+          "rtt_p99_us": 55.167
+        }
+      }
+    },
+    {
+      "workers": 1,
+      "connections": 32,
+      "bytes": 4096,
+      "variants": {
+        "fused": {
+          "samples": 5,
+          "median": 577984.3333333334,
+          "minimum": 575259.3333333334,
+          "maximum": 580934.0,
+          "change_percent": 1.4678714401162418,
+          "rtt_p99_us": 59.999
+        },
+        "baseline": {
+          "samples": 5,
+          "median": 569623.0,
+          "minimum": 567384.0,
+          "maximum": 573493.0,
+          "change_percent": 0.0,
+          "rtt_p99_us": 60.767
+        },
+        "tokio": {
+          "samples": 5,
+          "median": 638631.0,
+          "minimum": 636516.3333333334,
+          "maximum": 641805.0,
+          "change_percent": 12.114679358101753,
+          "rtt_p99_us": 58.399
+        }
+      }
+    },
+    {
+      "workers": 4,
+      "connections": 1,
+      "bytes": 64,
+      "variants": {
+        "baseline": {
+          "samples": 5,
+          "median": 253841.66666666666,
+          "minimum": 229153.0,
+          "maximum": 265910.6666666667,
+          "change_percent": 0.0,
+          "rtt_p99_us": 5.571
+        },
+        "fused": {
+          "samples": 5,
+          "median": 249008.33333333334,
+          "minimum": 240147.33333333334,
+          "maximum": 267829.0,
+          "change_percent": -1.9040740619152285,
+          "rtt_p99_us": 5.703
+        },
+        "tokio": {
+          "samples": 5,
+          "median": 278135.3333333333,
+          "minimum": 273092.6666666667,
+          "maximum": 278482.6666666667,
+          "change_percent": 9.570401496996151,
+          "rtt_p99_us": 4.331
+        }
+      }
+    },
+    {
+      "workers": 4,
+      "connections": 1,
+      "bytes": 4096,
+      "variants": {
+        "tokio": {
+          "samples": 5,
+          "median": 245132.33333333334,
+          "minimum": 242499.33333333334,
+          "maximum": 247134.33333333334,
+          "change_percent": 1.2013755956992611,
+          "rtt_p99_us": 5.283
+        },
+        "fused": {
+          "samples": 5,
+          "median": 244524.33333333334,
+          "minimum": 242075.0,
+          "maximum": 244812.0,
+          "change_percent": 0.9503665365291125,
+          "rtt_p99_us": 5.271
+        },
+        "baseline": {
+          "samples": 5,
+          "median": 242222.33333333334,
+          "minimum": 239965.0,
+          "maximum": 245600.33333333334,
+          "change_percent": 0.0,
+          "rtt_p99_us": 5.303
+        }
+      }
+    },
+    {
+      "workers": 4,
+      "connections": 32,
+      "bytes": 64,
+      "variants": {
+        "tokio": {
+          "samples": 5,
+          "median": 1759294.6666666667,
+          "minimum": 1755416.0,
+          "maximum": 1771861.6666666667,
+          "change_percent": -0.5163162105043972,
+          "rtt_p99_us": 51.711
+        },
+        "baseline": {
+          "samples": 5,
+          "median": 1768425.3333333333,
+          "minimum": 1724933.6666666667,
+          "maximum": 1782267.3333333333,
+          "change_percent": 0.0,
+          "rtt_p99_us": 51.103
+        },
+        "fused": {
+          "samples": 5,
+          "median": 1766796.3333333333,
+          "minimum": 1744466.3333333333,
+          "maximum": 1771569.6666666667,
+          "change_percent": -0.09211584844973641,
+          "rtt_p99_us": 51.743
+        }
+      }
+    },
+    {
+      "workers": 4,
+      "connections": 32,
+      "bytes": 4096,
+      "variants": {
+        "fused": {
+          "samples": 5,
+          "median": 1609238.0,
+          "minimum": 1585137.3333333333,
+          "maximum": 1625748.6666666667,
+          "change_percent": 0.02919417649733802,
+          "rtt_p99_us": 60.511
+        },
+        "baseline": {
+          "samples": 5,
+          "median": 1608768.3333333333,
+          "minimum": 1561174.3333333333,
+          "maximum": 1632484.6666666667,
+          "change_percent": 0.0,
+          "rtt_p99_us": 60.191
+        },
+        "tokio": {
+          "samples": 5,
+          "median": 1628462.6666666667,
+          "minimum": 1341455.6666666667,
+          "maximum": 1642188.0,
+          "change_percent": 1.2241870333516092,
+          "rtt_p99_us": 59.231
+        }
+      }
+    }
+  ],
+  "inline.json": [
+    {
+      "workers": 1,
+      "connections": 32,
+      "bytes": 64,
+      "variants": {
+        "baseline": {
+          "samples": 5,
+          "median": 627702.3333333334,
+          "minimum": 624099.3333333334,
+          "maximum": 631087.3333333334,
+          "change_percent": 0.0,
+          "rtt_p99_us": 55.295
+        },
+        "inline": {
+          "samples": 5,
+          "median": 630276.6666666666,
+          "minimum": 629701.0,
+          "maximum": 632301.6666666666,
+          "change_percent": 0.41012008345779893,
+          "rtt_p99_us": 54.975
+        }
+      }
+    },
+    {
+      "workers": 1,
+      "connections": 32,
+      "bytes": 4096,
+      "variants": {
+        "baseline": {
+          "samples": 5,
+          "median": 568947.0,
+          "minimum": 561553.3333333334,
+          "maximum": 573312.6666666666,
+          "change_percent": 0.0,
+          "rtt_p99_us": 60.863
+        },
+        "inline": {
+          "samples": 5,
+          "median": 574928.3333333334,
+          "minimum": 564846.3333333334,
+          "maximum": 575771.0,
+          "change_percent": 1.0512988614639562,
+          "rtt_p99_us": 60.415
+        }
+      }
+    }
+  ],
+  "notify.json": [
+    {
+      "workers": 1,
+      "connections": 32,
+      "bytes": 64,
+      "variants": {
+        "baseline": {
+          "samples": 5,
+          "median": 630410.6666666666,
+          "minimum": 624259.3333333334,
+          "maximum": 632765.0,
+          "change_percent": 0.0,
+          "rtt_p99_us": 55.071
+        },
+        "tokio": {
+          "samples": 5,
+          "median": 710499.6666666666,
+          "minimum": 706675.0,
+          "maximum": 720761.3333333334,
+          "change_percent": 12.704258388182943,
+          "rtt_p99_us": 52.735
+        },
+        "notify": {
+          "samples": 5,
+          "median": 630320.0,
+          "minimum": 626057.6666666666,
+          "maximum": 632127.6666666666,
+          "change_percent": -0.0143821593543203,
+          "rtt_p99_us": 55.039
+        }
+      }
+    },
+    {
+      "workers": 1,
+      "connections": 32,
+      "bytes": 4096,
+      "variants": {
+        "baseline": {
+          "samples": 5,
+          "median": 571270.6666666666,
+          "minimum": 570445.3333333334,
+          "maximum": 573548.0,
+          "change_percent": 0.0,
+          "rtt_p99_us": 60.639
+        },
+        "tokio": {
+          "samples": 5,
+          "median": 633669.6666666666,
+          "minimum": 632769.0,
+          "maximum": 638881.0,
+          "change_percent": 10.922843345711208,
+          "rtt_p99_us": 58.783
+        },
+        "notify": {
+          "samples": 5,
+          "median": 570887.0,
+          "minimum": 567664.3333333334,
+          "maximum": 573860.3333333334,
+          "change_percent": -0.06716022527557541,
+          "rtt_p99_us": 60.575
+        }
+      }
+    }
+  ],
+  "preflight.json": [
+    {
+      "workers": 1,
+      "connections": 1,
+      "bytes": 64,
+      "variants": {
+        "baseline": {
+          "samples": 5,
+          "median": 273254.3333333333,
+          "minimum": 271247.6666666667,
+          "maximum": 274436.0,
+          "change_percent": 0.0,
+          "rtt_p99_us": 4.291
+        },
+        "tokio": {
+          "samples": 5,
+          "median": 276259.3333333333,
+          "minimum": 273298.0,
+          "maximum": 279240.0,
+          "change_percent": 1.0997080863615505,
+          "rtt_p99_us": 4.271
+        },
+        "preflight": {
+          "samples": 5,
+          "median": 274760.6666666667,
+          "minimum": 272944.0,
+          "maximum": 279313.3333333333,
+          "change_percent": 0.5512568876614443,
+          "rtt_p99_us": 4.251
+        }
+      }
+    },
+    {
+      "workers": 1,
+      "connections": 1,
+      "bytes": 4096,
+      "variants": {
+        "baseline": {
+          "samples": 5,
+          "median": 240484.0,
+          "minimum": 238170.33333333334,
+          "maximum": 244805.33333333334,
+          "change_percent": 0.0,
+          "rtt_p99_us": 5.271
+        },
+        "tokio": {
+          "samples": 5,
+          "median": 243348.33333333334,
+          "minimum": 238161.66666666666,
+          "maximum": 247292.66666666666,
+          "change_percent": 1.1910702305905296,
+          "rtt_p99_us": 5.223
+        },
+        "preflight": {
+          "samples": 5,
+          "median": 244939.33333333334,
+          "minimum": 241672.66666666666,
+          "maximum": 248716.33333333334,
+          "change_percent": 1.8526527059319342,
+          "rtt_p99_us": 5.203
+        }
+      }
+    },
+    {
+      "workers": 1,
+      "connections": 32,
+      "bytes": 64,
+      "variants": {
+        "preflight": {
+          "samples": 5,
+          "median": 637443.0,
+          "minimum": 636424.3333333334,
+          "maximum": 643092.0,
+          "change_percent": 1.4559501211213854,
+          "rtt_p99_us": 54.527
+        },
+        "baseline": {
+          "samples": 5,
+          "median": 628295.3333333334,
+          "minimum": 626236.3333333334,
+          "maximum": 629631.6666666666,
+          "change_percent": 0.0,
+          "rtt_p99_us": 55.135
+        },
+        "tokio": {
+          "samples": 5,
+          "median": 714071.3333333334,
+          "minimum": 707729.0,
+          "maximum": 716740.0,
+          "change_percent": 13.652178434133422,
+          "rtt_p99_us": 52.415
+        }
+      }
+    },
+    {
+      "workers": 1,
+      "connections": 32,
+      "bytes": 4096,
+      "variants": {
+        "preflight": {
+          "samples": 5,
+          "median": 580940.0,
+          "minimum": 575064.6666666666,
+          "maximum": 583322.6666666666,
+          "change_percent": 1.906425854979732,
+          "rtt_p99_us": 59.807
+        },
+        "tokio": {
+          "samples": 5,
+          "median": 637447.0,
+          "minimum": 629318.3333333334,
+          "maximum": 645256.3333333334,
+          "change_percent": 11.818682552379345,
+          "rtt_p99_us": 58.495
+        },
+        "baseline": {
+          "samples": 5,
+          "median": 570072.0,
+          "minimum": 566165.3333333334,
+          "maximum": 573616.6666666666,
+          "change_percent": 0.0,
+          "rtt_p99_us": 60.735
+        }
+      }
+    },
+    {
+      "workers": 4,
+      "connections": 1,
+      "bytes": 64,
+      "variants": {
+        "baseline": {
+          "samples": 5,
+          "median": 263617.6666666667,
+          "minimum": 245093.0,
+          "maximum": 268903.3333333333,
+          "change_percent": 0.0,
+          "rtt_p99_us": 5.511
+        },
+        "tokio": {
+          "samples": 5,
+          "median": 274763.3333333333,
+          "minimum": 274010.3333333333,
+          "maximum": 278765.0,
+          "change_percent": 4.227966512107795,
+          "rtt_p99_us": 4.363
+        },
+        "preflight": {
+          "samples": 5,
+          "median": 262714.6666666667,
+          "minimum": 238523.0,
+          "maximum": 268326.6666666667,
+          "change_percent": -0.3425415342674265,
+          "rtt_p99_us": 5.523
+        }
+      }
+    },
+    {
+      "workers": 4,
+      "connections": 1,
+      "bytes": 4096,
+      "variants": {
+        "preflight": {
+          "samples": 5,
+          "median": 243736.0,
+          "minimum": 241618.0,
+          "maximum": 246279.33333333334,
+          "change_percent": 0.36786506489798754,
+          "rtt_p99_us": 5.343
+        },
+        "tokio": {
+          "samples": 5,
+          "median": 243493.0,
+          "minimum": 242110.33333333334,
+          "maximum": 245455.0,
+          "change_percent": 0.26780027672237416,
+          "rtt_p99_us": 5.263
+        },
+        "baseline": {
+          "samples": 5,
+          "median": 242842.66666666666,
+          "minimum": 241704.0,
+          "maximum": 244664.0,
+          "change_percent": 0.0,
+          "rtt_p99_us": 5.363
+        }
+      }
+    },
+    {
+      "workers": 4,
+      "connections": 32,
+      "bytes": 64,
+      "variants": {
+        "tokio": {
+          "samples": 5,
+          "median": 1758313.0,
+          "minimum": 1730813.3333333333,
+          "maximum": 1764735.0,
+          "change_percent": 0.8306053002913538,
+          "rtt_p99_us": 51.871
+        },
+        "baseline": {
+          "samples": 5,
+          "median": 1743828.6666666667,
+          "minimum": 1715526.3333333333,
+          "maximum": 1761804.0,
+          "change_percent": 0.0,
+          "rtt_p99_us": 51.871
+        },
+        "preflight": {
+          "samples": 5,
+          "median": 1742606.6666666667,
+          "minimum": 1730860.6666666667,
+          "maximum": 1762662.3333333333,
+          "change_percent": -0.07007569168683281,
+          "rtt_p99_us": 51.935
+        }
+      }
+    },
+    {
+      "workers": 4,
+      "connections": 32,
+      "bytes": 4096,
+      "variants": {
+        "tokio": {
+          "samples": 5,
+          "median": 1626913.0,
+          "minimum": 1584821.3333333333,
+          "maximum": 1661753.3333333333,
+          "change_percent": 1.6899010965428563,
+          "rtt_p99_us": 59.135
+        },
+        "baseline": {
+          "samples": 5,
+          "median": 1599876.6666666667,
+          "minimum": 1575973.3333333333,
+          "maximum": 1622503.6666666667,
+          "change_percent": 0.0,
+          "rtt_p99_us": 60.479
+        },
+        "preflight": {
+          "samples": 5,
+          "median": 1602975.3333333333,
+          "minimum": 1587029.0,
+          "maximum": 1635987.6666666667,
+          "change_percent": 0.1936815962896965,
+          "rtt_p99_us": 60.607
+        }
+      }
+    }
+  ],
+  "ring-send.json": [
+    {
+      "workers": 1,
+      "connections": 32,
+      "bytes": 64,
+      "variants": {
+        "baseline": {
+          "samples": 5,
+          "median": 623439.0,
+          "minimum": 617114.0,
+          "maximum": 626863.0,
+          "change_percent": 0.0,
+          "rtt_p99_us": 55.167
+        },
+        "tokio": {
+          "samples": 5,
+          "median": 711035.3333333334,
+          "minimum": 705006.0,
+          "maximum": 716392.3333333334,
+          "change_percent": 14.05050587681127,
+          "rtt_p99_us": 52.671
+        },
+        "ring-send": {
+          "samples": 5,
+          "median": 521610.6666666667,
+          "minimum": 515168.6666666667,
+          "maximum": 527157.0,
+          "change_percent": -16.333327451977386,
+          "rtt_p99_us": 65.663
+        }
+      }
+    },
+    {
+      "workers": 1,
+      "connections": 32,
+      "bytes": 4096,
+      "variants": {
+        "baseline": {
+          "samples": 5,
+          "median": 561003.6666666666,
+          "minimum": 555779.0,
+          "maximum": 563935.6666666666,
+          "change_percent": 0.0,
+          "rtt_p99_us": 61.535
+        },
+        "tokio": {
+          "samples": 5,
+          "median": 622440.0,
+          "minimum": 619433.6666666666,
+          "maximum": 623643.6666666666,
+          "change_percent": 10.951146486861951,
+          "rtt_p99_us": 59.775
+        },
+        "ring-send": {
+          "samples": 5,
+          "median": 475926.0,
+          "minimum": 468572.0,
+          "maximum": 477324.0,
+          "change_percent": -15.165260357775434,
+          "rtt_p99_us": 71.871
+        }
+      }
+    }
+  ],
+  "syscall-resume.json": [
+    {
+      "workers": 1,
+      "connections": 32,
+      "bytes": 64,
+      "variants": {
+        "baseline": {
+          "samples": 5,
+          "median": 629604.6666666666,
+          "minimum": 625543.6666666666,
+          "maximum": 632038.3333333334,
+          "change_percent": 0.0,
+          "rtt_p99_us": 55.103
+        },
+        "syscall-resume": {
+          "samples": 5,
+          "median": 638752.0,
+          "minimum": 635640.6666666666,
+          "maximum": 642858.6666666666,
+          "change_percent": 1.4528693667031245,
+          "rtt_p99_us": 54.431
+        }
+      }
+    },
+    {
+      "workers": 1,
+      "connections": 32,
+      "bytes": 4096,
+      "variants": {
+        "baseline": {
+          "samples": 5,
+          "median": 570529.0,
+          "minimum": 565093.6666666666,
+          "maximum": 571552.6666666666,
+          "change_percent": 0.0,
+          "rtt_p99_us": 60.671
+        },
+        "syscall-resume": {
+          "samples": 5,
+          "median": 575247.6666666666,
+          "minimum": 574629.3333333334,
+          "maximum": 577094.3333333334,
+          "change_percent": 0.8270686795354143,
+          "rtt_p99_us": 60.319
+        }
+      }
+    }
+  ]
+}

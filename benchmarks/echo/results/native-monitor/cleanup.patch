@@ -1,0 +1,113 @@
+--- a/crates/iouring/src/io_uring_selector/monitor.rs
++++ b/crates/iouring/src/io_uring_selector/monitor.rs
+@@ -56,18 +56,14 @@
+         ));
+     }
+ 
+-    // `try_update` is not available on the supported Rust 1.85 toolchain.
+-    #[allow(deprecated)]
+     fn notify(&self) {
+         let waker = {
+             let mut status = self.status.lock().unwrap();
+             // The low bit caches readiness; the remaining bits distinguish notifications racing a syscall. Like readiness ticks in other reactors, this counter wraps.
+-            discard(
+-                self.readiness
+-                    .fetch_update(Ordering::AcqRel, Ordering::Acquire, |value| {
+-                        Some(value.wrapping_add(2) | READY)
+-                    }),
+-            );
++            // Notifications are serialized by `status`. A concurrent clear can only remove READY from the previous generation; this notification always publishes a new one.
++            let readiness = self.readiness.load(Ordering::Relaxed);
++            self.readiness
++                .store(readiness.wrapping_add(2) | READY, Ordering::Release);
+             status.waker.take()
+         };
+         wake(waker);
+@@ -107,6 +103,7 @@
+ 
+ struct Wait<'a> {
+     storage: &'a State,
++    registered: bool,
+ }
+ impl<'a> Wait<'a> {
+     fn claim(storage: &'a State) -> io::Result<Self> {
+@@ -121,20 +118,25 @@
+                 "socket monitor already has a waiter",
+             ));
+         }
+-        Ok(Self { storage })
++        Ok(Self {
++            storage,
++            registered: false,
++        })
+     }
+ }
+ impl Drop for Wait<'_> {
+     fn drop(&mut self) {
+-        let previous = self
+-            .storage
+-            .registration()
+-            .status
+-            .lock()
+-            .unwrap()
+-            .waker
+-            .take();
+-        discard(previous);
++        if self.registered {
++            let previous = self
++                .storage
++                .registration()
++                .status
++                .lock()
++                .unwrap()
++                .waker
++                .take();
++            discard(previous);
++        }
+         self.storage
+             .registration()
+             .claimed
+@@ -166,7 +168,7 @@
+         let registration = state.registration();
+         cancellation.check()?;
+         self.check_monitor(state)?;
+-        let _wait = Wait::claim(state)?;
++        let mut wait = Wait::claim(state)?;
+         // Choose a route once for this wait. A suspended future can move without moving its active registration. The next wait may retire and rebind it after a worker change.
+         let controller = self.route();
+         let mut cancelled = pin!(cancellation.cancelled());
+@@ -178,6 +180,7 @@
+             let replacement = context.waker().clone();
+             let (previous, submission, retirement) = {
+                 let mut status = registration.status.lock().unwrap();
++                wait.registered = status.waker.is_some();
+                 if !status.retiring {
+                     if let Some(error) = status.error.take() {
+                         return Poll::Ready(Err(error.into()));
+@@ -215,6 +218,7 @@
+                         generation,
+                     ));
+                 }
++                wait.registered = true;
+                 (status.waker.replace(replacement), submission, retirement)
+             };
+             discard(previous);
+@@ -242,15 +246,17 @@
+                 "socket monitor belongs to another selector",
+             ));
+         }
+-        let _wait = Wait::claim(state)?;
++        let mut wait = Wait::claim(state)?;
+         registration.retire(true);
+         poll_fn(|context| {
+             let replacement = context.waker().clone();
+             let previous = {
+                 let mut status = registration.status.lock().unwrap();
++                wait.registered = status.waker.is_some();
+                 if !status.pending {
+                     return Poll::Ready(Ok(()));
+                 }
++                wait.registered = true;
+                 status.waker.replace(replacement)
+             };
+             discard(previous);
