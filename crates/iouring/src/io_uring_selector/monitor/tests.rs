@@ -930,17 +930,24 @@ fn interrupted_syscalls_retry_and_observe_cancellation_and_closure() {
         ),
         Err(OperationError::Cancelled(_))
     ));
-    assert_eq!(
-        block_on(
-            selector.monitor_io::<(), _>(&writer, Interest::Writable, &never, |_| {
-                selector.close();
-                Err(io::ErrorKind::Interrupted.into())
-            })
-        )
-        .unwrap_err()
-        .kind(),
-        io::ErrorKind::BrokenPipe
-    );
+    for kind in [io::ErrorKind::Interrupted, io::ErrorKind::WouldBlock] {
+        let (selector, _driver) = IoUringSelector::new(options()).unwrap();
+        let (socket, _peer) = sockets(&selector);
+        let writer = selector
+            .socket_monitor(&socket, Interest::Writable)
+            .unwrap();
+        assert_eq!(
+            block_on(
+                selector.monitor_io::<(), _>(&writer, Interest::Writable, &never, |_| {
+                    selector.close();
+                    Err(kind.into())
+                })
+            )
+            .unwrap_err()
+            .kind(),
+            io::ErrorKind::BrokenPipe
+        );
+    }
 }
 
 #[test]
