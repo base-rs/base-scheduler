@@ -2,9 +2,10 @@
 // Copyright, 2026, by Samuel Williams.
 
 //! Portable shared-pool receiver assertions.
+use crate::socket::stream_pair;
 use core_scheduler::*;
 use futures_lite::future::poll_once;
-use std::pin::pin;
+use std::{net::Shutdown, pin::pin};
 
 /// Demand-driven monitors must release storage while idle, share one slot across connections, and resume after their bufferless readiness wait is woken.
 pub async fn demand_driven<S>(scheduler: &S, sender: &S::Socket, socket: &S::Socket)
@@ -148,4 +149,152 @@ where
     }
     receiver.close(scheduler).await.unwrap();
     assert!(receiver.recv(scheduler, &never).await.unwrap().is_none());
+}
+
+/// A bounded portable receiver preserves datagrams, metadata, empty messages, truncation, and lease lifetime across cancellation and close.
+pub async fn messages<S: SocketScheduler + SocketSendMsg + SocketReceiving>(scheduler: &S) {
+    let never = Cancellation::never();
+    let sender = scheduler
+        .socket_open(SocketDomain::Ipv4, SocketType::Datagram, None, &never)
+        .await
+        .unwrap();
+    let socket = scheduler
+        .socket_open(SocketDomain::Ipv4, SocketType::Datagram, None, &never)
+        .await
+        .unwrap();
+    for socket in [&sender, &socket] {
+        scheduler
+            .socket_bind(socket, "127.0.0.1:0".parse().unwrap(), &never)
+            .await
+            .unwrap();
+    }
+    let address = scheduler.socket_local_address(&socket).unwrap();
+    let source = scheduler.socket_local_address(&sender).unwrap();
+    let pool = scheduler.buffer_pool(BufferPoolOptions::new(1, 4)).unwrap();
+    let cancelled = Cancellation::new();
+    cancelled.cancel();
+    crate::socket::cancelled(
+        scheduler
+            .socket_receiver(
+                &socket,
+                pool.clone(),
+                SocketRecvFlags::default(),
+                &cancelled,
+            )
+            .await,
+    );
+    assert!(
+        scheduler
+            .socket_receiver(
+                &socket,
+                pool.clone(),
+                SocketRecvFlags { peek: true },
+                &never
+            )
+            .await
+            .is_err()
+    );
+    drop(scheduler.socket_receiver(&socket, pool.clone(), SocketRecvFlags::default(), &never));
+    let mut receiver = scheduler
+        .socket_receiver(&socket, pool.clone(), SocketRecvFlags::default(), &never)
+        .await
+        .unwrap();
+    // Pre-cancellation must leave a persistent receiver usable.
+    crate::socket::cancelled(receiver.recv(scheduler, &cancelled).await);
+    let (sent, _) = scheduler
+        .socket_sendmsg(
+            &sender,
+            SocketMessage {
+                buffers: [b"abcdef".to_vec()],
+                address: Some(address),
+            },
+            SocketSendFlags::default(),
+            &never,
+        )
+        .await;
+    assert_eq!(sent.unwrap(), 6);
+    let first = receiver.recv(scheduler, &never).await.unwrap().unwrap();
+    assert_eq!(first.payload(), b"abcd");
+    assert_eq!(first.payload().len(), 4);
+    assert_eq!(
+        first.address().map(|address| address.to_socket_address()),
+        Some(source)
+    );
+    assert!(first.truncated());
+    let (sent, _) = scheduler
+        .socket_sendmsg(
+            &sender,
+            SocketMessage {
+                buffers: [Vec::<u8>::new()],
+                address: Some(address),
+            },
+            SocketSendFlags::default(),
+            &never,
+        )
+        .await;
+    assert_eq!(sent.unwrap(), 0);
+    let mut waiting = Box::pin(receiver.recv(scheduler, &never));
+    assert!(poll_once(&mut waiting).await.is_none());
+    assert_eq!(first.payload(), b"abcd");
+    drop(first);
+    let empty = waiting.await.unwrap().unwrap();
+    assert!(empty.payload().is_empty());
+    // Cancellation while capacity is exhausted preserves the receiver and the returned lease.
+    let token = Cancellation::new();
+    let mut waiting = Box::pin(receiver.recv(scheduler, &token));
+    assert!(poll_once(&mut waiting).await.is_none());
+    token.cancel();
+    crate::socket::cancelled(waiting.await);
+    // With the same lease retained, another receive must still wait for capacity.
+    let mut retry = Box::pin(receiver.recv(scheduler, &never));
+    assert!(poll_once(&mut retry).await.is_none());
+    drop(retry);
+    receiver.close(scheduler).await.unwrap();
+    receiver.close(scheduler).await.unwrap();
+    assert!(receiver.recv(scheduler, &never).await.unwrap().is_none());
+    drop(receiver);
+    assert!(empty.payload().is_empty());
+    drop(empty);
+    scheduler.socket_close(socket).await.unwrap();
+    scheduler.socket_close(sender).await.unwrap();
+}
+
+/// Stream receivers preserve ordering across leases, EOF, and explicit close. Non-power-of-two buffer counts are portable, even when a kernel ring rounds up.
+pub async fn stream_eof<S: SocketScheduler + SocketReceiving>(scheduler: &S) {
+    let never = Cancellation::never();
+    let (sender, socket) = stream_pair(scheduler, SocketDomain::Ipv4).await;
+    let mut receiver = scheduler
+        .socket_receiver(
+            &socket,
+            scheduler.buffer_pool(BufferPoolOptions::new(3, 4)).unwrap(),
+            SocketRecvFlags::default(),
+            &never,
+        )
+        .await
+        .unwrap();
+    let mut sent = 0;
+    while sent < 9 {
+        let (result, _) = scheduler
+            .socket_write(&sender, b"abcdefghi"[sent..].to_vec(), &never)
+            .await;
+        let count = result.unwrap();
+        assert!(count > 0);
+        sent += count;
+    }
+    scheduler
+        .socket_shutdown(&sender, Shutdown::Write)
+        .await
+        .unwrap();
+    let mut payload = Vec::new();
+    while let Some(message) = receiver.recv(scheduler, &never).await.unwrap() {
+        assert!(!message.payload().is_empty());
+        assert!(!message.truncated());
+        payload.extend_from_slice(message.payload());
+    }
+    assert_eq!(payload, b"abcdefghi");
+    assert!(receiver.recv(scheduler, &never).await.unwrap().is_none());
+    receiver.close(scheduler).await.unwrap();
+    drop(receiver);
+    scheduler.socket_close(socket).await.unwrap();
+    scheduler.socket_close(sender).await.unwrap();
 }

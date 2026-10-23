@@ -65,14 +65,8 @@ pub async fn sequential<S: FileMonitoring + FileSeek>(scheduler: &S, file: &S::F
             .1,
         b"ef"
     );
-    scheduler
-        .file_monitor_close(&mut monitor, &never)
-        .await
-        .unwrap();
-    scheduler
-        .file_monitor_close(&mut monitor, &never)
-        .await
-        .unwrap();
+    scheduler.file_monitor_close(&mut monitor).await.unwrap();
+    scheduler.file_monitor_close(&mut monitor).await.unwrap();
     assert!(
         scheduler
             .file_monitor_read(&mut monitor, vec![0; 2], &never)
@@ -95,14 +89,8 @@ pub async fn independent<S: FileMonitoring>(scheduler: &S, file: &S::File) {
     assert_eq!(a.1, b"abc");
     assert_eq!(b.0.unwrap(), 3);
     assert_eq!(b.1, b"def");
-    scheduler
-        .file_monitor_close(&mut first, &never)
-        .await
-        .unwrap();
-    scheduler
-        .file_monitor_close(&mut second, &never)
-        .await
-        .unwrap();
+    scheduler.file_monitor_close(&mut first).await.unwrap();
+    scheduler.file_monitor_close(&mut second).await.unwrap();
 }
 
 pub async fn cancellation<S: FileMonitoring>(scheduler: &S, file: &S::File) {
@@ -131,10 +119,6 @@ pub async fn cancellation<S: FileMonitoring>(scheduler: &S, file: &S::File) {
             .await
             .0
             .unwrap_err(),
-        scheduler
-            .file_monitor_close(&mut monitor, &cancelled)
-            .await
-            .unwrap_err(),
     ] {
         crate::file::cancelled::<()>(Err(error));
     }
@@ -161,10 +145,7 @@ pub async fn cancellation<S: FileMonitoring>(scheduler: &S, file: &S::File) {
             .1,
         b"a"
     );
-    scheduler
-        .file_monitor_close(&mut monitor, &never)
-        .await
-        .unwrap();
+    scheduler.file_monitor_close(&mut monitor).await.unwrap();
 }
 
 pub async fn abandonment<S: FileMonitoring>(scheduler: &S, file: &S::File) {
@@ -180,10 +161,7 @@ pub async fn abandonment<S: FileMonitoring>(scheduler: &S, file: &S::File) {
         })
         .await;
     }
-    scheduler
-        .file_monitor_close(&mut monitor, &never)
-        .await
-        .unwrap();
+    scheduler.file_monitor_close(&mut monitor).await.unwrap();
 }
 
 // Stop inside payload access, on the independent file worker or ring driver, so lifecycle assertions cannot accidentally test an already-completed operation.
@@ -241,20 +219,20 @@ pub async fn pending_retirement<S: FileMonitoring>(scheduler: &S, file: &S::File
         std::io::Error::from(error).kind(),
         std::io::ErrorKind::WouldBlock
     );
-    let cancellation = Cancellation::new();
-    let mut close = Box::pin(scheduler.file_monitor_close(&mut monitor, &cancellation));
+    let mut close = Box::pin(scheduler.file_monitor_close(&mut monitor));
     assert!(
         futures_lite::future::poll_once(close.as_mut())
             .await
             .is_none()
     );
-    cancellation.cancel();
-    crate::file::cancelled(close.await);
+    // Abandoning a pending cleanup does not reopen admission or establish retirement.
+    drop(close);
+    let (result, _) = scheduler
+        .file_monitor_read_at(&mut monitor, vec![0], 0, &never)
+        .await;
+    assert_eq!(result.unwrap_err().kind(), std::io::ErrorKind::BrokenPipe);
     release.send(()).unwrap();
-    scheduler
-        .file_monitor_close(&mut monitor, &never)
-        .await
-        .unwrap();
+    scheduler.file_monitor_close(&mut monitor).await.unwrap();
     // Dropping monitor here leaves the caller free to immediately close the original file.
 }
 
@@ -285,8 +263,5 @@ pub async fn inflight_cancellation<S: FileMonitoring>(scheduler: &S, file: &S::F
     // Either completed progress or cancellation may win, but ownership and the original stable allocation must always return after retirement.
     assert_eq!(buffer.as_ref().as_ptr() as usize, allocation);
     assert_eq!(buffer.as_mut().len(), 6);
-    scheduler
-        .file_monitor_close(&mut monitor, &Cancellation::never())
-        .await
-        .unwrap();
+    scheduler.file_monitor_close(&mut monitor).await.unwrap();
 }

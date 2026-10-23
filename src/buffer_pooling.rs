@@ -21,6 +21,7 @@ use std::io;
 ///     let received = receiver.recv(scheduler, cancellation).await;
 ///     // Retire reception even when the receive wait was cancelled or failed.
 ///     receiver.close(scheduler).await?;
+///     drop(receiver);
 ///     if let Some(message) = received? {
 ///         // Parse or decrypt through message.payload_mut() before freezing.
 ///         let frozen = message.into_payload().freeze();

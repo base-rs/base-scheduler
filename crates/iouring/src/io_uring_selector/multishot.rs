@@ -9,8 +9,8 @@ use std::{cell::UnsafeCell, sync::Mutex, task::Context};
 pub(crate) mod pool;
 use pool::Pool;
 
+use crate::RecvMsgMultishotOptions;
 use crate::io_uring_recv_message::{IoUringRecvMessage, MessageStorage};
-pub use core_scheduler::RecvMsgMultishotOptions;
 
 /// Counters for verifying persistent submissions and pool pressure.
 #[derive(Clone, Copy, Debug, Default)]
@@ -230,13 +230,13 @@ impl<B: IoBuf> RecvMsgMultishot<B> {
     }
 }
 
-impl core_scheduler::SocketRecvMsgMultishot for IoUringSelector {
-    type Receiver = RecvMsgMultishot;
-
-    /// Start a bounded multishot `recvmsg` receive (Linux 6.0+, provided rings 5.19+).
+impl IoUringSelector {
+    /// Start a concrete bounded multishot `recvmsg` receive (Linux 6.0+, provided rings 5.19+). Portable consumers use `SocketReceiving::socket_receiver` with a scheduler-created pool.
+    ///
+    /// Pre-cancellation leaves an existing receiver unchanged. Cancellation of a pending receive stops and retires this concrete receive sequence before returning; delivered immutable leases remain valid. This stronger behavior is specific to this constructor.
     ///
     /// This lazy operation selects one ring and retains the socket through final completion. The returned receiver is a backend resource, not an implicit scheduler. Pool registration errors are reported by its first `recv`. Each receiver holds one ring admission slot until EOF or close; reserve additional capacity for sends and other operations which may need the ring. Peeking is rejected: a persistent peek can repeatedly consume the whole pool with copies of the same datagram. Unsupported kernels fail explicitly.
-    async fn socket_recvmsg_multishot(
+    pub async fn socket_recvmsg_multishot(
         &self,
         socket: &NativeSocket,
         options: RecvMsgMultishotOptions,

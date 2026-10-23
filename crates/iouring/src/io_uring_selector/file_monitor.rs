@@ -421,9 +421,7 @@ impl FileMonitoring for IoUringSelector {
     async fn file_monitor_close(
         &self,
         monitor: &mut FileMonitor<NativeFile, IoUringFileRegistration>,
-        cancellation: &Cancellation,
-    ) -> OperationResult<()> {
-        cancellation.check()?;
+    ) -> io::Result<()> {
         self.check_file_monitor(monitor)?;
         let registration = monitor.registration_mut();
         registration.closed = true;
@@ -431,25 +429,20 @@ impl FileMonitoring for IoUringSelector {
             return Err(io::Error::new(
                 io::ErrorKind::BrokenPipe,
                 "selector failed before file retirement",
-            )
-            .into());
+            ));
         }
         if let Some(binding) = &registration.running {
             if !registration.shared.ready.load(Ordering::Acquire) {
                 let _ = binding.controller.send(Command::Cancel(binding.state));
             }
-            let mut cancelled = pin!(cancellation.cancelled());
             poll_fn(|context| {
                 registration.shared.waker.register(context.waker());
                 if registration.shared.ready.load(Ordering::Acquire) {
-                    return Poll::Ready(Ok(()));
-                }
-                if cancelled.as_mut().poll(context).is_ready() {
-                    return Poll::Ready(Err(Cancelled));
+                    return Poll::Ready(());
                 }
                 Poll::Pending
             })
-            .await?;
+            .await;
             registration.running = None;
             let completion = registration.shared.take();
             if matches!(completion, Completion::Failed) {
@@ -457,8 +450,7 @@ impl FileMonitoring for IoUringSelector {
                 return Err(io::Error::new(
                     io::ErrorKind::BrokenPipe,
                     "selector failed before file retirement",
-                )
-                .into());
+                ));
             }
             drop(completion);
         }
@@ -467,10 +459,10 @@ impl FileMonitoring for IoUringSelector {
             file.retire();
         }
         for file in registration.files.values() {
-            file.closed(cancellation).await?;
+            file.closed().await?;
         }
         for file in &registration.retiring {
-            file.closed(cancellation).await?;
+            file.closed().await?;
         }
         Ok(())
     }

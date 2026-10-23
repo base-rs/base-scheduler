@@ -342,15 +342,15 @@ macro_rules! socket_suites {
                 });
             }
             #[test]
-            fn portable_multishot_messages() {
+            fn pooled_messages() {
                 $run(async move |fixture| {
-                    core_scheduler_conformance::socket::multishot_messages(&fixture.scheduler).await;
+                    core_scheduler_conformance::socket_receiving::messages(&fixture.scheduler).await;
                 });
             }
             #[test]
-            fn portable_multishot_stream() {
+            fn pooled_stream_eof() {
                 $run(async move |fixture| {
-                    core_scheduler_conformance::socket::multishot_stream(&fixture.scheduler).await;
+                    core_scheduler_conformance::socket_receiving::stream_eof(&fixture.scheduler).await;
                 });
             }
             mod scalar { use super::*; core_scheduler_conformance::socket_tests!(run: streams); }

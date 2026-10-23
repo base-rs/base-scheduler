@@ -85,7 +85,7 @@ fn repeated_operations_reuse_request_storage_without_allocations() {
     drive(
         &mut worker,
         &mut context,
-        pin!(selector.file_monitor_close(&mut monitor, &never)),
+        pin!(selector.file_monitor_close(&mut monitor)),
     )
     .unwrap();
     drop(monitor);
@@ -135,7 +135,7 @@ fn abandoned_and_forgotten_operations_can_be_retired_and_reused() {
         drive(
             &mut worker,
             &mut context,
-            pin!(selector.file_monitor_close(&mut monitor, &never)),
+            pin!(selector.file_monitor_close(&mut monitor)),
         )
         .unwrap();
     }
@@ -145,7 +145,7 @@ fn abandoned_and_forgotten_operations_can_be_retired_and_reused() {
     assert!(operation.as_mut().poll(&mut context).is_pending());
     std::mem::forget(operation);
     {
-        let mut close = pin!(selector.file_monitor_close(&mut monitor, &never));
+        let mut close = pin!(selector.file_monitor_close(&mut monitor));
         drive(&mut worker, &mut context, close.as_mut()).unwrap();
     }
     drop(monitor);
@@ -199,7 +199,7 @@ fn swapped_registrations_cannot_redirect_file_operations() {
         assert_eq!(result.unwrap_err().kind(), io::ErrorKind::InvalidInput);
         assert_eq!(buffer, [7; 5]);
         assert_eq!(
-            block_on(selector.file_monitor_close(monitor, &never))
+            block_on(selector.file_monitor_close(monitor))
                 .unwrap_err()
                 .kind(),
             io::ErrorKind::InvalidInput
@@ -218,7 +218,7 @@ fn swapped_registrations_cannot_redirect_file_operations() {
         drive(
             &mut worker,
             &mut context,
-            pin!(selector.file_monitor_close(monitor, &never)),
+            pin!(selector.file_monitor_close(monitor)),
         )
         .unwrap();
     }
@@ -244,7 +244,8 @@ fn incompatible_and_closed_selectors_reject_monitor_operations() {
         io::ErrorKind::InvalidInput
     );
     assert_eq!(
-        io::Error::from(block_on(second.file_monitor_close(&mut monitor, &never)).unwrap_err())
+        block_on(second.file_monitor_close(&mut monitor))
+            .unwrap_err()
             .kind(),
         io::ErrorKind::InvalidInput
     );
@@ -286,7 +287,7 @@ fn queued_requests_return_owners_but_unknown_kernel_retirement_never_does() {
             assert!(panic.is_err());
             for _ in 0..2 {
                 assert_eq!(
-                    block_on(selector.file_monitor_close(&mut monitor, &never))
+                    block_on(selector.file_monitor_close(&mut monitor))
                         .unwrap_err()
                         .kind(),
                     io::ErrorKind::BrokenPipe
@@ -296,7 +297,7 @@ fn queued_requests_return_owners_but_unknown_kernel_retirement_never_does() {
             let (result, buffer) = block_on(operation);
             assert_eq!(result.unwrap_err().kind(), io::ErrorKind::BrokenPipe);
             assert_eq!(buffer, [42; 6]);
-            block_on(selector.file_monitor_close(&mut monitor, &never)).unwrap();
+            block_on(selector.file_monitor_close(&mut monitor)).unwrap();
             drop(monitor);
             let retained = retain_file(&file);
             assert_eq!(
@@ -340,7 +341,7 @@ fn close_and_reuse_both_report_an_abandoned_driver_failure() {
         }
         for _ in 0..2 {
             assert_eq!(
-                block_on(selector.file_monitor_close(&mut monitor, &never))
+                block_on(selector.file_monitor_close(&mut monitor))
                     .unwrap_err()
                     .kind(),
                 io::ErrorKind::BrokenPipe
@@ -375,7 +376,7 @@ fn admission_cancellation_and_identifier_exhaustion_return_the_buffer() {
         block_on(selector.file_monitor_read_at(&mut monitor, vec![43], 0, &never));
     assert_eq!(result.unwrap_err().kind(), io::ErrorKind::Other);
     assert_eq!(buffer, [43]);
-    block_on(selector.file_monitor_close(&mut monitor, &never)).unwrap();
+    block_on(selector.file_monitor_close(&mut monitor)).unwrap();
 }
 
 #[test]
@@ -396,7 +397,7 @@ fn rejected_abandoned_command_is_reclaimed_before_reuse_reports_shutdown() {
     assert_eq!(result.unwrap_err().kind(), io::ErrorKind::BrokenPipe);
     assert_eq!(buffer, [43]);
     assert!(monitor.registration().running.is_none());
-    block_on(selector.file_monitor_close(&mut monitor, &never)).unwrap();
+    block_on(selector.file_monitor_close(&mut monitor)).unwrap();
 }
 
 struct ClosingBuffer {
@@ -444,7 +445,7 @@ fn disposal_of_an_abandoned_owner_can_close_admission_before_publication() {
     drive(
         &mut worker,
         &mut context,
-        pin!(selector.file_monitor_close(&mut monitor, &never)),
+        pin!(selector.file_monitor_close(&mut monitor)),
     )
     .unwrap();
 }
@@ -507,7 +508,7 @@ fn migration_invalidates_old_registrations_and_reuses_request_storage() {
         assert_eq!(file.index().unwrap().0, 0);
     }
     {
-        let mut close = pin!(selector.file_monitor_close(&mut monitor, &never));
+        let mut close = pin!(selector.file_monitor_close(&mut monitor));
         loop {
             if let Poll::Ready(result) = close.as_mut().poll(&mut context) {
                 result.unwrap();
@@ -563,7 +564,7 @@ fn active_request_keeps_its_ring_when_polling_moves_to_another_worker() {
             .unwrap();
     }
     assert_eq!(monitor.registration().files.values().count(), 1);
-    let mut close = pin!(selector.file_monitor_close(&mut monitor, &never));
+    let mut close = pin!(selector.file_monitor_close(&mut monitor));
     loop {
         if let Poll::Ready(result) = close.as_mut().poll(&mut context) {
             result.unwrap();
@@ -617,7 +618,7 @@ fn unavailable_fixed_files_fall_back_without_changing_io_results() {
             drive(
                 &mut worker,
                 &mut context,
-                pin!(selector.file_monitor_close(monitor, &never)),
+                pin!(selector.file_monitor_close(monitor)),
             )
             .unwrap();
         }
@@ -625,7 +626,7 @@ fn unavailable_fixed_files_fall_back_without_changing_io_results() {
 }
 
 #[test]
-fn close_cancellation_preserves_release_and_retry_waits_for_every_registration() {
+fn abandoned_close_preserves_release_and_retry_waits_for_every_registration() {
     let (selector, driver) = IoUringSelector::new(Default::default()).unwrap();
     let mut worker = driver.enter();
     let wake = worker.waker();
@@ -640,17 +641,15 @@ fn close_cancellation_preserves_release_and_retry_waits_for_every_registration()
     )
     .0
     .unwrap();
-    let cancellation = Cancellation::new();
     {
-        let mut close = pin!(selector.file_monitor_close(&mut monitor, &cancellation));
+        let mut close = pin!(selector.file_monitor_close(&mut monitor));
         assert!(close.as_mut().poll(&mut context).is_pending());
-        cancellation.cancel();
-        assert!(matches!(block_on(close), Err(OperationError::Cancelled(_))));
+        // Leaving this scope drops the wait; the next close must finish retirement.
     }
     drive(
         &mut worker,
         &mut context,
-        pin!(selector.file_monitor_close(&mut monitor, &never)),
+        pin!(selector.file_monitor_close(&mut monitor)),
     )
     .unwrap();
     // The released table slot is immediately reusable by another monitor.
@@ -676,7 +675,7 @@ fn close_cancellation_preserves_release_and_retry_waits_for_every_registration()
     drive(
         &mut worker,
         &mut context,
-        pin!(selector.file_monitor_close(&mut next, &never)),
+        pin!(selector.file_monitor_close(&mut next)),
     )
     .unwrap();
 }
@@ -702,7 +701,7 @@ fn release_errors_and_driver_exit_remain_observable_on_repeated_close() {
             drop(worker);
             for _ in 0..2 {
                 assert_eq!(
-                    block_on(selector.file_monitor_close(&mut monitor, &never))
+                    block_on(selector.file_monitor_close(&mut monitor))
                         .unwrap_err()
                         .kind(),
                     io::ErrorKind::BrokenPipe
@@ -718,7 +717,7 @@ fn release_errors_and_driver_exit_remain_observable_on_repeated_close() {
                     drive(
                         &mut worker,
                         &mut context,
-                        pin!(selector.file_monitor_close(&mut monitor, &never))
+                        pin!(selector.file_monitor_close(&mut monitor))
                     )
                     .unwrap_err()
                     .kind(),
@@ -763,7 +762,7 @@ fn failed_eviction_remains_observable_after_another_migration() {
             .any(|file| !file.released())
     );
     for _ in 0..2 {
-        let mut close = pin!(selector.file_monitor_close(&mut monitor, &never));
+        let mut close = pin!(selector.file_monitor_close(&mut monitor));
         loop {
             if let Poll::Ready(result) = close.as_mut().poll(&mut context) {
                 assert_eq!(result.unwrap_err().kind(), io::ErrorKind::PermissionDenied);
@@ -777,7 +776,7 @@ fn failed_eviction_remains_observable_after_another_migration() {
 }
 
 #[test]
-fn close_waits_for_migration_release_on_the_original_ring_after_cancellation() {
+fn close_waits_for_migration_release_on_the_original_ring_after_abandonment() {
     let (selector, mut drivers) = IoUringSelector::with_workers(Default::default(), 2).unwrap();
     let (_directory, file) = super::super::tests::file(&selector);
     let mut monitor = selector.file_monitor(&file).unwrap();
@@ -795,18 +794,16 @@ fn close_waits_for_migration_release_on_the_original_ring_after_cancellation() {
     }
     assert_eq!(monitor.registration().retiring.len(), 1);
     assert!(!monitor.registration().retiring[0].released());
-    let cancellation = Cancellation::new();
     {
-        let mut close = pin!(selector.file_monitor_close(&mut monitor, &cancellation));
+        let mut close = pin!(selector.file_monitor_close(&mut monitor));
         assert!(close.as_mut().poll(&mut context).is_pending());
         drivers[1].turn(Some(Duration::ZERO)).unwrap();
         assert!(close.as_mut().poll(&mut context).is_pending());
-        cancellation.cancel();
-        assert!(matches!(block_on(close), Err(OperationError::Cancelled(_))));
+        // Leaving this scope drops the wait; the next close must finish retirement.
     }
     assert!(!monitor.registration().retiring[0].released());
     {
-        let mut close = pin!(selector.file_monitor_close(&mut monitor, &never));
+        let mut close = pin!(selector.file_monitor_close(&mut monitor));
         assert!(close.as_mut().poll(&mut context).is_pending());
         drivers[0].turn(Some(Duration::ZERO)).unwrap();
         block_on(close).unwrap();

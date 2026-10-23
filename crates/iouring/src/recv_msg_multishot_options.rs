@@ -3,9 +3,9 @@
 
 use std::io;
 
-/// Bounded storage for a sequence of received messages.
+/// Bounded provided-buffer storage for a concrete io_uring multishot receive.
 ///
-/// Backends may receive ahead, but need not do so. Held messages consume the configured buffers; returning a lease makes its storage available again.
+/// The ring may receive ahead. Held messages consume the configured buffers; returning a lease makes its storage available again.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct RecvMsgMultishotOptions {
     /// Number of reusable payload buffers, in 1..=32768.
@@ -24,7 +24,7 @@ impl Default for RecvMsgMultishotOptions {
 }
 
 impl RecvMsgMultishotOptions {
-    /// Validate portable size limits. Backends may have additional storage limits.
+    /// Validate provided-buffer count and payload size limits.
     pub fn validate(self) -> io::Result<()> {
         if self.buffers == 0
             || self.buffers > 32768

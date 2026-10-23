@@ -74,10 +74,7 @@ where
                 count = read.0.unwrap();
             }
             assert_eq!(copied, bytes);
-            scheduler
-                .file_monitor_close(&mut monitor, &never)
-                .await
-                .unwrap();
+            scheduler.file_monitor_close(&mut monitor).await.unwrap();
             drop(monitor);
             None
         } else {
@@ -126,7 +123,7 @@ where
         if mode != "vec-join" && mode != "vec-serial" {
             assert_eq!(copied, bytes);
         }
-        receiver.close(scheduler, &never).await.unwrap();
+        receiver.close(scheduler).await.unwrap();
         drop(receiver);
         scheduler.file_close(input).await.unwrap();
         scheduler.file_close(output).await.unwrap();

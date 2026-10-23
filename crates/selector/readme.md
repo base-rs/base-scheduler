@@ -28,7 +28,7 @@ Call `shutdown().await` after coordinating application cancellation and cleanup.
 
 `SelectorDriver` and `SelectorWorker` support executor-owned event loops. A movable driver enters one worker, consuming itself into a possibly thread-bound owner. That owner provides interruptible waits and bounded completion batches. Completion processing wakes tasks; the executor polls its ready queue only after the driver returns. Selectors with independent progress, such as `ReadinessSelector`, do not need to implement this optional driving contract.
 
-`SocketRecvMsgMultishot` emulates a bounded receive sequence with borrowed nonblocking message operations. It receives on demand into reserved reusable storage and returns immutable owned buffer leases; holding every lease pauses reception until storage returns. No background receive task or per-message payload allocation is needed. Pass the scheduler and cancellation explicitly to each `recv`; `close` releases the retained socket while preserving returned leases, including after scheduler admission closes.
+`SocketReceiving` constructs a portable receiver from a scheduler-created buffer pool. Receive and close take the scheduler explicitly. Completed messages expose mutable payloads which can be frozen into retained views. Close awaits retirement without cancellation; drop the receiver afterwards to release its socket owner before exclusive socket close. Explicit multishot kernel control remains a concrete io_uring API accessed through the selector.
 
 ## Releasing
 

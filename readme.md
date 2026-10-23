@@ -82,7 +82,7 @@ async fn read_chunk<S: FileMonitoring>(
     let (result, buffer) = scheduler
         .file_monitor_read_at(&mut reader, vec![0; 4096], 0, cancellation)
         .await;
-    scheduler.file_monitor_close(&mut reader, &Cancellation::never()).await?;
+    scheduler.file_monitor_close(&mut reader).await?;
     result?;
     Ok(buffer)
 }
@@ -110,7 +110,7 @@ where
     let result = scheduler
         .socket_monitor_recv_poll(&mut reader, buffer, SocketRecvFlags::default(), cancellation)
         .await;
-    scheduler.socket_monitor_close(&mut reader, &Cancellation::never()).await?;
+    scheduler.socket_monitor_close(&mut reader).await?;
     result
 }
 ```
@@ -119,7 +119,9 @@ Retain the monitor across operations to reuse its registration. Create separate 
 
 ## Receiving message sequences
 
-`SocketRecvMsgMultishot` is an optional bounded receive capability. Its receiver returns owned `IoBuf` message leases via `recv(scheduler, cancellation)`, with metadata, truncation, and stream EOF semantics. io_uring uses kernel multishot receives; readiness backends use on-demand nonblocking receives and a fixed reusable buffer pool. Neither a background task nor a payload allocation per message is required. Receivers retain resources, while each receive and close takes its scheduler explicitly.
+`SocketReceiving` constructs a receiver from an explicit scheduler-created pool. `recv(scheduler, cancellation)` returns owned messages exposing payload and address views; completed storage can be parsed, frozen, and retained independently of further receives. The backend chooses demand-driven or receive-ahead behavior. For shutdown, cancel and await the pending receive, await `receiver.close(scheduler)`, then drop the receiver before exclusively closing its socket. Monitor and receiver close methods take no cancellation token. The concrete io_uring multishot constructor remains a backend experiment.
+
+The [scheduler interface reference](context/interface.md) lists every portable capability, its arguments and result semantics, and the separate backend driver hooks.
 
 ## Cancellation, ownership, and completion
 

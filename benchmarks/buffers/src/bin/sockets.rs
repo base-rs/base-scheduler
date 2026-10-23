@@ -2,6 +2,13 @@
 // Copyright, 2026, by Samuel Williams.
 
 use core_scheduler::*;
+#[cfg(target_os = "linux")]
+#[path = "../multishot.rs"]
+mod multishot;
+#[cfg(not(target_os = "linux"))]
+use core_scheduler::SocketReceiving as Multishot;
+#[cfg(target_os = "linux")]
+use multishot::Multishot;
 use std::{
     io::{IoSliceMut, Read, Write},
     net::{TcpListener, UdpSocket},
@@ -37,11 +44,7 @@ async fn run<S>(
     group: &ConnectionGroup<S::Pool>,
 ) -> serde_json::Value
 where
-    S: SocketScheduler
-        + SocketMonitoring
-        + SocketReceiving
-        + SocketRecvMsgMultishot
-        + SocketSetOption<TcpNoDelay>,
+    S: SocketScheduler + SocketMonitoring + Multishot + SocketSetOption<TcpNoDelay>,
     S::Socket: 'static,
 {
     let mode = workload.mode.as_str();
@@ -151,18 +154,11 @@ where
     let mut writable = scheduler
         .socket_monitor(&socket, Interest::Writable)
         .unwrap();
+    #[cfg(target_os = "linux")]
     let mut multishot = if matches!(mode, "multi" | "multi-retain") {
         Some(
             scheduler
-                .socket_recvmsg_multishot(
-                    &socket,
-                    RecvMsgMultishotOptions {
-                        buffers: (window + 2).max(8).try_into().unwrap(),
-                        buffer_size: size,
-                    },
-                    SocketRecvFlags::default(),
-                    &never,
-                )
+                .multishot(&socket, (window + 2).max(8), size, &never)
                 .await
                 .unwrap(),
         )
@@ -172,6 +168,7 @@ where
     let payload = vec![42; size];
     let mut raw = vec![0; size];
     let mut retained = None;
+    #[cfg(target_os = "linux")]
     let mut retained_multi = None;
     let mut receive_calls = 0_u64;
     let mut short_receives = 0_u64;
@@ -248,6 +245,7 @@ where
                     }
                     count
                 }
+                #[cfg(target_os = "linux")]
                 "multi" | "multi-retain" => {
                     let message = multishot
                         .as_mut()
@@ -279,7 +277,9 @@ where
     }
     let elapsed = start.elapsed();
     drop(retained);
+    #[cfg(target_os = "linux")]
     drop(retained_multi);
+    #[cfg(target_os = "linux")]
     if let Some(mut multishot) = multishot {
         multishot.close(scheduler).await.unwrap();
     }
@@ -287,14 +287,8 @@ where
         receiver.close(scheduler).await.unwrap();
     }
     drop(receiver);
-    scheduler
-        .socket_monitor_close(&mut readable, &never)
-        .await
-        .unwrap();
-    scheduler
-        .socket_monitor_close(&mut writable, &never)
-        .await
-        .unwrap();
+    scheduler.socket_monitor_close(&mut readable).await.unwrap();
+    scheduler.socket_monitor_close(&mut writable).await.unwrap();
     drop((readable, writable));
     scheduler.socket_close(socket).await.unwrap();
     peer.join().unwrap();
@@ -305,8 +299,7 @@ async fn run_group<S>(scheduler: Arc<S>, workload: Workload, pool: S::Pool) -> s
 where
     S: SocketScheduler
         + SocketMonitoring
-        + SocketReceiving
-        + SocketRecvMsgMultishot
+        + Multishot
         + SocketSetOption<TcpNoDelay>
         + Spawn
         + Send
@@ -370,7 +363,12 @@ fn execute(args: &[String]) -> serde_json::Value {
     let backend = args.get(1).map(String::as_str).unwrap_or("native");
     let mode = args.get(2).map(String::as_str).unwrap_or("pool");
     assert!(
-        matches!(mode, "raw" | "pool" | "shared" | "multi" | "multi-retain"),
+        match mode {
+            "raw" | "pool" | "shared" => true,
+            #[cfg(target_os = "linux")]
+            "multi" | "multi-retain" => backend == "iouring",
+            _ => false,
+        },
         "unknown receiver mode"
     );
     let size: usize = args.get(3).map(|s| s.parse().unwrap()).unwrap_or(65536);
@@ -514,6 +512,12 @@ mod tests {
     use super::*;
 
     #[test]
+    #[should_panic(expected = "unknown receiver mode")]
+    fn rejects_multishot_on_portable_backends() {
+        execute(&["sockets", "tokio", "multi"].map(str::to_owned));
+    }
+
+    #[test]
     fn receivers_preserve_tcp_and_udp_data_on_each_backend() {
         #[cfg(target_os = "linux")]
         let backends = ["direct", "tokio", "native", "iouring"];
@@ -521,6 +525,9 @@ mod tests {
         let backends = ["direct", "tokio", "native"];
         for backend in backends {
             for mode in ["raw", "pool", "shared", "multi", "multi-retain"] {
+                if mode.starts_with("multi") && backend != "iouring" {
+                    continue;
+                }
                 for transport in ["tcp", "udp"] {
                     for traffic in ["echo", "receive"] {
                         let args = [

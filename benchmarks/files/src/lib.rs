@@ -42,10 +42,7 @@ where
     let (_, buffer) = scheduler
         .file_monitor_read_at(&mut warm, vec![0; size], 0, &never)
         .await;
-    scheduler
-        .file_monitor_close(&mut warm, &never)
-        .await
-        .unwrap();
+    scheduler.file_monitor_close(&mut warm).await.unwrap();
     drop((warm, buffer));
     let started = Instant::now();
     for _ in 0..tasks {
@@ -87,10 +84,7 @@ where
                             steady_start = Instant::now();
                         }
                     }
-                    scheduler
-                        .file_monitor_close(&mut monitor, &never)
-                        .await
-                        .unwrap();
+                    scheduler.file_monitor_close(&mut monitor).await.unwrap();
                     steady_start.elapsed().as_nanos() as u64
                 })
                 .unwrap(),

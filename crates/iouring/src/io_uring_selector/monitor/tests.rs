@@ -105,7 +105,7 @@ fn repeated_notifications_retain_one_registration_without_allocations() {
         }
         generation = Some(current);
     }
-    let mut close = pin!(selector.socket_monitor_close(&mut reader, &never));
+    let mut close = pin!(selector.socket_monitor_close(&mut reader));
     drive(&mut worker, &mut context, close.as_mut()).unwrap();
     assert!(!inspect.registration().status.lock().unwrap().pending);
 }
@@ -202,7 +202,7 @@ fn short_stream_reads_clear_readiness_only_on_would_block_and_preserve_eof() {
         .unwrap(),
         0
     );
-    let mut close = pin!(selector.socket_monitor_close(&mut reader, &never));
+    let mut close = pin!(selector.socket_monitor_close(&mut reader));
     drive(&mut worker, &mut context, close.as_mut()).unwrap();
 }
 
@@ -319,7 +319,7 @@ fn shutdown_readiness_survives_the_last_short_receive() {
         .unwrap(),
         0
     );
-    let mut close = pin!(selector.socket_monitor_close(&mut reader, &never));
+    let mut close = pin!(selector.socket_monitor_close(&mut reader));
     drive(&mut worker, &mut context, close.as_mut()).unwrap();
 }
 
@@ -540,7 +540,7 @@ fn cancelled_and_dropped_waiters_leave_the_registration_active() {
         io::ErrorKind::WouldBlock
     );
     assert_eq!(
-        block_on(selector.socket_monitor_close(&mut alias, &never))
+        block_on(selector.socket_monitor_close(&mut alias))
             .unwrap_err()
             .kind(),
         io::ErrorKind::WouldBlock
@@ -643,10 +643,10 @@ fn close_drains_the_registration_and_rejects_subsequent_operations() {
     assert!(waiting.as_mut().poll(&mut context).is_pending());
     drop(waiting);
     // Cancellation before the submission command is processed needs no kernel cancellation.
-    let mut closing = Box::pin(selector.socket_monitor_close(&mut reader, &never));
+    let mut closing = Box::pin(selector.socket_monitor_close(&mut reader));
     drive(&mut worker, &mut context, closing.as_mut()).unwrap();
     drop(closing);
-    block_on(selector.socket_monitor_close(&mut reader, &never)).unwrap();
+    block_on(selector.socket_monitor_close(&mut reader)).unwrap();
     assert_eq!(
         block_on(selector.socket_monitor_wait(&mut reader, &never))
             .unwrap_err()
@@ -725,7 +725,7 @@ fn registrations_do_not_consume_transient_operation_capacity() {
         0
     );
     for reader in &mut readers {
-        let mut close = pin!(selector.socket_monitor_close(reader, &never));
+        let mut close = pin!(selector.socket_monitor_close(reader));
         drive(&mut worker, &mut context, close.as_mut()).unwrap();
     }
 }
@@ -840,7 +840,7 @@ fn incompatible_closed_selectors_and_exhausted_ids_reject_waits() {
         io::ErrorKind::InvalidInput
     );
     assert_eq!(
-        block_on(other.socket_monitor_close(&mut reader, &Cancellation::never()))
+        block_on(other.socket_monitor_close(&mut reader))
             .unwrap_err()
             .kind(),
         io::ErrorKind::InvalidInput
@@ -1094,7 +1094,7 @@ fn a_later_wait_rebinds_to_its_new_workers_ring_after_retirement() {
             peer.write_all(b"x").unwrap();
             drive(&mut worker, &mut context, waiting.as_mut()).unwrap();
             drop(waiting);
-            let mut close = pin!(selector.socket_monitor_close(&mut reader, &never));
+            let mut close = pin!(selector.socket_monitor_close(&mut reader));
             drive(&mut worker, &mut context, close.as_mut()).unwrap();
             finished.store(true, Ordering::Release);
         });
@@ -1192,7 +1192,7 @@ fn shutdown_retires_active_and_accepted_queued_monitors() {
 }
 
 #[test]
-fn cancelling_close_leaves_retirement_running_and_can_be_awaited_again() {
+fn dropping_close_leaves_retirement_running_and_can_be_awaited_again() {
     let (selector, driver) = IoUringSelector::new(options()).unwrap();
     let mut worker = driver.enter();
     let wake = worker.waker();
@@ -1207,12 +1207,10 @@ fn cancelling_close_leaves_retirement_running_and_can_be_awaited_again() {
     worker.turn(Some(Duration::ZERO)).unwrap();
     worker.turn(Some(Duration::ZERO)).unwrap();
     drop(waiting);
-    let cancellation = Cancellation::new();
-    let mut close = Box::pin(selector.socket_monitor_close(&mut reader, &cancellation));
+    let mut close = Box::pin(selector.socket_monitor_close(&mut reader));
     assert!(close.as_mut().poll(&mut context).is_pending());
-    cancellation.cancel();
-    assert!(matches!(block_on(close), Err(OperationError::Cancelled(_))));
-    let mut close = pin!(selector.socket_monitor_close(&mut reader, &never));
+    drop(close);
+    let mut close = pin!(selector.socket_monitor_close(&mut reader));
     drive(&mut worker, &mut context, close.as_mut()).unwrap();
 }
 
@@ -1300,7 +1298,7 @@ fn datagram_boundaries_including_empty_messages_reuse_one_registration() {
         }
         generation = Some(current);
     }
-    let mut close = pin!(selector.socket_monitor_close(&mut reader, &never));
+    let mut close = pin!(selector.socket_monitor_close(&mut reader));
     drive(&mut worker, &mut context, close.as_mut()).unwrap();
 }
 
@@ -1486,7 +1484,7 @@ fn urgent_tcp_boundary<M: SocketMonitorState<NativeSocket, IoUringMonitorRegistr
                 0
             );
         }
-        let mut close = pin!(selector.socket_monitor_close(&mut reader, &never));
+        let mut close = pin!(selector.socket_monitor_close(&mut reader));
         drive(&mut worker, &mut context, close.as_mut()).unwrap();
     }
 }
@@ -1585,10 +1583,9 @@ fn a_close_caller_can_release_its_socket_before_the_completion_wake_returns() {
         resume: Mutex::new(resumed),
     }));
     let mut context = Context::from_waker(&waker);
-    let never = Cancellation::never();
     let mut thread = None;
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        let mut close = Box::pin(selector.socket_monitor_close(&mut monitor, &never));
+        let mut close = Box::pin(selector.socket_monitor_close(&mut monitor));
         assert!(close.as_mut().poll(&mut context).is_pending());
         thread = Some(std::thread::spawn(move || submission.finish(Ok(()))));
         // Hold the completing driver inside the wake callback while independently repolling close.

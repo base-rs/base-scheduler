@@ -92,9 +92,61 @@ impl FileWriteAt for Files {
 }
 impl FileMonitoring for Files {
     type FileRegistration = ();
+    async fn file_monitor_close(&self, monitor: &mut FileMonitor<Self::File>) -> io::Result<()> {
+        match monitor.file().load(Ordering::Relaxed) {
+            100 => std::future::pending().await,
+            101 => Err(io::ErrorKind::InvalidInput.into()),
+            102 => Err(io::ErrorKind::BrokenPipe.into()),
+            _ => Ok(()),
+        }
+    }
     fn file_monitor(&self, file: &Self::File) -> io::Result<FileMonitor<Self::File>> {
         Ok(FileMonitor::new(file.clone(), ()))
     }
+}
+
+#[test]
+fn close_abandonment_and_errors_never_restart_reception() {
+    block_on(async {
+        let scheduler = Files {
+            written: Mutex::new(Vec::new()),
+            limit: 8,
+        };
+        let never = Cancellation::never();
+        let file = Arc::new(AtomicUsize::new(1));
+        let pool = TestPool(HeapBufferPool::new(1, 8).unwrap());
+        let mut receiver = FileReceiver::new(scheduler.file_monitor(&file).unwrap(), pool.clone());
+        file.store(1, Ordering::Relaxed);
+        let held = receiver.recv(&scheduler, &never).await.unwrap().unwrap();
+        assert_eq!(held.as_ref(), &[42; 8]);
+        assert!(pool.try_acquire().is_none());
+        file.store(100, Ordering::Relaxed);
+        {
+            let mut close = std::pin::pin!(receiver.close(&scheduler));
+            assert!(
+                futures_lite::future::poll_once(close.as_mut())
+                    .await
+                    .is_none()
+            );
+        }
+        let result = futures_lite::future::poll_once(receiver.recv(&scheduler, &never))
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(result.is_none());
+        file.store(102, Ordering::Relaxed);
+        assert_eq!(
+            receiver.close(&scheduler).await.unwrap_err().kind(),
+            io::ErrorKind::BrokenPipe
+        );
+        file.store(101, Ordering::Relaxed);
+        assert!(receiver.close(&scheduler).await.is_err());
+        assert!(receiver.recv(&scheduler, &never).await.unwrap().is_none());
+        file.store(1, Ordering::Relaxed);
+        receiver.close(&scheduler).await.unwrap();
+        receiver.close(&scheduler).await.unwrap();
+        assert_eq!(held.as_ref(), &[42; 8]);
+    });
 }
 impl FileSubmission for Files {
     async fn file_read_submit<B: IoBufMut>(
@@ -244,12 +296,12 @@ fn receiver_distinguishes_retryable_rejection_from_terminal_io_failure() {
         );
         let cancelled = Cancellation::new();
         cancelled.cancel();
-        assert!(receiver.close(&scheduler, &cancelled).await.is_err());
+        drop(receiver.close(&scheduler));
         assert!(receiver.recv(&scheduler, &never).await.unwrap().is_some());
         file.store(4, Ordering::Relaxed);
         assert!(receiver.recv(&scheduler, &never).await.is_err());
         assert!(receiver.recv(&scheduler, &never).await.unwrap().is_none());
-        receiver.close(&scheduler, &never).await.unwrap();
+        receiver.close(&scheduler).await.unwrap();
     });
 }
 
@@ -275,6 +327,6 @@ fn cancellation_during_capacity_wait_preserves_file_reception() {
         }
         drop(held);
         assert!(receiver.recv(&scheduler, &never).await.unwrap().is_some());
-        receiver.close(&scheduler, &never).await.unwrap();
+        receiver.close(&scheduler).await.unwrap();
     });
 }

@@ -77,10 +77,7 @@ pub fn run_migration(
             std::hint::black_box(buffer[0]);
         }
         let task_elapsed = start.elapsed();
-        selector
-            .file_monitor_close(&mut monitor, &never)
-            .await
-            .unwrap();
+        selector.file_monitor_close(&mut monitor).await.unwrap();
         let elapsed = start.elapsed();
         drop(monitor);
         selector.file_close(file).await.unwrap();
