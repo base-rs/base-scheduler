@@ -162,6 +162,9 @@ fn short_stream_reads_clear_readiness_only_on_would_block_and_preserve_eof() {
         assert_eq!(attempts.load(Ordering::Relaxed), 1);
         worker.turn(Some(Duration::ZERO)).unwrap();
         peer.write_all(b"two").unwrap();
+        until(&mut worker, || {
+            inspect.registration().readiness.load(Ordering::Acquire) & READY != 0
+        });
         assert_eq!(
             drive(&mut worker, &mut context, receive.as_mut()).unwrap(),
             3
@@ -539,6 +542,18 @@ fn cancelled_and_dropped_waiters_leave_the_registration_active() {
             .kind(),
         io::ErrorKind::WouldBlock
     );
+    let mut unavailable = [0];
+    assert_eq!(
+        block_on(selector.socket_monitor_recv_poll(
+            &mut alias,
+            &mut unavailable,
+            SocketRecvFlags::default(),
+            &never
+        ))
+        .unwrap_err()
+        .kind(),
+        io::ErrorKind::WouldBlock
+    );
     assert_eq!(
         block_on(selector.socket_monitor_close(&mut alias))
             .unwrap_err()
@@ -866,6 +881,17 @@ fn incompatible_closed_selectors_and_exhausted_ids_reject_waits() {
             .kind(),
         io::ErrorKind::Other
     );
+    assert_eq!(
+        block_on(selector.socket_monitor_recv_poll(
+            &mut reader,
+            &mut byte,
+            SocketRecvFlags::default(),
+            &Cancellation::never()
+        ))
+        .unwrap_err()
+        .kind(),
+        io::ErrorKind::Other
+    );
     selector.close();
     assert!(
         selector
@@ -927,17 +953,24 @@ fn interrupted_syscalls_retry_and_observe_cancellation_and_closure() {
         ),
         Err(OperationError::Cancelled(_))
     ));
-    assert_eq!(
-        block_on(
-            selector.monitor_io::<(), _>(&writer, Interest::Writable, &never, |_| {
-                selector.close();
-                Err(io::ErrorKind::Interrupted.into())
-            })
-        )
-        .unwrap_err()
-        .kind(),
-        io::ErrorKind::BrokenPipe
-    );
+    for kind in [io::ErrorKind::Interrupted, io::ErrorKind::WouldBlock] {
+        let (selector, _driver) = IoUringSelector::new(options()).unwrap();
+        let (socket, _peer) = sockets(&selector);
+        let writer = selector
+            .socket_monitor(&socket, Interest::Writable)
+            .unwrap();
+        assert_eq!(
+            block_on(
+                selector.monitor_io::<(), _>(&writer, Interest::Writable, &never, |_| {
+                    selector.close();
+                    Err(kind.into())
+                })
+            )
+            .unwrap_err()
+            .kind(),
+            io::ErrorKind::BrokenPipe
+        );
+    }
 }
 
 #[test]
@@ -1036,6 +1069,9 @@ fn one_shot_compatibility_waits_rearm_after_each_terminal_completion() {
         ));
         assert!(read.as_mut().poll(&mut context).is_pending());
         peer.write_all(b"x").unwrap();
+        until(&mut worker, || {
+            !inspect.registration().status.lock().unwrap().pending
+        });
         assert_eq!(drive(&mut worker, &mut context, read.as_mut()).unwrap(), 1);
         assert!(!inspect.registration().status.lock().unwrap().pending);
     }
@@ -1101,8 +1137,7 @@ fn a_later_wait_rebinds_to_its_new_workers_ring_after_retirement() {
     });
 }
 
-#[test]
-fn an_active_monitor_future_can_move_to_another_workers_thread() {
+fn move_active_monitor_future(receive_payload: bool) {
     let (selector, mut drivers) = IoUringSelector::with_workers(options(), 2).unwrap();
     let (socket, mut peer) = sockets(&selector);
     let mut reader = selector
@@ -1110,7 +1145,23 @@ fn an_active_monitor_future_can_move_to_another_workers_thread() {
         .unwrap();
     let never = Cancellation::never();
     let inspect = reader.retained();
-    let waiting = Box::pin(selector.socket_monitor_wait(&mut reader, &never));
+    let mut byte = [0];
+    let waiting: Pin<Box<dyn Future<Output = OperationResult<usize>> + Send + '_>> =
+        if receive_payload {
+            Box::pin(selector.socket_monitor_recv_poll(
+                &mut reader,
+                &mut byte,
+                SocketRecvFlags::default(),
+                &never,
+            ))
+        } else {
+            Box::pin(async {
+                selector
+                    .socket_monitor_wait(&mut reader, &never)
+                    .await
+                    .map(|()| 0)
+            })
+        };
     let second_driver = drivers.pop().unwrap();
     let first_driver = drivers.pop().unwrap();
     let (handoff, receive) = mpsc::channel();
@@ -1149,10 +1200,26 @@ fn an_active_monitor_future_can_move_to_another_workers_thread() {
                 ));
             }
             peer.write_all(b"x").unwrap();
-            drive(&mut worker, &mut context, waiting.as_mut()).unwrap();
+            assert_eq!(
+                drive(&mut worker, &mut context, Pin::new(&mut waiting)).unwrap(),
+                usize::from(receive_payload)
+            );
             finished.store(true, Ordering::Release);
         });
     });
+    if receive_payload {
+        assert_eq!(byte, [b'x']);
+    }
+}
+
+#[test]
+fn an_active_monitor_future_can_move_to_another_workers_thread() {
+    move_active_monitor_future(false);
+}
+
+#[test]
+fn an_active_monitor_receive_can_move_to_another_workers_thread() {
+    move_active_monitor_future(true);
 }
 
 #[test]
@@ -1601,4 +1668,128 @@ fn a_close_caller_can_release_its_socket_before_the_completion_wake_returns() {
     let _ = resume.send(());
     thread.unwrap().join().unwrap();
     result.unwrap();
+}
+
+#[test]
+fn repolling_a_pending_receive_can_read_before_the_driver_reports_readiness() {
+    let (selector, driver) = IoUringSelector::new(options()).unwrap();
+    let mut worker = driver.enter();
+    let waker = worker.waker();
+    let mut context = Context::from_waker(&waker);
+    let (socket, mut peer) = sockets(&selector);
+    let mut reader = selector
+        .socket_monitor(&socket, Interest::Readable)
+        .unwrap();
+    let never = Cancellation::never();
+    let mut bytes = [0; 8];
+    {
+        let mut receive = pin!(selector.socket_monitor_recv_poll(
+            &mut reader,
+            &mut bytes,
+            SocketRecvFlags::default(),
+            &never,
+        ));
+        assert!(receive.as_mut().poll(&mut context).is_pending());
+        // The registration is queued but the driver has not published any readiness. An independent wake must still be able to make synchronous progress.
+        peer.write_all(b"ready").unwrap();
+        assert!(matches!(
+            receive.as_mut().poll(&mut context),
+            Poll::Ready(Ok(5))
+        ));
+    }
+    assert_eq!(&bytes[..5], b"ready");
+    // Successful completion released the waiter claim, so the next operation can wait normally.
+    {
+        let mut receive = pin!(selector.socket_monitor_recv_poll(
+            &mut reader,
+            &mut bytes,
+            SocketRecvFlags::default(),
+            &never,
+        ));
+        assert!(receive.as_mut().poll(&mut context).is_pending());
+        peer.write_all(b"again").unwrap();
+        assert_eq!(
+            drive(&mut worker, &mut context, receive.as_mut()).unwrap(),
+            5
+        );
+    }
+    assert_eq!(&bytes[..5], b"again");
+    let mut close = pin!(selector.socket_monitor_close(&mut reader));
+    drive(&mut worker, &mut context, close.as_mut()).unwrap();
+}
+
+#[test]
+fn cancelling_a_pending_receive_preserves_bytes_that_are_already_available() {
+    let (selector, driver) = IoUringSelector::new(options()).unwrap();
+    let mut worker = driver.enter();
+    let waker = worker.waker();
+    let mut context = Context::from_waker(&waker);
+    let (socket, mut peer) = sockets(&selector);
+    let mut reader = selector
+        .socket_monitor(&socket, Interest::Readable)
+        .unwrap();
+    let cancellation = Cancellation::new();
+    let mut bytes = [0; 8];
+    {
+        let mut receive = pin!(selector.socket_monitor_recv_poll(
+            &mut reader,
+            &mut bytes,
+            SocketRecvFlags::default(),
+            &cancellation,
+        ));
+        assert!(receive.as_mut().poll(&mut context).is_pending());
+        peer.write_all(b"ready").unwrap();
+        cancellation.cancel();
+        assert!(matches!(
+            receive.as_mut().poll(&mut context),
+            Poll::Ready(Err(OperationError::Cancelled(_)))
+        ));
+    }
+    assert_eq!(
+        block_on(selector.socket_monitor_recv_poll(
+            &mut reader,
+            &mut bytes,
+            SocketRecvFlags::default(),
+            &Cancellation::never(),
+        ))
+        .unwrap(),
+        5
+    );
+    assert_eq!(&bytes[..5], b"ready");
+    let mut close = pin!(selector.socket_monitor_close(&mut reader));
+    drive(&mut worker, &mut context, close.as_mut()).unwrap();
+}
+
+#[test]
+fn cancellation_racing_would_block_does_not_wait_for_readiness() {
+    let (selector, _driver) = IoUringSelector::new(options()).unwrap();
+    let (socket, _peer) = sockets(&selector);
+    let mut reader = selector
+        .socket_monitor(&socket, Interest::Readable)
+        .unwrap();
+    let cancellation = Cancellation::new();
+    let signal = cancellation.clone();
+    super::super::tests::BEFORE_SYSCALL.with(|hook| {
+        *hook.borrow_mut() = Some((
+            "monitor-recv",
+            Box::new(move || {
+                signal.cancel();
+            }),
+        ));
+    });
+    let mut byte = [0];
+    let result = block_on(poll_once(selector.socket_monitor_recv_poll(
+        &mut reader,
+        &mut byte,
+        SocketRecvFlags::default(),
+        &cancellation,
+    )));
+    assert!(matches!(result, Some(Err(OperationError::Cancelled(_)))));
+    // Cancellation released the claim even though it arrived between preflight and listener registration.
+    assert!(
+        block_on(poll_once(
+            selector.socket_monitor_wait(&mut reader, &Cancellation::never())
+        ))
+        .is_none()
+    );
 }

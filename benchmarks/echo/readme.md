@@ -6,6 +6,8 @@ Compare pure Tokio, `TokioScheduler`, and `NativeScheduler<IoUringSelector>` usi
 
 The [initial Aiko results](results.md) include throughput, latency, variation across repetitions, and raw samples.
 
+The [Native monitor polling investigation](native-monitor.md) measures syscall-first resumption and records the rejected monitor-bookkeeping and ring-send experiments.
+
 The [Tokio future-construction comparison](tokio-future-construction.md) measures eliminating intermediate operation-state copies while preserving cancellation and readiness behavior.
 
 The [performance investigation](profiling.md) compares compiler settings, identifies CPU and syscall costs, and measures isolated optimization prototypes.

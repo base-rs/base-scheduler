@@ -1,0 +1,25 @@
+--- a/crates/iouring/src/io_uring_selector/monitor.rs
++++ b/crates/iouring/src/io_uring_selector/monitor.rs
+@@ -56,18 +56,14 @@
+         ));
+     }
+ 
+-    // `try_update` is not available on the supported Rust 1.85 toolchain.
+-    #[allow(deprecated)]
+     fn notify(&self) {
+         let waker = {
+             let mut status = self.status.lock().unwrap();
+             // The low bit caches readiness; the remaining bits distinguish notifications racing a syscall. Like readiness ticks in other reactors, this counter wraps.
+-            discard(
+-                self.readiness
+-                    .fetch_update(Ordering::AcqRel, Ordering::Acquire, |value| {
+-                        Some(value.wrapping_add(2) | READY)
+-                    }),
+-            );
++            // Notifications are serialized by `status`. A concurrent clear can only remove READY from the previous generation; this notification always publishes a new one.
++            let readiness = self.readiness.load(Ordering::Relaxed);
++            self.readiness
++                .store(readiness.wrapping_add(2) | READY, Ordering::Release);
+             status.waker.take()
+         };
+         wake(waker);

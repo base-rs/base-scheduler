@@ -1,0 +1,19 @@
+diff --git a/crates/iouring/src/io_uring_selector/socket.rs b/crates/iouring/src/io_uring_selector/socket.rs
+index 851a0da..08df1b5 100644
+--- a/crates/iouring/src/io_uring_selector/socket.rs
++++ b/crates/iouring/src/io_uring_selector/socket.rs
+@@ -90,14 +90,6 @@ impl SocketWrite for IoUringSelector {
+         if let Err(error) = self.check_open() {
+             return (Err(error.into()), buffer);
+         }
+-        // A ready socket can finish synchronously without publishing a request. No access to the owned buffer survives this nonblocking syscall.
+-        match syscall("socket-write", || {
+-            socket.try_send(buffer.as_ref(), SocketSendFlags::default())
+-        }) {
+-            Err(error) if error.kind() == io::ErrorKind::WouldBlock => {}
+-            Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
+-            result => return (operation_result(result, cancellation), buffer),
+-        }
+         let controller = self.route();
+         let (result, buffer) = retry_operation(
+             self,

@@ -1,0 +1,615 @@
+{
+  "created_utc": "2026-10-23T23:26:37.201554+00:00",
+  "hostname": "aiko",
+  "platform": "Linux-7.2.8-arch1-2-x86_64-with-glibc2.44",
+  "commit": "45fb36eda8c7542052b44ff981023dcf6a0389cd",
+  "patch": "diff --git a/crates/iouring/src/io_uring_selector/monitor.rs b/crates/iouring/src/io_uring_selector/monitor.rs\nindex 5ae89db..3863a68 100644\n--- a/crates/iouring/src/io_uring_selector/monitor.rs\n+++ b/crates/iouring/src/io_uring_selector/monitor.rs\n@@ -46,6 +46,7 @@ fn wake(waker: Option<Waker>) {\n }\n \n impl IoUringMonitorRegistration {\n+    #[inline]\n     fn clear_readiness(&self, observed: u64) {\n         // Preserve notifications published after the syscall took its readiness snapshot.\n         discard(self.readiness.compare_exchange(\n@@ -56,18 +57,14 @@ impl IoUringMonitorRegistration {\n         ));\n     }\n \n-    // `try_update` is not available on the supported Rust 1.85 toolchain.\n-    #[allow(deprecated)]\n     fn notify(&self) {\n         let waker = {\n             let mut status = self.status.lock().unwrap();\n             // The low bit caches readiness; the remaining bits distinguish notifications racing a syscall. Like readiness ticks in other reactors, this counter wraps.\n-            discard(\n-                self.readiness\n-                    .fetch_update(Ordering::AcqRel, Ordering::Acquire, |value| {\n-                        Some(value.wrapping_add(2) | READY)\n-                    }),\n-            );\n+            // Notifications are serialized by `status`. A concurrent clear can only remove READY from the previous generation; this notification always publishes a new one.\n+            let readiness = self.readiness.load(Ordering::Relaxed);\n+            self.readiness\n+                .store(readiness.wrapping_add(2) | READY, Ordering::Release);\n             status.waker.take()\n         };\n         wake(waker);\n@@ -107,8 +104,10 @@ impl MonitorState for IoUringMonitorRegistration {\n \n struct Wait<'a> {\n     storage: &'a State,\n+    registered: bool,\n }\n impl<'a> Wait<'a> {\n+    #[inline]\n     fn claim(storage: &'a State) -> io::Result<Self> {\n         if storage\n             .registration()\n@@ -121,20 +120,26 @@ impl<'a> Wait<'a> {\n                 \"socket monitor already has a waiter\",\n             ));\n         }\n-        Ok(Self { storage })\n+        Ok(Self {\n+            storage,\n+            registered: false,\n+        })\n     }\n }\n impl Drop for Wait<'_> {\n+    #[inline]\n     fn drop(&mut self) {\n-        let previous = self\n-            .storage\n-            .registration()\n-            .status\n-            .lock()\n-            .unwrap()\n-            .waker\n-            .take();\n-        discard(previous);\n+        if self.registered {\n+            let previous = self\n+                .storage\n+                .registration()\n+                .status\n+                .lock()\n+                .unwrap()\n+                .waker\n+                .take();\n+            discard(previous);\n+        }\n         self.storage\n             .registration()\n             .claimed\n@@ -143,6 +148,7 @@ impl Drop for Wait<'_> {\n }\n \n impl IoUringSelector {\n+    #[inline]\n     fn check_monitor(&self, monitor: &State) -> io::Result<()> {\n         self.check_open()?;\n         if !Arc::ptr_eq(&self.group, &monitor.registration().group) {\n@@ -166,7 +172,7 @@ impl IoUringSelector {\n         let registration = state.registration();\n         cancellation.check()?;\n         self.check_monitor(state)?;\n-        let _wait = Wait::claim(state)?;\n+        let mut wait = Wait::claim(state)?;\n         // Choose a route once for this wait. A suspended future can move without moving its active registration. The next wait may retire and rebind it after a worker change.\n         let controller = self.route();\n         let mut cancelled = pin!(cancellation.cancelled());\n@@ -178,6 +184,7 @@ impl IoUringSelector {\n             let replacement = context.waker().clone();\n             let (previous, submission, retirement) = {\n                 let mut status = registration.status.lock().unwrap();\n+                wait.registered = status.waker.is_some();\n                 if !status.retiring {\n                     if let Some(error) = status.error.take() {\n                         return Poll::Ready(Err(error.into()));\n@@ -215,6 +222,7 @@ impl IoUringSelector {\n                         generation,\n                     ));\n                 }\n+                wait.registered = true;\n                 (status.waker.replace(replacement), submission, retirement)\n             };\n             discard(previous);\n@@ -242,15 +250,17 @@ impl IoUringSelector {\n                 \"socket monitor belongs to another selector\",\n             ));\n         }\n-        let _wait = Wait::claim(state)?;\n+        let mut wait = Wait::claim(state)?;\n         registration.retire(true);\n         poll_fn(|context| {\n             let replacement = context.waker().clone();\n             let previous = {\n                 let mut status = registration.status.lock().unwrap();\n+                wait.registered = status.waker.is_some();\n                 if !status.pending {\n                     return Poll::Ready(Ok(()));\n                 }\n+                wait.registered = true;\n                 status.waker.replace(replacement)\n             };\n             discard(previous);",
+  "rustc": "rustc 1.99.0 (b940084d7 2026-09-28) (Arch Linux rust 1:1.99.0-1)",
+  "cpu_topology": "CPU CORE SOCKET NODE L1d:L1i:L2:L3\n  0    0      0    0 0:0:0:0\n  1    1      0    0 1:1:1:0\n  2    2      0    0 2:2:2:0\n  3    3      0    0 3:3:3:0\n  4    4      0    0 4:4:4:0\n  5    5      0    0 5:5:5:0\n  6    6      0    0 6:6:6:0\n  7    7      0    0 7:7:7:0\n  8    8      0    0 8:8:8:1\n  9    9      0    0 9:9:9:1\n 10   10      0    0 10:10:10:1\n 11   11      0    0 11:11:11:1\n 12   12      0    0 12:12:12:1\n 13   13      0    0 13:13:13:1\n 14   14      0    0 14:14:14:1\n 15   15      0    0 15:15:15:1\n 16    0      0    0 0:0:0:0\n 17    1      0    0 1:1:1:0\n 18    2      0    0 2:2:2:0\n 19    3      0    0 3:3:3:0\n 20    4      0    0 4:4:4:0\n 21    5      0    0 5:5:5:0\n 22    6      0    0 6:6:6:0\n 23    7      0    0 7:7:7:0\n 24    8      0    0 8:8:8:1\n 25    9      0    0 9:9:9:1\n 26   10      0    0 10:10:10:1\n 27   11      0    0 11:11:11:1\n 28   12      0    0 12:12:12:1\n 29   13      0    0 13:13:13:1\n 30   14      0    0 14:14:14:1\n 31   15      0    0 15:15:15:1",
+  "load_before": [
+    2.50927734375,
+    1.9384765625,
+    0.9130859375
+  ],
+  "arguments": {
+    "variants": [
+      "baseline:iouring-monitor:/home/samuel/.cache/core-scheduler-native-monitor/baseline",
+      "inline:iouring-monitor:/home/samuel/.cache/core-scheduler-native-monitor/monitor-inline"
+    ],
+    "output": "/home/samuel/.cache/core-scheduler-native-monitor/inline.json",
+    "workers": [
+      1
+    ],
+    "connections": [
+      32
+    ],
+    "bytes": [
+      64,
+      4096
+    ],
+    "repeats": 5,
+    "seconds": 3,
+    "seed": 8739
+  },
+  "binaries": {
+    "client": {
+      "path": "/home/samuel/Developer/core-rs/core-scheduler-monoio-echo/target/release/core-scheduler-echo-benchmark",
+      "sha256": "c72f7aea7151fb83020b096cfdaccc46a70b0eeff6bbb0a0e4ea4157d1aeb071"
+    },
+    "baseline": {
+      "path": "/home/samuel/.cache/core-scheduler-native-monitor/baseline",
+      "sha256": "11cacb91a3db2d4c9c89a5156eb9b0ed5bad3dc113ed3a25f48f099485c67ef6"
+    },
+    "inline": {
+      "path": "/home/samuel/.cache/core-scheduler-native-monitor/monitor-inline",
+      "sha256": "f3741296cd6c597c2185be43fe4151a09414b4a1f2d91e3bb3561571395ee467"
+    }
+  },
+  "samples": [
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 38.367655436197914,
+      "requests": 1885847,
+      "requests_per_second": 628615.6666666666,
+      "rtt_max_us": 215.807,
+      "rtt_mean_us": 50.84310534046499,
+      "rtt_p50_us": 50.783,
+      "rtt_p95_us": 53.759,
+      "rtt_p99_us": 55.231,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "backend": "iouring-monitor",
+      "workers": 1,
+      "client_workers": 4,
+      "server_cpus": [
+        0
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "variant": "baseline",
+      "repeat": 1
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 38.580708821614586,
+      "requests": 1896319,
+      "requests_per_second": 632106.3333333334,
+      "rtt_max_us": 217.087,
+      "rtt_mean_us": 50.558605579019115,
+      "rtt_p50_us": 50.463,
+      "rtt_p95_us": 53.471,
+      "rtt_p99_us": 54.943,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "backend": "iouring-monitor",
+      "workers": 1,
+      "client_workers": 4,
+      "server_cpus": [
+        0
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "variant": "inline",
+      "repeat": 1
+    },
+    {
+      "bytes": 4096,
+      "connections": 32,
+      "payload_mib_per_second": 2193.5677083333335,
+      "requests": 1684660,
+      "requests_per_second": 561553.3333333334,
+      "rtt_max_us": 225.023,
+      "rtt_mean_us": 56.88440155164845,
+      "rtt_p50_us": 56.799,
+      "rtt_p95_us": 60.063,
+      "rtt_p99_us": 61.663,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "backend": "iouring-monitor",
+      "workers": 1,
+      "client_workers": 4,
+      "server_cpus": [
+        0
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "variant": "baseline",
+      "repeat": 1
+    },
+    {
+      "bytes": 4096,
+      "connections": 32,
+      "payload_mib_per_second": 2206.4309895833335,
+      "requests": 1694539,
+      "requests_per_second": 564846.3333333334,
+      "rtt_max_us": 232.063,
+      "rtt_mean_us": 56.553312477907035,
+      "rtt_p50_us": 56.479,
+      "rtt_p95_us": 59.711,
+      "rtt_p99_us": 61.343,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "backend": "iouring-monitor",
+      "workers": 1,
+      "client_workers": 4,
+      "server_cpus": [
+        0
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "variant": "inline",
+      "repeat": 1
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 38.118428548177086,
+      "requests": 1873597,
+      "requests_per_second": 624532.3333333334,
+      "rtt_max_us": 216.575,
+      "rtt_mean_us": 51.17269093567081,
+      "rtt_p50_us": 51.103,
+      "rtt_p95_us": 54.047,
+      "rtt_p99_us": 55.455,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "backend": "iouring-monitor",
+      "workers": 1,
+      "client_workers": 4,
+      "server_cpus": [
+        0
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "variant": "baseline",
+      "repeat": 2
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 38.592631022135414,
+      "requests": 1896905,
+      "requests_per_second": 632301.6666666666,
+      "rtt_max_us": 208.255,
+      "rtt_mean_us": 50.5442061542354,
+      "rtt_p50_us": 50.463,
+      "rtt_p95_us": 53.439,
+      "rtt_p99_us": 54.879,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "backend": "iouring-monitor",
+      "workers": 1,
+      "client_workers": 4,
+      "server_cpus": [
+        0
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "variant": "inline",
+      "repeat": 2
+    },
+    {
+      "bytes": 4096,
+      "connections": 32,
+      "payload_mib_per_second": 2218.83984375,
+      "requests": 1704069,
+      "requests_per_second": 568023.0,
+      "rtt_max_us": 3135.487,
+      "rtt_mean_us": 56.235366330823574,
+      "rtt_p50_us": 56.127,
+      "rtt_p95_us": 59.391,
+      "rtt_p99_us": 60.991,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "backend": "iouring-monitor",
+      "workers": 1,
+      "client_workers": 4,
+      "server_cpus": [
+        0
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "variant": "baseline",
+      "repeat": 2
+    },
+    {
+      "bytes": 4096,
+      "connections": 32,
+      "payload_mib_per_second": 2245.8138020833335,
+      "requests": 1724785,
+      "requests_per_second": 574928.3333333334,
+      "rtt_max_us": 230.271,
+      "rtt_mean_us": 55.55925007464702,
+      "rtt_p50_us": 55.423,
+      "rtt_p95_us": 58.719,
+      "rtt_p99_us": 60.415,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "backend": "iouring-monitor",
+      "workers": 1,
+      "client_workers": 4,
+      "server_cpus": [
+        0
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "variant": "inline",
+      "repeat": 2
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 38.43389892578125,
+      "requests": 1889103,
+      "requests_per_second": 629701.0,
+      "rtt_max_us": 216.831,
+      "rtt_mean_us": 50.75291645294099,
+      "rtt_p50_us": 50.687,
+      "rtt_p95_us": 53.631,
+      "rtt_p99_us": 55.071,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "backend": "iouring-monitor",
+      "workers": 1,
+      "client_workers": 4,
+      "server_cpus": [
+        0
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "variant": "inline",
+      "repeat": 3
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 38.311909993489586,
+      "requests": 1883107,
+      "requests_per_second": 627702.3333333334,
+      "rtt_max_us": 218.751,
+      "rtt_mean_us": 50.917204978793,
+      "rtt_p50_us": 50.847,
+      "rtt_p95_us": 53.823,
+      "rtt_p99_us": 55.295,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "backend": "iouring-monitor",
+      "workers": 1,
+      "client_workers": 4,
+      "server_cpus": [
+        0
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "variant": "baseline",
+      "repeat": 3
+    },
+    {
+      "bytes": 4096,
+      "connections": 32,
+      "payload_mib_per_second": 2248.765625,
+      "requests": 1727052,
+      "requests_per_second": 575684.0,
+      "rtt_max_us": 218.879,
+      "rtt_mean_us": 55.48648314121399,
+      "rtt_p50_us": 55.359,
+      "rtt_p95_us": 58.623,
+      "rtt_p99_us": 60.191,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "backend": "iouring-monitor",
+      "workers": 1,
+      "client_workers": 4,
+      "server_cpus": [
+        0
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "variant": "inline",
+      "repeat": 3
+    },
+    {
+      "bytes": 4096,
+      "connections": 32,
+      "payload_mib_per_second": 2239.5026041666665,
+      "requests": 1719938,
+      "requests_per_second": 573312.6666666666,
+      "rtt_max_us": 221.695,
+      "rtt_mean_us": 55.71716784442232,
+      "rtt_p50_us": 55.615,
+      "rtt_p95_us": 58.879,
+      "rtt_p99_us": 60.479,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "backend": "iouring-monitor",
+      "workers": 1,
+      "client_workers": 4,
+      "server_cpus": [
+        0
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "variant": "baseline",
+      "repeat": 3
+    },
+    {
+      "bytes": 4096,
+      "connections": 32,
+      "payload_mib_per_second": 2222.44921875,
+      "requests": 1706841,
+      "requests_per_second": 568947.0,
+      "rtt_max_us": 217.215,
+      "rtt_mean_us": 56.14460963850768,
+      "rtt_p50_us": 56.031,
+      "rtt_p95_us": 59.295,
+      "rtt_p99_us": 60.863,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "backend": "iouring-monitor",
+      "workers": 1,
+      "client_workers": 4,
+      "server_cpus": [
+        0
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "variant": "baseline",
+      "repeat": 4
+    },
+    {
+      "bytes": 4096,
+      "connections": 32,
+      "payload_mib_per_second": 2249.10546875,
+      "requests": 1727313,
+      "requests_per_second": 575771.0,
+      "rtt_max_us": 224.255,
+      "rtt_mean_us": 55.476792868461075,
+      "rtt_p50_us": 55.359,
+      "rtt_p95_us": 58.655,
+      "rtt_p99_us": 60.223,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "backend": "iouring-monitor",
+      "workers": 1,
+      "client_workers": 4,
+      "server_cpus": [
+        0
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "variant": "inline",
+      "repeat": 4
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 38.518513997395836,
+      "requests": 1893262,
+      "requests_per_second": 631087.3333333334,
+      "rtt_max_us": 221.695,
+      "rtt_mean_us": 50.64258246666331,
+      "rtt_p50_us": 50.559,
+      "rtt_p95_us": 53.535,
+      "rtt_p99_us": 54.975,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "backend": "iouring-monitor",
+      "workers": 1,
+      "client_workers": 4,
+      "server_cpus": [
+        0
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "variant": "baseline",
+      "repeat": 4
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 38.469034830729164,
+      "requests": 1890830,
+      "requests_per_second": 630276.6666666666,
+      "rtt_max_us": 218.367,
+      "rtt_mean_us": 50.70633831967975,
+      "rtt_p50_us": 50.623,
+      "rtt_p95_us": 53.567,
+      "rtt_p99_us": 54.975,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "backend": "iouring-monitor",
+      "workers": 1,
+      "client_workers": 4,
+      "server_cpus": [
+        0
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "variant": "inline",
+      "repeat": 4
+    },
+    {
+      "bytes": 4096,
+      "connections": 32,
+      "payload_mib_per_second": 2222.2630208333335,
+      "requests": 1706698,
+      "requests_per_second": 568899.3333333334,
+      "rtt_max_us": 224.767,
+      "rtt_mean_us": 56.148414236144916,
+      "rtt_p50_us": 56.031,
+      "rtt_p95_us": 59.263,
+      "rtt_p99_us": 60.831,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "backend": "iouring-monitor",
+      "workers": 1,
+      "client_workers": 4,
+      "server_cpus": [
+        0
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "variant": "inline",
+      "repeat": 5
+    },
+    {
+      "bytes": 4096,
+      "connections": 32,
+      "payload_mib_per_second": 2233.5130208333335,
+      "requests": 1715338,
+      "requests_per_second": 571779.3333333334,
+      "rtt_max_us": 222.847,
+      "rtt_mean_us": 55.86695607804402,
+      "rtt_p50_us": 55.743,
+      "rtt_p95_us": 58.943,
+      "rtt_p99_us": 60.511,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "backend": "iouring-monitor",
+      "workers": 1,
+      "client_workers": 4,
+      "server_cpus": [
+        0
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "variant": "baseline",
+      "repeat": 5
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 38.4422607421875,
+      "requests": 1889514,
+      "requests_per_second": 629838.0,
+      "rtt_max_us": 222.591,
+      "rtt_mean_us": 50.74138743719283,
+      "rtt_p50_us": 50.623,
+      "rtt_p95_us": 53.599,
+      "rtt_p99_us": 54.975,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "backend": "iouring-monitor",
+      "workers": 1,
+      "client_workers": 4,
+      "server_cpus": [
+        0
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "variant": "inline",
+      "repeat": 5
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 38.092000325520836,
+      "requests": 1872298,
+      "requests_per_second": 624099.3333333334,
+      "rtt_max_us": 215.167,
+      "rtt_mean_us": 51.20914449569457,
+      "rtt_p50_us": 51.103,
+      "rtt_p95_us": 54.047,
+      "rtt_p99_us": 55.455,
+      "seconds": 3.0,
+      "warmup_seconds": 1.0,
+      "backend": "iouring-monitor",
+      "workers": 1,
+      "client_workers": 4,
+      "server_cpus": [
+        0
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "variant": "baseline",
+      "repeat": 5
+    }
+  ],
+  "load_after": [
+    2.46142578125,
+    2.04638671875,
+    1.03759765625
+  ]
+}
