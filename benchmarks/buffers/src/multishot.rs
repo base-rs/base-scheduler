@@ -37,6 +37,31 @@ impl Multishot for core_scheduler_native::NativeScheduler {
     type Receiver = <Self as SocketReceiving>::PooledReceiver;
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn portable_backends_reject_the_retired_multishot_control() {
+        let scheduler = core_scheduler_direct::DirectScheduler::new(Default::default()).unwrap();
+        futures_lite::future::block_on(async {
+            let never = Cancellation::never();
+            let socket = scheduler
+                .socket_open(SocketDomain::Ipv4, SocketType::Datagram, None, &never)
+                .await
+                .unwrap();
+            let error = scheduler
+                .multishot(&socket, 8, 64, &never)
+                .await
+                .err()
+                .unwrap();
+            assert_eq!(error.kind(), std::io::ErrorKind::Unsupported);
+            scheduler.socket_close(socket).await.unwrap();
+            scheduler.shutdown().await;
+        });
+    }
+}
+
 #[cfg(target_os = "linux")]
 mod iouring {
     use super::*;

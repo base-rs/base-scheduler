@@ -114,9 +114,13 @@ impl<M: crate::MonitorState, P: BufferPool> SocketReceiver<M, P> {
         S::Socket: 'static,
         M: SocketMonitorState<S::Socket, S::MonitorRegistration>,
     {
-        scheduler.socket_monitor_close(&mut self.monitor).await?;
-        self.terminal = true;
-        Ok(())
+        // Stop reception before a close can suspend. An incompatible scheduler rejects without progress, so that one error preserves the previous receive state.
+        let terminal = std::mem::replace(&mut self.terminal, true);
+        let result = scheduler.socket_monitor_close(&mut self.monitor).await;
+        if matches!(&result, Err(error) if error.kind() == std::io::ErrorKind::InvalidInput) {
+            self.terminal = terminal;
+        }
+        result
     }
 }
 

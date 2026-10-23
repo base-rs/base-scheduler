@@ -123,6 +123,17 @@ impl SocketWait for Sockets {
 }
 impl SocketMonitoring for Sockets {
     type MonitorRegistration = ();
+    async fn socket_monitor_close<M: SocketMonitorState<Self::Socket, ()>>(
+        &self,
+        monitor: &mut MonitorStorage<M>,
+    ) -> io::Result<()> {
+        match monitor.as_ref().socket().load(Ordering::Relaxed) {
+            100 => pending().await,
+            101 => Err(io::ErrorKind::InvalidInput.into()),
+            102 => Err(io::ErrorKind::BrokenPipe.into()),
+            _ => Ok(()),
+        }
+    }
     fn socket_monitor_state(
         &self,
         socket: &Self::Socket,
@@ -130,6 +141,53 @@ impl SocketMonitoring for Sockets {
     ) -> io::Result<SocketMonitor<Self::Socket, ()>> {
         Ok(SocketMonitor::new(socket.clone(), interest, ()))
     }
+}
+
+#[test]
+fn close_abandonment_stops_receiving_but_incompatible_close_preserves_it() {
+    block_on(async {
+        let never = Cancellation::never();
+        let socket = Arc::new(AtomicUsize::new(101));
+        let pool = TestPool(HeapBufferPool::new(1, 8).unwrap());
+        let mut receiver = SocketReceiver::new(
+            Sockets.socket_monitor(&socket, Interest::Readable).unwrap(),
+            pool.clone(),
+            SocketType::Stream,
+            SocketRecvFlags::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            receiver.close(&Sockets).await.unwrap_err().kind(),
+            io::ErrorKind::InvalidInput
+        );
+        socket.store(1, Ordering::Relaxed);
+        let held = receiver.recv(&Sockets, &never).await.unwrap().unwrap();
+        assert_eq!(held.payload(), &[42; 8]);
+        assert!(pool.try_acquire().is_none());
+        socket.store(100, Ordering::Relaxed);
+        {
+            let mut close = pin!(receiver.close(&Sockets));
+            assert!(poll_once(close.as_mut()).await.is_none());
+        }
+        // It must not wait for the held slot or touch a closing monitor.
+        let result = poll_once(receiver.recv(&Sockets, &never))
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(result.is_none());
+        socket.store(102, Ordering::Relaxed);
+        assert_eq!(
+            receiver.close(&Sockets).await.unwrap_err().kind(),
+            io::ErrorKind::BrokenPipe
+        );
+        socket.store(101, Ordering::Relaxed);
+        assert!(receiver.close(&Sockets).await.is_err());
+        assert!(receiver.recv(&Sockets, &never).await.unwrap().is_none());
+        socket.store(1, Ordering::Relaxed);
+        receiver.close(&Sockets).await.unwrap();
+        receiver.close(&Sockets).await.unwrap();
+        assert_eq!(held.payload(), &[42; 8]);
+    });
 }
 fn receiver(
     socket: Arc<AtomicUsize>,

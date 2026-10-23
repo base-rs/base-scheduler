@@ -44,8 +44,8 @@ fn receiver_creation_is_lazy_and_foreign_close_preserves_reception() {
         receiver.close(&scheduler).await.unwrap();
         drop(receiver);
         assert_eq!(std::sync::Arc::strong_count(&socket.inner), owners);
-        scheduler.socket_close(socket).await.unwrap();
-        scheduler.socket_close(peer).await.unwrap();
+        // Ordinary admission is already closed. All monitor ownership is released, so the exclusive socket owners can now run their ordinary destructors.
+        drop((socket, peer));
         assert_eq!(message.payload(), &[42]);
         scheduler.shutdown().await;
         foreign.shutdown().await;
