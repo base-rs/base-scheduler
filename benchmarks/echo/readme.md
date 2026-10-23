@@ -6,6 +6,8 @@ Compare pure Tokio, `TokioScheduler`, and `NativeScheduler<IoUringSelector>` usi
 
 The [initial Aiko results](results.md) include throughput, latency, variation across repetitions, and raw samples.
 
+The [Tokio future-construction comparison](tokio-future-construction.md) measures eliminating intermediate operation-state copies while preserving cancellation and readiness behavior.
+
 The [performance investigation](profiling.md) compares compiler settings, identifies CPU and syscall costs, and measures isolated optimization prototypes.
 
 The [io_uring performance improvements](performance.md) describe the implemented fast paths, their relationship to `io-event`, and repeated before/after measurements.

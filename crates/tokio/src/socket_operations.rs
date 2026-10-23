@@ -35,25 +35,26 @@ impl TokioScheduler {
         read_nonempty: bool,
     ) -> (OperationResult<Output>, Input) {
         let result = self
-            .socket_result(
-                socket,
-                cancellation,
+            .socket_result(socket, cancellation, || {
                 socket.io_with(
                     interest,
                     |socket| operation(socket, &mut input),
                     read_nonempty,
-                ),
-            )
+                )
+            })
             .await;
         (result, input)
     }
 
-    async fn socket_result<Output: Send>(
+    async fn socket_result<Output: Send, Operation>(
         &self,
         socket: &TokioSocket,
         cancellation: &Cancellation,
-        operation: impl std::future::Future<Output = io::Result<Output>> + Send,
-    ) -> OperationResult<Output> {
+        operation: impl FnOnce() -> Operation + Send,
+    ) -> OperationResult<Output>
+    where
+        Operation: std::future::Future<Output = io::Result<Output>> + Send,
+    {
         use std::{
             future::{Future, poll_fn},
             pin::pin,
@@ -61,7 +62,8 @@ impl TokioScheduler {
         };
         cancellation.check()?;
         self.check_socket(socket)?;
-        let mut operation = pin!(operation);
+        // The factory lets the compiler construct the operation in its pinned local, avoiding moves of nested readiness state.
+        let mut operation = pin!(operation());
         let mut cancelled = pin!(cancellation.cancelled());
         poll_fn(|context| {
             match operation.as_mut().poll(context) {
@@ -312,7 +314,7 @@ impl SocketWait for TokioScheduler {
         interest: Interest,
         cancellation: &Cancellation,
     ) -> OperationResult<()> {
-        self.socket_result(socket, cancellation, socket.wait(interest))
+        self.socket_result(socket, cancellation, || socket.wait(interest))
             .await
     }
 }

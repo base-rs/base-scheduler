@@ -1,0 +1,51 @@
+diff --git a/benchmarks/echo/src/server.rs b/benchmarks/echo/src/server.rs
+index 465f5bf..2b1bb56 100644
+--- a/benchmarks/echo/src/server.rs
++++ b/benchmarks/echo/src/server.rs
+@@ -23,7 +23,7 @@ fn ready(listener: &TcpListener) {
+     io::stdout().flush().expect("report listener address");
+ }
+ 
+-async fn tokio_server(listener: TcpListener, connections: usize) {
++async fn tokio_server<const CONSERVATIVE: bool>(listener: TcpListener, connections: usize) {
+     listener
+         .set_nonblocking(true)
+         .expect("nonblocking listener");
+@@ -36,7 +36,19 @@ async fn tokio_server(listener: TcpListener, connections: usize) {
+         tasks.push(tokio::spawn(async move {
+             let mut buffer = vec![0; BUFFER_SIZE];
+             loop {
+-                let count = socket.read(&mut buffer).await.expect("echo read");
++                let count = if CONSERVATIVE {
++                    loop {
++                        std::future::poll_fn(|context| socket.poll_read_ready(context))
++                            .await
++                            .expect("read readiness");
++                        match socket.try_read(&mut buffer) {
++                            Err(error) if error.kind() == io::ErrorKind::WouldBlock => continue,
++                            result => break result.expect("echo read"),
++                        }
++                    }
++                } else {
++                    socket.read(&mut buffer).await.expect("echo read")
++                };
+                 if count == 0 {
+                     return;
+                 }
+@@ -296,10 +308,14 @@ pub(crate) fn run(backend: &str, workers: usize, connections: usize) -> Result<(
+             ));
+             scheduler.block_on(scheduler.shutdown());
+         }
+-        "tokio" => {
++        "tokio" | "tokio-conservative" => {
+             let runtime = crate::runtime(workers);
+             ready(&listener);
+-            runtime.block_on(tokio_server(listener, connections));
++            if backend == "tokio-conservative" {
++                runtime.block_on(tokio_server::<true>(listener, connections));
++            } else {
++                runtime.block_on(tokio_server::<false>(listener, connections));
++            }
+         }
+         "tokio-adapter" | "tokio-adapter-poll" | "tokio-adapter-monitor" => {
+             let runtime = crate::runtime(workers);
