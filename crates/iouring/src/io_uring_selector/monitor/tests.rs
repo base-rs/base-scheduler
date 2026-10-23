@@ -1602,3 +1602,93 @@ fn a_close_caller_can_release_its_socket_before_the_completion_wake_returns() {
     thread.unwrap().join().unwrap();
     result.unwrap();
 }
+
+#[test]
+fn repolling_a_pending_receive_can_read_before_the_driver_reports_readiness() {
+    let (selector, driver) = IoUringSelector::new(options()).unwrap();
+    let mut worker = driver.enter();
+    let waker = worker.waker();
+    let mut context = Context::from_waker(&waker);
+    let (socket, mut peer) = sockets(&selector);
+    let mut reader = selector
+        .socket_monitor(&socket, Interest::Readable)
+        .unwrap();
+    let never = Cancellation::never();
+    let mut bytes = [0; 8];
+    {
+        let mut receive = pin!(selector.socket_monitor_recv_poll(
+            &mut reader,
+            &mut bytes,
+            SocketRecvFlags::default(),
+            &never,
+        ));
+        assert!(receive.as_mut().poll(&mut context).is_pending());
+        // The registration is queued but the driver has not published any readiness. An independent wake must still be able to make synchronous progress.
+        peer.write_all(b"ready").unwrap();
+        assert!(matches!(
+            receive.as_mut().poll(&mut context),
+            Poll::Ready(Ok(5))
+        ));
+    }
+    assert_eq!(&bytes[..5], b"ready");
+    // Successful completion released the waiter claim, so the next operation can wait normally.
+    {
+        let mut receive = pin!(selector.socket_monitor_recv_poll(
+            &mut reader,
+            &mut bytes,
+            SocketRecvFlags::default(),
+            &never,
+        ));
+        assert!(receive.as_mut().poll(&mut context).is_pending());
+        peer.write_all(b"again").unwrap();
+        assert_eq!(
+            drive(&mut worker, &mut context, receive.as_mut()).unwrap(),
+            5
+        );
+    }
+    assert_eq!(&bytes[..5], b"again");
+    let mut close = pin!(selector.socket_monitor_close(&mut reader));
+    drive(&mut worker, &mut context, close.as_mut()).unwrap();
+}
+
+#[test]
+fn cancelling_a_pending_receive_preserves_bytes_that_are_already_available() {
+    let (selector, driver) = IoUringSelector::new(options()).unwrap();
+    let mut worker = driver.enter();
+    let waker = worker.waker();
+    let mut context = Context::from_waker(&waker);
+    let (socket, mut peer) = sockets(&selector);
+    let mut reader = selector
+        .socket_monitor(&socket, Interest::Readable)
+        .unwrap();
+    let cancellation = Cancellation::new();
+    let mut bytes = [0; 8];
+    {
+        let mut receive = pin!(selector.socket_monitor_recv_poll(
+            &mut reader,
+            &mut bytes,
+            SocketRecvFlags::default(),
+            &cancellation,
+        ));
+        assert!(receive.as_mut().poll(&mut context).is_pending());
+        peer.write_all(b"ready").unwrap();
+        cancellation.cancel();
+        assert!(matches!(
+            receive.as_mut().poll(&mut context),
+            Poll::Ready(Err(OperationError::Cancelled(_)))
+        ));
+    }
+    assert_eq!(
+        block_on(selector.socket_monitor_recv_poll(
+            &mut reader,
+            &mut bytes,
+            SocketRecvFlags::default(),
+            &Cancellation::never(),
+        ))
+        .unwrap(),
+        5
+    );
+    assert_eq!(&bytes[..5], b"ready");
+    let mut close = pin!(selector.socket_monitor_close(&mut reader));
+    drive(&mut worker, &mut context, close.as_mut()).unwrap();
+}

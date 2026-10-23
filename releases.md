@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Retry io_uring monitor I/O directly on wake, keeping readiness bookkeeping on the `WouldBlock` path while preserving cancellation and owned registration lifetimes.
+
 - Avoid intermediate future-state copies when constructing Tokio socket operations, preserving the existing cancellation and readiness behavior.
 
 - Add installed I/O usage guidance and runnable, cross-backend recipes for reused borrowed stream storage, retained frames, bounded packet handoff, and overlapped file copies. Benchmark the same loops and demonstrate monitor cleanup on errors and cancellation.
