@@ -347,7 +347,7 @@ mod cancellation_tests {
     }
     impl AsRef<[u8]> for Buffer {
         fn as_ref(&self) -> &[u8] {
-            // Submission first observes the length. The worker's next access requests cancellation during a ready short send.
+            // Submission first observes the length. The worker's next access requests cancellation after its initial check, as the first send is prepared.
             if self.calls.fetch_add(1, Ordering::Relaxed) == 1 {
                 self.cancellation.cancel();
             }
@@ -357,8 +357,9 @@ mod cancellation_tests {
     // SAFETY: The cancellation hook does not alter or alias the stable owned byte storage.
     unsafe impl IoBuf for Buffer {}
 
-    #[test]
-    fn cancellation_between_ready_short_sends_stops_accepted_output() {
+    fn assert_cancelled_output_is_terminal(
+        send: fn(&socket2::Socket, &[u8], SocketSendFlags) -> io::Result<usize>,
+    ) {
         let scheduler = ReadinessSelector::new().unwrap();
         let (sender, receiver) = block_on(core_scheduler_conformance::socket::stream_pair(
             &scheduler,
@@ -366,7 +367,7 @@ mod cancellation_tests {
         ));
         let token = Cancellation::new();
         let mut writer = ReadinessSocketStreamWriter::<Buffer>::new(&scheduler, &sender).unwrap();
-        writer.send = |_, _, _| Ok(1);
+        writer.send = send;
         block_on(writer.submit(
             Buffer {
                 bytes: vec![1; 4],
@@ -391,5 +392,15 @@ mod cancellation_tests {
         drop(writer);
         block_on(scheduler.socket_close(sender)).unwrap();
         block_on(scheduler.socket_close(receiver)).unwrap();
+    }
+
+    #[test]
+    fn cancellation_between_ready_short_sends_stops_accepted_output() {
+        assert_cancelled_output_is_terminal(|_, _, _| Ok(1));
+    }
+
+    #[test]
+    fn cancellation_interrupts_a_pending_send() {
+        assert_cancelled_output_is_terminal(|_, _, _| Err(io::ErrorKind::WouldBlock.into()));
     }
 }
