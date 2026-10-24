@@ -1,0 +1,14 @@
+{
+  "deferred": {
+    "sha256": "9f5047fd2a8febabd84b53b5ecef4ce34f46fdf68603c476d53cd0a60e2b2179",
+    "patch_sha256": "da1fe3a073fdae2325d64494df14de7d5a1205e0ef30af25e6b8e6a5198e36a2"
+  },
+  "deferred-no-iowait": {
+    "sha256": "bcdb65a50a77bab0b841979b13c8d31adc5e08cd6f7673121ffbe8984910aa12",
+    "patch_sha256": "37f9040cbff0f58e880eb492c1c888abf29d771cfac601df03315c5ddb9a10ea"
+  },
+  "coop-no-iowait": {
+    "sha256": "c00725458df078c7d454448ff15cc1fc32aacfed7df1902db45a6a701d6a2fb4",
+    "patch_sha256": "28604ba309fb0a18c969d7c98d5e49dab182ad94ff3c40c58648a2a66d303a89"
+  }
+}

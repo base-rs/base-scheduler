@@ -1,0 +1,12 @@
+diff --git a/crates/iouring/src/io_uring_selector.rs b/crates/iouring/src/io_uring_selector.rs
+index 9037ce7..c8b92d5 100644
+--- a/crates/iouring/src/io_uring_selector.rs
++++ b/crates/iouring/src/io_uring_selector.rs
+@@ -800,6 +800,7 @@ impl Reactor {
+         if !self.started {
+             if let Ok(ring) = syscall("cooperative-ring", || {
+                 IoUring::builder()
++                    .setup_single_issuer()
+                     .setup_coop_taskrun()
+                     .setup_taskrun_flag()
+                     .build(self.ring.params().sq_entries())

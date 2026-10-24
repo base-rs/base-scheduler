@@ -1,0 +1,98 @@
+diff --git a/crates/iouring/src/io_uring_selector.rs b/crates/iouring/src/io_uring_selector.rs
+index 9037ce7..867b2c5 100644
+--- a/crates/iouring/src/io_uring_selector.rs
++++ b/crates/iouring/src/io_uring_selector.rs
+@@ -800,7 +800,8 @@ impl Reactor {
+         if !self.started {
+             if let Ok(ring) = syscall("cooperative-ring", || {
+                 IoUring::builder()
+-                    .setup_coop_taskrun()
++                    .setup_single_issuer()
++                    .setup_defer_taskrun()
+                     .setup_taskrun_flag()
+                     .build(self.ring.params().sq_entries())
+             }) {
+@@ -1198,7 +1199,18 @@ impl Reactor {
+                     .submission_notifications
+                     .pending()
+                     .then(|| self.ring.submission().len());
+-                let result = syscall("submit", || self.ring.submit());
++                let result = syscall("submit", || {
++                    let count = self.ring.submission().len() as u32;
++                    // SAFETY: This diagnostic retains the exclusive ring owner and all submitted resources. Zero-minimum GETEVENTS does not block.
++                    unsafe {
++                        self.ring.submitter().enter::<libc::sigset_t>(
++                            count,
++                            0,
++                            io_uring::EnterFlags::GETEVENTS.bits(),
++                            None,
++                        )
++                    }
++                });
+                 if let Some(before) = before {
+                     self.submission_notifications
+                         .consumed(before, self.ring.submission().len());
+diff --git a/crates/native/src/worker.rs b/crates/native/src/worker.rs
+index d05d8a7..195a166 100644
+--- a/crates/native/src/worker.rs
++++ b/crates/native/src/worker.rs
+@@ -271,6 +271,10 @@ fn run_loop(
+         }))
+     });
+     let mut iteration = 0usize;
++    let mut batches = 0u64;
++    let mut polls = 0u64;
++    let mut waits = 0u64;
++    let mut histogram = [0u64; 65];
+     loop {
+         iteration = iteration.wrapping_add(1);
+         crate::worker_timers::turn(&shared, identifier);
+@@ -297,6 +301,7 @@ fn run_loop(
+                     find_work(&shared, iteration),
+                     || !shared.finished(),
+                     || {
++                        waits += 1;
+                         drive(
+                             &mut driver,
+                             crate::worker_timers::timeout(&shared, identifier),
+@@ -309,15 +314,22 @@ fn run_loop(
+         let Some(runnable) = runnable else {
+             continue;
+         };
+-        run_ready_batch(&shared, runnable);
++        let count = run_ready_batch(&shared, runnable);
++        batches += 1;
++        polls += count as u64;
++        histogram[count.min(64)] += 1;
+         // Publish the available completion batch before starting the next task batch.
+         drive(&mut driver, Some(Duration::ZERO));
+     }
++    eprintln!(
++        "WORKER_METRICS worker={identifier} loops={iteration} batches={batches} polls={polls} waits={waits} histogram={histogram:?}"
++    );
+     CURRENT_WORKER.with(|current| current.take());
+ }
+ 
+ #[inline(always)]
+-fn run_ready_batch(shared: &Shared, first: Runnable) {
++fn run_ready_batch(shared: &Shared, first: Runnable) -> usize {
++    let mut count = 0;
+     // Freeze the batch. Wakes during task polling go into the now-empty next queue.
+     let (identifier, has_more) = CURRENT_WORKER.with(|current| {
+         let mut current = current.borrow_mut();
+@@ -330,6 +342,7 @@ fn run_ready_batch(shared: &Shared, first: Runnable) {
+     }
+     let mut runnable = Some(first);
+     while let Some(task) = runnable {
++        count += 1;
+         task.metadata().worker.store(identifier, Ordering::Relaxed);
+         // Contain task-machinery panics as well as the guarded future's panics.
+         crate::panic::contain(|| {
+@@ -345,6 +358,7 @@ fn run_ready_batch(shared: &Shared, first: Runnable) {
+                 .pop()
+         });
+     }
++    count
+ }
+ 
+ #[cfg(test)]

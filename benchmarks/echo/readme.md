@@ -8,6 +8,8 @@ The [private I/O boundary comparison](results/private-io/readme.md) checks borro
 
 The [idle-search comparison](results/idle-search/readme.md) measures skipping Native victim searches when no outstanding runnable work exists, including a disabled-stealing baseline, uneven-load latency, and user-space versus kernel costs.
 
+The [completion-cost follow-up](results/worker-completions/readme.md) profiles the remaining busy single-worker gap, compares Tokio read policies, and measures rejected ring-policy and completion-collection refinements.
+
 The [initial Aiko results](results.md) include throughput, latency, variation across repetitions, and raw samples.
 
 The [Native monitor polling investigation](native-monitor.md) measures syscall-first resumption and records the rejected monitor-bookkeeping and ring-send experiments.

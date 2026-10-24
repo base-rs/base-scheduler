@@ -1,0 +1,25 @@
+diff --git a/crates/iouring/src/io_uring_selector.rs b/crates/iouring/src/io_uring_selector.rs
+index 9037ce7..88a8644 100644
+--- a/crates/iouring/src/io_uring_selector.rs
++++ b/crates/iouring/src/io_uring_selector.rs
+@@ -1218,7 +1218,19 @@ impl Reactor {
+             return Ok(false);
+         }
+         let result = syscall("wait", || match timeout {
+-            None => self.ring.submit_and_wait(1),
++            None => {
++                let count = self.ring.submission().len() as u32;
++                let mut flags = io_uring::EnterFlags::GETEVENTS;
++                if self.ring.params().is_feature_no_iowait() {
++                    flags |= io_uring::EnterFlags::NO_IOWAIT;
++                }
++                // SAFETY: This diagnostic preserves the existing indefinite wait and retained SQE resources, while selecting the kernel-supported wait-accounting flag.
++                unsafe {
++                    self.ring
++                        .submitter()
++                        .enter::<libc::sigset_t>(count, 1, flags.bits(), None)
++                }
++            }
+             Some(duration) => {
+                 // Clamp seconds to the signed kernel ABI rather than wrapping very long durations negative.
+                 let timespec = types::Timespec::new()

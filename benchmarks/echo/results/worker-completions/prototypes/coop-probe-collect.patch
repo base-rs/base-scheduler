@@ -1,0 +1,20 @@
+diff --git a/crates/iouring/src/io_uring_selector.rs b/crates/iouring/src/io_uring_selector.rs
+index 9037ce7..5d910d8 100644
+--- a/crates/iouring/src/io_uring_selector.rs
++++ b/crates/iouring/src/io_uring_selector.rs
+@@ -1192,6 +1192,7 @@ impl Reactor {
+                 (!submissions.is_empty() && !defer_submission)
+                     || submissions.cq_overflow()
+                     || submissions.taskrun()
++                    || submissions.is_empty()
+             };
+             if needs_submit {
+                 let before = self
+@@ -1215,6 +1216,7 @@ impl Reactor {
+                     }
+                 }
+             }
++            self.collect_completions()?;
+             return Ok(false);
+         }
+         let result = syscall("wait", || match timeout {

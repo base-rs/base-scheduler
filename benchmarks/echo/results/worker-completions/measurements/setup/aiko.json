@@ -1,0 +1,147 @@
+{
+  "baseline": {
+    "sha256": "a8c84568e0932f782179fbbb1c64272129c6af9a5f1344a8c84998b22527fc5f",
+    "sample": {
+      "bytes": 64,
+      "connections": 1,
+      "payload_mib_per_second": 6.5643310546875,
+      "requests": 2151,
+      "requests_per_second": 107550.0,
+      "rtt_max_us": 55.807,
+      "rtt_mean_us": 9.207272896327297,
+      "rtt_p50_us": 9.127,
+      "rtt_p95_us": 9.311,
+      "rtt_p99_us": 11.487,
+      "seconds": 0.02,
+      "warmup_seconds": 0.0,
+      "backend": "iouring-monitor",
+      "workers": 1,
+      "client_workers": 4,
+      "server_cpus": [
+        0
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ]
+    }
+  },
+  "deferred": {
+    "sha256": "9f5047fd2a8febabd84b53b5ecef4ce34f46fdf68603c476d53cd0a60e2b2179",
+    "sample": {
+      "bytes": 64,
+      "connections": 1,
+      "payload_mib_per_second": 6.6192626953125,
+      "requests": 2169,
+      "requests_per_second": 108450.0,
+      "rtt_max_us": 31.791,
+      "rtt_mean_us": 9.127827570308893,
+      "rtt_p50_us": 9.031,
+      "rtt_p95_us": 9.255,
+      "rtt_p99_us": 11.263,
+      "seconds": 0.02,
+      "warmup_seconds": 0.0,
+      "backend": "iouring-monitor",
+      "workers": 1,
+      "client_workers": 4,
+      "server_cpus": [
+        0
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ]
+    }
+  },
+  "deferred-no-iowait": {
+    "sha256": "bcdb65a50a77bab0b841979b13c8d31adc5e08cd6f7673121ffbe8984910aa12",
+    "sample": {
+      "bytes": 64,
+      "connections": 1,
+      "payload_mib_per_second": 6.8023681640625,
+      "requests": 2229,
+      "requests_per_second": 111450.0,
+      "rtt_max_us": 51.775,
+      "rtt_mean_us": 8.880985195154778,
+      "rtt_p50_us": 8.791,
+      "rtt_p95_us": 8.991,
+      "rtt_p99_us": 10.535,
+      "seconds": 0.02,
+      "warmup_seconds": 0.0,
+      "backend": "iouring-monitor",
+      "workers": 1,
+      "client_workers": 4,
+      "server_cpus": [
+        0
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ]
+    }
+  },
+  "coop-no-iowait": {
+    "sha256": "c00725458df078c7d454448ff15cc1fc32aacfed7df1902db45a6a701d6a2fb4",
+    "sample": {
+      "bytes": 64,
+      "connections": 1,
+      "payload_mib_per_second": 6.7626953125,
+      "requests": 2216,
+      "requests_per_second": 110800.0,
+      "rtt_max_us": 46.783,
+      "rtt_mean_us": 8.935353790613723,
+      "rtt_p50_us": 8.831,
+      "rtt_p95_us": 9.071,
+      "rtt_p99_us": 10.311,
+      "seconds": 0.02,
+      "warmup_seconds": 0.0,
+      "backend": "iouring-monitor",
+      "workers": 1,
+      "client_workers": 4,
+      "server_cpus": [
+        0
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ]
+    }
+  },
+  "deferred-collect": {
+    "sha256": "7a1d34d81ef24f4c1b72cf6bc3715a8d42f0ce807a3b43b2a96ef0718cf40fca",
+    "sample": {
+      "bytes": 64,
+      "connections": 1,
+      "payload_mib_per_second": 6.8084716796875,
+      "requests": 2231,
+      "requests_per_second": 111550.0,
+      "rtt_max_us": 73.663,
+      "rtt_mean_us": 8.873760645450467,
+      "rtt_p50_us": 8.775,
+      "rtt_p95_us": 8.975,
+      "rtt_p99_us": 10.175,
+      "seconds": 0.02,
+      "warmup_seconds": 0.0,
+      "backend": "iouring-monitor",
+      "workers": 1,
+      "client_workers": 4,
+      "server_cpus": [
+        0
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ]
+    }
+  }
+}
