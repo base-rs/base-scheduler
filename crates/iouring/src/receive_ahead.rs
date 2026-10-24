@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::{
-    IoUringBufferPool, IoUringRecvMessage, IoUringSelector, io_uring_receiver::IoUringReceiver,
+    IoUringBuffer, IoUringBufferPool, IoUringRecvMessage, IoUringSelector, RecvMsgMultishot,
     retained_socket::SocketSource,
 };
 use core_scheduler::{
@@ -14,7 +14,7 @@ use std::io::{self, IoSliceMut};
 // Explicit provided pools can receive ahead. The retained message bridges callers switching to borrowed I/O without discarding stream suffixes or already queued datagrams.
 #[derive(Default)]
 pub(crate) struct ReceiveAhead {
-    receiver: Option<IoUringReceiver>,
+    receiver: Option<RecvMsgMultishot<IoUringBuffer>>,
     pending: Option<IoUringRecvMessage>,
 }
 impl ReceiveAhead {
@@ -44,15 +44,10 @@ impl ReceiveAhead {
                     .await?,
             );
         }
-        self.receiver
-            .as_mut()
-            .unwrap()
-            .recv(selector, cancellation)
-            .await
+        self.receiver.as_mut().unwrap().recv(cancellation).await
     }
     async fn pending(
         &mut self,
-        selector: &IoUringSelector,
         cancellation: &Cancellation,
     ) -> OperationResult<Option<&mut IoUringRecvMessage>> {
         if self.pending.is_none() {
@@ -60,14 +55,13 @@ impl ReceiveAhead {
                 .receiver
                 .as_mut()
                 .expect("receive-ahead starts before buffered borrowing")
-                .recv(selector, cancellation)
+                .recv(cancellation)
                 .await?;
         }
         Ok(self.pending.as_mut())
     }
     pub(crate) async fn read_vectored(
         &mut self,
-        selector: &IoUringSelector,
         buffers: &mut [IoSliceMut<'_>],
         flags: SocketRecvFlags,
         stream: bool,
@@ -81,7 +75,7 @@ impl ReceiveAhead {
         if stream && buffers.iter().all(|buffer| buffer.is_empty()) {
             return Ok(empty_result());
         }
-        let Some(message) = self.pending(selector, cancellation).await? else {
+        let Some(message) = self.pending(cancellation).await? else {
             return Ok(empty_result());
         };
         let mut bytes = 0;
@@ -101,7 +95,6 @@ impl ReceiveAhead {
     }
     pub(crate) async fn read_owned<Buffers: IoBufSequenceMut>(
         &mut self,
-        selector: &IoUringSelector,
         mut buffers: Buffers,
         flags: SocketRecvFlags,
         stream: bool,
@@ -116,7 +109,7 @@ impl ReceiveAhead {
             if stream && (0..buffers.buffer_count()).all(|index| buffers.buffer(index).is_empty()) {
                 return Ok(empty_result());
             }
-            let Some(message) = self.pending(selector, cancellation).await? else {
+            let Some(message) = self.pending(cancellation).await? else {
                 return Ok(empty_result());
             };
             let mut bytes = 0;
@@ -149,9 +142,9 @@ impl ReceiveAhead {
             message.advance_payload(bytes);
         }
     }
-    pub(crate) async fn close(&mut self, selector: &IoUringSelector) -> io::Result<()> {
+    pub(crate) async fn close(&mut self) -> io::Result<()> {
         if let Some(receiver) = &mut self.receiver {
-            receiver.close(selector).await?;
+            receiver.close().await?;
         }
         self.pending = None;
         Ok(())

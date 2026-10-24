@@ -2,8 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::Interest;
-use crate::io_uring_selector::{RegisteredSocket, monitor::IoUringMonitorRegistration};
-use crate::{IoUringBufferPool, IoUringSelector, MonitorStorage, SocketMonitor};
+use crate::{IoUringBufferPool, IoUringSelector, MonitorStorage};
 use core_scheduler::{
     BufferPool, BufferPoolOptions, BufferPooling, Cancellation, OperationResult, ReceiveBuffer,
     SocketRecvFlags, SocketStreamReader,
@@ -20,7 +19,7 @@ use std::{
 pub(crate) struct IoUringSocketStreamReader<'a> {
     scheduler: &'a IoUringSelector,
     operations: crate::operation_state::OperationState,
-    monitor: MonitorStorage<SocketMonitor<RegisteredSocket, IoUringMonitorRegistration>>,
+    monitor: MonitorStorage,
     pool: Option<IoUringBufferPool>,
     ahead: crate::receive_ahead::ReceiveAhead,
     eof: bool,
@@ -54,7 +53,6 @@ impl<'a> IoUringSocketStreamReader<'a> {
     }
 
     fn check_open(&self) -> OperationResult<()> {
-        self.operations.check_idle()?;
         if self.closed {
             Err(io::Error::new(io::ErrorKind::BrokenPipe, "stream reader is closed").into())
         } else {
@@ -147,6 +145,7 @@ impl SocketStreamReader for IoUringSocketStreamReader<'_> {
         }
 
         self.check_open()?;
+        self.operations.check_idle()?;
         if self.eof || buffer.is_empty() {
             cancellation.check()?;
             return Ok(0);
@@ -179,6 +178,7 @@ impl SocketStreamReader for IoUringSocketStreamReader<'_> {
         }
 
         self.check_open()?;
+        self.operations.check_idle()?;
         if self.eof || buffers.iter().all(|buffer| buffer.is_empty()) {
             cancellation.check()?;
             return Ok(0);
@@ -206,6 +206,7 @@ impl SocketStreamReader for IoUringSocketStreamReader<'_> {
     ) -> OperationResult<core_scheduler::SocketRecvResult> {
         if self.ahead.active() {
             self.check_open()?;
+            self.operations.check_idle()?;
             if self.eof || buffers.iter().all(|buffer| buffer.is_empty()) {
                 cancellation.check()?;
                 return Ok(core_scheduler::SocketRecvResult {
@@ -217,11 +218,12 @@ impl SocketStreamReader for IoUringSocketStreamReader<'_> {
             }
             return self
                 .ahead
-                .read_vectored(self.scheduler, buffers, flags, true, cancellation)
+                .read_vectored(buffers, flags, true, cancellation)
                 .await;
         }
 
         self.check_open()?;
+        self.operations.check_idle()?;
         if self.eof || buffers.iter().all(|buffer| buffer.is_empty()) {
             cancellation.check()?;
             return Ok(core_scheduler::SocketRecvResult {
@@ -247,7 +249,7 @@ impl SocketStreamReader for IoUringSocketStreamReader<'_> {
             }
             return self
                 .ahead
-                .read_owned(self.scheduler, buffers, flags, true, cancellation)
+                .read_owned(buffers, flags, true, cancellation)
                 .await;
         }
 
@@ -267,9 +269,6 @@ impl SocketStreamReader for IoUringSocketStreamReader<'_> {
                 }),
                 buffers,
             );
-        }
-        if let Err(error) = cancellation.check() {
-            return (Err(error.into()), buffers);
         }
         let buffers = match self.operations.begin(buffers) {
             Ok(buffers) => buffers,
@@ -317,7 +316,7 @@ impl SocketStreamReader for IoUringSocketStreamReader<'_> {
     async fn close(&mut self) -> io::Result<()> {
         self.closed = true;
         self.operations.close().await;
-        let ahead = self.ahead.close(self.scheduler).await;
+        let ahead = self.ahead.close().await;
         self.scheduler
             .socket_monitor_close(&mut self.monitor)
             .await

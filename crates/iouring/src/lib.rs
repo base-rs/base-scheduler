@@ -25,24 +25,19 @@ mod io_uring_buffer_pool;
 pub use io_uring_buffer::IoUringBuffer;
 pub use io_uring_buffer_pool::IoUringBufferPool;
 
-mod io_uring_receiver;
-
 mod io_uring_recv_message;
 pub use io_uring_recv_message::IoUringRecvMessage;
 
 mod recv_msg_multishot_options;
 pub use recv_msg_multishot_options::RecvMsgMultishotOptions;
 
-mod monitor_state;
 mod monitor_storage;
 mod operation_state;
 mod socket_monitor;
-use monitor_state::MonitorState;
 use monitor_storage::MonitorStorage;
 use socket_monitor::SocketMonitor;
 mod retained_socket;
 
-mod demand_receiver;
 mod io_uring_socket_packet_reader;
 mod io_uring_socket_packet_writer;
 mod io_uring_socket_stream_reader;

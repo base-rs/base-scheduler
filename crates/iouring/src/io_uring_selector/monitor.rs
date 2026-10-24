@@ -10,8 +10,8 @@ use std::task::Waker;
 pub(super) const MONITOR_TAG: u64 = 1;
 const READY: u64 = 1;
 const NO_SLOT: usize = usize::MAX;
-pub(crate) type State = SocketMonitor<RegisteredSocket, IoUringMonitorRegistration>;
-pub(crate) type Storage = MonitorStorage<State>;
+pub(crate) type State = SocketMonitor;
+pub(crate) type Storage = MonitorStorage;
 
 /// Persistent directional readiness registration. The ring retains its storage through the final original and cancellation completions; application handles independently control when the registration closes.
 pub(crate) struct IoUringMonitorRegistration {
@@ -96,11 +96,11 @@ impl IoUringMonitorRegistration {
     }
 }
 
-impl MonitorState for IoUringMonitorRegistration {
-    fn acquire(&self) {
+impl IoUringMonitorRegistration {
+    pub(crate) fn acquire(&self) {
         self.users.fetch_add(1, Ordering::Relaxed);
     }
-    fn release(&self) {
+    pub(crate) fn release(&self) {
         if self.users.fetch_sub(1, Ordering::AcqRel) == 1 {
             self.retire(false);
         }
@@ -225,7 +225,7 @@ impl IoUringSelector {
                 status.retiring = false;
                 status.pending = true;
                 submission = Some(Submission::new(
-                    monitor.retained_project(AsRef::as_ref),
+                    monitor.retained(),
                     Arc::clone(&registration.status),
                     generation,
                 ));

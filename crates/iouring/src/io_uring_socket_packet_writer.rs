@@ -2,8 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::Interest;
-use crate::io_uring_selector::{RegisteredSocket, monitor::IoUringMonitorRegistration};
-use crate::{IoUringSelector, MonitorStorage, SocketMonitor};
+use crate::{IoUringSelector, MonitorStorage};
 use core_scheduler::{
     BufferResult, Cancellation, IoBuf, OperationResult, SocketAddress, SocketPacketWriter,
     SocketSendFlags, SocketType,
@@ -15,7 +14,7 @@ use std::io::{self, IoSlice};
 pub(crate) struct IoUringSocketPacketWriter<'a> {
     scheduler: &'a IoUringSelector,
     operations: crate::operation_state::OperationState,
-    monitor: MonitorStorage<SocketMonitor<RegisteredSocket, IoUringMonitorRegistration>>,
+    monitor: MonitorStorage,
     closing: bool,
 }
 

@@ -19,6 +19,7 @@ pub(super) async fn retry_operation<B, T, O, F>(
     cancellation: &Cancellation,
 ) -> (io::Result<T>, B)
 where
+    B: Send + 'static,
     O: FnMut(B) -> F,
     F: Future<Output = (io::Result<T>, B)>,
 {
@@ -33,10 +34,17 @@ where
         buffers = returned;
         match result {
             Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
-                if let Err(error) = selector
-                    .wait_ready(Arc::clone(controller), socket, interest, cancellation)
-                    .await
-                {
+                let (result, returned) = selector
+                    .wait_ready_owned(
+                        Arc::clone(controller),
+                        socket,
+                        buffers,
+                        interest,
+                        cancellation,
+                    )
+                    .await;
+                buffers = returned;
+                if let Err(error) = result {
                     return (Err(error.into()), buffers);
                 }
             }
@@ -78,10 +86,11 @@ impl IoUringSelector {
 }
 
 impl IoUringSelector {
-    pub(crate) async fn socket_write<B: IoBuf>(
+    pub(crate) async fn socket_write_owned<B: IoBuf>(
         &self,
         socket: &impl SocketSource,
         buffer: B,
+        operations: &mut crate::operation_state::OperationState,
         cancellation: &Cancellation,
     ) -> BufferResult<B> {
         if let Err(error) = cancellation.check() {
@@ -89,6 +98,9 @@ impl IoUringSelector {
         }
         if let Err(error) = self.check_open() {
             return (Err(error.into()), buffer);
+        }
+        if let Err(error) = operations.check_idle() {
+            return (Err(error), buffer);
         }
         // A ready socket can finish synchronously without publishing a request. No access to the owned buffer survives this nonblocking syscall.
         match syscall("socket-write", || {
@@ -98,6 +110,10 @@ impl IoUringSelector {
             Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
             result => return (operation_result(result, cancellation), buffer),
         }
+        let buffer = match operations.begin(buffer) {
+            Ok(buffer) => buffer,
+            Err((error, buffer)) => return (Err(error), buffer),
+        };
         let controller = self.route();
         let (result, buffer) = retry_operation(
             self,
@@ -118,7 +134,20 @@ impl IoUringSelector {
             cancellation,
         )
         .await;
-        (operation_result(result, cancellation), buffer)
+        (operation_result(result, cancellation), buffer.into_inner())
+    }
+}
+
+#[cfg(test)]
+impl IoUringSelector {
+    pub(super) async fn socket_write<B: IoBuf>(
+        &self,
+        socket: &impl SocketSource,
+        buffer: B,
+        cancellation: &Cancellation,
+    ) -> BufferResult<B> {
+        self.socket_write_owned(socket, buffer, &mut Default::default(), cancellation)
+            .await
     }
 }
 

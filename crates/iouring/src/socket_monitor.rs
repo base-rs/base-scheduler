@@ -2,33 +2,37 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::Interest;
-use crate::monitor_state::MonitorState;
+use crate::io_uring_selector::{RegisteredSocket, monitor::IoUringMonitorRegistration};
 use std::io;
 
 /// Persistent state for one direction of a socket. Create separate readable and writable monitors for concurrent reader and writer tasks.
 ///
 /// `Registration` belongs to the backend. The socket owner outlives every retained registration, including after future abandonment. A monitor does not replace the scheduler explicitly passed to an operation. Await `socket_monitor_close`, then drop all monitor handles before exclusively closing their socket. Dropping the last handle requests retirement but does not wait for it.
-pub(crate) struct SocketMonitor<Socket, Registration> {
-    socket: Socket,
+pub(crate) struct SocketMonitor {
+    socket: RegisteredSocket,
     interest: Interest,
-    registration: Registration,
+    registration: IoUringMonitorRegistration,
 }
 
-impl<Socket, Registration> SocketMonitor<Socket, Registration> {
-    pub fn new(socket: Socket, interest: Interest, registration: Registration) -> Self {
+impl SocketMonitor {
+    pub fn new(
+        socket: RegisteredSocket,
+        interest: Interest,
+        registration: IoUringMonitorRegistration,
+    ) -> Self {
         Self {
             socket,
             interest,
             registration,
         }
     }
-    pub fn socket(&self) -> &Socket {
+    pub fn socket(&self) -> &RegisteredSocket {
         &self.socket
     }
     pub fn interest(&self) -> Interest {
         self.interest
     }
-    pub fn registration(&self) -> &Registration {
+    pub fn registration(&self) -> &IoUringMonitorRegistration {
         &self.registration
     }
 
@@ -42,24 +46,5 @@ impl<Socket, Registration> SocketMonitor<Socket, Registration> {
                 "socket monitor has the wrong direction",
             ))
         }
-    }
-}
-
-impl<Socket: Send + Sync + 'static, Registration: MonitorState> MonitorState
-    for SocketMonitor<Socket, Registration>
-{
-    fn acquire(&self) {
-        self.registration.acquire();
-    }
-    fn release(&self) {
-        self.registration.release();
-    }
-}
-
-impl<Socket, Registration> AsRef<SocketMonitor<Socket, Registration>>
-    for SocketMonitor<Socket, Registration>
-{
-    fn as_ref(&self) -> &Self {
-        self
     }
 }

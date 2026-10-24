@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::{IoUringDriver, IoUringOptions};
-use crate::{MonitorState, MonitorStorage, SocketMonitor, retained_socket::SocketSource};
+use crate::{MonitorStorage, SocketMonitor, retained_socket::SocketSource};
 use core_scheduler::*;
 use core_scheduler_selector::{NativeFile, NativeSocket, ReadinessSelector, Selector};
 use event_listener::Event as CompletionEvent;

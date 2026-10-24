@@ -5,17 +5,18 @@ use super::socket::retain_socket;
 use super::*;
 use crate::Interest;
 
-// Readiness requests retain only the socket. Borrowed payloads and I/O vectors never enter the ring or its request bookkeeping.
-struct ReadinessRequest {
+// Transient retry waits retain the owned input and socket through retirement. The kernel accesses only the socket; no borrowed payload or I/O-vector pointer enters this request.
+struct ReadinessRequest<Input: Send + 'static> {
     identifier: u64,
     _permit: Permit,
     socket: Option<RegisteredSocket>,
     interest: Interest,
-    reply: Cell<Option<oneshot::Sender<io::Result<usize>>>>,
+    input: Option<Input>,
+    reply: Cell<Option<oneshot::Sender<RawBufferResult<Input>>>>,
     cancelling: Cell<bool>,
 }
 
-impl PendingRequest for ReadinessRequest {
+impl<Input: Send + 'static> PendingRequest for ReadinessRequest<Input> {
     fn identifier(&self) -> u64 {
         self.identifier
     }
@@ -36,14 +37,15 @@ impl PendingRequest for ReadinessRequest {
         false
     }
 
-    fn finish(self: Box<Self>, result: io::Result<usize>) {
+    fn finish(mut self: Box<Self>, result: io::Result<usize>) {
         let reply = self
             .reply
             .take()
             .expect("unfinished request retains its sender");
-        // Release the socket and capacity before waking a caller that may close the socket or start another wait.
+        let input = self.input.take().unwrap();
+        // Release socket and capacity before returning the retained owner, whose destructor may publish lane retirement.
         drop(self);
-        discard(reply.send(result));
+        discard(reply.send((result, input)));
     }
 
     fn begin_cancellation(&self) -> bool {
@@ -57,20 +59,24 @@ impl PendingRequest for ReadinessRequest {
     }
 }
 
-impl Drop for ReadinessRequest {
+impl<Input: Send + 'static> Drop for ReadinessRequest<Input> {
     fn drop(&mut self) {
         drop(self.socket.take());
         // An unpublished request may be discarded during shutdown. Unknown in-flight requests follow the driver's existing retention policy.
         if let Some(reply) = self.reply.take() {
-            discard(reply.send(Err(io::Error::new(
-                io::ErrorKind::BrokenPipe,
-                "selector closed before readiness submission",
-            ))));
+            discard(reply.send((
+                Err(io::Error::new(
+                    io::ErrorKind::BrokenPipe,
+                    "selector closed before readiness submission",
+                )),
+                self.input.take().unwrap(),
+            )));
         }
     }
 }
 
 impl IoUringSelector {
+    #[cfg(test)]
     pub(super) async fn wait_ready(
         &self,
         controller: Arc<Controller>,
@@ -78,27 +84,47 @@ impl IoUringSelector {
         interest: Interest,
         cancellation: &Cancellation,
     ) -> OperationResult<()> {
-        cancellation.check()?;
-        self.check_open()?;
-        let permit = operation_result(
-            controller.capacity.acquire(cancellation).await,
-            cancellation,
-        )?;
-        let identifier = controller.next_identifier()?;
+        self.wait_ready_owned(controller, socket, (), interest, cancellation)
+            .await
+            .0
+    }
+
+    pub(super) async fn wait_ready_owned<Input: Send + 'static>(
+        &self,
+        controller: Arc<Controller>,
+        socket: &impl SocketSource,
+        input: Input,
+        interest: Interest,
+        cancellation: &Cancellation,
+    ) -> (OperationResult<()>, Input) {
+        if let Err(error) = cancellation
+            .check()
+            .map_err(OperationError::from)
+            .and_then(|()| self.check_open().map_err(Into::into))
+        {
+            return (Err(error), input);
+        }
+        let permit = match controller.capacity.acquire(cancellation).await {
+            Ok(permit) => permit,
+            Err(error) => return (operation_result(Err(error), cancellation), input),
+        };
+        let identifier = match controller.next_identifier() {
+            Ok(identifier) => identifier,
+            Err(error) => return (Err(error.into()), input),
+        };
         let (reply, result) = oneshot::channel();
         let request = ReadinessRequest {
             identifier,
             _permit: permit,
             socket: Some(retain_socket(socket)),
             interest,
+            input: Some(input),
             reply: Cell::new(Some(reply)),
             cancelling: Cell::new(false),
         };
-        operation_result(
-            Self::submit(controller, Box::new(request), result, cancellation).await,
-            cancellation,
-        )
-        .map(drop)
+        let (result, input) =
+            Self::submit(controller, Box::new(request), result, cancellation).await;
+        (operation_result(result, cancellation).map(drop), input)
     }
 }
 

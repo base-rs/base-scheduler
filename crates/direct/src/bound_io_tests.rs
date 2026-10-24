@@ -318,6 +318,17 @@ fn abandoned_owned_transfers_keep_the_lane_busy_until_worker_retirement() {
                                 std::io::ErrorKind::WouldBlock
                             );
                             assert_eq!(
+                                reader
+                                    .read_vectored(
+                                        &mut [std::io::IoSliceMut::new(&mut [0])],
+                                        &never
+                                    )
+                                    .await
+                                    .unwrap_err()
+                                    .kind(),
+                                std::io::ErrorKind::WouldBlock
+                            );
+                            assert_eq!(
                                 reader.read(&never).await.err().unwrap().kind(),
                                 std::io::ErrorKind::WouldBlock
                             );
@@ -373,6 +384,17 @@ fn abandoned_owned_transfers_keep_the_lane_busy_until_worker_retirement() {
                                     std::io::ErrorKind::WouldBlock
                                 );
                                 assert_eq!(
+                                    reader
+                                        .read_vectored(
+                                            &mut [std::io::IoSliceMut::new(&mut [0])],
+                                            &never
+                                        )
+                                        .await
+                                        .unwrap_err()
+                                        .kind(),
+                                    std::io::ErrorKind::WouldBlock
+                                );
+                                assert_eq!(
                                     reader.read(&never).await.err().unwrap().kind(),
                                     std::io::ErrorKind::WouldBlock
                                 );
@@ -394,6 +416,17 @@ fn abandoned_owned_transfers_keep_the_lane_busy_until_worker_retirement() {
                             {
                                 assert_eq!(
                                     reader.read_into(&mut [0], &never).await.unwrap_err().kind(),
+                                    std::io::ErrorKind::WouldBlock
+                                );
+                                assert_eq!(
+                                    reader
+                                        .read_vectored(
+                                            &mut [std::io::IoSliceMut::new(&mut [0])],
+                                            &never
+                                        )
+                                        .await
+                                        .unwrap_err()
+                                        .kind(),
                                     std::io::ErrorKind::WouldBlock
                                 );
                                 assert_eq!(

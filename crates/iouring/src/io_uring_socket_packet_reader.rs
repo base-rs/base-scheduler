@@ -2,8 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::Interest;
-use crate::io_uring_selector::{RegisteredSocket, monitor::IoUringMonitorRegistration};
-use crate::{IoUringBufferPool, IoUringSelector, MonitorStorage, SocketMonitor};
+use crate::{IoUringBufferPool, IoUringSelector, MonitorStorage};
 use core_scheduler::{
     BufferPool, BufferPoolOptions, BufferPooling, Cancellation, OperationResult,
     OwnedSocketRecvMessage, ReceiveBuffer, SocketPacketReader, SocketRecvFlags, SocketRecvResult,
@@ -23,7 +22,7 @@ use std::{
 pub(crate) struct IoUringSocketPacketReader<'a> {
     scheduler: &'a IoUringSelector,
     operations: crate::operation_state::OperationState,
-    monitor: MonitorStorage<SocketMonitor<RegisteredSocket, IoUringMonitorRegistration>>,
+    monitor: MonitorStorage,
     pool: Option<IoUringBufferPool>,
     ahead: crate::receive_ahead::ReceiveAhead,
     closing: bool,
@@ -177,7 +176,7 @@ impl SocketPacketReader for IoUringSocketPacketReader<'_> {
             }
             return self
                 .ahead
-                .read_vectored(self.scheduler, buffers, flags, false, cancellation)
+                .read_vectored(buffers, flags, false, cancellation)
                 .await;
         }
 
@@ -205,7 +204,7 @@ impl SocketPacketReader for IoUringSocketPacketReader<'_> {
             }
             return self
                 .ahead
-                .read_owned(self.scheduler, buffers, flags, false, cancellation)
+                .read_owned(buffers, flags, false, cancellation)
                 .await;
         }
 
@@ -231,7 +230,7 @@ impl SocketPacketReader for IoUringSocketPacketReader<'_> {
     async fn close(&mut self) -> io::Result<()> {
         self.closing = true;
         self.operations.close().await;
-        let ahead = self.ahead.close(self.scheduler).await;
+        let ahead = self.ahead.close().await;
         self.scheduler
             .socket_monitor_close(&mut self.monitor)
             .await

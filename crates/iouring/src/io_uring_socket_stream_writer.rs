@@ -2,10 +2,8 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::Interest;
-use crate::io_uring_selector::{
-    RegisteredSocket, monitor::IoUringMonitorRegistration, stream_writer::IoUringStreamWriter,
-};
-use crate::{IoUringSelector, MonitorStorage, SocketMonitor};
+use crate::io_uring_selector::stream_writer::IoUringStreamWriter;
+use crate::{IoUringSelector, MonitorStorage};
 use core_scheduler::{
     Cancellation, IoBuf, OperationError, OperationResult, SocketSendFlags, SocketStreamWriter,
 };
@@ -17,7 +15,7 @@ pub(crate) struct IoUringSocketStreamWriter<'a, B: IoBuf> {
     scheduler: &'a IoUringSelector,
     operations: crate::operation_state::OperationState,
     output: IoUringStreamWriter<B>,
-    monitor: MonitorStorage<SocketMonitor<RegisteredSocket, IoUringMonitorRegistration>>,
+    monitor: MonitorStorage,
     closed: bool,
     submitted: bool,
 }
@@ -37,13 +35,16 @@ impl<'a, B: IoBuf> IoUringSocketStreamWriter<'a, B> {
         })
     }
 
-    fn check_open(&self) -> OperationResult<()> {
-        self.operations.check_idle()?;
+    fn check_closed(&self) -> OperationResult<()> {
         if self.closed {
             Err(io::Error::new(io::ErrorKind::BrokenPipe, "stream writer is closed").into())
         } else {
             Ok(())
         }
+    }
+    fn check_open(&self) -> OperationResult<()> {
+        self.check_closed()?;
+        self.operations.check_idle()
     }
 }
 
@@ -134,7 +135,7 @@ impl<B: IoBuf> SocketStreamWriter for IoUringSocketStreamWriter<'_, B> {
         flags: SocketSendFlags,
         cancellation: &Cancellation,
     ) -> (OperationResult<usize>, Buffers) {
-        if let Err(error) = self.check_open() {
+        if let Err(error) = self.check_closed() {
             return (Err(error), buffers);
         }
         if self.submitted {
@@ -169,7 +170,7 @@ impl<B: IoBuf> SocketStreamWriter for IoUringSocketStreamWriter<'_, B> {
         buffer: Owned,
         cancellation: &Cancellation,
     ) -> core_scheduler::BufferResult<Owned> {
-        if let Err(error) = self.check_open() {
+        if let Err(error) = self.check_closed() {
             return (Err(error), buffer);
         }
         if self.submitted {
@@ -181,15 +182,14 @@ impl<B: IoBuf> SocketStreamWriter for IoUringSocketStreamWriter<'_, B> {
         if let Err(error) = cancellation.check() {
             return (Err(error.into()), buffer);
         }
-        let buffer = match self.operations.begin(buffer) {
-            Ok(buffer) => buffer,
-            Err((error, buffer)) => return (Err(error), buffer),
-        };
-        let (result, buffer) = self
-            .scheduler
-            .socket_write(self.monitor.socket(), buffer, cancellation)
-            .await;
-        (result, buffer.into_inner())
+        self.scheduler
+            .socket_write_owned(
+                self.monitor.socket(),
+                buffer,
+                &mut self.operations,
+                cancellation,
+            )
+            .await
     }
     async fn close(&mut self) -> io::Result<()> {
         self.closed = true;

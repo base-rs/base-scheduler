@@ -600,18 +600,15 @@ fn cancelled_and_dropped_waiters_leave_the_registration_active() {
 }
 
 #[test]
-fn the_last_application_handle_retires_an_embedded_registration() {
+fn the_last_application_handle_retires_its_registration() {
     let (selector, driver) = IoUringSelector::new(options()).unwrap();
     let mut worker = driver.enter();
     let wake = worker.waker();
     let mut context = Context::from_waker(&wake);
     let (socket, _peer) = sockets(&selector);
-    let owner = Arc::new(
-        selector
-            .socket_monitor_state(&socket, Interest::Readable)
-            .unwrap(),
-    );
-    let mut reader = MonitorStorage::from_arc(Arc::clone(&owner), |state| state);
+    let mut reader = selector
+        .socket_monitor(&socket, Interest::Readable)
+        .unwrap();
     let alias = reader.clone();
     let inspect = reader.retained();
     let never = Cancellation::never();
@@ -623,16 +620,6 @@ fn the_last_application_handle_retires_an_embedded_registration() {
     assert!(!inspect.registration().status.lock().unwrap().retiring);
     drop(alias);
     assert!(inspect.registration().status.lock().unwrap().retiring);
-    until(&mut worker, || {
-        !inspect.registration().status.lock().unwrap().pending
-    });
-    // The containing allocation can create a new handle after the prior registration retired.
-    let mut reader = MonitorStorage::from_arc(owner, |state| state);
-    let mut waiting = Box::pin(selector.socket_monitor_wait(&mut reader, &never));
-    assert!(waiting.as_mut().poll(&mut context).is_pending());
-    worker.turn(Some(Duration::ZERO)).unwrap();
-    drop(waiting);
-    drop(reader);
     until(&mut worker, || {
         !inspect.registration().status.lock().unwrap().pending
     });
@@ -1588,17 +1575,14 @@ fn completion_releases_backend_storage_before_waking() {
     for finish in [false, true] {
         let (selector, _driver) = IoUringSelector::new(options()).unwrap();
         let (socket, _peer) = sockets(&selector);
-        let owner = Arc::new(
-            selector
-                .socket_monitor_state(&socket, Interest::Readable)
-                .unwrap(),
-        );
+        let storage = selector
+            .socket_monitor(&socket, Interest::Readable)
+            .unwrap();
         let observer = Arc::new(ObserveRelease {
-            owner: Arc::downgrade(&owner),
+            owner: storage.downgrade(),
             released: AtomicBool::new(false),
             woken: AtomicBool::new(false),
         });
-        let storage = MonitorStorage::from_arc(owner, |state| state);
         let submission = staged(&selector, &storage);
         storage.registration().status.lock().unwrap().waker =
             Some(Waker::from(Arc::clone(&observer)));

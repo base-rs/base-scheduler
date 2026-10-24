@@ -3,11 +3,7 @@
 
 use super::provided_buffers::WorkerBuffers;
 use super::*;
-use crate::Interest;
 use crate::IoUringBuffer;
-use crate::demand_receiver::DemandReceiver;
-use crate::io_uring_receiver::IoUringReceiver;
-use crate::io_uring_receiver::Strategy;
 use std::cell::UnsafeCell;
 impl IoUringSelector {
     pub(crate) async fn socket_receiver(
@@ -16,7 +12,7 @@ impl IoUringSelector {
         pool: crate::IoUringBufferPool,
         flags: SocketRecvFlags,
         cancellation: &Cancellation,
-    ) -> OperationResult<IoUringReceiver> {
+    ) -> OperationResult<multishot::RecvMsgMultishot<IoUringBuffer>> {
         cancellation.check()?;
         self.check_open()?;
         if !Weak::ptr_eq(&pool.0.selector, &Arc::downgrade(&self.group)) {
@@ -37,18 +33,12 @@ impl IoUringSelector {
         let stream =
             syscall("socket-type", || retained.get_ref().r#type())? == socket2::Type::STREAM;
         let controller = self.route();
-        let Some(buffers) = pool.worker(&controller) else {
-            let kind = if stream {
-                SocketType::Stream
-            } else {
-                SocketType::Datagram
-            };
-            return self
-                .socket_monitor(socket, Interest::Readable)
-                .and_then(|monitor| DemandReceiver::new(monitor, pool, kind, flags))
-                .map(|receiver| IoUringReceiver(Strategy::Demand(receiver)))
-                .map_err(Into::into);
-        };
+        let buffers = pool.worker(&controller).ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "receive-ahead requires a worker-provided pool",
+            )
+        })?;
         let buffers = Arc::clone(buffers);
         let socket = retained;
         let permit = operation_result(
@@ -74,17 +64,15 @@ impl IoUringSelector {
             finished: false,
         };
         controller.submit(Box::new(request));
-        Ok(IoUringReceiver(Strategy::Provided(
-            multishot::RecvMsgMultishot {
-                cancel_on_wait: false,
-                state,
-                cancel: CancelOnDrop {
-                    controller,
-                    identifier,
-                    armed: true,
-                },
+        Ok(multishot::RecvMsgMultishot {
+            cancel_on_wait: false,
+            state,
+            cancel: CancelOnDrop {
+                controller,
+                identifier,
+                armed: true,
             },
-        )))
+        })
     }
 }
 

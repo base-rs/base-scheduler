@@ -5,7 +5,7 @@ use crate::{BufferPool, BufferPooling, IoBuf, SocketOperation, SocketStreamWrite
 use std::io;
 
 /// Construct sequential stream output bound to this scheduler. Backends select a static writer without requiring protocols to choose registration or output-progress mechanisms. Construction performs no writes and rejects non-stream sockets.
-pub trait SocketStreamWriting: SocketOperation + BufferPooling + Sync {
+pub trait SocketStreamWriting: SocketOperation + BufferPooling {
     /// Retain the socket and reusable backend state. Owned submissions accept this scheduler's pooled chunks, so the default reader and writer compose without choosing a buffer representation. Borrowed writes do not allocate a payload pool. Subsequent operations take only payloads and cancellation, never another scheduler.
     fn socket_stream_writer<'scheduler>(
         &'scheduler self,

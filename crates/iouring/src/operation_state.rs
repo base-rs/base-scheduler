@@ -26,18 +26,11 @@ pub(crate) struct OperationGuard<T> {
     value: Option<T>,
     _retirement: Retirement,
 }
-struct Retirement(Option<Arc<Activity>>);
-impl Retirement {
-    fn retire(&mut self) {
-        if let Some(activity) = self.0.take() {
-            activity.running.store(false, Ordering::Release);
-            activity.retired.notify(usize::MAX);
-        }
-    }
-}
+struct Retirement(Arc<Activity>);
 impl Drop for Retirement {
     fn drop(&mut self) {
-        self.retire();
+        self.0.running.store(false, Ordering::Release);
+        self.0.retired.notify(usize::MAX);
     }
 }
 impl<T> OperationGuard<T> {
@@ -111,7 +104,7 @@ impl OperationState {
         }
         Ok(OperationGuard {
             value: Some(value),
-            _retirement: Retirement(Some(Arc::clone(activity))),
+            _retirement: Retirement(Arc::clone(activity)),
         })
     }
     pub(crate) async fn close(&mut self) {

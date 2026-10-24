@@ -1,8 +1,8 @@
-use crate::RecvMsgMultishotOptions;
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
 use super::*;
+use crate::RecvMsgMultishotOptions;
 use crate::io_uring_selector::tests::{BEFORE_SYSCALL, Failures, drain, drive, pair};
 use futures_lite::future::block_on;
 
@@ -11,17 +11,13 @@ fn receiver(
     socket: &NativeSocket,
     pool: crate::IoUringBufferPool,
 ) -> multishot::RecvMsgMultishot<IoUringBuffer> {
-    let receiving = block_on(selector.socket_receiver(
+    block_on(selector.socket_receiver(
         socket,
         pool,
         SocketRecvFlags::default(),
         &Cancellation::never(),
     ))
-    .unwrap();
-    let IoUringReceiver(Strategy::Provided(receiving)) = receiving else {
-        panic!("a worker pool selects provided-buffer reception")
-    };
-    receiving
+    .unwrap()
 }
 
 #[test]

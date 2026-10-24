@@ -332,3 +332,58 @@ mod tests {
         block_on(scheduler.socket_close(receiver)).unwrap();
     }
 }
+
+#[cfg(test)]
+mod cancellation_tests {
+    use super::*;
+    use core_scheduler::{SocketClose, SocketDomain};
+    use futures_lite::future::block_on;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    struct Buffer {
+        bytes: Vec<u8>,
+        calls: AtomicUsize,
+        cancellation: Cancellation,
+    }
+    impl AsRef<[u8]> for Buffer {
+        fn as_ref(&self) -> &[u8] {
+            // Submission first observes the length. The worker's next access requests cancellation during a ready short send.
+            if self.calls.fetch_add(1, Ordering::Relaxed) == 1 {
+                self.cancellation.cancel();
+            }
+            &self.bytes
+        }
+    }
+    // SAFETY: The cancellation hook does not alter or alias the stable owned byte storage.
+    unsafe impl IoBuf for Buffer {}
+
+    #[test]
+    fn cancellation_between_ready_short_sends_stops_accepted_output() {
+        let scheduler = ReadinessSelector::new().unwrap();
+        let (sender, receiver) = block_on(core_scheduler_conformance::socket::stream_pair(
+            &scheduler,
+            SocketDomain::Ipv4,
+        ));
+        let token = Cancellation::new();
+        let mut writer = ReadinessSocketStreamWriter::<Buffer>::new(&scheduler, &sender).unwrap();
+        writer.send = |_, _, _| Ok(1);
+        block_on(writer.submit(
+            Buffer {
+                bytes: vec![1; 4],
+                calls: AtomicUsize::new(0),
+                cancellation: token.clone(),
+            },
+            &token,
+        ))
+        .map_err(|(error, _)| error)
+        .unwrap();
+        assert!(matches!(
+            block_on(writer.flush(&Cancellation::never())),
+            Err(OperationError::Cancelled(_))
+        ));
+        block_on(writer.close()).unwrap();
+        drop(writer);
+        block_on(scheduler.socket_close(sender)).unwrap();
+        block_on(scheduler.socket_close(receiver)).unwrap();
+    }
+}
