@@ -22,12 +22,16 @@ async fn tokio_connection(socket: TcpStream, workload: Workload) -> Result<()> {
     let never = Cancellation::never();
     let mut request = [0];
     while socket.read(&mut request).await? != 0 {
-        if request[0] != 1 {
+        if !matches!(request[0], 1 | 2) {
             return Err("invalid request".into());
         }
         for chunk in 0..workload.chunks {
             let mut buffer = pool.acquire(&never).await?;
-            prepare(buffer.as_mut(), chunk, workload.work);
+            prepare(
+                buffer.as_mut(),
+                chunk + usize::from(request[0]) * workload.chunks,
+                workload.work,
+            );
             socket.write_all(buffer.as_ref()).await?;
         }
     }
@@ -59,12 +63,16 @@ where
             .await?
             != 0
         {
-            if request[0] != 1 {
+            if !matches!(request[0], 1 | 2) {
                 return Err("invalid request".into());
             }
             for chunk in 0..workload.chunks {
                 let mut buffer = pool.acquire(&never).await?;
-                prepare(buffer.as_mut(), chunk, workload.work);
+                prepare(
+                    buffer.as_mut(),
+                    chunk + usize::from(request[0]) * workload.chunks,
+                    workload.work,
+                );
                 let mut sent = 0;
                 while sent < workload.bytes {
                     let count = scheduler
@@ -117,12 +125,16 @@ where
             .await?
             != 0
         {
-            if request[0] != 1 {
+            if !matches!(request[0], 1 | 2) {
                 return Err("invalid request".into());
             }
             for chunk in 0..workload.chunks {
                 let mut buffer = pool.acquire(&never).await?;
-                prepare(buffer.as_mut(), chunk, workload.work);
+                prepare(
+                    buffer.as_mut(),
+                    chunk + usize::from(request[0]) * workload.chunks,
+                    workload.work,
+                );
                 writer
                     .submit(scheduler.as_ref(), buffer, &never)
                     .await

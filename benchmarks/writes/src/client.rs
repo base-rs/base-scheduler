@@ -23,12 +23,20 @@ pub(crate) async fn run(
 ) -> Result<()> {
     let gate = Arc::new(Barrier::new(connections + 1));
     let (schedule, clock) = watch::channel(None::<(Instant, Instant)>);
-    let expected: Arc<Vec<Vec<u8>>> = Arc::new(
-        (0..workload.chunks)
-            .map(|chunk| {
-                let mut buffer = vec![0; workload.bytes];
-                prepare(&mut buffer, chunk, workload.work);
-                buffer
+    let expected: Arc<Vec<Vec<Vec<u8>>>> = Arc::new(
+        (1..=2)
+            .map(|request| {
+                (0..workload.chunks)
+                    .map(|chunk| {
+                        let mut buffer = vec![0; workload.bytes];
+                        prepare(
+                            &mut buffer,
+                            chunk + request * workload.chunks,
+                            workload.work,
+                        );
+                        buffer
+                    })
+                    .collect()
             })
             .collect(),
     );
@@ -45,19 +53,21 @@ pub(crate) async fn run(
             gate.wait().await;
             clock.changed().await?;
             let (start, end) = clock.borrow().expect("coordinator publishes schedule");
+            let mut request = 0;
             loop {
                 let started = Instant::now();
                 if started >= end {
                     break;
                 }
-                socket.write_all(&[1]).await?;
-                for expected in expected.iter() {
+                socket.write_all(&[(request + 1) as u8]).await?;
+                for expected in &expected[request] {
                     socket.read_exact(&mut response).await?;
                     if response != *expected {
                         return Err("write payload mismatch".into());
                     }
                 }
                 let completed = Instant::now();
+                request ^= 1;
                 if started >= start && completed <= end {
                     latency.record((completed - started).as_nanos().max(1) as u64)?;
                 }
