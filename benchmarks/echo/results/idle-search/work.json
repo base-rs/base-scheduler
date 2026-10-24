@@ -1,0 +1,485 @@
+{
+  "platform": "Linux-7.2.8-arch1-2-x86_64-with-glibc2.44",
+  "hostname": "aiko",
+  "rustc": "rustc 1.99.0 (b940084d7 2026-09-28) (Arch Linux rust 1:1.99.0-1)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+  "settings": {
+    "server_cpus": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "client_cpus": [
+      4,
+      5,
+      6,
+      7
+    ],
+    "client_binary": "/home/samuel/.cache/core-scheduler-parity/client",
+    "client_workers": 4,
+    "warmup": 0,
+    "seconds": 3
+  },
+  "variants": {
+    "current": {
+      "binary": "/home/samuel/.cache/core-scheduler-stealing-research/bin/current",
+      "backend": "iouring-monitor",
+      "sha256": "55c9f6fea4d9d0470d88519d98dde79dfa0bc9c97e11a37a15fbde313b7ac12c"
+    },
+    "no-steal": {
+      "binary": "/home/samuel/.cache/core-scheduler-stealing-research/bin/no-steal",
+      "backend": "iouring-monitor",
+      "sha256": "e90f626a2fb593228c79780e89f55a27b9dbbcef97c2824e18659179be83e455"
+    },
+    "quiescent": {
+      "binary": "/home/samuel/.cache/core-scheduler-stealing-research/bin/quiescent",
+      "backend": "iouring-monitor",
+      "sha256": "aff8afcfd61f3e04bead3c4603b31f9d00293b9eb8c14e134ce1128f20753d94"
+    }
+  },
+  "client_sha256": "c72f7aea7151fb83020b096cfdaccc46a70b0eeff6bbb0a0e4ea4157d1aeb071",
+  "cases": [
+    [
+      4,
+      1,
+      64
+    ]
+  ],
+  "repeats": 3,
+  "seed": 20261025,
+  "counter_mode": "work",
+  "events": [
+    "syscalls:sys_enter_io_uring_enter",
+    "syscalls:sys_enter_write",
+    "syscalls:sys_enter_futex",
+    "io_uring:io_uring_task_work_run",
+    "io_uring:io_uring_local_work_run",
+    "io_uring:io_uring_complete"
+  ],
+  "note": "Counter-instrumented rates are mechanism checks, not capacity measurements.",
+  "samples": [
+    {
+      "bytes": 64,
+      "connections": 1,
+      "payload_mib_per_second": 13.8421630859375,
+      "requests": 680370,
+      "requests_per_second": 226790.0,
+      "rtt_max_us": 160.255,
+      "rtt_mean_us": 4.373064231227128,
+      "rtt_p50_us": 3.951,
+      "rtt_p95_us": 5.763,
+      "rtt_p99_us": 6.111,
+      "seconds": 3.0,
+      "warmup_seconds": 0.0,
+      "backend": "iouring-monitor",
+      "workers": 4,
+      "client_workers": 4,
+      "server_cpus": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "repeat": 0,
+      "variant": "quiescent",
+      "counters": {
+        "syscalls:sys_enter_io_uring_enter": 680378.0,
+        "syscalls:sys_enter_write": 29.0,
+        "syscalls:sys_enter_futex": 17.0,
+        "io_uring:io_uring_task_work_run": 680397.0,
+        "io_uring:io_uring_local_work_run": 0.0,
+        "io_uring:io_uring_complete": 680398.0
+      },
+      "per_request": {
+        "syscalls:sys_enter_io_uring_enter": 1.0000117583079795,
+        "syscalls:sys_enter_write": 4.2623866425621355e-05,
+        "syscalls:sys_enter_futex": 2.4986404456398726e-05,
+        "io_uring:io_uring_task_work_run": 1.0000396842894308,
+        "io_uring:io_uring_local_work_run": 0.0,
+        "io_uring:io_uring_complete": 1.0000411540779282
+      }
+    },
+    {
+      "bytes": 64,
+      "connections": 1,
+      "payload_mib_per_second": 13.906514485677084,
+      "requests": 683533,
+      "requests_per_second": 227844.33333333334,
+      "rtt_max_us": 41.311,
+      "rtt_mean_us": 4.351300083536568,
+      "rtt_p50_us": 3.931,
+      "rtt_p95_us": 5.771,
+      "rtt_p99_us": 6.411,
+      "seconds": 3.0,
+      "warmup_seconds": 0.0,
+      "backend": "iouring-monitor",
+      "workers": 4,
+      "client_workers": 4,
+      "server_cpus": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "repeat": 1,
+      "variant": "no-steal",
+      "counters": {
+        "syscalls:sys_enter_io_uring_enter": 683541.0,
+        "syscalls:sys_enter_write": 24.0,
+        "syscalls:sys_enter_futex": 24.0,
+        "io_uring:io_uring_task_work_run": 683555.0,
+        "io_uring:io_uring_local_work_run": 0.0,
+        "io_uring:io_uring_complete": 683556.0
+      },
+      "per_request": {
+        "syscalls:sys_enter_io_uring_enter": 1.0000117038972516,
+        "syscalls:sys_enter_write": 3.511169175445809e-05,
+        "syscalls:sys_enter_futex": 3.511169175445809e-05,
+        "io_uring:io_uring_task_work_run": 1.0000321857174417,
+        "io_uring:io_uring_local_work_run": 0.0,
+        "io_uring:io_uring_complete": 1.000033648704598
+      }
+    },
+    {
+      "bytes": 64,
+      "connections": 1,
+      "payload_mib_per_second": 13.184224446614584,
+      "requests": 648031,
+      "requests_per_second": 216010.33333333334,
+      "rtt_max_us": 62.431,
+      "rtt_mean_us": 4.589385040221838,
+      "rtt_p50_us": 4.391,
+      "rtt_p95_us": 5.911,
+      "rtt_p99_us": 6.583,
+      "seconds": 3.0,
+      "warmup_seconds": 0.0,
+      "backend": "iouring-monitor",
+      "workers": 4,
+      "client_workers": 4,
+      "server_cpus": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "repeat": 0,
+      "variant": "current",
+      "counters": {
+        "syscalls:sys_enter_io_uring_enter": 648040.0,
+        "syscalls:sys_enter_write": 25.0,
+        "syscalls:sys_enter_futex": 18.0,
+        "io_uring:io_uring_task_work_run": 648054.0,
+        "io_uring:io_uring_local_work_run": 0.0,
+        "io_uring:io_uring_complete": 648055.0
+      },
+      "per_request": {
+        "syscalls:sys_enter_io_uring_enter": 1.0000138882244831,
+        "syscalls:sys_enter_write": 3.857840134191111e-05,
+        "syscalls:sys_enter_futex": 2.7776448966176e-05,
+        "io_uring:io_uring_task_work_run": 1.0000354921292345,
+        "io_uring:io_uring_local_work_run": 0.0,
+        "io_uring:io_uring_complete": 1.0000370352652883
+      }
+    },
+    {
+      "bytes": 64,
+      "connections": 1,
+      "payload_mib_per_second": 13.690287272135416,
+      "requests": 672905,
+      "requests_per_second": 224301.66666666666,
+      "rtt_max_us": 41.599,
+      "rtt_mean_us": 4.4170359902215015,
+      "rtt_p50_us": 3.971,
+      "rtt_p95_us": 5.923,
+      "rtt_p99_us": 9.647,
+      "seconds": 3.0,
+      "warmup_seconds": 0.0,
+      "backend": "iouring-monitor",
+      "workers": 4,
+      "client_workers": 4,
+      "server_cpus": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "repeat": 1,
+      "variant": "current",
+      "counters": {
+        "syscalls:sys_enter_io_uring_enter": 672915.0,
+        "syscalls:sys_enter_write": 29.0,
+        "syscalls:sys_enter_futex": 22.0,
+        "io_uring:io_uring_task_work_run": 672932.0,
+        "io_uring:io_uring_local_work_run": 0.0,
+        "io_uring:io_uring_complete": 672933.0
+      },
+      "per_request": {
+        "syscalls:sys_enter_io_uring_enter": 1.0000148609387656,
+        "syscalls:sys_enter_write": 4.3096722419955266e-05,
+        "syscalls:sys_enter_futex": 3.2694065284104e-05,
+        "io_uring:io_uring_task_work_run": 1.0000401245346668,
+        "io_uring:io_uring_local_work_run": 0.0,
+        "io_uring:io_uring_complete": 1.0000416106285435
+      }
+    },
+    {
+      "bytes": 64,
+      "connections": 1,
+      "payload_mib_per_second": 14.095703125,
+      "requests": 692832,
+      "requests_per_second": 230944.0,
+      "rtt_max_us": 55.743,
+      "rtt_mean_us": 4.292149887707268,
+      "rtt_p50_us": 3.911,
+      "rtt_p95_us": 5.371,
+      "rtt_p99_us": 6.271,
+      "seconds": 3.0,
+      "warmup_seconds": 0.0,
+      "backend": "iouring-monitor",
+      "workers": 4,
+      "client_workers": 4,
+      "server_cpus": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "repeat": 1,
+      "variant": "quiescent",
+      "counters": {
+        "syscalls:sys_enter_io_uring_enter": 692840.0,
+        "syscalls:sys_enter_write": 49.0,
+        "syscalls:sys_enter_futex": 21.0,
+        "io_uring:io_uring_task_work_run": 692878.0,
+        "io_uring:io_uring_local_work_run": 0.0,
+        "io_uring:io_uring_complete": 692880.0
+      },
+      "per_request": {
+        "syscalls:sys_enter_io_uring_enter": 1.0000115468107709,
+        "syscalls:sys_enter_write": 7.072421597154866e-05,
+        "syscalls:sys_enter_futex": 3.0310378273520854e-05,
+        "io_uring:io_uring_task_work_run": 1.0000663941619325,
+        "io_uring:io_uring_local_work_run": 0.0,
+        "io_uring:io_uring_complete": 1.0000692808646252
+      }
+    },
+    {
+      "bytes": 64,
+      "connections": 1,
+      "payload_mib_per_second": 14.469034830729166,
+      "requests": 711182,
+      "requests_per_second": 237060.66666666666,
+      "rtt_max_us": 44.031,
+      "rtt_mean_us": 4.1777500864757595,
+      "rtt_p50_us": 3.911,
+      "rtt_p95_us": 5.251,
+      "rtt_p99_us": 5.983,
+      "seconds": 3.0,
+      "warmup_seconds": 0.0,
+      "backend": "iouring-monitor",
+      "workers": 4,
+      "client_workers": 4,
+      "server_cpus": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "repeat": 0,
+      "variant": "no-steal",
+      "counters": {
+        "syscalls:sys_enter_io_uring_enter": 711189.0,
+        "syscalls:sys_enter_write": 23.0,
+        "syscalls:sys_enter_futex": 20.0,
+        "io_uring:io_uring_task_work_run": 711203.0,
+        "io_uring:io_uring_local_work_run": 0.0,
+        "io_uring:io_uring_complete": 711204.0
+      },
+      "per_request": {
+        "syscalls:sys_enter_io_uring_enter": 1.000009842768799,
+        "syscalls:sys_enter_write": 3.234052605380901e-05,
+        "syscalls:sys_enter_futex": 2.8122196568529574e-05,
+        "io_uring:io_uring_task_work_run": 1.000029528306397,
+        "io_uring:io_uring_local_work_run": 0.0,
+        "io_uring:io_uring_complete": 1.0000309344162255
+      }
+    },
+    {
+      "bytes": 64,
+      "connections": 1,
+      "payload_mib_per_second": 14.45269775390625,
+      "requests": 710379,
+      "requests_per_second": 236793.0,
+      "rtt_max_us": 30.255,
+      "rtt_mean_us": 4.182545476428776,
+      "rtt_p50_us": 3.911,
+      "rtt_p95_us": 5.283,
+      "rtt_p99_us": 6.603,
+      "seconds": 3.0,
+      "warmup_seconds": 0.0,
+      "backend": "iouring-monitor",
+      "workers": 4,
+      "client_workers": 4,
+      "server_cpus": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "repeat": 2,
+      "variant": "no-steal",
+      "counters": {
+        "syscalls:sys_enter_io_uring_enter": 710387.0,
+        "syscalls:sys_enter_write": 23.0,
+        "syscalls:sys_enter_futex": 22.0,
+        "io_uring:io_uring_task_work_run": 710400.0,
+        "io_uring:io_uring_local_work_run": 0.0,
+        "io_uring:io_uring_complete": 710401.0
+      },
+      "per_request": {
+        "syscalls:sys_enter_io_uring_enter": 1.0000112615941632,
+        "syscalls:sys_enter_write": 3.2377083218957765e-05,
+        "syscalls:sys_enter_futex": 3.09693839485683e-05,
+        "io_uring:io_uring_task_work_run": 1.0000295616846782,
+        "io_uring:io_uring_local_work_run": 0.0,
+        "io_uring:io_uring_complete": 1.0000309693839486
+      }
+    },
+    {
+      "bytes": 64,
+      "connections": 1,
+      "payload_mib_per_second": 14.520100911458334,
+      "requests": 713692,
+      "requests_per_second": 237897.33333333334,
+      "rtt_max_us": 49.599,
+      "rtt_mean_us": 4.164183020126325,
+      "rtt_p50_us": 3.931,
+      "rtt_p95_us": 5.271,
+      "rtt_p99_us": 6.023,
+      "seconds": 3.0,
+      "warmup_seconds": 0.0,
+      "backend": "iouring-monitor",
+      "workers": 4,
+      "client_workers": 4,
+      "server_cpus": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "repeat": 2,
+      "variant": "quiescent",
+      "counters": {
+        "syscalls:sys_enter_io_uring_enter": 713701.0,
+        "syscalls:sys_enter_write": 31.0,
+        "syscalls:sys_enter_futex": 28.0,
+        "io_uring:io_uring_task_work_run": 713721.0,
+        "io_uring:io_uring_local_work_run": 0.0,
+        "io_uring:io_uring_complete": 713722.0
+      },
+      "per_request": {
+        "syscalls:sys_enter_io_uring_enter": 1.0000126104818325,
+        "syscalls:sys_enter_write": 4.3436104089719376e-05,
+        "syscalls:sys_enter_futex": 3.9232610145552985e-05,
+        "io_uring:io_uring_task_work_run": 1.0000406337747936,
+        "io_uring:io_uring_local_work_run": 0.0,
+        "io_uring:io_uring_complete": 1.0000420349394417
+      }
+    },
+    {
+      "bytes": 64,
+      "connections": 1,
+      "payload_mib_per_second": 13.681884765625,
+      "requests": 672492,
+      "requests_per_second": 224164.0,
+      "rtt_max_us": 39.743,
+      "rtt_mean_us": 4.41396635796411,
+      "rtt_p50_us": 3.941,
+      "rtt_p95_us": 5.943,
+      "rtt_p99_us": 6.423,
+      "seconds": 3.0,
+      "warmup_seconds": 0.0,
+      "backend": "iouring-monitor",
+      "workers": 4,
+      "client_workers": 4,
+      "server_cpus": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "repeat": 2,
+      "variant": "current",
+      "counters": {
+        "syscalls:sys_enter_io_uring_enter": 672499.0,
+        "syscalls:sys_enter_write": 23.0,
+        "syscalls:sys_enter_futex": 23.0,
+        "io_uring:io_uring_task_work_run": 672515.0,
+        "io_uring:io_uring_local_work_run": 0.0,
+        "io_uring:io_uring_complete": 672516.0
+      },
+      "per_request": {
+        "syscalls:sys_enter_io_uring_enter": 1.0000104090457582,
+        "syscalls:sys_enter_write": 3.420115034825693e-05,
+        "syscalls:sys_enter_futex": 3.420115034825693e-05,
+        "io_uring:io_uring_task_work_run": 1.0000342011503482,
+        "io_uring:io_uring_local_work_run": 0.0,
+        "io_uring:io_uring_complete": 1.000035688156885
+      }
+    }
+  ]
+}

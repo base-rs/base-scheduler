@@ -1,0 +1,29 @@
+--- a/crates/native/src/worker.rs
++++ b/crates/native/src/worker.rs
+@@ -136,6 +136,9 @@
+         let worker = &shared.workers[victim];
+         // Both generations remain stealable while their owner swaps their roles.
+         for stealer in &worker.stealers {
++            if stealer.is_empty() {
++                continue;
++            }
+             if let Some(runnable) =
+                 take_stolen(stealer.steal_batch_and_pop(&local.ready), &mut retry)
+             {
+@@ -143,6 +146,9 @@
+             }
+         }
+         // Remote wakes remain stealable while the previous worker is busy.
++        if worker.incoming.is_empty() {
++            continue;
++        }
+         if let Some(runnable) = take_stolen(
+             worker.incoming.steal_batch_and_pop(&local.ready),
+             &mut retry,
+@@ -345,3 +351,6 @@
+ 
+ #[cfg(test)]
+ mod tests;
++
++#[cfg(test)]
++mod stealing_benchmark;

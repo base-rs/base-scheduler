@@ -1,0 +1,45 @@
+--- a/crates/native/src/worker.rs
++++ b/crates/native/src/worker.rs
+@@ -123,33 +123,8 @@
+     if let Some(runnable) = local.ready.pop() {
+         return Steal::Success(runnable);
+     }
+-    // Only steal after exhausting this worker's own work. Rotate the first victim so idle workers do not always contend on worker zero.
+-    for offset in 0..shared.workers.len() {
+-        let victim = local
+-            .identifier
+-            .wrapping_add(iteration)
+-            .wrapping_add(offset)
+-            % shared.workers.len();
+-        if victim == local.identifier {
+-            continue;
+-        }
+-        let worker = &shared.workers[victim];
+-        // Both generations remain stealable while their owner swaps their roles.
+-        for stealer in &worker.stealers {
+-            if let Some(runnable) =
+-                take_stolen(stealer.steal_batch_and_pop(&local.ready), &mut retry)
+-            {
+-                return Steal::Success(runnable);
+-            }
+-        }
+-        // Remote wakes remain stealable while the previous worker is busy.
+-        if let Some(runnable) = take_stolen(
+-            worker.incoming.steal_batch_and_pop(&local.ready),
+-            &mut retry,
+-        ) {
+-            return Steal::Success(runnable);
+-        }
+-    }
++    // Diagnostic baseline: retain work on its assigned worker.
++    let _ = iteration;
+     search_result(retry)
+ }
+ 
+@@ -345,3 +320,6 @@
+ 
+ #[cfg(test)]
+ mod tests;
++
++#[cfg(test)]
++mod stealing_benchmark;
