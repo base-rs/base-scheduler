@@ -16,18 +16,6 @@ pub trait Receiver: Send {
     #[cfg(target_os = "linux")]
     fn close(&mut self) -> impl std::future::Future<Output = std::io::Result<()>> + Send;
 }
-#[cfg(target_os = "linux")]
-impl Receiver for std::convert::Infallible {
-    type Message = OwnedSocketRecvMessage<BufferLease>;
-    #[cfg(target_os = "linux")]
-    async fn recv(&mut self, _: &Cancellation) -> OperationResult<Option<Self::Message>> {
-        match *self {}
-    }
-    #[cfg(target_os = "linux")]
-    async fn close(&mut self) -> std::io::Result<()> {
-        match *self {}
-    }
-}
 
 pub trait Multishot: SocketOperation + BufferPooling + Sync {
     #[cfg(target_os = "linux")]
@@ -54,17 +42,23 @@ pub trait Multishot: SocketOperation + BufferPooling + Sync {
 }
 
 impl Multishot for core_scheduler_direct::DirectScheduler {
-    #[cfg(any(target_os = "linux", test))]
+    #[cfg(target_os = "linux")]
+    type Receiver = iouring::RingReceiver;
+    #[cfg(all(not(target_os = "linux"), test))]
     type Receiver = std::convert::Infallible;
 }
 
 impl Multishot for core_scheduler_tokio::TokioScheduler {
-    #[cfg(any(target_os = "linux", test))]
+    #[cfg(target_os = "linux")]
+    type Receiver = iouring::RingReceiver;
+    #[cfg(all(not(target_os = "linux"), test))]
     type Receiver = std::convert::Infallible;
 }
 
 impl Multishot for core_scheduler_native::NativeScheduler {
-    #[cfg(any(target_os = "linux", test))]
+    #[cfg(target_os = "linux")]
+    type Receiver = iouring::RingReceiver;
+    #[cfg(all(not(target_os = "linux"), test))]
     type Receiver = std::convert::Infallible;
 }
 
