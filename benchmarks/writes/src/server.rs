@@ -364,7 +364,10 @@ fn serve(backend: &str, workers: usize, workload: Workload, sockets: Vec<TcpStre
             scheduler.block_on(scheduler.shutdown());
             result
         }
+        #[cfg(not(target_os = "linux"))]
         _ => Err("Native backends require Linux".into()),
+        #[cfg(target_os = "linux")]
+        _ => unreachable!("backend was validated before accepting connections"),
     }
 }
 
