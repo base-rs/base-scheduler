@@ -237,6 +237,15 @@ mod tests {
                 let socket = b'd';
                 scheduler.socket_stream_writer(&socket).unwrap()
             };
+            let cancelled = Cancellation::new();
+            cancelled.cancel();
+            assert!(writer.write(b"rejected", &cancelled).await.is_err());
+            assert!(
+                writer
+                    .write_vectored(&[std::io::IoSlice::new(b"rejected")], &cancelled)
+                    .await
+                    .is_err()
+            );
             writer.submit(buffer, &never).await.unwrap();
             writer.write(b"borrowed", &never).await.unwrap();
             writer
