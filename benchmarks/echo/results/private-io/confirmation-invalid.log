@@ -1,0 +1,18 @@
+before-native-owned 4 32 0 1693904
+before-native-owned 4 32 2 1700768
+before-native-owned 4 32 5 1708058
+after-native-owned 4 32 0 1703224
+before-native-owned 1 1 4 238441
+tokio 1 32 2 719269
+Error: "no complete requests in measurement window"
+
+
+Traceback (most recent call last):
+  File "/home/samuel/.cache/core-scheduler-private-io/owned-confirmation.py", line 59, in <module>
+    sample = run.sample(binary, backend, workers, connections, size, args)
+  File "/home/samuel/Developer/core-rs/core-scheduler-private-io/benchmarks/echo/run.py", line 55, in sample
+    result = subprocess.run(client_command, cwd=ROOT, capture_output=True, text=True, timeout=args.warmup + args.seconds + 30, check=True)
+  File "/usr/lib/python3.14/subprocess.py", line 578, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['taskset', '--cpu-list', '4,5,6,7', '/home/samuel/Developer/core-rs/core-scheduler-monoio-echo/target/release/core-scheduler-echo-benchmark', 'client', '127.0.0.1:34605', '4', '32', '64', '1', '3']' returned non-zero exit status 1.

@@ -4,6 +4,8 @@ The portable multishot API has been consolidated into pooled receives. Historica
 
 Compare pure Tokio, `TokioScheduler`, and `NativeScheduler<IoUringSelector>` using the same persistent-connection TCP echo workload. Both scheduler adapters offer owned-buffer and borrowed-buffer cases through scheduler-bound stream readers and writers. `iouring-multishot` uses a concrete backend experiment with kernel rearming. Historical `-poll` and `-monitor` labels now select the same bound borrowed path; archived results describe their earlier implementations. The private workspace package adds no dependencies to the public scheduler interface.
 
+The [private I/O boundary comparison](results/private-io/readme.md) checks borrowed and owned paths after removing public backend plumbing, including the detected and corrected owned-write regression.
+
 The [initial Aiko results](results.md) include throughput, latency, variation across repetitions, and raw samples.
 
 The [Native monitor polling investigation](native-monitor.md) measures syscall-first resumption and records the rejected monitor-bookkeeping and ring-send experiments.
