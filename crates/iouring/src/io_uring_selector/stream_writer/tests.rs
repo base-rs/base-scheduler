@@ -412,7 +412,7 @@ fn delayed_cancellation_wakes_cannot_cancel_a_reused_request() {
         let (selector, mut driver) = pair(16);
         let (sender, receiver) = stream(&selector);
         let token = Cancellation::new();
-        let (mut request, completed) = make_request(&selector, &sender, token);
+        let (request, completed) = make_request(&selector, &sender, token);
         let old_waker = retain_old_waker
             .then(|| Waker::from(Arc::clone(request.cancel_waker.as_ref().unwrap())));
         request.offset.set(request.length);
