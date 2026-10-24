@@ -24,7 +24,7 @@ use std::{
 pub struct DirectScheduler {
     pub(crate) work: BlockingPool,
     pub(crate) cleanup: BlockingPool,
-    pub(crate) socket_retry: SocketRetry,
+    pub(crate) socket_retry: std::sync::Arc<SocketRetry>,
     pub(crate) tasks: crate::task_service::TaskService,
     pub(crate) timers: crate::timer_service::TimerService,
     #[cfg(test)]
@@ -57,7 +57,7 @@ impl DirectScheduler {
             file_probe: Default::default(),
             #[cfg(unix)]
             signals: crate::signal_service::SignalService::new(),
-            socket_retry: SocketRetry::new(),
+            socket_retry: std::sync::Arc::new(SocketRetry::new()),
             work: BlockingPool::new(options),
             cleanup: BlockingPool::new(DirectOptions {
                 threads: 1,

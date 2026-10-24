@@ -90,7 +90,9 @@ fn interrupted_attempts_retry_and_retry_service_errors_return_input() {
     // A fresh scheduler has not initialized its retry worker yet.
     block_on(scheduler.shutdown());
     scheduler = super::tests::scheduler(1);
-    scheduler.socket_retry.fail_start = true;
+    std::sync::Arc::get_mut(&mut scheduler.socket_retry)
+        .unwrap()
+        .fail_start = true;
     let (result, buffer) = block_on(scheduler.socket_operation(
         &socket,
         vec![5],
@@ -507,7 +509,9 @@ fn borrowed_retry_handles_interruption_startup_errors_and_successful_cancellatio
     );
     block_on(scheduler.shutdown());
     let mut scheduler = self::scheduler(1);
-    scheduler.socket_retry.fail_start = true;
+    std::sync::Arc::get_mut(&mut scheduler.socket_retry)
+        .unwrap()
+        .fail_start = true;
     assert_eq!(
         block_on(
             scheduler.socket_poll_operation::<()>(&socket, &never, |_| Err(

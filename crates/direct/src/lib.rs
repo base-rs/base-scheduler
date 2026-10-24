@@ -56,3 +56,6 @@ mod file_monitoring;
 mod file_submission;
 
 mod socket_receiving;
+
+mod direct_stream_writer;
+pub use direct_stream_writer::DirectStreamWriter;
