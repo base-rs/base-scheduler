@@ -3,7 +3,7 @@
 
 use std::{collections::VecDeque, sync::Arc};
 
-pub(super) trait SubmissionNotification: Send + Sync {
+pub(crate) trait SubmissionNotification: Send + Sync {
     fn submitted(&self);
 }
 
@@ -136,13 +136,17 @@ mod tests {
     fn issuance_handles_full_submission_queues_and_abandoned_waiters() {
         use super::super::{
             socket::retain_socket,
-            tests::{drive, pair},
+            tests::drive,
         };
         use core_scheduler::*;
         use futures_lite::future::{block_on, poll_once};
         use std::time::Duration;
 
-        let (selector, mut driver) = pair(1);
+        let (selector, mut driver) = crate::IoUringSelector::new(crate::IoUringOptions {
+            entries: 1,
+            ..Default::default()
+        })
+        .unwrap();
         let (sender, receiver) = block_on(core_scheduler_conformance::socket::stream_pair(
             &selector,
             SocketDomain::Ipv4,
