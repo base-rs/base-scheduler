@@ -1,0 +1,70 @@
+{
+  "platform": "Linux-7.2.8-arch1-2-x86_64-with-glibc2.44",
+  "hostname": "aiko",
+  "rustc": "rustc 1.99.0 (b940084d7 2026-09-28) (Arch Linux rust 1:1.99.0-1)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+  "settings": {
+    "server_cpus": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "client_cpus": [
+      4,
+      5,
+      6,
+      7
+    ],
+    "client_binary": "/home/samuel/.cache/core-scheduler-single-worker-completions/bin/baseline",
+    "client_workers": 4,
+    "warmup": 0,
+    "seconds": 3
+  },
+  "variants": {
+    "baseline": {
+      "binary": "/home/samuel/.cache/core-scheduler-single-worker-completions/bin/baseline",
+      "backend": "iouring-monitor",
+      "sha256": "a8c84568e0932f782179fbbb1c64272129c6af9a5f1344a8c84998b22527fc5f"
+    },
+    "deferred": {
+      "binary": "/home/samuel/.cache/core-scheduler-single-worker-completions/bin/deferred",
+      "backend": "iouring-monitor",
+      "sha256": "9f5047fd2a8febabd84b53b5ecef4ce34f46fdf68603c476d53cd0a60e2b2179"
+    }
+  },
+  "client_sha256": "a8c84568e0932f782179fbbb1c64272129c6af9a5f1344a8c84998b22527fc5f",
+  "cases": [
+    [
+      1,
+      32,
+      64
+    ],
+    [
+      1,
+      1,
+      64
+    ]
+  ],
+  "repeats": 2,
+  "seed": 20261025,
+  "counter_mode": "work",
+  "events": [
+    "syscalls:sys_enter_io_uring_enter",
+    "syscalls:sys_enter_write",
+    "syscalls:sys_enter_futex",
+    "io_uring:io_uring_task_work_run",
+    "io_uring:io_uring_local_work_run",
+    "io_uring:io_uring_complete"
+  ],
+  "note": "Counter-instrumented rates are mechanism checks, not capacity measurements.",
+  "samples": [
+    {"bytes":64,"connections":1,"payload_mib_per_second":14.28155517578125,"requests":701967,"requests_per_second":233989.0,"rtt_max_us":162.175,"rtt_mean_us":4.232465486269296,"rtt_p50_us":3.911,"rtt_p95_us":5.351,"rtt_p99_us":6.023,"seconds":3.0,"warmup_seconds":0.0,"backend":"iouring-monitor","workers":1,"client_workers":4,"server_cpus":[0],"client_cpus":[4,5,6,7],"repeat":0,"variant":"baseline","counters":{"syscalls:sys_enter_io_uring_enter":701966.0,"syscalls:sys_enter_write":3.0,"syscalls:sys_enter_futex":18.0,"io_uring:io_uring_task_work_run":701973.0,"io_uring:io_uring_local_work_run":0.0,"io_uring:io_uring_complete":701974.0},"per_request":{"syscalls:sys_enter_io_uring_enter":0.9999985754316086,"syscalls:sys_enter_write":4.2737051741748545e-06,"syscalls:sys_enter_futex":2.5642231045049127e-05,"io_uring:io_uring_task_work_run":1.0000085474103484,"io_uring:io_uring_local_work_run":0.0,"io_uring:io_uring_complete":1.0000099719787396}},
+    {"bytes":64,"connections":32,"payload_mib_per_second":37.408365885416664,"requests":1838696,"requests_per_second":612898.6666666666,"rtt_max_us":225.023,"rtt_mean_us":52.14811911050004,"rtt_p50_us":52.031,"rtt_p95_us":55.039,"rtt_p99_us":56.575,"seconds":3.0,"warmup_seconds":0.0,"backend":"iouring-monitor","workers":1,"client_workers":4,"server_cpus":[0],"client_cpus":[4,5,6,7],"repeat":1,"variant":"baseline","counters":{"syscalls:sys_enter_io_uring_enter":40429.0,"syscalls:sys_enter_write":33.0,"syscalls:sys_enter_futex":107.0,"io_uring:io_uring_task_work_run":1674861.0,"io_uring:io_uring_local_work_run":0.0,"io_uring:io_uring_complete":1838861.0},"per_request":{"syscalls:sys_enter_io_uring_enter":0.021987865313243735,"syscalls:sys_enter_write":1.794750192527748e-05,"syscalls:sys_enter_futex":5.819341533347546e-05,"io_uring:io_uring_task_work_run":0.9108960915779444,"io_uring:io_uring_local_work_run":0.0,"io_uring:io_uring_complete":1.0000897375096265}},
+    {"bytes":64,"connections":32,"payload_mib_per_second":37.339619954427086,"requests":1835317,"requests_per_second":611772.3333333334,"rtt_max_us":1040.895,"rtt_mean_us":52.24086078862662,"rtt_p50_us":52.159,"rtt_p95_us":55.135,"rtt_p99_us":56.607,"seconds":3.0,"warmup_seconds":0.0,"backend":"iouring-monitor","workers":1,"client_workers":4,"server_cpus":[0],"client_cpus":[4,5,6,7],"repeat":0,"variant":"baseline","counters":{"syscalls:sys_enter_io_uring_enter":40320.0,"syscalls:sys_enter_write":32.0,"syscalls:sys_enter_futex":120.0,"io_uring:io_uring_task_work_run":1659735.0,"io_uring:io_uring_local_work_run":0.0,"io_uring:io_uring_complete":1835479.0},"per_request":{"syscalls:sys_enter_io_uring_enter":0.021968956861403235,"syscalls:sys_enter_write":1.7435680048732724e-05,"syscalls:sys_enter_futex":6.538380018274772e-05,"io_uring:io_uring_task_work_run":0.9043315133026065,"io_uring:io_uring_local_work_run":0.0,"io_uring:io_uring_complete":1.0000882681302468}},
+    {"bytes":64,"connections":1,"payload_mib_per_second":14.57037353515625,"requests":716163,"requests_per_second":238721.0,"rtt_max_us":167.935,"rtt_mean_us":4.150920284907199,"rtt_p50_us":3.821,"rtt_p95_us":5.243,"rtt_p99_us":5.823,"seconds":3.0,"warmup_seconds":0.0,"backend":"iouring-monitor","workers":1,"client_workers":4,"server_cpus":[0],"client_cpus":[4,5,6,7],"repeat":1,"variant":"deferred","counters":{"syscalls:sys_enter_io_uring_enter":716168.0,"syscalls:sys_enter_write":4.0,"syscalls:sys_enter_futex":21.0,"io_uring:io_uring_task_work_run":0.0,"io_uring:io_uring_local_work_run":716168.0,"io_uring:io_uring_complete":716169.0},"per_request":{"syscalls:sys_enter_io_uring_enter":1.0000069816508252,"syscalls:sys_enter_write":5.585320660240755e-06,"syscalls:sys_enter_futex":2.9322933466263964e-05,"io_uring:io_uring_task_work_run":0.0,"io_uring:io_uring_local_work_run":1.0000069816508252,"io_uring:io_uring_complete":1.0000083779809903}},
+    {"bytes":64,"connections":32,"payload_mib_per_second":39.827921549479164,"requests":1957622,"requests_per_second":652540.6666666666,"rtt_max_us":3106.815,"rtt_mean_us":48.973047443786434,"rtt_p50_us":48.799,"rtt_p95_us":52.415,"rtt_p99_us":54.719,"seconds":3.0,"warmup_seconds":0.0,"backend":"iouring-monitor","workers":1,"client_workers":4,"server_cpus":[0],"client_cpus":[4,5,6,7],"repeat":1,"variant":"deferred","counters":{"syscalls:sys_enter_io_uring_enter":138069.0,"syscalls:sys_enter_write":32.0,"syscalls:sys_enter_futex":119.0,"io_uring:io_uring_task_work_run":0.0,"io_uring:io_uring_local_work_run":138022.0,"io_uring:io_uring_complete":1957747.0},"per_request":{"syscalls:sys_enter_io_uring_enter":0.07052893766007942,"syscalls:sys_enter_write":1.6346363087460193e-05,"syscalls:sys_enter_futex":6.0788037731492594e-05,"io_uring:io_uring_task_work_run":0.0,"io_uring:io_uring_local_work_run":0.07050492893929472,"io_uring:io_uring_complete":1.0000638529808104}},
+    {"bytes":64,"connections":32,"payload_mib_per_second":39.768351236979164,"requests":1954694,"requests_per_second":651564.6666666666,"rtt_max_us":217.471,"rtt_mean_us":49.04600204124015,"rtt_p50_us":48.863,"rtt_p95_us":52.479,"rtt_p99_us":54.783,"seconds":3.0,"warmup_seconds":0.0,"backend":"iouring-monitor","workers":1,"client_workers":4,"server_cpus":[0],"client_cpus":[4,5,6,7],"repeat":0,"variant":"deferred","counters":{"syscalls:sys_enter_io_uring_enter":139669.0,"syscalls:sys_enter_write":34.0,"syscalls:sys_enter_futex":123.0,"io_uring:io_uring_task_work_run":0.0,"io_uring:io_uring_local_work_run":139617.0,"io_uring:io_uring_complete":1954819.0},"per_request":{"syscalls:sys_enter_io_uring_enter":0.07145312770182954,"syscalls:sys_enter_write":1.7394026891165574e-05,"syscalls:sys_enter_futex":6.292545022392251e-05,"io_uring:io_uring_task_work_run":0.0,"io_uring:io_uring_local_work_run":0.07142652507246658,"io_uring:io_uring_complete":1.0000639486282763}},
+    {"bytes":64,"connections":1,"payload_mib_per_second":14.705423990885416,"requests":722801,"requests_per_second":240933.66666666666,"rtt_max_us":164.607,"rtt_mean_us":4.111910149543228,"rtt_p50_us":3.781,"rtt_p95_us":5.191,"rtt_p99_us":5.923,"seconds":3.0,"warmup_seconds":0.0,"backend":"iouring-monitor","workers":1,"client_workers":4,"server_cpus":[0],"client_cpus":[4,5,6,7],"repeat":0,"variant":"deferred","counters":{"syscalls:sys_enter_io_uring_enter":722806.0,"syscalls:sys_enter_write":4.0,"syscalls:sys_enter_futex":18.0,"io_uring:io_uring_task_work_run":0.0,"io_uring:io_uring_local_work_run":722806.0,"io_uring:io_uring_complete":722807.0},"per_request":{"syscalls:sys_enter_io_uring_enter":1.0000069175333184,"syscalls:sys_enter_write":5.534026654639382e-06,"syscalls:sys_enter_futex":2.490311994587722e-05,"io_uring:io_uring_task_work_run":0.0,"io_uring:io_uring_local_work_run":1.0000069175333184,"io_uring:io_uring_complete":1.000008301039982}},
+    {"bytes":64,"connections":1,"payload_mib_per_second":14.060262044270834,"requests":691090,"requests_per_second":230363.33333333334,"rtt_max_us":164.479,"rtt_mean_us":4.299628994776359,"rtt_p50_us":3.911,"rtt_p95_us":5.711,"rtt_p99_us":5.923,"seconds":3.0,"warmup_seconds":0.0,"backend":"iouring-monitor","workers":1,"client_workers":4,"server_cpus":[0],"client_cpus":[4,5,6,7],"repeat":1,"variant":"baseline","counters":{"syscalls:sys_enter_io_uring_enter":691092.0,"syscalls:sys_enter_write":4.0,"syscalls:sys_enter_futex":18.0,"io_uring:io_uring_task_work_run":691095.0,"io_uring:io_uring_local_work_run":0.0,"io_uring:io_uring_complete":691096.0},"per_request":{"syscalls:sys_enter_io_uring_enter":1.0000028939790766,"syscalls:sys_enter_write":5.787958153062553e-06,"syscalls:sys_enter_futex":2.604581168878149e-05,"io_uring:io_uring_task_work_run":1.0000072349476914,"io_uring:io_uring_local_work_run":0.0,"io_uring:io_uring_complete":1.0000086819372296}}
+  ]
+}

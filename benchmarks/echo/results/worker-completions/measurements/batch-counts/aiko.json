@@ -1,0 +1,61 @@
+{
+  "base": "29d47375bf9a1b0239e9229335beb4d8beb0825b",
+  "platform": "Linux-7.2.8-arch1-2-x86_64-with-glibc2.44",
+  "rustc": "rustc 1.99.0 (b940084d7 2026-09-28) (Arch Linux rust 1:1.99.0-1)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+  "topology": "CPU CORE SOCKET NODE L1d:L1i:L2:L3\n  0    0      0    0 0:0:0:0\n  1    1      0    0 1:1:1:0\n  2    2      0    0 2:2:2:0\n  3    3      0    0 3:3:3:0\n  4    4      0    0 4:4:4:0\n  5    5      0    0 5:5:5:0\n  6    6      0    0 6:6:6:0\n  7    7      0    0 7:7:7:0\n  8    8      0    0 8:8:8:1\n  9    9      0    0 9:9:9:1\n 10   10      0    0 10:10:10:1\n 11   11      0    0 11:11:11:1\n 12   12      0    0 12:12:12:1\n 13   13      0    0 13:13:13:1\n 14   14      0    0 14:14:14:1\n 15   15      0    0 15:15:15:1\n 16    0      0    0 0:0:0:0\n 17    1      0    0 1:1:1:0\n 18    2      0    0 2:2:2:0\n 19    3      0    0 3:3:3:0\n 20    4      0    0 4:4:4:0\n 21    5      0    0 5:5:5:0\n 22    6      0    0 6:6:6:0\n 23    7      0    0 7:7:7:0\n 24    8      0    0 8:8:8:1\n 25    9      0    0 9:9:9:1\n 26   10      0    0 10:10:10:1\n 27   11      0    0 11:11:11:1\n 28   12      0    0 12:12:12:1\n 29   13      0    0 13:13:13:1\n 30   14      0    0 14:14:14:1\n 31   15      0    0 15:15:15:1\n",
+  "client": "/home/samuel/.cache/core-scheduler-single-worker-completions/bin/baseline",
+  "mode": "control",
+  "cases": [
+    [
+      1,
+      32,
+      64
+    ],
+    [
+      1,
+      1,
+      64
+    ]
+  ],
+  "repeats": 2,
+  "seed": 20261025,
+  "note": "Optimized release binaries; server CPUs 0 through workers-1; fixed four-worker client on CPUs 4-7. Instrumented throughput is not capacity evidence.",
+  "variants": {
+    "baseline": {
+      "backend": "iouring-monitor",
+      "binary": "/home/samuel/.cache/core-scheduler-single-worker-completions/bin/baseline-diagnostic",
+      "sha256": "581b850127c1292ab76eadf2437988fe74c8104fc52b733458a213ff504419fb"
+    },
+    "deferred": {
+      "backend": "iouring-monitor",
+      "binary": "/home/samuel/.cache/core-scheduler-single-worker-completions/bin/deferred-diagnostic",
+      "sha256": "c4a1aed73e175f915e1665f625a16bed74354153db5fbf4a56584d2c14249902"
+    }
+  },
+  "client_sha256": "a8c84568e0932f782179fbbb1c64272129c6af9a5f1344a8c84998b22527fc5f",
+  "governors": {
+    "0": "powersave",
+    "1": "powersave",
+    "2": "powersave",
+    "3": "powersave",
+    "4": "powersave",
+    "5": "powersave",
+    "6": "powersave",
+    "7": "powersave"
+  },
+  "scripts": {
+    "benchmarks/echo/results/worker-completions/measure.py": "64beb7222a46235d05a71057a4ba7c6e2cb945e49b8eb708f626d675f57f0bdb",
+    "benchmarks/echo/results/single-worker-research/scripts/sample-runner.py": "31e6ad715214fcadfda358362100a21cb94cc41a79e23733191eb8e61b740909",
+    "benchmarks/echo/results/single-worker-research/scripts/supervise.py": "fe118d20518274c0a6ff084ad35a9e4f416b49aa621c5c36eaebecfbcb5a4c6f"
+  },
+  "samples": [
+    {"bytes":64,"connections":1,"payload_mib_per_second":17.319254557291668,"requests":851276,"requests_per_second":283758.6666666667,"rtt_max_us":255.359,"rtt_mean_us":3.495955960229113,"rtt_p50_us":3.461,"rtt_p95_us":3.721,"rtt_p99_us":4.143,"seconds":3.0,"warmup_seconds":1.0,"identifier":"control-iouring-monitor-w1-c1-b64-r0","mode":"control","backend":"iouring-monitor","workers":1,"repeat":0,"client_cpu":{"user":0.364643,"system":1.424347,"voluntary_switches":1127941,"involuntary_switches":10},"server_cpu":{"user":0.29482600000000003,"system":1.4527320000000001,"voluntary_switches":1127908,"involuntary_switches":9},"lifecycle_seconds":4.002501231007045,"variant":"baseline"},
+    {"bytes":64,"connections":32,"payload_mib_per_second":39.0059814453125,"requests":1917222,"requests_per_second":639074.0,"rtt_max_us":221.055,"rtt_mean_us":50.00836615530186,"rtt_p50_us":49.951,"rtt_p95_us":53.087,"rtt_p99_us":54.623,"seconds":3.0,"warmup_seconds":1.0,"identifier":"control-iouring-monitor-w1-c32-b64-r1","mode":"control","backend":"iouring-monitor","workers":1,"repeat":1,"client_cpu":{"user":1.21373,"system":3.2198219999999997,"voluntary_switches":1188234,"involuntary_switches":1486},"server_cpu":{"user":0.3044030000000002,"system":2.3824229999999993,"voluntary_switches":299,"involuntary_switches":72},"lifecycle_seconds":4.0031462280021515,"variant":"baseline"},
+    {"bytes":64,"connections":32,"payload_mib_per_second":38.587239583333336,"requests":1896640,"requests_per_second":632213.3333333334,"rtt_max_us":223.359,"rtt_mean_us":50.54967533058461,"rtt_p50_us":50.431,"rtt_p95_us":53.535,"rtt_p99_us":55.071,"seconds":3.0,"warmup_seconds":1.0,"identifier":"control-iouring-monitor-w1-c32-b64-r0","mode":"control","backend":"iouring-monitor","workers":1,"repeat":0,"client_cpu":{"user":1.253841,"system":3.197895000000001,"voluntary_switches":1201273,"involuntary_switches":893},"server_cpu":{"user":0.3192919999999999,"system":2.3701950000000007,"voluntary_switches":255,"involuntary_switches":74},"lifecycle_seconds":4.002811446000123,"variant":"baseline"},
+    {"bytes":64,"connections":1,"payload_mib_per_second":16.230448404947918,"requests":797759,"requests_per_second":265919.6666666667,"rtt_max_us":161.919,"rtt_mean_us":3.724409263950642,"rtt_p50_us":3.411,"rtt_p95_us":5.283,"rtt_p99_us":5.571,"seconds":3.0,"warmup_seconds":1.0,"identifier":"control-iouring-monitor-w1-c1-b64-r1","mode":"control","backend":"iouring-monitor","workers":1,"repeat":1,"client_cpu":{"user":0.37853899999999996,"system":1.3568099999999994,"voluntary_switches":1063349,"involuntary_switches":12},"server_cpu":{"user":0.2717400000000003,"system":1.3030169999999988,"voluntary_switches":1063358,"involuntary_switches":10},"lifecycle_seconds":4.001767309004208,"variant":"deferred"},
+    {"bytes":64,"connections":32,"payload_mib_per_second":41.260274251302086,"requests":2028025,"requests_per_second":676008.3333333334,"rtt_max_us":3192.831,"rtt_mean_us":47.27223769677405,"rtt_p50_us":47.199,"rtt_p95_us":50.431,"rtt_p99_us":52.031,"seconds":3.0,"warmup_seconds":1.0,"identifier":"control-iouring-monitor-w1-c32-b64-r1","mode":"control","backend":"iouring-monitor","workers":1,"repeat":1,"client_cpu":{"user":1.321345,"system":3.4647129999999997,"voluntary_switches":1358390,"involuntary_switches":1294},"server_cpu":{"user":0.3342099999999997,"system":2.299189000000002,"voluntary_switches":286,"involuntary_switches":72},"lifecycle_seconds":4.003012849003426,"variant":"deferred"},
+    {"bytes":64,"connections":32,"payload_mib_per_second":41.079264322916664,"requests":2019128,"requests_per_second":673042.6666666666,"rtt_max_us":3135.487,"rtt_mean_us":47.479789533897716,"rtt_p50_us":47.391,"rtt_p95_us":50.559,"rtt_p99_us":52.095,"seconds":3.0,"warmup_seconds":1.0,"identifier":"control-iouring-monitor-w1-c32-b64-r0","mode":"control","backend":"iouring-monitor","workers":1,"repeat":0,"client_cpu":{"user":1.2916920000000003,"system":3.4984900000000003,"voluntary_switches":1365965,"involuntary_switches":780},"server_cpu":{"user":0.33319099999999935,"system":2.3029389999999985,"voluntary_switches":115,"involuntary_switches":66},"lifecycle_seconds":4.0025555250031175,"variant":"deferred"},
+    {"bytes":64,"connections":1,"payload_mib_per_second":16.43707275390625,"requests":807915,"requests_per_second":269305.0,"rtt_max_us":169.727,"rtt_mean_us":3.6779894196790512,"rtt_p50_us":3.441,"rtt_p95_us":4.763,"rtt_p99_us":5.343,"seconds":3.0,"warmup_seconds":1.0,"identifier":"control-iouring-monitor-w1-c1-b64-r0","mode":"control","backend":"iouring-monitor","workers":1,"repeat":0,"client_cpu":{"user":0.37095900000000004,"system":1.3719029999999997,"voluntary_switches":1084655,"involuntary_switches":9},"server_cpu":{"user":0.27525400000000033,"system":1.3375060000000012,"voluntary_switches":1084643,"involuntary_switches":10},"lifecycle_seconds":4.001681460998952,"variant":"deferred"},
+    {"bytes":64,"connections":1,"payload_mib_per_second":16.945271809895832,"requests":832894,"requests_per_second":277631.3333333333,"rtt_max_us":163.071,"rtt_mean_us":3.573194314042361,"rtt_p50_us":3.501,"rtt_p95_us":4.071,"rtt_p99_us":4.283,"seconds":3.0,"warmup_seconds":1.0,"identifier":"control-iouring-monitor-w1-c1-b64-r1","mode":"control","backend":"iouring-monitor","workers":1,"repeat":1,"client_cpu":{"user":0.3465740000000004,"system":1.4192500000000017,"voluntary_switches":1109416,"involuntary_switches":6},"server_cpu":{"user":0.3022739999999988,"system":1.4697359999999975,"voluntary_switches":1109406,"involuntary_switches":9},"lifecycle_seconds":4.001975402003154,"variant":"baseline"}
+  ]
+}

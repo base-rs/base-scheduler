@@ -1,0 +1,14 @@
+{
+  "single-issuer": {
+    "sha256": "6d953bb9d462099b79c97c37cec2382964d883e75a6b8cf5bc06cac7a0616856",
+    "patch_sha256": "9eb24e063424c9242152b51c63c0b8cb7d8898189f65c03feffd8ff200f98280"
+  },
+  "deferred-probe-collect": {
+    "sha256": "95ddcd615952fac6d7bab5d81cdba82f9d866431944603e47df0f2e1399ec93c",
+    "patch_sha256": "7f8cae97248f05b2b40742ede41b5421d4d9baea570cabb8fa9371e37a0b2a4b"
+  },
+  "coop-probe-collect": {
+    "sha256": "5d0c3afb3a710b142b2aa73c2d364532525f8b5e285a8bfb509c70314f220274",
+    "patch_sha256": "aa293fe7b2611d43f941790045285db5df81b9fd5030c3b811e95077b2b67061"
+  }
+}

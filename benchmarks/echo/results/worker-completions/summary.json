@@ -1,0 +1,1409 @@
+{
+  "baseline": {
+    "samples": 30,
+    "cases": [
+      {
+        "case": [
+          1,
+          32,
+          64
+        ],
+        "variants": {
+          "native": {
+            "requests_per_second": 637815.3333333334,
+            "range": [
+              634489.3333333334,
+              638115.0
+            ],
+            "rtt_p99_us": 54.911
+          },
+          "owned": {
+            "requests_per_second": 641675.3333333334,
+            "range": [
+              641565.3333333334,
+              650382.3333333334
+            ],
+            "rtt_p99_us": 53.791
+          },
+          "adapter": {
+            "requests_per_second": 653156.3333333334,
+            "range": [
+              640638.6666666666,
+              655948.0
+            ],
+            "rtt_p99_us": 56.991
+          },
+          "tokio": {
+            "requests_per_second": 706139.6666666666,
+            "range": [
+              706116.6666666666,
+              713059.3333333334
+            ],
+            "rtt_p99_us": 53.087
+          },
+          "conservative": {
+            "requests_per_second": 660279.6666666666,
+            "range": [
+              659176.0,
+              664854.0
+            ],
+            "rtt_p99_us": 56.223
+          }
+        }
+      },
+      {
+        "case": [
+          1,
+          32,
+          4096
+        ],
+        "variants": {
+          "native": {
+            "requests_per_second": 567034.0,
+            "range": [
+              563515.3333333334,
+              569407.3333333334
+            ],
+            "rtt_p99_us": 61.791
+          },
+          "owned": {
+            "requests_per_second": 582915.0,
+            "range": [
+              582655.3333333334,
+              583016.6666666666
+            ],
+            "rtt_p99_us": 59.711
+          },
+          "adapter": {
+            "requests_per_second": 580754.3333333334,
+            "range": [
+              579768.3333333334,
+              584431.6666666666
+            ],
+            "rtt_p99_us": 63.647
+          },
+          "tokio": {
+            "requests_per_second": 639428.3333333334,
+            "range": [
+              636964.6666666666,
+              639637.3333333334
+            ],
+            "rtt_p99_us": 58.719
+          },
+          "conservative": {
+            "requests_per_second": 602755.6666666666,
+            "range": [
+              587782.6666666666,
+              607482.3333333334
+            ],
+            "rtt_p99_us": 61.759
+          }
+        }
+      }
+    ]
+  },
+  "batch-counts": {
+    "samples": 8,
+    "cases": [
+      {
+        "case": [
+          1,
+          32,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "requests_per_second": 635643.6666666667,
+            "range": [
+              632213.3333333334,
+              639074.0
+            ],
+            "rtt_p99_us": 54.846999999999994,
+            "change_percent": 0.0
+          },
+          "deferred": {
+            "requests_per_second": 674525.5,
+            "range": [
+              673042.6666666666,
+              676008.3333333334
+            ],
+            "rtt_p99_us": 52.063,
+            "change_percent": 6.116922951066384
+          }
+        }
+      },
+      {
+        "case": [
+          1,
+          1,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "requests_per_second": 280695.0,
+            "range": [
+              277631.3333333333,
+              283758.6666666667
+            ],
+            "rtt_p99_us": 4.213,
+            "change_percent": 0.0
+          },
+          "deferred": {
+            "requests_per_second": 267612.3333333334,
+            "range": [
+              265919.6666666667,
+              269305.0
+            ],
+            "rtt_p99_us": 5.457,
+            "change_percent": -4.66081215079236
+          }
+        }
+      }
+    ]
+  },
+  "collect-screen": {
+    "samples": 60,
+    "cases": [
+      {
+        "case": [
+          1,
+          32,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "requests_per_second": 636769.6666666666,
+            "range": [
+              629424.0,
+              641257.3333333334
+            ],
+            "rtt_p99_us": 54.495,
+            "change_percent": 0.0
+          },
+          "deferred": {
+            "requests_per_second": 681372.0,
+            "range": [
+              673121.3333333334,
+              685307.3333333334
+            ],
+            "rtt_p99_us": 51.487,
+            "change_percent": 7.00446891052704
+          },
+          "deferred-collect": {
+            "requests_per_second": 671679.3333333334,
+            "range": [
+              671091.6666666666,
+              677666.3333333334
+            ],
+            "rtt_p99_us": 52.447,
+            "change_percent": 5.482306789111102
+          },
+          "coop-collect": {
+            "requests_per_second": 634797.6666666666,
+            "range": [
+              633461.3333333334,
+              635264.0
+            ],
+            "rtt_p99_us": 54.655,
+            "change_percent": -0.309688118519047
+          },
+          "tokio": {
+            "requests_per_second": 704071.0,
+            "range": [
+              695865.0,
+              708568.6666666666
+            ],
+            "rtt_p99_us": 53.215,
+            "change_percent": 10.569180169281523
+          }
+        }
+      },
+      {
+        "case": [
+          1,
+          32,
+          4096
+        ],
+        "variants": {
+          "baseline": {
+            "requests_per_second": 575190.3333333334,
+            "range": [
+              571313.0,
+              577910.6666666666
+            ],
+            "rtt_p99_us": 60.639,
+            "change_percent": 0.0
+          },
+          "deferred": {
+            "requests_per_second": 609786.6666666666,
+            "range": [
+              602288.0,
+              611658.6666666666
+            ],
+            "rtt_p99_us": 57.471,
+            "change_percent": 6.014762649580918
+          },
+          "deferred-collect": {
+            "requests_per_second": 606006.3333333334,
+            "range": [
+              602378.3333333334,
+              606601.6666666666
+            ],
+            "rtt_p99_us": 57.951,
+            "change_percent": 5.357530927443732
+          },
+          "coop-collect": {
+            "requests_per_second": 574291.6666666666,
+            "range": [
+              573399.3333333334,
+              574385.6666666666
+            ],
+            "rtt_p99_us": 60.511,
+            "change_percent": -0.15623813798448793
+          },
+          "tokio": {
+            "requests_per_second": 637782.6666666666,
+            "range": [
+              631980.0,
+              639612.0
+            ],
+            "rtt_p99_us": 58.623,
+            "change_percent": 10.882021081717275
+          }
+        }
+      },
+      {
+        "case": [
+          1,
+          1,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "requests_per_second": 275892.3333333333,
+            "range": [
+              275384.3333333333,
+              276341.0
+            ],
+            "rtt_p99_us": 4.251,
+            "change_percent": 0.0
+          },
+          "deferred": {
+            "requests_per_second": 253702.66666666666,
+            "range": [
+              238796.66666666666,
+              273542.3333333333
+            ],
+            "rtt_p99_us": 5.383,
+            "change_percent": -8.042871796606644
+          },
+          "deferred-collect": {
+            "requests_per_second": 270229.6666666667,
+            "range": [
+              266555.0,
+              272158.3333333333
+            ],
+            "rtt_p99_us": 5.411,
+            "change_percent": -2.052491491245967
+          },
+          "coop-collect": {
+            "requests_per_second": 277939.0,
+            "range": [
+              276550.3333333333,
+              280066.0
+            ],
+            "rtt_p99_us": 4.243,
+            "change_percent": 0.7418352811543683
+          },
+          "tokio": {
+            "requests_per_second": 273490.6666666667,
+            "range": [
+              272837.3333333333,
+              279679.6666666667
+            ],
+            "rtt_p99_us": 4.291,
+            "change_percent": -0.870508664611902
+          }
+        }
+      },
+      {
+        "case": [
+          4,
+          1,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "requests_per_second": 274480.3333333333,
+            "range": [
+              272587.6666666667,
+              274516.3333333333
+            ],
+            "rtt_p99_us": 4.731,
+            "change_percent": 0.0
+          },
+          "deferred": {
+            "requests_per_second": 262945.0,
+            "range": [
+              250005.0,
+              264443.6666666667
+            ],
+            "rtt_p99_us": 5.571,
+            "change_percent": -4.202608322879231
+          },
+          "deferred-collect": {
+            "requests_per_second": 254612.66666666666,
+            "range": [
+              244253.33333333334,
+              263011.6666666667
+            ],
+            "rtt_p99_us": 6.603,
+            "change_percent": -7.238284224370661
+          },
+          "coop-collect": {
+            "requests_per_second": 272135.3333333333,
+            "range": [
+              272007.0,
+              274732.3333333333
+            ],
+            "rtt_p99_us": 4.703,
+            "change_percent": -0.854341719686047
+          },
+          "tokio": {
+            "requests_per_second": 275529.0,
+            "range": [
+              271964.6666666667,
+              276791.0
+            ],
+            "rtt_p99_us": 4.611,
+            "change_percent": 0.3820553020799311
+          }
+        }
+      }
+    ]
+  },
+  "full-batch-screen": {
+    "samples": 60,
+    "cases": [
+      {
+        "case": [
+          1,
+          32,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "requests_per_second": 637760.6666666666,
+            "range": [
+              632364.0,
+              639731.0
+            ],
+            "rtt_p99_us": 54.495,
+            "change_percent": 0.0
+          },
+          "deferred": {
+            "requests_per_second": 673894.3333333334,
+            "range": [
+              672179.6666666666,
+              679920.3333333334
+            ],
+            "rtt_p99_us": 51.839,
+            "change_percent": 5.665709498129412
+          },
+          "deferred-batch": {
+            "requests_per_second": 463586.0,
+            "range": [
+              462059.3333333333,
+              545073.6666666666
+            ],
+            "rtt_p99_us": 72.895,
+            "change_percent": -27.310349441431004
+          },
+          "deferred-batch-collect": {
+            "requests_per_second": 550618.0,
+            "range": [
+              548404.6666666666,
+              552516.3333333334
+            ],
+            "rtt_p99_us": 62.239,
+            "change_percent": -13.663850911679509
+          },
+          "tokio": {
+            "requests_per_second": 714136.6666666666,
+            "range": [
+              714039.0,
+              717751.3333333334
+            ],
+            "rtt_p99_us": 52.511,
+            "change_percent": 11.975652308441731
+          }
+        }
+      },
+      {
+        "case": [
+          1,
+          32,
+          4096
+        ],
+        "variants": {
+          "baseline": {
+            "requests_per_second": 577096.6666666666,
+            "range": [
+              573001.0,
+              578143.3333333334
+            ],
+            "rtt_p99_us": 60.191,
+            "change_percent": 0.0
+          },
+          "deferred": {
+            "requests_per_second": 610674.6666666666,
+            "range": [
+              604580.6666666666,
+              611851.6666666666
+            ],
+            "rtt_p99_us": 57.215,
+            "change_percent": 5.81843596393441
+          },
+          "deferred-batch": {
+            "requests_per_second": 495915.6666666667,
+            "range": [
+              495538.6666666667,
+              498814.3333333333
+            ],
+            "rtt_p99_us": 69.119,
+            "change_percent": -14.067140687002166
+          },
+          "deferred-batch-collect": {
+            "requests_per_second": 499421.3333333333,
+            "range": [
+              499340.6666666667,
+              504342.0
+            ],
+            "rtt_p99_us": 68.543,
+            "change_percent": -13.459674577915893
+          },
+          "tokio": {
+            "requests_per_second": 638080.3333333334,
+            "range": [
+              631429.6666666666,
+              643011.0
+            ],
+            "rtt_p99_us": 58.463,
+            "change_percent": 10.567322632256882
+          }
+        }
+      },
+      {
+        "case": [
+          1,
+          1,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "requests_per_second": 275021.3333333333,
+            "range": [
+              274425.6666666667,
+              275242.3333333333
+            ],
+            "rtt_p99_us": 4.271,
+            "change_percent": 0.0
+          },
+          "deferred": {
+            "requests_per_second": 265230.6666666667,
+            "range": [
+              249502.33333333334,
+              273029.0
+            ],
+            "rtt_p99_us": 5.631,
+            "change_percent": -3.559966257163072
+          },
+          "deferred-batch": {
+            "requests_per_second": 264471.6666666667,
+            "range": [
+              231680.0,
+              271894.6666666667
+            ],
+            "rtt_p99_us": 5.623,
+            "change_percent": -3.8359448479148184
+          },
+          "deferred-batch-collect": {
+            "requests_per_second": 271718.3333333333,
+            "range": [
+              236054.66666666666,
+              274325.3333333333
+            ],
+            "rtt_p99_us": 5.403,
+            "change_percent": -1.2009977407813177
+          },
+          "tokio": {
+            "requests_per_second": 273594.3333333333,
+            "range": [
+              272334.6666666667,
+              279779.3333333333
+            ],
+            "rtt_p99_us": 4.303,
+            "change_percent": -0.518868839265807
+          }
+        }
+      },
+      {
+        "case": [
+          4,
+          1,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "requests_per_second": 273613.3333333333,
+            "range": [
+              272959.3333333333,
+              277809.0
+            ],
+            "rtt_p99_us": 4.603,
+            "change_percent": 0.0
+          },
+          "deferred": {
+            "requests_per_second": 256007.33333333334,
+            "range": [
+              253379.66666666666,
+              257633.0
+            ],
+            "rtt_p99_us": 5.943,
+            "change_percent": -6.434627942108073
+          },
+          "deferred-batch": {
+            "requests_per_second": 267325.6666666667,
+            "range": [
+              266685.3333333333,
+              268321.6666666667
+            ],
+            "rtt_p99_us": 5.443,
+            "change_percent": -2.298011792797605
+          },
+          "deferred-batch-collect": {
+            "requests_per_second": 260095.0,
+            "range": [
+              253626.66666666666,
+              268631.0
+            ],
+            "rtt_p99_us": 5.731,
+            "change_percent": -4.940670532625113
+          },
+          "tokio": {
+            "requests_per_second": 272442.0,
+            "range": [
+              270173.6666666667,
+              275081.0
+            ],
+            "rtt_p99_us": 4.563,
+            "change_percent": -0.42809804590419054
+          }
+        }
+      }
+    ]
+  },
+  "owned-collect-screen": {
+    "samples": 36,
+    "cases": [
+      {
+        "case": [
+          1,
+          32,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "requests_per_second": 657844.3333333334,
+            "range": [
+              647773.6666666666,
+              661090.3333333334
+            ],
+            "rtt_p99_us": 52.639,
+            "change_percent": 0.0
+          },
+          "coop-collect": {
+            "requests_per_second": 665608.3333333334,
+            "range": [
+              661937.6666666666,
+              665737.0
+            ],
+            "rtt_p99_us": 52.383,
+            "change_percent": 1.1802184204672495
+          },
+          "tokio": {
+            "requests_per_second": 716076.6666666666,
+            "range": [
+              703784.0,
+              728551.3333333334
+            ],
+            "rtt_p99_us": 52.383,
+            "change_percent": 8.851992847345326
+          }
+        }
+      },
+      {
+        "case": [
+          1,
+          32,
+          4096
+        ],
+        "variants": {
+          "baseline": {
+            "requests_per_second": 587095.6666666666,
+            "range": [
+              585396.3333333334,
+              587274.6666666666
+            ],
+            "rtt_p99_us": 59.007,
+            "change_percent": 0.0
+          },
+          "coop-collect": {
+            "requests_per_second": 589336.3333333334,
+            "range": [
+              585314.0,
+              590147.3333333334
+            ],
+            "rtt_p99_us": 59.007,
+            "change_percent": 0.3816527346196308
+          },
+          "tokio": {
+            "requests_per_second": 641632.3333333334,
+            "range": [
+              641304.3333333334,
+              642783.3333333334
+            ],
+            "rtt_p99_us": 58.143,
+            "change_percent": 9.289229977851443
+          }
+        }
+      },
+      {
+        "case": [
+          1,
+          1,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "requests_per_second": 236072.33333333334,
+            "range": [
+              232387.66666666666,
+              242871.66666666666
+            ],
+            "rtt_p99_us": 5.731,
+            "change_percent": 0.0
+          },
+          "coop-collect": {
+            "requests_per_second": 233654.66666666666,
+            "range": [
+              229083.33333333334,
+              240333.33333333334
+            ],
+            "rtt_p99_us": 5.683,
+            "change_percent": -1.0241211380127901
+          },
+          "tokio": {
+            "requests_per_second": 278412.6666666667,
+            "range": [
+              276717.0,
+              279511.3333333333
+            ],
+            "rtt_p99_us": 4.243,
+            "change_percent": 17.935322083485715
+          }
+        }
+      },
+      {
+        "case": [
+          4,
+          1,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "requests_per_second": 235568.33333333334,
+            "range": [
+              231102.33333333334,
+              238179.0
+            ],
+            "rtt_p99_us": 7.211,
+            "change_percent": 0.0
+          },
+          "coop-collect": {
+            "requests_per_second": 233893.66666666666,
+            "range": [
+              232423.33333333334,
+              234796.66666666666
+            ],
+            "rtt_p99_us": 7.151,
+            "change_percent": -0.7109048329925538
+          },
+          "tokio": {
+            "requests_per_second": 275060.6666666667,
+            "range": [
+              269497.0,
+              276581.0
+            ],
+            "rtt_p99_us": 4.391,
+            "change_percent": 16.764703801444746
+          }
+        }
+      }
+    ]
+  },
+  "perf": {
+    "samples": 4,
+    "cases": [
+      {
+        "case": [
+          1,
+          32,
+          64
+        ],
+        "variants": {
+          "native": {
+            "requests_per_second": 631752.2,
+            "range": [
+              631752.2,
+              631752.2
+            ],
+            "rtt_p99_us": 55.807
+          },
+          "owned": {
+            "requests_per_second": 651678.8,
+            "range": [
+              651678.8,
+              651678.8
+            ],
+            "rtt_p99_us": 53.823
+          },
+          "tokio": {
+            "requests_per_second": 711383.6,
+            "range": [
+              711383.6,
+              711383.6
+            ],
+            "rtt_p99_us": 52.991
+          },
+          "conservative": {
+            "requests_per_second": 661747.0,
+            "range": [
+              661747.0,
+              661747.0
+            ],
+            "rtt_p99_us": 56.447
+          }
+        }
+      }
+    ]
+  },
+  "probe-screen": {
+    "samples": 45,
+    "cases": [
+      {
+        "case": [
+          1,
+          32,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "requests_per_second": 636143.6666666666,
+            "range": [
+              635969.6666666666,
+              636691.0
+            ],
+            "rtt_p99_us": 54.655,
+            "change_percent": 0.0
+          },
+          "single-issuer": {
+            "requests_per_second": 637854.3333333334,
+            "range": [
+              634263.0,
+              639607.3333333334
+            ],
+            "rtt_p99_us": 54.463,
+            "change_percent": 0.26891200153424943
+          },
+          "deferred-probe-collect": {
+            "requests_per_second": 670365.6666666666,
+            "range": [
+              667531.3333333334,
+              682590.6666666666
+            ],
+            "rtt_p99_us": 52.255,
+            "change_percent": 5.379602406374651
+          },
+          "coop-probe-collect": {
+            "requests_per_second": 635898.3333333334,
+            "range": [
+              634205.0,
+              637850.3333333334
+            ],
+            "rtt_p99_us": 54.623,
+            "change_percent": -0.03856571183342705
+          },
+          "tokio": {
+            "requests_per_second": 713824.3333333334,
+            "range": [
+              705077.0,
+              720713.6666666666
+            ],
+            "rtt_p99_us": 52.607,
+            "change_percent": 12.211182903652285
+          }
+        }
+      },
+      {
+        "case": [
+          1,
+          1,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "requests_per_second": 274308.6666666667,
+            "range": [
+              273584.6666666667,
+              276139.3333333333
+            ],
+            "rtt_p99_us": 4.271,
+            "change_percent": 0.0
+          },
+          "single-issuer": {
+            "requests_per_second": 270273.0,
+            "range": [
+              269107.3333333333,
+              274308.6666666667
+            ],
+            "rtt_p99_us": 4.291,
+            "change_percent": -1.4712136935763453
+          },
+          "deferred-probe-collect": {
+            "requests_per_second": 254637.33333333334,
+            "range": [
+              233440.66666666666,
+              258826.33333333334
+            ],
+            "rtt_p99_us": 6.491,
+            "change_percent": -7.171240184415129
+          },
+          "coop-probe-collect": {
+            "requests_per_second": 274222.0,
+            "range": [
+              273148.0,
+              276841.6666666667
+            ],
+            "rtt_p99_us": 4.643,
+            "change_percent": -0.03159457837036417
+          },
+          "tokio": {
+            "requests_per_second": 276479.3333333333,
+            "range": [
+              275479.3333333333,
+              278654.0
+            ],
+            "rtt_p99_us": 4.263,
+            "change_percent": 0.7913226705681842
+          }
+        }
+      },
+      {
+        "case": [
+          4,
+          1,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "requests_per_second": 272305.3333333333,
+            "range": [
+              271893.6666666667,
+              272348.3333333333
+            ],
+            "rtt_p99_us": 4.483,
+            "change_percent": 0.0
+          },
+          "single-issuer": {
+            "requests_per_second": 274358.0,
+            "range": [
+              273279.6666666667,
+              274541.0
+            ],
+            "rtt_p99_us": 4.471,
+            "change_percent": 0.7538106733128158
+          },
+          "deferred-probe-collect": {
+            "requests_per_second": 245095.0,
+            "range": [
+              241666.33333333334,
+              250832.66666666666
+            ],
+            "rtt_p99_us": 5.823,
+            "change_percent": -9.992581856641314
+          },
+          "coop-probe-collect": {
+            "requests_per_second": 273133.6666666667,
+            "range": [
+              272620.0,
+              273861.6666666667
+            ],
+            "rtt_p99_us": 4.403,
+            "change_percent": 0.3041928423485496
+          },
+          "tokio": {
+            "requests_per_second": 273956.0,
+            "range": [
+              272754.6666666667,
+              279926.0
+            ],
+            "rtt_p99_us": 4.531,
+            "change_percent": 0.6061822757786661
+          }
+        }
+      }
+    ]
+  },
+  "ring-screen": {
+    "samples": 60,
+    "cases": [
+      {
+        "case": [
+          1,
+          32,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "requests_per_second": 636372.3333333334,
+            "range": [
+              635577.6666666666,
+              636638.6666666666
+            ],
+            "rtt_p99_us": 54.751,
+            "change_percent": 0.0
+          },
+          "deferred": {
+            "requests_per_second": 673763.3333333334,
+            "range": [
+              658632.6666666666,
+              678053.0
+            ],
+            "rtt_p99_us": 51.871,
+            "change_percent": 5.875648270902212
+          },
+          "deferred-no-iowait": {
+            "requests_per_second": 669742.3333333334,
+            "range": [
+              669501.3333333334,
+              670744.6666666666
+            ],
+            "rtt_p99_us": 52.159,
+            "change_percent": 5.2437854777889426
+          },
+          "coop-no-iowait": {
+            "requests_per_second": 634965.0,
+            "range": [
+              624814.6666666666,
+              639455.3333333334
+            ],
+            "rtt_p99_us": 54.687,
+            "change_percent": -0.22114935857782125
+          },
+          "tokio": {
+            "requests_per_second": 702987.3333333334,
+            "range": [
+              701684.6666666666,
+              707130.6666666666
+            ],
+            "rtt_p99_us": 53.183,
+            "change_percent": 10.46792836688375
+          }
+        }
+      },
+      {
+        "case": [
+          1,
+          32,
+          4096
+        ],
+        "variants": {
+          "baseline": {
+            "requests_per_second": 577565.6666666666,
+            "range": [
+              575715.6666666666,
+              579375.3333333334
+            ],
+            "rtt_p99_us": 60.159,
+            "change_percent": 0.0
+          },
+          "deferred": {
+            "requests_per_second": 610675.6666666666,
+            "range": [
+              607154.0,
+              613054.6666666666
+            ],
+            "rtt_p99_us": 57.247,
+            "change_percent": 5.7326814786428315
+          },
+          "deferred-no-iowait": {
+            "requests_per_second": 609419.0,
+            "range": [
+              609306.6666666666,
+              611178.6666666666
+            ],
+            "rtt_p99_us": 57.375,
+            "change_percent": 5.515101601722638
+          },
+          "coop-no-iowait": {
+            "requests_per_second": 571246.0,
+            "range": [
+              567736.3333333334,
+              577987.6666666666
+            ],
+            "rtt_p99_us": 60.703,
+            "change_percent": -1.0941901555782674
+          },
+          "tokio": {
+            "requests_per_second": 637424.3333333334,
+            "range": [
+              635559.3333333334,
+              639888.3333333334
+            ],
+            "rtt_p99_us": 58.591,
+            "change_percent": 10.36395861480688
+          }
+        }
+      },
+      {
+        "case": [
+          1,
+          1,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "requests_per_second": 276213.0,
+            "range": [
+              271742.6666666667,
+              276962.3333333333
+            ],
+            "rtt_p99_us": 4.283,
+            "change_percent": 0.0
+          },
+          "deferred": {
+            "requests_per_second": 272678.6666666667,
+            "range": [
+              263045.0,
+              277498.6666666667
+            ],
+            "rtt_p99_us": 5.423,
+            "change_percent": -1.2795680628114203
+          },
+          "deferred-no-iowait": {
+            "requests_per_second": 255276.0,
+            "range": [
+              245392.66666666666,
+              268109.3333333333
+            ],
+            "rtt_p99_us": 6.043,
+            "change_percent": -7.580019767353452
+          },
+          "coop-no-iowait": {
+            "requests_per_second": 276202.0,
+            "range": [
+              270771.6666666667,
+              276726.6666666667
+            ],
+            "rtt_p99_us": 4.283,
+            "change_percent": -0.003982433846339006
+          },
+          "tokio": {
+            "requests_per_second": 276269.3333333333,
+            "range": [
+              271628.6666666667,
+              276383.6666666667
+            ],
+            "rtt_p99_us": 4.263,
+            "change_percent": 0.020394888485819607
+          }
+        }
+      },
+      {
+        "case": [
+          4,
+          1,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "requests_per_second": 273096.6666666667,
+            "range": [
+              272320.6666666667,
+              274700.6666666667
+            ],
+            "rtt_p99_us": 4.351,
+            "change_percent": 0.0
+          },
+          "deferred": {
+            "requests_per_second": 269314.6666666667,
+            "range": [
+              264290.3333333333,
+              273572.0
+            ],
+            "rtt_p99_us": 5.491,
+            "change_percent": -1.384857620622737
+          },
+          "deferred-no-iowait": {
+            "requests_per_second": 253980.66666666666,
+            "range": [
+              249622.33333333334,
+              265815.0
+            ],
+            "rtt_p99_us": 5.691,
+            "change_percent": -6.999719269123272
+          },
+          "coop-no-iowait": {
+            "requests_per_second": 273622.6666666667,
+            "range": [
+              273120.3333333333,
+              276648.6666666667
+            ],
+            "rtt_p99_us": 4.323,
+            "change_percent": 0.1926057928206104
+          },
+          "tokio": {
+            "requests_per_second": 276521.3333333333,
+            "range": [
+              274146.0,
+              277134.3333333333
+            ],
+            "rtt_p99_us": 4.523,
+            "change_percent": 1.254012620683742
+          }
+        }
+      }
+    ]
+  },
+  "stat": {
+    "samples": 8,
+    "cases": [
+      {
+        "case": [
+          1,
+          32,
+          64
+        ],
+        "variants": {
+          "native": {
+            "requests_per_second": 603526.8333333334,
+            "range": [
+              602506.3333333334,
+              604547.3333333334
+            ],
+            "rtt_p99_us": 57.486999999999995
+          },
+          "owned": {
+            "requests_per_second": 640192.6666666666,
+            "range": [
+              639318.6666666666,
+              641066.6666666666
+            ],
+            "rtt_p99_us": 54.126999999999995
+          },
+          "tokio": {
+            "requests_per_second": 686551.8333333333,
+            "range": [
+              678799.6666666666,
+              694304.0
+            ],
+            "rtt_p99_us": 54.495
+          },
+          "conservative": {
+            "requests_per_second": 641035.5,
+            "range": [
+              635763.0,
+              646308.0
+            ],
+            "rtt_p99_us": 57.887
+          }
+        }
+      }
+    ]
+  },
+  "cpu": {
+    "samples": 8,
+    "cases": [
+      {
+        "case": [
+          1,
+          32,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "requests_per_second": 631091.5,
+            "range": [
+              628103.6666666666,
+              634079.3333333334
+            ],
+            "rtt_p99_us": 56.383,
+            "per_request": {
+              "cycles:u": 909.4237506814654,
+              "cycles:k": 7603.851383447028,
+              "instructions:u": 1678.9559975991779,
+              "instructions:k": 13996.109901255051,
+              "context-switches": 8.607114746181363e-05,
+              "cpu-migrations": 0.0
+            },
+            "change_percent": 0.0
+          },
+          "deferred": {
+            "requests_per_second": 670393.1666666666,
+            "range": [
+              667107.6666666666,
+              673678.6666666666
+            ],
+            "rtt_p99_us": 52.367000000000004,
+            "per_request": {
+              "cycles:u": 965.4070187443435,
+              "cycles:k": 7036.360086814457,
+              "instructions:u": 1708.4734813215532,
+              "instructions:k": 13630.677923083502,
+              "context-switches": 8.604560906264989e-05,
+              "cpu-migrations": 0.0
+            },
+            "change_percent": 6.2275702757312645
+          },
+          "tokio": {
+            "requests_per_second": 704703.8333333333,
+            "range": [
+              703812.0,
+              705595.6666666666
+            ],
+            "rtt_p99_us": 53.343,
+            "per_request": {
+              "cycles:u": 667.5977774932048,
+              "cycles:k": 6963.589159964134,
+              "instructions:u": 1443.4659785030144,
+              "instructions:k": 12894.53552579441,
+              "context-switches": 7.001246530169593e-05,
+              "cpu-migrations": 0.0
+            },
+            "change_percent": 11.664288511782095
+          },
+          "conservative": {
+            "requests_per_second": 664088.5,
+            "range": [
+              657239.0,
+              670938.0
+            ],
+            "rtt_p99_us": 56.303,
+            "per_request": {
+              "cycles:u": 821.8096882225892,
+              "cycles:k": 7270.172013253614,
+              "instructions:u": 1717.2880837022317,
+              "instructions:k": 13669.413663077288,
+              "context-switches": 5.90076572143426e-05,
+              "cpu-migrations": 0.0
+            },
+            "change_percent": 5.228560359313983
+          }
+        }
+      }
+    ]
+  },
+  "work": {
+    "samples": 8,
+    "cases": [
+      {
+        "case": [
+          1,
+          32,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "requests_per_second": 612335.5,
+            "range": [
+              611772.3333333334,
+              612898.6666666666
+            ],
+            "rtt_p99_us": 56.591,
+            "per_request": {
+              "syscalls:sys_enter_io_uring_enter": 0.021978411087323485,
+              "syscalls:sys_enter_write": 1.7691590987005102e-05,
+              "syscalls:sys_enter_futex": 6.178860775811159e-05,
+              "io_uring:io_uring_task_work_run": 0.9076138024402755,
+              "io_uring:io_uring_local_work_run": 0.0,
+              "io_uring:io_uring_complete": 1.0000890028199367
+            },
+            "change_percent": 0.0
+          },
+          "deferred": {
+            "requests_per_second": 652052.6666666666,
+            "range": [
+              651564.6666666666,
+              652540.6666666666
+            ],
+            "rtt_p99_us": 54.751000000000005,
+            "per_request": {
+              "syscalls:sys_enter_io_uring_enter": 0.07099103268095448,
+              "syscalls:sys_enter_write": 1.6870194989312883e-05,
+              "syscalls:sys_enter_futex": 6.185674397770755e-05,
+              "io_uring:io_uring_task_work_run": 0.0,
+              "io_uring:io_uring_local_work_run": 0.07096572700588065,
+              "io_uring:io_uring_complete": 1.0000639008045433
+            },
+            "change_percent": 6.48617737607351
+          }
+        }
+      },
+      {
+        "case": [
+          1,
+          1,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "requests_per_second": 232176.1666666667,
+            "range": [
+              230363.33333333334,
+              233989.0
+            ],
+            "rtt_p99_us": 5.973,
+            "per_request": {
+              "syscalls:sys_enter_io_uring_enter": 1.0000007347053426,
+              "syscalls:sys_enter_write": 5.030831663618704e-06,
+              "syscalls:sys_enter_futex": 2.584402136691531e-05,
+              "io_uring:io_uring_task_work_run": 1.00000789117902,
+              "io_uring:io_uring_local_work_run": 0.0,
+              "io_uring:io_uring_complete": 1.0000093269579846
+            },
+            "change_percent": 0.0
+          },
+          "deferred": {
+            "requests_per_second": 239827.3333333333,
+            "range": [
+              238721.0,
+              240933.66666666666
+            ],
+            "rtt_p99_us": 5.873,
+            "per_request": {
+              "syscalls:sys_enter_io_uring_enter": 1.0000069495920718,
+              "syscalls:sys_enter_write": 5.559673657440068e-06,
+              "syscalls:sys_enter_futex": 2.7113026706070592e-05,
+              "io_uring:io_uring_task_work_run": 0.0,
+              "io_uring:io_uring_local_work_run": 1.0000069495920718,
+              "io_uring:io_uring_complete": 1.0000083395104862
+            },
+            "change_percent": 3.2954143297797334
+          }
+        }
+      }
+    ]
+  },
+  "client_sha256": "a8c84568e0932f782179fbbb1c64272129c6af9a5f1344a8c84998b22527fc5f"
+}

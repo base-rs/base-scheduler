@@ -1,0 +1,12 @@
+diff --git a/crates/iouring/src/io_uring_selector.rs b/crates/iouring/src/io_uring_selector.rs
+index 9037ce7..f15539e 100644
+--- a/crates/iouring/src/io_uring_selector.rs
++++ b/crates/iouring/src/io_uring_selector.rs
+@@ -1215,6 +1215,7 @@ impl Reactor {
+                     }
+                 }
+             }
++            self.collect_completions()?;
+             return Ok(false);
+         }
+         let result = syscall("wait", || match timeout {

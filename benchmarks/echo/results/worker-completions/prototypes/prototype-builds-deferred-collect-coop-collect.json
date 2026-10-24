@@ -1,0 +1,10 @@
+{
+  "deferred-collect": {
+    "sha256": "7a1d34d81ef24f4c1b72cf6bc3715a8d42f0ce807a3b43b2a96ef0718cf40fca",
+    "patch_sha256": "e0d9ad1d480f8ecfac97d2b1d432c75412bf1fc83f583a0283ecae92ad009db3"
+  },
+  "coop-collect": {
+    "sha256": "981d1a432e203705dd4b258733c00b2c5fd1fe5f9df90d2b1ff8b69ebcc15357",
+    "patch_sha256": "ecb6495ab9e536510ae98d5793f3fc6272071f0a326cffaf8a80ca116ec230a1"
+  }
+}

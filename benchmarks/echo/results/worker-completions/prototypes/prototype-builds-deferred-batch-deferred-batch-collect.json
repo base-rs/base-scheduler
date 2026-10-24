@@ -1,0 +1,10 @@
+{
+  "deferred-batch": {
+    "sha256": "7a8f791ffd9d6586aa92b7abe92a725a9e834ae36ae0204ddb13c0f899228ccf",
+    "patch_sha256": "27237cd9f176e38aaecb4af190a1488f38dc1729c9d69f99a48854fb1af01de9"
+  },
+  "deferred-batch-collect": {
+    "sha256": "3c215dc889c5febcc65c8ca5944265683aaf5d4fe448c46d641d521b30c31d29",
+    "patch_sha256": "b9af6e547c16b530f9a066261ae72f4a9f14648457e594b86d8e99a70a8e22f4"
+  }
+}

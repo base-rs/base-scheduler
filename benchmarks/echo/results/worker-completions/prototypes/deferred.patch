@@ -1,0 +1,34 @@
+diff --git a/crates/iouring/src/io_uring_selector.rs b/crates/iouring/src/io_uring_selector.rs
+index 9037ce7..867b2c5 100644
+--- a/crates/iouring/src/io_uring_selector.rs
++++ b/crates/iouring/src/io_uring_selector.rs
+@@ -800,7 +800,8 @@ impl Reactor {
+         if !self.started {
+             if let Ok(ring) = syscall("cooperative-ring", || {
+                 IoUring::builder()
+-                    .setup_coop_taskrun()
++                    .setup_single_issuer()
++                    .setup_defer_taskrun()
+                     .setup_taskrun_flag()
+                     .build(self.ring.params().sq_entries())
+             }) {
+@@ -1198,7 +1199,18 @@ impl Reactor {
+                     .submission_notifications
+                     .pending()
+                     .then(|| self.ring.submission().len());
+-                let result = syscall("submit", || self.ring.submit());
++                let result = syscall("submit", || {
++                    let count = self.ring.submission().len() as u32;
++                    // SAFETY: This diagnostic retains the exclusive ring owner and all submitted resources. Zero-minimum GETEVENTS does not block.
++                    unsafe {
++                        self.ring.submitter().enter::<libc::sigset_t>(
++                            count,
++                            0,
++                            io_uring::EnterFlags::GETEVENTS.bits(),
++                            None,
++                        )
++                    }
++                });
+                 if let Some(before) = before {
+                     self.submission_notifications
+                         .consumed(before, self.ring.submission().len());

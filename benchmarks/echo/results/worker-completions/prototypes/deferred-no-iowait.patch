@@ -1,0 +1,55 @@
+diff --git a/crates/iouring/src/io_uring_selector.rs b/crates/iouring/src/io_uring_selector.rs
+index 9037ce7..2f22bea 100644
+--- a/crates/iouring/src/io_uring_selector.rs
++++ b/crates/iouring/src/io_uring_selector.rs
+@@ -800,7 +800,8 @@ impl Reactor {
+         if !self.started {
+             if let Ok(ring) = syscall("cooperative-ring", || {
+                 IoUring::builder()
+-                    .setup_coop_taskrun()
++                    .setup_single_issuer()
++                    .setup_defer_taskrun()
+                     .setup_taskrun_flag()
+                     .build(self.ring.params().sq_entries())
+             }) {
+@@ -1198,7 +1199,18 @@ impl Reactor {
+                     .submission_notifications
+                     .pending()
+                     .then(|| self.ring.submission().len());
+-                let result = syscall("submit", || self.ring.submit());
++                let result = syscall("submit", || {
++                    let count = self.ring.submission().len() as u32;
++                    // SAFETY: This diagnostic retains the exclusive ring owner and all submitted resources. Zero-minimum GETEVENTS does not block.
++                    unsafe {
++                        self.ring.submitter().enter::<libc::sigset_t>(
++                            count,
++                            0,
++                            io_uring::EnterFlags::GETEVENTS.bits(),
++                            None,
++                        )
++                    }
++                });
+                 if let Some(before) = before {
+                     self.submission_notifications
+                         .consumed(before, self.ring.submission().len());
+@@ -1218,7 +1230,19 @@ impl Reactor {
+             return Ok(false);
+         }
+         let result = syscall("wait", || match timeout {
+-            None => self.ring.submit_and_wait(1),
++            None => {
++                let count = self.ring.submission().len() as u32;
++                let mut flags = io_uring::EnterFlags::GETEVENTS;
++                if self.ring.params().is_feature_no_iowait() {
++                    flags |= io_uring::EnterFlags::NO_IOWAIT;
++                }
++                // SAFETY: This diagnostic preserves the existing indefinite wait and retained SQE resources, while selecting the kernel-supported wait-accounting flag.
++                unsafe {
++                    self.ring
++                        .submitter()
++                        .enter::<libc::sigset_t>(count, 1, flags.bits(), None)
++                }
++            }
+             Some(duration) => {
+                 // Clamp seconds to the signed kernel ABI rather than wrapping very long durations negative.
+                 let timespec = types::Timespec::new()

@@ -1,0 +1,75 @@
+{
+  "platform": "Linux-7.2.8-arch1-2-x86_64-with-glibc2.44",
+  "hostname": "aiko",
+  "rustc": "rustc 1.99.0 (b940084d7 2026-09-28) (Arch Linux rust 1:1.99.0-1)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+  "settings": {
+    "server_cpus": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "client_cpus": [
+      4,
+      5,
+      6,
+      7
+    ],
+    "client_binary": "/home/samuel/.cache/core-scheduler-single-worker-completions/bin/baseline",
+    "client_workers": 4,
+    "warmup": 0,
+    "seconds": 3
+  },
+  "variants": {
+    "baseline": {
+      "binary": "/home/samuel/.cache/core-scheduler-single-worker-completions/bin/baseline",
+      "backend": "iouring-monitor",
+      "sha256": "a8c84568e0932f782179fbbb1c64272129c6af9a5f1344a8c84998b22527fc5f"
+    },
+    "deferred": {
+      "binary": "/home/samuel/.cache/core-scheduler-single-worker-completions/bin/deferred",
+      "backend": "iouring-monitor",
+      "sha256": "9f5047fd2a8febabd84b53b5ecef4ce34f46fdf68603c476d53cd0a60e2b2179"
+    },
+    "tokio": {
+      "binary": "/home/samuel/.cache/core-scheduler-single-worker-completions/bin/baseline",
+      "backend": "tokio",
+      "sha256": "a8c84568e0932f782179fbbb1c64272129c6af9a5f1344a8c84998b22527fc5f"
+    },
+    "conservative": {
+      "binary": "/home/samuel/.cache/core-scheduler-single-worker-completions/bin/conservative",
+      "backend": "tokio",
+      "sha256": "dc88daf5fbbfa6653706552920806956cfc56e0250cf67dbb282230d98dda468"
+    }
+  },
+  "client_sha256": "a8c84568e0932f782179fbbb1c64272129c6af9a5f1344a8c84998b22527fc5f",
+  "cases": [
+    [
+      1,
+      32,
+      64
+    ]
+  ],
+  "repeats": 2,
+  "seed": 20261025,
+  "counter_mode": "cpu",
+  "events": [
+    "cycles:u",
+    "cycles:k",
+    "instructions:u",
+    "instructions:k",
+    "context-switches",
+    "cpu-migrations"
+  ],
+  "note": "Counter-instrumented rates are mechanism checks, not capacity measurements.",
+  "samples": [
+    {"bytes":64,"connections":32,"payload_mib_per_second":42.957275390625,"requests":2111436,"requests_per_second":703812.0,"rtt_max_us":3139.583,"rtt_mean_us":45.400551450292554,"rtt_p50_us":46.399,"rtt_p95_us":51.039,"rtt_p99_us":53.631,"seconds":3.0,"warmup_seconds":0.0,"backend":"tokio","workers":1,"client_workers":4,"server_cpus":[0],"client_cpus":[4,5,6,7],"repeat":0,"variant":"tokio","counters":{"cycles:u":1419901943.0,"cycles:k":14711136286.0,"instructions:u":3057156303.0,"instructions:k":27228278070.0,"context-switches":159.0,"cpu-migrations":0.0},"per_request":{"cycles:u":672.4816395097934,"cycles:k":6967.360737431776,"instructions:u":1447.9038450608969,"instructions:k":12895.620833404375,"context-switches":7.530420055355691e-05,"cpu-migrations":0.0}},
+    {"bytes":64,"connections":32,"payload_mib_per_second":38.701131184895836,"requests":1902238,"requests_per_second":634079.3333333334,"rtt_max_us":1040.383,"rtt_mean_us":50.399364491194014,"rtt_p50_us":50.207,"rtt_p95_us":53.791,"rtt_p99_us":56.127,"seconds":3.0,"warmup_seconds":0.0,"backend":"iouring-monitor","workers":1,"client_workers":4,"server_cpus":[0],"client_cpus":[4,5,6,7],"repeat":1,"variant":"baseline","counters":{"cycles:u":1673831694.0,"cycles:k":14436677403.0,"instructions:u":3195627883.0,"instructions:k":26623581042.0,"context-switches":173.0,"cpu-migrations":0.0},"per_request":{"cycles:u":879.927587399684,"cycles:k":7589.31185424747,"instructions:u":1679.9306306571523,"instructions:k":13995.925347932278,"context-switches":9.094550734450684e-05,"cpu-migrations":0.0}},
+    {"bytes":64,"connections":32,"payload_mib_per_second":38.336405436197914,"requests":1884311,"requests_per_second":628103.6666666666,"rtt_max_us":225.023,"rtt_mean_us":50.88030355127153,"rtt_p50_us":50.655,"rtt_p95_us":54.271,"rtt_p99_us":56.639,"seconds":3.0,"warmup_seconds":0.0,"backend":"iouring-monitor","workers":1,"client_workers":4,"server_cpus":[0],"client_cpus":[4,5,6,7],"repeat":0,"variant":"baseline","counters":{"cycles:u":1769217122.0,"cycles:k":14355417799.0,"instructions:u":3161838743.0,"instructions:k":26373371600.0,"context-switches":153.0,"cpu-migrations":0.0},"per_request":{"cycles:u":938.919913963247,"cycles:k":7618.390912646585,"instructions:u":1677.9813645412037,"instructions:k":13996.294454577826,"context-switches":8.119678757912044e-05,"cpu-migrations":0.0}},
+    {"bytes":64,"connections":32,"payload_mib_per_second":40.11468505859375,"requests":1971717,"requests_per_second":657239.0,"rtt_max_us":224.767,"rtt_mean_us":48.61812141600444,"rtt_p50_us":49.663,"rtt_p95_us":54.431,"rtt_p99_us":57.215,"seconds":3.0,"warmup_seconds":0.0,"backend":"tokio","workers":1,"client_workers":4,"server_cpus":[0],"client_cpus":[4,5,6,7],"repeat":1,"variant":"conservative","counters":{"cycles:u":1625735988.0,"cycles:k":14505654802.0,"instructions:u":3387994111.0,"instructions:k":26955658061.0,"context-switches":122.0,"cpu-migrations":0.0},"per_request":{"cycles:u":824.5280575254968,"cycles:k":7356.864500331437,"instructions:u":1718.2963432378988,"instructions:k":13671.159735905305,"context-switches":6.187500538870436e-05,"cpu-migrations":0.0}},
+    {"bytes":64,"connections":32,"payload_mib_per_second":41.118082682291664,"requests":2021036,"requests_per_second":673678.6666666666,"rtt_max_us":218.367,"rtt_mean_us":47.43644329393444,"rtt_p50_us":47.295,"rtt_p95_us":50.591,"rtt_p99_us":52.351,"seconds":3.0,"warmup_seconds":0.0,"backend":"iouring-monitor","workers":1,"client_workers":4,"server_cpus":[0],"client_cpus":[4,5,6,7],"repeat":1,"variant":"deferred","counters":{"cycles:u":1894019434.0,"cycles:k":14197957823.0,"instructions:u":3453534166.0,"instructions:k":27544334855.0,"context-switches":163.0,"cpu-migrations":0.0},"per_request":{"cycles:u":937.1527444340427,"cycles:k":7025.089025133644,"instructions:u":1708.7939878359416,"instructions:k":13628.819503957377,"context-switches":8.065170536299205e-05,"cpu-migrations":0.0}},
+    {"bytes":64,"connections":32,"payload_mib_per_second":40.717020670572914,"requests":2001323,"requests_per_second":667107.6666666666,"rtt_max_us":3074.047,"rtt_mean_us":47.90227735452992,"rtt_p50_us":47.775,"rtt_p95_us":50.911,"rtt_p99_us":52.383,"seconds":3.0,"warmup_seconds":0.0,"backend":"iouring-monitor","workers":1,"client_workers":4,"server_cpus":[0],"client_cpus":[4,5,6,7],"repeat":0,"variant":"deferred","counters":{"cycles:u":1988637200.0,"cycles:k":14104586313.0,"instructions:u":3418565836.0,"instructions:k":27283108530.0,"context-switches":183.0,"cpu-migrations":0.0},"per_request":{"cycles:u":993.6612930546444,"cycles:k":7047.63114849527,"instructions:u":1708.152974807165,"instructions:k":13632.536342209629,"context-switches":9.143951276230773e-05,"cpu-migrations":0.0}},
+    {"bytes":64,"connections":32,"payload_mib_per_second":40.9508056640625,"requests":2012814,"requests_per_second":670938.0,"rtt_max_us":220.415,"rtt_mean_us":47.62947180017629,"rtt_p50_us":48.767,"rtt_p95_us":52.959,"rtt_p99_us":55.391,"seconds":3.0,"warmup_seconds":0.0,"backend":"tokio","workers":1,"client_workers":4,"server_cpus":[0],"client_cpus":[4,5,6,7],"repeat":0,"variant":"conservative","counters":{"cycles:u":1648678474.0,"cycles:k":14459008159.0,"instructions:u":3454552058.0,"instructions:k":27510472673.0,"context-switches":113.0,"cpu-migrations":0.0},"per_request":{"cycles:u":819.0913189196816,"cycles:k":7183.479526175792,"instructions:u":1716.2798241665648,"instructions:k":13667.667590249273,"context-switches":5.614030903998084e-05,"cpu-migrations":0.0}},
+    {"bytes":64,"connections":32,"payload_mib_per_second":43.066141764322914,"requests":2116787,"requests_per_second":705595.6666666666,"rtt_max_us":227.583,"rtt_mean_us":45.28611038711026,"rtt_p50_us":46.303,"rtt_p95_us":50.591,"rtt_p99_us":53.055,"seconds":3.0,"warmup_seconds":0.0,"backend":"tokio","workers":1,"client_workers":4,"server_cpus":[0],"client_cpus":[4,5,6,7],"repeat":1,"variant":"tokio","counters":{"cycles:u":1402824201.0,"cycles:k":14732451381.0,"instructions:u":3046116000.0,"instructions:k":27292687807.0,"context-switches":137.0,"cpu-migrations":0.0},"per_request":{"cycles:u":662.7139154766162,"cycles:k":6959.817582496491,"instructions:u":1439.028111945132,"instructions:k":12893.450218184447,"context-switches":6.472073004983496e-05,"cpu-migrations":0.0}}
+  ]
+}
