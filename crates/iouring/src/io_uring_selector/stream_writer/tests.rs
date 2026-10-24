@@ -384,12 +384,14 @@ fn socket_query_failure_and_closed_selector_reject_before_output() {
     drop(receiver);
 }
 
+type RequestWithReply = (Box<WriteRequest<Vec<u8>>>, Arc<Shared<Vec<u8>>>);
+
 // Model documented kernel completion outcomes before handing the request back to the real retirement machinery. No synthetic pointer is published to the kernel.
 fn make_request(
     selector: &IoUringSelector,
     sender: &NativeSocket,
     token: Cancellation,
-) -> (Box<WriteRequest<Vec<u8>>>, Arc<Shared<Vec<u8>>>) {
+) -> RequestWithReply {
     let shared = Arc::new(Shared {
         result: Mutex::new(None),
         ready: AtomicBool::new(false),
