@@ -143,10 +143,7 @@ fn accepted_cancellation_and_drop_release_owners() {
                 .map_err(|(e, _)| e)
                 .unwrap();
             cancellation.cancel();
-            assert!(matches!(
-                writer.flush(&scheduler, &never).await,
-                Err(OperationError::Cancelled(_))
-            ));
+            assert_cancelled(writer.flush(&scheduler, &never).await);
             assert!(pool.try_acquire().is_some());
             writer.close(&scheduler).await.unwrap();
             drop(writer);
@@ -177,20 +174,26 @@ fn ready_submission_and_flush_allocate_nothing() {
             {
                 let mut submission = std::pin::pin!(writer.submit(&scheduler, vec![42], &never));
                 let allocations = allocation_counter::measure(|| {
-                    assert!(matches!(
-                        submission.as_mut().poll(&mut context),
-                        Poll::Ready(Ok(()))
-                    ));
+                    assert_eq!(
+                        submission
+                            .as_mut()
+                            .poll(&mut context)
+                            .map(|result| result.is_ok()),
+                        Poll::Ready(true)
+                    );
                 });
                 assert_eq!(allocations.count_total, 0);
             }
             {
                 let mut flush = std::pin::pin!(writer.flush(&scheduler, &never));
                 let allocations = allocation_counter::measure(|| {
-                    assert!(matches!(
-                        flush.as_mut().poll(&mut context),
-                        Poll::Ready(Ok(()))
-                    ));
+                    assert_eq!(
+                        flush
+                            .as_mut()
+                            .poll(&mut context)
+                            .map(|result| result.is_ok()),
+                        Poll::Ready(true)
+                    );
                 });
                 assert_eq!(allocations.count_total, 0);
             }
@@ -304,7 +307,7 @@ fn background_retry_errors_and_pending_close_preserve_the_result() {
                         .is_none()
                 );
                 stopping.cancel();
-                assert!(matches!(pending.await, Err(OperationError::Cancelled(_))));
+                assert_cancelled(pending.await);
             }
             scheduler.shutdown().await;
         });
@@ -400,11 +403,18 @@ fn admission_rechecks_cancellation_and_shutdown_after_retiring_the_previous_owne
                 if close_scheduler {
                     assert_eq!(error.kind(), io::ErrorKind::BrokenPipe);
                 } else {
-                    assert!(matches!(error, OperationError::Cancelled(_)));
+                    assert_cancelled(Err(error));
                 }
                 writer.close(&scheduler).await.unwrap();
                 scheduler.shutdown().await;
             });
         }
     });
+}
+
+fn assert_cancelled(result: OperationResult<()>) {
+    assert_eq!(
+        std::mem::discriminant(&result.unwrap_err()),
+        std::mem::discriminant(&OperationError::Cancelled(Cancelled))
+    );
 }

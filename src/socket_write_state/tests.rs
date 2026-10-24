@@ -46,10 +46,10 @@ fn cancelled_wait_retains_pending_operation_and_close_signals_retirement() {
         state.accept(handle);
         let cancellation = Cancellation::new();
         cancellation.cancel();
-        assert!(matches!(
-            state.flush(&cancellation).await,
-            Err(OperationError::Cancelled(_))
-        ));
+        assert_eq!(
+            std::mem::discriminant(&state.flush(&cancellation).await.unwrap_err()),
+            std::mem::discriminant(&OperationError::Cancelled(crate::Cancelled))
+        );
         let mut closing = Box::pin(state.close());
         assert!(poll_once(closing.as_mut()).await.is_none());
         assert!(stopping.is_cancelled());
