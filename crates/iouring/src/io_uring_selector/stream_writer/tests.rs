@@ -438,8 +438,16 @@ fn completion_outcomes_preserve_short_write_order_and_retire_errors() {
         assert!(cached.socket.is_none());
     }
     let (mut request, shared) = make_request(&selector, &sender, Cancellation::never());
+    assert_eq!(request.entry().get_opcode() as u8, opcode::Send::CODE);
+    request.submission_notification().unwrap().submitted();
+    assert!(shared.submitted.load(Ordering::Acquire));
     request.completion(-libc::EINTR, 0);
     assert_eq!(request.retry(-libc::EINTR), Some(true));
+    assert_eq!(request.entry().get_opcode() as u8, opcode::Send::CODE);
+    assert!(
+        request.submission_notification().is_none(),
+        "retries do not acknowledge the same logical submission again"
+    );
     request.completion(-libc::EAGAIN, 0);
     assert!(request.polling.get());
     assert_eq!(request.retry(-libc::EAGAIN), Some(true));
@@ -678,6 +686,45 @@ fn completed_writes_can_migrate_rings_while_reusing_the_request_allocation() {
         }
     }
     block_on(writer.close(&selector)).unwrap();
+    drop(writer);
+    block_on(selector.socket_close(sender)).unwrap();
+    block_on(selector.socket_close(receiver)).unwrap();
+}
+
+#[test]
+fn raw_send_errors_preserve_os_details_and_completed_writers_can_be_dropped_without_flushing() {
+    use super::super::tests::Failures;
+    let (selector, mut driver) = pair(16);
+    let (sender, receiver) = stream(&selector);
+    let never = Cancellation::never();
+    let mut writer = selector.socket_stream_writer::<Vec<u8>>(&sender).unwrap();
+    {
+        let _failure = Failures::new([("stream-write", io::Error::from_raw_os_error(libc::EPIPE))]);
+        block_on(writer.submit(&selector, vec![1], &never)).unwrap();
+    }
+    assert_eq!(
+        block_on(writer.flush(&selector, &never))
+            .unwrap_err()
+            .raw_os_error(),
+        Some(libc::EPIPE)
+    );
+    block_on(writer.close(&selector)).unwrap();
+    drop(writer);
+
+    let drops = Arc::new(AtomicUsize::new(0));
+    let mut writer = selector.socket_stream_writer::<Buffer>(&sender).unwrap();
+    let _failure = Failures::new([("stream-write", io::ErrorKind::WouldBlock.into())]);
+    drive(
+        &mut driver,
+        writer.submit(&selector, buffer(16, 2, &drops), &never),
+    )
+    .unwrap();
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while !writer.shared.ready.load(Ordering::Acquire) {
+        assert!(Instant::now() < deadline);
+        driver.turn(Some(Duration::ZERO)).unwrap();
+    }
+    assert_eq!(drops.load(Ordering::Acquire), 1);
     drop(writer);
     block_on(selector.socket_close(sender)).unwrap();
     block_on(selector.socket_close(receiver)).unwrap();

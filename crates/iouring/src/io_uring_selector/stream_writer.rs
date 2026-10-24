@@ -112,7 +112,7 @@ impl<B: IoBuf> PendingRequest for WriteRequest<B> {
     }
 
     fn prepare(&mut self, _ring: &io_uring::Submitter<'_>) -> io::Result<()> {
-        if self.cancelling.get() || self.cancellation.is_cancelled() {
+        if self.cancelling.get() {
             return Err(io::ErrorKind::Interrupted.into());
         }
         // Register only after Submit has reached the owning driver. A concurrent cancellation can then safely refer to an already published request, including when it crosses the local and remote command queues.
