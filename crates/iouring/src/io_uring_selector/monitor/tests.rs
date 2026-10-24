@@ -893,6 +893,10 @@ fn incompatible_closed_selectors_and_exhausted_ids_reject_waits() {
         io::ErrorKind::Other
     );
     selector.close();
+    assert_eq!(
+        selector.socket_type(&socket).unwrap_err().kind(),
+        io::ErrorKind::BrokenPipe
+    );
     assert!(
         selector
             .socket_monitor_state(&socket, Interest::Readable)
