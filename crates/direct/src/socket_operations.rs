@@ -344,6 +344,10 @@ mod tests;
 
 impl SocketMonitoring for DirectScheduler {
     type MonitorRegistration = ();
+    fn socket_type(&self, socket: &Self::Socket) -> io::Result<SocketType> {
+        self.socket_retry.check_open()?;
+        crate::socket_io::recvmsg_socket_type(&socket.0)
+    }
     fn socket_monitor_state(
         &self,
         socket: &Self::Socket,

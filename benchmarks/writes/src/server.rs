@@ -4,7 +4,7 @@
 use crate::{Result, Workload, prepare};
 use core_scheduler::{
     BufferLease, Cancellation, HeapBufferPool, Interest, SocketMonitoring, SocketRecvFlags,
-    SocketRegistration, SocketSendFlags, SocketStreamWriter, SocketStreamWriting, Spawn,
+    SocketRegistration, SocketSendFlags, SocketStreamOutput, SocketStreamWriting, Spawn,
 };
 use core_scheduler_tokio::TokioScheduler;
 use std::{
@@ -126,7 +126,7 @@ where
     let pool = HeapBufferPool::new(2, workload.bytes).expect("validated buffer pool dimensions");
     let never = Cancellation::never();
     let mut reader = scheduler.socket_stream_monitor(&socket, Interest::Readable)?;
-    let mut writer = scheduler.socket_stream_writer::<BufferLease>(&socket)?;
+    let mut writer = scheduler.socket_stream_output::<BufferLease>(&socket)?;
     let result = async {
         let mut request = [0];
         while scheduler

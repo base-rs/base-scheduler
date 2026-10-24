@@ -3,17 +3,17 @@
 
 use crate::{NativeScheduler, Selector};
 use core_scheduler::{
-    Cancellation, IoBuf, OperationError, OperationResult, SocketStreamWriter, SocketStreamWriting,
+    Cancellation, IoBuf, OperationError, OperationResult, SocketStreamOutput, SocketStreamWriting,
 };
 use std::io;
 
 /// Ordered selector output driven through an explicitly supplied native scheduler.
 pub struct NativeStreamWriter<W>(W);
 
-impl<S, W> SocketStreamWriter<NativeScheduler<S>> for NativeStreamWriter<W>
+impl<S, W> SocketStreamOutput<NativeScheduler<S>> for NativeStreamWriter<W>
 where
     S: Selector,
-    W: SocketStreamWriter<S>,
+    W: SocketStreamOutput<S>,
 {
     type Buffer = W::Buffer;
 
@@ -44,9 +44,9 @@ where
 impl<S: Selector + SocketStreamWriting> SocketStreamWriting for NativeScheduler<S> {
     type Writer<B: IoBuf> = NativeStreamWriter<S::Writer<B>>;
 
-    fn socket_stream_writer<B: IoBuf>(&self, socket: &Self::Socket) -> io::Result<Self::Writer<B>> {
+    fn socket_stream_output<B: IoBuf>(&self, socket: &Self::Socket) -> io::Result<Self::Writer<B>> {
         self.selector()
-            .socket_stream_writer(socket)
+            .socket_stream_output(socket)
             .map(NativeStreamWriter)
     }
 }
@@ -71,11 +71,11 @@ mod tests {
     struct RecordingWriter<B>(u8, PhantomData<B>);
     impl SocketStreamWriting for RecordingSelector {
         type Writer<B: IoBuf> = RecordingWriter<B>;
-        fn socket_stream_writer<B: IoBuf>(&self, socket: &u8) -> io::Result<Self::Writer<B>> {
+        fn socket_stream_output<B: IoBuf>(&self, socket: &u8) -> io::Result<Self::Writer<B>> {
             Ok(RecordingWriter(*socket, PhantomData))
         }
     }
-    impl<B: IoBuf> SocketStreamWriter<RecordingSelector> for RecordingWriter<B> {
+    impl<B: IoBuf> SocketStreamOutput<RecordingSelector> for RecordingWriter<B> {
         type Buffer = B;
         async fn submit(
             &mut self,
@@ -122,7 +122,7 @@ mod tests {
             let never = Cancellation::never();
             let cancelled = Cancellation::new();
             cancelled.cancel();
-            let mut writer = first.socket_stream_writer(&b's').unwrap();
+            let mut writer = first.socket_stream_output(&b's').unwrap();
             writer
                 .submit(&second, b"data".to_vec(), &never)
                 .await

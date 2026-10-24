@@ -120,13 +120,13 @@ struct Writer<B>(PhantomData<B>);
 impl SocketStreamWriting for Script {
     type Writer<B: IoBuf> = Writer<B>;
 
-    fn socket_stream_writer<B: IoBuf>(&self, _: &()) -> io::Result<Writer<B>> {
+    fn socket_stream_output<B: IoBuf>(&self, _: &()) -> io::Result<Writer<B>> {
         self.step("writer")?;
         Ok(Writer(PhantomData))
     }
 }
 
-impl<B: IoBuf> SocketStreamWriter<Script> for Writer<B> {
+impl<B: IoBuf> SocketStreamOutput<Script> for Writer<B> {
     type Buffer = B;
 
     async fn submit(

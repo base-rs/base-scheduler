@@ -105,7 +105,7 @@ mod tests {
             .get_ref()
             .set_send_buffer_size(4096)
             .unwrap();
-        let mut writer = selector.socket_stream_writer::<Vec<u8>>(&sender).unwrap();
+        let mut writer = selector.socket_stream_output::<Vec<u8>>(&sender).unwrap();
         let never = Cancellation::never();
         let mut submission = Box::pin(writer.submit(&selector, vec![1; 4 * 1024 * 1024], &never));
         assert!(block_on(poll_once(submission.as_mut())).is_none());
@@ -157,9 +157,9 @@ mod tests {
             .get_ref()
             .set_send_buffer_size(4096)
             .unwrap();
-        let mut first = selector.socket_stream_writer::<Vec<u8>>(&sender).unwrap();
+        let mut first = selector.socket_stream_output::<Vec<u8>>(&sender).unwrap();
         let mut second = selector
-            .socket_stream_writer::<Vec<u8>>(&other_sender)
+            .socket_stream_output::<Vec<u8>>(&other_sender)
             .unwrap();
         let never = Cancellation::never();
         let mut a = Box::pin(first.submit(&selector, vec![1; 4 * 1024 * 1024], &never));
@@ -193,7 +193,7 @@ mod tests {
             &selector,
             SocketDomain::Ipv4,
         ));
-        let mut writer = selector.socket_stream_writer::<Vec<u8>>(&sender).unwrap();
+        let mut writer = selector.socket_stream_output::<Vec<u8>>(&sender).unwrap();
         let token = Cancellation::new();
         let mut submission = Box::pin(writer.submit(&selector, vec![1; 8 * 1024 * 1024], &token));
         assert!(block_on(poll_once(submission.as_mut())).is_none());
@@ -274,7 +274,7 @@ mod tests {
         // Ordinary unmarked file I/O precedes the writer's marked Send in the same batch. The notification PollAdd follows it.
         let mut first = Box::pin(selector.file_read_at(&file, vec![0; 1], 0, &never));
         assert!(block_on(poll_once(first.as_mut())).is_none());
-        let mut writer = selector.socket_stream_writer::<Vec<u8>>(&sender).unwrap();
+        let mut writer = selector.socket_stream_output::<Vec<u8>>(&sender).unwrap();
         let _failure = Failures::new([("stream-write", io::ErrorKind::WouldBlock.into())]);
         let mut submission = Box::pin(writer.submit(&selector, vec![1; 16], &never));
         assert!(submission.as_mut().poll(&mut context).is_pending());

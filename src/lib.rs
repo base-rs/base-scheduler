@@ -61,6 +61,8 @@ mod io_buffers;
 mod io_buffers_mut;
 mod monitor_state;
 mod monitor_storage;
+mod monitored_socket_stream_reader;
+mod monitored_socket_stream_writer;
 mod notify;
 mod operation_error;
 mod owned_socket_recv_message;
@@ -108,6 +110,9 @@ mod socket_send_poll;
 mod socket_set_option;
 mod socket_shutdown;
 mod socket_stream_monitor;
+mod socket_stream_output;
+mod socket_stream_reader;
+mod socket_stream_reading;
 mod socket_stream_writer;
 mod socket_stream_writing;
 mod socket_type;
@@ -223,7 +228,7 @@ pub use socket_send_poll::SocketSendPoll;
 pub use socket_set_option::SocketSetOption;
 pub use socket_shutdown::SocketShutdown;
 pub use socket_stream_monitor::SocketStreamMonitor;
-pub use socket_stream_writer::SocketStreamWriter;
+pub use socket_stream_output::SocketStreamOutput;
 pub use socket_stream_writing::SocketStreamWriting;
 pub use socket_type::SocketType;
 pub use socket_wait::SocketWait;
@@ -239,3 +244,13 @@ pub use timers::Timers;
 
 /// An IP endpoint, compatible with standard-library socket addresses.
 pub use std::net::SocketAddr as SocketAddress;
+
+pub use monitored_socket_stream_reader::MonitoredSocketStreamReader;
+
+pub use monitored_socket_stream_writer::MonitoredSocketStreamWriter;
+
+pub use socket_stream_reader::SocketStreamReader;
+
+pub use socket_stream_reading::SocketStreamReading;
+
+pub use socket_stream_writer::SocketStreamWriter;

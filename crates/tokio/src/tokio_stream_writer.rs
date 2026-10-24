@@ -3,7 +3,7 @@
 
 use crate::{TokioScheduler, TokioSocket, TokioTask, socket_io};
 use core_scheduler::{
-    Cancellation, Interest, IoBuf, OperationError, OperationResult, SocketStreamWriter,
+    Cancellation, Interest, IoBuf, OperationError, OperationResult, SocketStreamOutput,
     SocketStreamWriting, SocketWriteState,
 };
 use std::{
@@ -24,7 +24,7 @@ pub struct TokioStreamWriter<B> {
 impl SocketStreamWriting for TokioScheduler {
     type Writer<B: IoBuf> = TokioStreamWriter<B>;
 
-    fn socket_stream_writer<B: IoBuf>(&self, socket: &TokioSocket) -> io::Result<Self::Writer<B>> {
+    fn socket_stream_output<B: IoBuf>(&self, socket: &TokioSocket) -> io::Result<Self::Writer<B>> {
         self.check_socket(socket)?;
         if socket_io::recvmsg_socket_type(socket.get_ref())? != core_scheduler::SocketType::Stream {
             return Err(io::Error::new(
@@ -40,7 +40,7 @@ impl SocketStreamWriting for TokioScheduler {
     }
 }
 
-impl<B: IoBuf> SocketStreamWriter<TokioScheduler> for TokioStreamWriter<B> {
+impl<B: IoBuf> SocketStreamOutput<TokioScheduler> for TokioStreamWriter<B> {
     type Buffer = B;
 
     async fn submit(

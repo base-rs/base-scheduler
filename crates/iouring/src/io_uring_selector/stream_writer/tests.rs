@@ -78,7 +78,7 @@ fn drive_all<F: Future>(drivers: &mut [crate::IoUringDriver], future: F) -> F::O
 fn immediate_writes_release_buffers_and_reuse_writer_without_allocating() {
     let (selector, mut driver) = pair(16);
     let (sender, receiver) = stream(&selector);
-    let mut writer = selector.socket_stream_writer::<Buffer>(&sender).unwrap();
+    let mut writer = selector.socket_stream_output::<Buffer>(&sender).unwrap();
     let never = Cancellation::never();
     let drops = Arc::new(AtomicUsize::new(0));
     for iteration in 0..8 {
@@ -115,10 +115,10 @@ fn stream_type_scheduler_and_pre_cancellation_checks_preserve_new_buffers() {
         block_on(selector.socket_open(SocketDomain::Ipv4, SocketType::Datagram, None, &never))
             .unwrap();
     assert!(
-        matches!(selector.socket_stream_writer::<Vec<u8>>(&datagram), Err(error) if error.kind() == io::ErrorKind::InvalidInput)
+        matches!(selector.socket_stream_output::<Vec<u8>>(&datagram), Err(error) if error.kind() == io::ErrorKind::InvalidInput)
     );
     let (sender, receiver) = stream(&selector);
-    let mut writer = selector.socket_stream_writer::<Vec<u8>>(&sender).unwrap();
+    let mut writer = selector.socket_stream_output::<Vec<u8>>(&sender).unwrap();
     let token = Cancellation::new();
     token.cancel();
     let (error, bytes) = block_on(writer.submit(&selector, vec![1, 2], &token)).unwrap_err();
@@ -151,7 +151,7 @@ fn stalled_write_finishes_and_releases_its_owner_without_polling_a_writer_future
     let (selector, mut driver) = pair(16);
     let (sender, receiver) = stream(&selector);
     small_send_buffer(&sender);
-    let mut writer = selector.socket_stream_writer::<Buffer>(&sender).unwrap();
+    let mut writer = selector.socket_stream_output::<Buffer>(&sender).unwrap();
     let drops = Arc::new(AtomicUsize::new(0));
     let never = Cancellation::never();
     let length = 1024 * 1024;
@@ -203,7 +203,7 @@ fn cancelled_flush_does_not_cancel_accepted_output_but_submission_token_does() {
         let (selector, mut driver) = pair(16);
         let (sender, receiver) = stream(&selector);
         small_send_buffer(&sender);
-        let mut writer = selector.socket_stream_writer::<Buffer>(&sender).unwrap();
+        let mut writer = selector.socket_stream_output::<Buffer>(&sender).unwrap();
         let drops = Arc::new(AtomicUsize::new(0));
         let token = Cancellation::new();
         if before_preparation {
@@ -262,7 +262,7 @@ fn next_submission_waits_and_cancelled_admission_does_not_touch_the_previous_wri
     let (selector, mut driver) = pair(16);
     let (sender, receiver) = stream(&selector);
     small_send_buffer(&sender);
-    let mut writer = selector.socket_stream_writer::<Vec<u8>>(&sender).unwrap();
+    let mut writer = selector.socket_stream_output::<Vec<u8>>(&sender).unwrap();
     let never = Cancellation::never();
     drive(
         &mut driver,
@@ -288,7 +288,7 @@ fn direct_send_errors_are_accepted_then_reported_and_drop_retires_pending_output
     use super::super::tests::Failures;
     let (selector, mut driver) = pair(16);
     let (sender, receiver) = stream(&selector);
-    let mut writer = selector.socket_stream_writer::<Vec<u8>>(&sender).unwrap();
+    let mut writer = selector.socket_stream_output::<Vec<u8>>(&sender).unwrap();
     let _failure = Failures::new([("stream-write", io::ErrorKind::BrokenPipe.into())]);
     block_on(writer.submit(&selector, vec![1], &Cancellation::never())).unwrap();
     for _ in 0..2 {
@@ -303,7 +303,7 @@ fn direct_send_errors_are_accepted_then_reported_and_drop_retires_pending_output
     drop(writer);
     small_send_buffer(&sender);
     let drops = Arc::new(AtomicUsize::new(0));
-    let mut writer = selector.socket_stream_writer::<Buffer>(&sender).unwrap();
+    let mut writer = selector.socket_stream_output::<Buffer>(&sender).unwrap();
     drive(
         &mut driver,
         writer.submit(
@@ -329,7 +329,7 @@ fn immediate_zero_progress_and_identifier_exhaustion_become_terminal_write_error
     let (selector, _driver) = pair(16);
     let (sender, receiver) = stream(&selector);
     let never = Cancellation::never();
-    let mut writer = selector.socket_stream_writer::<Vec<u8>>(&sender).unwrap();
+    let mut writer = selector.socket_stream_output::<Vec<u8>>(&sender).unwrap();
     SEND_ZERO.with(|value| value.set(true));
     block_on(writer.submit(&selector, vec![1], &never)).unwrap();
     assert_eq!(
@@ -340,7 +340,7 @@ fn immediate_zero_progress_and_identifier_exhaustion_become_terminal_write_error
     );
     block_on(writer.close(&selector)).unwrap();
     drop(writer);
-    let mut writer = selector.socket_stream_writer::<Vec<u8>>(&sender).unwrap();
+    let mut writer = selector.socket_stream_output::<Vec<u8>>(&sender).unwrap();
     selector.controllers[0]
         .next_identifier
         .store(CANCEL_TAG - 1, Ordering::Relaxed);
@@ -366,13 +366,13 @@ fn socket_query_failure_and_closed_selector_reject_before_output() {
     {
         let _failure = Failures::new([("stream-socket-type", io::ErrorKind::Other.into())]);
         assert!(
-            matches!(selector.socket_stream_writer::<Vec<u8>>(&sender), Err(error) if error.kind() == io::ErrorKind::Other)
+            matches!(selector.socket_stream_output::<Vec<u8>>(&sender), Err(error) if error.kind() == io::ErrorKind::Other)
         );
     }
-    let mut writer = selector.socket_stream_writer::<Vec<u8>>(&sender).unwrap();
+    let mut writer = selector.socket_stream_output::<Vec<u8>>(&sender).unwrap();
     selector.group.close();
     assert!(
-        matches!(selector.socket_stream_writer::<Vec<u8>>(&sender), Err(error) if error.kind() == io::ErrorKind::BrokenPipe)
+        matches!(selector.socket_stream_output::<Vec<u8>>(&sender), Err(error) if error.kind() == io::ErrorKind::BrokenPipe)
     );
     let (error, bytes) =
         block_on(writer.submit(&selector, vec![1], &Cancellation::never())).unwrap_err();
@@ -571,7 +571,7 @@ fn unpublished_commands_release_normally_and_unknown_kernel_access_reports_retir
 
     let (request, shared) = make_request(&selector, &sender, Cancellation::never());
     let identifier = request.identifier;
-    let mut writer = selector.socket_stream_writer::<Vec<u8>>(&sender).unwrap();
+    let mut writer = selector.socket_stream_output::<Vec<u8>>(&sender).unwrap();
     writer.shared = shared;
     writer.running = Some(RingBinding::new(&selector.controllers[0], identifier));
     let mut in_flight = InFlight::default();
@@ -622,7 +622,7 @@ fn completion_callbacks_can_cancel_or_close_a_waiting_admission_before_its_first
         let (selector, mut driver) = pair(16);
         let (sender, receiver) = stream(&selector);
         small_send_buffer(&sender);
-        let mut writer = selector.socket_stream_writer::<AfterDrop>(&sender).unwrap();
+        let mut writer = selector.socket_stream_output::<AfterDrop>(&sender).unwrap();
         let cancellation = Cancellation::new();
         let token = cancellation.clone();
         let group = Arc::clone(&selector.group);
@@ -693,7 +693,7 @@ fn completed_writes_can_migrate_rings_while_reusing_the_request_allocation() {
     )
     .unwrap();
     let (sender, receiver) = stream(&selector);
-    let mut writer = selector.socket_stream_writer::<Vec<u8>>(&sender).unwrap();
+    let mut writer = selector.socket_stream_output::<Vec<u8>>(&sender).unwrap();
     let never = Cancellation::never();
     let mut previous_worker = None;
     let mut previous_request = None;
@@ -757,7 +757,7 @@ fn raw_send_errors_preserve_os_details_and_completed_writers_can_be_dropped_with
     let (selector, mut driver) = pair(16);
     let (sender, receiver) = stream(&selector);
     let never = Cancellation::never();
-    let mut writer = selector.socket_stream_writer::<Vec<u8>>(&sender).unwrap();
+    let mut writer = selector.socket_stream_output::<Vec<u8>>(&sender).unwrap();
     {
         let _failure = Failures::new([("stream-write", io::Error::from_raw_os_error(libc::EPIPE))]);
         block_on(writer.submit(&selector, vec![1], &never)).unwrap();
@@ -772,7 +772,7 @@ fn raw_send_errors_preserve_os_details_and_completed_writers_can_be_dropped_with
     drop(writer);
 
     let drops = Arc::new(AtomicUsize::new(0));
-    let mut writer = selector.socket_stream_writer::<Buffer>(&sender).unwrap();
+    let mut writer = selector.socket_stream_output::<Buffer>(&sender).unwrap();
     let _failure = Failures::new([("stream-write", io::ErrorKind::WouldBlock.into())]);
     drive(
         &mut driver,

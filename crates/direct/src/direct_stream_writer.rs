@@ -3,7 +3,7 @@
 
 use crate::{DirectScheduler, DirectSocket, DirectTask, socket_io, socket_retry::SocketRetry};
 use core_scheduler::{
-    Cancellation, IoBuf, OperationError, OperationResult, SocketStreamWriter, SocketStreamWriting,
+    Cancellation, IoBuf, OperationError, OperationResult, SocketStreamOutput, SocketStreamWriting,
     SocketWriteState,
 };
 use std::{
@@ -25,7 +25,7 @@ pub struct DirectStreamWriter<B> {
 impl SocketStreamWriting for DirectScheduler {
     type Writer<B: IoBuf> = DirectStreamWriter<B>;
 
-    fn socket_stream_writer<B: IoBuf>(&self, socket: &DirectSocket) -> io::Result<Self::Writer<B>> {
+    fn socket_stream_output<B: IoBuf>(&self, socket: &DirectSocket) -> io::Result<Self::Writer<B>> {
         self.socket_retry.check_open()?;
         if socket_io::recvmsg_socket_type(&socket.0)? != core_scheduler::SocketType::Stream {
             return Err(io::Error::new(
@@ -41,7 +41,7 @@ impl SocketStreamWriting for DirectScheduler {
     }
 }
 
-impl<B: IoBuf> SocketStreamWriter<DirectScheduler> for DirectStreamWriter<B> {
+impl<B: IoBuf> SocketStreamOutput<DirectScheduler> for DirectStreamWriter<B> {
     type Buffer = B;
 
     async fn submit(

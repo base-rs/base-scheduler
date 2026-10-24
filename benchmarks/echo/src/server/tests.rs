@@ -155,6 +155,9 @@ impl core_scheduler::SocketSendMsgPoll for PartialSocket {
     }
 }
 impl SocketMonitoring for PartialSocket {
+    fn socket_type(&self, _: &()) -> io::Result<core_scheduler::SocketType> {
+        Ok(core_scheduler::SocketType::Stream)
+    }
     type MonitorRegistration = ();
     fn socket_monitor_state(
         &self,
@@ -192,4 +195,35 @@ fn monitor_echo_rejects_zero_progress() {
         std::panic::catch_unwind(|| crate::runtime(1).block_on(echo_monitor(&scheduler, ())))
             .is_err()
     );
+}
+
+impl core_scheduler::BufferPooling for PartialSocket {
+    type Pool = core_scheduler::HeapBufferPool;
+    fn buffer_pool(&self, options: core_scheduler::BufferPoolOptions) -> io::Result<Self::Pool> {
+        core_scheduler::HeapBufferPool::with_options(options)
+    }
+}
+impl SocketStreamWriting for PartialSocket {
+    type Writer<B: IoBuf> = UnusedOutput<B>;
+    fn socket_stream_output<B: IoBuf>(&self, _: &()) -> io::Result<Self::Writer<B>> {
+        Ok(UnusedOutput(std::marker::PhantomData))
+    }
+}
+struct UnusedOutput<B>(std::marker::PhantomData<B>);
+impl<B: IoBuf> core_scheduler::SocketStreamOutput<PartialSocket> for UnusedOutput<B> {
+    type Buffer = B;
+    async fn submit(
+        &mut self,
+        _: &PartialSocket,
+        _: B,
+        _: &Cancellation,
+    ) -> std::result::Result<(), (core_scheduler::OperationError, B)> {
+        unreachable!("The borrowed echo benchmark never submits owned output")
+    }
+    async fn flush(&mut self, _: &PartialSocket, _: &Cancellation) -> OperationResult<()> {
+        Ok(())
+    }
+    async fn close(&mut self, _: &PartialSocket) -> io::Result<()> {
+        Ok(())
+    }
 }

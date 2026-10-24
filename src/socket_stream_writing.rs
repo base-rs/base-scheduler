@@ -1,13 +1,42 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use crate::{IoBuf, SocketOperation, SocketStreamWriter};
+use crate::{
+    BufferPool, BufferPooling, IoBuf, MonitoredSocketStreamWriter, SocketMonitoring,
+    SocketOperation, SocketStreamOutput,
+};
 use std::io;
 
-/// Construct reusable ordered output state for stream sockets. Construction performs no writes and rejects non-stream sockets. The associated writer retains resource and backend state, while operations continue to receive execution services explicitly.
+/// Construct a sequential stream output lane bound to this scheduler. Construction performs no writes and rejects non-stream sockets.
 pub trait SocketStreamWriting: SocketOperation {
-    type Writer<B: IoBuf>: SocketStreamWriter<Self, Buffer = B>;
+    #[doc(hidden)]
+    type Writer<B: IoBuf>: SocketStreamOutput<Self, Buffer = B>;
 
     /// Construct a writer for one buffer owner type. Applications normally infer this type from `submit`; pooled leases can be repeatedly transferred without reallocating payload storage. Socket ownership and registration follow the backend's compatibility contract. Separate writers do not coordinate output through aliases of the same socket.
-    fn socket_stream_writer<B: IoBuf>(&self, socket: &Self::Socket) -> io::Result<Self::Writer<B>>;
+    #[doc(hidden)]
+    fn socket_stream_output<B: IoBuf>(&self, socket: &Self::Socket) -> io::Result<Self::Writer<B>>;
+
+    /// Retain the socket and reusable backend state. Owned submissions accept this scheduler's pooled chunks, so the default reader and writer compose without choosing a buffer representation. Borrowed writes do not allocate a payload pool. Subsequent operations take only payloads and cancellation, never another scheduler.
+    fn socket_stream_writer(
+        &self,
+        socket: &Self::Socket,
+    ) -> io::Result<MonitoredSocketStreamWriter<'_, Self, <Self::Pool as BufferPool>::Buffer>>
+    where
+        Self: SocketMonitoring + BufferPooling + Sync,
+        Self::Socket: 'static,
+    {
+        MonitoredSocketStreamWriter::new(self, socket)
+    }
+
+    /// Select another stable owner type, such as `Vec<u8>` or an application lease. This changes storage compatibility, not the writer's ordering or backend execution strategy.
+    fn socket_stream_writer_with_buffer<B: IoBuf>(
+        &self,
+        socket: &Self::Socket,
+    ) -> io::Result<MonitoredSocketStreamWriter<'_, Self, B>>
+    where
+        Self: SocketMonitoring + Sync,
+        Self::Socket: 'static,
+    {
+        MonitoredSocketStreamWriter::new(self, socket)
+    }
 }

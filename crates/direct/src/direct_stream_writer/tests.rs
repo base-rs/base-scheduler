@@ -19,7 +19,12 @@ macro_rules! conformance {
         }
     )*};
 }
-conformance!(ordering, independent_progress, abandoned_admission);
+conformance!(
+    ordering,
+    independent_progress,
+    abandoned_admission,
+    bound_io
+);
 
 #[test]
 fn close_pending() {
@@ -48,7 +53,7 @@ fn rejects_datagrams_and_closed_admission() {
                 .unwrap();
             assert_eq!(
                 scheduler
-                    .socket_stream_writer::<Vec<u8>>(&datagram)
+                    .socket_stream_output::<Vec<u8>>(&datagram)
                     .err()
                     .unwrap()
                     .kind(),
@@ -61,17 +66,17 @@ fn rejects_datagrams_and_closed_admission() {
                 .with(|slot| slot.set(Some(io::ErrorKind::PermissionDenied)));
             assert_eq!(
                 scheduler
-                    .socket_stream_writer::<Vec<u8>>(&sender)
+                    .socket_stream_output::<Vec<u8>>(&sender)
                     .err()
                     .unwrap()
                     .kind(),
                 io::ErrorKind::PermissionDenied
             );
-            let mut writer = scheduler.socket_stream_writer::<Vec<u8>>(&sender).unwrap();
+            let mut writer = scheduler.socket_stream_output::<Vec<u8>>(&sender).unwrap();
             scheduler.close();
             assert_eq!(
                 scheduler
-                    .socket_stream_writer::<Vec<u8>>(&sender)
+                    .socket_stream_output::<Vec<u8>>(&sender)
                     .err()
                     .unwrap()
                     .kind(),
@@ -102,7 +107,7 @@ fn immediate_error_is_accepted_and_retained() {
                 .socket_shutdown(&sender, std::net::Shutdown::Write)
                 .await
                 .unwrap();
-            let mut writer = scheduler.socket_stream_writer::<Vec<u8>>(&sender).unwrap();
+            let mut writer = scheduler.socket_stream_output::<Vec<u8>>(&sender).unwrap();
             writer.submit(&scheduler, vec![42], &never).await.unwrap();
             let kind = writer.flush(&scheduler, &never).await.unwrap_err().kind();
             let (error, buffer) = writer
@@ -131,7 +136,7 @@ fn accepted_cancellation_and_drop_release_owners() {
                 core_scheduler_conformance::socket::stream_pair(&scheduler, SocketDomain::Ipv4)
                     .await;
             let pool = HeapBufferPool::new(1, 8 * 1024 * 1024).unwrap();
-            let mut writer = scheduler.socket_stream_writer(&sender).unwrap();
+            let mut writer = scheduler.socket_stream_output(&sender).unwrap();
             let cancellation = Cancellation::new();
             // Keep the retry task queued so cancellation cannot race successful completion.
             let (gate, entered, release) = crate::test_support::Gate::new();
@@ -157,7 +162,7 @@ fn accepted_cancellation_and_drop_release_owners() {
             assert!(pool.try_acquire().is_some());
             writer.close(&scheduler).await.unwrap();
             drop(writer);
-            let mut writer = scheduler.socket_stream_writer(&sender).unwrap();
+            let mut writer = scheduler.socket_stream_output(&sender).unwrap();
             let (gate, entered, release) = crate::test_support::Gate::new();
             let blocked = scheduler.tasks.spawn(async move { gate.wait() }).unwrap();
             entered
@@ -188,7 +193,7 @@ fn ready_submission_and_flush_allocate_nothing() {
             let (sender, _receiver) =
                 core_scheduler_conformance::socket::stream_pair(&scheduler, SocketDomain::Ipv4)
                     .await;
-            let mut writer = scheduler.socket_stream_writer(&sender).unwrap();
+            let mut writer = scheduler.socket_stream_output(&sender).unwrap();
             let mut context = std::task::Context::from_waker(std::task::Waker::noop());
             {
                 let mut submission = std::pin::pin!(writer.submit(&scheduler, vec![42], &never));
@@ -274,7 +279,7 @@ fn partial_initial_sends_continue_from_the_accepted_offset() {
                     .unwrap(),
                 1
             );
-            let mut writer = scheduler.socket_stream_writer(&sender).unwrap();
+            let mut writer = scheduler.socket_stream_output(&sender).unwrap();
             inject([Ok(1)]);
             writer
                 .submit(&scheduler, b"abc".to_vec(), &never)
@@ -312,7 +317,7 @@ fn syscall_and_task_admission_failures_are_retained_after_acceptance() {
             let (sender, _receiver) =
                 core_scheduler_conformance::socket::stream_pair(&scheduler, SocketDomain::Ipv4)
                     .await;
-            let mut writer = scheduler.socket_stream_writer(&sender).unwrap();
+            let mut writer = scheduler.socket_stream_output(&sender).unwrap();
             inject([Ok(0)]);
             writer.submit(&scheduler, vec![42], &never).await.unwrap();
             assert_eq!(
@@ -320,12 +325,12 @@ fn syscall_and_task_admission_failures_are_retained_after_acceptance() {
                 io::ErrorKind::WriteZero
             );
             writer.close(&scheduler).await.unwrap();
-            let mut writer = scheduler.socket_stream_writer(&sender).unwrap();
+            let mut writer = scheduler.socket_stream_output(&sender).unwrap();
             inject([Err(io::ErrorKind::WouldBlock.into())]);
             writer.submit(&scheduler, vec![43], &never).await.unwrap();
             writer.flush(&scheduler, &never).await.unwrap();
             writer.close(&scheduler).await.unwrap();
-            let mut writer = scheduler.socket_stream_writer(&sender).unwrap();
+            let mut writer = scheduler.socket_stream_output(&sender).unwrap();
             scheduler.tasks.close();
             inject([Err(io::ErrorKind::Interrupted.into())]);
             writer.submit(&scheduler, vec![44], &never).await.unwrap();
@@ -462,7 +467,7 @@ fn admission_rechecks_cancellation_and_shutdown_after_retiring_the_previous_owne
                         cancellation.cancel();
                     })
                 };
-                let mut writer = scheduler.socket_stream_writer(&sender).unwrap();
+                let mut writer = scheduler.socket_stream_output(&sender).unwrap();
                 // Force background ownership and hold its worker until the next admission waits.
                 let (gate, entered, release) = crate::test_support::Gate::new();
                 let blocked = scheduler.tasks.spawn(async move { gate.wait() }).unwrap();

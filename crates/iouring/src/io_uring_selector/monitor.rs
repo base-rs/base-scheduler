@@ -311,6 +311,10 @@ impl IoUringSelector {
 
 impl SocketMonitoring for IoUringSelector {
     type MonitorRegistration = IoUringMonitorRegistration;
+    fn socket_type(&self, socket: &Self::Socket) -> io::Result<SocketType> {
+        self.check_open()?;
+        self.fallback.socket_type(socket)
+    }
     fn socket_monitor_state(&self, socket: &NativeSocket, interest: Interest) -> io::Result<State> {
         self.check_open()?;
         let (socket, ()) = self

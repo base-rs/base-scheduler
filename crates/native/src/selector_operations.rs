@@ -504,6 +504,9 @@ where
     S::Socket: 'static,
 {
     type MonitorRegistration = S::MonitorRegistration;
+    fn socket_type(&self, socket: &Self::Socket) -> io::Result<SocketType> {
+        self.selector().socket_type(socket)
+    }
     fn socket_monitor_state(
         &self,
         socket: &Self::Socket,

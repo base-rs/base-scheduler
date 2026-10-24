@@ -323,7 +323,7 @@ impl<B: IoBuf> IoUringStreamWriter<B> {
 impl SocketStreamWriting for IoUringSelector {
     type Writer<B: IoBuf> = IoUringStreamWriter<B>;
 
-    fn socket_stream_writer<B: IoBuf>(&self, socket: &Self::Socket) -> io::Result<Self::Writer<B>> {
+    fn socket_stream_output<B: IoBuf>(&self, socket: &Self::Socket) -> io::Result<Self::Writer<B>> {
         self.check_open()?;
         let socket = socket::retain_socket(socket);
         if syscall("stream-socket-type", || socket.get_ref().r#type())? != socket2::Type::STREAM {
@@ -350,7 +350,7 @@ impl SocketStreamWriting for IoUringSelector {
     }
 }
 
-impl<B: IoBuf> SocketStreamWriter<IoUringSelector> for IoUringStreamWriter<B> {
+impl<B: IoBuf> SocketStreamOutput<IoUringSelector> for IoUringStreamWriter<B> {
     type Buffer = B;
 
     async fn submit(

@@ -153,6 +153,7 @@ macro_rules! ordered_writer_tests {
                 };
             }
             case!(ordering);
+            case!(bound_io);
             case!(independent_progress);
             case!(abandoned_admission);
             #[test]
