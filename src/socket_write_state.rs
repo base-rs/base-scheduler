@@ -114,3 +114,6 @@ impl<H> Drop for SocketWriteState<H> {
         self.cancellation.cancel();
     }
 }
+
+#[cfg(test)]
+mod tests;

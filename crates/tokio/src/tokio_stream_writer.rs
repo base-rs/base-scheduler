@@ -3,8 +3,8 @@
 
 use crate::{TokioScheduler, TokioSocket, TokioTask, socket_io};
 use core_scheduler::{
-    Cancellation, Interest, IoBuf, OperationError, OperationResult, SocketSendFlags,
-    SocketStreamWriter, SocketStreamWriting, SocketWriteState,
+    Cancellation, Interest, IoBuf, OperationError, OperationResult, SocketStreamWriter,
+    SocketStreamWriting, SocketWriteState,
 };
 use std::{
     future::{Future, poll_fn},
@@ -26,7 +26,7 @@ impl SocketStreamWriting for TokioScheduler {
 
     fn socket_stream_writer<B: IoBuf>(&self, socket: &TokioSocket) -> io::Result<Self::Writer<B>> {
         self.check_socket(socket)?;
-        if socket.get_ref().r#type()? != socket2::Type::STREAM {
+        if socket_io::recvmsg_socket_type(socket.get_ref())? != core_scheduler::SocketType::Stream {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "ordered writers require a stream socket",
@@ -69,11 +69,7 @@ impl<B: IoBuf> SocketStreamWriter<TokioScheduler> for TokioStreamWriter<B> {
             return Ok(());
         }
         // Admission precedes the first syscall. Errors from now on belong to this accepted logical write and are reported by flush or the next submission.
-        let offset = match socket_io::send_poll(
-            self.socket.get_ref(),
-            buffer.as_ref(),
-            SocketSendFlags::default(),
-        ) {
+        let offset = match send(self.socket.get_ref(), buffer.as_ref()) {
             Ok(count) if count == length => return Ok(()),
             Ok(0) => {
                 self.state
@@ -140,11 +136,7 @@ async fn write_remaining<B: IoBuf>(
         cancellation.check()?;
         stopping.check()?;
         let bytes = &buffer.as_ref()[offset..];
-        let operation = socket.io_with(
-            Interest::Writable,
-            |socket| socket_io::send_poll(socket, bytes, SocketSendFlags::default()),
-            false,
-        );
+        let operation = socket.io_with(Interest::Writable, |socket| send(socket, bytes), false);
         let mut operation = pin!(operation);
         let count = poll_fn(|context| {
             if let Poll::Ready(result) = operation.as_mut().poll(context) {
@@ -168,6 +160,14 @@ async fn write_remaining<B: IoBuf>(
         }
     }
     Ok(())
+}
+
+fn send(socket: &socket2::Socket, bytes: &[u8]) -> io::Result<usize> {
+    #[cfg(test)]
+    if let Some(result) = tests::SEND_RESULTS.with(|results| results.borrow_mut().pop_front()) {
+        return result;
+    }
+    socket_io::send_poll(socket, bytes, core_scheduler::SocketSendFlags::default())
 }
 
 #[cfg(test)]

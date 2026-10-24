@@ -3,8 +3,8 @@
 
 use crate::{DirectScheduler, DirectSocket, DirectTask, socket_io, socket_retry::SocketRetry};
 use core_scheduler::{
-    Cancellation, IoBuf, OperationError, OperationResult, SocketSendFlags, SocketStreamWriter,
-    SocketStreamWriting, SocketWriteState,
+    Cancellation, IoBuf, OperationError, OperationResult, SocketStreamWriter, SocketStreamWriting,
+    SocketWriteState,
 };
 use std::{
     future::{Future, poll_fn},
@@ -27,7 +27,7 @@ impl SocketStreamWriting for DirectScheduler {
 
     fn socket_stream_writer<B: IoBuf>(&self, socket: &DirectSocket) -> io::Result<Self::Writer<B>> {
         self.socket_retry.check_open()?;
-        if socket.0.r#type()? != socket2::Type::STREAM {
+        if socket_io::recvmsg_socket_type(&socket.0)? != core_scheduler::SocketType::Stream {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "ordered writers require a stream socket",
@@ -69,29 +69,27 @@ impl<B: IoBuf> SocketStreamWriter<DirectScheduler> for DirectStreamWriter<B> {
         if length == 0 {
             return Ok(());
         }
-        let offset =
-            match socket_io::send_poll(&self.socket.0, buffer.as_ref(), SocketSendFlags::default())
+        let offset = match send(&self.socket.0, buffer.as_ref()) {
+            Ok(count) if count == length => return Ok(()),
+            Ok(0) => {
+                self.state
+                    .fail(io::Error::from(io::ErrorKind::WriteZero).into());
+                return Ok(());
+            }
+            Ok(count) => count,
+            Err(error)
+                if matches!(
+                    error.kind(),
+                    io::ErrorKind::WouldBlock | io::ErrorKind::Interrupted
+                ) =>
             {
-                Ok(count) if count == length => return Ok(()),
-                Ok(0) => {
-                    self.state
-                        .fail(io::Error::from(io::ErrorKind::WriteZero).into());
-                    return Ok(());
-                }
-                Ok(count) => count,
-                Err(error)
-                    if matches!(
-                        error.kind(),
-                        io::ErrorKind::WouldBlock | io::ErrorKind::Interrupted
-                    ) =>
-                {
-                    0
-                }
-                Err(error) => {
-                    self.state.fail(error.into());
-                    return Ok(());
-                }
-            };
+                0
+            }
+            Err(error) => {
+                self.state.fail(error.into());
+                return Ok(());
+            }
+        };
         let socket = self.socket.retain();
         let retry = Arc::clone(&scheduler.socket_retry);
         let cancellation = cancellation.clone();
@@ -143,11 +141,7 @@ async fn write_remaining<B: IoBuf>(
     while offset < buffer.as_ref().len() {
         cancellation.check()?;
         stopping.check()?;
-        match socket_io::send_poll(
-            socket,
-            &buffer.as_ref()[offset..],
-            SocketSendFlags::default(),
-        ) {
+        match send(socket, &buffer.as_ref()[offset..]) {
             Ok(0) => return Err(io::Error::from(io::ErrorKind::WriteZero).into()),
             Ok(count) => offset += count,
             Err(error)
@@ -172,6 +166,14 @@ async fn write_remaining<B: IoBuf>(
         }
     }
     Ok(())
+}
+
+fn send(socket: &socket2::Socket, bytes: &[u8]) -> io::Result<usize> {
+    #[cfg(test)]
+    if let Some(result) = tests::SEND_RESULTS.with(|results| results.borrow_mut().pop_front()) {
+        return result;
+    }
+    socket_io::send_poll(socket, bytes, core_scheduler::SocketSendFlags::default())
 }
 
 #[cfg(test)]
