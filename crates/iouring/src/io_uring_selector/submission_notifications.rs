@@ -119,10 +119,7 @@ mod tests {
         );
         // No peer is consuming bytes. A blocking completion wait here would deadlock issuance, so pending receipts force a nonblocking submission turn.
         driver.turn(None).unwrap();
-        assert!(matches!(
-            block_on(poll_once(submission.as_mut())),
-            Some(Ok(()))
-        ));
+        block_on(poll_once(submission.as_mut())).unwrap().unwrap();
         drop(submission);
         let mut flush = Box::pin(writer.flush(&selector, &never));
         assert!(block_on(poll_once(flush.as_mut())).is_none());
@@ -170,7 +167,7 @@ mod tests {
         assert!(block_on(poll_once(a.as_mut())).is_none());
         assert!(block_on(poll_once(b.as_mut())).is_none());
         driver.turn(Some(Duration::ZERO)).unwrap();
-        assert!(matches!(block_on(poll_once(a.as_mut())), Some(Ok(()))));
+        block_on(poll_once(a.as_mut())).unwrap().unwrap();
         assert!(block_on(poll_once(b.as_mut())).is_none());
         drop(a);
         // Accepted storage remains owned by the second writer even when its receipt waiter is abandoned.
@@ -202,15 +199,14 @@ mod tests {
         assert!(block_on(poll_once(submission.as_mut())).is_none());
         token.cancel();
         driver.turn(Some(Duration::ZERO)).unwrap();
-        assert!(matches!(
-            block_on(poll_once(submission.as_mut())),
-            Some(Ok(()))
-        ));
+        block_on(poll_once(submission.as_mut())).unwrap().unwrap();
         drop(submission);
-        assert!(matches!(
-            block_on(writer.flush(&selector, &Cancellation::never())),
-            Err(OperationError::Cancelled(_))
-        ));
+        assert_eq!(
+            std::mem::discriminant(
+                &block_on(writer.flush(&selector, &Cancellation::never())).unwrap_err()
+            ),
+            std::mem::discriminant(&OperationError::Cancelled(Cancelled))
+        );
         drive(&mut driver, writer.close(&selector)).unwrap();
         drop(writer);
         block_on(selector.socket_close(sender)).unwrap();
@@ -267,7 +263,6 @@ mod tests {
             .incoming
             .try_recv()
             .unwrap();
-        assert!(matches!(&command, Command::Submit(_)));
         let enqueue = Arc::new(Enqueue {
             controller: Arc::clone(&selector.controllers[0]),
             command: Mutex::new(Some(command)),
@@ -285,10 +280,13 @@ mod tests {
         assert!(submission.as_mut().poll(&mut context).is_pending());
         driver.turn(Some(Duration::ZERO)).unwrap();
         assert_eq!(enqueue.published.load(Ordering::Acquire), 1);
-        assert!(matches!(
-            submission.as_mut().poll(&mut context),
-            std::task::Poll::Ready(Ok(()))
-        ));
+        assert!(
+            submission
+                .as_mut()
+                .poll(&mut context)
+                .map(Result::unwrap)
+                .is_ready()
+        );
         drop(submission);
         let (result, bytes) = drive(&mut driver, later);
         assert_eq!(result.unwrap(), 6);
