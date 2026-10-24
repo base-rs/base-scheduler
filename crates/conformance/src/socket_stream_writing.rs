@@ -56,40 +56,42 @@ where
     S: SocketStreamWriting + SocketRecvPoll,
 {
     let never = Cancellation::never();
-    let pool = HeapBufferPool::new(1, 8 * 1024 * 1024).unwrap();
-    let mut buffer = pool.acquire(&never).await.unwrap();
-    buffer.as_mut().fill(0x5a);
-    let mut writer = scheduler.socket_stream_writer(sender).unwrap();
-    writer
-        .submit(scheduler, buffer, &never)
-        .await
-        .map_err(|(error, _)| error)
-        .unwrap();
-
-    // Cancelling a flush wait does not cancel accepted output.
-    let cancellation = Cancellation::new();
-    cancellation.cancel();
-    let result = writer.flush(scheduler, &cancellation).await;
-    if let Err(error) = result {
-        crate::socket_monitoring::cancelled::<()>(Err(error));
-    }
-    let mut incoming = vec![0; 64 * 1024];
-    let mut received = 0;
-    while received < pool.buffer_size() {
-        let length = scheduler
-            .socket_recv_poll(receiver, &mut incoming, SocketRecvFlags::default(), &never)
+    for size in [8, 8 * 1024 * 1024] {
+        let pool = HeapBufferPool::new(1, size).unwrap();
+        let mut buffer = pool.acquire(&never).await.unwrap();
+        buffer.as_mut().fill(0x5a);
+        let mut writer = scheduler.socket_stream_writer(sender).unwrap();
+        writer
+            .submit(scheduler, buffer, &never)
             .await
+            .map_err(|(error, _)| error)
             .unwrap();
-        assert!(length > 0);
-        assert!(incoming[..length].iter().all(|byte| *byte == 0x5a));
-        received += length;
+
+        // Cancelling a flush wait does not cancel accepted output.
+        let cancellation = Cancellation::new();
+        cancellation.cancel();
+        let result = writer.flush(scheduler, &cancellation).await;
+        if let Err(error) = result {
+            crate::socket_monitoring::cancelled::<()>(Err(error));
+        }
+        let mut incoming = vec![0; 64 * 1024];
+        let mut received = 0;
+        while received < pool.buffer_size() {
+            let length = scheduler
+                .socket_recv_poll(receiver, &mut incoming, SocketRecvFlags::default(), &never)
+                .await
+                .unwrap();
+            assert!(length > 0);
+            assert!(incoming[..length].iter().all(|byte| *byte == 0x5a));
+            received += length;
+        }
+        assert_eq!(received, pool.buffer_size());
+        // Waiting for pool capacity, rather than a writer method, also proves ownership is released autonomously.
+        let returned = pool.acquire(&never).await.unwrap();
+        drop(returned);
+        writer.flush(scheduler, &never).await.unwrap();
+        writer.close(scheduler).await.unwrap();
     }
-    assert_eq!(received, pool.buffer_size());
-    // Waiting for pool capacity, rather than a writer method, also proves ownership is released autonomously.
-    let returned = pool.acquire(&never).await.unwrap();
-    drop(returned);
-    writer.flush(scheduler, &never).await.unwrap();
-    writer.close(scheduler).await.unwrap();
 }
 
 /// Abandoning a later admission wait leaves the first accepted write intact.
