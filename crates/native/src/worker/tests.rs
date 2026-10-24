@@ -200,10 +200,14 @@ fn idle_empty_search_parks_while_scheduler_is_running() {
 #[test]
 fn batch_search_admits_incoming_tasks_before_local_work() {
     use super::{LocalWorker, search};
-    use crate::task_service::Shared;
+    use crate::task_service::{Shared, TaskService};
+    use futures_lite::future::block_on;
     use std::sync::Arc;
     let queues = std::array::from_fn(|_| Worker::new_fifo());
     let shared = Arc::new(Shared::new(std::slice::from_ref(&queues), 8));
+    let service = TaskService {
+        shared: Arc::clone(&shared),
+    };
     let [ready, current] = queues;
     let local = LocalWorker {
         identifier: 0,
@@ -212,8 +216,10 @@ fn batch_search_admits_incoming_tasks_before_local_work() {
         current,
         timers: core_scheduler_timers::local::TimerQueue::with_capacity(8),
     };
-    shared.workers[0].incoming.push(runnable());
-    assert!(matches!(search(&shared, &local, 1), Steal::Success(_)));
+    let task = service.spawn(async {}).unwrap();
+    search(&shared, &local, 1).success().unwrap().run();
+    shared.retire_runnable();
+    block_on(task).unwrap();
     assert!(matches!(search(&shared, &local, 1), Steal::Empty));
 }
 
@@ -280,12 +286,16 @@ fn nested_admission_distributes_tasks_instead_of_inheriting_the_worker() {
 #[test]
 fn idle_worker_steals_remote_wakes_when_preferred_worker_is_busy() {
     use super::{LocalWorker, search};
-    use crate::task_service::Shared;
+    use crate::task_service::{Shared, TaskService};
+    use futures_lite::future::block_on;
     use std::sync::Arc;
     let mut queues: Vec<[Worker<Runnable>; 2]> = (0..2)
         .map(|_| std::array::from_fn(|_| Worker::new_fifo()))
         .collect();
     let shared = Arc::new(Shared::new(&queues, 8));
+    let service = TaskService {
+        shared: Arc::clone(&shared),
+    };
     let [ready, current] = queues.remove(0);
     let local = LocalWorker {
         identifier: 0,
@@ -294,21 +304,31 @@ fn idle_worker_steals_remote_wakes_when_preferred_worker_is_busy() {
         current,
         timers: core_scheduler_timers::local::TimerQueue::with_capacity(8),
     };
-    // The victim has no local work, but a remote wake has reached its inbox.
-    shared.workers[1].incoming.push(runnable());
-    assert!(matches!(search(&shared, &local, 1), Steal::Success(_)));
+    let first = service.spawn(async {}).unwrap();
+    shared.workers[0].incoming.steal().success().unwrap().run();
+    shared.retire_runnable();
+    block_on(first).unwrap();
+    // The victim has no local work, but a real scheduled runnable has reached its inbox.
+    let task = service.spawn(async {}).unwrap();
+    search(&shared, &local, 1).success().unwrap().run();
+    shared.retire_runnable();
+    block_on(task).unwrap();
     assert!(matches!(search(&shared, &local, 1), Steal::Empty));
 }
 
 #[test]
 fn idle_worker_can_steal_both_ready_generations() {
     use super::{LocalWorker, search};
-    use crate::task_service::Shared;
+    use crate::task_service::{Shared, TaskService};
+    use futures_lite::future::block_on;
     use std::sync::Arc;
     let mut queues: Vec<[Worker<Runnable>; 2]> = (0..2)
         .map(|_| std::array::from_fn(|_| Worker::new_fifo()))
         .collect();
     let shared = Arc::new(Shared::new(&queues, 8));
+    let service = TaskService {
+        shared: Arc::clone(&shared),
+    };
     let [ready, current] = queues.remove(0);
     let local = LocalWorker {
         identifier: 0,
@@ -318,10 +338,123 @@ fn idle_worker_can_steal_both_ready_generations() {
         timers: core_scheduler_timers::local::TimerQueue::with_capacity(8),
     };
     for queue in &queues[0] {
-        queue.push(runnable());
-        assert!(matches!(search(&shared, &local, 1), Steal::Success(_)));
+        let first = service.spawn(async {}).unwrap();
+        shared.workers[0].incoming.steal().success().unwrap().run();
+        shared.retire_runnable();
+        block_on(first).unwrap();
+        let task = service.spawn(async {}).unwrap();
+        let runnable = shared.workers[1].incoming.steal().success().unwrap();
+        queue.push(runnable);
+        search(&shared, &local, 1).success().unwrap().run();
+        shared.retire_runnable();
+        block_on(task).unwrap();
     }
     assert!(matches!(search(&shared, &local, 1), Steal::Empty));
+}
+
+#[test]
+fn idle_recheck_finds_work_published_after_a_quiescent_search() {
+    quiescent_publication(false);
+}
+
+#[test]
+fn publication_after_the_idle_recheck_retains_a_wake() {
+    quiescent_publication(true);
+}
+
+fn quiescent_publication(after_recheck: bool) {
+    use super::{LocalWorker, search};
+    use crate::task_service::{Shared, TaskService};
+    use futures_lite::future::block_on;
+    use std::{
+        sync::{Arc, mpsc},
+        thread,
+        time::{Duration, Instant},
+    };
+
+    let mut queues = (0..2)
+        .map(|_| std::array::from_fn(|_| Worker::new_fifo()))
+        .collect::<Vec<_>>();
+    let shared = Arc::new(Shared::new(&queues, 8));
+    let service = TaskService {
+        shared: Arc::clone(&shared),
+    };
+    // Advance admission so the next task belongs to the other worker.
+    let first = service.spawn(async {}).unwrap();
+    shared.workers[0].incoming.steal().success().unwrap().run();
+    shared.retire_runnable();
+    block_on(first).unwrap();
+
+    let [ready, current] = queues.remove(0);
+    let local = LocalWorker {
+        identifier: 0,
+        scheduler: Arc::downgrade(&shared),
+        ready,
+        current,
+        timers: core_scheduler_timers::local::TimerQueue::with_capacity(8),
+    };
+    let published = Arc::new(AtomicBool::new(false));
+    let (searching, searched) = mpsc::channel();
+    let (finished, completion) = mpsc::channel();
+    let target = Arc::clone(&shared);
+    let release = Arc::clone(&published);
+    let handle = thread::spawn(move || {
+        let worker = &target.workers[0];
+        worker.thread.set(thread::current()).unwrap();
+        assert!(matches!(search(&target, &local, 1), Steal::Empty));
+        if after_recheck {
+            worker.sleeping.store(true, Ordering::SeqCst);
+            target.idle_workers.fetch_add(1, Ordering::SeqCst);
+            std::sync::atomic::fence(Ordering::SeqCst);
+            assert!(matches!(search(&target, &local, 1), Steal::Empty));
+        }
+        searching.send(()).unwrap();
+        // Channel receives can consume Thread's unpark token. Keep it available for the actual park below.
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while !release.load(Ordering::Acquire) {
+            assert!(
+                Instant::now() < deadline,
+                "task publication deadline exceeded"
+            );
+            std::hint::spin_loop();
+        }
+        let result = if after_recheck {
+            assert!(!worker.sleeping.load(Ordering::SeqCst));
+            Steal::Empty
+        } else {
+            worker.sleeping.store(true, Ordering::SeqCst);
+            target.idle_workers.fetch_add(1, Ordering::SeqCst);
+            std::sync::atomic::fence(Ordering::SeqCst);
+            search(&target, &local, 1)
+        };
+        let runnable = finish_idle_search(
+            worker,
+            &target.idle_workers,
+            result,
+            || true,
+            || {
+                assert!(
+                    after_recheck,
+                    "the idle recheck must find the published task"
+                );
+                thread::park_timeout(Duration::from_secs(30));
+            },
+        )
+        .unwrap_or_else(|| search(&target, &local, 1).success().unwrap());
+        assert!(!worker.sleeping.load(Ordering::SeqCst));
+        assert_eq!(target.idle_workers.load(Ordering::SeqCst), 0);
+        runnable.run();
+        target.retire_runnable();
+        finished.send(()).unwrap();
+    });
+
+    searched.recv_timeout(Duration::from_secs(5)).unwrap();
+    let task = service.spawn(async { 42 }).unwrap();
+    published.store(true, Ordering::Release);
+    completion.recv_timeout(Duration::from_secs(5)).unwrap();
+    handle.join().unwrap();
+    assert_eq!(block_on(task).unwrap(), 42);
+    block_on(service.drain());
 }
 
 #[test]

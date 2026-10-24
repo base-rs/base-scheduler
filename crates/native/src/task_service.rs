@@ -92,6 +92,10 @@ impl Shared {
         }
     }
 
+    pub(crate) fn has_runnables(&self) -> bool {
+        self.outstanding.load(Ordering::Acquire) != 0
+    }
+
     pub(crate) fn is_closed(&self) -> bool {
         self.closed.load(Ordering::Acquire)
     }
