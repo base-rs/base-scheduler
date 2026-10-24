@@ -168,7 +168,7 @@ async fn write_remaining<B: IoBuf>(
 
 fn send(socket: &socket2::Socket, bytes: &[u8]) -> io::Result<usize> {
     #[cfg(test)]
-    if let Some(result) = tests::SEND_RESULTS.with(|results| results.borrow_mut().pop_front()) {
+    if let Some(result) = tests::send_result() {
         return result;
     }
     socket_io::send_poll(socket, bytes, core_scheduler::SocketSendFlags::default())

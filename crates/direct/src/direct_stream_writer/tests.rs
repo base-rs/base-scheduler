@@ -133,6 +133,13 @@ fn accepted_cancellation_and_drop_release_owners() {
             let pool = HeapBufferPool::new(1, 8 * 1024 * 1024).unwrap();
             let mut writer = scheduler.socket_stream_writer(&sender).unwrap();
             let cancellation = Cancellation::new();
+            // Keep the retry task queued so cancellation cannot race successful completion.
+            let (gate, entered, release) = crate::test_support::Gate::new();
+            let blocked = scheduler.tasks.spawn(async move { gate.wait() }).unwrap();
+            entered
+                .recv_timeout(std::time::Duration::from_secs(5))
+                .unwrap();
+            inject([Err(io::ErrorKind::WouldBlock.into())]);
             writer
                 .submit(
                     &scheduler,
@@ -142,18 +149,30 @@ fn accepted_cancellation_and_drop_release_owners() {
                 .await
                 .map_err(|(e, _)| e)
                 .unwrap();
+            assert!(pool.try_acquire().is_none());
             cancellation.cancel();
+            drop(release);
+            blocked.await.unwrap();
             assert_cancelled(writer.flush(&scheduler, &never).await);
             assert!(pool.try_acquire().is_some());
             writer.close(&scheduler).await.unwrap();
             drop(writer);
             let mut writer = scheduler.socket_stream_writer(&sender).unwrap();
+            let (gate, entered, release) = crate::test_support::Gate::new();
+            let blocked = scheduler.tasks.spawn(async move { gate.wait() }).unwrap();
+            entered
+                .recv_timeout(std::time::Duration::from_secs(5))
+                .unwrap();
+            inject([Err(io::ErrorKind::WouldBlock.into())]);
             writer
                 .submit(&scheduler, pool.acquire(&never).await.unwrap(), &never)
                 .await
                 .map_err(|(e, _)| e)
                 .unwrap();
             drop(writer);
+            assert!(pool.try_acquire().is_none());
+            drop(release);
+            blocked.await.unwrap();
             drop(pool.acquire(&never).await.unwrap());
             scheduler.shutdown().await;
         });
@@ -204,7 +223,30 @@ fn ready_submission_and_flush_allocate_nothing() {
 }
 
 thread_local! {
-    pub(super) static SEND_RESULTS: std::cell::RefCell<std::collections::VecDeque<io::Result<usize>>> = const { std::cell::RefCell::new(std::collections::VecDeque::new()) };
+    static SEND_RESULTS: std::cell::RefCell<std::collections::VecDeque<io::Result<usize>>> = const { std::cell::RefCell::new(std::collections::VecDeque::new()) };
+    static SEND_BLOCKED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+pub(super) fn send_result() -> Option<io::Result<usize>> {
+    SEND_RESULTS
+        .with(|results| results.borrow_mut().pop_front())
+        .or_else(|| {
+            SEND_BLOCKED
+                .with(|blocked| blocked.get().then(|| Err(io::ErrorKind::WouldBlock.into())))
+        })
+}
+
+struct BlockSends;
+impl BlockSends {
+    fn new() -> Self {
+        SEND_BLOCKED.with(|blocked| assert!(!blocked.replace(true)));
+        Self
+    }
+}
+impl Drop for BlockSends {
+    fn drop(&mut self) {
+        SEND_BLOCKED.with(|blocked| blocked.set(false));
+    }
 }
 
 fn inject(results: impl IntoIterator<Item = io::Result<usize>>) {
@@ -293,6 +335,8 @@ fn background_retry_errors_and_pending_close_preserve_the_result() {
                 io::ErrorKind::PermissionDenied
             );
             {
+                // Retry pulses may race the first poll, so every send must remain blocked until stop.
+                let _blocked = BlockSends::new();
                 let mut pending = std::pin::pin!(write_remaining(
                     &sender.0,
                     &mut buffer,
@@ -361,6 +405,13 @@ fn admission_rechecks_cancellation_and_shutdown_after_retiring_the_previous_owne
                     })
                 };
                 let mut writer = scheduler.socket_stream_writer(&sender).unwrap();
+                // Force background ownership and hold its worker until the next admission waits.
+                let (gate, entered, release) = crate::test_support::Gate::new();
+                let blocked = scheduler.tasks.spawn(async move { gate.wait() }).unwrap();
+                entered
+                    .recv_timeout(std::time::Duration::from_secs(5))
+                    .unwrap();
+                inject([Err(io::ErrorKind::WouldBlock.into())]);
                 writer
                     .submit(
                         &scheduler,
@@ -393,6 +444,8 @@ fn admission_rechecks_cancellation_and_shutdown_after_retiring_the_previous_owne
                         std::io::Read::read_exact(&mut peer, &mut bytes).unwrap();
                         assert!(bytes.iter().all(|byte| *byte == 6));
                     });
+                    drop(release);
+                    blocked.await.unwrap();
                     scheduler.tasks.drain().await;
                     scheduler.tasks.wait(false).await;
                     let result = next.await.err().unwrap();
