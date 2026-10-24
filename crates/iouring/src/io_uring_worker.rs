@@ -46,10 +46,7 @@ pub struct IoUringWorker {
     route: Rc<LocalRoute>,
 }
 impl IoUringWorker {
-    pub(crate) fn new(mut driver: IoUringDriver) -> Self {
-        if let Some(reactor) = driver.reactor.as_mut() {
-            reactor.bind_worker();
-        }
+    pub(crate) fn new(driver: IoUringDriver) -> Self {
         let route = Rc::new(LocalRoute {
             group: Arc::clone(&driver.group),
             controller: Arc::clone(&driver.controller),
