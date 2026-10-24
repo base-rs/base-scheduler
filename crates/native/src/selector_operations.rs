@@ -2,6 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::{NativeScheduler, Selector};
+use core_scheduler::backend::*;
 use core_scheduler::*;
 use std::{
     io,
@@ -848,5 +849,25 @@ where
         Self::Socket: 'static,
     {
         self.selector().socket_packet_writer(socket)
+    }
+}
+
+impl<S: Selector + FileReading> FileReading for NativeScheduler<S> {
+    type Reader<'scheduler>
+        = S::Reader<'scheduler>
+    where
+        Self: 'scheduler;
+    fn file_reader(&self, file: &Self::File) -> io::Result<Self::Reader<'_>> {
+        self.selector().file_reader(file)
+    }
+}
+
+impl<S: Selector + FileWriting> FileWriting for NativeScheduler<S> {
+    type Writer<'scheduler>
+        = S::Writer<'scheduler>
+    where
+        Self: 'scheduler;
+    fn file_writer(&self, file: &Self::File) -> io::Result<Self::Writer<'_>> {
+        self.selector().file_writer(file)
     }
 }

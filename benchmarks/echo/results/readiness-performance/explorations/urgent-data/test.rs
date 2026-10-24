@@ -3,6 +3,7 @@
 #[test]
 fn urgent_tcp_boundary_keeps_trailing_bytes_readable() {
     use core_scheduler::*;
+use core_scheduler::backend::*;
     use futures_lite::future::block_on;
     use std::io::Write;
     let runtime = runtime();

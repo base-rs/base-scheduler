@@ -4,6 +4,7 @@
 //! Borrowed nonblocking I/O assertions. Fixtures provide fresh sockets and drive readiness while enforcing test deadlines.
 
 use crate::probe::WakeProbe;
+use core_scheduler::backend::*;
 use core_scheduler::*;
 use futures_lite::future::poll_once;
 use std::{

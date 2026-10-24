@@ -1,6 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
+use core_scheduler::backend::*;
 use core_scheduler::*;
 #[path = "support/buffer_pool.rs"]
 mod pool_support;
@@ -689,8 +690,6 @@ fn bound_stream_reader_preserves_pool_failures_exhaustion_and_cancellation_at_eo
     });
 }
 
-impl SocketStreamReading for Sockets {}
-
 #[test]
 fn opaque_stream_factories_bind_the_scheduler_without_borrowing_the_input_reference() {
     block_on(async {
@@ -719,28 +718,42 @@ fn opaque_stream_factories_bind_the_scheduler_without_borrowing_the_input_refere
     });
 }
 
-impl core_scheduler::SocketStreamWriting for Sockets {
+impl SocketStreamWriting for Sockets {
     fn socket_stream_writer<'scheduler>(
         &'scheduler self,
         socket: &Self::Socket,
-    ) -> io::Result<
-        impl core_scheduler::SocketStreamWriter<
-            Buffer = <Self::Pool as core_scheduler::BufferPool>::Buffer,
-        > + 'scheduler,
-    >
+    ) -> io::Result<impl SocketStreamWriter<Buffer = <Self::Pool as BufferPool>::Buffer> + 'scheduler>
     where
         Self::Socket: 'static,
     {
-        core_scheduler::BoundSocketStreamWriter::new(self, socket)
+        BoundSocketStreamWriter::new(self, socket)
     }
 
     fn socket_stream_writer_with_buffer<'scheduler, B: IoBuf>(
         &'scheduler self,
         socket: &Self::Socket,
-    ) -> io::Result<impl core_scheduler::SocketStreamWriter<Buffer = B> + 'scheduler>
+    ) -> io::Result<impl SocketStreamWriter<Buffer = B> + 'scheduler>
     where
         Self::Socket: 'static,
     {
-        core_scheduler::BoundSocketStreamWriter::new(self, socket)
+        BoundSocketStreamWriter::new(self, socket)
+    }
+}
+
+impl SocketStreamReading for Sockets {
+    fn socket_stream_reader<'scheduler>(
+        &'scheduler self,
+        socket: &Self::Socket,
+    ) -> io::Result<impl SocketStreamReader<Buffer = <Self::Pool as BufferPool>::Buffer> + 'scheduler>
+    {
+        BoundSocketStreamReader::new(self, socket)
+    }
+    fn socket_stream_reader_with_pool<'scheduler>(
+        &'scheduler self,
+        socket: &Self::Socket,
+        pool: Self::Pool,
+    ) -> io::Result<impl SocketStreamReader<Buffer = <Self::Pool as BufferPool>::Buffer> + 'scheduler>
+    {
+        Ok(BoundSocketStreamReader::new(self, socket)?.with_pool(pool))
     }
 }

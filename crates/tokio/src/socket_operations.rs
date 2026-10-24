@@ -7,6 +7,7 @@ use crate::{
     socket_io::{self, IoVectors},
     tokio_scheduler::wait_close,
 };
+use core_scheduler::backend::*;
 use core_scheduler::*;
 use socket2::Socket;
 use std::{io, net::Shutdown};

@@ -3,6 +3,7 @@
 
 //! Portable shared-pool receiver assertions.
 use crate::socket::stream_pair;
+use core_scheduler::backend::*;
 use core_scheduler::*;
 use futures_lite::future::poll_once;
 use std::{net::Shutdown, pin::pin};
@@ -152,7 +153,11 @@ where
 }
 
 /// A bounded portable receiver preserves datagrams, metadata, empty messages, truncation, and lease lifetime across cancellation and close.
-pub async fn messages<S: SocketScheduler + SocketSendMsg + SocketReceiving>(scheduler: &S) {
+pub async fn messages<
+    S: SocketOpen + SocketBind + SocketLocalAddress + SocketClose + SocketSendMsg + SocketReceiving,
+>(
+    scheduler: &S,
+) {
     let never = Cancellation::never();
     let sender = scheduler
         .socket_open(SocketDomain::Ipv4, SocketType::Datagram, None, &never)
@@ -260,7 +265,21 @@ pub async fn messages<S: SocketScheduler + SocketSendMsg + SocketReceiving>(sche
 }
 
 /// Stream receivers preserve ordering across leases, EOF, and explicit close. Non-power-of-two buffer counts are portable, even when a kernel ring rounds up.
-pub async fn stream_eof<S: SocketScheduler + SocketReceiving>(scheduler: &S) {
+pub async fn stream_eof<
+    S: SocketOpen
+        + SocketBind
+        + SocketListen
+        + SocketConnect
+        + SocketAccept
+        + SocketLocalAddress
+        + SocketPeerAddress
+        + SocketClose
+        + SocketWrite
+        + SocketShutdown
+        + SocketReceiving,
+>(
+    scheduler: &S,
+) {
     let never = Cancellation::never();
     let (sender, socket) = stream_pair(scheduler, SocketDomain::Ipv4).await;
     let mut receiver = scheduler

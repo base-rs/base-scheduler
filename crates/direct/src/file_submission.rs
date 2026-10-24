@@ -2,7 +2,8 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::DirectScheduler;
-use core_scheduler::{BufferResult, Cancellation, FileSubmission, IoBuf, IoBufMut, OperationError};
+use core_scheduler::backend::FileSubmission;
+use core_scheduler::{BufferResult, Cancellation, IoBuf, IoBufMut, OperationError};
 use std::future::Future;
 
 impl FileSubmission for DirectScheduler {

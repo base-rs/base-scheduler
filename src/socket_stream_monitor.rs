@@ -1,7 +1,8 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use crate::{MonitorState, SocketMonitor};
+use crate::backend::{MonitorState, SocketMonitor};
+
 use std::ops::Deref;
 
 /// A directional socket monitor which permits backend-specific byte-stream readiness optimizations.

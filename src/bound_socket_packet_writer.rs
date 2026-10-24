@@ -1,9 +1,10 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
+use crate::backend::{MonitorStorage, SocketMonitor, SocketMonitoring};
 use crate::{
-    BufferResult, Cancellation, Interest, IoBuf, MonitorStorage, OperationResult, SocketAddress,
-    SocketMonitor, SocketMonitoring, SocketPacketWriter, SocketSendFlags, SocketType,
+    BufferResult, Cancellation, Interest, IoBuf, OperationResult, SocketAddress,
+    SocketPacketWriter, SocketSendFlags, SocketType,
 };
 use std::io::{self, IoSlice};
 
@@ -24,7 +25,6 @@ where
     S::Socket: 'static,
 {
     /// Construct the default backend composition without submitting payload I/O. Applications normally use the scheduler factory.
-    #[doc(hidden)]
     pub fn new(scheduler: &'a S, socket: &S::Socket) -> io::Result<Self> {
         if scheduler.socket_type(socket)? == SocketType::Stream {
             return Err(io::Error::new(

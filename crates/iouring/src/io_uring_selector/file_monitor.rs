@@ -565,3 +565,17 @@ impl FileMonitoring for IoUringSelector {
 
 #[cfg(test)]
 mod tests;
+
+impl core_scheduler::FileReading for IoUringSelector {
+    type Reader<'scheduler> = core_scheduler::backend::BoundFileReader<'scheduler, Self>;
+    fn file_reader(&self, file: &Self::File) -> std::io::Result<Self::Reader<'_>> {
+        core_scheduler::backend::BoundFileReader::new(self, file)
+    }
+}
+
+impl core_scheduler::FileWriting for IoUringSelector {
+    type Writer<'scheduler> = core_scheduler::backend::BoundFileWriter<'scheduler, Self>;
+    fn file_writer(&self, file: &Self::File) -> std::io::Result<Self::Writer<'_>> {
+        core_scheduler::backend::BoundFileWriter::new(self, file)
+    }
+}

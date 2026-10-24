@@ -1,7 +1,9 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::{Cancellation, FileClose, FileMonitoring, FileOpen, FileOptions, Spawn};
+use core_scheduler::{
+    Cancellation, FileClose, FileOpen, FileOptions, Spawn, backend::FileMonitoring,
+};
 use std::{sync::Arc, time::Instant};
 
 pub async fn run<S>(

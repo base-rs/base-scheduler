@@ -637,6 +637,61 @@ impl Drop for Monitors {
 #[cfg(test)]
 mod tests;
 
-impl core_scheduler::SocketStreamReading for IoUringSelector {}
-impl core_scheduler::SocketPacketReading for IoUringSelector {}
-impl core_scheduler::SocketPacketWriting for IoUringSelector {}
+impl core_scheduler::SocketStreamReading for IoUringSelector {
+    fn socket_stream_reader<'scheduler>(
+        &'scheduler self,
+        socket: &Self::Socket,
+    ) -> std::io::Result<
+        impl core_scheduler::SocketStreamReader<
+            Buffer = <Self::Pool as core_scheduler::BufferPool>::Buffer,
+        > + 'scheduler,
+    > {
+        core_scheduler::backend::BoundSocketStreamReader::new(self, socket)
+    }
+    fn socket_stream_reader_with_pool<'scheduler>(
+        &'scheduler self,
+        socket: &Self::Socket,
+        pool: Self::Pool,
+    ) -> std::io::Result<
+        impl core_scheduler::SocketStreamReader<
+            Buffer = <Self::Pool as core_scheduler::BufferPool>::Buffer,
+        > + 'scheduler,
+    > {
+        Ok(core_scheduler::backend::BoundSocketStreamReader::new(self, socket)?.with_pool(pool))
+    }
+}
+impl core_scheduler::SocketPacketReading for IoUringSelector {
+    fn socket_packet_reader<'scheduler>(
+        &'scheduler self,
+        socket: &Self::Socket,
+    ) -> std::io::Result<
+        impl core_scheduler::SocketPacketReader<
+            Message: core_scheduler::SocketRecvMessageMut<
+                Payload = <Self::Pool as core_scheduler::BufferPool>::Buffer,
+            >,
+        > + 'scheduler,
+    > {
+        core_scheduler::backend::BoundSocketPacketReader::new(self, socket)
+    }
+    fn socket_packet_reader_with_pool<'scheduler>(
+        &'scheduler self,
+        socket: &Self::Socket,
+        pool: Self::Pool,
+    ) -> std::io::Result<
+        impl core_scheduler::SocketPacketReader<
+            Message: core_scheduler::SocketRecvMessageMut<
+                Payload = <Self::Pool as core_scheduler::BufferPool>::Buffer,
+            >,
+        > + 'scheduler,
+    > {
+        Ok(core_scheduler::backend::BoundSocketPacketReader::new(self, socket)?.with_pool(pool))
+    }
+}
+impl core_scheduler::SocketPacketWriting for IoUringSelector {
+    fn socket_packet_writer<'scheduler>(
+        &'scheduler self,
+        socket: &Self::Socket,
+    ) -> std::io::Result<impl core_scheduler::SocketPacketWriter + 'scheduler> {
+        core_scheduler::backend::BoundSocketPacketWriter::new(self, socket)
+    }
+}

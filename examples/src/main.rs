@@ -35,7 +35,13 @@ impl Workload {
 
 async fn network<S>(scheduler: &S, workload: &Workload) -> Duration
 where
-    S: SocketScheduler + SocketStreamReading + SocketPacketReading + SocketReceiving + Spawn,
+    S: SocketOpen
+        + SocketConnect
+        + SocketClose
+        + SocketStreamReading
+        + SocketPacketReading
+        + SocketPacketWriting
+        + Spawn,
     S::Socket: 'static,
 {
     let data = Arc::new(workload.data());
@@ -98,10 +104,9 @@ where
         .unwrap();
     let mut buffer = vec![0; workload.buffer_size];
     if workload.recipe == "datagrams" {
-        scheduler
-            .socket_send_poll(&socket, &[0], SocketSendFlags::default(), &cancellation)
-            .await
-            .unwrap();
+        let mut writer = scheduler.socket_packet_writer(&socket).unwrap();
+        writer.write(&[0], None, &cancellation).await.unwrap();
+        writer.close().await.unwrap();
     }
     let mut retained = VecDeque::new();
     let mut position = 0;
@@ -204,7 +209,7 @@ fn send_packets(
     Ok(())
 }
 
-async fn file<S: FileOpen + FileClose + FileMonitoring>(
+async fn file<S: FileOpen + FileClose + FileReading + FileWriting>(
     scheduler: &S,
     workload: &Workload,
 ) -> Duration {
@@ -245,15 +250,17 @@ async fn file<S: FileOpen + FileClose + FileMonitoring>(
 
 async fn measure<S>(scheduler: Arc<S>, workload: Workload) -> f64
 where
-    S: SocketScheduler
-        + SocketMonitoring
-        + SocketReceiving
+    S: SocketOpen
+        + SocketConnect
+        + SocketClose
+        + SocketPacketWriting
         + SocketStreamReading
         + SocketPacketReading
         + Spawn
         + FileOpen
         + FileClose
-        + FileMonitoring
+        + FileReading
+        + FileWriting
         + Send
         + Sync
         + 'static,

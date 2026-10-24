@@ -121,7 +121,7 @@ fn poll_zero_progress_is_an_error_instead_of_an_infinite_loop() {
     );
 }
 
-impl core_scheduler::SocketWait for PartialSocket {
+impl core_scheduler::backend::SocketWait for PartialSocket {
     async fn socket_wait(
         &self,
         _: &(),
@@ -131,7 +131,7 @@ impl core_scheduler::SocketWait for PartialSocket {
         Ok(())
     }
 }
-impl core_scheduler::SocketRecvMsgPoll for PartialSocket {
+impl core_scheduler::backend::SocketRecvMsgPoll for PartialSocket {
     async fn socket_recvmsg_poll(
         &self,
         _: &(),
@@ -142,7 +142,7 @@ impl core_scheduler::SocketRecvMsgPoll for PartialSocket {
         Err(std::io::Error::from(std::io::ErrorKind::Unsupported).into())
     }
 }
-impl core_scheduler::SocketSendMsgPoll for PartialSocket {
+impl core_scheduler::backend::SocketSendMsgPoll for PartialSocket {
     async fn socket_sendmsg_poll(
         &self,
         _: &(),
@@ -163,8 +163,12 @@ impl SocketMonitoring for PartialSocket {
         &self,
         _: &(),
         interest: core_scheduler::Interest,
-    ) -> std::io::Result<core_scheduler::SocketMonitor<(), ()>> {
-        Ok(core_scheduler::SocketMonitor::new((), interest, ()))
+    ) -> std::io::Result<core_scheduler::backend::SocketMonitor<(), ()>> {
+        Ok(core_scheduler::backend::SocketMonitor::new(
+            (),
+            interest,
+            (),
+        ))
     }
 }
 
@@ -203,14 +207,14 @@ impl core_scheduler::BufferPooling for PartialSocket {
         core_scheduler::HeapBufferPool::with_options(options)
     }
 }
-impl core_scheduler::SocketStreamOutputting for PartialSocket {
+impl core_scheduler::backend::SocketStreamOutputting for PartialSocket {
     type Writer<B: IoBuf> = UnusedOutput<B>;
     fn socket_stream_output<B: IoBuf>(&self, _: &()) -> io::Result<Self::Writer<B>> {
         Ok(UnusedOutput(std::marker::PhantomData))
     }
 }
 struct UnusedOutput<B>(std::marker::PhantomData<B>);
-impl<B: IoBuf> core_scheduler::SocketStreamOutput<PartialSocket> for UnusedOutput<B> {
+impl<B: IoBuf> core_scheduler::backend::SocketStreamOutput<PartialSocket> for UnusedOutput<B> {
     type Buffer = B;
     async fn submit(
         &mut self,
@@ -228,8 +232,6 @@ impl<B: IoBuf> core_scheduler::SocketStreamOutput<PartialSocket> for UnusedOutpu
     }
 }
 
-impl SocketStreamReading for PartialSocket {}
-
 impl core_scheduler::SocketStreamWriting for PartialSocket {
     fn socket_stream_writer<'scheduler>(
         &'scheduler self,
@@ -242,7 +244,7 @@ impl core_scheduler::SocketStreamWriting for PartialSocket {
     where
         Self::Socket: 'static,
     {
-        core_scheduler::BoundSocketStreamWriter::new(self, socket)
+        core_scheduler::backend::BoundSocketStreamWriter::new(self, socket)
     }
 
     fn socket_stream_writer_with_buffer<'scheduler, B: IoBuf>(
@@ -252,6 +254,30 @@ impl core_scheduler::SocketStreamWriting for PartialSocket {
     where
         Self::Socket: 'static,
     {
-        core_scheduler::BoundSocketStreamWriter::new(self, socket)
+        core_scheduler::backend::BoundSocketStreamWriter::new(self, socket)
+    }
+}
+
+impl core_scheduler::SocketStreamReading for PartialSocket {
+    fn socket_stream_reader<'scheduler>(
+        &'scheduler self,
+        socket: &Self::Socket,
+    ) -> std::io::Result<
+        impl core_scheduler::SocketStreamReader<
+            Buffer = <Self::Pool as core_scheduler::BufferPool>::Buffer,
+        > + 'scheduler,
+    > {
+        core_scheduler::backend::BoundSocketStreamReader::new(self, socket)
+    }
+    fn socket_stream_reader_with_pool<'scheduler>(
+        &'scheduler self,
+        socket: &Self::Socket,
+        pool: Self::Pool,
+    ) -> std::io::Result<
+        impl core_scheduler::SocketStreamReader<
+            Buffer = <Self::Pool as core_scheduler::BufferPool>::Buffer,
+        > + 'scheduler,
+    > {
+        Ok(core_scheduler::backend::BoundSocketStreamReader::new(self, socket)?.with_pool(pool))
     }
 }

@@ -1,11 +1,13 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
+use crate::backend::{
+    MonitorState, MonitorStorage, SocketMonitor, SocketMonitorState, SocketRecvMsgPoll,
+    SocketRecvPoll, SocketSendMsgPoll, SocketSendPoll, SocketStreamMonitor, SocketWait,
+};
 use crate::{
-    Cancellation, Interest, MonitorState, MonitorStorage, OperationResult, SocketAddress,
-    SocketMonitor, SocketMonitorState, SocketRecvFlags, SocketRecvMsgPoll, SocketRecvPoll,
-    SocketRecvResult, SocketSendFlags, SocketSendMsgPoll, SocketSendPoll, SocketStreamMonitor,
-    SocketWait,
+    Cancellation, Interest, OperationResult, SocketAddress, SocketRecvFlags, SocketRecvResult,
+    SocketSendFlags,
 };
 use std::{
     future::Future,

@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use crate::MonitorState;
+use crate::backend::MonitorState;
 use std::{ops::Deref, ptr::NonNull, sync::Arc};
 
 /// Stable, retained storage for a monitor, either allocated separately or embedded in a shared application object.

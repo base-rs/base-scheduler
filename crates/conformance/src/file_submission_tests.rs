@@ -33,7 +33,7 @@ macro_rules! file_submission_tests {
                 writer.close().await.unwrap();
             },
             submission_is_lazy_and_pre_cancelled_admission_returns_the_owner => |fixture, scheduler, file| {
-                use $crate::__core_scheduler::FileSubmission as _;
+                use $crate::__core_scheduler::backend::FileSubmission as _;
                 let never = $crate::__core_scheduler::Cancellation::never();
                 let cancelled = $crate::__core_scheduler::Cancellation::new();
                 cancelled.cancel();
@@ -72,7 +72,7 @@ macro_rules! file_submission_tests {
                 fixture.assert_contents(b"abcdef");
             },
             submitted_reads_and_writes_return_the_original_storage => |fixture, scheduler, file| {
-                use $crate::__core_scheduler::FileSubmission as _;
+                use $crate::__core_scheduler::backend::FileSubmission as _;
                 let never = $crate::__core_scheduler::Cancellation::never();
                 let buffer = ::std::vec![0;3];
                 let pointer = buffer.as_ptr();
@@ -133,7 +133,7 @@ macro_rules! file_submission_tests {
                 }
             },
             accepted_write_progresses_without_polling_its_completion => |fixture, scheduler, file| {
-                use $crate::__core_scheduler::{FileReadAt as _, FileSubmission as _};
+                use $crate::__core_scheduler::{backend::FileReadAt as _, backend::FileSubmission as _};
                 let never = $crate::__core_scheduler::Cancellation::never();
                 let completion = scheduler
                     .file_write_at_submit(&file, b"UVWXYZ".to_vec(), 0, &never)
@@ -157,11 +157,11 @@ macro_rules! file_submission_tests {
                 assert_eq!(result.unwrap(), 6);
             },
             receiver_chunks_survive_the_next_read_and_pool_exhaustion_is_cancellable => |fixture, scheduler, file| {
-                use $crate::__core_scheduler::FileMonitoring as _;
+                use $crate::__core_scheduler::backend::FileMonitoring as _;
                 let never = $crate::__core_scheduler::Cancellation::never();
                 let pool = $crate::__core_scheduler::HeapBufferPool::new(2, 3).unwrap();
                 let mut receiver =
-                    $crate::__core_scheduler::FileReceiver::new(scheduler.file_monitor(&file).unwrap(), pool.clone());
+                    $crate::__core_scheduler::backend::FileReceiver::new(scheduler.file_monitor(&file).unwrap(), pool.clone());
                 let first = receiver.recv(scheduler, &never).await.unwrap().unwrap();
                 let second = receiver.recv(scheduler, &never).await.unwrap().unwrap();
                 assert_eq!(first.as_ref(), b"abc");
@@ -179,7 +179,7 @@ macro_rules! file_submission_tests {
                 drop(second);
             },
             dropping_an_unpolled_accepted_completion_releases_only_after_retirement => |fixture, scheduler, file| {
-                use $crate::__core_scheduler::FileSubmission as _;
+                use $crate::__core_scheduler::backend::FileSubmission as _;
                 let never = $crate::__core_scheduler::Cancellation::never();
                 let pool = $crate::__core_scheduler::HeapBufferPool::new(1, 6).unwrap();
                 let buffer = pool.try_acquire().unwrap();
@@ -193,7 +193,7 @@ macro_rules! file_submission_tests {
                 drop(returned);
             },
             receiver_lease_can_be_forwarded_while_the_next_read_is_running => |fixture, scheduler, file| {
-                use $crate::__core_scheduler::{FileMonitoring as _, FileOpen as _};
+                use $crate::__core_scheduler::{backend::FileMonitoring as _, FileOpen as _};
                 let never = $crate::__core_scheduler::Cancellation::never();
                 let output = scheduler
                     .file_open(
@@ -205,16 +205,16 @@ macro_rules! file_submission_tests {
                     .unwrap();
                 let pool = $crate::__core_scheduler::HeapBufferPool::new(2, 3).unwrap();
                 let mut receiver =
-                    $crate::__core_scheduler::FileReceiver::new(scheduler.file_monitor(&file).unwrap(), pool);
+                    $crate::__core_scheduler::backend::FileReceiver::new(scheduler.file_monitor(&file).unwrap(), pool);
                 let first = receiver.recv(scheduler, &never).await.unwrap().unwrap();
-                let writing = $crate::__core_scheduler::file_write_all_submit(scheduler, &output, first, &never)
+                let writing = $crate::__core_scheduler::backend::file_write_all_submit(scheduler, &output, first, &never)
                     .await
                     .unwrap();
                 let second = receiver.recv(scheduler, &never).await.unwrap().unwrap();
                 let (result, first) = writing.await;
                 assert_eq!(result.unwrap(), 3);
                 drop(first);
-                let (result, second) = $crate::__core_scheduler::file_write_all(scheduler, &output, second, &never).await;
+                let (result, second) = $crate::__core_scheduler::backend::file_write_all(scheduler, &output, second, &never).await;
                 assert_eq!(result.unwrap(), 3);
                 drop(second);
                 receiver.close(scheduler).await.unwrap();

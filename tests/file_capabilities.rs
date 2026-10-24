@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use core_scheduler::{
-    BufferResult, Cancellation, FileOperation, FileRead, IoBufMut, OperationError,
+    BufferResult, Cancellation, FileOperation, IoBufMut, OperationError, backend::FileRead,
 };
 use futures_lite::future::block_on;
 use std::sync::Mutex;

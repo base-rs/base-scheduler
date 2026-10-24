@@ -7,6 +7,7 @@ use crate::{
     direct_scheduler::wait_close,
     socket_io::{self, IoVectors},
 };
+use core_scheduler::backend::*;
 use core_scheduler::*;
 use socket2::Socket;
 use std::{io, net::Shutdown};

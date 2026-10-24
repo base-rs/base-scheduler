@@ -3,8 +3,8 @@
 
 use core_scheduler::{
     Cancellation, IoBufSequence, IoBufSequenceMut, IoBuffers, IoBuffersMut, OperationError,
-    OperationResult, SocketMessage, SocketOperation, SocketRecvFlags, SocketRecvMsg,
-    SocketRecvResult, SocketSendFlags, SocketSendMsg,
+    OperationResult, SocketMessage, SocketOperation, SocketRecvFlags, SocketRecvResult,
+    SocketSendFlags, backend::SocketRecvMsg, backend::SocketSendMsg,
 };
 use futures_channel::oneshot;
 use std::future::Future;

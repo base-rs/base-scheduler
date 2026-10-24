@@ -1,7 +1,8 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use crate::{BufferResult, Cancellation, FileSubmission, FileWrite, IoBuf, OperationError};
+use crate::backend::{FileSubmission, FileWrite};
+use crate::{BufferResult, Cancellation, IoBuf, OperationError};
 use std::{future::Future, io};
 
 /// Write the entire initialized range, preserving the original owner on every result. Writes are ordered and partial writes advance an owned view without copying. Zero progress is `WriteZero`; success does not imply durability.

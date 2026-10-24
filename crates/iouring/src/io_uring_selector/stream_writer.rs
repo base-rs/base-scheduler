@@ -525,7 +525,7 @@ impl core_scheduler::SocketStreamWriting for IoUringSelector {
     where
         Self::Socket: 'static,
     {
-        core_scheduler::BoundSocketStreamWriter::new(self, socket)
+        core_scheduler::backend::BoundSocketStreamWriter::new(self, socket)
     }
 
     fn socket_stream_writer_with_buffer<'scheduler, B: IoBuf>(
@@ -535,6 +535,6 @@ impl core_scheduler::SocketStreamWriting for IoUringSelector {
     where
         Self::Socket: 'static,
     {
-        core_scheduler::BoundSocketStreamWriter::new(self, socket)
+        core_scheduler::backend::BoundSocketStreamWriter::new(self, socket)
     }
 }

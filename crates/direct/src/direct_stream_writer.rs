@@ -2,10 +2,8 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::{DirectScheduler, DirectSocket, DirectTask, socket_io, socket_retry::SocketRetry};
-use core_scheduler::{
-    Cancellation, IoBuf, OperationError, OperationResult, SocketStreamOutput,
-    SocketStreamOutputting, SocketWriteState,
-};
+use core_scheduler::backend::{SocketStreamOutput, SocketStreamOutputting, SocketWriteState};
+use core_scheduler::{Cancellation, IoBuf, OperationError, OperationResult};
 use std::{
     future::{Future, poll_fn},
     io,
@@ -189,7 +187,7 @@ impl core_scheduler::SocketStreamWriting for DirectScheduler {
     where
         Self::Socket: 'static,
     {
-        core_scheduler::BoundSocketStreamWriter::new(self, socket)
+        core_scheduler::backend::BoundSocketStreamWriter::new(self, socket)
     }
 
     fn socket_stream_writer_with_buffer<'scheduler, B: IoBuf>(
@@ -199,6 +197,6 @@ impl core_scheduler::SocketStreamWriting for DirectScheduler {
     where
         Self::Socket: 'static,
     {
-        core_scheduler::BoundSocketStreamWriter::new(self, socket)
+        core_scheduler::backend::BoundSocketStreamWriter::new(self, socket)
     }
 }

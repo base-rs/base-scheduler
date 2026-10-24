@@ -1,6 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
+use core_scheduler::backend::*;
 use core_scheduler::*;
 use core_scheduler_examples::files;
 use futures_lite::future::block_on;
@@ -236,4 +237,18 @@ fn copy_closes_both_monitors_on_cancellation_empty_input_and_write_failure() {
         let mut writer = scheduler.file_writer(&file).unwrap();
         assert_eq!(writer.write_all(vec![], &never).await.0.unwrap(), 0);
     });
+}
+
+impl core_scheduler::FileReading for Files {
+    type Reader<'a> = core_scheduler::backend::BoundFileReader<'a, Self>;
+    fn file_reader(&self, file: &Self::File) -> std::io::Result<Self::Reader<'_>> {
+        core_scheduler::backend::BoundFileReader::new(self, file)
+    }
+}
+
+impl core_scheduler::FileWriting for Files {
+    type Writer<'a> = core_scheduler::backend::BoundFileWriter<'a, Self>;
+    fn file_writer(&self, file: &Self::File) -> std::io::Result<Self::Writer<'_>> {
+        core_scheduler::backend::BoundFileWriter::new(self, file)
+    }
 }

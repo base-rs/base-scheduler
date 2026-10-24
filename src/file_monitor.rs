@@ -9,7 +9,7 @@ use std::sync::{
 
 /// Reusable state for one sequential stream of file operations. Independent monitors may reference the same file; they still share its OS cursor. Use explicit offsets for independent positions.
 ///
-/// The monitor retains its file. Close the monitor and drop it before exclusively closing the file. Backend registration is accessible to implementations; applications use their scheduler's `file_monitor_*` operations.
+/// The monitor retains its file. Close the monitor and drop it before exclusively closing the file. Backend registration and `file_monitor_*` operations support adapter implementations; applications use bound file readers and writers.
 pub struct FileMonitor<F, R = ()> {
     file: F,
     registration: R,

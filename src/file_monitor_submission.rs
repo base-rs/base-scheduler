@@ -1,14 +1,12 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
+use crate::backend::{FileMonitor, FileMonitoring, FileSubmission};
 use crate::file_monitoring::{begin, finish};
-use crate::{
-    BufferResult, Cancellation, FileMonitor, FileMonitoring, FileSubmission, IoBuf, IoBufMut,
-};
+use crate::{BufferResult, Cancellation, IoBuf, IoBufMut};
 use std::future::Future;
 
 /// Optional monitor-aware admission/completion hooks. Implementations with custom monitor state must coordinate these operations with ordinary monitor operations and close. The defaults share the portable monitor's owned-buffer retirement guard.
-#[doc(hidden)]
 pub trait FileMonitorSubmission: FileMonitoring + FileSubmission {
     /// Await bounded admission, then return the accepted operation's owning completion. Monitor reuse remains blocked until the accepted buffer retires, including after dropping its completion. Admission rejection returns the original owner without submitting work.
     fn file_monitor_read_submit<B: IoBufMut>(

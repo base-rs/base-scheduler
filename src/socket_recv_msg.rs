@@ -5,12 +5,13 @@ use super::SocketOperation;
 use crate::{Cancellation, IoBufSequenceMut, OperationResult, SocketRecvFlags, SocketRecvResult};
 use std::future::Future;
 
-/// Receive one scatter/gather message through an existing socket. Buffer owners are returned on every result. See [`SocketMessages`](crate::SocketMessages) for the shared message I/O contract.
+/// Receive one scatter/gather message through an existing socket. Buffer owners are returned on every result. See [`SocketMessages`](crate::backend::SocketMessages) for the shared message I/O contract.
 ///
 /// A receive-only adapter need not provide sending or any core socket operations:
 ///
 /// ```
-/// use core_scheduler::{Cancellation, IoBufSequenceMut, OperationResult, SocketOperation, SocketRecvFlags, SocketRecvMsg, SocketRecvResult};
+/// use core_scheduler::backend::{SocketRecvMsg};
+/// use core_scheduler::{Cancellation, IoBufSequenceMut, OperationResult, SocketOperation, SocketRecvFlags, SocketRecvResult};
 /// struct Receiver<S>(S);
 /// impl<S: SocketRecvMsg> SocketOperation for Receiver<S> {
 ///     type Socket = S::Socket;

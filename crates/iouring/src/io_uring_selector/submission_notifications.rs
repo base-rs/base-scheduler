@@ -92,6 +92,7 @@ mod tests {
             socket::retain_socket,
             tests::{Failures, drive, pair},
         };
+        use core_scheduler::backend::*;
         use core_scheduler::*;
         use futures_lite::future::{block_on, poll_once};
         use std::{io, time::Duration};
@@ -133,6 +134,7 @@ mod tests {
     #[test]
     fn issuance_handles_full_submission_queues_and_abandoned_waiters() {
         use super::super::{socket::retain_socket, tests::drive};
+        use core_scheduler::backend::*;
         use core_scheduler::*;
         use futures_lite::future::{block_on, poll_once};
         use std::time::Duration;
@@ -184,6 +186,7 @@ mod tests {
     #[test]
     fn terminal_failure_before_issuance_still_resolves_accepted_submission() {
         use super::super::tests::{drive, pair};
+        use core_scheduler::backend::*;
         use core_scheduler::*;
         use futures_lite::future::{block_on, poll_once};
         use std::time::Duration;
@@ -219,6 +222,7 @@ mod tests {
             Command, Controller,
             tests::{Failures, drive, file, pair},
         };
+        use core_scheduler::backend::*;
         use core_scheduler::*;
         use futures_lite::future::{block_on, poll_once};
         use std::{

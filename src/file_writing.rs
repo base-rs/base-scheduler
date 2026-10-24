@@ -1,17 +1,15 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use crate::{BoundFileWriter, FileMonitoring};
+use crate::{FileOperation, FileWriter};
 use std::io;
 
-/// Construct a reusable file writer bound to this scheduler. Construction retains the file and backend monitor state without submitting I/O. Cancellation remains an operation argument.
-pub trait FileWriting: FileMonitoring + Sync {
-    fn file_writer(&self, file: &Self::File) -> io::Result<BoundFileWriter<'_, Self>> {
-        Ok(BoundFileWriter {
-            scheduler: self,
-            monitor: self.file_monitor(file)?,
-        })
-    }
-}
+/// Construct a sequential file writer bound to this scheduler. Backends select the handle representation; protocols need no monitor or raw dispatch capabilities.
+pub trait FileWriting: FileOperation {
+    type Writer<'scheduler>: FileWriter + 'scheduler
+    where
+        Self: 'scheduler;
 
-impl<S: FileMonitoring + Sync + ?Sized> FileWriting for S {}
+    /// Retain the file and reusable backend state without submitting I/O. The file reference need not live as long as the returned handle. Cancellation remains an operation argument.
+    fn file_writer(&self, file: &Self::File) -> io::Result<Self::Writer<'_>>;
+}

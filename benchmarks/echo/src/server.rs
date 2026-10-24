@@ -2,14 +2,14 @@
 // Copyright, 2026, by Samuel Williams.
 
 #[cfg(target_os = "linux")]
-use core_scheduler::{SocketRecvMessage, SocketRecvMsgReceiver};
+use core_scheduler::{SocketRecvMessage, backend::SocketRecvMsgReceiver};
 
 use crate::Result;
 use core_scheduler::{
-    BufferPooling, Cancellation, IoBuf, SocketAccept, SocketMonitoring, SocketRead,
-    SocketRecvFlags, SocketRecvPoll, SocketRegistration, SocketSendFlags, SocketSendPoll,
-    SocketSetOption, SocketStreamReader, SocketStreamReading, SocketStreamWriter,
-    SocketStreamWriting, SocketWrite, Spawn, TcpNoDelay,
+    BufferPooling, Cancellation, IoBuf, SocketAccept, SocketRecvFlags, SocketRegistration,
+    SocketSendFlags, SocketSetOption, SocketStreamReader, SocketStreamReading, SocketStreamWriter,
+    SocketStreamWriting, Spawn, TcpNoDelay, backend::SocketMonitoring, backend::SocketRead,
+    backend::SocketRecvPoll, backend::SocketSendPoll, backend::SocketWrite,
 };
 use core_scheduler_tokio::TokioScheduler;
 use std::{

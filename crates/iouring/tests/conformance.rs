@@ -3,6 +3,7 @@
 
 #![cfg(target_os = "linux")]
 
+use core_scheduler::backend::*;
 use core_scheduler::*;
 use core_scheduler_conformance::FileTestFixture;
 use core_scheduler_iouring::{IoUringOptions, IoUringSelector};
@@ -23,7 +24,7 @@ struct Fixture<S> {
     path: PathBuf,
     _directory: tempfile::TempDir,
 }
-impl<S: FileScheduler> FileTestFixture for Fixture<S> {
+impl<S: core_scheduler_conformance::FileTestScheduler> FileTestFixture for Fixture<S> {
     type Scheduler = S;
     fn scheduler(&self) -> &S {
         &self.scheduler

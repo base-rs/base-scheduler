@@ -1,11 +1,9 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
+use crate::backend::{FileMonitor, FileRead, FileReadAt, FileWrite, FileWriteAt};
 use crate::file_monitor::{Activity, MonitoredBuffer, Retirement};
-use crate::{
-    BufferResult, Cancellation, FileMonitor, FileRead, FileReadAt, FileWrite, FileWriteAt, IoBuf,
-    IoBufMut,
-};
+use crate::{BufferResult, Cancellation, IoBuf, IoBufMut};
 use std::{
     future::{Future, poll_fn},
     io,

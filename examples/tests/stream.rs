@@ -1,6 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
+use core_scheduler::backend::*;
 use core_scheduler::*;
 use core_scheduler_direct::DirectScheduler;
 use core_scheduler_examples::stream;
@@ -181,4 +182,26 @@ fn stream_cleanup_allows_exclusive_close_after_cancellation_and_consumer_errors(
     });
 }
 
-impl SocketStreamReading for FailedMonitor {}
+impl core_scheduler::SocketStreamReading for FailedMonitor {
+    fn socket_stream_reader<'scheduler>(
+        &'scheduler self,
+        socket: &Self::Socket,
+    ) -> std::io::Result<
+        impl core_scheduler::SocketStreamReader<
+            Buffer = <Self::Pool as core_scheduler::BufferPool>::Buffer,
+        > + 'scheduler,
+    > {
+        core_scheduler::backend::BoundSocketStreamReader::new(self, socket)
+    }
+    fn socket_stream_reader_with_pool<'scheduler>(
+        &'scheduler self,
+        socket: &Self::Socket,
+        pool: Self::Pool,
+    ) -> std::io::Result<
+        impl core_scheduler::SocketStreamReader<
+            Buffer = <Self::Pool as core_scheduler::BufferPool>::Buffer,
+        > + 'scheduler,
+    > {
+        Ok(core_scheduler::backend::BoundSocketStreamReader::new(self, socket)?.with_pool(pool))
+    }
+}

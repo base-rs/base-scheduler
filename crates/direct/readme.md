@@ -7,16 +7,19 @@
 The workspace is not published yet. Add this package from Git with `cargo add core-scheduler core-scheduler-direct --git https://github.com/core-rs/core-scheduler`.
 
 ```rust
-use core_scheduler::{Cancellation, FileClose, FileOpen, FileOptions, FileRead};
+use core_scheduler::{Cancellation, FileClose, FileOpen, FileOptions, FileReader, FileReading};
 use core_scheduler_direct::{DirectOptions, DirectScheduler};
 
 # async fn example(path: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
 let scheduler = DirectScheduler::new(DirectOptions::default())?;
 let cancellation = Cancellation::new();
 let file = scheduler.file_open(path, FileOptions::READ, &cancellation).await?;
-let (result, buffer) = scheduler.file_read(&file, vec![0; 4096], &cancellation).await;
+let mut reader = scheduler.file_reader(&file)?;
+let (result, buffer) = reader.read(vec![0; 4096], &cancellation).await;
 let count = result?;
 assert!(count <= buffer.len());
+reader.close().await?;
+drop(reader);
 scheduler.file_close(file).await?;
 scheduler.shutdown().await;
 # Ok(()) }

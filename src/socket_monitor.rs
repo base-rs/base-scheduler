@@ -1,7 +1,8 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use crate::{Interest, MonitorState};
+use crate::Interest;
+use crate::backend::MonitorState;
 use std::io;
 
 /// Persistent state for one direction of a socket. Create separate readable and writable monitors for concurrent reader and writer tasks.

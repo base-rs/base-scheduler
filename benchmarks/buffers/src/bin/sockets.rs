@@ -1,12 +1,13 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
+use core_scheduler::backend::*;
 use core_scheduler::*;
 #[cfg(target_os = "linux")]
 #[path = "../multishot.rs"]
 mod multishot;
 #[cfg(not(target_os = "linux"))]
-use core_scheduler::SocketReceiving as Multishot;
+use core_scheduler::backend::SocketReceiving as Multishot;
 #[cfg(target_os = "linux")]
 use multishot::Multishot;
 use std::{
@@ -44,7 +45,12 @@ async fn run<S>(
     group: &ConnectionGroup<S::Pool>,
 ) -> serde_json::Value
 where
-    S: SocketScheduler + SocketMonitoring + Multishot + SocketSetOption<TcpNoDelay>,
+    S: SocketOpen
+        + SocketConnect
+        + SocketClose
+        + SocketMonitoring
+        + Multishot
+        + SocketSetOption<TcpNoDelay>,
     S::Socket: 'static,
 {
     let mode = workload.mode.as_str();
@@ -297,7 +303,9 @@ where
 
 async fn run_group<S>(scheduler: Arc<S>, workload: Workload, pool: S::Pool) -> serde_json::Value
 where
-    S: SocketScheduler
+    S: SocketOpen
+        + SocketConnect
+        + SocketClose
         + SocketMonitoring
         + Multishot
         + SocketSetOption<TcpNoDelay>

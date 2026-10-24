@@ -13,7 +13,8 @@ use std::future::Future;
 /// Futures are lazy, pre-cancellation prevents I/O, and successful progress wins concurrent cancellation. A successful receive, including EOF or an empty datagram, returns `Ready` in the same poll; `Pending` must not consume bytes or datagrams. Pending operations arrange wakeups for readiness and cancellation. Receives preserve short transfers and do not resize storage. For datagrams, an undersized buffer can truncate and discard the remainder of a message.
 ///
 /// ```
-/// use core_scheduler::{Cancellation, OperationResult, SocketRecvPoll, SocketRecvFlags};
+/// use core_scheduler::backend::{SocketRecvPoll};
+/// use core_scheduler::{Cancellation, OperationResult, SocketRecvFlags};
 /// async fn read_header<S: SocketRecvPoll>(scheduler: &S, socket: &S::Socket) -> OperationResult<usize> {
 ///     let mut header = [0; 64];
 ///     scheduler.socket_recv_poll(socket, &mut header, SocketRecvFlags::default(), &Cancellation::never()).await

@@ -78,7 +78,7 @@ macro_rules! file_monitor_tests {
                 $crate::file_monitoring::pending_retirement(scheduler, &file).await;
             },
             monitor_write_error => |fixture, scheduler, file| {
-                use $crate::__core_scheduler::{FileOpen as _, FileMonitoring as _};
+                use $crate::__core_scheduler::{FileOpen as _, backend::FileMonitoring as _};
                 let never = $crate::__core_scheduler::Cancellation::never();
                 let read_only = scheduler.file_open(fixture.path(), $crate::__core_scheduler::FileOptions::READ, &never).await.unwrap();
                 let mut monitor = scheduler.file_monitor(&read_only).unwrap();

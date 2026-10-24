@@ -3,6 +3,7 @@
 
 //! Keep the concrete io_uring control separate from the portable pooled receive benchmark.
 
+use core_scheduler::backend::*;
 use core_scheduler::*;
 
 pub trait Multishot: SocketReceiving + Sync {

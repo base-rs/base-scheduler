@@ -3,6 +3,7 @@
 
 #![cfg(target_os = "linux")]
 
+use core_scheduler::backend::*;
 use core_scheduler::*;
 use core_scheduler_iouring::{IoUringDriver, IoUringSelector};
 use futures_lite::future::{block_on, or, poll_once};

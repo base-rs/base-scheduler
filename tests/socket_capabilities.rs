@@ -2,8 +2,8 @@
 // Copyright, 2026, by Samuel Williams.
 
 use core_scheduler::{
-    BufferResult, Cancellation, IoBuf, IoBufMut, OperationError, SocketOperation, SocketRead,
-    SocketWrite,
+    BufferResult, Cancellation, IoBuf, IoBufMut, OperationError, SocketOperation,
+    backend::SocketRead, backend::SocketWrite,
 };
 use futures_lite::future::block_on;
 use std::sync::Mutex;

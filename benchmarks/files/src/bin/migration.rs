@@ -4,7 +4,8 @@
 #[cfg(target_os = "linux")]
 mod linux {
     use core_scheduler::{
-        Cancellation, FileClose, FileMonitor, FileMonitoring, FileOpen, FileOptions,
+        Cancellation, FileClose, FileOpen, FileOptions, backend::FileMonitor,
+        backend::FileMonitoring,
     };
     use core_scheduler_iouring::{IoUringFileRegistration, IoUringOptions, IoUringSelector};
     use core_scheduler_selector::{NativeFile, SelectorDriver, SelectorWorker};

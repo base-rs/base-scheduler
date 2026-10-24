@@ -2,7 +2,9 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::{TokioScheduler, TokioSocket};
+use core_scheduler::backend::*;
 use core_scheduler::*;
+use std::io;
 impl SocketReceiving for TokioScheduler {
     type PooledReceiver =
         SocketReceiver<SocketMonitor<TokioSocket, <Self as SocketMonitoring>::MonitorRegistration>>;
@@ -25,6 +27,51 @@ impl SocketReceiving for TokioScheduler {
 #[cfg(test)]
 mod tests;
 
-impl core_scheduler::SocketStreamReading for TokioScheduler {}
-impl core_scheduler::SocketPacketReading for TokioScheduler {}
-impl core_scheduler::SocketPacketWriting for TokioScheduler {}
+impl SocketStreamReading for TokioScheduler {
+    fn socket_stream_reader<'scheduler>(
+        &'scheduler self,
+        socket: &Self::Socket,
+    ) -> io::Result<impl SocketStreamReader<Buffer = <Self::Pool as BufferPool>::Buffer> + 'scheduler>
+    {
+        BoundSocketStreamReader::new(self, socket)
+    }
+    fn socket_stream_reader_with_pool<'scheduler>(
+        &'scheduler self,
+        socket: &Self::Socket,
+        pool: Self::Pool,
+    ) -> io::Result<impl SocketStreamReader<Buffer = <Self::Pool as BufferPool>::Buffer> + 'scheduler>
+    {
+        Ok(BoundSocketStreamReader::new(self, socket)?.with_pool(pool))
+    }
+}
+impl SocketPacketReading for TokioScheduler {
+    fn socket_packet_reader<'scheduler>(
+        &'scheduler self,
+        socket: &Self::Socket,
+    ) -> io::Result<
+        impl SocketPacketReader<
+            Message: SocketRecvMessageMut<Payload = <Self::Pool as BufferPool>::Buffer>,
+        > + 'scheduler,
+    > {
+        BoundSocketPacketReader::new(self, socket)
+    }
+    fn socket_packet_reader_with_pool<'scheduler>(
+        &'scheduler self,
+        socket: &Self::Socket,
+        pool: Self::Pool,
+    ) -> io::Result<
+        impl SocketPacketReader<
+            Message: SocketRecvMessageMut<Payload = <Self::Pool as BufferPool>::Buffer>,
+        > + 'scheduler,
+    > {
+        Ok(BoundSocketPacketReader::new(self, socket)?.with_pool(pool))
+    }
+}
+impl SocketPacketWriting for TokioScheduler {
+    fn socket_packet_writer<'scheduler>(
+        &'scheduler self,
+        socket: &Self::Socket,
+    ) -> io::Result<impl SocketPacketWriter + 'scheduler> {
+        BoundSocketPacketWriter::new(self, socket)
+    }
+}

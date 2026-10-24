@@ -1,6 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
+use core_scheduler::backend::*;
 use core_scheduler::*;
 use futures_lite::future::{block_on, poll_once};
 use std::{
@@ -567,9 +568,6 @@ fn abandoned_and_failed_close_prevent_further_packet_io_but_allow_cleanup_retrie
     });
 }
 
-impl SocketPacketReading for Scheduler {}
-impl SocketPacketWriting for Scheduler {}
-
 #[test]
 fn opaque_packet_handles_retain_the_resource_without_borrowing_its_input_reference() {
     block_on(async {
@@ -649,74 +647,6 @@ impl BufferPooling for Specialized {
     type Pool = TestPool;
     fn buffer_pool(&self, options: BufferPoolOptions) -> io::Result<TestPool> {
         self.0.buffer_pool(options)
-    }
-}
-impl SocketRecvPoll for Specialized {
-    async fn socket_recv_poll(
-        &self,
-        _: &Arc<Socket>,
-        _: &mut [u8],
-        _: SocketRecvFlags,
-        _: &Cancellation,
-    ) -> OperationResult<usize> {
-        panic!("specialized reader must bypass raw polling")
-    }
-}
-impl SocketSendPoll for Specialized {
-    async fn socket_send_poll(
-        &self,
-        _: &Arc<Socket>,
-        _: &[u8],
-        _: SocketSendFlags,
-        _: &Cancellation,
-    ) -> OperationResult<usize> {
-        panic!("specialized reader does not send")
-    }
-}
-impl SocketRecvMsgPoll for Specialized {
-    async fn socket_recvmsg_poll(
-        &self,
-        _: &Arc<Socket>,
-        _: &mut [IoSliceMut<'_>],
-        _: SocketRecvFlags,
-        _: &Cancellation,
-    ) -> OperationResult<SocketRecvResult> {
-        panic!("specialized reader must bypass raw polling")
-    }
-}
-impl SocketSendMsgPoll for Specialized {
-    async fn socket_sendmsg_poll(
-        &self,
-        _: &Arc<Socket>,
-        _: &[IoSlice<'_>],
-        _: Option<SocketAddress>,
-        _: SocketSendFlags,
-        _: &Cancellation,
-    ) -> OperationResult<usize> {
-        panic!("specialized reader does not send")
-    }
-}
-impl SocketWait for Specialized {
-    async fn socket_wait(
-        &self,
-        _: &Arc<Socket>,
-        _: Interest,
-        _: &Cancellation,
-    ) -> OperationResult<()> {
-        panic!("specialized reader must bypass raw readiness")
-    }
-}
-impl SocketMonitoring for Specialized {
-    type MonitorRegistration = ();
-    fn socket_type(&self, _: &Arc<Socket>) -> io::Result<SocketType> {
-        panic!("specialized factory validates its own resource")
-    }
-    fn socket_monitor_state(
-        &self,
-        _: &Arc<Socket>,
-        _: Interest,
-    ) -> io::Result<SocketMonitor<Arc<Socket>, ()>> {
-        panic!("specialized factory must not construct a monitor")
     }
 }
 struct NativeReader<'a> {
@@ -871,4 +801,37 @@ fn packet_factory_specialization_preserves_native_metadata_and_owned_payload() {
         drop(message);
         assert!(pool.try_acquire().is_some());
     });
+}
+
+impl SocketPacketReading for Scheduler {
+    fn socket_packet_reader<'scheduler>(
+        &'scheduler self,
+        socket: &Self::Socket,
+    ) -> io::Result<
+        impl SocketPacketReader<
+            Message: SocketRecvMessageMut<Payload = <Self::Pool as BufferPool>::Buffer>,
+        > + 'scheduler,
+    > {
+        BoundSocketPacketReader::new(self, socket)
+    }
+    fn socket_packet_reader_with_pool<'scheduler>(
+        &'scheduler self,
+        socket: &Self::Socket,
+        pool: Self::Pool,
+    ) -> io::Result<
+        impl SocketPacketReader<
+            Message: SocketRecvMessageMut<Payload = <Self::Pool as BufferPool>::Buffer>,
+        > + 'scheduler,
+    > {
+        Ok(BoundSocketPacketReader::new(self, socket)?.with_pool(pool))
+    }
+}
+
+impl SocketPacketWriting for Scheduler {
+    fn socket_packet_writer<'scheduler>(
+        &'scheduler self,
+        socket: &Self::Socket,
+    ) -> io::Result<impl SocketPacketWriter + 'scheduler> {
+        BoundSocketPacketWriter::new(self, socket)
+    }
 }

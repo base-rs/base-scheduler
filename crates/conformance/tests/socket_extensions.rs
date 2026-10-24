@@ -2,6 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 mod support;
+use core_scheduler::backend::*;
 use core_scheduler::*;
 use core_scheduler_conformance::{
     SocketOptionFixture, SocketRegistrationFixture, socket_options, socket_registration,

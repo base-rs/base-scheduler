@@ -2,6 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 //! Ordered output assertions shared by completion and readiness backends.
+use core_scheduler::backend::*;
 use core_scheduler::*;
 use futures_lite::future::{poll_once, zip};
 use std::io;

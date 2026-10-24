@@ -3,9 +3,10 @@
 
 use super::*;
 use core_scheduler::{
-    IoBuf, MonitorStorage, OperationError, OperationResult, SocketAddress, SocketMonitor,
-    SocketMonitorState, SocketOperation, SocketRecvMsgPoll, SocketRecvPoll, SocketRecvResult,
-    SocketSendMsgPoll, SocketSendPoll, SocketWait, SpawnError, TaskError,
+    IoBuf, OperationError, OperationResult, SocketAddress, SocketOperation, SocketRecvResult,
+    SpawnError, TaskError, backend::MonitorStorage, backend::SocketMonitor,
+    backend::SocketMonitorState, backend::SocketRecvMsgPoll, backend::SocketRecvPoll,
+    backend::SocketSendMsgPoll, backend::SocketSendPoll, backend::SocketWait,
 };
 use std::{collections::VecDeque, io::ErrorKind, marker::PhantomData, pin::Pin, sync::Mutex};
 

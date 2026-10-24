@@ -2,6 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use super::*;
+use core_scheduler::backend::*;
 use core_scheduler::*;
 
 macro_rules! conformance {

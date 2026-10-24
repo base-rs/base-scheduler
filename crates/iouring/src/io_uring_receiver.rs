@@ -4,6 +4,7 @@
 use crate::{
     IoUringBuffer, IoUringBufferPool, IoUringMonitorRegistration, IoUringSelector, RecvMsgMultishot,
 };
+use core_scheduler::backend::*;
 use core_scheduler::*;
 use core_scheduler_selector::NativeSocket;
 use std::io;

@@ -2,7 +2,11 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::{NativeFile, ReadinessSelector};
-use core_scheduler::{FileMonitor, FileMonitoring};
+use core_scheduler::backend::{
+    BoundFileReader, BoundFileWriter, FileMonitor, FileMonitorSubmission, FileMonitoring,
+};
+use core_scheduler::{FileReading, FileWriting};
+
 use std::io;
 
 impl FileMonitoring for ReadinessSelector {
@@ -13,4 +17,18 @@ impl FileMonitoring for ReadinessSelector {
     }
 }
 
-impl core_scheduler::FileMonitorSubmission for ReadinessSelector {}
+impl FileMonitorSubmission for ReadinessSelector {}
+
+impl FileReading for ReadinessSelector {
+    type Reader<'scheduler> = BoundFileReader<'scheduler, Self>;
+    fn file_reader(&self, file: &Self::File) -> io::Result<Self::Reader<'_>> {
+        BoundFileReader::new(self, file)
+    }
+}
+
+impl FileWriting for ReadinessSelector {
+    type Writer<'scheduler> = BoundFileWriter<'scheduler, Self>;
+    fn file_writer(&self, file: &Self::File) -> io::Result<Self::Writer<'_>> {
+        BoundFileWriter::new(self, file)
+    }
+}

@@ -7,15 +7,18 @@
 The workspace is not published yet. Add this package from Git with `cargo add core-scheduler core-scheduler-tokio --git https://github.com/core-rs/core-scheduler`. Add Tokio to the application with `cargo add tokio --features rt,net,time`.
 
 ```rust
-use core_scheduler::{Cancellation, FileClose, FileOpen, FileOptions, FileRead};
+use core_scheduler::{Cancellation, FileClose, FileOpen, FileOptions, FileReader, FileReading};
 use core_scheduler_tokio::TokioScheduler;
 
 # async fn example(path: &std::path::Path, runtime: tokio::runtime::Handle) -> Result<(), Box<dyn std::error::Error>> {
 let scheduler = TokioScheduler::new(runtime);
 let cancellation = Cancellation::new();
 let file = scheduler.file_open(path, FileOptions::READ, &cancellation).await?;
-let (result, buffer) = scheduler.file_read(&file, vec![0; 4096], &cancellation).await;
+let mut reader = scheduler.file_reader(&file)?;
+let (result, buffer) = reader.read(vec![0; 4096], &cancellation).await;
 assert!(result? <= buffer.len());
+reader.close().await?;
+drop(reader);
 scheduler.file_close(file).await?;
 scheduler.shutdown().await;
 # Ok(()) }

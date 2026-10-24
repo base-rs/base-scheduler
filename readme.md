@@ -57,7 +57,7 @@ Construct them through `scheduler.socket_stream_reader`, `socket_stream_writer`,
 
 Call `close().await` on each reader and writer before dropping it and exclusively closing its resource. Flush successful stream output first. Close has no cancellation argument and establishes backend retirement; dropping a handle is not an awaited cleanup barrier.
 
-See the [I/O usage guide](context/io.md), [interface reference](context/interface.md), and [runnable examples](examples/readme.md) for complete loops, buffer retention, partial transfers, and cleanup. The backend selects persistent readiness, request reuse, and buffer registration behind these handles.
+See the [I/O usage guide](context/io.md), [interface reference](context/interface.md), and [runnable examples](examples/readme.md) for complete loops, buffer retention, partial transfers, and cleanup. The backend selects persistent readiness, request reuse, and buffer registration behind these handles. Adapter authors use `core_scheduler::backend` for low-level dispatch and reusable handle implementations; protocol libraries depend on the crate-root resource capabilities.
 
 ## Other capabilities
 

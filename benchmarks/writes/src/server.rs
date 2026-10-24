@@ -3,8 +3,9 @@
 
 use crate::{Result, Workload, prepare};
 use core_scheduler::{
-    BufferLease, Cancellation, HeapBufferPool, Interest, SocketMonitoring, SocketRecvFlags,
-    SocketRegistration, SocketSendFlags, SocketStreamOutput, SocketStreamOutputting, Spawn,
+    BufferLease, Cancellation, HeapBufferPool, Interest, SocketRecvFlags, SocketRegistration,
+    SocketSendFlags, Spawn, backend::SocketMonitoring, backend::SocketStreamOutput,
+    backend::SocketStreamOutputting,
 };
 use core_scheduler_tokio::TokioScheduler;
 use std::{

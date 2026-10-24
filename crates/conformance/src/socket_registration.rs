@@ -3,6 +3,7 @@
 
 //! Standard-library TCP import retains established connections and listeners.
 
+use core_scheduler::backend::*;
 use core_scheduler::*;
 use std::{
     io::{Read, Write},

@@ -1,6 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
+use core_scheduler::backend::*;
 use core_scheduler::*;
 use core_scheduler_conformance::socket;
 use core_scheduler_direct::{DirectOptions, DirectScheduler, DirectSocket};

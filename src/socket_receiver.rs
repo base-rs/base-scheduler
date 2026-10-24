@@ -1,10 +1,10 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
+use crate::backend::{MonitorStorage, SocketMonitorState, SocketMonitoring};
 use crate::{
-    BufferPool, Cancellation, HeapBufferPool, MonitorStorage, OperationResult,
-    OwnedSocketRecvMessage, ReceiveBuffer, SocketMonitorState, SocketMonitoring, SocketRecvFlags,
-    SocketType,
+    BufferPool, Cancellation, HeapBufferPool, OperationResult, OwnedSocketRecvMessage,
+    ReceiveBuffer, SocketRecvFlags, SocketType,
 };
 use std::{
     future::poll_fn,
@@ -14,14 +14,15 @@ use std::{
 };
 
 /// A demand-driven receiver composed from a readable socket monitor and a shared pool. Works with general and stream monitors; it does not spawn a task, receive ahead, or allocate per message. A pending socket receive returns its buffer before waiting for readiness, so idle connections do not reserve pool capacity. Backends offering kernel receive-ahead retain their separate receiver implementation.
-pub struct SocketReceiver<Monitor: crate::MonitorState, Pool: BufferPool = HeapBufferPool> {
+pub struct SocketReceiver<Monitor: crate::backend::MonitorState, Pool: BufferPool = HeapBufferPool>
+{
     monitor: MonitorStorage<Monitor>,
     pool: Pool,
     flags: SocketRecvFlags,
     stream: bool,
     terminal: bool,
 }
-impl<M: crate::MonitorState, P: BufferPool> SocketReceiver<M, P> {
+impl<M: crate::backend::MonitorState, P: BufferPool> SocketReceiver<M, P> {
     /// `kind` must describe the socket: empty datagrams are messages, whereas a zero-length stream receive is EOF. Peeking is rejected because a receiver must consume its messages.
     pub fn new(
         monitor: MonitorStorage<M>,
@@ -119,7 +120,7 @@ impl<M: crate::MonitorState, P: BufferPool> SocketReceiver<M, P> {
     }
 }
 
-impl<S, M, P> crate::SocketRecvMsgReceiver<S> for SocketReceiver<M, P>
+impl<S, M, P> crate::backend::SocketRecvMsgReceiver<S> for SocketReceiver<M, P>
 where
     P: BufferPool,
     S: SocketMonitoring,

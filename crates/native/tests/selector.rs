@@ -1,7 +1,9 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::{BufferResult, Cancellation, FileOperation, FileRead, IoBufMut, Spawn};
+use core_scheduler::{
+    BufferResult, Cancellation, FileOperation, IoBufMut, Spawn, backend::FileRead,
+};
 use core_scheduler_native::{NativeExecutorOptions, NativeScheduler, ReadinessSelector, Selector};
 use std::sync::{
     Arc,
@@ -201,6 +203,7 @@ fn optional_file_capabilities_preserve_custom_resources_arguments_and_errors() {
 
 #[test]
 fn registered_sockets_options_resolution_and_signals_forward_to_the_selector() {
+    use core_scheduler::backend::*;
     use core_scheduler::*;
     use std::net::{TcpListener, TcpStream};
     let scheduler = NativeScheduler::new().unwrap();

@@ -28,7 +28,7 @@ A runner receives one async closure and creates a **fresh isolated fixture for e
 | --- | --- | --- |
 | `blocking_tests!` | Scheduler | `Blocking` |
 | `blocking_queue_tests!` | Fixture | `blocking::BlockingFixture` |
-| `file_tests!` | Fixture | `FileTestFixture` with the complete `FileScheduler` profile |
+| `file_tests!` | Fixture | `FileTestFixture` with the complete `FileTestScheduler` profile |
 | `socket_tests!` | Scheduler and fresh connected stream pair | `SocketRead`, `SocketWrite`, `SocketWait`, `SocketShutdown` |
 | `socket_message_tests!` | Scheduler and fresh connected stream pair | `SocketSendMsg`, `SocketRecvMsg` |
 | `socket_datagram_tests!` | Scheduler and fresh bound, unconnected datagram pair | `SocketSendMsg`, `SocketRecvMsg`, `SocketLocalAddress` |

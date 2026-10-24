@@ -26,7 +26,7 @@ Use one handle per sequential execution, with independent readers and writers fo
 | [`SocketPacketReading`](https://github.com/core-rs/core-scheduler/blob/main/src/socket_packet_reading.rs) | `socket_packet_reader(K)` | `SocketPacketReader` |
 | [`SocketPacketWriting`](https://github.com/core-rs/core-scheduler/blob/main/src/socket_packet_writing.rs) | `socket_packet_writer(K)` | `SocketPacketWriter` |
 
-The default stream writer accepts the same pooled owner type returned by the default stream reader, with no type annotation needed for borrowed-only output. `socket_stream_writer_with_buffer::<B>(K)` selects another stable owner type. Reader factories allocate no payload pool; the first owned read initializes default storage lazily. `socket_stream_reader_with_pool(K, pool)` and `socket_packet_reader_with_pool(K, pool)` select an application-owned shared budget at construction. Factories return implementation-selected handles through the reader/writer contracts; backends can override the default composition without changing application operations.
+The default stream writer accepts the same pooled owner type returned by the default stream reader, with no type annotation needed for borrowed-only output. `socket_stream_writer_with_buffer::<B>(K)` selects another stable owner type. Reader factories allocate no payload pool; the first owned read initializes default storage lazily. `socket_stream_reader_with_pool(K, pool)` and `socket_packet_reader_with_pool(K, pool)` select an application-owned shared budget at construction. Factories return implementation-selected handles through the reader/writer contracts; backends choose their composition without changing application operations.
 
 The Direct and Tokio backends provide all four socket handles. Native forwards its selector’s capabilities: io\_uring provides all four, while the readiness selector currently lacks ordered stream output (`SocketStreamWriting`).
 
@@ -98,7 +98,7 @@ Owned file operations may outlive dropped futures. Reusing that sequential handl
 
 ### Optional file submission waits
 
-When the scheduler implements the backend submission capability, the supplied concrete file handles also expose `read_submit`, `read_at_submit`, `write_submit`, and `write_at_submit`. Their arguments match the corresponding ordinary methods, with per-call cancellation and no scheduler argument. Awaiting admission returns:
+The supplied `backend::BoundFileReader` and `backend::BoundFileWriter` handles expose `read_submit`, `read_at_submit`, `write_submit`, and `write_at_submit` when their scheduler implements `backend::FileMonitorSubmission`. The file factory traits select associated handle families, so concrete handles preserve these optional methods. A generic `FileReading` or `FileWriting` bound guarantees only the ordinary resource trait, independently of backend submission support. Their arguments match the corresponding ordinary methods, with per-call cancellation and no scheduler argument. Awaiting admission returns:
 
 ```rust,ignore
 Result<impl Future<Output = BufferResult<B>> + Send, (OperationError, B)>
@@ -198,7 +198,7 @@ Dropping an ordinary clock wait releases its registration. Reusable timer waits 
 
 ## Backend composition and selector integration
 
-Application protocols use the bound resource traits above. Backend implementations compose hidden operation capabilities, monitor state, stable registration storage, and receivers to provide them. Those hooks retain explicit scheduler arguments for backend dispatch and conformance; they do not require application callers to select a polling or completion mechanism. See [socket monitoring](design.md#directional-socket-monitor-machinery), [file monitoring](design.md#sequential-file-monitor-machinery), and [ring ownership](design.md#io_uring-ring-ownership-and-migration) for their lifetime rules.
+Application protocols use the crate-root bound resource traits above. Adapter authors use the public `core_scheduler::backend` module for owned and borrowed dispatch capabilities, monitor state, stable registration storage, receivers, and reusable `Bound*` implementations. These items have no crate-root aliases. The public factory traits do not inherit the backend hooks: an implementation can select its own handles without implementing monitor dispatch. Full file-test profiles belong to `core_scheduler_conformance::FileTestScheduler`, rather than a production scheduler aggregate. Those hooks retain explicit scheduler arguments for backend dispatch and conformance; they do not require application callers to select a polling or completion mechanism. See [socket monitoring](design.md#directional-socket-monitor-machinery), [file monitoring](design.md#sequential-file-monitor-machinery), and [ring ownership](design.md#io_uring-ring-ownership-and-migration) for their lifetime rules.
 
 The selector lifecycle hooks below live in `core-scheduler-selector`, not the portable interface. They let the Native executor drive independently selected I/O machinery.
 

@@ -2,7 +2,9 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::{DirectScheduler, DirectSocket};
+use core_scheduler::backend::*;
 use core_scheduler::*;
+use std::io;
 impl SocketReceiving for DirectScheduler {
     type PooledReceiver = SocketReceiver<
         SocketMonitor<DirectSocket, <Self as SocketMonitoring>::MonitorRegistration>,
@@ -26,6 +28,51 @@ impl SocketReceiving for DirectScheduler {
 #[cfg(test)]
 mod tests;
 
-impl core_scheduler::SocketStreamReading for DirectScheduler {}
-impl core_scheduler::SocketPacketReading for DirectScheduler {}
-impl core_scheduler::SocketPacketWriting for DirectScheduler {}
+impl SocketStreamReading for DirectScheduler {
+    fn socket_stream_reader<'scheduler>(
+        &'scheduler self,
+        socket: &Self::Socket,
+    ) -> io::Result<impl SocketStreamReader<Buffer = <Self::Pool as BufferPool>::Buffer> + 'scheduler>
+    {
+        BoundSocketStreamReader::new(self, socket)
+    }
+    fn socket_stream_reader_with_pool<'scheduler>(
+        &'scheduler self,
+        socket: &Self::Socket,
+        pool: Self::Pool,
+    ) -> io::Result<impl SocketStreamReader<Buffer = <Self::Pool as BufferPool>::Buffer> + 'scheduler>
+    {
+        Ok(BoundSocketStreamReader::new(self, socket)?.with_pool(pool))
+    }
+}
+impl SocketPacketReading for DirectScheduler {
+    fn socket_packet_reader<'scheduler>(
+        &'scheduler self,
+        socket: &Self::Socket,
+    ) -> io::Result<
+        impl SocketPacketReader<
+            Message: SocketRecvMessageMut<Payload = <Self::Pool as BufferPool>::Buffer>,
+        > + 'scheduler,
+    > {
+        BoundSocketPacketReader::new(self, socket)
+    }
+    fn socket_packet_reader_with_pool<'scheduler>(
+        &'scheduler self,
+        socket: &Self::Socket,
+        pool: Self::Pool,
+    ) -> io::Result<
+        impl SocketPacketReader<
+            Message: SocketRecvMessageMut<Payload = <Self::Pool as BufferPool>::Buffer>,
+        > + 'scheduler,
+    > {
+        Ok(BoundSocketPacketReader::new(self, socket)?.with_pool(pool))
+    }
+}
+impl SocketPacketWriting for DirectScheduler {
+    fn socket_packet_writer<'scheduler>(
+        &'scheduler self,
+        socket: &Self::Socket,
+    ) -> io::Result<impl SocketPacketWriter + 'scheduler> {
+        BoundSocketPacketWriter::new(self, socket)
+    }
+}

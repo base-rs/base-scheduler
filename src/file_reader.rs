@@ -13,7 +13,7 @@ pub trait FileReader: Send {
         cancellation: &Cancellation,
     ) -> impl Future<Output = BufferResult<B>> + Send;
 
-    /// Read once at an explicit offset. This follows [`FileReadAt`](crate::FileReadAt)'s platform cursor semantics; the handle maintains no private cursor.
+    /// Read once at an explicit offset. This follows [`FileReadAt`](crate::backend::FileReadAt)'s platform cursor semantics; the handle maintains no private cursor.
     fn read_at<B: IoBufMut>(
         &mut self,
         buffer: B,

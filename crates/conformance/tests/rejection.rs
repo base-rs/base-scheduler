@@ -2,13 +2,13 @@
 // Copyright, 2026, by Samuel Williams.
 
 use core_scheduler::{
-    Blocking, BlockingError, BufferResult, Cancellation, FileOperation, FileRead, FileWrite, IoBuf,
-    IoBufMut, TaskError,
+    Blocking, BlockingError, BufferResult, Cancellation, FileOperation, IoBuf, IoBufMut, TaskError,
+    backend::FileRead, backend::FileWrite,
 };
 use core_scheduler::{
     Interest, IoBufSequence, IoBufSequenceMut, OperationResult, SocketMessage, SocketOperation,
-    SocketRead, SocketRecvFlags, SocketRecvMsg, SocketRecvResult, SocketSendFlags, SocketSendMsg,
-    SocketShutdown, SocketWait, SocketWrite,
+    SocketRecvFlags, SocketRecvResult, SocketSendFlags, SocketShutdown, backend::SocketRead,
+    backend::SocketRecvMsg, backend::SocketSendMsg, backend::SocketWait, backend::SocketWrite,
 };
 use core_scheduler_conformance::{blocking, file};
 use core_scheduler_conformance::{socket, socket_messages};

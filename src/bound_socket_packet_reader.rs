@@ -1,10 +1,11 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
+use crate::backend::{MonitorStorage, SocketMonitor, SocketMonitoring};
 use crate::{
-    BufferPool, BufferPoolOptions, BufferPooling, Cancellation, Interest, MonitorStorage,
-    OperationResult, OwnedSocketRecvMessage, ReceiveBuffer, SocketMonitor, SocketMonitoring,
-    SocketPacketReader, SocketRecvFlags, SocketRecvResult, SocketType,
+    BufferPool, BufferPoolOptions, BufferPooling, Cancellation, Interest, OperationResult,
+    OwnedSocketRecvMessage, ReceiveBuffer, SocketPacketReader, SocketRecvFlags, SocketRecvResult,
+    SocketType,
 };
 use std::{
     future::poll_fn,
@@ -33,7 +34,6 @@ where
     S::Socket: 'static,
 {
     /// Construct the default backend composition without submitting payload I/O. Applications normally use the scheduler factory.
-    #[doc(hidden)]
     pub fn new(scheduler: &'a S, socket: &S::Socket) -> io::Result<Self> {
         if scheduler.socket_type(socket)? == SocketType::Stream {
             return Err(io::Error::new(

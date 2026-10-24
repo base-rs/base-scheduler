@@ -2,6 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::{IoUringDriver, IoUringOptions};
+use core_scheduler::backend::*;
 use core_scheduler::*;
 use core_scheduler_selector::{NativeFile, NativeSocket, ReadinessSelector, Selector};
 use event_listener::Event as CompletionEvent;

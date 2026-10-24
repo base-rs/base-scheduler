@@ -1,7 +1,8 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::{Cancellation, FileMonitoring, FileSeek};
+use core_scheduler::backend::FileMonitoring;
+use core_scheduler::{Cancellation, FileSeek};
 use std::{
     future::{Future, poll_fn},
     io::SeekFrom,

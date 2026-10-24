@@ -4,6 +4,7 @@
 //! Reusable IP socket assertions. Fixtures supply isolated connections and enforce test deadlines.
 
 use crate::{SocketIoFixture, SocketIoGuard};
+use core_scheduler::backend::*;
 use core_scheduler::*;
 use futures_lite::future::{poll_once, zip};
 use std::{
@@ -20,7 +21,16 @@ pub(crate) fn cancelled<T>(result: OperationResult<T>) {
 }
 
 /// Create an isolated loopback connection, exercising separate open/bind/listen/connect/accept operations and pre-cancellation. The listener is explicitly closed; the caller owns both returned ends.
-pub async fn stream_pair<S: SocketScheduler>(
+pub async fn stream_pair<
+    S: SocketOpen
+        + SocketBind
+        + SocketListen
+        + SocketConnect
+        + SocketAccept
+        + SocketLocalAddress
+        + SocketPeerAddress
+        + SocketClose,
+>(
     scheduler: &S,
     domain: SocketDomain,
 ) -> (S::Socket, S::Socket) {

@@ -1,14 +1,11 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use crate::{
-    BoundSocketPacketReader, BufferPool, BufferPooling, SocketMonitoring, SocketPacketReader,
-    SocketRecvMessageMut,
-};
+use crate::{BufferPool, BufferPooling, SocketOperation, SocketPacketReader, SocketRecvMessageMut};
 use std::io;
 
 /// Construct sequential packet input bound to this scheduler. Backends choose the static reader and completed message representation without exposing their receive mechanism.
-pub trait SocketPacketReading: SocketMonitoring + BufferPooling + Sync {
+pub trait SocketPacketReading: SocketOperation + BufferPooling {
     /// Retain the socket and reusable backend state without submitting a receive or allocating a payload pool. Owned reads initialize default storage lazily.
     fn socket_packet_reader<'scheduler>(
         &'scheduler self,
@@ -20,10 +17,7 @@ pub trait SocketPacketReading: SocketMonitoring + BufferPooling + Sync {
     >
     where
         Self: Sized,
-        Self::Socket: 'static,
-    {
-        BoundSocketPacketReader::new(self, socket)
-    }
+        Self::Socket: 'static;
 
     /// Construct a reader using the supplied pool for owned messages. Borrowed reads do not acquire pool storage; completed messages retain their pool independently.
     fn socket_packet_reader_with_pool<'scheduler>(
@@ -37,8 +31,5 @@ pub trait SocketPacketReading: SocketMonitoring + BufferPooling + Sync {
     >
     where
         Self: Sized,
-        Self::Socket: 'static,
-    {
-        Ok(BoundSocketPacketReader::new(self, socket)?.with_pool(pool))
-    }
+        Self::Socket: 'static;
 }

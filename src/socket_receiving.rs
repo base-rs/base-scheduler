@@ -1,10 +1,8 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use crate::{
-    BufferPooling, Cancellation, OperationResult, SocketOperation, SocketRecvFlags,
-    SocketRecvMsgReceiver,
-};
+use crate::backend::SocketRecvMsgReceiver;
+use crate::{BufferPooling, Cancellation, OperationResult, SocketOperation, SocketRecvFlags};
 use std::future::Future;
 
 /// Construct an owned receive resource backed by a server-shared bounded pool. Applications choose the memory budget and retain completed buffers; the backend chooses allocation, reuse order, registration, publication depth, and receive strategy. Applications need not select a kernel mechanism to use this capability.

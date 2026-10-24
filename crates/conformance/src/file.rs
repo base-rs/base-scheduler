@@ -2,9 +2,10 @@
 // Copyright, 2026, by Samuel Williams.
 
 //! Assertions for independently implementable file capabilities. Fixtures supply regular files with exclusive test ownership and a cursor initially at zero unless documented otherwise.
+use core_scheduler::backend::{FileRead, FileReadAt, FileWrite, FileWriteAt};
 use core_scheduler::{
-    Cancellation, FileMetadata, FileRead, FileReadAt, FileSeek, FileStat, FileSync, FileTruncate,
-    FileType, FileWrite, FileWriteAt, IoBuf, OperationError, SyncMode,
+    Cancellation, FileMetadata, FileSeek, FileStat, FileSync, FileTruncate, FileType, IoBuf,
+    OperationError, SyncMode,
 };
 use std::io::{self, SeekFrom};
 

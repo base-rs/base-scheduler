@@ -2,6 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 //! Reusable directional monitor assertions, including caller-owned connection storage.
+use core_scheduler::backend::*;
 use core_scheduler::*;
 use futures_lite::future::{poll_once, zip};
 use std::{

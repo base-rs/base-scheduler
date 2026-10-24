@@ -6,10 +6,11 @@ use crate::{
     blocking_pool::{BlockingPool, admission_error},
     file_io,
 };
+use core_scheduler::backend::{FileRead, FileReadAt, FileWrite, FileWriteAt};
 use core_scheduler::{
     Blocking, BlockingError, BufferResult, Cancellation, FileClose, FileOpen, FileOperation,
-    FileOptions, FileRead, FileReadAt, FileSeek, FileStat, FileSync, FileTruncate, FileWrite,
-    FileWriteAt, IoBuf, IoBufMut, OperationResult, SyncMode, TaskError,
+    FileOptions, FileSeek, FileStat, FileSync, FileTruncate, IoBuf, IoBufMut, OperationResult,
+    SyncMode, TaskError,
 };
 use futures_channel::oneshot;
 use std::{

@@ -192,7 +192,7 @@ impl<B: IoBuf> RecvMsgMultishot<B> {
     }
 }
 
-impl<B: MessageStorage> core_scheduler::SocketRecvMsgReceiver<IoUringSelector>
+impl<B: MessageStorage> core_scheduler::backend::SocketRecvMsgReceiver<IoUringSelector>
     for RecvMsgMultishot<B>
 {
     type Message = IoUringRecvMessage<B>;

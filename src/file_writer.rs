@@ -13,7 +13,7 @@ pub trait FileWriter: Send {
         cancellation: &Cancellation,
     ) -> impl Future<Output = BufferResult<B>> + Send;
 
-    /// Write once at an explicit offset, following [`FileWriteAt`](crate::FileWriteAt)'s platform cursor semantics. The handle maintains no private cursor.
+    /// Write once at an explicit offset, following [`FileWriteAt`](crate::backend::FileWriteAt)'s platform cursor semantics. The handle maintains no private cursor.
     fn write_at<B: IoBuf>(
         &mut self,
         buffer: B,

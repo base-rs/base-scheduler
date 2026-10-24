@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::{MonitorState, MonitorStorage};
+use core_scheduler::{backend::MonitorState, backend::MonitorStorage};
 use std::sync::{
     Arc,
     atomic::{AtomicUsize, Ordering},
@@ -46,7 +46,7 @@ fn embedded_state_retains_its_containing_allocation_across_threads() {
 
 #[test]
 fn socket_monitor_state_preserves_its_resource_and_direction() {
-    use core_scheduler::{Interest, SocketMonitor};
+    use core_scheduler::{Interest, backend::SocketMonitor};
     let monitor = SocketMonitor::new(42, Interest::Readable, "registration");
     assert_eq!(*monitor.socket(), 42);
     assert_eq!(*monitor.registration(), "registration");
@@ -91,7 +91,9 @@ fn backend_retention_does_not_extend_application_handle_lifetime() {
 
 #[test]
 fn stream_state_projects_the_same_registration_without_allocating() {
-    use core_scheduler::{Interest, SocketMonitor, SocketMonitorState, SocketStreamMonitor};
+    use core_scheduler::{
+        Interest, backend::SocketMonitor, backend::SocketMonitorState, backend::SocketStreamMonitor,
+    };
     struct Registration(Arc<AtomicUsize>);
     impl MonitorState for Registration {
         fn acquire(&self) {

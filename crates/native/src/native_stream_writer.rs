@@ -2,9 +2,10 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::{NativeScheduler, Selector};
+use core_scheduler::backend::{SocketStreamOutput, SocketStreamOutputting};
 use core_scheduler::{
-    BufferPool, Cancellation, IoBuf, OperationError, OperationResult, SocketStreamOutput,
-    SocketStreamOutputting, SocketStreamWriter, SocketStreamWriting,
+    BufferPool, Cancellation, IoBuf, OperationError, OperationResult, SocketStreamWriter,
+    SocketStreamWriting,
 };
 use std::io;
 

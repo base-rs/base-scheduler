@@ -3,6 +3,7 @@
 
 //! Message assertions use both prepared packages and ordinary owned sequences.
 
+use core_scheduler::backend::*;
 use core_scheduler::*;
 use futures_lite::future::poll_once;
 use std::pin::pin;

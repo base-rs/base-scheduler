@@ -1,6 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
+use core_scheduler::backend::*;
 use core_scheduler::*;
 use futures_lite::future::{block_on, poll_once, zip};
 use std::{
@@ -473,4 +474,18 @@ fn abandoned_ordinary_file_operations_block_submission_until_retirement() {
         check!(file_reader, read_at, read_at_submit, 0);
         check!(file_writer, write_at, write_at_submit, 0);
     });
+}
+
+impl FileReading for Files {
+    type Reader<'scheduler> = BoundFileReader<'scheduler, Self>;
+    fn file_reader(&self, file: &Self::File) -> io::Result<Self::Reader<'_>> {
+        BoundFileReader::new(self, file)
+    }
+}
+
+impl FileWriting for Files {
+    type Writer<'scheduler> = BoundFileWriter<'scheduler, Self>;
+    fn file_writer(&self, file: &Self::File) -> io::Result<Self::Writer<'_>> {
+        BoundFileWriter::new(self, file)
+    }
 }

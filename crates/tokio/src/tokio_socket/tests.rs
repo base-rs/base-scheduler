@@ -117,7 +117,7 @@ fn transient_would_block_retries_with_the_requested_readiness_direction() {
             assert_eq!(&buffer, b"x");
             assert!(reads >= 2);
             // Confirm normal public operations still use the same registration.
-            use core_scheduler::{SocketClose, SocketWait};
+            use core_scheduler::{SocketClose, backend::SocketWait};
             scheduler
                 .socket_wait(&client, Interest::Writable, &Cancellation::never())
                 .await
@@ -132,6 +132,7 @@ fn transient_would_block_retries_with_the_requested_readiness_direction() {
 #[cfg(unix)]
 #[test]
 fn registration_is_deferred_until_waiting_and_reused_after_cancellation() {
+    use core_scheduler::backend::*;
     use core_scheduler::*;
     use futures_lite::future::{block_on, poll_once};
     use std::io::Write;
@@ -368,6 +369,7 @@ fn runtime_shutdown_wakes_both_reserved_and_concurrent_waiters() {
 #[cfg(unix)]
 #[test]
 fn established_stream_reads_only_retry_stale_readiness_once() {
+    use core_scheduler::backend::*;
     use core_scheduler::*;
     use futures_lite::future::{block_on, poll_once};
     use std::io::Write;
@@ -451,6 +453,7 @@ fn established_stream_reads_only_retry_stale_readiness_once() {
 #[cfg(unix)]
 #[test]
 fn full_peeking_and_datagram_reads_retain_readability() {
+    use core_scheduler::backend::*;
     use core_scheduler::*;
     use futures_lite::future::{block_on, poll_once};
     use std::io::Write;
@@ -525,6 +528,7 @@ fn full_peeking_and_datagram_reads_retain_readability() {
 #[cfg(target_os = "linux")]
 #[test]
 fn registered_listeners_still_report_invalid_read_errors_immediately() {
+    use core_scheduler::backend::*;
     use core_scheduler::*;
     use futures_lite::future::{block_on, poll_once};
     crate::test_support::run(|| {
@@ -564,6 +568,7 @@ fn registered_listeners_still_report_invalid_read_errors_immediately() {
 #[cfg(unix)]
 #[test]
 fn established_stream_empty_reads_do_not_require_reactor_progress() {
+    use core_scheduler::backend::*;
     use core_scheduler::*;
     use futures_lite::future::{block_on, poll_once};
     use std::io::Write;
@@ -654,6 +659,7 @@ fn wait_for_readable(socket: &TokioSocket) {
 #[cfg(unix)]
 #[test]
 fn datagrams_preserve_direct_syscall_behavior() {
+    use core_scheduler::backend::*;
     use core_scheduler::*;
     use futures_lite::future::block_on;
     let runtime = runtime();
@@ -696,6 +702,7 @@ fn datagrams_preserve_direct_syscall_behavior() {
 #[cfg(target_os = "linux")]
 #[test]
 fn urgent_tcp_boundary_keeps_trailing_bytes_readable() {
+    use core_scheduler::backend::*;
     use core_scheduler::*;
     use futures_lite::future::block_on;
     use std::io::Write;

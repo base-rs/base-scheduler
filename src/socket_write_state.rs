@@ -10,7 +10,6 @@ use std::{
 };
 
 /// Shared lifecycle support for task-backed stream writers. This is backend implementation support, not an application-facing writer.
-#[doc(hidden)]
 pub struct SocketWriteState<H> {
     pending: Option<H>,
     cancellation: Cancellation,

@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use crate::{MonitorState, SocketMonitor, SocketStreamMonitor};
+use crate::backend::{MonitorState, SocketMonitor, SocketStreamMonitor};
 
 mod private {
     pub trait Sealed {}
