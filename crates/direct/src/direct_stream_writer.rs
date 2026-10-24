@@ -152,13 +152,11 @@ async fn write_remaining<B: IoBuf>(
             {
                 let mut waiting = pin!(retry.wait(cancellation));
                 poll_fn(|context| {
-                    if let Poll::Ready(result) = waiting.as_mut().poll(context) {
-                        return Poll::Ready(result);
+                    // A retry pulse reports no I/O progress; it must not postpone an already requested stop.
+                    if stopped.as_mut().poll(context).is_ready() {
+                        return Poll::Ready(Err(core_scheduler::Cancelled.into()));
                     }
-                    stopped
-                        .as_mut()
-                        .poll(context)
-                        .map(|()| Err(core_scheduler::Cancelled.into()))
+                    waiting.as_mut().poll(context)
                 })
                 .await?;
             }
