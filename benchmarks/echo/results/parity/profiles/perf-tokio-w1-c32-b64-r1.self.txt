@@ -1,0 +1,100 @@
+# ========
+# captured on    : Sat Oct 24 17:11:03 2026
+# header version : 1
+# data offset    : 520
+# data size      : 50210392
+# feat offset    : 50210912
+# hostname : aiko
+# os release : 7.2.8-arch1-2
+# perf version : 7.2.8-2
+# arch : x86_64
+# nrcpus online : 32
+# nrcpus avail : 32
+# cpudesc : AMD Ryzen 9 9950X3D 16-Core Processor
+# cpuid : AuthenticAMD,26,68,0
+# total memory : 48436228 kB
+# cmdline : /usr/bin/perf 
+# event : name = cycles:u, , id = { 5236, 5237, 5238, 5239, 5240, 5241, 5242, 5243, 5244, 5245, 5246, 5247, 5248, 5249, 5250, 5251, 5252, 5253, 5254, 5255, 5256, 5257, 5258, 5259, 5260, 5261, 5262, 5263, 5264, 5265, 5266, 5267 }, type = 0 (PERF_TYPE_HARDWARE), size = 144, config = 0 (PERF_COUNT_HW_CPU_CYCLES), { sample_period, sample_freq } = 999, sample_type = IP|TID|TIME|CALLCHAIN|PERIOD|REGS_USER|STACK_USER, read_format = ID|LOST, disabled = 1, inherit = 1, exclude_kernel = 1, exclude_hv = 1, mmap = 1, comm = 1, freq = 1, enable_on_exec = 1, task = 1, mmap_data = 1, sample_id_all = 1, exclude_callchain_user = 1, mmap2 = 1, comm_exec = 1, ksymbol = 1, bpf_event = 1, build_id = 1, sample_regs_user = 0xff0fff, sample_stack_user = 8192
+# CPU_TOPOLOGY info available, use -I to display
+# NUMA_TOPOLOGY info available, use -I to display
+# pmu mappings: cpu = 4, amd_iommu_0 = 12, breakpoint = 5, drm_amdgpu = 4294836224, hwmon_amdgpu = 4294901762, hwmon_asus = 4294901769, hwmon_asusec = 4294901765, hwmon_eno2 = 4294901768, hwmon_iwlwifi_1 = 4294901770, hwmon_k10temp = 4294901764, hwmon_nct6799 = 4294901763, hwmon_nvme = 4294901760, hwmon_nvme = 4294901761, hwmon_spd5118 = 4294901766, hwmon_spd5118 = 4294901767, ibs_fetch = 10, ibs_op = 11, kprobe = 8, msr = 13, power = 14, power_core = 15, software = 1, tool = 4294967294, tracepoint = 2, uprobe = 9
+# CACHE info available, use -I to display
+# time of first sample : 64045.863660
+# time of last sample : 64051.867118
+# sample duration :   6003.458 ms
+# MEM_TOPOLOGY info available, use -I to display
+# bpf_prog_info empty
+# btf info empty
+# cpu pmu capabilities: branches=16, max_precise=0
+# ibs_fetch pmu capabilities: zen4_ibs_extensions=1
+# ibs_op pmu capabilities: zen4_ibs_extensions=1, ldlat=1, dtlb_pgsize=1
+# AMD systems uses ibs_op// PMU for some precise events, e.g.: cycles:p, see the 'perf list' man page for further details.
+# CPU_DOMAIN_INFO info available, use -I to display
+# e_machine : 62
+#   e_flags : 0
+# cacheline size: 64
+# missing features: TRACING_DATA BUILD_ID BRANCH_STACK GROUP_DESC AUXTRACE STAT CLOCKID DIR_FORMAT COMPRESSED CLOCK_DATA HYBRID_TOPOLOGY 
+# ========
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 5K of event 'cycles:u'
+# Event count (approx.): 2830590880
+#
+# Overhead       Samples  Symbol                                                                                                                                                                                                        IPC   [IPC Coverage]
+# ........  ............  ............................................................................................................................................................................................................  ....................
+#
+    16.17%           966  [.] <tokio::runtime::io::scheduled_io::ScheduledIo>::poll_readiness                                                                                                                                           -      -            
+    10.42%           623  [k] 0xffffffff93200080                                                                                                                                                                                        -      -            
+     9.72%           583  [.] tokio::runtime::task::waker::wake_by_val                                                                                                                                                                  -      -            
+     7.41%           442  [.] <tokio::runtime::scheduler::multi_thread::worker::Context>::run                                                                                                                                           -      -            
+     6.45%           387  [.] <tokio::runtime::io::scheduled_io::ScheduledIo>::wake                                                                                                                                                     -      -            
+     5.97%           354  [.] <tokio::runtime::task::state::State>::transition_to_idle                                                                                                                                                  -      -            
+     5.47%           325  [k] 0xffffffff93a0ded6                                                                                                                                                                                        -      -            
+     4.61%           276  [.] <tokio::runtime::task::state::State>::transition_to_running                                                                                                                                               -      -            
+     4.30%           258  [.] <tokio::runtime::io::driver::Driver>::turn                                                                                                                                                                -      -            
+     4.19%           252  [.] <tokio::runtime::task::state::State>::transition_to_notified_by_val                                                                                                                                       -      -            
+     4.10%           244  [.] tokio::runtime::task::waker::clone_waker                                                                                                                                                                  -      -            
+     3.30%           196  [.] <tokio::net::tcp::stream::TcpStream>::poll_read_priv                                                                                                                                                      -      -            
+     1.82%           109  [.] __vdso_clock_gettime                                                                                                                                                                                      -      -            
+     0.90%            54  [.] <tokio::runtime::scheduler::multi_thread::worker::Context>::park_internal                                                                                                                                 -      -            
+     0.90%            53  [.] <tokio::runtime::time::handle::Handle>::process_at_time                                                                                                                                                   -      -            
+     0.80%            47  [.] <tokio::runtime::scheduler::multi_thread::worker::Context>::run_task                                                                                                                                      -      -            
+     0.78%            47  [k] 0xffffffff93a0de44                                                                                                                                                                                        -      -            
+     0.68%            40  [.] <tokio::runtime::scheduler::multi_thread::worker::Core>::maintenance                                                                                                                                      -      -            
+     0.58%            34  [.] <tokio::runtime::time::Driver>::park_internal                                                                                                                                                             -      -            
+     0.58%            34  [k] 0xffffffff934aae30                                                                                                                                                                                        -      -            
+     0.55%            33  [k] 0xffffffff9478cac1                                                                                                                                                                                        -      -            
+     0.53%            32  [.] <tokio::runtime::scheduler::multi_thread::idle::Idle>::worker_to_notify                                                                                                                                   -      -            
+     0.45%            27  [.] 0x00000000000936a0                                                                                                                                                                                        -      -            
+     0.42%            25  [k] 0xffffffff932000ab                                                                                                                                                                                        -      -            
+     0.35%            21  [k] 0xffffffff9320008f                                                                                                                                                                                        -      -            
+     0.31%            18  [k] 0xffffffff932000ad                                                                                                                                                                                        -      -            
+     0.28%            17  [k] 0xffffffff93200087                                                                                                                                                                                        -      -            
+     0.27%            16  [k] 0xffffffff93ea87af                                                                                                                                                                                        -      -            
+     0.27%            16  [k] 0xffffffff9478ca85                                                                                                                                                                                        -      -            
+     0.26%            16  [k] 0xffffffff9478ca79                                                                                                                                                                                        -      -            
+     0.25%            15  [k] 0xffffffff93a0de58                                                                                                                                                                                        -      -            
+     0.24%            14  [k] 0xffffffff94471118                                                                                                                                                                                        -      -            
+     0.24%            14  [k] 0xffffffff93a0dec8                                                                                                                                                                                        -      -            
+     0.23%            14  [.] <std::sync::poison::mutex::Mutex<core::option::Option<alloc::collections::vec_deque::VecDeque<tokio::runtime::task::Notified<alloc::sync::Arc<tokio::task::local::Shared>>>>>>::lock                      -      -            
+     0.20%            12  [.] <tokio::runtime::io::registration::Registration>::poll_ready                                                                                                                                              -      -            
+     0.17%            10  [.] <tokio::net::tcp::stream::TcpStream as tokio::io::async_read::AsyncRead>::poll_read                                                                                                                       -      -            
+     0.16%            10  [k] 0xffffffff94470dfd                                                                                                                                                                                        -      -            
+     0.13%             8  [.] 0x00000000000936da                                                                                                                                                                                        -      -            
+     0.13%             8  [k] 0xffffffff93a0de51                                                                                                                                                                                        -      -            
+     0.13%             8  [k] 0xffffffff94470d8e                                                                                                                                                                                        -      -            
+     0.13%             8  [k] 0xffffffff934aafee                                                                                                                                                                                        -      -            
+     0.12%             7  [k] 0xffffffff93200084                                                                                                                                                                                        -      -            
+     0.12%             7  [k] 0xffffffff94470fd9                                                                                                                                                                                        -      -            
+     0.12%             7  [k] 0xffffffff94471198                                                                                                                                                                                        -      -            
+     0.12%             7  [k] 0xffffffff944710e6                                                                                                                                                                                        -      -            
+     0.11%             6  [k] 0xffffffff93ea3a03                                                                                                                                                                                        -      -            
+     0.10%             6  [.] clock_gettime                                                                                                                                                                                             -      -            
+     0.10%             6  [k] 0xffffffff94470d9e                                                                                                                                                                                        -      -            
+
+
+#
+# (Tip: Save output of perf stat using: perf stat record <target workload>)
+#

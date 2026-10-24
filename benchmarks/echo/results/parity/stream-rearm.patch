@@ -1,0 +1,277 @@
+diff --git a/crates/iouring/src/io_uring_selector.rs b/crates/iouring/src/io_uring_selector.rs
+index d6043f5..b52ced8 100644
+--- a/crates/iouring/src/io_uring_selector.rs
++++ b/crates/iouring/src/io_uring_selector.rs
+@@ -466,6 +466,7 @@ pub(crate) struct DriverGroup {
+     controllers: OnceLock<Vec<Weak<Controller>>>,
+     fallback: Arc<ReadinessSelector>,
+     closed: AtomicBool,
++    stream_rearm: bool,
+ }
+ impl DriverGroup {
+     pub(crate) fn close(&self) {
+@@ -519,6 +520,7 @@ impl IoUringSelector {
+             controllers: OnceLock::new(),
+             fallback: Arc::clone(&fallback),
+             closed: AtomicBool::new(false),
++            stream_rearm: std::env::var_os("CORE_SCHEDULER_STREAM_REARM").is_some(),
+         });
+         let mut controllers = Vec::with_capacity(workers);
+         let mut drivers = Vec::with_capacity(workers);
+@@ -546,7 +548,13 @@ impl IoUringSelector {
+         group: Arc<DriverGroup>,
+         worker: usize,
+     ) -> io::Result<IoUringDriver> {
+-        let ring = syscall("ring", || IoUring::new(options.entries))?;
++        let ring = syscall("ring", || {
++            let mut builder = IoUring::builder();
++            if std::env::var("CORE_SCHEDULER_TASKWORK").as_deref() == Ok("cooperative") {
++                builder.setup_coop_taskrun().setup_taskrun_flag();
++            }
++            builder.build(options.entries)
++        })?;
+         syscall("completion-support", || {
+             validate_completion_support(
+                 ring.params().is_feature_nodrop(),
+@@ -1289,7 +1297,9 @@ impl Reactor {
+         if return_to_executor {
+             let needs_submit = {
+                 let submissions = self.ring.submission();
+-                (!submissions.is_empty() && !defer_submission) || submissions.cq_overflow()
++                (!submissions.is_empty() && !defer_submission)
++                    || submissions.cq_overflow()
++                    || submissions.taskrun()
+             };
+             if needs_submit {
+                 let before = self
+diff --git a/crates/iouring/src/io_uring_selector/monitor.rs b/crates/iouring/src/io_uring_selector/monitor.rs
+index 9bfeb09..d23698d 100644
+--- a/crates/iouring/src/io_uring_selector/monitor.rs
++++ b/crates/iouring/src/io_uring_selector/monitor.rs
+@@ -21,6 +21,8 @@ pub struct IoUringMonitorRegistration {
+     claimed: AtomicBool,
+     readiness: AtomicU64,
+     multishot: AtomicBool,
++    stream_rearm: bool,
++    poll_first: AtomicBool,
+     status: Arc<Mutex<Status>>,
+ }
+ #[derive(Default)]
+@@ -275,6 +277,7 @@ impl IoUringSelector {
+         monitor: &MonitorStorage<M>,
+         interest: Interest,
+         cancellation: &Cancellation,
++        poll_first: bool,
+         mut operation: impl FnMut(&NativeSocket) -> io::Result<T> + Send,
+     ) -> OperationResult<T> {
+         let state = monitor.as_ref();
+@@ -286,6 +289,19 @@ impl IoUringSelector {
+                 cancellation.check()?;
+                 self.check_monitor(state)?;
+                 state.check_interest(interest)?;
++                if poll_first
++                    && registration.poll_first.load(Ordering::Acquire)
++                    && registration.readiness.load(Ordering::Acquire) & READY == 0
++                {
++                    if wait.is_none() {
++                        wait = Some((Wait::claim(state)?, self.route()));
++                    }
++                    if cancelled.as_mut().poll(context).is_ready() {
++                        return Poll::Ready(Err(core_scheduler::Cancelled.into()));
++                    }
++                    let (_, controller) = wait.as_ref().unwrap();
++                    std::task::ready!(self.poll_monitor_wait(monitor, controller, context))?;
++                }
+                 let readiness = registration.readiness.load(Ordering::Acquire);
+                 match operation(state.socket()) {
+                     Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+@@ -328,11 +344,33 @@ impl SocketMonitoring for IoUringSelector {
+                 closed: AtomicBool::new(false),
+                 readiness: AtomicU64::new(0),
+                 multishot: AtomicBool::new(true),
++                stream_rearm: false,
++                poll_first: AtomicBool::new(false),
+                 claimed: AtomicBool::new(false),
+                 status: Arc::new(Mutex::new(Status::default())),
+             },
+         ))
+     }
++    fn socket_stream_monitor_state(
++        &self,
++        socket: &NativeSocket,
++        interest: Interest,
++    ) -> io::Result<SocketStreamMonitor<NativeSocket, IoUringMonitorRegistration>> {
++        let monitor = self.socket_monitor_state(socket, interest)?;
++        let (socket, mut registration) = monitor.into_parts();
++        if self.group.stream_rearm
++            && interest == Interest::Readable
++            && super::socket::retain_socket(&socket).get_ref().r#type()? == socket2::Type::STREAM
++        {
++            registration.stream_rearm = true;
++            registration.multishot.store(false, Ordering::Relaxed);
++        }
++        Ok(SocketStreamMonitor::new(SocketMonitor::new(
++            socket,
++            interest,
++            registration,
++        )))
++    }
+     async fn socket_monitor_wait<
+         M: SocketMonitorState<NativeSocket, IoUringMonitorRegistration>,
+     >(
+@@ -359,8 +397,26 @@ impl SocketMonitoring for IoUringSelector {
+         flags: SocketRecvFlags,
+         cancellation: &Cancellation,
+     ) -> OperationResult<usize> {
+-        self.monitor_io(monitor, Interest::Readable, cancellation, |socket| {
+-            syscall("monitor-recv", || socket.try_recv(buffer, flags))
++        let registration = monitor.as_ref().registration();
++        let rearm = M::STREAM && registration.stream_rearm && !buffer.is_empty() && !flags.peek;
++        self.monitor_io(monitor, Interest::Readable, cancellation, rearm, |socket| {
++            let observed = if rearm {
++                registration.readiness.load(Ordering::Acquire)
++            } else {
++                0
++            };
++            let result = syscall("monitor-recv", || socket.try_recv(buffer, flags));
++            if rearm {
++                if let Ok(count) = result {
++                    let short = count != 0 && count < buffer.len();
++                    registration.poll_first.store(short, Ordering::Release);
++                    if short {
++                        // A fresh one-shot arm checks current level readiness, including bytes after a TCP urgent-data boundary.
++                        registration.clear_readiness(observed);
++                    }
++                }
++            }
++            result
+         })
+         .await
+     }
+@@ -373,7 +429,7 @@ impl SocketMonitoring for IoUringSelector {
+         flags: SocketSendFlags,
+         cancellation: &Cancellation,
+     ) -> OperationResult<usize> {
+-        self.monitor_io(monitor, Interest::Writable, cancellation, |socket| {
++        self.monitor_io(monitor, Interest::Writable, cancellation, false, |socket| {
+             socket.try_send(buffer, flags)
+         })
+         .await
+@@ -387,7 +443,7 @@ impl SocketMonitoring for IoUringSelector {
+         flags: SocketRecvFlags,
+         cancellation: &Cancellation,
+     ) -> OperationResult<SocketRecvResult> {
+-        self.monitor_io(monitor, Interest::Readable, cancellation, |socket| {
++        self.monitor_io(monitor, Interest::Readable, cancellation, false, |socket| {
+             socket.try_recvmsg(buffers, flags)
+         })
+         .await
+@@ -402,7 +458,7 @@ impl SocketMonitoring for IoUringSelector {
+         flags: SocketSendFlags,
+         cancellation: &Cancellation,
+     ) -> OperationResult<usize> {
+-        self.monitor_io(monitor, Interest::Writable, cancellation, |socket| {
++        self.monitor_io(monitor, Interest::Writable, cancellation, false, |socket| {
+             socket.try_sendmsg(buffers, address, flags)
+         })
+         .await
+diff --git a/crates/iouring/src/io_uring_selector/monitor/tests.rs b/crates/iouring/src/io_uring_selector/monitor/tests.rs
+index 3177928..0b1abf1 100644
+--- a/crates/iouring/src/io_uring_selector/monitor/tests.rs
++++ b/crates/iouring/src/io_uring_selector/monitor/tests.rs
+@@ -928,16 +928,17 @@ fn interrupted_syscalls_retry_and_observe_cancellation_and_closure() {
+         .unwrap();
+     let never = Cancellation::never();
+     let mut attempts = 0;
+-    let mut operation = Box::pin(
+-        selector.monitor_io(&writer, Interest::Writable, &never, |_| {
+-            attempts += 1;
+-            match attempts {
+-                1 => Err(io::ErrorKind::Interrupted.into()),
+-                2 => Err(io::ErrorKind::WouldBlock.into()),
+-                _ => Ok(7),
+-            }
+-        }),
+-    );
++    let mut operation =
++        Box::pin(
++            selector.monitor_io(&writer, Interest::Writable, &never, false, |_| {
++                attempts += 1;
++                match attempts {
++                    1 => Err(io::ErrorKind::Interrupted.into()),
++                    2 => Err(io::ErrorKind::WouldBlock.into()),
++                    _ => Ok(7),
++                }
++            }),
++        );
+     assert_eq!(
+         drive(&mut worker, &mut context, operation.as_mut()).unwrap(),
+         7
+@@ -945,12 +946,16 @@ fn interrupted_syscalls_retry_and_observe_cancellation_and_closure() {
+     drop(operation);
+     let cancellation = Cancellation::new();
+     assert!(matches!(
+-        block_on(
+-            selector.monitor_io::<(), _>(&writer, Interest::Writable, &cancellation, |_| {
++        block_on(selector.monitor_io::<(), _>(
++            &writer,
++            Interest::Writable,
++            &cancellation,
++            false,
++            |_| {
+                 cancellation.cancel();
+                 Err(io::ErrorKind::Interrupted.into())
+-            })
+-        ),
++            }
++        )),
+         Err(OperationError::Cancelled(_))
+     ));
+     for kind in [io::ErrorKind::Interrupted, io::ErrorKind::WouldBlock] {
+@@ -960,12 +965,16 @@ fn interrupted_syscalls_retry_and_observe_cancellation_and_closure() {
+             .socket_monitor(&socket, Interest::Writable)
+             .unwrap();
+         assert_eq!(
+-            block_on(
+-                selector.monitor_io::<(), _>(&writer, Interest::Writable, &never, |_| {
++            block_on(selector.monitor_io::<(), _>(
++                &writer,
++                Interest::Writable,
++                &never,
++                false,
++                |_| {
+                     selector.close();
+                     Err(kind.into())
+-                })
+-            )
++                }
++            ))
+             .unwrap_err()
+             .kind(),
+             io::ErrorKind::BrokenPipe
+@@ -1015,8 +1024,12 @@ fn cached_readiness_survives_success_and_newer_notifications_survive_would_block
+     let before = inspect.registration().readiness.load(Ordering::Acquire);
+     let mut attempts = 0;
+     assert_eq!(
+-        block_on(
+-            selector.monitor_io(&writer, Interest::Writable, &Cancellation::never(), |_| {
++        block_on(selector.monitor_io(
++            &writer,
++            Interest::Writable,
++            &Cancellation::never(),
++            false,
++            |_| {
+                 attempts += 1;
+                 if attempts == 1 {
+                     // A notification racing the syscall's EAGAIN must not be cleared using the older readiness tick.
+@@ -1025,8 +1038,8 @@ fn cached_readiness_survives_success_and_newer_notifications_survive_would_block
+                 } else {
+                     Ok(5)
+                 }
+-            })
+-        )
++            }
++        ))
+         .unwrap(),
+         5
+     );

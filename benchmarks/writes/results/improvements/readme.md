@@ -1,5 +1,7 @@
 # Reducing ordered writer overhead
 
+The ordinary task-work policy measured here was subsequently withdrawn after [fresh Tokio parity controls](../../../echo/parity.md) showed a substantial regression in concurrent borrowed-monitor traffic. Production restores cooperative delivery for unused thread-bound worker rings. The cancellation allocation reductions remain; the ordinary-delivery kernel-entry and throughput results below describe the archived experiment.
+
 This follow-up keeps the writer's ownership, ordering, cancellation and submission acknowledgement contracts. It removes unnecessary cancellation setup and changes worker rings to ordinary kernel completion delivery.
 
 ## Changes

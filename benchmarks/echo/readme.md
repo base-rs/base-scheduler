@@ -8,6 +8,8 @@ The [initial Aiko results](results.md) include throughput, latency, variation ac
 
 The [Native monitor polling investigation](native-monitor.md) measures syscall-first resumption and records the rejected monitor-bookkeeping and ring-send experiments.
 
+The [fresh Tokio parity controls](parity.md) identify the concurrent monitor regression from ordinary ring task-work delivery, confirm the production-safe cooperative restoration, and reject one-shot rearming as a default.
+
 The [Tokio future-construction comparison](tokio-future-construction.md) measures eliminating intermediate operation-state copies while preserving cancellation and readiness behavior.
 
 The [performance investigation](profiling.md) compares compiler settings, identifies CPU and syscall costs, and measures isolated optimization prototypes.
