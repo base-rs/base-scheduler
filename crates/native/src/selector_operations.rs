@@ -775,3 +775,78 @@ impl<S: Selector + BufferPooling> BufferPooling for NativeScheduler<S> {
         self.selector().buffer_pool(options)
     }
 }
+
+impl<S: Selector + SocketStreamReading> SocketStreamReading for NativeScheduler<S>
+where
+    S::Socket: 'static,
+{
+    fn socket_stream_reader<'scheduler>(
+        &'scheduler self,
+        socket: &Self::Socket,
+    ) -> io::Result<impl SocketStreamReader<Buffer = <Self::Pool as BufferPool>::Buffer> + 'scheduler>
+    where
+        Self::Socket: 'static,
+    {
+        self.selector().socket_stream_reader(socket)
+    }
+
+    fn socket_stream_reader_with_pool<'scheduler>(
+        &'scheduler self,
+        socket: &Self::Socket,
+        pool: Self::Pool,
+    ) -> io::Result<impl SocketStreamReader<Buffer = <Self::Pool as BufferPool>::Buffer> + 'scheduler>
+    where
+        Self::Socket: 'static,
+    {
+        self.selector().socket_stream_reader_with_pool(socket, pool)
+    }
+}
+
+impl<S: Selector + SocketPacketReading> SocketPacketReading for NativeScheduler<S>
+where
+    S::Socket: 'static,
+{
+    fn socket_packet_reader<'scheduler>(
+        &'scheduler self,
+        socket: &Self::Socket,
+    ) -> io::Result<
+        impl SocketPacketReader<
+            Message: SocketRecvMessageMut<Payload = <Self::Pool as BufferPool>::Buffer>,
+        > + 'scheduler,
+    >
+    where
+        Self::Socket: 'static,
+    {
+        self.selector().socket_packet_reader(socket)
+    }
+
+    fn socket_packet_reader_with_pool<'scheduler>(
+        &'scheduler self,
+        socket: &Self::Socket,
+        pool: Self::Pool,
+    ) -> io::Result<
+        impl SocketPacketReader<
+            Message: SocketRecvMessageMut<Payload = <Self::Pool as BufferPool>::Buffer>,
+        > + 'scheduler,
+    >
+    where
+        Self::Socket: 'static,
+    {
+        self.selector().socket_packet_reader_with_pool(socket, pool)
+    }
+}
+
+impl<S: Selector + SocketPacketWriting> SocketPacketWriting for NativeScheduler<S>
+where
+    S::Socket: 'static,
+{
+    fn socket_packet_writer<'scheduler>(
+        &'scheduler self,
+        socket: &Self::Socket,
+    ) -> io::Result<impl SocketPacketWriter + 'scheduler>
+    where
+        Self::Socket: 'static,
+    {
+        self.selector().socket_packet_writer(socket)
+    }
+}

@@ -342,8 +342,7 @@ fn custom_pools_backpressure_and_outstanding_packets_survive_replacement() {
         let scheduler = Scheduler::default();
         let socket = Socket::new(SocketType::Datagram);
         let old_pool = TestPool(HeapBufferPool::new(1, 4).unwrap());
-        let mut reader = scheduler
-            .socket_packet_reader(&socket)
+        let mut reader = BoundSocketPacketReader::new(&scheduler, &socket)
             .unwrap()
             .with_pool(old_pool.clone());
         socket.packet(b"first");
@@ -378,9 +377,8 @@ fn idle_owned_reads_return_the_lease_before_waiting_and_survive_cancellation() {
         let socket = Socket::new(SocketType::Datagram);
         let pool = TestPool(HeapBufferPool::new(1, 8).unwrap());
         let mut reader = scheduler
-            .socket_packet_reader(&socket)
-            .unwrap()
-            .with_pool(pool.clone());
+            .socket_packet_reader_with_pool(&socket, pool.clone())
+            .unwrap();
         let cancellation = Cancellation::new();
         {
             let mut reading = pin!(reader.read(&cancellation));
@@ -561,5 +559,311 @@ fn abandoned_and_failed_close_prevent_further_packet_io_but_allow_cleanup_retrie
         writer.close().await.unwrap();
         reader.close().await.unwrap();
         writer.close().await.unwrap();
+    });
+}
+
+impl SocketPacketReading for Scheduler {}
+impl SocketPacketWriting for Scheduler {}
+
+#[test]
+fn opaque_packet_handles_retain_the_resource_without_borrowing_its_input_reference() {
+    block_on(async {
+        let scheduler = Scheduler::default();
+        let mut reader = {
+            let socket = Socket::new(SocketType::Datagram);
+            socket.packet(b"retained");
+            scheduler.socket_packet_reader(&socket).unwrap()
+        };
+        assert_eq!(
+            reader
+                .read(&Cancellation::never())
+                .await
+                .unwrap()
+                .unwrap()
+                .payload(),
+            b"retained"
+        );
+        reader.close().await.unwrap();
+        let mut writer = {
+            let socket = Socket::new(SocketType::Datagram);
+            scheduler.socket_packet_writer(&socket).unwrap()
+        };
+        assert_eq!(
+            writer
+                .write(b"retained", None, &Cancellation::never())
+                .await
+                .unwrap(),
+            8
+        );
+        writer.close().await.unwrap();
+    });
+}
+
+// A backend can retain native metadata and replace the monitor composition without changing protocol code.
+struct NativeAddress {
+    port: u16,
+    scope: u32,
+}
+impl SocketAddressView for NativeAddress {
+    fn to_socket_address(&self) -> SocketAddress {
+        std::net::SocketAddrV6::new(std::net::Ipv6Addr::LOCALHOST, self.port, 7, self.scope).into()
+    }
+}
+struct NativeMessage {
+    address: NativeAddress,
+    payload: <TestPool as BufferPool>::Buffer,
+}
+impl SocketRecvMessage for NativeMessage {
+    type Payload = <TestPool as BufferPool>::Buffer;
+    fn address(&self) -> Option<impl SocketAddressView + '_> {
+        Some(&self.address)
+    }
+    fn payload(&self) -> &[u8] {
+        self.payload.as_ref()
+    }
+    fn truncated(&self) -> bool {
+        false
+    }
+    fn control_truncated(&self) -> bool {
+        false
+    }
+    fn into_payload(self) -> Self::Payload {
+        self.payload
+    }
+}
+impl SocketRecvMessageMut for NativeMessage {
+    fn payload_mut(&mut self) -> &mut [u8] {
+        self.payload.as_mut()
+    }
+}
+struct Specialized(Scheduler);
+impl SocketOperation for Specialized {
+    type Socket = Arc<Socket>;
+}
+impl BufferPooling for Specialized {
+    type Pool = TestPool;
+    fn buffer_pool(&self, options: BufferPoolOptions) -> io::Result<TestPool> {
+        self.0.buffer_pool(options)
+    }
+}
+impl SocketRecvPoll for Specialized {
+    async fn socket_recv_poll(
+        &self,
+        _: &Arc<Socket>,
+        _: &mut [u8],
+        _: SocketRecvFlags,
+        _: &Cancellation,
+    ) -> OperationResult<usize> {
+        panic!("specialized reader must bypass raw polling")
+    }
+}
+impl SocketSendPoll for Specialized {
+    async fn socket_send_poll(
+        &self,
+        _: &Arc<Socket>,
+        _: &[u8],
+        _: SocketSendFlags,
+        _: &Cancellation,
+    ) -> OperationResult<usize> {
+        panic!("specialized reader does not send")
+    }
+}
+impl SocketRecvMsgPoll for Specialized {
+    async fn socket_recvmsg_poll(
+        &self,
+        _: &Arc<Socket>,
+        _: &mut [IoSliceMut<'_>],
+        _: SocketRecvFlags,
+        _: &Cancellation,
+    ) -> OperationResult<SocketRecvResult> {
+        panic!("specialized reader must bypass raw polling")
+    }
+}
+impl SocketSendMsgPoll for Specialized {
+    async fn socket_sendmsg_poll(
+        &self,
+        _: &Arc<Socket>,
+        _: &[IoSlice<'_>],
+        _: Option<SocketAddress>,
+        _: SocketSendFlags,
+        _: &Cancellation,
+    ) -> OperationResult<usize> {
+        panic!("specialized reader does not send")
+    }
+}
+impl SocketWait for Specialized {
+    async fn socket_wait(
+        &self,
+        _: &Arc<Socket>,
+        _: Interest,
+        _: &Cancellation,
+    ) -> OperationResult<()> {
+        panic!("specialized reader must bypass raw readiness")
+    }
+}
+impl SocketMonitoring for Specialized {
+    type MonitorRegistration = ();
+    fn socket_type(&self, _: &Arc<Socket>) -> io::Result<SocketType> {
+        panic!("specialized factory validates its own resource")
+    }
+    fn socket_monitor_state(
+        &self,
+        _: &Arc<Socket>,
+        _: Interest,
+    ) -> io::Result<SocketMonitor<Arc<Socket>, ()>> {
+        panic!("specialized factory must not construct a monitor")
+    }
+}
+struct NativeReader<'a> {
+    scheduler: &'a Specialized,
+    pool: Option<TestPool>,
+    closed: bool,
+}
+impl SocketPacketReader for NativeReader<'_> {
+    type Message = NativeMessage;
+    async fn read(
+        &mut self,
+        cancellation: &Cancellation,
+    ) -> OperationResult<Option<NativeMessage>> {
+        cancellation.check()?;
+        if self.closed {
+            return Ok(None);
+        }
+        if self.pool.is_none() {
+            self.pool = Some(self.scheduler.buffer_pool(BufferPoolOptions::new(1, 16))?);
+        }
+        let mut payload = self.pool.as_ref().unwrap().acquire(cancellation).await?;
+        payload.as_mut()[..6].copy_from_slice(b"native");
+        payload.truncate(6);
+        Ok(Some(NativeMessage {
+            address: NativeAddress {
+                port: 4567,
+                scope: 9,
+            },
+            payload,
+        }))
+    }
+    async fn read_into(
+        &mut self,
+        buffer: &mut [u8],
+        cancellation: &Cancellation,
+    ) -> OperationResult<SocketRecvResult> {
+        self.read_vectored(&mut [IoSliceMut::new(buffer)], cancellation)
+            .await
+    }
+    async fn read_vectored(
+        &mut self,
+        buffers: &mut [IoSliceMut<'_>],
+        cancellation: &Cancellation,
+    ) -> OperationResult<SocketRecvResult> {
+        cancellation.check()?;
+        let mut bytes = 0;
+        for buffer in buffers {
+            let count = buffer.len().min(6 - bytes);
+            buffer[..count].copy_from_slice(&b"native"[bytes..bytes + count]);
+            bytes += count;
+        }
+        Ok(SocketRecvResult {
+            bytes,
+            address: Some(
+                NativeAddress {
+                    port: 4567,
+                    scope: 9,
+                }
+                .to_socket_address(),
+            ),
+            truncated: bytes < 6,
+            control_truncated: false,
+        })
+    }
+    async fn close(&mut self) -> io::Result<()> {
+        self.closed = true;
+        // This borrow makes the scheduler lifetime part of the replacement handle as well.
+        assert_eq!(self.scheduler.0.pools.load(Ordering::Relaxed), 1);
+        Ok(())
+    }
+}
+impl SocketPacketReading for Specialized {
+    fn socket_packet_reader<'scheduler>(
+        &'scheduler self,
+        socket: &Self::Socket,
+    ) -> io::Result<
+        impl SocketPacketReader<
+            Message: SocketRecvMessageMut<Payload = <Self::Pool as BufferPool>::Buffer>,
+        > + 'scheduler,
+    > {
+        assert_eq!(socket.kind, SocketType::Datagram);
+        Ok(NativeReader {
+            scheduler: self,
+            pool: None,
+            closed: false,
+        })
+    }
+    fn socket_packet_reader_with_pool<'scheduler>(
+        &'scheduler self,
+        socket: &Self::Socket,
+        pool: Self::Pool,
+    ) -> io::Result<
+        impl SocketPacketReader<
+            Message: SocketRecvMessageMut<Payload = <Self::Pool as BufferPool>::Buffer>,
+        > + 'scheduler,
+    > {
+        assert_eq!(socket.kind, SocketType::Datagram);
+        Ok(NativeReader {
+            scheduler: self,
+            pool: Some(pool),
+            closed: false,
+        })
+    }
+}
+
+#[test]
+fn packet_factory_specialization_preserves_native_metadata_and_owned_payload() {
+    block_on(async {
+        let scheduler = Specialized(Scheduler::default());
+        let socket = Socket::new(SocketType::Datagram);
+        let never = Cancellation::never();
+        let mut reader = scheduler.socket_packet_reader(&socket).unwrap();
+        assert_eq!(scheduler.0.pools.load(Ordering::Relaxed), 0);
+        let mut message = reader.read(&never).await.unwrap().unwrap();
+        assert_eq!(message.payload(), b"native");
+        let endpoint = message.address().unwrap().to_socket_address();
+        assert_eq!(endpoint.port(), 4567);
+        assert!(
+            matches!(endpoint, SocketAddress::V6(address) if address.scope_id() == 9 && address.flowinfo() == 7)
+        );
+        message.payload_mut()[0] = b'N';
+        let mut held = message.into_payload().freeze();
+        assert_eq!(held.as_ref(), b"Native");
+        reader.close().await.unwrap();
+        assert!(reader.read(&never).await.unwrap().is_none());
+        drop(reader);
+        held = std::thread::spawn(move || {
+            assert_eq!(held.as_ref(), b"Native");
+            held
+        })
+        .join()
+        .unwrap();
+        drop(held);
+        let pool = TestPool(HeapBufferPool::new(1, 16).unwrap());
+        let mut reader = scheduler
+            .socket_packet_reader_with_pool(&socket, pool.clone())
+            .unwrap();
+        let mut bytes = [0; 6];
+        assert_eq!(reader.read_into(&mut bytes, &never).await.unwrap().bytes, 6);
+        assert_eq!(&bytes, b"native");
+        assert_eq!(
+            reader
+                .read_vectored(&mut [IoSliceMut::new(&mut bytes[..2])], &never)
+                .await
+                .unwrap()
+                .bytes,
+            2
+        );
+        let message = reader.read(&never).await.unwrap().unwrap();
+        reader.close().await.unwrap();
+        assert!(pool.try_acquire().is_none());
+        drop(message);
+        assert!(pool.try_acquire().is_some());
     });
 }

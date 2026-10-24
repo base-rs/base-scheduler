@@ -401,7 +401,7 @@ fn bound_stream_reader_preserves_borrowing_eof_and_owned_chunks() {
     block_on(async {
         let socket = Arc::new(AtomicUsize::new(1));
         let never = Cancellation::never();
-        let mut reader = Sockets.socket_stream_reader(&socket).unwrap();
+        let mut reader = BoundSocketStreamReader::new(&Sockets, &socket).unwrap();
         assert_eq!(reader.read_into(&mut [], &never).await.unwrap(), 0);
         let mut bytes = [0; 4];
         assert_eq!(reader.read_into(&mut bytes, &never).await.unwrap(), 4);
@@ -468,9 +468,8 @@ fn bound_stream_reader_returns_idle_capacity_and_retries_cancelled_waits() {
         let never = Cancellation::never();
         let pool = HeapBufferPool::new(1, 8).unwrap();
         let mut reader = Sockets
-            .socket_stream_reader(&socket)
-            .unwrap()
-            .with_pool(pool.clone());
+            .socket_stream_reader_with_pool(&socket, pool.clone())
+            .unwrap();
         let cancellation = Cancellation::new();
         {
             let mut reading = pin!(reader.read(&cancellation));
@@ -654,7 +653,7 @@ fn bound_stream_reader_preserves_pool_failures_exhaustion_and_cancellation_at_eo
     block_on(async {
         let socket = Arc::new(AtomicUsize::new(1));
         let never = Cancellation::never();
-        let mut reader = Sockets.socket_stream_reader(&socket).unwrap();
+        let mut reader = BoundSocketStreamReader::new(&Sockets, &socket).unwrap();
         FAIL_POOL.with(|flag| flag.set(true));
         assert_eq!(
             reader.read(&never).await.unwrap_err().kind(),
@@ -682,5 +681,35 @@ fn bound_stream_reader_preserves_pool_failures_exhaustion_and_cancellation_at_eo
         assert!(reader.read_into(&mut [0; 1], &cancellation).await.is_err());
         assert!(reader.read_vectored(&mut [], &cancellation).await.is_err());
         reader.close().await.unwrap();
+    });
+}
+
+impl SocketStreamReading for Sockets {}
+
+#[test]
+fn opaque_stream_factories_bind_the_scheduler_without_borrowing_the_input_reference() {
+    block_on(async {
+        let never = Cancellation::never();
+        let mut reader = {
+            let socket = Arc::new(AtomicUsize::new(1));
+            Sockets.socket_stream_reader(&socket).unwrap()
+        };
+        let chunk = reader.read(&never).await.unwrap().unwrap();
+        let mut writer = {
+            let socket = Arc::new(AtomicUsize::new(1));
+            Sockets.socket_stream_writer(&socket).unwrap()
+        };
+        writer.submit(chunk, &never).await.unwrap();
+        writer.flush(&never).await.unwrap();
+        writer.close().await.unwrap();
+        reader.close().await.unwrap();
+        let mut writer = {
+            let socket = Arc::new(AtomicUsize::new(1));
+            Sockets
+                .socket_stream_writer_with_buffer::<Vec<u8>>(&socket)
+                .unwrap()
+        };
+        writer.submit(b"typed".to_vec(), &never).await.unwrap();
+        writer.close().await.unwrap();
     });
 }

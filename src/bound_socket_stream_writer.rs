@@ -26,7 +26,9 @@ where
     S::Socket: 'static,
     B: IoBuf,
 {
-    pub(crate) fn new(scheduler: &'a S, socket: &S::Socket) -> io::Result<Self> {
+    /// Construct the default backend composition without submitting payload I/O. Applications normally use the scheduler factory.
+    #[doc(hidden)]
+    pub fn new(scheduler: &'a S, socket: &S::Socket) -> io::Result<Self> {
         let output = scheduler.socket_stream_output(socket)?;
         let monitor = scheduler.socket_stream_monitor(socket, Interest::Writable)?;
         Ok(Self {

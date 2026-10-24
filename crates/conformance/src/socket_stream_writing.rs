@@ -177,9 +177,8 @@ where
     let mut writer = scheduler.socket_stream_writer(sender).unwrap();
     let pool = scheduler.buffer_pool(BufferPoolOptions::new(2, 8)).unwrap();
     let mut reader = scheduler
-        .socket_stream_reader(receiver)
-        .unwrap()
-        .with_pool(pool);
+        .socket_stream_reader_with_pool(receiver, pool)
+        .unwrap();
     let cancelled = Cancellation::new();
     let mut storage = [0; 8];
     {

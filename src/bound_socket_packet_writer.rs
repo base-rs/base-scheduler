@@ -23,7 +23,9 @@ where
     S: SocketMonitoring + Sync,
     S::Socket: 'static,
 {
-    pub(crate) fn new(scheduler: &'a S, socket: &S::Socket) -> io::Result<Self> {
+    /// Construct the default backend composition without submitting payload I/O. Applications normally use the scheduler factory.
+    #[doc(hidden)]
+    pub fn new(scheduler: &'a S, socket: &S::Socket) -> io::Result<Self> {
         if scheduler.socket_type(socket)? == SocketType::Stream {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,

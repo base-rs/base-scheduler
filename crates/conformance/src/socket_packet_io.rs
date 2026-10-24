@@ -14,7 +14,7 @@ use std::{
 /// Receive sender metadata, preserve packet boundaries, report truncation, and send empty datagrams through reusable borrowed handles.
 pub async fn borrowed<S>(scheduler: &S, sender: &S::Socket, receiver: &S::Socket)
 where
-    S: SocketPacketReading + SocketLocalAddress,
+    S: SocketPacketReading + SocketPacketWriting + SocketLocalAddress,
     S::Socket: 'static,
 {
     let never = Cancellation::never();
@@ -77,7 +77,7 @@ where
 /// Owned packets retain their sender, empty payload, truncated prefix, and independent pool ownership after reader retirement.
 pub async fn owned<S>(scheduler: &S, sender: &S::Socket, receiver: &S::Socket)
 where
-    S: SocketPacketReading + SocketLocalAddress,
+    S: SocketPacketReading + SocketPacketWriting + SocketLocalAddress,
     S::Socket: 'static,
 {
     let never = Cancellation::never();
@@ -85,9 +85,8 @@ where
     let peer = scheduler.socket_local_address(sender).unwrap();
     let pool = scheduler.buffer_pool(BufferPoolOptions::new(2, 4)).unwrap();
     let mut reader = scheduler
-        .socket_packet_reader(receiver)
-        .unwrap()
-        .with_pool(pool.clone());
+        .socket_packet_reader_with_pool(receiver, pool.clone())
+        .unwrap();
     let mut writer = scheduler.socket_packet_writer(sender).unwrap();
     let (first, sent) = zip(
         reader.read(&never),
@@ -131,7 +130,7 @@ where
 /// Cancel and abandon pending reads, then reuse the handles; pre-cancelled writes preserve their owner and emit no datagram.
 pub async fn cancellation<S>(scheduler: &S, sender: &S::Socket, receiver: &S::Socket)
 where
-    S: SocketPacketReading + SocketLocalAddress,
+    S: SocketPacketReading + SocketPacketWriting + SocketLocalAddress,
     S::Socket: 'static,
 {
     let never = Cancellation::never();
@@ -140,9 +139,8 @@ where
         .buffer_pool(BufferPoolOptions::new(1, 16))
         .unwrap();
     let mut reader = scheduler
-        .socket_packet_reader(receiver)
-        .unwrap()
-        .with_pool(pool.clone());
+        .socket_packet_reader_with_pool(receiver, pool.clone())
+        .unwrap();
     let mut writer = scheduler.socket_packet_writer(sender).unwrap();
     let cancellation = Cancellation::new();
     {

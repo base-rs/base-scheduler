@@ -35,7 +35,7 @@ impl Workload {
 
 async fn network<S>(scheduler: &S, workload: &Workload) -> Duration
 where
-    S: SocketScheduler + SocketMonitoring + SocketReceiving + Spawn,
+    S: SocketScheduler + SocketStreamReading + SocketPacketReading + SocketReceiving + Spawn,
     S::Socket: 'static,
 {
     let data = Arc::new(workload.data());
@@ -146,8 +146,9 @@ where
             let packet_data = Arc::clone(&data);
             datagrams::receive(
                 scheduler,
-                &socket,
-                pool,
+                scheduler
+                    .socket_packet_reader_with_pool(&socket, pool)
+                    .unwrap(),
                 packets,
                 8,
                 &cancellation,
@@ -247,6 +248,8 @@ where
     S: SocketScheduler
         + SocketMonitoring
         + SocketReceiving
+        + SocketStreamReading
+        + SocketPacketReading
         + Spawn
         + FileOpen
         + FileClose

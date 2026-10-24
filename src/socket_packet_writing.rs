@@ -1,15 +1,15 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use crate::{BoundSocketPacketWriter, SocketMonitoring};
+use crate::{BoundSocketPacketWriter, SocketMonitoring, SocketPacketWriter};
 use std::io;
 
-/// Construct an independently monitored sequential packet writer bound to this scheduler. Separate reader and writer handles permit concurrent reception and sending.
+/// Construct sequential packet output bound to this scheduler. Separate reader and writer handles permit concurrent reception and sending; backends can choose their own static writer.
 pub trait SocketPacketWriting: SocketMonitoring + Sync {
-    fn socket_packet_writer(
-        &self,
+    fn socket_packet_writer<'scheduler>(
+        &'scheduler self,
         socket: &Self::Socket,
-    ) -> io::Result<BoundSocketPacketWriter<'_, Self>>
+    ) -> io::Result<impl SocketPacketWriter + 'scheduler>
     where
         Self: Sized,
         Self::Socket: 'static,
@@ -17,5 +17,3 @@ pub trait SocketPacketWriting: SocketMonitoring + Sync {
         BoundSocketPacketWriter::new(self, socket)
     }
 }
-
-impl<S: SocketMonitoring + Sync> SocketPacketWriting for S {}

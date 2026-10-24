@@ -199,8 +199,9 @@ fn packet_handoff_preserves_empty_messages_addresses_and_bounded_capacity() {
         let counter = Arc::clone(&processed);
         datagrams::receive(
             &scheduler,
-            &SocketType::Datagram,
-            pool.clone(),
+            scheduler
+                .socket_packet_reader_with_pool(&SocketType::Datagram, pool.clone())
+                .unwrap(),
             3,
             2,
             &Cancellation::never(),
@@ -235,8 +236,9 @@ fn packet_errors_and_task_panics_still_close_receivers_and_drain_accepted_work()
             let pool = HeapBufferPool::new(2, 16).unwrap();
             let error = datagrams::receive(
                 &scheduler,
-                &SocketType::Datagram,
-                pool.clone(),
+                scheduler
+                    .socket_packet_reader_with_pool(&SocketType::Datagram, pool.clone())
+                    .unwrap(),
                 if mode == 5 || mode == 7 { 2 } else { 1 },
                 1,
                 &Cancellation::never(),
@@ -280,8 +282,9 @@ fn cancellation_after_handoff_waits_for_processing_and_returns_storage() {
         assert!(matches!(
             datagrams::receive(
                 &scheduler,
-                &SocketType::Datagram,
-                pool.clone(),
+                scheduler
+                    .socket_packet_reader_with_pool(&SocketType::Datagram, pool.clone())
+                    .unwrap(),
                 2,
                 2,
                 &token,
@@ -298,8 +301,9 @@ fn cancellation_after_handoff_waits_for_processing_and_returns_storage() {
         assert!(
             datagrams::receive(
                 &scheduler,
-                &SocketType::Datagram,
-                pool.clone(),
+                scheduler
+                    .socket_packet_reader_with_pool(&SocketType::Datagram, pool.clone())
+                    .unwrap(),
                 1,
                 0,
                 &token,
@@ -311,8 +315,9 @@ fn cancellation_after_handoff_waits_for_processing_and_returns_storage() {
         assert!(
             datagrams::receive(
                 &scheduler,
-                &SocketType::Datagram,
-                pool,
+                scheduler
+                    .socket_packet_reader_with_pool(&SocketType::Datagram, pool)
+                    .unwrap(),
                 1,
                 1,
                 &token,
@@ -403,3 +408,6 @@ fn frame_receiver_validates_setup_and_reports_close_failure() {
         }
     });
 }
+
+impl SocketStreamReading for Receives {}
+impl SocketPacketReading for Receives {}

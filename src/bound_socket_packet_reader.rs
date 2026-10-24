@@ -32,7 +32,9 @@ where
     S: SocketMonitoring + BufferPooling + Sync,
     S::Socket: 'static,
 {
-    pub(crate) fn new(scheduler: &'a S, socket: &S::Socket) -> io::Result<Self> {
+    /// Construct the default backend composition without submitting payload I/O. Applications normally use the scheduler factory.
+    #[doc(hidden)]
+    pub fn new(scheduler: &'a S, socket: &S::Socket) -> io::Result<Self> {
         if scheduler.socket_type(socket)? == SocketType::Stream {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
@@ -59,12 +61,12 @@ where
     S: SocketMonitoring + BufferPooling + Sync,
     S::Socket: 'static,
 {
-    type Buffer = <S::Pool as BufferPool>::Buffer;
+    type Message = OwnedSocketRecvMessage<<S::Pool as BufferPool>::Buffer>;
 
     async fn read(
         &mut self,
         cancellation: &Cancellation,
-    ) -> OperationResult<Option<OwnedSocketRecvMessage<Self::Buffer>>> {
+    ) -> OperationResult<Option<Self::Message>> {
         cancellation.check()?;
         if self.closing {
             return Ok(None);

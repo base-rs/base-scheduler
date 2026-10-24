@@ -224,6 +224,7 @@ async fn scheduler_server<S>(
         + SocketSendPoll
         + SocketMonitoring
         + SocketStreamWriting
+        + SocketStreamReading
         + BufferPooling
         + SocketSetOption<TcpNoDelay>
         + Spawn

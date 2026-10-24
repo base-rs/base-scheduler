@@ -1,21 +1,44 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use crate::{BoundSocketPacketReader, BufferPooling, SocketMonitoring};
+use crate::{
+    BoundSocketPacketReader, BufferPool, BufferPooling, SocketMonitoring, SocketPacketReader,
+    SocketRecvMessageMut,
+};
 use std::io;
 
-/// Construct a sequential packet reader bound to this scheduler. Borrowed reads reuse a persistent monitor; owned reads lazily obtain reusable pooled storage.
+/// Construct sequential packet input bound to this scheduler. Backends choose the static reader and completed message representation without exposing their receive mechanism.
 pub trait SocketPacketReading: SocketMonitoring + BufferPooling + Sync {
-    fn socket_packet_reader(
-        &self,
+    /// Retain the socket and reusable backend state without submitting a receive or allocating a payload pool. Owned reads initialize default storage lazily.
+    fn socket_packet_reader<'scheduler>(
+        &'scheduler self,
         socket: &Self::Socket,
-    ) -> io::Result<BoundSocketPacketReader<'_, Self>>
+    ) -> io::Result<
+        impl SocketPacketReader<
+            Message: SocketRecvMessageMut<Payload = <Self::Pool as BufferPool>::Buffer>,
+        > + 'scheduler,
+    >
     where
         Self: Sized,
         Self::Socket: 'static,
     {
         BoundSocketPacketReader::new(self, socket)
     }
-}
 
-impl<S: SocketMonitoring + BufferPooling + Sync> SocketPacketReading for S {}
+    /// Construct a reader using the supplied pool for owned messages. Borrowed reads do not acquire pool storage; completed messages retain their pool independently.
+    fn socket_packet_reader_with_pool<'scheduler>(
+        &'scheduler self,
+        socket: &Self::Socket,
+        pool: Self::Pool,
+    ) -> io::Result<
+        impl SocketPacketReader<
+            Message: SocketRecvMessageMut<Payload = <Self::Pool as BufferPool>::Buffer>,
+        > + 'scheduler,
+    >
+    where
+        Self: Sized,
+        Self::Socket: 'static,
+    {
+        Ok(BoundSocketPacketReader::new(self, socket)?.with_pool(pool))
+    }
+}

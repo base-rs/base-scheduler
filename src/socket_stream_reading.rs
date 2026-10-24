@@ -1,20 +1,33 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use crate::{BoundSocketStreamReader, BufferPooling, SocketMonitoring};
+use crate::{
+    BoundSocketStreamReader, BufferPool, BufferPooling, SocketMonitoring, SocketStreamReader,
+};
 use std::io;
 
-/// Construct a sequential stream input lane bound to this scheduler. Protocol consumers can depend on [`SocketStreamReader`](crate::SocketStreamReader) without requiring unrelated scheduler capabilities.
+/// Construct sequential stream input bound to this scheduler. Backends can substitute their own static reader while keeping protocol code independent of registration and receive mechanisms.
 pub trait SocketStreamReading: SocketMonitoring + BufferPooling + Sync {
-    /// Retain the socket and allocate persistent registration state once. No receive or payload-pool allocation occurs during construction. Use `with_pool` on the returned reader to share a receive budget across connections.
-    fn socket_stream_reader(
-        &self,
+    /// Retain the socket and reusable backend state without submitting a receive or allocating a payload pool. Owned reads initialize default storage lazily.
+    fn socket_stream_reader<'scheduler>(
+        &'scheduler self,
         socket: &Self::Socket,
-    ) -> io::Result<BoundSocketStreamReader<'_, Self>>
+    ) -> io::Result<impl SocketStreamReader<Buffer = <Self::Pool as BufferPool>::Buffer> + 'scheduler>
     where
         Self::Socket: 'static,
     {
         BoundSocketStreamReader::new(self, socket)
     }
+
+    /// Construct a reader using the supplied pool for owned chunks. Borrowed reads do not acquire pool storage. Returned chunks retain their pool independently of the reader.
+    fn socket_stream_reader_with_pool<'scheduler>(
+        &'scheduler self,
+        socket: &Self::Socket,
+        pool: Self::Pool,
+    ) -> io::Result<impl SocketStreamReader<Buffer = <Self::Pool as BufferPool>::Buffer> + 'scheduler>
+    where
+        Self::Socket: 'static,
+    {
+        Ok(BoundSocketStreamReader::new(self, socket)?.with_pool(pool))
+    }
 }
-impl<S: SocketMonitoring + BufferPooling + Sync + ?Sized> SocketStreamReading for S {}

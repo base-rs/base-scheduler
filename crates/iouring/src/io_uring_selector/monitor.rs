@@ -636,3 +636,7 @@ impl Drop for Monitors {
 
 #[cfg(test)]
 mod tests;
+
+impl core_scheduler::SocketStreamReading for IoUringSelector {}
+impl core_scheduler::SocketPacketReading for IoUringSelector {}
+impl core_scheduler::SocketPacketWriting for IoUringSelector {}

@@ -180,3 +180,5 @@ fn stream_cleanup_allows_exclusive_close_after_cancellation_and_consumer_errors(
         scheduler.shutdown().await;
     });
 }
+
+impl SocketStreamReading for FailedMonitor {}

@@ -94,7 +94,7 @@ where
 {
     let mut decoder = FrameDecoder::new(frame_size)?;
     cancellation.check()?;
-    let mut reader = scheduler.socket_stream_reader(socket)?.with_pool(pool);
+    let mut reader = scheduler.socket_stream_reader_with_pool(socket, pool)?;
     let result = async {
         while let Some(chunk) = reader.read(cancellation).await? {
             decoder.push(chunk.freeze(), &mut consume)?;

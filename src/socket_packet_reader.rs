@@ -1,9 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use crate::{
-    Cancellation, OperationResult, OwnedSocketRecvMessage, ReceiveBuffer, SocketRecvResult,
-};
+use crate::{Cancellation, OperationResult, ReceiveBuffer, SocketRecvMessageMut, SocketRecvResult};
 use std::{
     future::Future,
     io::{self, IoSliceMut},
@@ -11,13 +9,13 @@ use std::{
 
 /// Sequential packet reception through a fixed execution service. Each read consumes at most one packet and preserves its sender and truncation metadata. Empty packets are messages, not EOF.
 pub trait SocketPacketReader: Send {
-    type Buffer: ReceiveBuffer;
+    type Message: SocketRecvMessageMut<Payload: ReceiveBuffer>;
 
     /// Receive independently owned storage. `None` means the reader has been closed. Retained messages remain valid after subsequent reads, pool replacement, and close. Pool exhaustion waits with cancellation.
     fn read(
         &mut self,
         cancellation: &Cancellation,
-    ) -> impl Future<Output = OperationResult<Option<OwnedSocketRecvMessage<Self::Buffer>>>> + Send;
+    ) -> impl Future<Output = OperationResult<Option<Self::Message>>> + Send;
 
     /// Receive one packet into reused borrowed storage. A short buffer truncates that packet; no subsequent read recovers its discarded suffix. An empty packet returns zero bytes successfully.
     fn read_into(

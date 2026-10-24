@@ -24,3 +24,7 @@ impl SocketReceiving for TokioScheduler {
 
 #[cfg(test)]
 mod tests;
+
+impl core_scheduler::SocketStreamReading for TokioScheduler {}
+impl core_scheduler::SocketPacketReading for TokioScheduler {}
+impl core_scheduler::SocketPacketWriting for TokioScheduler {}

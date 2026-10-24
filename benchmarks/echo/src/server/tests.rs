@@ -227,3 +227,5 @@ impl<B: IoBuf> core_scheduler::SocketStreamOutput<PartialSocket> for UnusedOutpu
         Ok(())
     }
 }
+
+impl SocketStreamReading for PartialSocket {}
