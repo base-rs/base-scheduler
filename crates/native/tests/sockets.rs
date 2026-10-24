@@ -9,6 +9,28 @@ use std::{sync::mpsc, time::Duration};
 
 const TIMEOUT: Duration = Duration::from_secs(20);
 
+mod selector_packet_handles {
+    use super::*;
+
+    fn run_case(
+        test: impl AsyncFnOnce(
+            &core_scheduler_selector::ReadinessSelector,
+            &NativeSocket,
+            &NativeSocket,
+        ) + Send
+        + 'static,
+    ) {
+        run_datagram(
+            SocketDomain::Ipv4,
+            async move |scheduler, sender, receiver| {
+                test(scheduler.selector(), sender, receiver).await;
+            },
+        );
+    }
+
+    core_scheduler_conformance::socket_packet_io_tests!(run: run_case);
+}
+
 fn run(test: impl FnOnce() + Send + 'static) {
     let (done, completion) = mpsc::channel();
     std::thread::spawn(move || {
@@ -151,6 +173,10 @@ mod ipv4 {
         use super::*;
         core_scheduler_conformance::socket_datagram_poll_tests!(run: run_datagram_case);
     }
+    mod packet_handles {
+        use super::*;
+        core_scheduler_conformance::socket_packet_io_tests!(run: run_datagram_case);
+    }
     mod scalar {
         use super::*;
         core_scheduler_conformance::socket_tests!(run: run_stream_case);
@@ -204,6 +230,10 @@ mod ipv6 {
     mod borrowed_datagrams {
         use super::*;
         core_scheduler_conformance::socket_datagram_poll_tests!(run: run_datagram_case);
+    }
+    mod packet_handles {
+        use super::*;
+        core_scheduler_conformance::socket_packet_io_tests!(run: run_datagram_case);
     }
     mod scalar {
         use super::*;

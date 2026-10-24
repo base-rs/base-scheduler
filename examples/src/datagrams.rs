@@ -2,8 +2,8 @@
 // Copyright, 2026, by Samuel Williams.
 
 use core_scheduler::{
-    Cancellation, OperationResult, SocketReceiving, SocketRecvFlags, SocketRecvMessage,
-    SocketRecvMsgReceiver, Spawn,
+    BufferPool, Cancellation, OperationResult, OwnedSocketRecvMessage, SocketPacketReader,
+    SocketPacketReading, SocketRecvMessage, Spawn,
 };
 use std::{collections::VecDeque, io};
 
@@ -20,8 +20,9 @@ pub async fn receive<S, F>(
     process: F,
 ) -> OperationResult<()>
 where
-    S: SocketReceiving + Spawn,
-    F: Fn(<S::PooledReceiver as SocketRecvMsgReceiver<S>>::Message) -> OperationResult<()>
+    S: SocketPacketReading + Spawn,
+    S::Socket: 'static,
+    F: Fn(OwnedSocketRecvMessage<<S::Pool as BufferPool>::Buffer>) -> OperationResult<()>
         + Clone
         + Send
         + 'static,
@@ -29,9 +30,8 @@ where
     if concurrency == 0 {
         return Err(io::Error::new(io::ErrorKind::InvalidInput, "zero packet concurrency").into());
     }
-    let mut receiver = scheduler
-        .socket_receiver(socket, pool, SocketRecvFlags::default(), cancellation)
-        .await?;
+    cancellation.check()?;
+    let mut reader = scheduler.socket_packet_reader(socket)?.with_pool(pool);
     let mut tasks = VecDeque::with_capacity(concurrency);
     let result: OperationResult<()> = async {
         for _ in 0..packets {
@@ -40,15 +40,9 @@ where
                 task.await
                     .map_err(|error| io::Error::other(error.to_string()))??;
             }
-            let message = receiver
-                .recv(scheduler, cancellation)
-                .await?
-                .ok_or_else(|| {
-                    io::Error::new(
-                        io::ErrorKind::UnexpectedEof,
-                        "receiver ended before all packets arrived",
-                    )
-                })?;
+            let Some(message) = reader.read(cancellation).await? else {
+                unreachable!("an open packet reader cannot produce EOF");
+            };
             if message.truncated() || message.control_truncated() {
                 return Err(
                     io::Error::new(io::ErrorKind::InvalidData, "truncated datagram").into(),
@@ -64,7 +58,7 @@ where
         Ok(())
     }
     .await;
-    let closed = receiver.close(scheduler).await;
+    let closed = reader.close().await;
     // Owning task handles are awaited even after cancellation or a handler failure. Dropping them would abort accepted processing.
     let mut drained = Ok(());
     for task in tasks {

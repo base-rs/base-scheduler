@@ -161,6 +161,10 @@ mod ipv4 {
         use super::*;
         core_scheduler_conformance::socket_datagram_poll_tests!(run: run_datagram_case);
     }
+    mod packet_handles {
+        use super::*;
+        core_scheduler_conformance::socket_packet_io_tests!(run: run_datagram_case);
+    }
     mod scalar {
         use super::*;
         core_scheduler_conformance::socket_tests!(run: run_stream_case);
@@ -214,6 +218,10 @@ mod ipv6 {
     mod borrowed_datagrams {
         use super::*;
         core_scheduler_conformance::socket_datagram_poll_tests!(run: run_datagram_case);
+    }
+    mod packet_handles {
+        use super::*;
+        core_scheduler_conformance::socket_packet_io_tests!(run: run_datagram_case);
     }
     mod scalar {
         use super::*;

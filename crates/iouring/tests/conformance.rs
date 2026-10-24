@@ -415,6 +415,7 @@ macro_rules! socket_suites {
             mod borrowed_scalar { use super::*; core_scheduler_conformance::socket_poll_tests!(run: borrowed_streams); }
             mod borrowed_message { use super::*; core_scheduler_conformance::socket_message_poll_tests!(run: borrowed_streams); }
             mod borrowed_datagram { use super::*; core_scheduler_conformance::socket_datagram_poll_tests!(run: datagrams); }
+            mod packet_handles { use super::*; core_scheduler_conformance::socket_packet_io_tests!(run: datagrams); }
         }
     };
 }
