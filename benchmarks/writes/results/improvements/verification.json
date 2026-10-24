@@ -1,0 +1,29 @@
+{
+  "production_commit": "b389c46",
+  "runtime_commit": "72fdd77",
+  "linux_coverage_source": "5990901",
+  "macos_coverage_source": "4e3fcd9",
+  "differences": "5990901 and72fdd77 are equivalent cherry-picks; later source changes remove an unnecessary test mut annotation and name a test fixture type.",
+  "macos": {
+    "regions": [
+      23922,
+      23922
+    ],
+    "excluded_unreachable": 3,
+    "clippy": "workspace all-targets/all-features, warnings denied, passed",
+    "rustdoc": "workspace all-features, warnings denied, passed",
+    "msrv": "Rust1.85.1 root/native/direct/tokio checks passed"
+  },
+  "linux": {
+    "regions": [
+      34532,
+      34532
+    ],
+    "excluded_unreachable": 12,
+    "passed_tests": 1730,
+    "ignored_tests": 2,
+    "clippy": "workspace all-targets/all-features, warnings denied, passed",
+    "msrv": "Rust1.85.1 io_uring Linux-target tests/all-features check passed"
+  },
+  "review": "Independent review approved production, test-only annotations and final report; no remaining findings."
+}

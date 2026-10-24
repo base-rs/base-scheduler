@@ -1,0 +1,5038 @@
+{
+  "description": "Uninstrumented capacity comparisons and separate instrumented enter classification; no throughput conclusions are drawn from perf-record samples.",
+  "case_order": [
+    "workers",
+    "connections",
+    "bytes_per_chunk",
+    "chunks",
+    "work_per_cache_line",
+    "requested_send_buffer"
+  ],
+  "benchmark_groups": [
+    {
+      "artifact": {
+        "path": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json",
+        "bytes": 82550,
+        "sha256": "0d89bb96c977e2b786c0e1bdc044e2e9cd4e4c5b4f14539f250db783cf19a43b"
+      },
+      "metadata": {
+        "started_unix": 1792808336.9166846,
+        "hostname": "aiko",
+        "uname": "Linux aiko 7.2.8-arch1-2 #1 SMP PREEMPT_DYNAMIC Thu, 01 Oct 2026 17:24:20 +0000 x86_64 GNU/Linux",
+        "rustc": "rustc 1.99.0 (b940084d7 2026-09-28) (Arch Linux rust 1:1.99.0-1)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.0\nLLVM version: 23.1.1",
+        "git_head": "599090189e97c1567ba17f7abc6ac916860295a8",
+        "git_status": "",
+        "git_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "binary": "/home/samuel/Developer/core-rs/core-scheduler-ordered-writer-validation/target/release/core-scheduler-write-benchmark",
+        "binary_sha256": "e115265db6c533fb7b93b858157befdc533b7dc8387052e7d19a8ffd8c9a3acc",
+        "client_binary": "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client_binary_sha256": "e0742ba2d815e9ab2aa4bee2ac85c8b90ac91ca88e835439f468ea3bb2455606",
+        "variants": {
+          "baseline-writer": {
+            "backend": "iouring-writer",
+            "binary": "/home/samuel/.cache/ordered-writer-enter-classification/baseline-server",
+            "binary_sha256": "b186057dd5ec6d01ab3b50b0b27cbd3a4b9f67e97735a2c28cfb2807c664621a"
+          },
+          "final-writer": {
+            "backend": "iouring-writer",
+            "binary": "/home/samuel/Developer/core-rs/core-scheduler-ordered-writer-validation/target/release/core-scheduler-write-benchmark",
+            "binary_sha256": "e115265db6c533fb7b93b858157befdc533b7dc8387052e7d19a8ffd8c9a3acc"
+          },
+          "baseline-monitor": {
+            "backend": "iouring-monitor",
+            "binary": "/home/samuel/.cache/ordered-writer-enter-classification/baseline-server",
+            "binary_sha256": "b186057dd5ec6d01ab3b50b0b27cbd3a4b9f67e97735a2c28cfb2807c664621a"
+          },
+          "final-monitor": {
+            "backend": "iouring-monitor",
+            "binary": "/home/samuel/Developer/core-rs/core-scheduler-ordered-writer-validation/target/release/core-scheduler-write-benchmark",
+            "binary_sha256": "e115265db6c533fb7b93b858157befdc533b7dc8387052e7d19a8ffd8c9a3acc"
+          }
+        },
+        "instrumented": false,
+        "io_uring_submit_filter": null,
+        "cargo_lock_sha256": "e5285ddd9065f136e2557e54be7bb57ab84ab02f42b7e66ab90466b085e10f7b",
+        "cpu": {
+          "lscpu": [
+            {
+              "field": "Architecture:",
+              "data": "x86_64"
+            },
+            {
+              "field": "CPU op-mode(s):",
+              "data": "32-bit, 64-bit"
+            },
+            {
+              "field": "Address sizes:",
+              "data": "48 bits physical, 48 bits virtual"
+            },
+            {
+              "field": "Byte Order:",
+              "data": "Little Endian"
+            },
+            {
+              "field": "CPU(s):",
+              "data": "32"
+            },
+            {
+              "field": "On-line CPU(s) list:",
+              "data": "0-31"
+            },
+            {
+              "field": "Vendor ID:",
+              "data": "AuthenticAMD"
+            },
+            {
+              "field": "Model name:",
+              "data": "AMD Ryzen 9 9950X3D 16-Core Processor"
+            },
+            {
+              "field": "CPU family:",
+              "data": "26"
+            },
+            {
+              "field": "Model:",
+              "data": "68"
+            },
+            {
+              "field": "Thread(s) per core:",
+              "data": "2"
+            },
+            {
+              "field": "Core(s) per socket:",
+              "data": "16"
+            },
+            {
+              "field": "Socket(s):",
+              "data": "1"
+            },
+            {
+              "field": "Stepping:",
+              "data": "0"
+            },
+            {
+              "field": "Microcode version:",
+              "data": "0xb404035"
+            },
+            {
+              "field": "Frequency boost:",
+              "data": "enabled"
+            },
+            {
+              "field": "CPU(s) scaling MHz:",
+              "data": "39%"
+            },
+            {
+              "field": "CPU max MHz:",
+              "data": "5756.4521"
+            },
+            {
+              "field": "CPU min MHz:",
+              "data": "624.1940"
+            },
+            {
+              "field": "BogoMIPS:",
+              "data": "8599.98"
+            },
+            {
+              "field": "Flags:",
+              "data": "fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good amd_lbr_v2 nopl xtopology nonstop_tsc cpuid extd_apicid aperfmperf rapl pni pclmulqdq monitor ssse3 fma cx16 sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand lahf_lm cmp_legacy svm extapic cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw ibs skinit wdt tce topoext perfctr_core perfctr_nb bpext perfctr_llc mwaitx cpuid_fault cpb cat_l3 cdp_l3 hw_pstate ssbd mba perfmon_v2 ibrs ibpb stibp ibrs_enhanced vmmcall fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid cqm rdt_a avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local user_shstk avx_vnni avx512_bf16 clzero irperf xsaveerptr rdpru wbnoinvd cppc arat npt lbrv svm_lock nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold avic v_vmsave_vmload vgif x2avic v_spec_ctrl vnmi avx512vbmi umip pku ospke avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid bus_lock_detect movdiri movdir64b overflow_recov succor smca fsrm avx512_vp2intersect flush_l1d amd_lbr_pmc_freeze"
+            },
+            {
+              "field": "Virtualization:",
+              "data": "AMD-V"
+            },
+            {
+              "field": "L1d cache:",
+              "data": "768 KiB (16 instances)"
+            },
+            {
+              "field": "L1i cache:",
+              "data": "512 KiB (16 instances)"
+            },
+            {
+              "field": "L2 cache:",
+              "data": "16 MiB (16 instances)"
+            },
+            {
+              "field": "L3 cache:",
+              "data": "128 MiB (2 instances)"
+            },
+            {
+              "field": "NUMA node(s):",
+              "data": "1"
+            },
+            {
+              "field": "NUMA node0 CPU(s):",
+              "data": "0-31"
+            },
+            {
+              "field": "Vulnerability Gather data sampling:",
+              "data": "Not affected"
+            },
+            {
+              "field": "Vulnerability Ghostwrite:",
+              "data": "Not affected"
+            },
+            {
+              "field": "Vulnerability Indirect target selection:",
+              "data": "Not affected"
+            },
+            {
+              "field": "Vulnerability Itlb multihit:",
+              "data": "Not affected"
+            },
+            {
+              "field": "Vulnerability L1tf:",
+              "data": "Not affected"
+            },
+            {
+              "field": "Vulnerability Mds:",
+              "data": "Not affected"
+            },
+            {
+              "field": "Vulnerability Meltdown:",
+              "data": "Not affected"
+            },
+            {
+              "field": "Vulnerability Mmio stale data:",
+              "data": "Not affected"
+            },
+            {
+              "field": "Vulnerability Old microcode:",
+              "data": "Not affected"
+            },
+            {
+              "field": "Vulnerability Reg file data sampling:",
+              "data": "Not affected"
+            },
+            {
+              "field": "Vulnerability Retbleed:",
+              "data": "Not affected"
+            },
+            {
+              "field": "Vulnerability Spec rstack overflow:",
+              "data": "Mitigation; IBPB on VMEXIT only"
+            },
+            {
+              "field": "Vulnerability Spec store bypass:",
+              "data": "Mitigation; Speculative Store Bypass disabled via prctl"
+            },
+            {
+              "field": "Vulnerability Spectre v1:",
+              "data": "Mitigation; usercopy/swapgs barriers and __user pointer sanitization"
+            },
+            {
+              "field": "Vulnerability Spectre v2:",
+              "data": "Mitigation; Enhanced / Automatic IBRS; IBPB conditional; STIBP always-on; PBRSB-eIBRS Not affected; BHI Not affected"
+            },
+            {
+              "field": "Vulnerability Srbds:",
+              "data": "Not affected"
+            },
+            {
+              "field": "Vulnerability Tsa:",
+              "data": "Not affected"
+            },
+            {
+              "field": "Vulnerability Tsx async abort:",
+              "data": "Not affected"
+            },
+            {
+              "field": "Vulnerability Vmscape:",
+              "data": "Mitigation; IBPB on VMEXIT"
+            }
+          ]
+        },
+        "governors": {
+          "0": "powersave",
+          "1": "powersave",
+          "2": "powersave",
+          "3": "powersave",
+          "4": "powersave",
+          "5": "powersave",
+          "6": "powersave",
+          "7": "powersave"
+        },
+        "suite": "screen",
+        "cases": [
+          [
+            1,
+            1,
+            64,
+            1,
+            0,
+            0
+          ],
+          [
+            1,
+            1,
+            262144,
+            8,
+            0,
+            65536
+          ],
+          [
+            1,
+            1,
+            262144,
+            8,
+            8,
+            65536
+          ],
+          [
+            4,
+            32,
+            262144,
+            8,
+            8,
+            65536
+          ]
+        ],
+        "repetitions": 3,
+        "warmup": 1.0,
+        "seconds": 3.0,
+        "seed": 20261025,
+        "backends": [
+          "baseline-writer",
+          "final-writer",
+          "baseline-monitor",
+          "final-monitor"
+        ],
+        "payload_validation": "Every response byte checked against precomputed chunk-specific contents.",
+        "buffer_budget": "Two fixed payload buffers per connection for every server backend.",
+        "finished_unix": 1792808529.1723797
+      }
+    },
+    {
+      "artifact": {
+        "path": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-supplement.json",
+        "bytes": 27217,
+        "sha256": "a18b4b5a2524012e3f1d2727c8ebb1d5caaf70fff96a4ab91d9feb59641af39b"
+      },
+      "metadata": {
+        "started_unix": 1792808625.2579865,
+        "hostname": "aiko",
+        "uname": "Linux aiko 7.2.8-arch1-2 #1 SMP PREEMPT_DYNAMIC Thu, 01 Oct 2026 17:24:20 +0000 x86_64 GNU/Linux",
+        "rustc": "rustc 1.99.0 (b940084d7 2026-09-28) (Arch Linux rust 1:1.99.0-1)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.0\nLLVM version: 23.1.1",
+        "git_head": "599090189e97c1567ba17f7abc6ac916860295a8",
+        "git_status": "",
+        "git_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "binary": "/home/samuel/Developer/core-rs/core-scheduler-ordered-writer-validation/target/release/core-scheduler-write-benchmark",
+        "binary_sha256": "e115265db6c533fb7b93b858157befdc533b7dc8387052e7d19a8ffd8c9a3acc",
+        "client_binary": "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client_binary_sha256": "e0742ba2d815e9ab2aa4bee2ac85c8b90ac91ca88e835439f468ea3bb2455606",
+        "variants": {
+          "baseline-writer": {
+            "backend": "iouring-writer",
+            "binary": "/home/samuel/.cache/ordered-writer-enter-classification/baseline-server",
+            "binary_sha256": "b186057dd5ec6d01ab3b50b0b27cbd3a4b9f67e97735a2c28cfb2807c664621a"
+          },
+          "final-writer": {
+            "backend": "iouring-writer",
+            "binary": "/home/samuel/Developer/core-rs/core-scheduler-ordered-writer-validation/target/release/core-scheduler-write-benchmark",
+            "binary_sha256": "e115265db6c533fb7b93b858157befdc533b7dc8387052e7d19a8ffd8c9a3acc"
+          },
+          "baseline-monitor": {
+            "backend": "iouring-monitor",
+            "binary": "/home/samuel/.cache/ordered-writer-enter-classification/baseline-server",
+            "binary_sha256": "b186057dd5ec6d01ab3b50b0b27cbd3a4b9f67e97735a2c28cfb2807c664621a"
+          },
+          "final-monitor": {
+            "backend": "iouring-monitor",
+            "binary": "/home/samuel/Developer/core-rs/core-scheduler-ordered-writer-validation/target/release/core-scheduler-write-benchmark",
+            "binary_sha256": "e115265db6c533fb7b93b858157befdc533b7dc8387052e7d19a8ffd8c9a3acc"
+          }
+        },
+        "instrumented": false,
+        "io_uring_submit_filter": null,
+        "cargo_lock_sha256": "e5285ddd9065f136e2557e54be7bb57ab84ab02f42b7e66ab90466b085e10f7b",
+        "cpu": {
+          "lscpu": [
+            {
+              "field": "Architecture:",
+              "data": "x86_64"
+            },
+            {
+              "field": "CPU op-mode(s):",
+              "data": "32-bit, 64-bit"
+            },
+            {
+              "field": "Address sizes:",
+              "data": "48 bits physical, 48 bits virtual"
+            },
+            {
+              "field": "Byte Order:",
+              "data": "Little Endian"
+            },
+            {
+              "field": "CPU(s):",
+              "data": "32"
+            },
+            {
+              "field": "On-line CPU(s) list:",
+              "data": "0-31"
+            },
+            {
+              "field": "Vendor ID:",
+              "data": "AuthenticAMD"
+            },
+            {
+              "field": "Model name:",
+              "data": "AMD Ryzen 9 9950X3D 16-Core Processor"
+            },
+            {
+              "field": "CPU family:",
+              "data": "26"
+            },
+            {
+              "field": "Model:",
+              "data": "68"
+            },
+            {
+              "field": "Thread(s) per core:",
+              "data": "2"
+            },
+            {
+              "field": "Core(s) per socket:",
+              "data": "16"
+            },
+            {
+              "field": "Socket(s):",
+              "data": "1"
+            },
+            {
+              "field": "Stepping:",
+              "data": "0"
+            },
+            {
+              "field": "Microcode version:",
+              "data": "0xb404035"
+            },
+            {
+              "field": "Frequency boost:",
+              "data": "enabled"
+            },
+            {
+              "field": "CPU(s) scaling MHz:",
+              "data": "91%"
+            },
+            {
+              "field": "CPU max MHz:",
+              "data": "5756.4521"
+            },
+            {
+              "field": "CPU min MHz:",
+              "data": "624.1940"
+            },
+            {
+              "field": "BogoMIPS:",
+              "data": "8599.98"
+            },
+            {
+              "field": "Flags:",
+              "data": "fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good amd_lbr_v2 nopl xtopology nonstop_tsc cpuid extd_apicid aperfmperf rapl pni pclmulqdq monitor ssse3 fma cx16 sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand lahf_lm cmp_legacy svm extapic cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw ibs skinit wdt tce topoext perfctr_core perfctr_nb bpext perfctr_llc mwaitx cpuid_fault cpb cat_l3 cdp_l3 hw_pstate ssbd mba perfmon_v2 ibrs ibpb stibp ibrs_enhanced vmmcall fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid cqm rdt_a avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local user_shstk avx_vnni avx512_bf16 clzero irperf xsaveerptr rdpru wbnoinvd cppc arat npt lbrv svm_lock nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold avic v_vmsave_vmload vgif x2avic v_spec_ctrl vnmi avx512vbmi umip pku ospke avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid bus_lock_detect movdiri movdir64b overflow_recov succor smca fsrm avx512_vp2intersect flush_l1d amd_lbr_pmc_freeze"
+            },
+            {
+              "field": "Virtualization:",
+              "data": "AMD-V"
+            },
+            {
+              "field": "L1d cache:",
+              "data": "768 KiB (16 instances)"
+            },
+            {
+              "field": "L1i cache:",
+              "data": "512 KiB (16 instances)"
+            },
+            {
+              "field": "L2 cache:",
+              "data": "16 MiB (16 instances)"
+            },
+            {
+              "field": "L3 cache:",
+              "data": "128 MiB (2 instances)"
+            },
+            {
+              "field": "NUMA node(s):",
+              "data": "1"
+            },
+            {
+              "field": "NUMA node0 CPU(s):",
+              "data": "0-31"
+            },
+            {
+              "field": "Vulnerability Gather data sampling:",
+              "data": "Not affected"
+            },
+            {
+              "field": "Vulnerability Ghostwrite:",
+              "data": "Not affected"
+            },
+            {
+              "field": "Vulnerability Indirect target selection:",
+              "data": "Not affected"
+            },
+            {
+              "field": "Vulnerability Itlb multihit:",
+              "data": "Not affected"
+            },
+            {
+              "field": "Vulnerability L1tf:",
+              "data": "Not affected"
+            },
+            {
+              "field": "Vulnerability Mds:",
+              "data": "Not affected"
+            },
+            {
+              "field": "Vulnerability Meltdown:",
+              "data": "Not affected"
+            },
+            {
+              "field": "Vulnerability Mmio stale data:",
+              "data": "Not affected"
+            },
+            {
+              "field": "Vulnerability Old microcode:",
+              "data": "Not affected"
+            },
+            {
+              "field": "Vulnerability Reg file data sampling:",
+              "data": "Not affected"
+            },
+            {
+              "field": "Vulnerability Retbleed:",
+              "data": "Not affected"
+            },
+            {
+              "field": "Vulnerability Spec rstack overflow:",
+              "data": "Mitigation; IBPB on VMEXIT only"
+            },
+            {
+              "field": "Vulnerability Spec store bypass:",
+              "data": "Mitigation; Speculative Store Bypass disabled via prctl"
+            },
+            {
+              "field": "Vulnerability Spectre v1:",
+              "data": "Mitigation; usercopy/swapgs barriers and __user pointer sanitization"
+            },
+            {
+              "field": "Vulnerability Spectre v2:",
+              "data": "Mitigation; Enhanced / Automatic IBRS; IBPB conditional; STIBP always-on; PBRSB-eIBRS Not affected; BHI Not affected"
+            },
+            {
+              "field": "Vulnerability Srbds:",
+              "data": "Not affected"
+            },
+            {
+              "field": "Vulnerability Tsa:",
+              "data": "Not affected"
+            },
+            {
+              "field": "Vulnerability Tsx async abort:",
+              "data": "Not affected"
+            },
+            {
+              "field": "Vulnerability Vmscape:",
+              "data": "Mitigation; IBPB on VMEXIT"
+            }
+          ]
+        },
+        "governors": {
+          "0": "powersave",
+          "1": "powersave",
+          "2": "powersave",
+          "3": "powersave",
+          "4": "powersave",
+          "5": "powersave",
+          "6": "powersave",
+          "7": "powersave"
+        },
+        "suite": "screen",
+        "cases": [
+          [
+            1,
+            1,
+            65536,
+            8,
+            8,
+            0
+          ]
+        ],
+        "repetitions": 3,
+        "warmup": 1.0,
+        "seconds": 3.0,
+        "seed": 20261026,
+        "backends": [
+          "baseline-writer",
+          "final-writer",
+          "baseline-monitor",
+          "final-monitor"
+        ],
+        "payload_validation": "Every response byte checked against precomputed chunk-specific contents.",
+        "buffer_budget": "Two fixed payload buffers per connection for every server backend.",
+        "finished_unix": 1792808673.3049276
+      }
+    }
+  ],
+  "benchmark_samples": [
+    {
+      "repetition": 1,
+      "started_unix": 1792808336.936582,
+      "backend": "final-writer",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 0,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/Developer/core-rs/core-scheduler-ordered-writer-validation/target/release/core-scheduler-write-benchmark",
+        "server",
+        "iouring-writer",
+        "1",
+        "1",
+        "64",
+        "1",
+        "0",
+        "0"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:36507",
+        "4",
+        "1",
+        "64",
+        "1",
+        "0",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":2626560,\"requested_send_buffer\":0}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 64,
+        "chunks": 1,
+        "connections": 1,
+        "payload_mib_per_second": 16.799723307291668,
+        "requests": 825740,
+        "requests_per_second": 275246.6666666667,
+        "rtt_max_us": 161.151,
+        "rtt_mean_us": 3.60557083827839,
+        "rtt_p50_us": 3.521,
+        "rtt_p95_us": 4.151,
+        "rtt_p99_us": 4.263,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 0
+      },
+      "server_backend": "iouring-writer",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 2,
+      "started_unix": 1792808340.938691,
+      "backend": "final-writer",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 65536,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/Developer/core-rs/core-scheduler-ordered-writer-validation/target/release/core-scheduler-write-benchmark",
+        "server",
+        "iouring-writer",
+        "1",
+        "1",
+        "262144",
+        "8",
+        "0",
+        "65536"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:44073",
+        "4",
+        "1",
+        "262144",
+        "8",
+        "0",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":131072,\"requested_send_buffer\":65536}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 262144,
+        "chunks": 8,
+        "connections": 1,
+        "payload_mib_per_second": 4659.333333333333,
+        "requests": 6989,
+        "requests_per_second": 2329.6666666666665,
+        "rtt_max_us": 623.103,
+        "rtt_mean_us": 429.16832279296045,
+        "rtt_p50_us": 421.119,
+        "rtt_p95_us": 505.599,
+        "rtt_p99_us": 508.671,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 0
+      },
+      "server_backend": "iouring-writer",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 0,
+      "started_unix": 1792808344.942538,
+      "backend": "baseline-monitor",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 65536,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/.cache/ordered-writer-enter-classification/baseline-server",
+        "server",
+        "iouring-monitor",
+        "1",
+        "1",
+        "262144",
+        "8",
+        "8",
+        "65536"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:34215",
+        "4",
+        "1",
+        "262144",
+        "8",
+        "8",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":131072,\"requested_send_buffer\":65536}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 262144,
+        "chunks": 8,
+        "connections": 1,
+        "payload_mib_per_second": 3642.0,
+        "requests": 5463,
+        "requests_per_second": 1821.0,
+        "rtt_max_us": 706.047,
+        "rtt_mean_us": 548.9860721215448,
+        "rtt_p50_us": 549.375,
+        "rtt_p95_us": 555.519,
+        "rtt_p99_us": 560.639,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 8
+      },
+      "server_backend": "iouring-monitor",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 2,
+      "started_unix": 1792808348.9461007,
+      "backend": "baseline-writer",
+      "workers": 4,
+      "server_cpus": "0-3",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 65536,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0-3",
+        "/home/samuel/.cache/ordered-writer-enter-classification/baseline-server",
+        "server",
+        "iouring-writer",
+        "4",
+        "32",
+        "262144",
+        "8",
+        "8",
+        "65536"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:45485",
+        "4",
+        "32",
+        "262144",
+        "8",
+        "8",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":131072,\"requested_send_buffer\":65536}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 262144,
+        "chunks": 8,
+        "connections": 32,
+        "payload_mib_per_second": 15989.333333333334,
+        "requests": 23984,
+        "requests_per_second": 7994.666666666667,
+        "rtt_max_us": 4370.431,
+        "rtt_mean_us": 3996.845939959973,
+        "rtt_p50_us": 3989.503,
+        "rtt_p95_us": 4048.895,
+        "rtt_p99_us": 4065.279,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 8
+      },
+      "server_backend": "iouring-writer",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 2,
+      "started_unix": 1792808352.9519598,
+      "backend": "final-monitor",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 65536,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/Developer/core-rs/core-scheduler-ordered-writer-validation/target/release/core-scheduler-write-benchmark",
+        "server",
+        "iouring-monitor",
+        "1",
+        "1",
+        "262144",
+        "8",
+        "0",
+        "65536"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:46189",
+        "4",
+        "1",
+        "262144",
+        "8",
+        "0",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":131072,\"requested_send_buffer\":65536}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 262144,
+        "chunks": 8,
+        "connections": 1,
+        "payload_mib_per_second": 4458.0,
+        "requests": 6687,
+        "requests_per_second": 2229.0,
+        "rtt_max_us": 616.447,
+        "rtt_mean_us": 448.51209570809027,
+        "rtt_p50_us": 451.327,
+        "rtt_p95_us": 456.191,
+        "rtt_p99_us": 460.543,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 0
+      },
+      "server_backend": "iouring-monitor",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 1,
+      "started_unix": 1792808356.9553094,
+      "backend": "baseline-writer",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 0,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/.cache/ordered-writer-enter-classification/baseline-server",
+        "server",
+        "iouring-writer",
+        "1",
+        "1",
+        "64",
+        "1",
+        "0",
+        "0"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:46705",
+        "4",
+        "1",
+        "64",
+        "1",
+        "0",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":2626560,\"requested_send_buffer\":0}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 64,
+        "chunks": 1,
+        "connections": 1,
+        "payload_mib_per_second": 16.686971028645832,
+        "requests": 820198,
+        "requests_per_second": 273399.3333333333,
+        "rtt_max_us": 166.655,
+        "rtt_mean_us": 3.629808224355584,
+        "rtt_p50_us": 3.551,
+        "rtt_p95_us": 4.131,
+        "rtt_p99_us": 4.303,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 0
+      },
+      "server_backend": "iouring-writer",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 1,
+      "started_unix": 1792808360.9570243,
+      "backend": "final-monitor",
+      "workers": 4,
+      "server_cpus": "0-3",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 65536,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0-3",
+        "/home/samuel/Developer/core-rs/core-scheduler-ordered-writer-validation/target/release/core-scheduler-write-benchmark",
+        "server",
+        "iouring-monitor",
+        "4",
+        "32",
+        "262144",
+        "8",
+        "8",
+        "65536"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:43577",
+        "4",
+        "32",
+        "262144",
+        "8",
+        "8",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":131072,\"requested_send_buffer\":65536}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 262144,
+        "chunks": 8,
+        "connections": 32,
+        "payload_mib_per_second": 16982.666666666668,
+        "requests": 25474,
+        "requests_per_second": 8491.333333333334,
+        "rtt_max_us": 5132.287,
+        "rtt_mean_us": 3763.652909162278,
+        "rtt_p50_us": 3807.231,
+        "rtt_p95_us": 4411.391,
+        "rtt_p99_us": 4632.575,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 8
+      },
+      "server_backend": "iouring-monitor",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 0,
+      "started_unix": 1792808364.975589,
+      "backend": "baseline-monitor",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 65536,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/.cache/ordered-writer-enter-classification/baseline-server",
+        "server",
+        "iouring-monitor",
+        "1",
+        "1",
+        "262144",
+        "8",
+        "0",
+        "65536"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:39047",
+        "4",
+        "1",
+        "262144",
+        "8",
+        "0",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":131072,\"requested_send_buffer\":65536}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 262144,
+        "chunks": 8,
+        "connections": 1,
+        "payload_mib_per_second": 3720.0,
+        "requests": 5580,
+        "requests_per_second": 1860.0,
+        "rtt_max_us": 714.751,
+        "rtt_mean_us": 537.4472946236557,
+        "rtt_p50_us": 540.159,
+        "rtt_p95_us": 548.351,
+        "rtt_p99_us": 553.471,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 0
+      },
+      "server_backend": "iouring-monitor",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 2,
+      "started_unix": 1792808368.978865,
+      "backend": "baseline-writer",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 0,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/.cache/ordered-writer-enter-classification/baseline-server",
+        "server",
+        "iouring-writer",
+        "1",
+        "1",
+        "64",
+        "1",
+        "0",
+        "0"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:43165",
+        "4",
+        "1",
+        "64",
+        "1",
+        "0",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":2626560,\"requested_send_buffer\":0}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 64,
+        "chunks": 1,
+        "connections": 1,
+        "payload_mib_per_second": 16.6617431640625,
+        "requests": 818958,
+        "requests_per_second": 272986.0,
+        "rtt_max_us": 2024.447,
+        "rtt_mean_us": 3.635490793178653,
+        "rtt_p50_us": 3.541,
+        "rtt_p95_us": 4.151,
+        "rtt_p99_us": 4.311,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 0
+      },
+      "server_backend": "iouring-writer",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 0,
+      "started_unix": 1792808372.9811165,
+      "backend": "final-writer",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 65536,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/Developer/core-rs/core-scheduler-ordered-writer-validation/target/release/core-scheduler-write-benchmark",
+        "server",
+        "iouring-writer",
+        "1",
+        "1",
+        "262144",
+        "8",
+        "0",
+        "65536"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:43889",
+        "4",
+        "1",
+        "262144",
+        "8",
+        "0",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":131072,\"requested_send_buffer\":65536}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 262144,
+        "chunks": 8,
+        "connections": 1,
+        "payload_mib_per_second": 4251.333333333333,
+        "requests": 6377,
+        "requests_per_second": 2125.6666666666665,
+        "rtt_max_us": 665.087,
+        "rtt_mean_us": 470.3567646228636,
+        "rtt_p50_us": 501.759,
+        "rtt_p95_us": 508.159,
+        "rtt_p99_us": 511.743,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 0
+      },
+      "server_backend": "iouring-writer",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 1,
+      "started_unix": 1792808376.9847496,
+      "backend": "baseline-monitor",
+      "workers": 4,
+      "server_cpus": "0-3",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 65536,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0-3",
+        "/home/samuel/.cache/ordered-writer-enter-classification/baseline-server",
+        "server",
+        "iouring-monitor",
+        "4",
+        "32",
+        "262144",
+        "8",
+        "8",
+        "65536"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:41269",
+        "4",
+        "32",
+        "262144",
+        "8",
+        "8",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":131072,\"requested_send_buffer\":65536}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 262144,
+        "chunks": 8,
+        "connections": 32,
+        "payload_mib_per_second": 17962.666666666668,
+        "requests": 26944,
+        "requests_per_second": 8981.333333333334,
+        "rtt_max_us": 4898.815,
+        "rtt_mean_us": 3558.267515439433,
+        "rtt_p50_us": 3461.119,
+        "rtt_p95_us": 4259.839,
+        "rtt_p99_us": 4489.215,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 8
+      },
+      "server_backend": "iouring-monitor",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 0,
+      "started_unix": 1792808380.990328,
+      "backend": "baseline-writer",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 0,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/.cache/ordered-writer-enter-classification/baseline-server",
+        "server",
+        "iouring-writer",
+        "1",
+        "1",
+        "64",
+        "1",
+        "0",
+        "0"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:44033",
+        "4",
+        "1",
+        "64",
+        "1",
+        "0",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":2626560,\"requested_send_buffer\":0}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 64,
+        "chunks": 1,
+        "connections": 1,
+        "payload_mib_per_second": 16.776529947916668,
+        "requests": 824600,
+        "requests_per_second": 274866.6666666667,
+        "rtt_max_us": 158.847,
+        "rtt_mean_us": 3.610701142372058,
+        "rtt_p50_us": 3.531,
+        "rtt_p95_us": 4.131,
+        "rtt_p99_us": 4.271,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 0
+      },
+      "server_backend": "iouring-writer",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 2,
+      "started_unix": 1792808385.0046384,
+      "backend": "final-writer",
+      "workers": 4,
+      "server_cpus": "0-3",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 65536,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0-3",
+        "/home/samuel/Developer/core-rs/core-scheduler-ordered-writer-validation/target/release/core-scheduler-write-benchmark",
+        "server",
+        "iouring-writer",
+        "4",
+        "32",
+        "262144",
+        "8",
+        "8",
+        "65536"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:43177",
+        "4",
+        "32",
+        "262144",
+        "8",
+        "8",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":131072,\"requested_send_buffer\":65536}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 262144,
+        "chunks": 8,
+        "connections": 32,
+        "payload_mib_per_second": 15872.0,
+        "requests": 23808,
+        "requests_per_second": 7936.0,
+        "rtt_max_us": 4198.399,
+        "rtt_mean_us": 4027.5344086021514,
+        "rtt_p50_us": 4028.415,
+        "rtt_p95_us": 4046.847,
+        "rtt_p99_us": 4055.039,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 8
+      },
+      "server_backend": "iouring-writer",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 2,
+      "started_unix": 1792808389.0119536,
+      "backend": "baseline-monitor",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 65536,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/.cache/ordered-writer-enter-classification/baseline-server",
+        "server",
+        "iouring-monitor",
+        "1",
+        "1",
+        "262144",
+        "8",
+        "0",
+        "65536"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:34173",
+        "4",
+        "1",
+        "262144",
+        "8",
+        "0",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":131072,\"requested_send_buffer\":65536}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 262144,
+        "chunks": 8,
+        "connections": 1,
+        "payload_mib_per_second": 3656.0,
+        "requests": 5484,
+        "requests_per_second": 1828.0,
+        "rtt_max_us": 716.287,
+        "rtt_mean_us": 546.8724843180157,
+        "rtt_p50_us": 551.935,
+        "rtt_p95_us": 561.663,
+        "rtt_p99_us": 567.807,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 0
+      },
+      "server_backend": "iouring-monitor",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 0,
+      "started_unix": 1792808393.0152724,
+      "backend": "final-monitor",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 65536,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/Developer/core-rs/core-scheduler-ordered-writer-validation/target/release/core-scheduler-write-benchmark",
+        "server",
+        "iouring-monitor",
+        "1",
+        "1",
+        "262144",
+        "8",
+        "0",
+        "65536"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:38321",
+        "4",
+        "1",
+        "262144",
+        "8",
+        "0",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":131072,\"requested_send_buffer\":65536}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 262144,
+        "chunks": 8,
+        "connections": 1,
+        "payload_mib_per_second": 4401.333333333333,
+        "requests": 6602,
+        "requests_per_second": 2200.6666666666665,
+        "rtt_max_us": 607.231,
+        "rtt_mean_us": 454.32157528021827,
+        "rtt_p50_us": 453.887,
+        "rtt_p95_us": 461.055,
+        "rtt_p99_us": 464.895,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 0
+      },
+      "server_backend": "iouring-monitor",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 0,
+      "started_unix": 1792808397.0189488,
+      "backend": "final-writer",
+      "workers": 4,
+      "server_cpus": "0-3",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 65536,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0-3",
+        "/home/samuel/Developer/core-rs/core-scheduler-ordered-writer-validation/target/release/core-scheduler-write-benchmark",
+        "server",
+        "iouring-writer",
+        "4",
+        "32",
+        "262144",
+        "8",
+        "8",
+        "65536"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:46281",
+        "4",
+        "32",
+        "262144",
+        "8",
+        "8",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":131072,\"requested_send_buffer\":65536}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 262144,
+        "chunks": 8,
+        "connections": 32,
+        "payload_mib_per_second": 15852.666666666666,
+        "requests": 23779,
+        "requests_per_second": 7926.333333333333,
+        "rtt_max_us": 4435.967,
+        "rtt_mean_us": 4031.721445645317,
+        "rtt_p50_us": 4032.511,
+        "rtt_p95_us": 4050.943,
+        "rtt_p99_us": 4061.183,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 8
+      },
+      "server_backend": "iouring-writer",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 2,
+      "started_unix": 1792808401.0251076,
+      "backend": "baseline-monitor",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 65536,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/.cache/ordered-writer-enter-classification/baseline-server",
+        "server",
+        "iouring-monitor",
+        "1",
+        "1",
+        "262144",
+        "8",
+        "8",
+        "65536"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:42721",
+        "4",
+        "1",
+        "262144",
+        "8",
+        "8",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":131072,\"requested_send_buffer\":65536}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 262144,
+        "chunks": 8,
+        "connections": 1,
+        "payload_mib_per_second": 4433.333333333333,
+        "requests": 6650,
+        "requests_per_second": 2216.6666666666665,
+        "rtt_max_us": 610.815,
+        "rtt_mean_us": 450.9748162406015,
+        "rtt_p50_us": 451.071,
+        "rtt_p95_us": 455.935,
+        "rtt_p99_us": 459.263,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 8
+      },
+      "server_backend": "iouring-monitor",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 2,
+      "started_unix": 1792808405.0285897,
+      "backend": "baseline-monitor",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 0,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/.cache/ordered-writer-enter-classification/baseline-server",
+        "server",
+        "iouring-monitor",
+        "1",
+        "1",
+        "64",
+        "1",
+        "0",
+        "0"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:38085",
+        "4",
+        "1",
+        "64",
+        "1",
+        "0",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":2626560,\"requested_send_buffer\":0}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 64,
+        "chunks": 1,
+        "connections": 1,
+        "payload_mib_per_second": 16.60223388671875,
+        "requests": 816033,
+        "requests_per_second": 272011.0,
+        "rtt_max_us": 153.855,
+        "rtt_mean_us": 3.6485248341672456,
+        "rtt_p50_us": 3.541,
+        "rtt_p95_us": 4.131,
+        "rtt_p99_us": 4.283,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 0
+      },
+      "server_backend": "iouring-monitor",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 2,
+      "started_unix": 1792808409.0308628,
+      "backend": "final-monitor",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 0,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/Developer/core-rs/core-scheduler-ordered-writer-validation/target/release/core-scheduler-write-benchmark",
+        "server",
+        "iouring-monitor",
+        "1",
+        "1",
+        "64",
+        "1",
+        "0",
+        "0"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:44415",
+        "4",
+        "1",
+        "64",
+        "1",
+        "0",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":2626560,\"requested_send_buffer\":0}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 64,
+        "chunks": 1,
+        "connections": 1,
+        "payload_mib_per_second": 16.6241455078125,
+        "requests": 817110,
+        "requests_per_second": 272370.0,
+        "rtt_max_us": 162.175,
+        "rtt_mean_us": 3.6437473889684364,
+        "rtt_p50_us": 3.531,
+        "rtt_p95_us": 4.151,
+        "rtt_p99_us": 4.471,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 0
+      },
+      "server_backend": "iouring-monitor",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 1,
+      "started_unix": 1792808413.0331118,
+      "backend": "final-writer",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 65536,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/Developer/core-rs/core-scheduler-ordered-writer-validation/target/release/core-scheduler-write-benchmark",
+        "server",
+        "iouring-writer",
+        "1",
+        "1",
+        "262144",
+        "8",
+        "8",
+        "65536"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:38217",
+        "4",
+        "1",
+        "262144",
+        "8",
+        "8",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":131072,\"requested_send_buffer\":65536}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 262144,
+        "chunks": 8,
+        "connections": 1,
+        "payload_mib_per_second": 3960.0,
+        "requests": 5940,
+        "requests_per_second": 1980.0,
+        "rtt_max_us": 678.399,
+        "rtt_mean_us": 504.9367272727273,
+        "rtt_p50_us": 516.351,
+        "rtt_p95_us": 521.983,
+        "rtt_p99_us": 525.823,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 8
+      },
+      "server_backend": "iouring-writer",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 1,
+      "started_unix": 1792808417.036437,
+      "backend": "baseline-writer",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 65536,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/.cache/ordered-writer-enter-classification/baseline-server",
+        "server",
+        "iouring-writer",
+        "1",
+        "1",
+        "262144",
+        "8",
+        "0",
+        "65536"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:35977",
+        "4",
+        "1",
+        "262144",
+        "8",
+        "0",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":131072,\"requested_send_buffer\":65536}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 262144,
+        "chunks": 8,
+        "connections": 1,
+        "payload_mib_per_second": 3827.3333333333335,
+        "requests": 5741,
+        "requests_per_second": 1913.6666666666667,
+        "rtt_max_us": 693.247,
+        "rtt_mean_us": 522.4373844278001,
+        "rtt_p50_us": 525.823,
+        "rtt_p95_us": 532.479,
+        "rtt_p99_us": 537.599,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 0
+      },
+      "server_backend": "iouring-writer",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 2,
+      "started_unix": 1792808421.0398753,
+      "backend": "final-monitor",
+      "workers": 4,
+      "server_cpus": "0-3",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 65536,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0-3",
+        "/home/samuel/Developer/core-rs/core-scheduler-ordered-writer-validation/target/release/core-scheduler-write-benchmark",
+        "server",
+        "iouring-monitor",
+        "4",
+        "32",
+        "262144",
+        "8",
+        "8",
+        "65536"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:32775",
+        "4",
+        "32",
+        "262144",
+        "8",
+        "8",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":131072,\"requested_send_buffer\":65536}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 262144,
+        "chunks": 8,
+        "connections": 32,
+        "payload_mib_per_second": 17450.0,
+        "requests": 26175,
+        "requests_per_second": 8725.0,
+        "rtt_max_us": 5103.615,
+        "rtt_mean_us": 3662.7113493027705,
+        "rtt_p50_us": 3590.143,
+        "rtt_p95_us": 4370.431,
+        "rtt_p99_us": 4603.903,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 8
+      },
+      "server_backend": "iouring-monitor",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 0,
+      "started_unix": 1792808425.0582106,
+      "backend": "final-writer",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 0,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/Developer/core-rs/core-scheduler-ordered-writer-validation/target/release/core-scheduler-write-benchmark",
+        "server",
+        "iouring-writer",
+        "1",
+        "1",
+        "64",
+        "1",
+        "0",
+        "0"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:38467",
+        "4",
+        "1",
+        "64",
+        "1",
+        "0",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":2626560,\"requested_send_buffer\":0}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 64,
+        "chunks": 1,
+        "connections": 1,
+        "payload_mib_per_second": 16.636474609375,
+        "requests": 817716,
+        "requests_per_second": 272572.0,
+        "rtt_max_us": 158.335,
+        "rtt_mean_us": 3.6415482416878295,
+        "rtt_p50_us": 3.551,
+        "rtt_p95_us": 4.163,
+        "rtt_p99_us": 4.291,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 0
+      },
+      "server_backend": "iouring-writer",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 2,
+      "started_unix": 1792808429.060165,
+      "backend": "final-writer",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 0,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/Developer/core-rs/core-scheduler-ordered-writer-validation/target/release/core-scheduler-write-benchmark",
+        "server",
+        "iouring-writer",
+        "1",
+        "1",
+        "64",
+        "1",
+        "0",
+        "0"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:38843",
+        "4",
+        "1",
+        "64",
+        "1",
+        "0",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":2626560,\"requested_send_buffer\":0}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 64,
+        "chunks": 1,
+        "connections": 1,
+        "payload_mib_per_second": 16.453755696614582,
+        "requests": 808735,
+        "requests_per_second": 269578.3333333333,
+        "rtt_max_us": 162.559,
+        "rtt_mean_us": 3.6822823718523363,
+        "rtt_p50_us": 3.571,
+        "rtt_p95_us": 4.203,
+        "rtt_p99_us": 4.343,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 0
+      },
+      "server_backend": "iouring-writer",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 0,
+      "started_unix": 1792808433.062294,
+      "backend": "final-monitor",
+      "workers": 4,
+      "server_cpus": "0-3",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 65536,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0-3",
+        "/home/samuel/Developer/core-rs/core-scheduler-ordered-writer-validation/target/release/core-scheduler-write-benchmark",
+        "server",
+        "iouring-monitor",
+        "4",
+        "32",
+        "262144",
+        "8",
+        "8",
+        "65536"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:43989",
+        "4",
+        "32",
+        "262144",
+        "8",
+        "8",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":131072,\"requested_send_buffer\":65536}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 262144,
+        "chunks": 8,
+        "connections": 32,
+        "payload_mib_per_second": 17770.666666666668,
+        "requests": 26656,
+        "requests_per_second": 8885.333333333334,
+        "rtt_max_us": 4984.831,
+        "rtt_mean_us": 3596.9590780312133,
+        "rtt_p50_us": 3549.183,
+        "rtt_p95_us": 4251.647,
+        "rtt_p99_us": 4497.407,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 8
+      },
+      "server_backend": "iouring-monitor",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 1,
+      "started_unix": 1792808437.0683022,
+      "backend": "baseline-monitor",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 65536,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/.cache/ordered-writer-enter-classification/baseline-server",
+        "server",
+        "iouring-monitor",
+        "1",
+        "1",
+        "262144",
+        "8",
+        "0",
+        "65536"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:39871",
+        "4",
+        "1",
+        "262144",
+        "8",
+        "0",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":131072,\"requested_send_buffer\":65536}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 262144,
+        "chunks": 8,
+        "connections": 1,
+        "payload_mib_per_second": 3596.6666666666665,
+        "requests": 5395,
+        "requests_per_second": 1798.3333333333333,
+        "rtt_max_us": 715.775,
+        "rtt_mean_us": 555.9805152919367,
+        "rtt_p50_us": 556.031,
+        "rtt_p95_us": 562.175,
+        "rtt_p99_us": 566.271,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 0
+      },
+      "server_backend": "iouring-monitor",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 0,
+      "started_unix": 1792808441.07212,
+      "backend": "baseline-monitor",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 0,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/.cache/ordered-writer-enter-classification/baseline-server",
+        "server",
+        "iouring-monitor",
+        "1",
+        "1",
+        "64",
+        "1",
+        "0",
+        "0"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:45711",
+        "4",
+        "1",
+        "64",
+        "1",
+        "0",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":2626560,\"requested_send_buffer\":0}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 64,
+        "chunks": 1,
+        "connections": 1,
+        "payload_mib_per_second": 16.838785807291668,
+        "requests": 827660,
+        "requests_per_second": 275886.6666666667,
+        "rtt_max_us": 162.431,
+        "rtt_mean_us": 3.5973792873885406,
+        "rtt_p50_us": 3.541,
+        "rtt_p95_us": 4.103,
+        "rtt_p99_us": 4.211,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 0
+      },
+      "server_backend": "iouring-monitor",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 1,
+      "started_unix": 1792808445.074192,
+      "backend": "final-monitor",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 0,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/Developer/core-rs/core-scheduler-ordered-writer-validation/target/release/core-scheduler-write-benchmark",
+        "server",
+        "iouring-monitor",
+        "1",
+        "1",
+        "64",
+        "1",
+        "0",
+        "0"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:43731",
+        "4",
+        "1",
+        "64",
+        "1",
+        "0",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":2626560,\"requested_send_buffer\":0}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 64,
+        "chunks": 1,
+        "connections": 1,
+        "payload_mib_per_second": 16.5538330078125,
+        "requests": 813654,
+        "requests_per_second": 271218.0,
+        "rtt_max_us": 164.223,
+        "rtt_mean_us": 3.659195007951783,
+        "rtt_p50_us": 3.551,
+        "rtt_p95_us": 4.151,
+        "rtt_p99_us": 4.283,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 0
+      },
+      "server_backend": "iouring-monitor",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 1,
+      "started_unix": 1792808449.0760186,
+      "backend": "baseline-monitor",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 0,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/.cache/ordered-writer-enter-classification/baseline-server",
+        "server",
+        "iouring-monitor",
+        "1",
+        "1",
+        "64",
+        "1",
+        "0",
+        "0"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:42015",
+        "4",
+        "1",
+        "64",
+        "1",
+        "0",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":2626560,\"requested_send_buffer\":0}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 64,
+        "chunks": 1,
+        "connections": 1,
+        "payload_mib_per_second": 16.729410807291668,
+        "requests": 822284,
+        "requests_per_second": 274094.6666666667,
+        "rtt_max_us": 159.231,
+        "rtt_mean_us": 3.620974634068031,
+        "rtt_p50_us": 3.541,
+        "rtt_p95_us": 4.123,
+        "rtt_p99_us": 4.243,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 0
+      },
+      "server_backend": "iouring-monitor",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 0,
+      "started_unix": 1792808453.0783393,
+      "backend": "final-monitor",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 65536,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/Developer/core-rs/core-scheduler-ordered-writer-validation/target/release/core-scheduler-write-benchmark",
+        "server",
+        "iouring-monitor",
+        "1",
+        "1",
+        "262144",
+        "8",
+        "8",
+        "65536"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:40489",
+        "4",
+        "1",
+        "262144",
+        "8",
+        "8",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":131072,\"requested_send_buffer\":65536}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 262144,
+        "chunks": 8,
+        "connections": 1,
+        "payload_mib_per_second": 4228.666666666667,
+        "requests": 6343,
+        "requests_per_second": 2114.3333333333335,
+        "rtt_max_us": 642.559,
+        "rtt_mean_us": 472.8648525934099,
+        "rtt_p50_us": 473.343,
+        "rtt_p95_us": 475.903,
+        "rtt_p99_us": 477.183,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 8
+      },
+      "server_backend": "iouring-monitor",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 1,
+      "started_unix": 1792808457.0826323,
+      "backend": "final-writer",
+      "workers": 4,
+      "server_cpus": "0-3",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 65536,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0-3",
+        "/home/samuel/Developer/core-rs/core-scheduler-ordered-writer-validation/target/release/core-scheduler-write-benchmark",
+        "server",
+        "iouring-writer",
+        "4",
+        "32",
+        "262144",
+        "8",
+        "8",
+        "65536"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:35175",
+        "4",
+        "32",
+        "262144",
+        "8",
+        "8",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":131072,\"requested_send_buffer\":65536}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 262144,
+        "chunks": 8,
+        "connections": 32,
+        "payload_mib_per_second": 15894.0,
+        "requests": 23841,
+        "requests_per_second": 7947.0,
+        "rtt_max_us": 4198.399,
+        "rtt_mean_us": 4021.2383359758387,
+        "rtt_p50_us": 4030.463,
+        "rtt_p95_us": 4048.895,
+        "rtt_p99_us": 4059.135,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 8
+      },
+      "server_backend": "iouring-writer",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 2,
+      "started_unix": 1792808461.0886867,
+      "backend": "baseline-writer",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 65536,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/.cache/ordered-writer-enter-classification/baseline-server",
+        "server",
+        "iouring-writer",
+        "1",
+        "1",
+        "262144",
+        "8",
+        "8",
+        "65536"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:33101",
+        "4",
+        "1",
+        "262144",
+        "8",
+        "8",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":131072,\"requested_send_buffer\":65536}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 262144,
+        "chunks": 8,
+        "connections": 1,
+        "payload_mib_per_second": 4277.333333333333,
+        "requests": 6416,
+        "requests_per_second": 2138.6666666666665,
+        "rtt_max_us": 593.407,
+        "rtt_mean_us": 467.4451670822942,
+        "rtt_p50_us": 439.039,
+        "rtt_p95_us": 523.263,
+        "rtt_p99_us": 527.359,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 8
+      },
+      "server_backend": "iouring-writer",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 2,
+      "started_unix": 1792808465.0923965,
+      "backend": "baseline-monitor",
+      "workers": 4,
+      "server_cpus": "0-3",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 65536,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0-3",
+        "/home/samuel/.cache/ordered-writer-enter-classification/baseline-server",
+        "server",
+        "iouring-monitor",
+        "4",
+        "32",
+        "262144",
+        "8",
+        "8",
+        "65536"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:46777",
+        "4",
+        "32",
+        "262144",
+        "8",
+        "8",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":131072,\"requested_send_buffer\":65536}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 262144,
+        "chunks": 8,
+        "connections": 32,
+        "payload_mib_per_second": 16914.0,
+        "requests": 25371,
+        "requests_per_second": 8457.0,
+        "rtt_max_us": 5038.079,
+        "rtt_mean_us": 3779.0907880651203,
+        "rtt_p50_us": 3858.431,
+        "rtt_p95_us": 4358.143,
+        "rtt_p99_us": 4558.847,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 8
+      },
+      "server_backend": "iouring-monitor",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 2,
+      "started_unix": 1792808469.098906,
+      "backend": "final-writer",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 65536,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/Developer/core-rs/core-scheduler-ordered-writer-validation/target/release/core-scheduler-write-benchmark",
+        "server",
+        "iouring-writer",
+        "1",
+        "1",
+        "262144",
+        "8",
+        "8",
+        "65536"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:39919",
+        "4",
+        "1",
+        "262144",
+        "8",
+        "8",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":131072,\"requested_send_buffer\":65536}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 262144,
+        "chunks": 8,
+        "connections": 1,
+        "payload_mib_per_second": 3992.0,
+        "requests": 5988,
+        "requests_per_second": 1996.0,
+        "rtt_max_us": 668.671,
+        "rtt_mean_us": 500.8887748830994,
+        "rtt_p50_us": 507.647,
+        "rtt_p95_us": 512.255,
+        "rtt_p99_us": 515.327,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 8
+      },
+      "server_backend": "iouring-writer",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 1,
+      "started_unix": 1792808473.1022022,
+      "backend": "final-writer",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 65536,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/Developer/core-rs/core-scheduler-ordered-writer-validation/target/release/core-scheduler-write-benchmark",
+        "server",
+        "iouring-writer",
+        "1",
+        "1",
+        "262144",
+        "8",
+        "0",
+        "65536"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:40037",
+        "4",
+        "1",
+        "262144",
+        "8",
+        "0",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":131072,\"requested_send_buffer\":65536}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 262144,
+        "chunks": 8,
+        "connections": 1,
+        "payload_mib_per_second": 3958.0,
+        "requests": 5937,
+        "requests_per_second": 1979.0,
+        "rtt_max_us": 666.111,
+        "rtt_mean_us": 505.18943843692085,
+        "rtt_p50_us": 505.343,
+        "rtt_p95_us": 510.463,
+        "rtt_p99_us": 514.047,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 0
+      },
+      "server_backend": "iouring-writer",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 0,
+      "started_unix": 1792808477.105765,
+      "backend": "final-monitor",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 0,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/Developer/core-rs/core-scheduler-ordered-writer-validation/target/release/core-scheduler-write-benchmark",
+        "server",
+        "iouring-monitor",
+        "1",
+        "1",
+        "64",
+        "1",
+        "0",
+        "0"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:39419",
+        "4",
+        "1",
+        "64",
+        "1",
+        "0",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":2626560,\"requested_send_buffer\":0}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 64,
+        "chunks": 1,
+        "connections": 1,
+        "payload_mib_per_second": 16.885274251302082,
+        "requests": 829945,
+        "requests_per_second": 276648.3333333333,
+        "rtt_max_us": 164.223,
+        "rtt_mean_us": 3.5871488363686725,
+        "rtt_p50_us": 3.501,
+        "rtt_p95_us": 4.081,
+        "rtt_p99_us": 4.563,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 0
+      },
+      "server_backend": "iouring-monitor",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 0,
+      "started_unix": 1792808481.1083448,
+      "backend": "baseline-writer",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 65536,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/.cache/ordered-writer-enter-classification/baseline-server",
+        "server",
+        "iouring-writer",
+        "1",
+        "1",
+        "262144",
+        "8",
+        "8",
+        "65536"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:40981",
+        "4",
+        "1",
+        "262144",
+        "8",
+        "8",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":131072,\"requested_send_buffer\":65536}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 262144,
+        "chunks": 8,
+        "connections": 1,
+        "payload_mib_per_second": 3746.0,
+        "requests": 5619,
+        "requests_per_second": 1873.0,
+        "rtt_max_us": 689.151,
+        "rtt_mean_us": 533.7483139348637,
+        "rtt_p50_us": 533.503,
+        "rtt_p95_us": 541.695,
+        "rtt_p99_us": 545.791,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 8
+      },
+      "server_backend": "iouring-writer",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 0,
+      "started_unix": 1792808485.1241655,
+      "backend": "final-writer",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 65536,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/Developer/core-rs/core-scheduler-ordered-writer-validation/target/release/core-scheduler-write-benchmark",
+        "server",
+        "iouring-writer",
+        "1",
+        "1",
+        "262144",
+        "8",
+        "8",
+        "65536"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:34443",
+        "4",
+        "1",
+        "262144",
+        "8",
+        "8",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":131072,\"requested_send_buffer\":65536}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 262144,
+        "chunks": 8,
+        "connections": 1,
+        "payload_mib_per_second": 4352.666666666667,
+        "requests": 6529,
+        "requests_per_second": 2176.3333333333335,
+        "rtt_max_us": 592.383,
+        "rtt_mean_us": 459.3269119313828,
+        "rtt_p50_us": 434.687,
+        "rtt_p95_us": 519.935,
+        "rtt_p99_us": 521.215,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 8
+      },
+      "server_backend": "iouring-writer",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 1,
+      "started_unix": 1792808489.1278348,
+      "backend": "final-monitor",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 65536,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/Developer/core-rs/core-scheduler-ordered-writer-validation/target/release/core-scheduler-write-benchmark",
+        "server",
+        "iouring-monitor",
+        "1",
+        "1",
+        "262144",
+        "8",
+        "0",
+        "65536"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:37597",
+        "4",
+        "1",
+        "262144",
+        "8",
+        "0",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":131072,\"requested_send_buffer\":65536}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 262144,
+        "chunks": 8,
+        "connections": 1,
+        "payload_mib_per_second": 4379.333333333333,
+        "requests": 6569,
+        "requests_per_second": 2189.6666666666665,
+        "rtt_max_us": 691.199,
+        "rtt_mean_us": 456.5842423504337,
+        "rtt_p50_us": 456.447,
+        "rtt_p95_us": 462.335,
+        "rtt_p99_us": 466.431,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 0
+      },
+      "server_backend": "iouring-monitor",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 1,
+      "started_unix": 1792808493.1320055,
+      "backend": "baseline-monitor",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 65536,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/.cache/ordered-writer-enter-classification/baseline-server",
+        "server",
+        "iouring-monitor",
+        "1",
+        "1",
+        "262144",
+        "8",
+        "8",
+        "65536"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:34781",
+        "4",
+        "1",
+        "262144",
+        "8",
+        "8",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":131072,\"requested_send_buffer\":65536}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 262144,
+        "chunks": 8,
+        "connections": 1,
+        "payload_mib_per_second": 3580.0,
+        "requests": 5370,
+        "requests_per_second": 1790.0,
+        "rtt_max_us": 703.487,
+        "rtt_mean_us": 558.4846420856612,
+        "rtt_p50_us": 558.079,
+        "rtt_p95_us": 569.343,
+        "rtt_p99_us": 574.975,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 8
+      },
+      "server_backend": "iouring-monitor",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 0,
+      "started_unix": 1792808497.1362844,
+      "backend": "baseline-writer",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 65536,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/.cache/ordered-writer-enter-classification/baseline-server",
+        "server",
+        "iouring-writer",
+        "1",
+        "1",
+        "262144",
+        "8",
+        "0",
+        "65536"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:40067",
+        "4",
+        "1",
+        "262144",
+        "8",
+        "0",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":131072,\"requested_send_buffer\":65536}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 262144,
+        "chunks": 8,
+        "connections": 1,
+        "payload_mib_per_second": 3798.6666666666665,
+        "requests": 5698,
+        "requests_per_second": 1899.3333333333333,
+        "rtt_max_us": 693.759,
+        "rtt_mean_us": 526.3209715689715,
+        "rtt_p50_us": 525.823,
+        "rtt_p95_us": 534.527,
+        "rtt_p99_us": 539.135,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 0
+      },
+      "server_backend": "iouring-writer",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 1,
+      "started_unix": 1792808501.1396801,
+      "backend": "baseline-writer",
+      "workers": 4,
+      "server_cpus": "0-3",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 65536,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0-3",
+        "/home/samuel/.cache/ordered-writer-enter-classification/baseline-server",
+        "server",
+        "iouring-writer",
+        "4",
+        "32",
+        "262144",
+        "8",
+        "8",
+        "65536"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:35181",
+        "4",
+        "32",
+        "262144",
+        "8",
+        "8",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":131072,\"requested_send_buffer\":65536}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 262144,
+        "chunks": 8,
+        "connections": 32,
+        "payload_mib_per_second": 16068.0,
+        "requests": 24102,
+        "requests_per_second": 8034.0,
+        "rtt_max_us": 4321.279,
+        "rtt_mean_us": 3977.6584502530905,
+        "rtt_p50_us": 3979.263,
+        "rtt_p95_us": 3999.743,
+        "rtt_p99_us": 4036.607,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 8
+      },
+      "server_backend": "iouring-writer",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 2,
+      "started_unix": 1792808505.1455703,
+      "backend": "baseline-writer",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 65536,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/.cache/ordered-writer-enter-classification/baseline-server",
+        "server",
+        "iouring-writer",
+        "1",
+        "1",
+        "262144",
+        "8",
+        "0",
+        "65536"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:46035",
+        "4",
+        "1",
+        "262144",
+        "8",
+        "0",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":131072,\"requested_send_buffer\":65536}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 262144,
+        "chunks": 8,
+        "connections": 1,
+        "payload_mib_per_second": 3714.6666666666665,
+        "requests": 5572,
+        "requests_per_second": 1857.3333333333333,
+        "rtt_max_us": 696.831,
+        "rtt_mean_us": 538.259250538406,
+        "rtt_p50_us": 538.623,
+        "rtt_p95_us": 545.791,
+        "rtt_p99_us": 549.887,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 0
+      },
+      "server_backend": "iouring-writer",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 2,
+      "started_unix": 1792808509.1491961,
+      "backend": "final-monitor",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 65536,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/Developer/core-rs/core-scheduler-ordered-writer-validation/target/release/core-scheduler-write-benchmark",
+        "server",
+        "iouring-monitor",
+        "1",
+        "1",
+        "262144",
+        "8",
+        "8",
+        "65536"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:38591",
+        "4",
+        "1",
+        "262144",
+        "8",
+        "8",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":131072,\"requested_send_buffer\":65536}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 262144,
+        "chunks": 8,
+        "connections": 1,
+        "payload_mib_per_second": 4291.333333333333,
+        "requests": 6437,
+        "requests_per_second": 2145.6666666666665,
+        "rtt_max_us": 636.415,
+        "rtt_mean_us": 465.96394593754866,
+        "rtt_p50_us": 465.663,
+        "rtt_p95_us": 472.575,
+        "rtt_p99_us": 476.671,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 8
+      },
+      "server_backend": "iouring-monitor",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 0,
+      "started_unix": 1792808513.1531196,
+      "backend": "baseline-writer",
+      "workers": 4,
+      "server_cpus": "0-3",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 65536,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0-3",
+        "/home/samuel/.cache/ordered-writer-enter-classification/baseline-server",
+        "server",
+        "iouring-writer",
+        "4",
+        "32",
+        "262144",
+        "8",
+        "8",
+        "65536"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:39407",
+        "4",
+        "32",
+        "262144",
+        "8",
+        "8",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":131072,\"requested_send_buffer\":65536}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 262144,
+        "chunks": 8,
+        "connections": 32,
+        "payload_mib_per_second": 16002.666666666666,
+        "requests": 24004,
+        "requests_per_second": 8001.333333333333,
+        "rtt_max_us": 5169.151,
+        "rtt_mean_us": 3993.841879686723,
+        "rtt_p50_us": 3991.551,
+        "rtt_p95_us": 4993.023,
+        "rtt_p99_us": 5001.215,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 8
+      },
+      "server_backend": "iouring-writer",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 0,
+      "started_unix": 1792808517.1598032,
+      "backend": "baseline-monitor",
+      "workers": 4,
+      "server_cpus": "0-3",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 65536,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0-3",
+        "/home/samuel/.cache/ordered-writer-enter-classification/baseline-server",
+        "server",
+        "iouring-monitor",
+        "4",
+        "32",
+        "262144",
+        "8",
+        "8",
+        "65536"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:36055",
+        "4",
+        "32",
+        "262144",
+        "8",
+        "8",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":131072,\"requested_send_buffer\":65536}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 262144,
+        "chunks": 8,
+        "connections": 32,
+        "payload_mib_per_second": 16212.666666666666,
+        "requests": 24319,
+        "requests_per_second": 8106.333333333333,
+        "rtt_max_us": 5046.271,
+        "rtt_mean_us": 3942.3119542744375,
+        "rtt_p50_us": 3966.975,
+        "rtt_p95_us": 4395.007,
+        "rtt_p99_us": 4587.519,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 8
+      },
+      "server_backend": "iouring-monitor",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 1,
+      "started_unix": 1792808521.1657994,
+      "backend": "baseline-writer",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 65536,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/.cache/ordered-writer-enter-classification/baseline-server",
+        "server",
+        "iouring-writer",
+        "1",
+        "1",
+        "262144",
+        "8",
+        "8",
+        "65536"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:42709",
+        "4",
+        "1",
+        "262144",
+        "8",
+        "8",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":131072,\"requested_send_buffer\":65536}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 262144,
+        "chunks": 8,
+        "connections": 1,
+        "payload_mib_per_second": 4436.666666666667,
+        "requests": 6655,
+        "requests_per_second": 2218.3333333333335,
+        "rtt_max_us": 605.695,
+        "rtt_mean_us": 450.6436664162284,
+        "rtt_p50_us": 450.815,
+        "rtt_p95_us": 456.703,
+        "rtt_p99_us": 459.519,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 8
+      },
+      "server_backend": "iouring-writer",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 1,
+      "started_unix": 1792808525.1691337,
+      "backend": "final-monitor",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 65536,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/Developer/core-rs/core-scheduler-ordered-writer-validation/target/release/core-scheduler-write-benchmark",
+        "server",
+        "iouring-monitor",
+        "1",
+        "1",
+        "262144",
+        "8",
+        "8",
+        "65536"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:46849",
+        "4",
+        "1",
+        "262144",
+        "8",
+        "8",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":131072,\"requested_send_buffer\":65536}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 262144,
+        "chunks": 8,
+        "connections": 1,
+        "payload_mib_per_second": 4226.0,
+        "requests": 6339,
+        "requests_per_second": 2113.0,
+        "rtt_max_us": 629.247,
+        "rtt_mean_us": 473.1364619025079,
+        "rtt_p50_us": 473.087,
+        "rtt_p95_us": 476.159,
+        "rtt_p99_us": 477.951,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 8
+      },
+      "server_backend": "iouring-monitor",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-comparison.json"
+    },
+    {
+      "repetition": 2,
+      "started_unix": 1792808625.2760255,
+      "backend": "baseline-writer",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 0,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/.cache/ordered-writer-enter-classification/baseline-server",
+        "server",
+        "iouring-writer",
+        "1",
+        "1",
+        "65536",
+        "8",
+        "8",
+        "0"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:42881",
+        "4",
+        "1",
+        "65536",
+        "8",
+        "8",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":2626560,\"requested_send_buffer\":0}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 65536,
+        "chunks": 8,
+        "connections": 1,
+        "payload_mib_per_second": 4293.166666666667,
+        "requests": 25759,
+        "requests_per_second": 8586.333333333334,
+        "rtt_max_us": 284.927,
+        "rtt_mean_us": 116.42690352886376,
+        "rtt_p50_us": 116.351,
+        "rtt_p95_us": 117.887,
+        "rtt_p99_us": 118.591,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 8
+      },
+      "server_backend": "iouring-writer",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-supplement.json"
+    },
+    {
+      "repetition": 2,
+      "started_unix": 1792808629.2783494,
+      "backend": "final-monitor",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 0,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/Developer/core-rs/core-scheduler-ordered-writer-validation/target/release/core-scheduler-write-benchmark",
+        "server",
+        "iouring-monitor",
+        "1",
+        "1",
+        "65536",
+        "8",
+        "8",
+        "0"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:37085",
+        "4",
+        "1",
+        "65536",
+        "8",
+        "8",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":2626560,\"requested_send_buffer\":0}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 65536,
+        "chunks": 8,
+        "connections": 1,
+        "payload_mib_per_second": 4337.5,
+        "requests": 26025,
+        "requests_per_second": 8675.0,
+        "rtt_max_us": 274.431,
+        "rtt_mean_us": 115.23184753121993,
+        "rtt_p50_us": 115.263,
+        "rtt_p95_us": 116.543,
+        "rtt_p99_us": 117.631,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 8
+      },
+      "server_backend": "iouring-monitor",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-supplement.json"
+    },
+    {
+      "repetition": 2,
+      "started_unix": 1792808633.2807837,
+      "backend": "final-writer",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 0,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/Developer/core-rs/core-scheduler-ordered-writer-validation/target/release/core-scheduler-write-benchmark",
+        "server",
+        "iouring-writer",
+        "1",
+        "1",
+        "65536",
+        "8",
+        "8",
+        "0"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:37305",
+        "4",
+        "1",
+        "65536",
+        "8",
+        "8",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":2626560,\"requested_send_buffer\":0}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 65536,
+        "chunks": 8,
+        "connections": 1,
+        "payload_mib_per_second": 4289.0,
+        "requests": 25734,
+        "requests_per_second": 8578.0,
+        "rtt_max_us": 271.359,
+        "rtt_mean_us": 116.52886795678872,
+        "rtt_p50_us": 116.863,
+        "rtt_p95_us": 118.143,
+        "rtt_p99_us": 119.167,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 8
+      },
+      "server_backend": "iouring-writer",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-supplement.json"
+    },
+    {
+      "repetition": 2,
+      "started_unix": 1792808637.283067,
+      "backend": "baseline-monitor",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 0,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/.cache/ordered-writer-enter-classification/baseline-server",
+        "server",
+        "iouring-monitor",
+        "1",
+        "1",
+        "65536",
+        "8",
+        "8",
+        "0"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:40741",
+        "4",
+        "1",
+        "65536",
+        "8",
+        "8",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":2626560,\"requested_send_buffer\":0}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 65536,
+        "chunks": 8,
+        "connections": 1,
+        "payload_mib_per_second": 3650.0,
+        "requests": 21900,
+        "requests_per_second": 7300.0,
+        "rtt_max_us": 296.703,
+        "rtt_mean_us": 136.94994995433788,
+        "rtt_p50_us": 136.959,
+        "rtt_p95_us": 138.367,
+        "rtt_p99_us": 139.263,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 8
+      },
+      "server_backend": "iouring-monitor",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-supplement.json"
+    },
+    {
+      "repetition": 1,
+      "started_unix": 1792808641.2854712,
+      "backend": "final-writer",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 0,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/Developer/core-rs/core-scheduler-ordered-writer-validation/target/release/core-scheduler-write-benchmark",
+        "server",
+        "iouring-writer",
+        "1",
+        "1",
+        "65536",
+        "8",
+        "8",
+        "0"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:41151",
+        "4",
+        "1",
+        "65536",
+        "8",
+        "8",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":2626560,\"requested_send_buffer\":0}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 65536,
+        "chunks": 8,
+        "connections": 1,
+        "payload_mib_per_second": 4370.0,
+        "requests": 26220,
+        "requests_per_second": 8740.0,
+        "rtt_max_us": 274.687,
+        "rtt_mean_us": 114.37115484363079,
+        "rtt_p50_us": 114.303,
+        "rtt_p95_us": 115.839,
+        "rtt_p99_us": 116.671,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 8
+      },
+      "server_backend": "iouring-writer",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-supplement.json"
+    },
+    {
+      "repetition": 0,
+      "started_unix": 1792808645.2881033,
+      "backend": "baseline-writer",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 0,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/.cache/ordered-writer-enter-classification/baseline-server",
+        "server",
+        "iouring-writer",
+        "1",
+        "1",
+        "65536",
+        "8",
+        "8",
+        "0"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:43801",
+        "4",
+        "1",
+        "65536",
+        "8",
+        "8",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":2626560,\"requested_send_buffer\":0}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 65536,
+        "chunks": 8,
+        "connections": 1,
+        "payload_mib_per_second": 4380.333333333333,
+        "requests": 26282,
+        "requests_per_second": 8760.666666666666,
+        "rtt_max_us": 276.735,
+        "rtt_mean_us": 114.10739395784188,
+        "rtt_p50_us": 114.047,
+        "rtt_p95_us": 115.711,
+        "rtt_p99_us": 116.607,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 8
+      },
+      "server_backend": "iouring-writer",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-supplement.json"
+    },
+    {
+      "repetition": 1,
+      "started_unix": 1792808649.2904558,
+      "backend": "baseline-writer",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 0,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/.cache/ordered-writer-enter-classification/baseline-server",
+        "server",
+        "iouring-writer",
+        "1",
+        "1",
+        "65536",
+        "8",
+        "8",
+        "0"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:36559",
+        "4",
+        "1",
+        "65536",
+        "8",
+        "8",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":2626560,\"requested_send_buffer\":0}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 65536,
+        "chunks": 8,
+        "connections": 1,
+        "payload_mib_per_second": 4393.5,
+        "requests": 26361,
+        "requests_per_second": 8787.0,
+        "rtt_max_us": 278.271,
+        "rtt_mean_us": 113.76956564621982,
+        "rtt_p50_us": 113.855,
+        "rtt_p95_us": 115.391,
+        "rtt_p99_us": 116.223,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 8
+      },
+      "server_backend": "iouring-writer",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-supplement.json"
+    },
+    {
+      "repetition": 1,
+      "started_unix": 1792808653.2926693,
+      "backend": "baseline-monitor",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 0,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/.cache/ordered-writer-enter-classification/baseline-server",
+        "server",
+        "iouring-monitor",
+        "1",
+        "1",
+        "65536",
+        "8",
+        "8",
+        "0"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:36855",
+        "4",
+        "1",
+        "65536",
+        "8",
+        "8",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":2626560,\"requested_send_buffer\":0}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 65536,
+        "chunks": 8,
+        "connections": 1,
+        "payload_mib_per_second": 4388.5,
+        "requests": 26331,
+        "requests_per_second": 8777.0,
+        "rtt_max_us": 276.991,
+        "rtt_mean_us": 113.89652409707188,
+        "rtt_p50_us": 113.855,
+        "rtt_p95_us": 115.391,
+        "rtt_p99_us": 116.159,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 8
+      },
+      "server_backend": "iouring-monitor",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-supplement.json"
+    },
+    {
+      "repetition": 1,
+      "started_unix": 1792808657.2948039,
+      "backend": "final-monitor",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 0,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/Developer/core-rs/core-scheduler-ordered-writer-validation/target/release/core-scheduler-write-benchmark",
+        "server",
+        "iouring-monitor",
+        "1",
+        "1",
+        "65536",
+        "8",
+        "8",
+        "0"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:38011",
+        "4",
+        "1",
+        "65536",
+        "8",
+        "8",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":2626560,\"requested_send_buffer\":0}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 65536,
+        "chunks": 8,
+        "connections": 1,
+        "payload_mib_per_second": 4377.666666666667,
+        "requests": 26266,
+        "requests_per_second": 8755.333333333334,
+        "rtt_max_us": 266.239,
+        "rtt_mean_us": 114.17763618365954,
+        "rtt_p50_us": 114.175,
+        "rtt_p95_us": 115.647,
+        "rtt_p99_us": 116.671,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 8
+      },
+      "server_backend": "iouring-monitor",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-supplement.json"
+    },
+    {
+      "repetition": 0,
+      "started_unix": 1792808661.2970843,
+      "backend": "baseline-monitor",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 0,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/.cache/ordered-writer-enter-classification/baseline-server",
+        "server",
+        "iouring-monitor",
+        "1",
+        "1",
+        "65536",
+        "8",
+        "8",
+        "0"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:44179",
+        "4",
+        "1",
+        "65536",
+        "8",
+        "8",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":2626560,\"requested_send_buffer\":0}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 65536,
+        "chunks": 8,
+        "connections": 1,
+        "payload_mib_per_second": 4376.5,
+        "requests": 26259,
+        "requests_per_second": 8753.0,
+        "rtt_max_us": 270.079,
+        "rtt_mean_us": 114.20809627175439,
+        "rtt_p50_us": 114.047,
+        "rtt_p95_us": 115.903,
+        "rtt_p99_us": 117.055,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 8
+      },
+      "server_backend": "iouring-monitor",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-supplement.json"
+    },
+    {
+      "repetition": 0,
+      "started_unix": 1792808665.299424,
+      "backend": "final-monitor",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 0,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/Developer/core-rs/core-scheduler-ordered-writer-validation/target/release/core-scheduler-write-benchmark",
+        "server",
+        "iouring-monitor",
+        "1",
+        "1",
+        "65536",
+        "8",
+        "8",
+        "0"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:32779",
+        "4",
+        "1",
+        "65536",
+        "8",
+        "8",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":2626560,\"requested_send_buffer\":0}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 65536,
+        "chunks": 8,
+        "connections": 1,
+        "payload_mib_per_second": 4371.0,
+        "requests": 26226,
+        "requests_per_second": 8742.0,
+        "rtt_max_us": 263.679,
+        "rtt_mean_us": 114.3462945168916,
+        "rtt_p50_us": 114.303,
+        "rtt_p95_us": 115.647,
+        "rtt_p99_us": 116.479,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 8
+      },
+      "server_backend": "iouring-monitor",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-supplement.json"
+    },
+    {
+      "repetition": 0,
+      "started_unix": 1792808669.3022697,
+      "backend": "final-writer",
+      "workers": 1,
+      "server_cpus": "0",
+      "client_cpus": "4-7",
+      "client_workers": 4,
+      "send_buffer": 0,
+      "server_command": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/samuel/Developer/core-rs/core-scheduler-ordered-writer-validation/target/release/core-scheduler-write-benchmark",
+        "server",
+        "iouring-writer",
+        "1",
+        "1",
+        "65536",
+        "8",
+        "8",
+        "0"
+      ],
+      "client_command": [
+        "taskset",
+        "-c",
+        "4-7",
+        "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+        "client",
+        "127.0.0.1:36609",
+        "4",
+        "1",
+        "65536",
+        "8",
+        "8",
+        "1.0",
+        "3.0"
+      ],
+      "server_stderr": "{\"actual_send_buffer\":2626560,\"requested_send_buffer\":0}\n",
+      "server_remaining_stdout": "",
+      "perf_stat": null,
+      "result": {
+        "bytes": 65536,
+        "chunks": 8,
+        "connections": 1,
+        "payload_mib_per_second": 4087.1666666666665,
+        "requests": 24523,
+        "requests_per_second": 8174.333333333333,
+        "rtt_max_us": 283.391,
+        "rtt_mean_us": 122.29649422990659,
+        "rtt_p50_us": 123.967,
+        "rtt_p95_us": 125.503,
+        "rtt_p99_us": 126.335,
+        "seconds": 3.0,
+        "warmup_seconds": 1.0,
+        "work": 8
+      },
+      "server_backend": "iouring-writer",
+      "source_artifact": "/home/samuel/.cache/ordered-writer-normal-taskwork-final-supplement.json"
+    }
+  ],
+  "benchmark_summary": [
+    {
+      "case": [
+        1,
+        1,
+        64,
+        1,
+        0,
+        0
+      ],
+      "backend": "writer",
+      "baseline_median_requests_per_second": 273399.3333333333,
+      "final_median_requests_per_second": 272572.0,
+      "change_percent": -0.30260985761974
+    },
+    {
+      "case": [
+        1,
+        1,
+        64,
+        1,
+        0,
+        0
+      ],
+      "backend": "monitor",
+      "baseline_median_requests_per_second": 274094.6666666667,
+      "final_median_requests_per_second": 272370.0,
+      "change_percent": -0.6292229935156324
+    },
+    {
+      "case": [
+        1,
+        1,
+        65536,
+        8,
+        8,
+        0
+      ],
+      "backend": "writer",
+      "baseline_median_requests_per_second": 8760.666666666666,
+      "final_median_requests_per_second": 8578.0,
+      "change_percent": -2.0850772391750927
+    },
+    {
+      "case": [
+        1,
+        1,
+        65536,
+        8,
+        8,
+        0
+      ],
+      "backend": "monitor",
+      "baseline_median_requests_per_second": 8753.0,
+      "final_median_requests_per_second": 8742.0,
+      "change_percent": -0.1256711984462422
+    },
+    {
+      "case": [
+        1,
+        1,
+        262144,
+        8,
+        0,
+        65536
+      ],
+      "backend": "writer",
+      "baseline_median_requests_per_second": 1899.3333333333333,
+      "final_median_requests_per_second": 2125.6666666666665,
+      "change_percent": 11.916461916461918
+    },
+    {
+      "case": [
+        1,
+        1,
+        262144,
+        8,
+        0,
+        65536
+      ],
+      "backend": "monitor",
+      "baseline_median_requests_per_second": 1828.0,
+      "final_median_requests_per_second": 2200.6666666666665,
+      "change_percent": 20.386579139314364
+    },
+    {
+      "case": [
+        1,
+        1,
+        262144,
+        8,
+        8,
+        65536
+      ],
+      "backend": "writer",
+      "baseline_median_requests_per_second": 2138.6666666666665,
+      "final_median_requests_per_second": 1996.0,
+      "change_percent": -6.670822942643384
+    },
+    {
+      "case": [
+        1,
+        1,
+        262144,
+        8,
+        8,
+        65536
+      ],
+      "backend": "monitor",
+      "baseline_median_requests_per_second": 1821.0,
+      "final_median_requests_per_second": 2114.3333333333335,
+      "change_percent": 16.10836536701448
+    },
+    {
+      "case": [
+        4,
+        32,
+        262144,
+        8,
+        8,
+        65536
+      ],
+      "backend": "writer",
+      "baseline_median_requests_per_second": 8001.333333333333,
+      "final_median_requests_per_second": 7936.0,
+      "change_percent": -0.8165305782369514
+    },
+    {
+      "case": [
+        4,
+        32,
+        262144,
+        8,
+        8,
+        65536
+      ],
+      "backend": "monitor",
+      "baseline_median_requests_per_second": 8457.0,
+      "final_median_requests_per_second": 8725.0,
+      "change_percent": 3.168972448858942
+    }
+  ],
+  "classifications": [
+    {
+      "source_head": "78846c3 runtime, frozen baseline",
+      "report": {
+        "path": "/home/samuel/.cache/ordered-writer-enter-classification/report.json",
+        "bytes": 3061,
+        "sha256": "d0d114234ea650c2c26ecd9cd0f9c98617305f24271a175ea193674b6b6eed2e"
+      },
+      "metadata": {
+        "binary": "/home/samuel/Developer/core-rs/core-scheduler-ordered-writer/target/release/core-scheduler-write-benchmark",
+        "binary_sha256": "b186057dd5ec6d01ab3b50b0b27cbd3a4b9f67e97735a2c28cfb2807c664621a",
+        "case": [
+          1,
+          1,
+          262144,
+          8,
+          8,
+          65536
+        ],
+        "samples": [
+          {
+            "backend": "iouring-monitor",
+            "workers": 1,
+            "server_cpus": "0",
+            "client_cpus": "4-7",
+            "client_workers": 4,
+            "send_buffer": 65536,
+            "server_command": [
+              "taskset",
+              "-c",
+              "0",
+              "/home/samuel/.cache/ordered-writer-enter-classification/iouring-monitor.sh",
+              "server",
+              "iouring-monitor",
+              "1",
+              "1",
+              "262144",
+              "8",
+              "8",
+              "65536"
+            ],
+            "client_command": [
+              "taskset",
+              "-c",
+              "4-7",
+              "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+              "client",
+              "127.0.0.1:34267",
+              "4",
+              "1",
+              "262144",
+              "8",
+              "8",
+              "0",
+              "2"
+            ],
+            "server_stderr": "{\"actual_send_buffer\":131072,\"requested_send_buffer\":65536}\n",
+            "server_remaining_stdout": "",
+            "perf_stat": null,
+            "result": {
+              "bytes": 262144,
+              "chunks": 8,
+              "connections": 1,
+              "payload_mib_per_second": 3681.0,
+              "requests": 3681,
+              "requests_per_second": 1840.5,
+              "rtt_max_us": 822.783,
+              "rtt_mean_us": 543.2453181200758,
+              "rtt_p50_us": 544.255,
+              "rtt_p95_us": 557.055,
+              "rtt_p99_us": 563.711,
+              "seconds": 2.0,
+              "warmup_seconds": 0.0,
+              "work": 8
+            }
+          },
+          {
+            "backend": "iouring-writer",
+            "workers": 1,
+            "server_cpus": "0",
+            "client_cpus": "4-7",
+            "client_workers": 4,
+            "send_buffer": 65536,
+            "server_command": [
+              "taskset",
+              "-c",
+              "0",
+              "/home/samuel/.cache/ordered-writer-enter-classification/iouring-writer.sh",
+              "server",
+              "iouring-writer",
+              "1",
+              "1",
+              "262144",
+              "8",
+              "8",
+              "65536"
+            ],
+            "client_command": [
+              "taskset",
+              "-c",
+              "4-7",
+              "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+              "client",
+              "127.0.0.1:38547",
+              "4",
+              "1",
+              "262144",
+              "8",
+              "8",
+              "0",
+              "2"
+            ],
+            "server_stderr": "{\"actual_send_buffer\":131072,\"requested_send_buffer\":65536}\n",
+            "server_remaining_stdout": "",
+            "perf_stat": null,
+            "result": {
+              "bytes": 262144,
+              "chunks": 8,
+              "connections": 1,
+              "payload_mib_per_second": 3779.0,
+              "requests": 3779,
+              "requests_per_second": 1889.5,
+              "rtt_max_us": 821.247,
+              "rtt_mean_us": 529.1655146864249,
+              "rtt_p50_us": 537.087,
+              "rtt_p95_us": 544.767,
+              "rtt_p99_us": 549.375,
+              "seconds": 2.0,
+              "warmup_seconds": 0.0,
+              "work": 8
+            }
+          }
+        ]
+      },
+      "backends": [
+        {
+          "backend": "iouring-monitor",
+          "completed_measured_responses": 3681,
+          "enter_count": 48097,
+          "enters_per_response": 13.06628633523499,
+          "category_counts": {
+            "blocking_wait": 48095,
+            "submission_only": 2
+          },
+          "category_per_response": {
+            "blocking_wait": 13.06574300461831,
+            "submission_only": 0.0005433306166802499
+          },
+          "argument_histogram": [
+            {
+              "to_submit": 0,
+              "min_complete": 1,
+              "flags": 1,
+              "count": 48093
+            },
+            {
+              "to_submit": 1,
+              "min_complete": 0,
+              "flags": 0,
+              "count": 2
+            },
+            {
+              "to_submit": 1,
+              "min_complete": 1,
+              "flags": 1,
+              "count": 1
+            },
+            {
+              "to_submit": 2,
+              "min_complete": 1,
+              "flags": 1,
+              "count": 1
+            }
+          ],
+          "trace": {
+            "path": "/home/samuel/.cache/ordered-writer-enter-classification/iouring-monitor.trace",
+            "bytes": 9619400,
+            "sha256": "ef9734f3326aff7dfd732a086e78d32f5850b52069ce0da3da9a280f2095cdb3"
+          },
+          "perf_data": {
+            "path": "/home/samuel/.cache/ordered-writer-enter-classification/iouring-monitor.data",
+            "bytes": 5853287,
+            "sha256": "91eaa818298f8e31f8a771515833d0242b5d708d01eabf8ed2ba912330eca334"
+          },
+          "wrapper": {
+            "artifact": {
+              "path": "/home/samuel/.cache/ordered-writer-enter-classification/iouring-monitor.sh",
+              "bytes": 277,
+              "sha256": "6a335fe8fc6a4d9db3409a2e4268e1ce995f022e6e485b6a7f8b9e11190b4954"
+            },
+            "contents": "#!/bin/sh\nexec sudo -n perf record -q -m 64M -e syscalls:sys_enter_io_uring_enter -o /home/samuel/.cache/ordered-writer-enter-classification/iouring-monitor.data -- /home/samuel/Developer/core-rs/core-scheduler-ordered-writer/target/release/core-scheduler-write-benchmark \"$@\"\n"
+          }
+        },
+        {
+          "backend": "iouring-writer",
+          "completed_measured_responses": 3779,
+          "enter_count": 76575,
+          "enters_per_response": 20.263297168563113,
+          "category_counts": {
+            "submission_only": 30241,
+            "empty_getevents": 24845,
+            "blocking_wait": 21489
+          },
+          "category_per_response": {
+            "submission_only": 8.002381582429214,
+            "empty_getevents": 6.574490605980418,
+            "blocking_wait": 5.68642498015348
+          },
+          "argument_histogram": [
+            {
+              "to_submit": 0,
+              "min_complete": 0,
+              "flags": 1,
+              "count": 24845
+            },
+            {
+              "to_submit": 0,
+              "min_complete": 1,
+              "flags": 1,
+              "count": 21488
+            },
+            {
+              "to_submit": 1,
+              "min_complete": 0,
+              "flags": 0,
+              "count": 30240
+            },
+            {
+              "to_submit": 1,
+              "min_complete": 1,
+              "flags": 1,
+              "count": 1
+            },
+            {
+              "to_submit": 2,
+              "min_complete": 0,
+              "flags": 0,
+              "count": 1
+            }
+          ],
+          "trace": {
+            "path": "/home/samuel/.cache/ordered-writer-enter-classification/iouring-writer.trace",
+            "bytes": 15315000,
+            "sha256": "f42e1fb698c21f07a7841982384722c9b8bf39afeba48cf7b09e1faf7f01ae4a"
+          },
+          "perf_data": {
+            "path": "/home/samuel/.cache/ordered-writer-enter-classification/iouring-writer.data",
+            "bytes": 9270647,
+            "sha256": "f0861b0e232a7fa520a90aee103490722d55d55c53366c2005ffd1d7bfb6bc01"
+          },
+          "wrapper": {
+            "artifact": {
+              "path": "/home/samuel/.cache/ordered-writer-enter-classification/iouring-writer.sh",
+              "bytes": 276,
+              "sha256": "1467137fd052c1080a35753d08f3309e4ee2740b9c945ec28b586b738c1dbd9d"
+            },
+            "contents": "#!/bin/sh\nexec sudo -n perf record -q -m 64M -e syscalls:sys_enter_io_uring_enter -o /home/samuel/.cache/ordered-writer-enter-classification/iouring-writer.data -- /home/samuel/Developer/core-rs/core-scheduler-ordered-writer/target/release/core-scheduler-write-benchmark \"$@\"\n"
+          }
+        }
+      ]
+    },
+    {
+      "source_head": "522a4ea",
+      "report": {
+        "path": "/home/samuel/.cache/ordered-writer-normal-taskwork-classification/report.json",
+        "bytes": 1699,
+        "sha256": "32615ace6d952c46b2f78694c856444fc09cdc4dccdd10785dfac1511c7a5d62"
+      },
+      "metadata": {
+        "binary": "/home/samuel/Developer/core-rs/core-scheduler-ordered-writer-validation/target/release/core-scheduler-write-benchmark",
+        "binary_sha256": "b47d3bae43d421fddd08618baf5edb3ec3b40c3c0d2f138b812167b8370c8be2",
+        "case": [
+          1,
+          1,
+          262144,
+          8,
+          8,
+          65536
+        ],
+        "samples": [
+          {
+            "backend": "iouring-writer",
+            "workers": 1,
+            "server_cpus": "0",
+            "client_cpus": "4-7",
+            "client_workers": 4,
+            "send_buffer": 65536,
+            "server_command": [
+              "taskset",
+              "-c",
+              "0",
+              "/home/samuel/.cache/ordered-writer-normal-taskwork-classification/iouring-writer.sh",
+              "server",
+              "iouring-writer",
+              "1",
+              "1",
+              "262144",
+              "8",
+              "8",
+              "65536"
+            ],
+            "client_command": [
+              "taskset",
+              "-c",
+              "4-7",
+              "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+              "client",
+              "127.0.0.1:46305",
+              "4",
+              "1",
+              "262144",
+              "8",
+              "8",
+              "0",
+              "2"
+            ],
+            "server_stderr": "{\"actual_send_buffer\":131072,\"requested_send_buffer\":65536}\n",
+            "server_remaining_stdout": "",
+            "perf_stat": null,
+            "result": {
+              "bytes": 262144,
+              "chunks": 8,
+              "connections": 1,
+              "payload_mib_per_second": 3842.0,
+              "requests": 3842,
+              "requests_per_second": 1921.0,
+              "rtt_max_us": 807.423,
+              "rtt_mean_us": 520.3984591358668,
+              "rtt_p50_us": 520.703,
+              "rtt_p95_us": 523.263,
+              "rtt_p99_us": 526.847,
+              "seconds": 2.0,
+              "warmup_seconds": 0.0,
+              "work": 8
+            }
+          }
+        ]
+      },
+      "backends": [
+        {
+          "backend": "iouring-writer",
+          "completed_measured_responses": 3842,
+          "enter_count": 38422,
+          "enters_per_response": 10.000520562207184,
+          "category_counts": {
+            "submission_only": 30745,
+            "blocking_wait": 7677
+          },
+          "category_per_response": {
+            "submission_only": 8.002342529932326,
+            "blocking_wait": 1.9981780322748568
+          },
+          "argument_histogram": [
+            {
+              "to_submit": 0,
+              "min_complete": 1,
+              "flags": 1,
+              "count": 7676
+            },
+            {
+              "to_submit": 1,
+              "min_complete": 0,
+              "flags": 0,
+              "count": 30744
+            },
+            {
+              "to_submit": 1,
+              "min_complete": 1,
+              "flags": 1,
+              "count": 1
+            },
+            {
+              "to_submit": 2,
+              "min_complete": 0,
+              "flags": 0,
+              "count": 1
+            }
+          ],
+          "trace": {
+            "path": "/home/samuel/.cache/ordered-writer-normal-taskwork-classification/iouring-writer.trace",
+            "bytes": 7684400,
+            "sha256": "3420bf459dc97ab99469600331810e1d9e9ae515535788395c831f7503f2344e"
+          },
+          "perf_data": {
+            "path": "/home/samuel/.cache/ordered-writer-normal-taskwork-classification/iouring-writer.data",
+            "bytes": 4692295,
+            "sha256": "27366a9c28f4f81dab731b6a0bec7d3d13f1e8a2f8378dec2a010224df70f6d7"
+          },
+          "wrapper": {
+            "artifact": {
+              "path": "/home/samuel/.cache/ordered-writer-normal-taskwork-classification/iouring-writer.sh",
+              "bytes": 297,
+              "sha256": "d6f35adcb6f09f5add9e35c9856fe1f13405be1cc7d446e4c0e30ef1a5155d6c"
+            },
+            "contents": "#!/bin/sh\nexec sudo -n perf record -q -m 64M -e syscalls:sys_enter_io_uring_enter -o /home/samuel/.cache/ordered-writer-normal-taskwork-classification/iouring-writer.data -- /home/samuel/Developer/core-rs/core-scheduler-ordered-writer-validation/target/release/core-scheduler-write-benchmark \"$@\"\n"
+          }
+        }
+      ]
+    },
+    {
+      "source_head": "5990901",
+      "report": {
+        "path": "/home/samuel/.cache/ordered-writer-final-taskwork-classification/report.json",
+        "bytes": 1760,
+        "sha256": "b8576289ce6eeba73a083f20f60f3fa3490a9bef0f90d160fc3cf43378a83070"
+      },
+      "metadata": {
+        "binary": "/home/samuel/Developer/core-rs/core-scheduler-ordered-writer-validation/target/release/core-scheduler-write-benchmark",
+        "binary_sha256": "e115265db6c533fb7b93b858157befdc533b7dc8387052e7d19a8ffd8c9a3acc",
+        "case": [
+          1,
+          1,
+          262144,
+          8,
+          8,
+          65536
+        ],
+        "source_head": "599090189e97c1567ba17f7abc6ac916860295a8",
+        "samples": [
+          {
+            "backend": "iouring-writer",
+            "workers": 1,
+            "server_cpus": "0",
+            "client_cpus": "4-7",
+            "client_workers": 4,
+            "send_buffer": 65536,
+            "server_command": [
+              "taskset",
+              "-c",
+              "0",
+              "/home/samuel/.cache/ordered-writer-final-taskwork-classification/iouring-writer.sh",
+              "server",
+              "iouring-writer",
+              "1",
+              "1",
+              "262144",
+              "8",
+              "8",
+              "65536"
+            ],
+            "client_command": [
+              "taskset",
+              "-c",
+              "4-7",
+              "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+              "client",
+              "127.0.0.1:40715",
+              "4",
+              "1",
+              "262144",
+              "8",
+              "8",
+              "0",
+              "3"
+            ],
+            "server_stderr": "{\"actual_send_buffer\":131072,\"requested_send_buffer\":65536}\n",
+            "server_remaining_stdout": "",
+            "perf_stat": null,
+            "result": {
+              "bytes": 262144,
+              "chunks": 8,
+              "connections": 1,
+              "payload_mib_per_second": 4596.0,
+              "requests": 6894,
+              "requests_per_second": 2298.0,
+              "rtt_max_us": 744.959,
+              "rtt_mean_us": 435.10623730780407,
+              "rtt_p50_us": 435.199,
+              "rtt_p95_us": 439.807,
+              "rtt_p99_us": 443.391,
+              "seconds": 3.0,
+              "warmup_seconds": 0.0,
+              "work": 8
+            }
+          }
+        ]
+      },
+      "backends": [
+        {
+          "backend": "iouring-writer",
+          "completed_measured_responses": 6894,
+          "enter_count": 67705,
+          "enters_per_response": 9.820858717725558,
+          "category_counts": {
+            "submission_only": 55161,
+            "blocking_wait": 12544
+          },
+          "category_per_response": {
+            "submission_only": 8.001305483028721,
+            "blocking_wait": 1.819553234696838
+          },
+          "argument_histogram": [
+            {
+              "to_submit": 0,
+              "min_complete": 1,
+              "flags": 1,
+              "count": 12543
+            },
+            {
+              "to_submit": 1,
+              "min_complete": 0,
+              "flags": 0,
+              "count": 55160
+            },
+            {
+              "to_submit": 1,
+              "min_complete": 1,
+              "flags": 1,
+              "count": 1
+            },
+            {
+              "to_submit": 2,
+              "min_complete": 0,
+              "flags": 0,
+              "count": 1
+            }
+          ],
+          "trace": {
+            "path": "/home/samuel/.cache/ordered-writer-final-taskwork-classification/iouring-writer.trace",
+            "bytes": 13541000,
+            "sha256": "c5764f049145e00fca71e6720fb844c6470382e6700c02d0f14217ed53f1c939"
+          },
+          "perf_data": {
+            "path": "/home/samuel/.cache/ordered-writer-final-taskwork-classification/iouring-writer.data",
+            "bytes": 8206255,
+            "sha256": "f172a533dd516783cbeb5d77b150856252bd388c0eb4fab7b6c095fce457ee24"
+          },
+          "wrapper": {
+            "artifact": {
+              "path": "/home/samuel/.cache/ordered-writer-final-taskwork-classification/iouring-writer.sh",
+              "bytes": 296,
+              "sha256": "b16b60c3fe326d3bbca658244d387651569b4c282de08e0f5ce064ffd3edfb77"
+            },
+            "contents": "#!/bin/sh\nexec sudo -n perf record -q -m 64M -e syscalls:sys_enter_io_uring_enter -o /home/samuel/.cache/ordered-writer-final-taskwork-classification/iouring-writer.data -- /home/samuel/Developer/core-rs/core-scheduler-ordered-writer-validation/target/release/core-scheduler-write-benchmark \"$@\"\n"
+          }
+        }
+      ]
+    },
+    {
+      "source_head": "5990901 runtime, with test-only annotations",
+      "report": {
+        "path": "/home/samuel/.cache/ordered-writer-final-monitor-classification/report.json",
+        "bytes": 1783,
+        "sha256": "dcbd2ee62ca93e83c3d23efb590598d336d04acd3f2e474770db4c20ccaa08fa"
+      },
+      "metadata": {
+        "binary": "/home/samuel/Developer/core-rs/core-scheduler-ordered-writer-validation/target/release/core-scheduler-write-benchmark",
+        "binary_sha256": "e115265db6c533fb7b93b858157befdc533b7dc8387052e7d19a8ffd8c9a3acc",
+        "case": [
+          1,
+          1,
+          262144,
+          8,
+          8,
+          65536
+        ],
+        "source_head": "0ffb89a42b177af3fb632fcc0b3d3aa64bf2d69f",
+        "samples": [
+          {
+            "backend": "iouring-monitor",
+            "workers": 1,
+            "server_cpus": "0",
+            "client_cpus": "4-7",
+            "client_workers": 4,
+            "send_buffer": 65536,
+            "server_command": [
+              "taskset",
+              "-c",
+              "0",
+              "/home/samuel/.cache/ordered-writer-final-monitor-classification/iouring-monitor.sh",
+              "server",
+              "iouring-monitor",
+              "1",
+              "1",
+              "262144",
+              "8",
+              "8",
+              "65536"
+            ],
+            "client_command": [
+              "taskset",
+              "-c",
+              "4-7",
+              "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/initial-server",
+              "client",
+              "127.0.0.1:37699",
+              "4",
+              "1",
+              "262144",
+              "8",
+              "8",
+              "0",
+              "3"
+            ],
+            "server_stderr": "{\"actual_send_buffer\":131072,\"requested_send_buffer\":65536}\n",
+            "server_remaining_stdout": "",
+            "perf_stat": null,
+            "result": {
+              "bytes": 262144,
+              "chunks": 8,
+              "connections": 1,
+              "payload_mib_per_second": 4286.666666666667,
+              "requests": 6430,
+              "requests_per_second": 2143.3333333333335,
+              "rtt_max_us": 933.887,
+              "rtt_mean_us": 466.494367651633,
+              "rtt_p50_us": 465.663,
+              "rtt_p95_us": 473.855,
+              "rtt_p99_us": 478.719,
+              "seconds": 3.0,
+              "warmup_seconds": 0.0,
+              "work": 8
+            }
+          }
+        ]
+      },
+      "backends": [
+        {
+          "backend": "iouring-monitor",
+          "completed_measured_responses": 6430,
+          "enter_count": 83704,
+          "enters_per_response": 13.017729393468118,
+          "category_counts": {
+            "blocking_wait": 83702,
+            "submission_only": 2
+          },
+          "category_per_response": {
+            "blocking_wait": 13.017418351477449,
+            "submission_only": 0.00031104199066874026
+          },
+          "argument_histogram": [
+            {
+              "to_submit": 0,
+              "min_complete": 1,
+              "flags": 1,
+              "count": 83700
+            },
+            {
+              "to_submit": 1,
+              "min_complete": 0,
+              "flags": 0,
+              "count": 2
+            },
+            {
+              "to_submit": 1,
+              "min_complete": 1,
+              "flags": 1,
+              "count": 1
+            },
+            {
+              "to_submit": 2,
+              "min_complete": 1,
+              "flags": 1,
+              "count": 1
+            }
+          ],
+          "trace": {
+            "path": "/home/samuel/.cache/ordered-writer-final-monitor-classification/iouring-monitor.trace",
+            "bytes": 16740800,
+            "sha256": "066d1e2f75bc1649b634faef67a89bc19d4dbccbae0f56e5ac5639d2fb8d8c29"
+          },
+          "perf_data": {
+            "path": "/home/samuel/.cache/ordered-writer-final-monitor-classification/iouring-monitor.data",
+            "bytes": 10126135,
+            "sha256": "bc0a2e4f2572451734c2c3daa0ed4953bc97b4fe2d8ee5c9878e7a3044e457ed"
+          },
+          "wrapper": {
+            "artifact": {
+              "path": "/home/samuel/.cache/ordered-writer-final-monitor-classification/iouring-monitor.sh",
+              "bytes": 296,
+              "sha256": "94162955c1b32bfe94ede3b01b945b8a43678c349994a6839502c6d5b7e85d0c"
+            },
+            "contents": "#!/bin/sh\nexec sudo -n perf record -q -m 64M -e syscalls:sys_enter_io_uring_enter -o /home/samuel/.cache/ordered-writer-final-monitor-classification/iouring-monitor.data -- /home/samuel/Developer/core-rs/core-scheduler-ordered-writer-validation/target/release/core-scheduler-write-benchmark \"$@\"\n"
+          }
+        }
+      ]
+    }
+  ],
+  "classification_notes": [
+    "GETEVENTS with min_complete=0 and to_submit=0 identifies an empty nonblocking completion flush. In the original driver this is caused by the taskrun or CQ-overflow check; this one-connection workload cannot fill its at-least-256-entry completion queue.",
+    "COOP_TASKRUN permits task work at ordinary kernel/user transitions; it is not DEFER_TASKRUN. Ordinary task-work delivery additionally permits interruption during user computation.",
+    "Normalization uses completed responses inside the measurement interval. Traces also include startup and the final crossing response, so ratios include a small boundary contribution."
+  ],
+  "scripts": [
+    {
+      "path": "/home/samuel/.cache/ordered-writer-enter-classification.py",
+      "bytes": 1522,
+      "sha256": "4ab09b7bb92e71b48c09a4133b4057e0f2af856a0cc7fcd116ed8327960feb5e"
+    },
+    {
+      "path": "/home/samuel/.cache/ordered-writer-normal-taskwork-classification.py",
+      "bytes": 1524,
+      "sha256": "6e43ef6dc81b66d97f5a8cd1d0c8ffffb6d07227d2bd46778dbcc356619f6471"
+    },
+    {
+      "path": "/home/samuel/.cache/ordered-writer-final-taskwork-classification.py",
+      "bytes": 1582,
+      "sha256": "3a95583257d09dce0728ef88fafae4a706dc78b8aae4c13c93bcce15582600cd"
+    },
+    {
+      "path": "/home/samuel/.cache/ordered-writer-final-monitor-classification.py",
+      "bytes": 1582,
+      "sha256": "fb1dabb630d515fcb77063f9ffea7bab86b9dd7af9f4fc31fc3fbce9f16a1e82"
+    },
+    {
+      "path": "/home/samuel/.cache/ordered-writer-taskwork-summary.py",
+      "bytes": 5979,
+      "sha256": "384d85861bd12cbd7ed867174ecfdce4db24a3e7a48760f65f2f215341e4ca2c"
+    },
+    {
+      "path": "/home/samuel/.cache/ordered-writer-taskwork-policy-control.py",
+      "bytes": 2952,
+      "sha256": "351b913ecaa4c2ab4ae2ccbd6483e0e96fb8386ca83b20001802ff0daf2424f2"
+    }
+  ]
+}

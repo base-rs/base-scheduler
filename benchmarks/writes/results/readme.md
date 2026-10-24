@@ -1,5 +1,7 @@
 # Ordered stream writer research
 
+The [follow-up optimization report](improvements/readme.md) records newer cancellation and completion-delivery changes, including the reduction in explicit ring entries. The measurements below describe the original prototype.
+
 The prototype separates accepting an owned stream write from waiting for all its bytes. It preserves ordering, handles partial transfers, and releases completed buffer owners without requiring another application call. Immediate full sends remain direct, allocation-free syscalls. This is an optional capability for applications that can prepare useful work while output is pending; ordinary borrowed monitor writes remain the simpler choice when that overlap is unnecessary.
 
 ## Interface and execution
