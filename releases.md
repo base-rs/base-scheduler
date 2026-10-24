@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Store Native task futures in the task allocation where their size permits, removing a second allocation and pointer indirection while preserving pinned addresses, abandonment, and panic containment.
+
 - Inline cancellation and Native I/O preflight checks across crate boundaries, and issue scalar Native socket calls directly with the same nonblocking flags and error semantics.
 
 - Skip Native work-stealing searches when there is only one worker or no outstanding runnable work, preserving idle wakeups and stealing when work becomes available.
