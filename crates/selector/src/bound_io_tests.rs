@@ -345,6 +345,9 @@ fn pending_stream_output_keeps_order_when_later_waiters_are_cancelled() {
 #[test]
 fn accepted_stream_cancellation_and_socket_errors_remain_observable() {
     stream_case(async |scheduler, sender, receiver| {
+        // Bound both queues so Windows cannot accept the entire payload before cancellation.
+        sender.get_ref().set_send_buffer_size(4096).unwrap();
+        receiver.get_ref().set_recv_buffer_size(4096).unwrap();
         let never = Cancellation::never();
         let cancellation = Cancellation::new();
         let mut writer = scheduler
@@ -358,10 +361,8 @@ fn accepted_stream_cancellation_and_socket_errors_remain_observable() {
         reader.read_into(&mut [0; 1], &never).await.unwrap();
         cancellation.cancel();
         for _ in 0..2 {
-            assert!(matches!(
-                writer.flush(&never).await,
-                Err(OperationError::Cancelled(_))
-            ));
+            let error = writer.flush(&never).await.unwrap_err();
+            assert!(std::error::Error::source(&error).unwrap().is::<Cancelled>());
         }
         assert!(writer.write(b"after failure", &never).await.is_err());
         writer.close().await.unwrap();
