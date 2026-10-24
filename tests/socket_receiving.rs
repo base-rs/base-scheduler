@@ -526,6 +526,11 @@ fn bound_stream_reader_rejects_invalid_socket_kinds_and_setup_failures() {
     for state in [200, 201, 202] {
         let socket = Arc::new(AtomicUsize::new(state));
         assert!(Sockets.socket_stream_reader(&socket).is_err());
+        assert!(
+            Sockets
+                .socket_stream_reader_with_pool(&socket, HeapBufferPool::new(1, 8).unwrap())
+                .is_err()
+        );
     }
 }
 
@@ -533,7 +538,7 @@ struct Output<B> {
     socket: Arc<AtomicUsize>,
     marker: std::marker::PhantomData<B>,
 }
-impl SocketStreamWriting for Sockets {
+impl SocketStreamOutputting for Sockets {
     type Writer<B: IoBuf> = Output<B>;
     fn socket_stream_output<B: IoBuf>(&self, socket: &Self::Socket) -> io::Result<Self::Writer<B>> {
         if socket.load(Ordering::Relaxed) == 200 {
@@ -712,4 +717,30 @@ fn opaque_stream_factories_bind_the_scheduler_without_borrowing_the_input_refere
         writer.submit(b"typed".to_vec(), &never).await.unwrap();
         writer.close().await.unwrap();
     });
+}
+
+impl core_scheduler::SocketStreamWriting for Sockets {
+    fn socket_stream_writer<'scheduler>(
+        &'scheduler self,
+        socket: &Self::Socket,
+    ) -> io::Result<
+        impl core_scheduler::SocketStreamWriter<
+            Buffer = <Self::Pool as core_scheduler::BufferPool>::Buffer,
+        > + 'scheduler,
+    >
+    where
+        Self::Socket: 'static,
+    {
+        core_scheduler::BoundSocketStreamWriter::new(self, socket)
+    }
+
+    fn socket_stream_writer_with_buffer<'scheduler, B: IoBuf>(
+        &'scheduler self,
+        socket: &Self::Socket,
+    ) -> io::Result<impl core_scheduler::SocketStreamWriter<Buffer = B> + 'scheduler>
+    where
+        Self::Socket: 'static,
+    {
+        core_scheduler::BoundSocketStreamWriter::new(self, socket)
+    }
 }

@@ -203,7 +203,7 @@ impl core_scheduler::BufferPooling for PartialSocket {
         core_scheduler::HeapBufferPool::with_options(options)
     }
 }
-impl SocketStreamWriting for PartialSocket {
+impl core_scheduler::SocketStreamOutputting for PartialSocket {
     type Writer<B: IoBuf> = UnusedOutput<B>;
     fn socket_stream_output<B: IoBuf>(&self, _: &()) -> io::Result<Self::Writer<B>> {
         Ok(UnusedOutput(std::marker::PhantomData))
@@ -229,3 +229,29 @@ impl<B: IoBuf> core_scheduler::SocketStreamOutput<PartialSocket> for UnusedOutpu
 }
 
 impl SocketStreamReading for PartialSocket {}
+
+impl core_scheduler::SocketStreamWriting for PartialSocket {
+    fn socket_stream_writer<'scheduler>(
+        &'scheduler self,
+        socket: &Self::Socket,
+    ) -> io::Result<
+        impl core_scheduler::SocketStreamWriter<
+            Buffer = <Self::Pool as core_scheduler::BufferPool>::Buffer,
+        > + 'scheduler,
+    >
+    where
+        Self::Socket: 'static,
+    {
+        core_scheduler::BoundSocketStreamWriter::new(self, socket)
+    }
+
+    fn socket_stream_writer_with_buffer<'scheduler, B: IoBuf>(
+        &'scheduler self,
+        socket: &Self::Socket,
+    ) -> io::Result<impl core_scheduler::SocketStreamWriter<Buffer = B> + 'scheduler>
+    where
+        Self::Socket: 'static,
+    {
+        core_scheduler::BoundSocketStreamWriter::new(self, socket)
+    }
+}

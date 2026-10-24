@@ -320,7 +320,7 @@ impl<B: IoBuf> IoUringStreamWriter<B> {
     }
 }
 
-impl SocketStreamWriting for IoUringSelector {
+impl SocketStreamOutputting for IoUringSelector {
     type Writer<B: IoBuf> = IoUringStreamWriter<B>;
 
     fn socket_stream_output<B: IoBuf>(&self, socket: &Self::Socket) -> io::Result<Self::Writer<B>> {
@@ -512,3 +512,29 @@ impl<B: IoBuf> Drop for IoUringStreamWriter<B> {
 
 #[cfg(test)]
 mod tests;
+
+impl core_scheduler::SocketStreamWriting for IoUringSelector {
+    fn socket_stream_writer<'scheduler>(
+        &'scheduler self,
+        socket: &Self::Socket,
+    ) -> io::Result<
+        impl core_scheduler::SocketStreamWriter<
+            Buffer = <Self::Pool as core_scheduler::BufferPool>::Buffer,
+        > + 'scheduler,
+    >
+    where
+        Self::Socket: 'static,
+    {
+        core_scheduler::BoundSocketStreamWriter::new(self, socket)
+    }
+
+    fn socket_stream_writer_with_buffer<'scheduler, B: IoBuf>(
+        &'scheduler self,
+        socket: &Self::Socket,
+    ) -> io::Result<impl core_scheduler::SocketStreamWriter<Buffer = B> + 'scheduler>
+    where
+        Self::Socket: 'static,
+    {
+        core_scheduler::BoundSocketStreamWriter::new(self, socket)
+    }
+}

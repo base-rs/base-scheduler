@@ -312,6 +312,7 @@ fn failed_writes_return_the_original_buffer() {
                 )
                 .await
                 .unwrap();
+            assert_eq!(scheduler.socket_type(&socket).unwrap(), SocketType::Stream);
             socket::write_error(&scheduler, &socket).await;
             scheduler.socket_close(socket).await.unwrap();
             scheduler.shutdown().await;

@@ -251,6 +251,11 @@ fn packet_handles_validate_socket_kind_and_monitor_creation() {
     scheduler.unsupported_kind.store(false, Ordering::Relaxed);
     scheduler.fail_monitor.store(true, Ordering::Relaxed);
     assert!(scheduler.socket_packet_reader(&socket).is_err());
+    assert!(
+        scheduler
+            .socket_packet_reader_with_pool(&socket, TestPool(HeapBufferPool::new(1, 8).unwrap()))
+            .is_err()
+    );
     assert!(scheduler.socket_packet_writer(&socket).is_err());
     scheduler.fail_monitor.store(false, Ordering::Relaxed);
     for kind in [SocketType::Raw, SocketType::Other(123)] {

@@ -124,6 +124,7 @@ mod socket_set_option;
 mod socket_shutdown;
 mod socket_stream_monitor;
 mod socket_stream_output;
+mod socket_stream_outputting;
 mod socket_stream_reader;
 mod socket_stream_reading;
 mod socket_stream_writer;
@@ -268,6 +269,8 @@ pub use socket_shutdown::SocketShutdown;
 pub use socket_stream_monitor::SocketStreamMonitor;
 #[doc(hidden)]
 pub use socket_stream_output::SocketStreamOutput;
+#[doc(hidden)]
+pub use socket_stream_outputting::SocketStreamOutputting;
 pub use socket_stream_writing::SocketStreamWriting;
 pub use socket_type::SocketType;
 #[doc(hidden)]

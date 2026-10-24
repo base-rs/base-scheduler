@@ -120,7 +120,7 @@ impl SocketMonitoring for Script {
 
 struct Writer<B>(PhantomData<B>);
 
-impl SocketStreamWriting for Script {
+impl SocketStreamOutputting for Script {
     type Writer<B: IoBuf> = Writer<B>;
 
     fn socket_stream_output<B: IoBuf>(&self, _: &()) -> io::Result<Writer<B>> {

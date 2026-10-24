@@ -3,14 +3,17 @@
 
 use crate::{
     Cancellation, Interest, IoBuf, MonitorStorage, OperationError, OperationResult,
-    SocketMonitoring, SocketSendFlags, SocketStreamMonitor, SocketStreamOutput, SocketStreamWriter,
-    SocketStreamWriting,
+    SocketMonitoring, SocketSendFlags, SocketStreamMonitor, SocketStreamOutput,
+    SocketStreamOutputting, SocketStreamWriter,
 };
 use std::io::{self, IoSlice};
 
-/// A scheduler-bound output lane combining borrowed writes with ordered owned submission. Construct through [`SocketStreamWriting`].
-pub struct BoundSocketStreamWriter<'a, S: SocketStreamWriting + SocketMonitoring + ?Sized, B: IoBuf>
-where
+/// A scheduler-bound output lane combining borrowed writes with ordered owned submission. Construct through [`SocketStreamWriting`](crate::SocketStreamWriting).
+pub struct BoundSocketStreamWriter<
+    'a,
+    S: SocketStreamOutputting + SocketMonitoring + ?Sized,
+    B: IoBuf,
+> where
     S::Socket: 'static,
 {
     scheduler: &'a S,
@@ -22,7 +25,7 @@ where
 
 impl<'a, S, B> BoundSocketStreamWriter<'a, S, B>
 where
-    S: SocketStreamWriting + SocketMonitoring + Sync + ?Sized,
+    S: SocketStreamOutputting + SocketMonitoring + Sync + ?Sized,
     S::Socket: 'static,
     B: IoBuf,
 {
@@ -51,7 +54,7 @@ where
 
 impl<S, B> SocketStreamWriter for BoundSocketStreamWriter<'_, S, B>
 where
-    S: SocketStreamWriting + SocketMonitoring + Sync + ?Sized,
+    S: SocketStreamOutputting + SocketMonitoring + Sync + ?Sized,
     S::Socket: 'static,
     B: IoBuf,
 {

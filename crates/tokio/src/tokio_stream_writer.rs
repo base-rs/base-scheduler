@@ -4,7 +4,7 @@
 use crate::{TokioScheduler, TokioSocket, TokioTask, socket_io};
 use core_scheduler::{
     Cancellation, Interest, IoBuf, OperationError, OperationResult, SocketStreamOutput,
-    SocketStreamWriting, SocketWriteState,
+    SocketStreamOutputting, SocketWriteState,
 };
 use std::{
     future::{Future, poll_fn},
@@ -21,7 +21,7 @@ pub struct TokioStreamWriter<B> {
     buffer: PhantomData<fn(B)>,
 }
 
-impl SocketStreamWriting for TokioScheduler {
+impl SocketStreamOutputting for TokioScheduler {
     type Writer<B: IoBuf> = TokioStreamWriter<B>;
 
     fn socket_stream_output<B: IoBuf>(&self, socket: &TokioSocket) -> io::Result<Self::Writer<B>> {
@@ -176,3 +176,29 @@ fn send(socket: &socket2::Socket, bytes: &[u8]) -> io::Result<usize> {
 
 #[cfg(test)]
 mod tests;
+
+impl core_scheduler::SocketStreamWriting for TokioScheduler {
+    fn socket_stream_writer<'scheduler>(
+        &'scheduler self,
+        socket: &Self::Socket,
+    ) -> io::Result<
+        impl core_scheduler::SocketStreamWriter<
+            Buffer = <Self::Pool as core_scheduler::BufferPool>::Buffer,
+        > + 'scheduler,
+    >
+    where
+        Self::Socket: 'static,
+    {
+        core_scheduler::BoundSocketStreamWriter::new(self, socket)
+    }
+
+    fn socket_stream_writer_with_buffer<'scheduler, B: IoBuf>(
+        &'scheduler self,
+        socket: &Self::Socket,
+    ) -> io::Result<impl core_scheduler::SocketStreamWriter<Buffer = B> + 'scheduler>
+    where
+        Self::Socket: 'static,
+    {
+        core_scheduler::BoundSocketStreamWriter::new(self, socket)
+    }
+}

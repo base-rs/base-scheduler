@@ -4,7 +4,7 @@
 use crate::{Result, Workload, prepare};
 use core_scheduler::{
     BufferLease, Cancellation, HeapBufferPool, Interest, SocketMonitoring, SocketRecvFlags,
-    SocketRegistration, SocketSendFlags, SocketStreamOutput, SocketStreamWriting, Spawn,
+    SocketRegistration, SocketSendFlags, SocketStreamOutput, SocketStreamOutputting, Spawn,
 };
 use core_scheduler_tokio::TokioScheduler;
 use std::{
@@ -120,7 +120,7 @@ async fn writer_connection<S>(
     workload: Workload,
 ) -> Result<()>
 where
-    S: SocketMonitoring + SocketStreamWriting + 'static,
+    S: SocketMonitoring + SocketStreamOutputting + 'static,
     S::Socket: 'static,
 {
     let pool = HeapBufferPool::new(2, workload.bytes).expect("validated buffer pool dimensions");
