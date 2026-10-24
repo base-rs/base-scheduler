@@ -124,15 +124,21 @@ fn immediate_error_is_accepted_and_retained() {
 #[test]
 fn accepted_cancellation_and_drop_release_owners() {
     crate::test_support::run(|| {
-        let scheduler = crate::test_support::scheduler();
-        crate::test_support::runtime().block_on(async {
+        // Keep accepted work queued until cancellation or drop, independent of the platform's socket buffer capacity.
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let scheduler = TokioScheduler::new(runtime.handle().clone());
+        runtime.block_on(async {
             let never = Cancellation::never();
             let (sender, _receiver) =
                 core_scheduler_conformance::socket::stream_pair(&scheduler, SocketDomain::Ipv4)
                     .await;
-            let pool = HeapBufferPool::new(1, 8 * 1024 * 1024).unwrap();
+            let pool = HeapBufferPool::new(1, 1).unwrap();
             let mut writer = scheduler.socket_stream_writer(&sender).unwrap();
             let cancellation = Cancellation::new();
+            inject([Err(io::ErrorKind::WouldBlock.into())]);
             writer
                 .submit(
                     &scheduler,
@@ -148,6 +154,7 @@ fn accepted_cancellation_and_drop_release_owners() {
             writer.close(&scheduler).await.unwrap();
             drop(writer);
             let mut writer = scheduler.socket_stream_writer(&sender).unwrap();
+            inject([Err(io::ErrorKind::WouldBlock.into())]);
             writer
                 .submit(&scheduler, pool.acquire(&never).await.unwrap(), &never)
                 .await
@@ -261,7 +268,21 @@ fn ready_submission_and_flush_allocate_nothing() {
 }
 
 thread_local! {
+    pub(super) static BLOCK_SENDS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     pub(super) static SEND_RESULTS: std::cell::RefCell<std::collections::VecDeque<io::Result<usize>>> = const { std::cell::RefCell::new(std::collections::VecDeque::new()) };
+}
+
+struct BlockSends;
+impl BlockSends {
+    fn new() -> Self {
+        BLOCK_SENDS.with(|blocked| assert!(!blocked.replace(true)));
+        Self
+    }
+}
+impl Drop for BlockSends {
+    fn drop(&mut self) {
+        BLOCK_SENDS.with(|blocked| blocked.set(false));
+    }
 }
 
 fn inject(results: impl IntoIterator<Item = io::Result<usize>>) {
@@ -336,6 +357,8 @@ fn background_retry_errors_and_pending_close_preserve_the_result() {
                 io::ErrorKind::PermissionDenied
             );
             {
+                // Keep every readiness retry blocked until cancellation, independent of the platform's socket buffer capacity.
+                let _blocked = BlockSends::new();
                 let mut pending =
                     std::pin::pin!(write_remaining(&sender, &mut buffer, 0, &never, &stopping));
                 assert!(
@@ -402,6 +425,8 @@ fn admission_rechecks_cancellation_and_shutdown_after_retiring_the_previous_owne
                     })
                 };
                 let mut writer = scheduler.socket_stream_writer(&sender).unwrap();
+                // The current-thread runtime cannot poll the accepted task before the next admission yields.
+                inject([Err(io::ErrorKind::WouldBlock.into())]);
                 writer
                     .submit(
                         &scheduler,

@@ -422,6 +422,8 @@ impl Capacity {
                     return Err(io::ErrorKind::BrokenPipe.into());
                 }
                 if state < self.limit {
+                    #[cfg(test)]
+                    tests::before_capacity_admission();
                     if self
                         .state
                         .compare_exchange_weak(

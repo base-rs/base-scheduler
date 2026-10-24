@@ -164,6 +164,10 @@ async fn write_remaining<B: IoBuf>(
 
 fn send(socket: &socket2::Socket, bytes: &[u8]) -> io::Result<usize> {
     #[cfg(test)]
+    if tests::BLOCK_SENDS.with(std::cell::Cell::get) {
+        return Err(io::ErrorKind::WouldBlock.into());
+    }
+    #[cfg(test)]
     if let Some(result) = tests::SEND_RESULTS.with(|results| results.borrow_mut().pop_front()) {
         return result;
     }
