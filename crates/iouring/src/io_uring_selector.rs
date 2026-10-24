@@ -188,6 +188,11 @@ pub(crate) trait PendingRequest: Send {
         None
     }
     fn entry(&mut self) -> squeue::Entry;
+    fn submission_notification(
+        &mut self,
+    ) -> Option<Arc<dyn submission_notifications::SubmissionNotification>> {
+        None
+    }
     // Buffer accessors may run arbitrary user code, including waking tasks. Such requests must return to the executor after preparation instead of waiting.
     fn entry_may_wake(&self) -> bool {
         true
@@ -874,6 +879,7 @@ pub(crate) struct Reactor {
     cancellations: VecDeque<u64>,
     closing: bool,
     notification_armed: bool,
+    submission_notifications: submission_notifications::SubmissionNotifications,
 }
 
 impl Reactor {
@@ -901,6 +907,7 @@ impl Reactor {
             cancellations: VecDeque::new(),
             closing: false,
             notification_armed: false,
+            submission_notifications: submission_notifications::SubmissionNotifications::default(),
         }
     }
 
@@ -1233,6 +1240,10 @@ impl Reactor {
                 // SAFETY: InFlight owns the buffer allocation and descriptor before publication. Neither is released or accessed until the original CQE, even when cancellation completes first. A failed push does not publish the entry.
                 unsafe { submissions.push(&entry) }
                     .expect("submission capacity was checked and the local queue has not changed");
+                if let Some(notification) = request.submission_notification() {
+                    self.submission_notifications
+                        .push(submissions.len(), notification);
+                }
             }
             while !submissions.is_full() {
                 let Some(submission) = self.pending_monitors.pop_front() else {
@@ -1282,6 +1293,8 @@ impl Reactor {
 
         // Nonblocking turns may stage one readiness-only batch for the next turn. An idle wait submits it and waits in one entry; a busy worker submits it on its next nonblocking turn. Overflow and task work always enter. Short-circuiting preserves the local permit through productive turns. At the actual wait decision, consume it; the armed poll retains remote notifications until their CQE drains the counter.
         let return_to_executor = progressed
+            // Issuance waiters may need to run before their I/O can complete. Never enter a blocking completion wait while an unconsumed SQE still owes its caller a submission notification.
+            || self.submission_notifications.pending()
             || command_batch_full
             || timeout == Some(Duration::ZERO)
             || !self.pending.is_empty()
@@ -1297,7 +1310,16 @@ impl Reactor {
                     || submissions.taskrun()
             };
             if needs_submit {
-                match syscall("submit", || self.ring.submit()) {
+                let before = self
+                    .submission_notifications
+                    .pending()
+                    .then(|| self.ring.submission().len());
+                let result = syscall("submit", || self.ring.submit());
+                if let Some(before) = before {
+                    self.submission_notifications
+                        .consumed(before, self.ring.submission().len());
+                }
+                match result {
                     Err(error)
                         if error.kind() == io::ErrorKind::Interrupted
                             || matches!(error.raw_os_error(), Some(libc::EBUSY | libc::EAGAIN)) =>
@@ -1385,3 +1407,4 @@ mod socket_receiving;
 pub(crate) mod provided_buffers;
 
 pub(crate) mod stream_writer;
+mod submission_notifications;

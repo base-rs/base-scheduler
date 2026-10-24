@@ -23,6 +23,7 @@ pub struct IoUringStreamWriter<B: IoBuf> {
 struct Shared<B: IoBuf> {
     result: Mutex<Option<Completion<B>>>,
     ready: AtomicBool,
+    submitted: AtomicBool,
     waker: atomic_waker::AtomicWaker,
 }
 
@@ -35,6 +36,13 @@ impl<B: IoBuf> Shared<B> {
     fn publish(&self, result: Completion<B>) {
         *self.result.lock().unwrap() = Some(result);
         self.ready.store(true, Ordering::Release);
+        self.waker.wake();
+    }
+}
+
+impl<B: IoBuf> submission_notifications::SubmissionNotification for Shared<B> {
+    fn submitted(&self) {
+        self.submitted.store(true, Ordering::Release);
         self.waker.wake();
     }
 }
@@ -65,6 +73,7 @@ struct WriteRequest<B: IoBuf> {
     watch: Option<Pin<Box<dyn Future<Output = ()> + Send>>>,
     cancel_waker: Option<Waker>,
     reply: Cell<Option<Arc<Shared<B>>>>,
+    announced: bool,
 }
 
 impl<B: IoBuf> WriteRequest<B> {
@@ -81,6 +90,7 @@ impl<B: IoBuf> WriteRequest<B> {
             watch: None,
             cancel_waker: None,
             reply: Cell::new(None),
+            announced: false,
         }
     }
 
@@ -133,6 +143,18 @@ impl<B: IoBuf> PendingRequest for WriteRequest<B> {
             .build()
         };
         entry.user_data(self.identifier)
+    }
+
+    fn submission_notification(
+        &mut self,
+    ) -> Option<Arc<dyn submission_notifications::SubmissionNotification>> {
+        if self.announced {
+            return None;
+        }
+        self.announced = true;
+        let shared = self.reply.take().unwrap();
+        self.reply.set(Some(Arc::clone(&shared)));
+        Some(shared)
     }
 
     fn completion(&self, result: i32, _flags: u32) {
@@ -300,6 +322,7 @@ impl SocketStreamWriting for IoUringSelector {
             shared: Arc::new(Shared {
                 result: Mutex::new(None),
                 ready: AtomicBool::new(false),
+                submitted: AtomicBool::new(false),
                 waker: atomic_waker::AtomicWaker::new(),
             }),
             cached: None,
@@ -407,10 +430,24 @@ impl<B: IoBuf> SocketStreamWriter<IoUringSelector> for IoUringStreamWriter<B> {
             identifier,
         })));
         request.reply.set(Some(Arc::clone(&self.shared)));
+        request.announced = false;
         self.shared.ready.store(false, Ordering::Relaxed);
+        self.shared.submitted.store(false, Ordering::Relaxed);
         self.running = Some(RingBinding::new(&controller, identifier));
         // The persistent writer bounds itself to one active logical write, just as a persistent readiness monitor bounds itself to one waiter. It does not occupy the transient-operation admission pool.
         controller.submit(request);
+        // A complete immediate send returns above. An asynchronous send returns only after the driver observes the kernel consume its SQE, or the accepted write ends before that acknowledgement. This crosses a real loop boundary even if the caller is stolen to another worker.
+        poll_fn(|context| {
+            self.shared.waker.register(context.waker());
+            if self.shared.submitted.load(Ordering::Acquire)
+                || self.shared.ready.load(Ordering::Acquire)
+            {
+                Poll::Ready(())
+            } else {
+                Poll::Pending
+            }
+        })
+        .await;
         Ok(())
     }
 
