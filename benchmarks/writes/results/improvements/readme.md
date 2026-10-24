@@ -6,7 +6,7 @@ This follow-up keeps the writer's ownership, ordering, cancellation and submissi
 
 ## Changes
 
-`Cancellation::is_never()` identifies signals which cannot be cancelled. Stalled io_uring writes with such signals now omit both the boxed cancellation future and the cancellation wake allocation. Actual cancellable writes retain their listener and reuse the wake allocation when `Arc::get_mut` establishes exclusive ownership. A delayed notification may retain an older wake object; that case allocates a new object rather than changing the older request ID. Unique request IDs also prevent already-queued old cancellation commands from affecting new writes. Explicit writer close and drop still cancel accepted output independently of its submission token.
+`Cancellation::is_never()` identifies signals which cannot be cancelled. Stalled io\_uring writes with such signals now omit both the boxed cancellation future and the cancellation wake allocation. Actual cancellable writes retain their listener and reuse the wake allocation when `Arc::get_mut` establishes exclusive ownership. A delayed notification may retain an older wake object; that case allocates a new object rather than changing the older request ID. Unique request IDs also prevent already-queued old cancellation commands from affecting new writes. Explicit writer close and drop still cancel accepted output independently of its submission token.
 
 Worker rings now retain the ordinary ring created during selector setup. Removed code includes optional cooperative-ring replacement, its failure fallback, the started flag and the taskrun-only flush branch. CQ overflow still forces kernel progress. Submission receipts still wait until the kernel consumes the first SQE, and a subsequent submission still completes its predecessor before accepting another buffer.
 
@@ -62,7 +62,7 @@ To separate policy from executable-layout differences, an experimental build sel
 
 For work=0, all three normal samples exceed all three cooperative samples. The four-worker result is effectively unchanged. Work=8 remains inconclusive: normal samples are 1,958, 2,282 and 1,977; cooperative samples are 2,226, 1,882 and 2,101. Their arithmetic means are nearly identical (2,072.2 versus 2,069.7, or +0.12%), despite the negative median comparison. Reporting both statistics makes that small sample's sensitivity visible; neither establishes a general generation-workload advantage. The host's recorded power policy remains unchanged.
 
-Keep ordinary completion delivery as the simpler default for this prototype: it eliminates a demonstrated source of explicit kernel entries and has a repeatable benefit in the backpressure case without extra generation work. Keep direct sends and the cancellation allocation reduction. Do not claim a universal throughput improvement or recommend the writer over borrowed monitors for every workload. The generation-heavy results, the default-buffer loss and the many-connection echo loss remain part of the evidence; real protocol workloads should determine any later policy change.
+The archived experiment recommended ordinary completion delivery because it eliminated a demonstrated source of explicit kernel entries and repeatedly helped the backpressure case without extra generation work. Fresh concurrent-monitor controls subsequently withdrew that recommendation; the final implementation restores cooperative delivery for unused thread-bound worker rings. Keep direct sends and the cancellation allocation reduction. Do not claim a universal throughput improvement or recommend the writer over borrowed monitors for every workload. The generation-heavy results, the default-buffer loss and the many-connection echo loss remain part of the evidence; real protocol workloads should determine any later policy change.
 
 ## Ordinary owned echo
 
@@ -81,7 +81,7 @@ The full macOS Bake gate passes at `4e3fcd9`: 23,922/23,922 measured regions, wi
 
 Independent review approved both production changes and confirmed preservation of queued and in-flight work, worker migration, retired workers, submission acknowledgement, cancellation and overflow handling. The delayed-notification regression test exercises both exclusive wake reuse and surviving older notifications.
 
-Formatting, strict workspace Clippy across all targets and features on macOS and Linux, Rust documentation with warnings denied, macOS Rust 1.85.1 package checks and the Linux-target io_uring test check pass. The test-only mutable-binding removal and fixture alias address lint clarity and change no reachable behavior. No Windows execution results are claimed.
+Formatting, strict workspace Clippy across all targets and features on macOS and Linux, Rust documentation with warnings denied, macOS Rust 1.85.1 package checks and the Linux-target io\_uring test check pass. The test-only mutable-binding removal and fixture alias address lint clarity and change no reachable behavior. No Windows execution results are claimed.
 
 ## Retained artifacts
 

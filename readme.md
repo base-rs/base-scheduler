@@ -16,146 +16,65 @@ The workspace also contains seven companion crates, released together with the i
 
 ## Usage
 
-The workspace is not published yet. Add the interface from Git with `cargo add core-scheduler --git https://github.com/core-rs/core-scheduler`. Applications also select a companion backend; reusable libraries require only the interface capabilities they use.
+The workspace is not published yet. Add the interface from Git with `cargo add core-scheduler --git https://github.com/core-rs/core-scheduler`. Applications select a companion backend; reusable libraries depend on the interface capabilities they use.
 
-Keep resources and protocol state in an object, and pass the scheduler and cancellation to each operation. The resulting future borrows that operation's execution context:
+Construct readers and writers from the scheduler once, then pass cancellation to their operations. A protocol object can retain these bound capabilities alongside its parser and protocol state:
 
 ```rust
-use core_scheduler::{BufferResult, Cancellation, SocketRead};
+use core_scheduler::{Cancellation, OperationResult, SocketStreamReader};
 
-struct Body<Socket> {
-    socket: Socket,
+struct Body<Reader> {
+    reader: Reader,
 }
 
-impl<Socket> Body<Socket> {
-    async fn read<S>(
-        &self,
-        scheduler: &S,
+impl<Reader: SocketStreamReader> Body<Reader> {
+    async fn read_into(
+        &mut self,
+        buffer: &mut [u8],
         cancellation: &Cancellation,
-        buffer: Vec<u8>,
-    ) -> BufferResult
-    where
-        S: SocketRead<Socket = Socket>,
-    {
-        scheduler.socket_read(&self.socket, buffer, cancellation).await
+    ) -> OperationResult<usize> {
+        self.reader.read_into(buffer, cancellation).await
     }
 }
 ```
 
-This small example illustrates owned-buffer dispatch. The [runnable I/O examples](examples/readme.md) show complete loops that reuse monitors and storage, retain parsed frames, hand off packets, and overlap file operations.
+Create the reader with `scheduler.socket_stream_reader(&socket)`. Its scheduler is fixed at construction; cancellation belongs to each call. Moving the protocol object or its future between workers leaves registration, routing, and retirement to the selected backend.
 
-The body retains no scheduler. Its next operation can use a different compatible scheduler. Associated resource types and backend registration rules determine compatibility; passing a new scheduler does not rebind an outstanding future or an incompatible resource.
+## Socket and file I/O
 
-## Capabilities
+The four socket handles are the normal application interface:
 
-Require individual operations, such as `FileRead`, `SocketRead + SocketWrite`, or `Clock`. `FileScheduler` and `SocketScheduler` aggregate their core operations for consumers that need the complete capability set.
+| Resource | Operations |
+| --- | --- |
+| `SocketStreamReader` | `read` returns an owned chunk; `read_into` and `read_vectored` use borrowed parser storage. |
+| `SocketStreamWriter` | `write` and `write_vectored` make borrowed transfers; `submit` accepts owned output that progresses independently, and `flush` waits for all accepted bytes. |
+| `SocketPacketReader` | `read` returns an owned message with source metadata; borrowed forms fill caller storage and report truncation. |
+| `SocketPacketWriter` | Send one packet from borrowed scalar/vector storage or an owned buffer, with an optional destination. |
+
+Construct them through `scheduler.socket_stream_reader`, `socket_stream_writer`, `socket_packet_reader`, and `socket_packet_writer`. Reuse one handle per sequential execution, with separate readers and writers for concurrent tasks. Borrowed-only readers do not allocate a receive pool. Owned reads initialize a default pool lazily, or use a shared pool configured through `with_pool`. Retained chunks can freeze into immutable views and move between tasks; their final owner returns storage for reuse.
+
+`scheduler.file_reader(&file)` and `scheduler.file_writer(&file)` provide the same construction pattern for reusable owned-buffer file I/O. `read` and `write` use the OS cursor; `read_at` and `write_at` take explicit offsets. Handles have no private logical file position. File operations return the original owner alongside success, error, or cancellation. Join independent read and write futures to overlap a file pipeline.
+
+Call `close().await` on each reader and writer before dropping it and exclusively closing its resource. Flush successful stream output first. Close has no cancellation argument and establishes backend retirement; dropping a handle is not an awaited cleanup barrier.
+
+See the [I/O usage guide](context/io.md), [interface reference](context/interface.md), and [runnable examples](examples/readme.md) for complete loops, buffer retention, partial transfers, and cleanup. The backend selects persistent readiness, request reuse, and buffer registration behind these handles.
+
+## Other capabilities
+
+File and socket lifecycle operations remain explicit scheduler capabilities: open, bind, listen, connect, accept, options, metadata, synchronization, and close. Protocol libraries require the individual capabilities they use; there is no universal scheduler requirement.
 
 | Capability | Contract |
 | --- | --- |
-| File operations | Open, close, metadata, cursor and positioned I/O, truncation, and synchronization, using an associated file type. |
-| Socket operations | Open, bind, listen, accept, connect, close, shutdown, readiness, and I/O, using an associated socket type. |
 | `Clock` | Monotonic observations and cancellable relative or absolute waits. |
-| `Spawn` | Primitive task dispatch with implementation-associated, owning completion handles. |
-| `Blocking` | Optional bounded admission of owned synchronous work. |
-| `Signals` | Optional notification subscriptions with implementation-associated guards and signal identifiers. |
-| Borrowed socket I/O | Optional `SocketRecvPoll`, `SocketSendPoll`, `SocketRecvMsgPoll`, and `SocketSendMsgPoll`, accepting borrowed slices and I/O vectors. |
-| `BufferPooling` and `SocketReceiving` | Experimental bounded reusable storage and owned received chunks, with retained parser views and backend-selected receive strategies. |
-| Extension capabilities | Typed socket options, scatter/gather messages, address resolution, standard TCP resource registration, file advice, and allocation. |
+| `Spawn` | Task dispatch with implementation-associated, owning completion handles. |
+| `Blocking` | Bounded admission of owned synchronous work. |
+| `Signals` | Notification subscriptions with implementation-associated guards and signal identifiers. |
+| `BufferPooling` | Shareable bounded storage with retained immutable views and cancellable capacity waits. |
+| Extension capabilities | Typed socket options, address resolution, standard TCP resource registration, file advice, and allocation. |
 
-Operation futures use static dispatch and are `Send`. File and socket resources are `Send + Sync`; spawned futures and outputs are `Send + 'static`. Local-only execution is outside this initial contract. Independent capabilities can be implemented separately without runtime-selection features.
+Operation futures use static dispatch and are `Send`; no boxed future or runtime-selection feature is required. Spawned futures and outputs are `Send + 'static`. Backend resource types and construction establish compatibility.
 
-Buffer consumers choose a shared payload budget and alignment through `scheduler.buffer_pool(options)`, then pass that pool to `scheduler.socket_receiver(socket, pool, flags, cancellation)`. Completed chunks are uniquely writable and can freeze into immutable views that outlive the receiver and move between workers. Retained views prevent reuse; exhaustion waits with cancellation. The backend owns allocation, hot-buffer reuse, registration, publication depth, and receive strategy. Changing worker count does not multiply the portable pool's capacity. Admitted receivers may receive ahead within the budget, so close them explicitly before exclusively closing their sockets. See the [buffer ownership design](context/design.md#experimental-shared-buffer-pools-and-receivers) and [buffer experiments](benchmarks/buffers/readme.md).
-
-Received messages expose `address()` and `payload()` while owning their backend's storage and metadata. Convert an address view with `to_socket_address()` when a portable endpoint is needed. Pooled messages support `payload_mut()` for parsing or decryption and `into_payload()` to transfer an owned buffer into a write or freeze it into retained views. These accessors specify contents and ownership; allocation, copying, and native metadata representation remain implementation choices.
-
-## Reusable file monitors
-
-`FileMonitoring` is an experimental capability for sequential owned-buffer reads and writes. Construct one monitor per sequential execution; separate monitors support concurrent operations on the same file. Retain it across operations to reuse backend request state. io_uring also caches an optional fixed-file registration for the current ring. A subsequent operation on another worker releases and replaces that registration while reusing request storage:
-
-```rust
-use core_scheduler::{Cancellation, FileMonitoring, OperationResult};
-
-async fn read_file<S: FileMonitoring>(
-    scheduler: &S,
-    file: &S::File,
-    cancellation: &Cancellation,
-    mut consume: impl FnMut(&[u8]),
-) -> OperationResult<()> {
-    let mut reader = scheduler.file_monitor(file)?;
-    let mut buffer = vec![0; 65536];
-    let result = async {
-        loop {
-            let (read, returned) = scheduler
-                .file_monitor_read(&mut reader, buffer, cancellation)
-                .await;
-            buffer = returned;
-            let count = read?;
-            if count == 0 {
-                return Ok(());
-            }
-            consume(&buffer[..count]);
-        }
-    }.await;
-    scheduler.file_monitor_close(&mut reader).await?;
-    result
-}
-```
-
-A monitor can alternate reads and writes. Independent monitors share the underlying file cursor; use positioned operations for independent offsets. Close and drop every monitor before exclusively closing the file. After an operation future is dropped, reuse can return `WouldBlock` until backend access retires. The ordinary file operations remain available without monitor state. See the [file benchmark](benchmarks/files/readme.md) for measured costs and benefits.
-
-## Reusable socket monitors
-
-`SocketMonitoring` supplies reusable directional readiness state. Use `socket_monitor` for general socket I/O, including UDP, or `socket_stream_monitor` to enable backend-specific byte-stream optimizations. Both use the same operations:
-
-```rust
-use core_scheduler::{Cancellation, Interest, OperationResult, SocketMonitoring, SocketRecvFlags};
-
-async fn receive<S: SocketMonitoring>(
-    scheduler: &S,
-    socket: &S::Socket,
-    cancellation: &Cancellation,
-    mut consume: impl FnMut(&[u8]),
-) -> OperationResult<()>
-where
-    S::Socket: 'static,
-{
-    let mut reader = scheduler.socket_stream_monitor(socket, Interest::Readable)?;
-    let mut buffer = vec![0; 65536];
-    let result = async {
-        loop {
-            let count = scheduler
-                .socket_monitor_recv_poll(&mut reader, &mut buffer, SocketRecvFlags::default(), cancellation)
-                .await?;
-            if count == 0 {
-                return Ok(());
-            }
-            consume(&buffer[..count]);
-        }
-    }.await;
-    scheduler.socket_monitor_close(&mut reader).await?;
-    result
-}
-```
-
-Retain the monitor across operations to reuse its registration. Create separate readable and writable monitors for concurrent tasks. `SocketStreamMonitor` wraps the common state without another allocation; `socket_stream_monitor_state` and `MonitorStorage::from_arc` also let you embed it in shared connection state. It does not imply connectedness or a universal rule for short reads. Scheduler and cancellation remain explicit operation arguments.
-
-## Receiving message sequences
-
-`SocketReceiving` constructs a receiver from an explicit scheduler-created pool. `recv(scheduler, cancellation)` returns owned messages exposing payload and address views; completed storage can be parsed, frozen, and retained independently of further receives. The backend chooses demand-driven or receive-ahead behavior. For shutdown, cancel and await the pending receive, await `receiver.close(scheduler)`, then drop the receiver before exclusively closing its socket. Monitor and receiver close methods take no cancellation token. The concrete io_uring multishot constructor remains a backend experiment.
-
-The [scheduler interface reference](context/interface.md) lists every portable capability, its arguments and result semantics, and the separate backend driver hooks.
-
-## Cancellation, ownership, and completion
-
-`Cancellation` is a runtime-independent cooperative signal. Clones share state, children inherit ancestor cancellation, and dropping a signal does not cancel it. Cancellation requests and completed cleanup are separate events.
-
-Owned I/O buffers keep a stable, initialized allocation. Operations return the original owner with success, error, or cancellation. A backend must retain buffers and resources until access ends, including when a caller drops the future. Reads and writes can be partial; there is no implicit read-exact or write-all behavior.
-
-Borrowed socket `_poll` operations are also ordinary async methods: callers `.await` them with explicit cancellation. Each payload access finishes before a poll returns; pending readiness waits retain no payload pointers. Their buffers and `IoSlice` arrays can therefore live on the stack, and dropping or forgetting a pending future leaves no outstanding buffer access. Windows implementations can enable nonblocking mode and leave it enabled; aliases must not concurrently restore blocking mode. Owned operations remain available for completion-based dispatch.
-
-Operation futures are lazy unless explicitly documented otherwise. Pre-cancellation prevents cancellable operation submission. Successful I/O progress wins a concurrent cancellation request; abandoning an operation cannot roll back its effects. Cleanup operations intentionally take no cancellation token so they can finish during graceful shutdown. `Spawn::spawn` and signal subscription register synchronously.
-
-A task handle owns its task: moving transfers ownership, awaiting observes completion, and dropping requests destruction after any active poll returns. Runtime adapters must preserve this contract, including when their host runtime normally detaches on drop. The interface exposes no forced-abort method or implicit task hierarchy.
+`Cancellation` is a runtime-independent cooperative signal. Clones share state, children inherit ancestor cancellation, and dropping a signal does not cancel it. Pre-cancellation prevents cancellable operation submission; successful progress can win a concurrent request. Cancellation does not roll back bytes or cursor changes. A task handle owns its execution lifetime: await it to observe completion, or drop it to request destruction after any active poll returns. Keep the scheduler and its drivers alive while accepted work retires.
 
 ## Development
 
@@ -165,7 +84,7 @@ Install the launcher with `cargo install bake --locked`. The private `bake/` wor
 cargo bake --locked test:coverage --all-targets true --all-features true
 ```
 
-The tests cover runtime-independent support, generic composition, reusable conformance assertions, and the Direct, Tokio, Native, readiness, and io_uring backends.
+The tests cover runtime-independent support, generic composition, reusable conformance assertions, and the Direct, Tokio, Native, readiness, and io\_uring backends.
 
 ## Releasing
 
@@ -179,7 +98,7 @@ The workspace has not been released. See [release notes](releases.md) for change
 
 See the [design and behavioral contracts](context/design.md) for resource compatibility, shutdown, cancellation boundaries, and extraction decisions.
 
-The [TCP echo benchmark](benchmarks/echo/readme.md) compares pure Tokio, the Tokio scheduler adapter, and Native with per-worker io_uring rings using separate server and client processes.
+The [TCP echo benchmark](benchmarks/echo/readme.md) compares pure Tokio, the Tokio scheduler adapter, and Native with per-worker io\_uring rings using separate server and client processes.
 
 ## Contributing
 
