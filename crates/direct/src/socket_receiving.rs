@@ -42,7 +42,7 @@ impl SocketStreamReading for DirectScheduler {
         pool: Self::Pool,
     ) -> io::Result<impl SocketStreamReader<Buffer = <Self::Pool as BufferPool>::Buffer> + 'scheduler>
     {
-        Ok(BoundSocketStreamReader::new(self, socket)?.with_pool(pool))
+        BoundSocketStreamReader::new(self, socket).map(|reader| reader.with_pool(pool))
     }
 }
 impl SocketPacketReading for DirectScheduler {
@@ -65,7 +65,7 @@ impl SocketPacketReading for DirectScheduler {
             Message: SocketRecvMessageMut<Payload = <Self::Pool as BufferPool>::Buffer>,
         > + 'scheduler,
     > {
-        Ok(BoundSocketPacketReader::new(self, socket)?.with_pool(pool))
+        BoundSocketPacketReader::new(self, socket).map(|reader| reader.with_pool(pool))
     }
 }
 impl SocketPacketWriting for DirectScheduler {

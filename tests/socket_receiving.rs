@@ -754,6 +754,6 @@ impl SocketStreamReading for Sockets {
         pool: Self::Pool,
     ) -> io::Result<impl SocketStreamReader<Buffer = <Self::Pool as BufferPool>::Buffer> + 'scheduler>
     {
-        Ok(BoundSocketStreamReader::new(self, socket)?.with_pool(pool))
+        BoundSocketStreamReader::new(self, socket).map(|reader| reader.with_pool(pool))
     }
 }

@@ -657,7 +657,8 @@ impl core_scheduler::SocketStreamReading for IoUringSelector {
             Buffer = <Self::Pool as core_scheduler::BufferPool>::Buffer,
         > + 'scheduler,
     > {
-        Ok(core_scheduler::backend::BoundSocketStreamReader::new(self, socket)?.with_pool(pool))
+        core_scheduler::backend::BoundSocketStreamReader::new(self, socket)
+            .map(|reader| reader.with_pool(pool))
     }
 }
 impl core_scheduler::SocketPacketReading for IoUringSelector {
@@ -684,7 +685,8 @@ impl core_scheduler::SocketPacketReading for IoUringSelector {
             >,
         > + 'scheduler,
     > {
-        Ok(core_scheduler::backend::BoundSocketPacketReader::new(self, socket)?.with_pool(pool))
+        core_scheduler::backend::BoundSocketPacketReader::new(self, socket)
+            .map(|reader| reader.with_pool(pool))
     }
 }
 impl core_scheduler::SocketPacketWriting for IoUringSelector {

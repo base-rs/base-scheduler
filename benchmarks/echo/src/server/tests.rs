@@ -278,6 +278,7 @@ impl core_scheduler::SocketStreamReading for PartialSocket {
             Buffer = <Self::Pool as core_scheduler::BufferPool>::Buffer,
         > + 'scheduler,
     > {
-        Ok(core_scheduler::backend::BoundSocketStreamReader::new(self, socket)?.with_pool(pool))
+        core_scheduler::backend::BoundSocketStreamReader::new(self, socket)
+            .map(|reader| reader.with_pool(pool))
     }
 }

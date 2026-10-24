@@ -34,6 +34,7 @@ mod file_advice_tests;
 mod file_allocate_fixture;
 mod file_allocate_tests;
 mod file_test_fixture;
+mod file_test_scheduler;
 mod file_tests;
 mod probe;
 mod signals_dispatch_tests;
@@ -64,6 +65,7 @@ pub use clock_fixture::ClockFixture;
 pub use file_advice_fixture::FileAdviceFixture;
 pub use file_allocate_fixture::FileAllocateFixture;
 pub use file_test_fixture::FileTestFixture;
+pub use file_test_scheduler::FileTestScheduler;
 pub use signals_fixture::SignalsFixture;
 pub use socket_io_fixture::SocketIoFixture;
 pub use socket_io_guard::SocketIoGuard;
@@ -82,6 +84,3 @@ pub mod socket_receiving;
 pub mod buffer_pool;
 
 pub mod socket_packet_io;
-
-mod file_test_scheduler;
-pub use file_test_scheduler::FileTestScheduler;

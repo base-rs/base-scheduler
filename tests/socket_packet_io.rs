@@ -823,7 +823,7 @@ impl SocketPacketReading for Scheduler {
             Message: SocketRecvMessageMut<Payload = <Self::Pool as BufferPool>::Buffer>,
         > + 'scheduler,
     > {
-        Ok(BoundSocketPacketReader::new(self, socket)?.with_pool(pool))
+        BoundSocketPacketReader::new(self, socket).map(|reader| reader.with_pool(pool))
     }
 }
 
