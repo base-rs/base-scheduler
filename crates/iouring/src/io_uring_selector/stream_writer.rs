@@ -371,18 +371,24 @@ impl<B: IoBuf> SocketStreamWriter<IoUringSelector> for IoUringStreamWriter<B> {
         if length == 0 {
             return Ok(());
         }
-        let send = || {
-            syscall("stream-write", || {
-                self.socket.get_ref().send_with_flags(
-                    &buffer.as_ref()[..length.min(i32::MAX as usize)],
-                    libc::MSG_NOSIGNAL | libc::MSG_DONTWAIT,
-                )
-            })
+        let result = {
+            let send = || {
+                syscall("stream-write", || {
+                    self.socket.get_ref().send_with_flags(
+                        &buffer.as_ref()[..length.min(i32::MAX as usize)],
+                        libc::MSG_NOSIGNAL | libc::MSG_DONTWAIT,
+                    )
+                })
+            };
+            #[cfg(test)]
+            {
+                tests::send(send)
+            }
+            #[cfg(not(test))]
+            {
+                send()
+            }
         };
-        #[cfg(test)]
-        let result = tests::send(send);
-        #[cfg(not(test))]
-        let result = send();
         let offset = match result {
             Ok(count) if count == length => return Ok(()),
             Ok(0) => {
