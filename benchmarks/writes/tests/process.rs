@@ -15,14 +15,24 @@ struct Server(Child);
 
 impl Server {
     fn start(backend: &str, connections: usize, send_buffer: usize) -> (Self, SocketAddr) {
+        Self::workload(backend, connections, send_buffer, 137, 3)
+    }
+
+    fn workload(
+        backend: &str,
+        connections: usize,
+        send_buffer: usize,
+        bytes: usize,
+        chunks: usize,
+    ) -> (Self, SocketAddr) {
         let mut child = Command::new(BINARY)
             .args([
                 "server",
                 backend,
                 "1",
                 &connections.to_string(),
-                "137",
-                "3",
+                &bytes.to_string(),
+                &chunks.to_string(),
                 "2",
                 &send_buffer.to_string(),
             ])
@@ -89,11 +99,8 @@ fn every_backend_exchanges_validated_responses_and_rejects_invalid_requests() {
             ])
             .output()
             .unwrap();
-        assert!(
-            client.status.success(),
-            "{backend}: {}",
-            String::from_utf8_lossy(&client.stderr)
-        );
+        let detail = format!("{backend}: {}", String::from_utf8_lossy(&client.stderr));
+        assert!(client.status.success(), "{detail}");
         let report: serde_json::Value = serde_json::from_slice(&client.stdout).unwrap();
         assert!(report["requests"].as_u64().unwrap() > 0);
         server.finish(true);
@@ -176,6 +183,35 @@ fn invalid_command_lines_fail_without_starting_work() {
         vec!["client", "127.0.0.1:1", "1", "1", "1", "1", "0", "0", "0"],
         vec!["client", "invalid", "1", "1", "1", "1", "0", "0", "1"],
         vec!["unknown"],
+        vec!["server", "tokio", "0", "1", "1", "1", "0", "0"],
+        vec!["server", "tokio", "1", "0", "1", "1", "0", "0"],
+        vec!["server", "tokio", "1", "1", "1", "0", "0", "0"],
+        vec!["server", "tokio", "1", "1", "1", "1", "0", "invalid"],
+        vec![
+            "client",
+            "127.0.0.1:1",
+            "1",
+            "1",
+            "1",
+            "1",
+            "0",
+            "0",
+            "invalid",
+        ],
+        vec!["client", "127.0.0.1:1", "0", "1", "1", "1", "0", "0", "1"],
+        vec!["client", "127.0.0.1:1", "1", "0", "1", "1", "0", "0", "1"],
+        vec!["client", "127.0.0.1:1", "1", "1", "1", "0", "0", "0", "1"],
+        vec![
+            "client",
+            "127.0.0.1:1",
+            "1",
+            "1",
+            "1",
+            "1",
+            "0",
+            "invalid",
+            "1",
+        ],
     ] {
         assert!(
             !Command::new(BINARY)
@@ -185,5 +221,91 @@ fn invalid_command_lines_fail_without_starting_work() {
                 .status
                 .success()
         );
+    }
+}
+
+#[test]
+fn connection_refusal_is_reported() {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let address = listener.local_addr().unwrap();
+    drop(listener);
+    let client = Command::new(BINARY)
+        .args([
+            "client",
+            &address.to_string(),
+            "1",
+            "1",
+            "1",
+            "1",
+            "0",
+            "0",
+            "0.1",
+        ])
+        .output()
+        .unwrap();
+    assert!(!client.status.success());
+    assert!(String::from_utf8_lossy(&client.stderr).contains("refused"));
+}
+
+#[test]
+fn client_reports_a_response_cut_short_by_disconnect() {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let address = listener.local_addr().unwrap();
+    let server = thread::spawn(move || {
+        let (mut stream, _) = listener.accept().unwrap();
+        let mut request = [0];
+        stream.read_exact(&mut request).unwrap();
+        stream.write_all(&[69]).unwrap();
+    });
+    let client = Command::new(BINARY)
+        .args([
+            "client",
+            &address.to_string(),
+            "1",
+            "1",
+            "137",
+            "1",
+            "0",
+            "0",
+            "0.1",
+        ])
+        .output()
+        .unwrap();
+    server.join().unwrap();
+    assert!(!client.status.success());
+    assert!(String::from_utf8_lossy(&client.stderr).contains("early eof"));
+}
+
+#[cfg(not(target_os = "linux"))]
+#[test]
+fn native_backends_report_platform_requirement() {
+    let (server, address) = Server::start("native-monitor", 1, 0);
+    let _client = TcpStream::connect(address).unwrap();
+    server.finish(false);
+}
+
+#[test]
+fn every_backend_reports_a_reset_peer_during_reading_and_writing() {
+    for backend in backends() {
+        let (server, address) = Server::start(backend, 1, 0);
+        let client = TcpStream::connect(address).unwrap();
+        socket2::SockRef::from(&client)
+            .set_linger(Some(Duration::ZERO))
+            .unwrap();
+        drop(client);
+        server.finish(false);
+
+        for chunks in [1, 8] {
+            let (server, address) = Server::workload(backend, 1, 65536, 1024 * 1024, chunks);
+            let mut client = TcpStream::connect(address).unwrap();
+            client.write_all(&[1]).unwrap();
+            // The small send buffer keeps the response incomplete while this peer stops receiving, exercising both last-write flush and next-write rejection.
+            client.read_exact(&mut [0]).unwrap();
+            socket2::SockRef::from(&client)
+                .set_linger(Some(Duration::ZERO))
+                .unwrap();
+            drop(client);
+            server.finish(false);
+        }
     }
 }

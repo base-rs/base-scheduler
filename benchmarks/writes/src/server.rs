@@ -16,9 +16,11 @@ use std::{
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 async fn tokio_connection(socket: TcpStream, workload: Workload) -> Result<()> {
-    socket.set_nonblocking(true)?;
-    let mut socket = tokio::net::TcpStream::from_std(socket)?;
-    let pool = HeapBufferPool::new(2, workload.bytes)?;
+    crate::setup("nonblocking stream", || socket.set_nonblocking(true))?;
+    let mut socket = crate::setup("Tokio stream registration", || {
+        tokio::net::TcpStream::from_std(socket)
+    })?;
+    let pool = HeapBufferPool::new(2, workload.bytes).expect("validated buffer pool dimensions");
     let never = Cancellation::never();
     let mut request = [0];
     while socket.read(&mut request).await? != 0 {
@@ -26,7 +28,10 @@ async fn tokio_connection(socket: TcpStream, workload: Workload) -> Result<()> {
             return Err("invalid request".into());
         }
         for chunk in 0..workload.chunks {
-            let mut buffer = pool.acquire(&never).await?;
+            let mut buffer = pool
+                .acquire(&never)
+                .await
+                .expect("live pool and uncancelled acquisition");
             prepare(
                 buffer.as_mut(),
                 chunk + usize::from(request[0]) * workload.chunks,
@@ -47,7 +52,7 @@ where
     S: SocketMonitoring + 'static,
     S::Socket: 'static,
 {
-    let pool = HeapBufferPool::new(2, workload.bytes)?;
+    let pool = HeapBufferPool::new(2, workload.bytes).expect("validated buffer pool dimensions");
     let never = Cancellation::never();
     let mut reader = scheduler.socket_stream_monitor(&socket, Interest::Readable)?;
     let mut writer = scheduler.socket_stream_monitor(&socket, Interest::Writable)?;
@@ -68,7 +73,10 @@ where
             }
             let mut previous = None;
             for chunk in 0..workload.chunks {
-                let mut buffer = pool.acquire(&never).await?;
+                let mut buffer = pool
+                    .acquire(&never)
+                    .await
+                    .expect("live pool and uncancelled acquisition");
                 // The control retains the completed buffer until the next acquisition, forcing alternation between the same two slots without overlapping I/O.
                 drop(previous.take());
                 prepare(
@@ -115,7 +123,7 @@ where
     S: SocketMonitoring + SocketStreamWriting + 'static,
     S::Socket: 'static,
 {
-    let pool = HeapBufferPool::new(2, workload.bytes)?;
+    let pool = HeapBufferPool::new(2, workload.bytes).expect("validated buffer pool dimensions");
     let never = Cancellation::never();
     let mut reader = scheduler.socket_stream_monitor(&socket, Interest::Readable)?;
     let mut writer = scheduler.socket_stream_writer::<BufferLease>(&socket)?;
@@ -135,7 +143,10 @@ where
                 return Err("invalid request".into());
             }
             for chunk in 0..workload.chunks {
-                let mut buffer = pool.acquire(&never).await?;
+                let mut buffer = pool
+                    .acquire(&never)
+                    .await
+                    .expect("live pool and uncancelled acquisition");
                 prepare(
                     buffer.as_mut(),
                     chunk + usize::from(request[0]) * workload.chunks,
@@ -182,6 +193,31 @@ where
     Ok(())
 }
 
+fn accept_connections(
+    listener: &TcpListener,
+    connections: usize,
+    send_buffer: usize,
+) -> Result<Vec<TcpStream>> {
+    // Accept and configure all streams before timing starts. Each accepted stream is registered only once, after its mode and options have been set.
+    let mut sockets = Vec::with_capacity(connections);
+    for _ in 0..connections {
+        let (socket, _) = crate::setup("accept connection", || listener.accept())?;
+        crate::setup("server TCP_NODELAY", || socket.set_nodelay(true))?;
+        let native = socket2::SockRef::from(&socket);
+        if send_buffer != 0 {
+            crate::setup("send buffer", || native.set_send_buffer_size(send_buffer))?;
+        }
+        if sockets.is_empty() {
+            eprintln!(
+                "{}",
+                serde_json::json!({"requested_send_buffer": send_buffer, "actual_send_buffer": crate::setup("send buffer size", || native.send_buffer_size())?})
+            );
+        }
+        sockets.push(socket);
+    }
+    Ok(sockets)
+}
+
 pub(crate) fn run(
     backend: &str,
     workers: usize,
@@ -203,26 +239,17 @@ pub(crate) fn run(
     ) {
         return Err("unknown write benchmark backend".into());
     }
-    let listener = TcpListener::bind("127.0.0.1:0")?;
-    println!("{}", listener.local_addr()?);
-    io::stdout().flush()?;
-    // Accept and configure all streams before timing starts. Each accepted stream is registered only once, after its mode and options have been set.
-    let mut sockets = Vec::with_capacity(connections);
-    for _ in 0..connections {
-        let (socket, _) = listener.accept()?;
-        socket.set_nodelay(true)?;
-        let native = socket2::SockRef::from(&socket);
-        if send_buffer != 0 {
-            native.set_send_buffer_size(send_buffer)?;
-        }
-        if sockets.is_empty() {
-            eprintln!(
-                "{}",
-                serde_json::json!({"requested_send_buffer": send_buffer, "actual_send_buffer": native.send_buffer_size()?})
-            );
-        }
-        sockets.push(socket);
-    }
+    let listener = crate::setup("bind listener", || TcpListener::bind("127.0.0.1:0"))?;
+    println!(
+        "{}",
+        crate::setup("listener address", || listener.local_addr())?
+    );
+    crate::setup("report listener", || io::stdout().flush())?;
+    let sockets = accept_connections(&listener, connections, send_buffer)?;
+    serve(backend, workers, workload, sockets)
+}
+
+fn serve(backend: &str, workers: usize, workload: Workload, sockets: Vec<TcpStream>) -> Result<()> {
     match backend {
         "tokio" => crate::runtime(workers).block_on(async move {
             let tasks: Vec<_> = sockets
@@ -230,7 +257,7 @@ pub(crate) fn run(
                 .map(|socket| tokio::spawn(tokio_connection(socket, workload)))
                 .collect();
             for task in tasks {
-                task.await??;
+                task.await.expect("server task completed without panic")?;
             }
             Ok(())
         }),
@@ -265,9 +292,11 @@ pub(crate) fn run(
         #[cfg(target_os = "linux")]
         "native-monitor" | "native-monitor-alternating" => {
             use core_scheduler_native::{NativeOptions, NativeScheduler};
-            let scheduler = Arc::new(NativeScheduler::with_options(NativeOptions {
-                workers,
-                ..Default::default()
+            let scheduler = Arc::new(crate::setup("native runtime", || {
+                NativeScheduler::with_options(NativeOptions {
+                    workers,
+                    ..Default::default()
+                })
             })?);
             let result = if backend.ends_with("-alternating") {
                 scheduler.block_on(scheduler_server(
@@ -291,21 +320,25 @@ pub(crate) fn run(
         "iouring-monitor" | "iouring-monitor-alternating" | "iouring-writer" => {
             use core_scheduler_iouring::{IoUringOptions, IoUringSelector};
             use core_scheduler_native::{NativeExecutorOptions, NativeScheduler};
-            let (selector, drivers) = IoUringSelector::with_workers(
-                IoUringOptions {
-                    capacity: (connections * 2).max(256),
-                    ..Default::default()
-                },
-                workers,
-            )?;
-            let scheduler = Arc::new(NativeScheduler::with_drivers(
-                selector,
-                drivers,
-                NativeExecutorOptions {
+            let (selector, drivers) = crate::setup("io_uring selector", || {
+                IoUringSelector::with_workers(
+                    IoUringOptions {
+                        capacity: (sockets.len() * 2).max(256),
+                        ..Default::default()
+                    },
                     workers,
-                    ..Default::default()
-                },
-            )?);
+                )
+            })?;
+            let scheduler = Arc::new(crate::setup("io_uring runtime", || {
+                NativeScheduler::with_drivers(
+                    selector,
+                    drivers,
+                    NativeExecutorOptions {
+                        workers,
+                        ..Default::default()
+                    },
+                )
+            })?);
             let result = if backend == "iouring-writer" {
                 scheduler.block_on(scheduler_server(
                     Arc::clone(&scheduler),
@@ -334,3 +367,6 @@ pub(crate) fn run(
         _ => Err("Native backends require Linux".into()),
     }
 }
+
+#[cfg(test)]
+mod tests;

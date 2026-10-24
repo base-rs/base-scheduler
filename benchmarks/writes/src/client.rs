@@ -9,7 +9,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
+    io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
     net::TcpStream,
     sync::{Barrier, watch},
 };
@@ -42,46 +42,27 @@ pub(crate) async fn run(
     );
     let mut tasks = Vec::with_capacity(connections);
     for _ in 0..connections {
-        let mut socket = TcpStream::connect(address).await?;
-        socket.set_nodelay(true)?;
-        let gate = Arc::clone(&gate);
-        let expected = Arc::clone(&expected);
-        let mut clock = clock.clone();
-        tasks.push(tokio::spawn(async move {
-            let mut response = vec![0; workload.bytes];
-            let mut latency = Histogram::<u64>::new_with_bounds(1, 60_000_000_000, 3)?;
-            gate.wait().await;
-            clock.changed().await?;
-            let (start, end) = clock.borrow().expect("coordinator publishes schedule");
-            let mut request = 0;
-            loop {
-                let started = Instant::now();
-                if started >= end {
-                    break;
-                }
-                socket.write_all(&[(request + 1) as u8]).await?;
-                for expected in &expected[request] {
-                    socket.read_exact(&mut response).await?;
-                    if response != *expected {
-                        return Err("write payload mismatch".into());
-                    }
-                }
-                let completed = Instant::now();
-                request ^= 1;
-                if started >= start && completed <= end {
-                    latency.record((completed - started).as_nanos().max(1) as u64)?;
-                }
-            }
-            socket.shutdown().await?;
-            Ok::<_, Box<dyn std::error::Error + Send + Sync>>(latency)
-        }));
+        let socket = TcpStream::connect(address).await?;
+        crate::setup("client TCP_NODELAY", || socket.set_nodelay(true))?;
+        tasks.push(tokio::spawn(connection(
+            socket,
+            workload,
+            Arc::clone(&expected),
+            Arc::clone(&gate),
+            clock.clone(),
+        )));
     }
     gate.wait().await;
     let start = Instant::now() + warmup;
-    schedule.send(Some((start, start + duration)))?;
-    let mut latency = Histogram::<u64>::new_with_bounds(1, 60_000_000_000, 3)?;
+    schedule
+        .send(Some((start, start + duration)))
+        .expect("clients await schedule");
+    let mut latency =
+        Histogram::<u64>::new_with_bounds(1, 60_000_000_000, 3).expect("valid histogram bounds");
     for task in tasks {
-        latency.add(task.await??)?;
+        latency
+            .add(task.await.expect("client task completed without panic")?)
+            .expect("matching histogram bounds");
     }
     if latency.is_empty() {
         return Err("no complete responses in measurement window".into());
@@ -99,4 +80,104 @@ pub(crate) async fn run(
         })
     );
     Ok(())
+}
+
+async fn connection(
+    mut socket: impl AsyncRead + AsyncWrite + Unpin,
+    workload: Workload,
+    expected: Arc<Vec<Vec<Vec<u8>>>>,
+    gate: Arc<Barrier>,
+    mut clock: watch::Receiver<Option<(Instant, Instant)>>,
+) -> Result<Histogram<u64>> {
+    let mut response = vec![0; workload.bytes];
+    let mut latency =
+        Histogram::<u64>::new_with_bounds(1, 60_000_000_000, 3).expect("valid histogram bounds");
+    gate.wait().await;
+    clock
+        .changed()
+        .await
+        .expect("coordinator publishes schedule");
+    let (start, end) = clock.borrow().expect("coordinator publishes schedule");
+    let mut request = 0;
+    loop {
+        let started = Instant::now();
+        if started >= end {
+            break;
+        }
+        socket.write_all(&[(request + 1) as u8]).await?;
+        for expected in &expected[request] {
+            socket.read_exact(&mut response).await?;
+            if response != *expected {
+                return Err("write payload mismatch".into());
+            }
+        }
+        let completed = Instant::now();
+        request ^= 1;
+        if started >= start && completed <= end {
+            latency
+                .record((completed - started).as_nanos().max(1) as u64)
+                .expect("round trip within histogram bounds");
+        }
+    }
+    // Dropping the task-owned socket sends EOF after the final response.
+    Ok::<_, Box<dyn std::error::Error + Send + Sync>>(latency)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{io, net::TcpListener};
+
+    #[test]
+    fn failed_socket_configuration_is_reported() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let runtime = crate::runtime(1);
+        let error = crate::tests::fail_setup("client TCP_NODELAY", || {
+            runtime.block_on(run(
+                address,
+                1,
+                Workload {
+                    bytes: 1,
+                    chunks: 1,
+                    work: 0,
+                },
+                Duration::ZERO,
+                Duration::from_secs(1),
+            ))
+        })
+        .unwrap_err();
+        assert_eq!(error.to_string(), "client TCP_NODELAY");
+    }
+
+    #[test]
+    fn failed_request_writes_return_the_transport_error() {
+        let runtime = crate::runtime(1);
+        runtime.block_on(async {
+            let (socket, peer) = tokio::io::duplex(1);
+            drop(peer);
+            let (schedule, clock) = watch::channel(None);
+            let start = Instant::now();
+            schedule
+                .send(Some((start, start + Duration::from_secs(1))))
+                .unwrap();
+            let error = connection(
+                socket,
+                Workload {
+                    bytes: 1,
+                    chunks: 1,
+                    work: 0,
+                },
+                Arc::new(vec![vec![vec![0]]; 2]),
+                Arc::new(Barrier::new(1)),
+                clock,
+            )
+            .await
+            .unwrap_err();
+            assert_eq!(
+                error.downcast::<io::Error>().unwrap().kind(),
+                io::ErrorKind::BrokenPipe
+            );
+        });
+    }
 }

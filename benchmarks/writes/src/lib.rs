@@ -4,9 +4,19 @@
 mod client;
 mod server;
 
-use std::{error::Error, time::Duration};
+use std::{error::Error, io, time::Duration};
 
 type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;
+
+// Production setup delegates directly to the OS. Unit tests can replace one named setup operation with a deterministic resource failure.
+#[inline]
+fn setup<T>(_operation: &'static str, perform: impl FnOnce() -> io::Result<T>) -> io::Result<T> {
+    #[cfg(test)]
+    if tests::SETUP_FAILURE.get() == Some(_operation) {
+        return Err(io::Error::other(_operation));
+    }
+    perform()
+}
 
 #[derive(Clone, Copy)]
 struct Workload {
@@ -100,6 +110,22 @@ pub fn run(args: &[String]) -> Result<()> {
 mod tests {
     use super::*;
 
+    thread_local! {
+        pub(super) static SETUP_FAILURE: std::cell::Cell<Option<&'static str>> = const { std::cell::Cell::new(None) };
+    }
+
+    pub(super) fn fail_setup<T>(operation: &'static str, run: impl FnOnce() -> T) -> T {
+        struct Reset;
+        impl Drop for Reset {
+            fn drop(&mut self) {
+                SETUP_FAILURE.set(None);
+            }
+        }
+        SETUP_FAILURE.set(Some(operation));
+        let _reset = Reset;
+        run()
+    }
+
     #[test]
     fn generated_payload_distinguishes_chunks_and_work() {
         let mut first = [0; 137];
@@ -118,9 +144,12 @@ mod tests {
         assert!(positive("0").is_err());
         assert!(positive("n").is_err());
         assert!(seconds("-1").is_err());
+        assert!(seconds("invalid").is_err());
         assert!(run(&["benchmark".into()]).is_err());
         for values in [
             ["0", "1", "0"],
+            ["1", "0", "0"],
+            ["1", "1", "invalid"],
             ["1048577", "1", "0"],
             ["1", "1025", "0"],
             ["1", "1", "4097"],
