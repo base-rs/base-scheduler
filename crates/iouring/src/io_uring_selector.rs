@@ -867,6 +867,7 @@ impl Selector for IoUringSelector {
 }
 pub(crate) struct Reactor {
     ring: IoUring,
+    started: bool,
     notification: Arc<OwnedFd>,
     incoming: mpsc::Receiver<Command>,
     controller: Arc<Controller>,
@@ -898,6 +899,7 @@ impl Reactor {
             pending_monitors,
             buffer_pools: Vec::new(),
             pool_ready: Vec::new(),
+            started: false,
             notification,
             incoming,
             controller,
@@ -908,6 +910,21 @@ impl Reactor {
             closing: false,
             notification_armed: false,
             submission_notifications: submission_notifications::SubmissionNotifications::default(),
+        }
+    }
+
+    pub(crate) fn bind_worker(&mut self) {
+        // Cooperative task work belongs to its submitting thread. Enable it only for a never-driven ring after its owner becomes thread-bound; a movable driver must keep the default interrupt behavior.
+        if !self.started {
+            if let Ok(ring) = syscall("cooperative-ring", || {
+                IoUring::builder()
+                    .setup_coop_taskrun()
+                    .setup_taskrun_flag()
+                    .build(self.ring.params().sq_entries())
+            }) {
+                // Setup already validated this kernel's operations and completion features. No request or notification has reached the old ring, and queued commands remain on the controller. Failure to obtain this optional replacement leaves the original valid ring intact.
+                self.ring = ring;
+            }
         }
     }
 
@@ -1156,6 +1173,7 @@ impl Reactor {
     }
 
     pub(crate) fn turn(&mut self, timeout: Option<Duration>) -> io::Result<bool> {
+        self.started = true;
         let (mut progressed, command_batch_full) = self.process_commands();
 
         progressed |= self.collect_completions()?;
@@ -1275,7 +1293,7 @@ impl Reactor {
             return Ok(true);
         }
 
-        // Nonblocking turns may stage one readiness-only batch for the next turn. An idle wait submits it and waits in one entry; a busy worker submits it on its next nonblocking turn. Overflow always enters. Short-circuiting preserves the local permit through productive turns. At the actual wait decision, consume it; the armed poll retains remote notifications until their CQE drains the counter.
+        // Nonblocking turns may stage one readiness-only batch for the next turn. An idle wait submits it and waits in one entry; a busy worker submits it on its next nonblocking turn. Overflow and task work always enter. Short-circuiting preserves the local permit through productive turns. At the actual wait decision, consume it; the armed poll retains remote notifications until their CQE drains the counter.
         let return_to_executor = progressed
             // Issuance waiters may need to run before their I/O can complete. Never enter a blocking completion wait while an unconsumed SQE still owes its caller a submission notification.
             || self.submission_notifications.pending()
@@ -1289,7 +1307,9 @@ impl Reactor {
         if return_to_executor {
             let needs_submit = {
                 let submissions = self.ring.submission();
-                (!submissions.is_empty() && !defer_submission) || submissions.cq_overflow()
+                (!submissions.is_empty() && !defer_submission)
+                    || submissions.cq_overflow()
+                    || submissions.taskrun()
             };
             if needs_submit {
                 let before = self
