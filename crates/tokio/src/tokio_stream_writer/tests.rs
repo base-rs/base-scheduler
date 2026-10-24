@@ -244,6 +244,8 @@ fn ready_submission_and_flush_allocate_nothing() {
                     .await;
             let mut writer = scheduler.socket_stream_output(&sender).unwrap();
             let mut context = std::task::Context::from_waker(std::task::Waker::noop());
+            // Initialize the fault-injection TLS outside the production-path allocation measurement. Some targets allocate when registering its thread destructor.
+            SEND_RESULTS.with(|_| {});
             {
                 let mut submission = std::pin::pin!(writer.submit(&scheduler, vec![42], &never));
                 let allocations = allocation_counter::measure(|| {
