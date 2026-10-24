@@ -652,6 +652,58 @@ impl<S: Selector + FileMonitoring> FileMonitoring for NativeScheduler<S> {
     }
 }
 
+impl<S: Selector + FileMonitorSubmission> FileMonitorSubmission for NativeScheduler<S> {
+    async fn file_monitor_read_submit<B: IoBufMut>(
+        &self,
+        monitor: &mut FileMonitor<Self::File, Self::FileRegistration>,
+        buffer: B,
+        cancellation: &Cancellation,
+    ) -> Result<impl std::future::Future<Output = BufferResult<B>> + Send, (OperationError, B)>
+    {
+        self.selector()
+            .file_monitor_read_submit(monitor, buffer, cancellation)
+            .await
+    }
+
+    async fn file_monitor_write_submit<B: IoBuf>(
+        &self,
+        monitor: &mut FileMonitor<Self::File, Self::FileRegistration>,
+        buffer: B,
+        cancellation: &Cancellation,
+    ) -> Result<impl std::future::Future<Output = BufferResult<B>> + Send, (OperationError, B)>
+    {
+        self.selector()
+            .file_monitor_write_submit(monitor, buffer, cancellation)
+            .await
+    }
+
+    async fn file_monitor_read_at_submit<B: IoBufMut>(
+        &self,
+        monitor: &mut FileMonitor<Self::File, Self::FileRegistration>,
+        buffer: B,
+        offset: u64,
+        cancellation: &Cancellation,
+    ) -> Result<impl std::future::Future<Output = BufferResult<B>> + Send, (OperationError, B)>
+    {
+        self.selector()
+            .file_monitor_read_at_submit(monitor, buffer, offset, cancellation)
+            .await
+    }
+
+    async fn file_monitor_write_at_submit<B: IoBuf>(
+        &self,
+        monitor: &mut FileMonitor<Self::File, Self::FileRegistration>,
+        buffer: B,
+        offset: u64,
+        cancellation: &Cancellation,
+    ) -> Result<impl std::future::Future<Output = BufferResult<B>> + Send, (OperationError, B)>
+    {
+        self.selector()
+            .file_monitor_write_at_submit(monitor, buffer, offset, cancellation)
+            .await
+    }
+}
+
 impl<S: Selector + FileSubmission> FileSubmission for NativeScheduler<S> {
     async fn file_read_submit<B: IoBufMut>(
         &self,

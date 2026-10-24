@@ -12,3 +12,5 @@ impl FileMonitoring for TokioScheduler {
         Ok(FileMonitor::new(TokioFile(file.retain()), ()))
     }
 }
+
+impl core_scheduler::FileMonitorSubmission for TokioScheduler {}

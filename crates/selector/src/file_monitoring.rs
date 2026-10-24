@@ -12,3 +12,5 @@ impl FileMonitoring for ReadinessSelector {
         Ok(FileMonitor::new(NativeFile(file.retain()), ()))
     }
 }
+
+impl core_scheduler::FileMonitorSubmission for ReadinessSelector {}

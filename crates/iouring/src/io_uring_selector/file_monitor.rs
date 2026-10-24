@@ -166,39 +166,54 @@ impl IoUringSelector {
         pointer: fn(&mut B) -> *mut u8,
         cancellation: &Cancellation,
     ) -> BufferResult<B> {
+        match self
+            .file_monitor_operation_submit(monitor, buffer, offset, write, pointer, cancellation)
+            .await
+        {
+            Ok(completion) => completion.await,
+            Err((error, buffer)) => (Err(error), buffer),
+        }
+    }
+
+    async fn file_monitor_operation_submit<B: IoBuf>(
+        &self,
+        monitor: &mut FileMonitor<NativeFile, IoUringFileRegistration>,
+        buffer: B,
+        offset: Option<u64>,
+        write: bool,
+        pointer: fn(&mut B) -> *mut u8,
+        cancellation: &Cancellation,
+    ) -> Result<impl Future<Output = BufferResult<B>> + Send, (OperationError, B)> {
         let check = cancellation
             .check()
             .map_err(OperationError::from)
             .and_then(|()| self.check_file_monitor(monitor).map_err(Into::into));
         if let Err(error) = check {
-            return (Err(error), buffer);
+            return Err((error, buffer));
         }
         if offset.is_some_and(|offset| offset > i64::MAX as u64) {
-            return (
-                Err(
-                    io::Error::new(io::ErrorKind::InvalidInput, "file offset exceeds i64::MAX")
-                        .into(),
-                ),
+            return Err((
+                io::Error::new(io::ErrorKind::InvalidInput, "file offset exceeds i64::MAX").into(),
                 buffer,
-            );
+            ));
         }
         let registration = monitor.registration_mut();
         if registration.closed {
-            return (
-                Err(io::Error::new(io::ErrorKind::BrokenPipe, "file monitor is closed").into()),
+            return Err((
+                io::Error::new(io::ErrorKind::BrokenPipe, "file monitor is closed").into(),
                 buffer,
-            );
+            ));
         }
         if registration.running.is_some() {
             if !registration.shared.ready.load(Ordering::Acquire) {
-                return (
-                    Err(io::Error::new(
+                return Err((
+                    io::Error::new(
                         io::ErrorKind::WouldBlock,
                         "file monitor operation has not retired",
                     )
-                    .into()),
+                    .into(),
                     buffer,
-                );
+                ));
             }
             registration.running = None;
             // Abandonment forfeits the old buffer to retirement. Dispose of it without a completion lock held.
@@ -208,29 +223,34 @@ impl IoUringSelector {
                 Completion::Failed => {
                     registration.closed = true;
                     registration.failed = true;
-                    return (
-                        Err(io::Error::new(
+                    return Err((
+                        io::Error::new(
                             io::ErrorKind::BrokenPipe,
                             "selector failed with an operation in flight",
                         )
-                        .into()),
+                        .into(),
                         buffer,
-                    );
+                    ));
                 }
             }
         }
         if let Err(error) = self.check_open() {
-            return (Err(error.into()), buffer);
+            return Err((error.into(), buffer));
         }
         let shared = Arc::clone(&registration.shared);
         let controller = self.route();
         let permit = match controller.capacity.acquire(cancellation).await {
             Ok(permit) => permit,
-            Err(error) => return (operation_result(Err(error), cancellation), buffer),
+            Err(error) => {
+                return Err((
+                    operation_result::<usize>(Err(error), cancellation).unwrap_err(),
+                    buffer,
+                ));
+            }
         };
         let identifier = match controller.next_identifier() {
             Ok(identifier) => identifier,
-            Err(error) => return (Err(error.into()), buffer),
+            Err(error) => return Err((error.into(), buffer)),
         };
         let cached = monitor.registration_mut().cached.take();
         let mut request = cached
@@ -287,41 +307,115 @@ impl IoUringSelector {
             identifier,
             armed: true,
         };
-        let mut cancelled = pin!(cancellation.cancelled());
-        poll_fn(|context| {
-            shared.waker.register(context.waker());
-            if shared.ready.load(Ordering::Acquire) {
-                return Poll::Ready(());
+        Ok(async move {
+            let mut cancelled = pin!(cancellation.cancelled());
+            poll_fn(|context| {
+                shared.waker.register(context.waker());
+                if shared.ready.load(Ordering::Acquire) {
+                    return Poll::Ready(());
+                }
+                if cancel.armed && cancelled.as_mut().poll(context).is_ready() {
+                    cancel.request();
+                }
+                Poll::Pending
+            })
+            .await;
+            cancel.armed = false;
+            monitor.registration_mut().running = None;
+            match shared.take() {
+                Completion::Request(result, cached) => {
+                    let mut request = cached.downcast::<FileRequest<B>>().ok().unwrap();
+                    let buffer = request.buffer.take().unwrap();
+                    monitor.registration_mut().cached = Some(request);
+                    (operation_result(result, cancellation), buffer)
+                }
+                Completion::Rejected(buffer) => (
+                    Err(io::Error::new(
+                        io::ErrorKind::BrokenPipe,
+                        "selector closed before submission",
+                    )
+                    .into()),
+                    *buffer.downcast::<B>().ok().unwrap(),
+                ),
+                Completion::Failed => {
+                    monitor.registration_mut().closed = true;
+                    monitor.registration_mut().failed = true;
+                    panic!("io_uring selector failed with an operation in flight");
+                }
             }
-            if cancel.armed && cancelled.as_mut().poll(context).is_ready() {
-                cancel.request();
-            }
-            Poll::Pending
         })
-        .await;
-        cancel.armed = false;
-        monitor.registration_mut().running = None;
-        match shared.take() {
-            Completion::Request(result, cached) => {
-                let mut request = cached.downcast::<FileRequest<B>>().ok().unwrap();
-                let buffer = request.buffer.take().unwrap();
-                monitor.registration_mut().cached = Some(request);
-                (operation_result(result, cancellation), buffer)
-            }
-            Completion::Rejected(buffer) => (
-                Err(io::Error::new(
-                    io::ErrorKind::BrokenPipe,
-                    "selector closed before submission",
-                )
-                .into()),
-                *buffer.downcast::<B>().ok().unwrap(),
-            ),
-            Completion::Failed => {
-                monitor.registration_mut().closed = true;
-                monitor.registration_mut().failed = true;
-                panic!("io_uring selector failed with an operation in flight");
-            }
-        }
+    }
+}
+
+impl FileMonitorSubmission for IoUringSelector {
+    async fn file_monitor_read_submit<B: IoBufMut>(
+        &self,
+        monitor: &mut FileMonitor<NativeFile, IoUringFileRegistration>,
+        buffer: B,
+        cancellation: &Cancellation,
+    ) -> Result<impl Future<Output = BufferResult<B>> + Send, (OperationError, B)> {
+        self.file_monitor_operation_submit(
+            monitor,
+            buffer,
+            None,
+            false,
+            |buffer| buffer.as_mut().as_mut_ptr(),
+            cancellation,
+        )
+        .await
+    }
+
+    async fn file_monitor_write_submit<B: IoBuf>(
+        &self,
+        monitor: &mut FileMonitor<NativeFile, IoUringFileRegistration>,
+        buffer: B,
+        cancellation: &Cancellation,
+    ) -> Result<impl Future<Output = BufferResult<B>> + Send, (OperationError, B)> {
+        self.file_monitor_operation_submit(
+            monitor,
+            buffer,
+            None,
+            true,
+            |buffer| buffer.as_ref().as_ptr().cast_mut(),
+            cancellation,
+        )
+        .await
+    }
+
+    async fn file_monitor_read_at_submit<B: IoBufMut>(
+        &self,
+        monitor: &mut FileMonitor<NativeFile, IoUringFileRegistration>,
+        buffer: B,
+        offset: u64,
+        cancellation: &Cancellation,
+    ) -> Result<impl Future<Output = BufferResult<B>> + Send, (OperationError, B)> {
+        self.file_monitor_operation_submit(
+            monitor,
+            buffer,
+            Some(offset),
+            false,
+            |buffer| buffer.as_mut().as_mut_ptr(),
+            cancellation,
+        )
+        .await
+    }
+
+    async fn file_monitor_write_at_submit<B: IoBuf>(
+        &self,
+        monitor: &mut FileMonitor<NativeFile, IoUringFileRegistration>,
+        buffer: B,
+        offset: u64,
+        cancellation: &Cancellation,
+    ) -> Result<impl Future<Output = BufferResult<B>> + Send, (OperationError, B)> {
+        self.file_monitor_operation_submit(
+            monitor,
+            buffer,
+            Some(offset),
+            true,
+            |buffer| buffer.as_ref().as_ptr().cast_mut(),
+            cancellation,
+        )
+        .await
     }
 }
 

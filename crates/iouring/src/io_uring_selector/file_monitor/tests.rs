@@ -22,6 +22,60 @@ fn drive<F: Future>(
 }
 
 #[test]
+fn ordinary_and_submitted_monitor_operations_share_admission_and_retirement() {
+    let (selector, driver) = IoUringSelector::new(Default::default()).unwrap();
+    let mut worker = driver.enter();
+    let waker = worker.waker();
+    let mut context = Context::from_waker(&waker);
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("file");
+    std::fs::write(&path, b"abcdef").unwrap();
+    let never = Cancellation::never();
+    let file = block_on(selector.file_open(
+        &path,
+        FileOptions {
+            write: true,
+            ..FileOptions::READ
+        },
+        &never,
+    ))
+    .unwrap();
+    macro_rules! check {
+        ($ordinary:ident, $submit:ident $(, $offset:expr)?) => {{
+            let mut monitor = selector.file_monitor(&file).unwrap();
+            {
+                let mut operation = pin!(selector.$ordinary(&mut monitor, vec![42], $($offset,)? &never));
+                assert!(operation.as_mut().poll(&mut context).is_pending());
+            }
+            let (error, buffer) = block_on(selector.$submit(&mut monitor, vec![7], $($offset,)? &never)).err().unwrap();
+            assert_eq!(error.kind(), io::ErrorKind::WouldBlock);
+            assert_eq!(buffer, [7]);
+            drive(&mut worker, &mut context, pin!(selector.file_monitor_close(&mut monitor))).unwrap();
+
+            let mut monitor = selector.file_monitor(&file).unwrap();
+            let completion = block_on(selector.$submit(&mut monitor, vec![42], $($offset,)? &never)).unwrap();
+            drop(completion);
+            let (result, buffer) = block_on(selector.$ordinary(&mut monitor, vec![7], $($offset,)? &never));
+            assert_eq!(result.unwrap_err().kind(), io::ErrorKind::WouldBlock);
+            assert_eq!(buffer, [7]);
+            {
+                let mut close = pin!(selector.file_monitor_close(&mut monitor));
+                assert!(close.as_mut().poll(&mut context).is_pending());
+            }
+            drive(&mut worker, &mut context, pin!(selector.file_monitor_close(&mut monitor))).unwrap();
+            let (error, buffer) = block_on(selector.$submit(&mut monitor, vec![7], $($offset,)? &never)).err().unwrap();
+            assert_eq!(error.kind(), io::ErrorKind::BrokenPipe);
+            assert_eq!(buffer, [7]);
+        }};
+    }
+    check!(file_monitor_read, file_monitor_read_submit);
+    check!(file_monitor_write, file_monitor_write_submit);
+    check!(file_monitor_read_at, file_monitor_read_at_submit, 0);
+    check!(file_monitor_write_at, file_monitor_write_at_submit, 0);
+    block_on(selector.file_close(file)).unwrap();
+}
+
+#[test]
 fn repeated_operations_reuse_request_storage_without_allocations() {
     let (selector, driver) = IoUringSelector::new(IoUringOptions {
         entries: 16,

@@ -12,3 +12,5 @@ impl FileMonitoring for DirectScheduler {
         Ok(FileMonitor::new(DirectFile(file.retain()), ()))
     }
 }
+
+impl core_scheduler::FileMonitorSubmission for DirectScheduler {}
