@@ -89,6 +89,7 @@ unsafe impl<T: IoBufSequenceMut> IoBufSequenceMut for OperationGuard<T> {
     }
 }
 impl OperationState {
+    #[inline]
     pub(crate) fn check_idle(&self) -> Result<(), OperationError> {
         if self
             .activity
