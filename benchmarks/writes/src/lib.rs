@@ -52,6 +52,8 @@ fn runtime(workers: usize) -> tokio::runtime::Runtime {
 }
 
 // Fill the actual output allocation. `work` controls a dependency chain per cache line; its result affects every byte, so the compiler cannot discard it. Chunk-specific contents catch reordering, duplication, and partially overwritten leases. Clients precompute expected contents outside the timed loop.
+// Keep one shared implementation across the differently shaped backend futures so payload generation is not a separate compiler-inlining experiment.
+#[inline(never)]
 fn prepare(buffer: &mut [u8], chunk: usize, work: usize) {
     let mut state = (chunk as u64).wrapping_add(0x9e3779b97f4a7c15);
     for line in buffer.chunks_mut(64) {
