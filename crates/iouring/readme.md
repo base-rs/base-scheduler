@@ -1,6 +1,8 @@
 # `core-scheduler-iouring`
 
-A Linux selector with independently driven completion I/O. Owned file reads and writes (including positioned operations), socket reads/writes, and socket message sends/receives use io_uring. Borrowed `_poll` operations try nonblocking syscalls directly and use ring readiness waits after `WouldBlock`. Other file operations, socket lifecycle, resolution, blocking work, and signals use an explicitly owned `ReadinessSelector` fallback.
+A Linux selector with independently driven completion I/O. Owned file reads and writes (including positioned operations), socket reads/writes, and socket message sends/receives use io\_uring. Borrowed `_poll` operations try nonblocking syscalls directly and use ring readiness waits after `WouldBlock`. Other file operations, socket lifecycle, resolution, blocking work, and signals use an explicitly owned `ReadinessSelector` fallback.
+
+Application code constructs scheduler-bound stream and packet readers and writers, plus file readers and writers. Operations accept cancellation without another scheduler argument; registration, request reuse, and worker migration remain internal. See the [I/O usage guide](../../context/io.md).
 
 ## Usage
 
@@ -39,11 +41,11 @@ Owned scalar socket writes first attempt a synchronous nonblocking send after ch
 
 ## Reusable file state
 
-`FileMonitoring` retains typed request and completion storage for one sequential stream of owned reads or writes. Reusing the buffer-owner type avoids fresh request/channel allocations after warmup. Independent monitors can share a file for concurrent operations; use positioned operations for independent offsets.
+Bound `FileReader` and `FileWriter` handles retain typed request and completion storage for one sequential stream of owned reads or writes through internal file monitors. Reusing the buffer-owner type avoids fresh request/channel allocations after warmup. Independent monitors can share a file for concurrent operations; use positioned operations for independent offsets.
 
 Each monitor also caches an optional fixed-file registration for its current ring. `IoUringOptions::fixed_files` limits each ring's sparse table and defaults to 256; zero disables registration. Unsupported setup, insertion failure, or exhaustion falls back to ordinary descriptors. A future moving threads keeps its accepted operation on the original ring. After retirement, a later operation can use another worker, releasing the previous registration through its original ring and creating a new registration on the destination. Returning to a previous worker registers again. Pending and failed releases remain tracked for explicit close, so old registrations can temporarily coexist with the current one. This cache does not implement registered buffers.
 
-Call `file_monitor_close` while the drivers remain active, then drop the monitor before exclusively closing the file. Close retires accepted I/O and waits for every cached ring registration to be released. Cancelling close stops waiting while release continues; another close observes its result. Drop queues release without waiting. See the [ring-state research](../../benchmarks/files/ring-state-research.md) for measured benefits, costs, and further opportunities.
+Call the bound handle’s uncancellable `close()` while the drivers remain active, then drop the handle before exclusively closing the file. Close retires accepted I/O and waits for every cached ring registration to be released. Dropping a close future stops waiting while release continues; another close observes its result. Dropping the handle queues release without waiting. See the [ring-state research](../../benchmarks/files/ring-state-research.md) for measured benefits, costs, and further opportunities.
 
 ## Borrowed I/O
 
@@ -61,7 +63,7 @@ Worker capacity is deliberately local: one shard can wait while another has free
 
 Worker-owned receive-ahead requires Linux 6.0 or later with provided-buffer ring and multishot receive support. Unsupported operations report errors; use an ordinary shared pool for the portable monitor strategy. Cancelling an individual worker-owned receive wait leaves that receiver usable. Explicit `close(scheduler).await` retires the resource; drop requests cancellation without waiting. Each receiver holds one admission slot for its lifetime, so leave room for sends and other operations. Pools and receivers must be used with the selector that created them. Performance comparisons are recorded in [the worker-owned pool experiment](../../benchmarks/buffers/worker-owned.md); the [preceding shared-budget prototype](../../benchmarks/buffers/worker-pools.md) is retained as historical research.
 
-`IoUringSelector::socket_recvmsg_multishot` starts one persistent receive using a bounded provided-buffer ring. This is a concrete experimental API; import `RecvMsgMultishotOptions` from `core_scheduler_iouring` and `SocketRecvMsgReceiver` from `core_scheduler`. With Native, construct and advance it through `scheduler.selector()`. Portable consumers use `SocketReceiving::socket_receiver` with an explicit pool. The concrete receiver exposes immutable owned messages and retires reception on pending-wait cancellation. Returned payloads can outlive close or move to another worker; local returns publish directly and remote returns use the owning ring's inbox.
+`IoUringSelector::socket_recvmsg_multishot` starts one persistent receive using a bounded provided-buffer ring. This is a concrete experimental API; import `RecvMsgMultishotOptions` from `core_scheduler_iouring` and `SocketRecvMsgReceiver` from `core_scheduler`. With Native, construct and advance it through `scheduler.selector()`. Portable application code uses bound stream or packet readers; the raw receiver hooks remain backend machinery. The concrete receiver exposes immutable owned messages and retires reception on pending-wait cancellation. Returned payloads can outlive close or move to another worker; local returns publish directly and remote returns use the owning ring's inbox.
 
 The kernel rearms a multishot request across receives. Only a CQE without `IORING_CQE_F_MORE` retires that submission. Exhaustion pauses the receiver instead of spinning: returning a buffer resubmits the request. TCP EOF ends reception; empty datagrams remain messages, and truncation and sender metadata are preserved. Peeking is rejected. Linux 6.0 or later and provided-buffer ring support are required; setup or operation errors are explicit, without a fallback.
 

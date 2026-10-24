@@ -56,8 +56,7 @@ Sockets stay nonblocking throughout their lifetime. Each syscall attempt uses th
 
 `SocketSendMsg` and `SocketRecvMsg` use prepared `IoBuffers`/`IoBuffersMut` arrays directly during synchronous `sendmsg`/`recvmsg` or non-overlapped Winsock calls. Other sequences build native vectors in scratch storage reused across attempts. Each operation makes one transfer, preserves short counts and datagram boundaries, and returns the unchanged collection owner. Unix reports discarded control data when the OS supplies `MSG_CTRUNC`; the Windows payload/address path has no control metadata. No syscall retains vector or payload pointers after that attempt returns. Accepted attempts retain the entire owner even if the waiting future or scheduler is dropped. Between attempts, the future owns its input with no backend access remaining; dropping it safely ends retries. Scheduler shutdown wakes pending retry waiters and drains accepted attempts and cleanup, without requiring abandoned futures to be polled.
 
-
-`SocketReceiving` constructs a portable receiver from a scheduler-created buffer pool. Receive and close take the scheduler explicitly. Completed messages expose mutable payloads which can be frozen into retained views. Close awaits retirement without cancellation; drop the receiver afterwards to release its socket owner before exclusive socket close. Explicit multishot kernel control remains a concrete io_uring API accessed through the selector.
+Construct scheduler-bound stream and packet readers and writers for application I/O, and file readers and writers for repeated file operations. Their operations take cancellation without another scheduler argument. Borrowed-only readers allocate no payload pool; owned reads use lazy default storage or an explicit shared pool. Close and drop every handle before exclusively closing its underlying resource. See the [I/O usage guide](../../context/io.md) for the recommended paths.
 
 ## Development
 

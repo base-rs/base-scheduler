@@ -28,6 +28,8 @@ Use one handle per sequential execution, with independent readers and writers fo
 
 The default stream writer accepts the same pooled owner type returned by the default stream reader, with no type annotation needed for borrowed-only output. `socket_stream_writer_with_buffer::<B>(K)` selects another stable owner type. Reader factories allocate no payload pool; the first owned read initializes default storage lazily. `socket_stream_reader_with_pool(K, pool)` and `socket_packet_reader_with_pool(K, pool)` select an application-owned shared budget at construction. Factories return implementation-selected handles through the reader/writer contracts; backends can override the default composition without changing application operations.
 
+The Direct and Tokio backends provide all four socket handles. Native forwards its selector’s capabilities: io\_uring provides all four, while the readiness selector currently lacks ordered stream output (`SocketStreamWriting`).
+
 ### Stream input
 
 [`SocketStreamReader`](https://github.com/core-rs/core-scheduler/blob/main/src/socket_stream_reader.rs) associates `Buffer: ReceiveBuffer`.
