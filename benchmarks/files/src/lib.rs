@@ -68,21 +68,19 @@ where
                                 reader.as_mut().unwrap().read_at(buffer, 0, &never).await
                             }
                             (false, "read-at") => {
-                                scheduler
-                                    .file_reader(&file)
-                                    .unwrap()
-                                    .read_at(buffer, 0, &never)
-                                    .await
+                                let mut reader = scheduler.file_reader(&file).unwrap();
+                                let result = reader.read_at(buffer, 0, &never).await;
+                                reader.close().await.unwrap();
+                                result
                             }
                             (true, "write-at") => {
                                 writer.as_mut().unwrap().write_at(buffer, 0, &never).await
                             }
                             (false, "write-at") => {
-                                scheduler
-                                    .file_writer(&file)
-                                    .unwrap()
-                                    .write_at(buffer, 0, &never)
-                                    .await
+                                let mut writer = scheduler.file_writer(&file).unwrap();
+                                let result = writer.write_at(buffer, 0, &never).await;
+                                writer.close().await.unwrap();
+                                result
                             }
                             _ => panic!("unknown workload"),
                         };

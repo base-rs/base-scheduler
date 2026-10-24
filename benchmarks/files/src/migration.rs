@@ -66,18 +66,16 @@ pub fn run_migration(
                 (true, false) => reader.as_mut().unwrap().read_at(buffer, 0, &never).await,
                 (true, true) => writer.as_mut().unwrap().write_at(buffer, 0, &never).await,
                 (false, false) => {
-                    selector
-                        .file_reader(&file)
-                        .unwrap()
-                        .read_at(buffer, 0, &never)
-                        .await
+                    let mut reader = selector.file_reader(&file).unwrap();
+                    let result = reader.read_at(buffer, 0, &never).await;
+                    reader.close().await.unwrap();
+                    result
                 }
                 (false, true) => {
-                    selector
-                        .file_writer(&file)
-                        .unwrap()
-                        .write_at(buffer, 0, &never)
-                        .await
+                    let mut writer = selector.file_writer(&file).unwrap();
+                    let result = writer.write_at(buffer, 0, &never).await;
+                    writer.close().await.unwrap();
+                    result
                 }
             };
             assert_eq!(result.unwrap(), size);
