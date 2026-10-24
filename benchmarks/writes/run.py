@@ -53,11 +53,15 @@ def save(path, value):
     temporary.replace(path)
 
 
-def sample(server_binary, client_binary, backend, case, warmup, seconds):
+def sample(server_binary, client_binary, backend, case, warmup, seconds, stat_path=None):
     workers, connections, size, chunks, work, send_buffer = case
     affinity = "0" if workers == 1 else f"0-{workers - 1}"
     server_command = ["taskset", "-c", affinity, server_binary, "server", backend,
                       str(workers), str(connections), str(size), str(chunks), str(work), str(send_buffer)]
+    if stat_path:
+        server_command = ["sudo", "-n", "perf", "stat", "-x,", "-o", str(stat_path),
+                          "-e", "cycles,instructions,cache-misses,syscalls:sys_enter_io_uring_enter,syscalls:sys_enter_sendto",
+                          "-e", "io_uring:io_uring_submit_req", "--filter", "opcode == 26", "--"] + server_command
     server = subprocess.Popen(server_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     try:
         with selectors.DefaultSelector() as ready:
@@ -86,6 +90,7 @@ def sample(server_binary, client_binary, backend, case, warmup, seconds):
             "client_command": client_command,
             "server_stderr": server_stderr,
             "server_remaining_stdout": remaining_stdout,
+            "perf_stat": str(stat_path) if stat_path else None,
             "result": json.loads(client.stdout),
         }
     finally:
@@ -99,6 +104,7 @@ def main():
     parser.add_argument("--binary", default="target/release/core-scheduler-write-benchmark")
     parser.add_argument("--client-binary")
     parser.add_argument("--variant", action="append", default=[], help="LABEL=BACKEND=SERVER_BINARY; use LABEL in --backends to compare isolated implementations")
+    parser.add_argument("--perf-stat", type=Path, help="Diagnostic counter directory; instrumented throughput is not a capacity measurement")
     parser.add_argument("--backends", nargs="+", default=BACKENDS)
     parser.add_argument("--suite", choices=CASES, default="screen")
     parser.add_argument("--case", action="append", help="Override suite with workers,connections,bytes,chunks,work,send_buffer; repeatable")
@@ -120,6 +126,9 @@ def main():
         label, backend, path = item.split("=", 2)
         variants[label] = {"backend": backend, "binary": str(Path(path).resolve()), "binary_sha256": digest(path)}
     args.output.parent.mkdir(parents=True, exist_ok=True)
+    if args.perf_stat:
+        args.perf_stat = args.perf_stat.resolve()
+        args.perf_stat.mkdir(parents=True, exist_ok=True)
     with open("/tmp/core-scheduler-perf.lock", "a") as lock:
         print("Waiting for /tmp/core-scheduler-perf.lock", flush=True)
         fcntl.flock(lock, fcntl.LOCK_EX)
@@ -136,6 +145,8 @@ def main():
             "client_binary": client_binary,
             "client_binary_sha256": digest(client_binary),
             "variants": variants,
+            "instrumented": bool(args.perf_stat),
+            "io_uring_submit_filter": "opcode == 26 (IORING_OP_SEND)" if args.perf_stat else None,
             "cargo_lock_sha256": digest("Cargo.lock"),
             "cpu": json.loads(command("lscpu", "-J")),
             "governors": {str(cpu): Path(f"/sys/devices/system/cpu/cpu{cpu}/cpufreq/scaling_governor").read_text().strip() for cpu in range(8)},
@@ -158,7 +169,8 @@ def main():
             record = {"repetition": repetition, "started_unix": time.time()}
             try:
                 variant = variants.get(backend, {"backend": backend, "binary": binary})
-                record.update(sample(variant["binary"], client_binary, variant["backend"], case, args.warmup, args.seconds))
+                stat_path = args.perf_stat / f"{index:03}-{backend}-r{repetition}.csv" if args.perf_stat else None
+                record.update(sample(variant["binary"], client_binary, variant["backend"], case, args.warmup, args.seconds, stat_path))
                 record["server_backend"] = variant["backend"]
                 record["backend"] = backend
             except Exception as error:
