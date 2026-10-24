@@ -37,7 +37,7 @@ The Direct and Tokio backends provide all four socket handles. Native forwards i
 | Method | Arguments → awaited result | Semantics |
 | --- | --- | --- |
 | `read` | `(C) → OperationResult<Option<Buffer>>` | One owned initialized chunk. `None` means EOF or closed input. The returned chunk can outlive the reader and subsequent reads. |
-| `read_into` | `(&mut [u8], C) → OperationResult<usize>` | One possibly short borrowed transfer. Zero with nonempty capacity means EOF; an empty destination does not establish EOF. |
+| `read_into` | `(&mut [u8], C) → OperationResult<usize>` | One possibly short borrowed transfer. Zero with nonempty capacity means EOF; an empty destination completes immediately after handle and cancellation checks, without establishing EOF. |
 | `read_vectored` | `(&mut [IoSliceMut], C) → OperationResult<usize>` | One scatter read into borrowed initialized ranges. No read-exact or framing behavior. |
 | `close` | `() → io::Result<()>` | Stop input and await registration retirement. Does not close or shut down the socket; returned chunks remain valid. |
 

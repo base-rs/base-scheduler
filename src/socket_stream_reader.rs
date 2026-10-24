@@ -19,7 +19,7 @@ pub trait SocketStreamReader: Send {
         cancellation: &Cancellation,
     ) -> impl Future<Output = OperationResult<Option<Self::Buffer>>> + Send;
 
-    /// Read once into borrowed storage, returning a possibly short count. Zero with nonempty storage is EOF. An empty destination completes with zero after admission and cancellation checks, without establishing EOF. Successful progress wins concurrent cancellation.
+    /// Read once into borrowed storage, returning a possibly short count. Zero with nonempty storage is EOF. An empty destination completes with zero after checking that the handle is open and cancellation has not been requested, without establishing EOF. Successful progress wins concurrent cancellation.
     fn read_into(
         &mut self,
         buffer: &mut [u8],
