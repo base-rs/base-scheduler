@@ -22,7 +22,7 @@ where
         .submit(scheduler, rejected, &cancellation)
         .await
         .unwrap_err();
-    assert!(matches!(error, OperationError::Cancelled(_)));
+    crate::socket_monitoring::cancelled::<()>(Err(error));
     assert_eq!(returned.as_ptr(), pointer);
     assert_eq!(returned, b"rejected");
     let ((), ()) = zip(
@@ -70,7 +70,9 @@ where
     let cancellation = Cancellation::new();
     cancellation.cancel();
     let result = writer.flush(scheduler, &cancellation).await;
-    assert!(result.is_ok() || matches!(result, Err(OperationError::Cancelled(_))));
+    if let Err(error) = result {
+        crate::socket_monitoring::cancelled::<()>(Err(error));
+    }
     let mut incoming = vec![0; 64 * 1024];
     let mut received = 0;
     while received < pool.buffer_size() {
@@ -96,27 +98,29 @@ where
     S: SocketStreamWriting + SocketRecvPoll,
 {
     let never = Cancellation::never();
-    let expected = vec![0x33; 8 * 1024 * 1024];
-    let mut writer = scheduler.socket_stream_writer(sender).unwrap();
-    writer
-        .submit(scheduler, expected.clone(), &never)
-        .await
-        .map_err(|(error, _)| error)
-        .unwrap();
-    let mut next = Box::pin(writer.submit(scheduler, b"tail".to_vec(), &never));
-    let accepted = poll_once(next.as_mut()).await;
-    // A platform may have buffered the whole first write already. Account for the second admission if it completed synchronously.
-    let appended = accepted.is_some();
-    if let Some(result) = accepted {
-        result.map_err(|(error, _)| error).unwrap();
+    for size in [8, 8 * 1024 * 1024] {
+        let expected = vec![0x33; size];
+        let mut writer = scheduler.socket_stream_writer(sender).unwrap();
+        writer
+            .submit(scheduler, expected.clone(), &never)
+            .await
+            .map_err(|(error, _)| error)
+            .unwrap();
+        let mut next = Box::pin(writer.submit(scheduler, b"tail".to_vec(), &never));
+        let accepted = poll_once(next.as_mut()).await;
+        // A platform may have buffered the whole first write already. Account for the second admission if it completed synchronously.
+        let appended = accepted.is_some();
+        if let Some(result) = accepted {
+            result.map_err(|(error, _)| error).unwrap();
+        }
+        drop(next);
+        receive(scheduler, receiver, &expected).await;
+        if appended {
+            receive(scheduler, receiver, b"tail").await;
+        }
+        writer.flush(scheduler, &never).await.unwrap();
+        writer.close(scheduler).await.unwrap();
     }
-    drop(next);
-    receive(scheduler, receiver, &expected).await;
-    if appended {
-        receive(scheduler, receiver, b"tail").await;
-    }
-    writer.flush(scheduler, &never).await.unwrap();
-    writer.close(scheduler).await.unwrap();
 }
 
 /// Cleanup can cancel blocked output without a peer consuming it, and releases retained pool storage.
