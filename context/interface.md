@@ -57,7 +57,7 @@ The submission token continues to govern accepted output until its send result. 
 
 ### Packet input and output
 
-[`SocketPacketReader`](https://github.com/core-rs/core-scheduler/blob/main/src/socket_packet_reader.rs) associates an owned `Message: SocketRecvMessageMut`. Each successful read represents one datagram.
+[`SocketPacketReader`](https://github.com/core-rs/core-scheduler/blob/main/src/socket_packet_reader.rs) associates an owned `Message: SocketRecvMessageMut`. Each successful read represents one packet.
 
 | Method | Arguments → awaited result | Semantics |
 | --- | --- | --- |
@@ -66,7 +66,7 @@ The submission token continues to govern accepted output until its send result. 
 | `read_vectored` | `(&mut [IoSliceMut], C) → OperationResult<SocketRecvResult>` | Receive one packet across borrowed ranges; preserve the same message metadata. |
 | `close` | `() → io::Result<()>` | Stop input and await registration retirement, preserving already returned messages. |
 
-[`SocketPacketWriter`](https://github.com/core-rs/core-scheduler/blob/main/src/socket_packet_writer.rs) sends one datagram per operation. `address: Option<SocketAddress>` selects a destination; `None` uses the connected peer.
+[`SocketPacketWriter`](https://github.com/core-rs/core-scheduler/blob/main/src/socket_packet_writer.rs) sends one packet per operation. `address: Option<SocketAddress>` selects a destination; `None` uses the connected peer.
 
 | Method | Arguments → awaited result | Semantics |
 | --- | --- | --- |
