@@ -43,7 +43,7 @@ These bookkeeping changes leave borrowed throughput close to baseline: -0.93% to
 
 ### Owned scalar stream receives
 
-`iouring` transfers the buffer owner to the completion-based reader. Returning the owner requires CQE retirement; substituting a borrowed receive would change that contract.
+`iouring` transfers the buffer owner to the completion-based reader. Submitted requests retain that owner through CQE retirement; substituting the borrowed path would change what this benchmark measures. The public owned-buffer contract also permits synchronous completion before submission.
 
 | Workers | Connections | Bytes | Baseline | Selected | Change | Ordinary Tokio | Selected vs Tokio |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
