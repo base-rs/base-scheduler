@@ -455,6 +455,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "core-scheduler-write-benchmark"
+version = "0.0.0"
+dependencies = [
+ "core-scheduler",
+ "core-scheduler-iouring",
+ "core-scheduler-native",
+ "core-scheduler-tokio",
+ "hdrhistogram",
+ "serde_json",
+ "socket2",
+ "tokio",
+]
+
+[[package]]
 name = "crc32fast"
 version = "1.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
