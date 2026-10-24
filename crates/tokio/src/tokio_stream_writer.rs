@@ -1,30 +1,33 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
+use crate::Interest;
+use crate::socket_write_state::SocketWriteState;
 use crate::{TokioScheduler, TokioSocket, TokioTask, socket_io};
 use core_scheduler::{
-    Cancellation, Interest, IoBuf, OperationError, OperationResult, SocketStreamOutput,
-    SocketStreamOutputting, SocketWriteState,
+    Cancellation, IoBuf, OperationError, OperationResult, SocketSendFlags, SocketStreamWriter,
 };
 use std::{
     future::{Future, poll_fn},
-    io,
+    io::{self, IoSlice},
     marker::PhantomData,
     pin::pin,
     task::Poll,
 };
 
 /// Ordered output which completes ready sends inline and delegates stalled logical writes to the adapter's task service.
-pub struct TokioStreamWriter<B> {
+pub(crate) struct TokioStreamWriter<'scheduler, B> {
+    scheduler: &'scheduler TokioScheduler,
     socket: TokioSocket,
     state: SocketWriteState<TokioTask<OperationResult<()>>>,
     buffer: PhantomData<fn(B)>,
 }
 
-impl SocketStreamOutputting for TokioScheduler {
-    type Writer<B: IoBuf> = TokioStreamWriter<B>;
-
-    fn socket_stream_output<B: IoBuf>(&self, socket: &TokioSocket) -> io::Result<Self::Writer<B>> {
+impl TokioScheduler {
+    pub(crate) fn socket_stream_output<B: IoBuf>(
+        &self,
+        socket: &TokioSocket,
+    ) -> io::Result<TokioStreamWriter<'_, B>> {
         self.check_socket(socket)?;
         if socket_io::recvmsg_socket_type(socket.get_ref())? != core_scheduler::SocketType::Stream {
             return Err(io::Error::new(
@@ -33,6 +36,7 @@ impl SocketStreamOutputting for TokioScheduler {
             ));
         }
         Ok(TokioStreamWriter {
+            scheduler: self,
             socket: socket.retain(),
             state: SocketWriteState::default(),
             buffer: PhantomData,
@@ -40,15 +44,112 @@ impl SocketStreamOutputting for TokioScheduler {
     }
 }
 
-impl<B: IoBuf> SocketStreamOutput<TokioScheduler> for TokioStreamWriter<B> {
+impl<B: IoBuf> SocketStreamWriter for TokioStreamWriter<'_, B> {
     type Buffer = B;
+
+    async fn write(
+        &mut self,
+        buffer: &[u8],
+        cancellation: &Cancellation,
+    ) -> OperationResult<usize> {
+        self.state.check_open()?;
+        if self.state.is_pending() {
+            self.state.flush(cancellation).await?;
+        }
+        self.scheduler
+            .socket_send_poll(
+                &self.socket,
+                buffer,
+                SocketSendFlags::default(),
+                cancellation,
+            )
+            .await
+    }
+
+    async fn write_vectored(
+        &mut self,
+        buffers: &[IoSlice<'_>],
+        cancellation: &Cancellation,
+    ) -> OperationResult<usize> {
+        self.write_vectored_with_flags(buffers, SocketSendFlags::default(), cancellation)
+            .await
+    }
+
+    async fn write_vectored_with_flags(
+        &mut self,
+        buffers: &[std::io::IoSlice<'_>],
+        flags: core_scheduler::SocketSendFlags,
+        cancellation: &Cancellation,
+    ) -> OperationResult<usize> {
+        self.state.check_open()?;
+        if self.state.is_pending() {
+            self.state.flush(cancellation).await?;
+        }
+        self.scheduler
+            .socket_sendmsg_poll(&self.socket, buffers, None, flags, cancellation)
+            .await
+    }
+
+    async fn write_owned_vectored<Buffers: core_scheduler::IoBufSequence>(
+        &mut self,
+        buffers: Buffers,
+        flags: core_scheduler::SocketSendFlags,
+        cancellation: &Cancellation,
+    ) -> (OperationResult<usize>, Buffers) {
+        if let Err(error) = self.state.check_open() {
+            return (Err(error), buffers);
+        }
+        if self.state.is_pending() {
+            if let Err(error) = self.state.flush(cancellation).await {
+                return (Err(error), buffers);
+            }
+        }
+        if let Err(error) = cancellation.check() {
+            return (Err(error.into()), buffers);
+        }
+        let message = crate::SocketMessage {
+            buffers,
+            address: None,
+        };
+        let (result, message) = self
+            .scheduler
+            .socket_sendmsg(&self.socket, message, flags, cancellation)
+            .await;
+        (result, message.buffers)
+    }
+
+    async fn write_owned<Owned: core_scheduler::IoBuf>(
+        &mut self,
+        buffer: Owned,
+        cancellation: &Cancellation,
+    ) -> core_scheduler::BufferResult<Owned> {
+        if let Err(error) = self.state.check_open() {
+            return (Err(error), buffer);
+        }
+        if self.state.is_pending() {
+            if let Err(error) = self.state.flush(cancellation).await {
+                return (Err(error), buffer);
+            }
+        }
+        if let Err(error) = cancellation.check() {
+            return (Err(error.into()), buffer);
+        }
+        let (result, buffer) = self
+            .scheduler
+            .socket_write(&self.socket, buffer, cancellation)
+            .await;
+        (result, buffer)
+    }
 
     async fn submit(
         &mut self,
-        scheduler: &TokioScheduler,
         buffer: B,
         cancellation: &Cancellation,
     ) -> Result<(), (OperationError, B)> {
+        let scheduler = self.scheduler;
+        if let Err(error) = self.state.check_open() {
+            return Err((error, buffer));
+        }
         if let Err(error) = scheduler.check_socket(&self.socket).map_err(Into::into) {
             return Err((error, buffer));
         }
@@ -108,17 +209,12 @@ impl<B: IoBuf> SocketStreamOutput<TokioScheduler> for TokioStreamWriter<B> {
         Ok(())
     }
 
-    async fn flush(
-        &mut self,
-        scheduler: &TokioScheduler,
-        cancellation: &Cancellation,
-    ) -> OperationResult<()> {
-        scheduler.check_socket_compatibility(&self.socket)?;
+    async fn flush(&mut self, cancellation: &Cancellation) -> OperationResult<()> {
         self.state.flush(cancellation).await
     }
 
-    async fn close(&mut self, scheduler: &TokioScheduler) -> io::Result<()> {
-        scheduler.check_socket_compatibility(&self.socket)?;
+    async fn close(&mut self) -> io::Result<()> {
+        self.state.stop();
         self.state.close().await
     }
 }
@@ -189,7 +285,7 @@ impl core_scheduler::SocketStreamWriting for TokioScheduler {
     where
         Self::Socket: 'static,
     {
-        core_scheduler::BoundSocketStreamWriter::new(self, socket)
+        self.socket_stream_output(socket)
     }
 
     fn socket_stream_writer_with_buffer<'scheduler, B: IoBuf>(
@@ -199,6 +295,6 @@ impl core_scheduler::SocketStreamWriting for TokioScheduler {
     where
         Self::Socket: 'static,
     {
-        core_scheduler::BoundSocketStreamWriter::new(self, socket)
+        self.socket_stream_output(socket)
     }
 }

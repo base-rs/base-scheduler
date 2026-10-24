@@ -2,6 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use super::*;
+use core_scheduler::SocketStreamWriter;
 use core_scheduler::*;
 
 macro_rules! conformance {
@@ -86,13 +87,10 @@ fn rejects_datagrams_and_closed_admission() {
                     .kind(),
                 io::ErrorKind::BrokenPipe
             );
-            let (error, buffer) = writer
-                .submit(&scheduler, vec![42], &never)
-                .await
-                .unwrap_err();
+            let (error, buffer) = writer.submit(vec![42], &never).await.unwrap_err();
             assert_eq!(error.kind(), io::ErrorKind::BrokenPipe);
             assert_eq!(buffer, [42]);
-            writer.close(&scheduler).await.unwrap();
+            writer.close().await.unwrap();
             scheduler.shutdown().await;
         });
     });
@@ -112,19 +110,13 @@ fn immediate_error_is_accepted_and_retained() {
                 .await
                 .unwrap();
             let mut writer = scheduler.socket_stream_output::<Vec<u8>>(&sender).unwrap();
-            writer.submit(&scheduler, vec![42], &never).await.unwrap();
-            let kind = writer.flush(&scheduler, &never).await.unwrap_err().kind();
-            let (error, buffer) = writer
-                .submit(&scheduler, vec![43], &never)
-                .await
-                .unwrap_err();
+            writer.submit(vec![42], &never).await.unwrap();
+            let kind = writer.flush(&never).await.unwrap_err().kind();
+            let (error, buffer) = writer.submit(vec![43], &never).await.unwrap_err();
             assert_eq!(error.kind(), kind);
             assert_eq!(buffer, [43]);
-            assert_eq!(
-                writer.flush(&scheduler, &never).await.unwrap_err().kind(),
-                kind
-            );
-            writer.close(&scheduler).await.unwrap();
+            assert_eq!(writer.flush(&never).await.unwrap_err().kind(), kind);
+            writer.close().await.unwrap();
             scheduler.shutdown().await;
         });
     });
@@ -149,23 +141,19 @@ fn accepted_cancellation_and_drop_release_owners() {
             let cancellation = Cancellation::new();
             inject([Err(io::ErrorKind::WouldBlock.into())]);
             writer
-                .submit(
-                    &scheduler,
-                    pool.acquire(&never).await.unwrap(),
-                    &cancellation,
-                )
+                .submit(pool.acquire(&never).await.unwrap(), &cancellation)
                 .await
                 .map_err(|(e, _)| e)
                 .unwrap();
             cancellation.cancel();
-            assert_cancelled(writer.flush(&scheduler, &never).await);
+            assert_cancelled(writer.flush(&never).await);
             assert!(pool.try_acquire().is_some());
-            writer.close(&scheduler).await.unwrap();
+            writer.close().await.unwrap();
             drop(writer);
             let mut writer = scheduler.socket_stream_output(&sender).unwrap();
             inject([Err(io::ErrorKind::WouldBlock.into())]);
             writer
-                .submit(&scheduler, pool.acquire(&never).await.unwrap(), &never)
+                .submit(pool.acquire(&never).await.unwrap(), &never)
                 .await
                 .map_err(|(e, _)| e)
                 .unwrap();
@@ -203,18 +191,7 @@ fn foreign_scheduler_is_rejected_before_changing_writer_state() {
                 io::ErrorKind::InvalidInput
             );
             let mut writer = scheduler.socket_stream_output(&sender).unwrap();
-            let (error, buffer) = writer.submit(&foreign, vec![42], &never).await.unwrap_err();
-            assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
-            assert_eq!(buffer, [42]);
-            assert_eq!(
-                writer.flush(&foreign, &never).await.unwrap_err().kind(),
-                io::ErrorKind::InvalidInput
-            );
-            assert_eq!(
-                writer.close(&foreign).await.unwrap_err().kind(),
-                io::ErrorKind::InvalidInput
-            );
-            writer.submit(&scheduler, buffer, &never).await.unwrap();
+            writer.submit(vec![42], &never).await.unwrap();
             let mut incoming = [0; 1];
             assert_eq!(
                 scheduler
@@ -225,8 +202,8 @@ fn foreign_scheduler_is_rejected_before_changing_writer_state() {
             );
             assert_eq!(incoming, [42]);
             scheduler.close();
-            writer.flush(&scheduler, &never).await.unwrap();
-            writer.close(&scheduler).await.unwrap();
+            writer.flush(&never).await.unwrap();
+            writer.close().await.unwrap();
             scheduler.shutdown().await;
             foreign.shutdown().await;
         });
@@ -247,7 +224,7 @@ fn ready_submission_and_flush_allocate_nothing() {
             // Initialize the fault-injection TLS outside the production-path allocation measurement. Some targets allocate when registering its thread destructor.
             SEND_RESULTS.with(|_| {});
             {
-                let mut submission = std::pin::pin!(writer.submit(&scheduler, vec![42], &never));
+                let mut submission = std::pin::pin!(writer.submit(vec![42], &never));
                 let allocations = allocation_counter::measure(|| {
                     assert_eq!(
                         submission
@@ -260,7 +237,7 @@ fn ready_submission_and_flush_allocate_nothing() {
                 assert_eq!(allocations.count_total, 0);
             }
             {
-                let mut flush = std::pin::pin!(writer.flush(&scheduler, &never));
+                let mut flush = std::pin::pin!(writer.flush(&never));
                 let allocations = allocation_counter::measure(|| {
                     assert_eq!(
                         flush
@@ -272,7 +249,7 @@ fn ready_submission_and_flush_allocate_nothing() {
                 });
                 assert_eq!(allocations.count_total, 0);
             }
-            writer.close(&scheduler).await.unwrap();
+            writer.close().await.unwrap();
             scheduler.shutdown().await;
         });
     });
@@ -323,11 +300,8 @@ fn partial_initial_sends_continue_from_the_accepted_offset() {
             );
             let mut writer = scheduler.socket_stream_output(&sender).unwrap();
             inject([Ok(1)]);
-            writer
-                .submit(&scheduler, b"abc".to_vec(), &never)
-                .await
-                .unwrap();
-            writer.flush(&scheduler, &never).await.unwrap();
+            writer.submit(b"abc".to_vec(), &never).await.unwrap();
+            writer.flush(&never).await.unwrap();
             let mut incoming = [0; 3];
             let mut received = 0;
             while received < incoming.len() {
@@ -344,7 +318,7 @@ fn partial_initial_sends_continue_from_the_accepted_offset() {
                 received += count;
             }
             assert_eq!(&incoming, b"abc");
-            writer.close(&scheduler).await.unwrap();
+            writer.close().await.unwrap();
             scheduler.shutdown().await;
         });
     });
@@ -361,26 +335,26 @@ fn syscall_and_task_admission_failures_are_retained_after_acceptance() {
                     .await;
             let mut writer = scheduler.socket_stream_output(&sender).unwrap();
             inject([Ok(0)]);
-            writer.submit(&scheduler, vec![42], &never).await.unwrap();
+            writer.submit(vec![42], &never).await.unwrap();
             assert_eq!(
-                writer.flush(&scheduler, &never).await.unwrap_err().kind(),
+                writer.flush(&never).await.unwrap_err().kind(),
                 io::ErrorKind::WriteZero
             );
-            writer.close(&scheduler).await.unwrap();
+            writer.close().await.unwrap();
             let mut writer = scheduler.socket_stream_output(&sender).unwrap();
             inject([Err(io::ErrorKind::WouldBlock.into())]);
-            writer.submit(&scheduler, vec![43], &never).await.unwrap();
-            writer.flush(&scheduler, &never).await.unwrap();
-            writer.close(&scheduler).await.unwrap();
+            writer.submit(vec![43], &never).await.unwrap();
+            writer.flush(&never).await.unwrap();
+            writer.close().await.unwrap();
             let mut writer = scheduler.socket_stream_output(&sender).unwrap();
             scheduler.tasks.close();
             inject([Err(io::ErrorKind::Interrupted.into())]);
-            writer.submit(&scheduler, vec![44], &never).await.unwrap();
+            writer.submit(vec![44], &never).await.unwrap();
             assert_eq!(
-                writer.flush(&scheduler, &never).await.unwrap_err().kind(),
+                writer.flush(&never).await.unwrap_err().kind(),
                 io::ErrorKind::Other
             );
-            writer.close(&scheduler).await.unwrap();
+            writer.close().await.unwrap();
             scheduler.shutdown().await;
         });
     });
@@ -488,7 +462,6 @@ fn admission_rechecks_cancellation_and_shutdown_after_retiring_the_previous_owne
                 inject([Err(io::ErrorKind::WouldBlock.into())]);
                 writer
                     .submit(
-                        &scheduler,
                         RetiringBuffer {
                             bytes: vec![6; 8 * 1024 * 1024],
                             retired: Some(action),
@@ -500,7 +473,6 @@ fn admission_rechecks_cancellation_and_shutdown_after_retiring_the_previous_owne
                     .unwrap();
                 let (error, returned) = {
                     let mut next = std::pin::pin!(writer.submit(
-                        &scheduler,
                         RetiringBuffer {
                             bytes: vec![7],
                             retired: None
@@ -529,7 +501,7 @@ fn admission_rechecks_cancellation_and_shutdown_after_retiring_the_previous_owne
                 } else {
                     assert_cancelled(Err(error));
                 }
-                writer.close(&scheduler).await.unwrap();
+                writer.close().await.unwrap();
                 scheduler.shutdown().await;
             });
         }
@@ -541,4 +513,132 @@ fn assert_cancelled(result: OperationResult<()>) {
         std::mem::discriminant(&result.unwrap_err()),
         std::mem::discriminant(&OperationError::Cancelled(Cancelled))
     );
+}
+
+#[test]
+fn every_write_form_waits_for_accepted_output_and_preserves_terminal_errors() {
+    crate::test_support::run(|| {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let scheduler = TokioScheduler::new(runtime.handle().clone());
+        runtime.block_on(async {
+            let never = Cancellation::never();
+            let cancelled = Cancellation::new();
+            cancelled.cancel();
+            let (sender, receiver) =
+                core_scheduler_conformance::socket::stream_pair(&scheduler, SocketDomain::Ipv4)
+                    .await;
+            let mut writer = scheduler.socket_stream_output::<Vec<u8>>(&sender).unwrap();
+            writer.state.accept(
+                scheduler
+                    .tasks
+                    .spawn(async { Err(io::Error::from(io::ErrorKind::ConnectionReset).into()) })
+                    .unwrap(),
+            );
+            let (error, returned) = writer.submit(vec![42], &never).await.unwrap_err();
+            assert_eq!(error.kind(), io::ErrorKind::ConnectionReset);
+            assert_eq!(returned, [42]);
+            writer.close().await.unwrap();
+            for mode in 0..5 {
+                for waiting in [false, true] {
+                    let mut writer = scheduler.socket_stream_output::<Vec<u8>>(&sender).unwrap();
+                    if waiting {
+                        let stopping = writer.state.cancellation();
+                        let task = scheduler
+                            .tasks
+                            .spawn(async move {
+                                stopping.cancelled().await;
+                                Err(core_scheduler::Cancelled.into())
+                            })
+                            .unwrap();
+                        writer.state.accept(task);
+                    } else {
+                        writer
+                            .state
+                            .fail(io::Error::from(io::ErrorKind::ConnectionReset).into());
+                    }
+                    let result = match mode {
+                        0 => writer.write(b"x", &cancelled).await,
+                        1 => {
+                            writer
+                                .write_vectored(&[std::io::IoSlice::new(b"x")], &cancelled)
+                                .await
+                        }
+                        2 => {
+                            writer
+                                .write_with_flags(b"x", SocketSendFlags::default(), &cancelled)
+                                .await
+                        }
+                        3 => writer.write_owned(vec![1], &cancelled).await.0,
+                        _ => {
+                            writer
+                                .write_owned_vectored(
+                                    [vec![1]],
+                                    SocketSendFlags::default(),
+                                    &cancelled,
+                                )
+                                .await
+                                .0
+                        }
+                    };
+                    assert_eq!(
+                        result.unwrap_err().kind(),
+                        if waiting {
+                            io::ErrorKind::Interrupted
+                        } else {
+                            io::ErrorKind::ConnectionReset
+                        }
+                    );
+                    writer.close().await.unwrap();
+                }
+                let mut writer = scheduler.socket_stream_output::<Vec<u8>>(&sender).unwrap();
+                writer
+                    .state
+                    .accept(scheduler.tasks.spawn(async { Ok(()) }).unwrap());
+                let result = match mode {
+                    0 => writer.write(b"x", &never).await,
+                    1 => {
+                        writer
+                            .write_vectored(&[std::io::IoSlice::new(b"x")], &never)
+                            .await
+                    }
+                    2 => {
+                        writer
+                            .write_with_flags(b"x", SocketSendFlags::default(), &never)
+                            .await
+                    }
+                    3 => writer.write_owned(b"x".to_vec(), &never).await.0,
+                    _ => {
+                        writer
+                            .write_owned_vectored(
+                                [b"x".to_vec()],
+                                SocketSendFlags::default(),
+                                &never,
+                            )
+                            .await
+                            .0
+                    }
+                };
+                assert_eq!(result.unwrap(), 1);
+                let mut byte = [0];
+                assert_eq!(
+                    scheduler
+                        .socket_recv_poll(
+                            &receiver,
+                            &mut byte,
+                            core_scheduler::SocketRecvFlags::default(),
+                            &never
+                        )
+                        .await
+                        .unwrap(),
+                    1
+                );
+                assert_eq!(byte, *b"x");
+                writer.close().await.unwrap();
+            }
+            scheduler.shutdown().await;
+        });
+    });
 }

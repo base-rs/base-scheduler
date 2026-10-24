@@ -1,7 +1,9 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::{BufferResult, Cancellation, FileOperation, FileRead, IoBufMut, Spawn};
+use core_scheduler::{
+    BufferResult, Cancellation, FileOperation, FileReader, FileReading, IoBufMut, Spawn,
+};
 use core_scheduler_native::{NativeExecutorOptions, NativeScheduler, ReadinessSelector, Selector};
 use std::sync::{
     Arc,
@@ -24,19 +26,36 @@ impl Selector for MemorySelector {
 impl FileOperation for MemorySelector {
     type File = [u8; 3];
 }
-impl FileRead for MemorySelector {
-    async fn file_read<B: IoBufMut>(
-        &self,
-        file: &Self::File,
+struct MemoryReader([u8; 3]);
+impl FileReading for MemorySelector {
+    type Reader<'a> = MemoryReader;
+    fn file_reader(&self, file: &Self::File) -> std::io::Result<MemoryReader> {
+        Ok(MemoryReader(*file))
+    }
+}
+impl FileReader for MemoryReader {
+    async fn read<B: IoBufMut>(
+        &mut self,
         mut buffer: B,
         cancellation: &Cancellation,
     ) -> BufferResult<B> {
         if let Err(error) = cancellation.check() {
             return (Err(error.into()), buffer);
         }
-        let count = file.len().min(buffer.as_ref().len());
-        buffer.as_mut()[..count].copy_from_slice(&file[..count]);
+        let count = self.0.len().min(buffer.as_ref().len());
+        buffer.as_mut()[..count].copy_from_slice(&self.0[..count]);
         (Ok(count), buffer)
+    }
+    async fn read_at<B: IoBufMut>(
+        &mut self,
+        buffer: B,
+        _: u64,
+        cancellation: &Cancellation,
+    ) -> BufferResult<B> {
+        self.read(buffer, cancellation).await
+    }
+    async fn close(&mut self) -> std::io::Result<()> {
+        Ok(())
     }
 }
 
@@ -60,7 +79,9 @@ fn a_partial_selector_keeps_its_own_resource_type_and_needs_no_executor() {
         let buffer = vec![0; 3];
         let pointer = buffer.as_ptr();
         let (result, buffer) = scheduler
-            .file_read(b"abc", buffer, &Cancellation::never())
+            .file_reader(b"abc")
+            .unwrap()
+            .read(buffer, &Cancellation::never())
             .await;
         assert_eq!(result.unwrap(), 3);
         assert_eq!(buffer, b"abc");
@@ -227,7 +248,11 @@ fn registered_sockets_options_resolution_and_signals_forward_to_the_selector() {
             .socket_shutdown_submit(&stream, std::net::Shutdown::Write)
             .await
             .unwrap();
-        let (result, _) = scheduler.socket_read(&peer, vec![0; 1], &never).await;
+        let (result, _) = scheduler
+            .socket_stream_reader(&peer)
+            .unwrap()
+            .read_owned(vec![0; 1], &never)
+            .await;
         assert_eq!(result.unwrap(), 0);
         // EOF observes shutdown's effect, but the admission-only request may still retain its socket. Scheduler shutdown below drains it.
         drop(stream);

@@ -9,8 +9,8 @@ use crate::{
 };
 use core_scheduler::{
     Blocking, BlockingError, BufferResult, Cancellation, FileClose, FileOpen, FileOperation,
-    FileOptions, FileRead, FileReadAt, FileSeek, FileStat, FileSync, FileTruncate, FileWrite,
-    FileWriteAt, IoBuf, IoBufMut, OperationResult, Spawn, SpawnError, SyncMode, TaskError,
+    FileOptions, FileSeek, FileStat, FileSync, FileTruncate, IoBuf, OperationResult, Spawn,
+    SpawnError, SyncMode, TaskError,
 };
 use futures_channel::oneshot;
 use std::{
@@ -91,34 +91,7 @@ impl DirectScheduler {
         self.signals.drain().await;
     }
 
-    pub(crate) async fn buffer_operation_submit<B: IoBuf>(
-        &self,
-        file: &DirectFile,
-        buffer: B,
-        cancellation: &Cancellation,
-        operation: impl FnOnce(&std::fs::File, &mut B) -> io::Result<usize> + Send + 'static,
-    ) -> Result<
-        impl std::future::Future<Output = BufferResult<B>> + Send,
-        (core_scheduler::OperationError, B),
-    > {
-        match self
-            .work
-            .execute_submit(
-                (file.retain(), buffer),
-                cancellation,
-                move |(file, buffer)| operation(file, buffer),
-            )
-            .await
-        {
-            Ok(completion) => Ok(async move {
-                let (result, (_, buffer)) = completion.await;
-                (result, buffer)
-            }),
-            Err((error, (_, buffer))) => Err((error, buffer)),
-        }
-    }
-
-    async fn buffer_operation<B: IoBuf>(
+    pub(crate) async fn buffer_operation<B: IoBuf>(
         &self,
         file: &DirectFile,
         buffer: B,
@@ -206,64 +179,6 @@ impl FileOpen for DirectScheduler {
             })
             .await
             .0
-    }
-}
-
-impl FileRead for DirectScheduler {
-    async fn file_read<B: IoBufMut>(
-        &self,
-        file: &DirectFile,
-        buffer: B,
-        cancellation: &Cancellation,
-    ) -> BufferResult<B> {
-        self.buffer_operation(file, buffer, cancellation, |file, buffer| {
-            file_io::read(file, buffer.as_mut())
-        })
-        .await
-    }
-}
-
-impl FileWrite for DirectScheduler {
-    async fn file_write<B: IoBuf>(
-        &self,
-        file: &DirectFile,
-        buffer: B,
-        cancellation: &Cancellation,
-    ) -> BufferResult<B> {
-        self.buffer_operation(file, buffer, cancellation, |file, buffer| {
-            file_io::write(file, buffer.as_ref())
-        })
-        .await
-    }
-}
-
-impl FileReadAt for DirectScheduler {
-    async fn file_read_at<B: IoBufMut>(
-        &self,
-        file: &DirectFile,
-        buffer: B,
-        offset: u64,
-        cancellation: &Cancellation,
-    ) -> BufferResult<B> {
-        self.buffer_operation(file, buffer, cancellation, move |file, buffer| {
-            file_io::read_at(file, buffer.as_mut(), offset)
-        })
-        .await
-    }
-}
-
-impl FileWriteAt for DirectScheduler {
-    async fn file_write_at<B: IoBuf>(
-        &self,
-        file: &DirectFile,
-        buffer: B,
-        offset: u64,
-        cancellation: &Cancellation,
-    ) -> BufferResult<B> {
-        self.buffer_operation(file, buffer, cancellation, move |file, buffer| {
-            file_io::write_at(file, buffer.as_ref(), offset)
-        })
-        .await
     }
 }
 

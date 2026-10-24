@@ -19,8 +19,8 @@ use crate::SocketOption;
 /// ```
 /// Merely supporting sockets does not imply support for every option:
 /// ```compile_fail
-/// use core_scheduler::{Cancellation, SocketScheduler, SocketSetOption, TcpNoDelay};
-/// async fn configure<S: SocketScheduler>(scheduler: &S, socket: &S::Socket) {
+/// use core_scheduler::{Cancellation, SocketOperation, SocketSetOption, TcpNoDelay};
+/// async fn configure<S: SocketOperation>(scheduler: &S, socket: &S::Socket) {
 ///     scheduler.socket_set_option(socket, TcpNoDelay, true, &Cancellation::never()).await;
 /// }
 /// ```

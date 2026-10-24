@@ -192,46 +192,23 @@ impl<B: IoBuf> RecvMsgMultishot<B> {
     }
 }
 
-impl<B: MessageStorage> core_scheduler::SocketRecvMsgReceiver<IoUringSelector>
-    for RecvMsgMultishot<B>
-{
-    type Message = IoUringRecvMessage<B>;
-
-    async fn recv(
+impl<B: IoBuf> RecvMsgMultishot<B> {
+    /// Receive from this bound sequence. The original ring remains its owner after worker migration.
+    pub async fn recv(
         &mut self,
-        scheduler: &IoUringSelector,
         cancellation: &Cancellation,
     ) -> OperationResult<Option<IoUringRecvMessage<B>>> {
         cancellation.check()?;
-        self.check_selector(scheduler)?;
         self.receive(cancellation).await
     }
-
-    async fn close(&mut self, scheduler: &IoUringSelector) -> io::Result<()> {
-        self.check_selector(scheduler)?;
+    /// Stop reception and await retirement of every original request.
+    pub async fn close(&mut self) -> io::Result<()> {
         self.retire().await
     }
 }
 
-impl<B: IoBuf> RecvMsgMultishot<B> {
-    fn check_selector(&self, selector: &IoUringSelector) -> io::Result<()> {
-        if selector
-            .controllers
-            .iter()
-            .any(|controller| Arc::ptr_eq(controller, &self.cancel.controller))
-        {
-            Ok(())
-        } else {
-            Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "receiver belongs to another io_uring selector",
-            ))
-        }
-    }
-}
-
 impl IoUringSelector {
-    /// Start a concrete bounded multishot `recvmsg` receive (Linux 6.0+, provided rings 5.19+). Portable consumers use `SocketReceiving::socket_receiver` with a scheduler-created pool.
+    /// Start a concrete bounded multishot `recvmsg` receive (Linux 6.0+, provided rings 5.19+). Portable consumers use bound stream or packet readers with a scheduler-created pool.
     ///
     /// Pre-cancellation leaves an existing receiver unchanged. Cancellation of a pending receive stops and retires this concrete receive sequence before returning; delivered immutable leases remain valid. This stronger behavior is specific to this constructor.
     ///

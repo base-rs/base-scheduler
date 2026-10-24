@@ -1,7 +1,8 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::{Interest, SocketRecvFlags, SocketRecvResult, SocketSendFlags};
+use crate::Interest;
+use core_scheduler::{SocketRecvFlags, SocketRecvResult, SocketSendFlags};
 use std::{io, net::SocketAddr, sync::Arc};
 type RegisteredSocket = async_io::Async<socket2::Socket>;
 

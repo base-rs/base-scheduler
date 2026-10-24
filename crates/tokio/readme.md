@@ -7,15 +7,18 @@
 The workspace is not published yet. Add this package from Git with `cargo add core-scheduler core-scheduler-tokio --git https://github.com/core-rs/core-scheduler`. Add Tokio to the application with `cargo add tokio --features rt,net,time`.
 
 ```rust
-use core_scheduler::{Cancellation, FileClose, FileOpen, FileOptions, FileRead};
+use core_scheduler::{Cancellation, FileClose, FileOpen, FileOptions, FileReader, FileReading};
 use core_scheduler_tokio::TokioScheduler;
 
 # async fn example(path: &std::path::Path, runtime: tokio::runtime::Handle) -> Result<(), Box<dyn std::error::Error>> {
 let scheduler = TokioScheduler::new(runtime);
 let cancellation = Cancellation::new();
 let file = scheduler.file_open(path, FileOptions::READ, &cancellation).await?;
-let (result, buffer) = scheduler.file_read(&file, vec![0; 4096], &cancellation).await;
+let mut reader = scheduler.file_reader(&file)?;
+let (result, buffer) = reader.read(vec![0; 4096], &cancellation).await;
 assert!(result? <= buffer.len());
+reader.close().await?;
+drop(reader);
 scheduler.file_close(file).await?;
 scheduler.shutdown().await;
 # Ok(()) }
@@ -37,7 +40,7 @@ The application owns the Tokio runtime and keeps it alive and driven, with I/O a
 
 Socket syscalls execute synchronously in readiness callbacks and retain no payload pointers after returning. Pending futures own their buffers. Prepared `IoBuffers` and `IoBuffersMut` supply native I/O vectors directly; other sequences reuse scratch capacity across attempts. Completion wins concurrent cancellation. Dropping a pending readiness operation safely releases its input because no outstanding kernel operation retains it. Socket shutdown and explicit close use independent bounded cleanup admission; accepted cleanup survives waiter abandonment.
 
-Construct scheduler-bound stream and packet readers and writers for application I/O, and file readers and writers for repeated file operations. Their operations take cancellation without another scheduler argument. Borrowed-only readers allocate no payload pool; owned reads use lazy default storage or an explicit shared pool. Close and drop every handle before exclusively closing its underlying resource. See the [I/O usage guide](../../context/io.md) for the recommended paths.
+Construct scheduler-bound stream and packet readers and writers for application I/O, and file readers and writers for repeated file operations. Their operations take cancellation without another scheduler argument. Scalar and vectored calls with explicit flags preserve peeking and routing semantics without exposing dispatch hooks. File readers and writers also expose submission/completion separation; accepted file work retires independently of collecting its completion. Borrowed-only readers allocate no payload pool; owned reads use lazy default storage or an explicit shared pool. Close and drop every handle before exclusively closing its underlying resource. See the [I/O usage guide](../../context/io.md) for the recommended paths.
 
 Lifecycle operations, empty reads, and sockets without a successful stream read first attempt their nonblocking syscall, preserving immediate OS results independently of cached readiness. Nonempty scalar reads on a known-connected stream with an existing registration may wait on cached readiness first. Readiness is cleared only after `WouldBlock`, since even a short TCP read can stop at an urgent-data boundary while ordinary bytes remain queued. On Unix, after `WouldBlock`, one waiting operation per direction reserves Tokio's polling waker, and concurrent operations use independent readiness waiters. Dropping the reserving future releases its slot; forgetting it leaves later operations on the independent waiter path.
 

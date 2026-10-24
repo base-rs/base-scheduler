@@ -2,6 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use super::*;
+use crate::Interest;
 use core_scheduler_selector::{SelectorDriver, SelectorWorker};
 use futures_lite::future::{block_on, poll_once};
 use std::{
@@ -66,9 +67,7 @@ fn repeated_notifications_retain_one_registration_without_allocations() {
     let wake = worker.waker();
     let mut context = Context::from_waker(&wake);
     let (socket, mut peer) = sockets(&selector);
-    let mut reader = selector
-        .socket_stream_monitor(&socket, Interest::Readable)
-        .unwrap();
+    let mut reader = selector.socket_monitor(&socket, Interest::Readable);
     let inspect = reader.retained();
     let never = Cancellation::never();
     let mut byte = [0; 16];
@@ -117,9 +116,7 @@ fn short_stream_reads_clear_readiness_only_on_would_block_and_preserve_eof() {
     let wake = worker.waker();
     let mut context = Context::from_waker(&wake);
     let (socket, mut peer) = sockets(&selector);
-    let mut reader = selector
-        .socket_stream_monitor(&socket, Interest::Readable)
-        .unwrap();
+    let mut reader = selector.socket_monitor(&socket, Interest::Readable);
     let inspect = reader.retained();
     let never = Cancellation::never();
     let mut bytes = [0; 16];
@@ -213,9 +210,7 @@ fn short_stream_reads_clear_readiness_only_on_would_block_and_preserve_eof() {
 fn full_reads_keep_progress_and_short_reads_preserve_racing_notifications() {
     let (selector, _driver) = IoUringSelector::new(options()).unwrap();
     let (socket, mut peer) = sockets(&selector);
-    let mut reader = selector
-        .socket_stream_monitor(&socket, Interest::Readable)
-        .unwrap();
+    let mut reader = selector.socket_monitor(&socket, Interest::Readable);
     let inspect = reader.retained();
     let never = Cancellation::never();
     peer.write_all(b"abc").unwrap();
@@ -284,9 +279,7 @@ fn shutdown_readiness_survives_the_last_short_receive() {
     let wake = worker.waker();
     let mut context = Context::from_waker(&wake);
     let (socket, mut peer) = sockets(&selector);
-    let mut reader = selector
-        .socket_stream_monitor(&socket, Interest::Readable)
-        .unwrap();
+    let mut reader = selector.socket_monitor(&socket, Interest::Readable);
     let inspect = reader.retained();
     let never = Cancellation::never();
     {
@@ -333,9 +326,7 @@ fn pending_receive_cancellation_leaves_the_stream_usable() {
     let wake = worker.waker();
     let mut context = Context::from_waker(&wake);
     let (socket, mut peer) = sockets(&selector);
-    let mut reader = selector
-        .socket_stream_monitor(&socket, Interest::Readable)
-        .unwrap();
+    let mut reader = selector.socket_monitor(&socket, Interest::Readable);
     let never = Cancellation::never();
     let mut bytes = [0; 8];
     peer.write_all(b"x").unwrap();
@@ -385,9 +376,7 @@ fn peeking_and_empty_receives_keep_syscall_semantics() {
     let wake = worker.waker();
     let mut context = Context::from_waker(&wake);
     let (socket, mut peer) = sockets(&selector);
-    let mut reader = selector
-        .socket_stream_monitor(&socket, Interest::Readable)
-        .unwrap();
+    let mut reader = selector.socket_monitor(&socket, Interest::Readable);
     let inspect = reader.retained();
     let never = Cancellation::never();
     let mut bytes = [0; 8];
@@ -476,9 +465,7 @@ fn datagram_scalar_receives_do_not_treat_short_messages_as_stream_exhaustion() {
     let peer = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
     peer.connect(selector.socket_local_address(&socket).unwrap())
         .unwrap();
-    let mut reader = selector
-        .socket_monitor(&socket, Interest::Readable)
-        .unwrap();
+    let mut reader = selector.socket_monitor(&socket, Interest::Readable);
 
     // Queue several datagrams before the first syscall. A short message does not mean there are no further messages.
     for payload in [&b"x"[..], b"", b"yz"] {
@@ -507,9 +494,7 @@ fn unconnected_stream_receives_return_the_os_error_without_waiting() {
     let socket =
         block_on(selector.socket_open(SocketDomain::Ipv4, SocketType::Stream, None, &never))
             .unwrap();
-    let mut reader = selector
-        .socket_stream_monitor(&socket, Interest::Readable)
-        .unwrap();
+    let mut reader = selector.socket_monitor(&socket, Interest::Readable);
     let mut bytes = [0; 8];
     let result = block_on(poll_once(selector.socket_monitor_recv_poll(
         &mut reader,
@@ -528,45 +513,19 @@ fn cancelled_and_dropped_waiters_leave_the_registration_active() {
     let wake = worker.waker();
     let mut context = Context::from_waker(&wake);
     let (socket, mut peer) = sockets(&selector);
-    let mut reader = selector
-        .socket_monitor(&socket, Interest::Readable)
-        .unwrap();
-    let mut alias = reader.clone();
+    let mut reader = selector.socket_monitor(&socket, Interest::Readable);
+    let inspect = reader.retained();
     let never = Cancellation::never();
     let token = Cancellation::new();
     let mut waiting = Box::pin(selector.socket_monitor_wait(&mut reader, &token));
     assert!(waiting.as_mut().poll(&mut context).is_pending());
-    assert_eq!(
-        block_on(selector.socket_monitor_wait(&mut alias, &never))
-            .unwrap_err()
-            .kind(),
-        io::ErrorKind::WouldBlock
-    );
-    let mut unavailable = [0];
-    assert_eq!(
-        block_on(selector.socket_monitor_recv_poll(
-            &mut alias,
-            &mut unavailable,
-            SocketRecvFlags::default(),
-            &never
-        ))
-        .unwrap_err()
-        .kind(),
-        io::ErrorKind::WouldBlock
-    );
-    assert_eq!(
-        block_on(selector.socket_monitor_close(&mut alias))
-            .unwrap_err()
-            .kind(),
-        io::ErrorKind::WouldBlock
-    );
     worker.turn(Some(Duration::ZERO)).unwrap();
     token.cancel();
     assert!(matches!(
         block_on(waiting),
         Err(OperationError::Cancelled(_))
     ));
-    let generation = alias
+    let generation = inspect
         .registration()
         .status
         .lock()
@@ -579,7 +538,7 @@ fn cancelled_and_dropped_waiters_leave_the_registration_active() {
     let mut pending = Box::pin(selector.socket_monitor_wait(&mut reader, &never));
     assert!(pending.as_mut().poll(&mut context).is_pending());
     drop(pending);
-    assert!(alias.registration().status.lock().unwrap().pending);
+    assert!(inspect.registration().status.lock().unwrap().pending);
     peer.write_all(b"x").unwrap();
     let mut byte = [0];
     let mut read = pin!(selector.socket_monitor_recv_poll(
@@ -590,7 +549,7 @@ fn cancelled_and_dropped_waiters_leave_the_registration_active() {
     ));
     drive(&mut worker, &mut context, read.as_mut()).unwrap();
     assert_eq!(
-        alias
+        inspect
             .registration()
             .status
             .lock()
@@ -605,19 +564,13 @@ fn cancelled_and_dropped_waiters_leave_the_registration_active() {
 }
 
 #[test]
-fn the_last_application_handle_retires_an_embedded_registration() {
+fn dropping_the_resource_retires_its_registration() {
     let (selector, driver) = IoUringSelector::new(options()).unwrap();
     let mut worker = driver.enter();
     let wake = worker.waker();
     let mut context = Context::from_waker(&wake);
     let (socket, _peer) = sockets(&selector);
-    let owner = Arc::new(
-        selector
-            .socket_stream_monitor_state(&socket, Interest::Readable)
-            .unwrap(),
-    );
-    let mut reader = MonitorStorage::from_arc(Arc::clone(&owner), |state| state);
-    let alias = reader.clone();
+    let mut reader = selector.socket_monitor(&socket, Interest::Readable);
     let inspect = reader.retained();
     let never = Cancellation::never();
     let mut waiting = Box::pin(selector.socket_monitor_wait(&mut reader, &never));
@@ -625,19 +578,7 @@ fn the_last_application_handle_retires_an_embedded_registration() {
     worker.turn(Some(Duration::ZERO)).unwrap();
     drop(waiting);
     drop(reader);
-    assert!(!inspect.registration().status.lock().unwrap().retiring);
-    drop(alias);
     assert!(inspect.registration().status.lock().unwrap().retiring);
-    until(&mut worker, || {
-        !inspect.registration().status.lock().unwrap().pending
-    });
-    // The containing allocation can create a new handle after the prior registration retired.
-    let mut reader = MonitorStorage::from_arc(owner, |state| state);
-    let mut waiting = Box::pin(selector.socket_monitor_wait(&mut reader, &never));
-    assert!(waiting.as_mut().poll(&mut context).is_pending());
-    worker.turn(Some(Duration::ZERO)).unwrap();
-    drop(waiting);
-    drop(reader);
     until(&mut worker, || {
         !inspect.registration().status.lock().unwrap().pending
     });
@@ -650,9 +591,7 @@ fn close_drains_the_registration_and_rejects_subsequent_operations() {
     let wake = worker.waker();
     let mut context = Context::from_waker(&wake);
     let (socket, _peer) = sockets(&selector);
-    let mut reader = selector
-        .socket_monitor(&socket, Interest::Readable)
-        .unwrap();
+    let mut reader = selector.socket_monitor(&socket, Interest::Readable);
     let never = Cancellation::never();
     let mut waiting = Box::pin(selector.socket_monitor_wait(&mut reader, &never));
     assert!(waiting.as_mut().poll(&mut context).is_pending());
@@ -682,11 +621,7 @@ fn driver_abandonment_notifies_active_queued_and_submission_space_waiters() {
         let (socket, _peer) = sockets(&selector);
         let never = Cancellation::never();
         let mut readers: Vec<_> = (0..3)
-            .map(|_| {
-                selector
-                    .socket_monitor(&socket, Interest::Readable)
-                    .unwrap()
-            })
+            .map(|_| selector.socket_monitor(&socket, Interest::Readable))
             .collect();
         let mut waits: Vec<_> = readers
             .iter_mut()
@@ -721,11 +656,7 @@ fn registrations_do_not_consume_transient_operation_capacity() {
     let (socket, _peer) = sockets(&selector);
     let never = Cancellation::never();
     let mut readers: Vec<_> = (0..3)
-        .map(|_| {
-            selector
-                .socket_monitor(&socket, Interest::Readable)
-                .unwrap()
-        })
+        .map(|_| selector.socket_monitor(&socket, Interest::Readable))
         .collect();
     for reader in &mut readers {
         let mut wait = Box::pin(selector.socket_monitor_wait(reader, &never));
@@ -768,9 +699,7 @@ fn terminal_and_cancellation_cqes_retire_in_either_order() {
     for cancel_first in [false, true] {
         let (selector, driver) = IoUringSelector::new(options()).unwrap();
         let (socket, _peer) = sockets(&selector);
-        let storage = selector
-            .socket_monitor(&socket, Interest::Readable)
-            .unwrap();
+        let storage = selector.socket_monitor(&socket, Interest::Readable);
         let submission = staged(&selector, &storage);
         let token = submission.token();
         let generation = submission.retirement.generation;
@@ -803,9 +732,7 @@ fn terminal_and_cancellation_cqes_retire_in_either_order() {
 fn unsupported_multishot_poll_falls_back_and_terminal_success_can_rearm() {
     let (selector, driver) = IoUringSelector::new(options()).unwrap();
     let (socket, _peer) = sockets(&selector);
-    let mut storage = selector
-        .socket_monitor(&socket, Interest::Readable)
-        .unwrap();
+    let mut storage = selector.socket_monitor(&socket, Interest::Readable);
     let mut monitors = Monitors::new(1);
     let submission = staged(&selector, &storage);
     let token = submission.token();
@@ -845,9 +772,13 @@ fn incompatible_closed_selectors_and_exhausted_ids_reject_waits() {
     let (selector, driver) = IoUringSelector::new(options()).unwrap();
     let (other, other_driver) = IoUringSelector::new(options()).unwrap();
     let (socket, _peer) = sockets(&selector);
-    let mut reader = selector
-        .socket_monitor(&socket, Interest::Readable)
-        .unwrap();
+    let mut reader = selector.socket_monitor(&socket, Interest::Readable);
+    let cancelled = Cancellation::new();
+    cancelled.cancel();
+    assert!(matches!(
+        block_on(selector.socket_monitor_wait(&mut reader, &cancelled)),
+        Err(OperationError::Cancelled(_))
+    ));
     assert_eq!(
         block_on(other.socket_monitor_wait(&mut reader, &Cancellation::never()))
             .unwrap_err()
@@ -858,6 +789,17 @@ fn incompatible_closed_selectors_and_exhausted_ids_reject_waits() {
         block_on(other.socket_monitor_close(&mut reader))
             .unwrap_err()
             .kind(),
+        io::ErrorKind::InvalidInput
+    );
+    assert_eq!(
+        block_on(selector.socket_monitor_send_poll(
+            &mut reader,
+            b"x",
+            SocketSendFlags::default(),
+            &Cancellation::never(),
+        ))
+        .unwrap_err()
+        .kind(),
         io::ErrorKind::InvalidInput
     );
     let mut byte = [0];
@@ -897,19 +839,6 @@ fn incompatible_closed_selectors_and_exhausted_ids_reject_waits() {
         selector.socket_type(&socket).unwrap_err().kind(),
         io::ErrorKind::BrokenPipe
     );
-    assert!(
-        selector
-            .socket_monitor_state(&socket, Interest::Readable)
-            .is_err()
-    );
-    assert_eq!(
-        selector
-            .socket_stream_monitor(&socket, Interest::Readable)
-            .err()
-            .unwrap()
-            .kind(),
-        io::ErrorKind::BrokenPipe
-    );
     assert_eq!(
         block_on(selector.socket_monitor_wait(&mut reader, &Cancellation::never()))
             .unwrap_err()
@@ -927,9 +856,7 @@ fn interrupted_syscalls_retry_and_observe_cancellation_and_closure() {
     let wake = worker.waker();
     let mut context = Context::from_waker(&wake);
     let (socket, _peer) = sockets(&selector);
-    let writer = selector
-        .socket_monitor(&socket, Interest::Writable)
-        .unwrap();
+    let writer = selector.socket_monitor(&socket, Interest::Writable);
     let never = Cancellation::never();
     let mut attempts = 0;
     let mut operation = Box::pin(
@@ -950,7 +877,7 @@ fn interrupted_syscalls_retry_and_observe_cancellation_and_closure() {
     let cancellation = Cancellation::new();
     assert!(matches!(
         block_on(
-            selector.monitor_io::<(), _>(&writer, Interest::Writable, &cancellation, |_| {
+            selector.monitor_io::<()>(&writer, Interest::Writable, &cancellation, |_| {
                 cancellation.cancel();
                 Err(io::ErrorKind::Interrupted.into())
             })
@@ -960,12 +887,10 @@ fn interrupted_syscalls_retry_and_observe_cancellation_and_closure() {
     for kind in [io::ErrorKind::Interrupted, io::ErrorKind::WouldBlock] {
         let (selector, _driver) = IoUringSelector::new(options()).unwrap();
         let (socket, _peer) = sockets(&selector);
-        let writer = selector
-            .socket_monitor(&socket, Interest::Writable)
-            .unwrap();
+        let writer = selector.socket_monitor(&socket, Interest::Writable);
         assert_eq!(
             block_on(
-                selector.monitor_io::<(), _>(&writer, Interest::Writable, &never, |_| {
+                selector.monitor_io::<()>(&writer, Interest::Writable, &never, |_| {
                     selector.close();
                     Err(kind.into())
                 })
@@ -984,9 +909,7 @@ fn shutdown_overtakes_an_accepted_local_registration() {
     let wake = worker.waker();
     let mut context = Context::from_waker(&wake);
     let (socket, _peer) = sockets(&selector);
-    let mut reader = selector
-        .socket_monitor(&socket, Interest::Readable)
-        .unwrap();
+    let mut reader = selector.socket_monitor(&socket, Interest::Readable);
     assert!(
         selector.controllers[0]
             .send(Command::MonitorCancel(1, 0))
@@ -1011,9 +934,7 @@ fn shutdown_overtakes_an_accepted_local_registration() {
 fn cached_readiness_survives_success_and_newer_notifications_survive_would_block() {
     let (selector, driver) = IoUringSelector::new(options()).unwrap();
     let (socket, _peer) = sockets(&selector);
-    let mut writer = selector
-        .socket_monitor(&socket, Interest::Writable)
-        .unwrap();
+    let mut writer = selector.socket_monitor(&socket, Interest::Writable);
     let inspect = writer.retained();
     inspect.registration().notify();
     let before = inspect.registration().readiness.load(Ordering::Acquire);
@@ -1054,9 +975,7 @@ fn one_shot_compatibility_waits_rearm_after_each_terminal_completion() {
     let wake = worker.waker();
     let mut context = Context::from_waker(&wake);
     let (socket, mut peer) = sockets(&selector);
-    let mut reader = selector
-        .socket_stream_monitor(&socket, Interest::Readable)
-        .unwrap();
+    let mut reader = selector.socket_monitor(&socket, Interest::Readable);
     reader
         .registration()
         .multishot
@@ -1085,9 +1004,7 @@ fn one_shot_compatibility_waits_rearm_after_each_terminal_completion() {
 fn a_later_wait_rebinds_to_its_new_workers_ring_after_retirement() {
     let (selector, mut drivers) = IoUringSelector::with_workers(options(), 2).unwrap();
     let (socket, mut peer) = sockets(&selector);
-    let reader = selector
-        .socket_stream_monitor(&socket, Interest::Readable)
-        .unwrap();
+    let reader = selector.socket_monitor(&socket, Interest::Readable);
     let second_driver = drivers.pop().unwrap();
     let first_driver = drivers.pop().unwrap();
     let (handoff, receive) = mpsc::channel();
@@ -1144,9 +1061,7 @@ fn a_later_wait_rebinds_to_its_new_workers_ring_after_retirement() {
 fn move_active_monitor_future(receive_payload: bool) {
     let (selector, mut drivers) = IoUringSelector::with_workers(options(), 2).unwrap();
     let (socket, mut peer) = sockets(&selector);
-    let mut reader = selector
-        .socket_stream_monitor(&socket, Interest::Readable)
-        .unwrap();
+    let mut reader = selector.socket_monitor(&socket, Interest::Readable);
     let never = Cancellation::never();
     let inspect = reader.retained();
     let mut byte = [0];
@@ -1233,12 +1148,8 @@ fn shutdown_retires_active_and_accepted_queued_monitors() {
     let wake = worker.waker();
     let mut context = Context::from_waker(&wake);
     let (socket, _peer) = sockets(&selector);
-    let mut first = selector
-        .socket_monitor(&socket, Interest::Readable)
-        .unwrap();
-    let mut second = selector
-        .socket_monitor(&socket, Interest::Readable)
-        .unwrap();
+    let mut first = selector.socket_monitor(&socket, Interest::Readable);
+    let mut second = selector.socket_monitor(&socket, Interest::Readable);
     let never = Cancellation::never();
     let mut active = Box::pin(selector.socket_monitor_wait(&mut first, &never));
     assert!(active.as_mut().poll(&mut context).is_pending());
@@ -1269,9 +1180,7 @@ fn dropping_close_leaves_retirement_running_and_can_be_awaited_again() {
     let wake = worker.waker();
     let mut context = Context::from_waker(&wake);
     let (socket, _peer) = sockets(&selector);
-    let mut reader = selector
-        .socket_monitor(&socket, Interest::Readable)
-        .unwrap();
+    let mut reader = selector.socket_monitor(&socket, Interest::Readable);
     let never = Cancellation::never();
     let mut waiting = Box::pin(selector.socket_monitor_wait(&mut reader, &never));
     assert!(waiting.as_mut().poll(&mut context).is_pending());
@@ -1292,22 +1201,39 @@ fn forgetting_a_wait_cannot_prevent_last_handle_retirement() {
     let wake = worker.waker();
     let mut context = Context::from_waker(&wake);
     let (socket, _peer) = sockets(&selector);
-    let mut reader = selector
-        .socket_stream_monitor(&socket, Interest::Readable)
-        .unwrap();
+    let mut reader = selector.socket_monitor(&socket, Interest::Readable);
     let never = Cancellation::never();
     let mut waiting = Box::pin(selector.socket_monitor_wait(&mut reader, &never));
     assert!(waiting.as_mut().poll(&mut context).is_pending());
     worker.turn(Some(Duration::ZERO)).unwrap();
-    // Forgetting leaks the future and its waiter claim. Neither is required to retire the kernel registration, whose storage has independent ownership.
+    // Forgetting leaks the future and its waiter claim. Explicit close still retires independently of that future's destructor.
     std::mem::forget(waiting);
+    assert_eq!(
+        block_on(selector.socket_monitor_wait(&mut reader, &never))
+            .unwrap_err()
+            .kind(),
+        io::ErrorKind::WouldBlock
+    );
+    assert_eq!(
+        block_on(selector.socket_monitor_recv_poll(
+            &mut reader,
+            &mut [0],
+            SocketRecvFlags::default(),
+            &never,
+        ))
+        .unwrap_err()
+        .kind(),
+        io::ErrorKind::WouldBlock
+    );
     let inspect = reader.retained();
+    {
+        let mut close = pin!(selector.socket_monitor_close(&mut reader));
+        drive(&mut worker, &mut context, close.as_mut()).unwrap();
+    }
+    assert!(!inspect.registration().status.lock().unwrap().pending);
     drop(reader);
-    assert_eq!(inspect.registration().users.load(Ordering::Acquire), 0);
+    assert!(inspect.registration().closed.load(Ordering::Acquire));
     assert!(inspect.registration().claimed.load(Ordering::Acquire));
-    until(&mut worker, || {
-        !inspect.registration().status.lock().unwrap().pending
-    });
 }
 
 #[test]
@@ -1324,9 +1250,7 @@ fn datagram_boundaries_including_empty_messages_reuse_one_registration() {
     let peer = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
     peer.connect(selector.socket_local_address(&socket).unwrap())
         .unwrap();
-    let mut reader = selector
-        .socket_monitor(&socket, Interest::Readable)
-        .unwrap();
+    let mut reader = selector.socket_monitor(&socket, Interest::Readable);
     let inspect = reader.retained();
     let mut generation = None;
     for payload in [&b""[..], b"x", b"yz"] {
@@ -1377,9 +1301,7 @@ fn datagram_boundaries_including_empty_messages_reuse_one_registration() {
 fn a_general_tcp_monitor_keeps_syscall_first_behavior_after_short_reads() {
     let (selector, _driver) = IoUringSelector::new(options()).unwrap();
     let (socket, mut peer) = sockets(&selector);
-    let mut reader = selector
-        .socket_monitor(&socket, Interest::Readable)
-        .unwrap();
+    let mut reader = selector.socket_monitor(&socket, Interest::Readable);
     let never = Cancellation::never();
     reader.registration().notify();
     peer.write_all(b"a").unwrap();
@@ -1425,9 +1347,7 @@ fn a_stream_monitor_on_a_datagram_socket_keeps_message_semantics() {
     let peer = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
     peer.connect(selector.socket_local_address(&socket).unwrap())
         .unwrap();
-    let mut reader = selector
-        .socket_stream_monitor(&socket, Interest::Readable)
-        .unwrap();
+    let mut reader = selector.socket_monitor(&socket, Interest::Readable);
 
     reader.registration().notify();
     for payload in [&b"x"[..], b"", b"yz"] {
@@ -1453,9 +1373,7 @@ fn a_stream_monitor_on_a_datagram_socket_keeps_message_semantics() {
     }
 }
 
-fn urgent_tcp_boundary<M: SocketMonitorState<NativeSocket, IoUringMonitorRegistration>>(
-    monitor: impl Fn(&IoUringSelector, &NativeSocket) -> MonitorStorage<M>,
-) {
+fn urgent_tcp_boundary(monitor: impl Fn(&IoUringSelector, &NativeSocket) -> Storage) {
     for (armed, inline, consumed) in [
         (false, false, false),
         (true, false, false),
@@ -1562,18 +1480,7 @@ fn urgent_tcp_boundary<M: SocketMonitorState<NativeSocket, IoUringMonitorRegistr
 
 #[test]
 fn urgent_tcp_boundary_keeps_trailing_bytes_readable() {
-    urgent_tcp_boundary(|selector, socket| {
-        selector.socket_monitor(socket, Interest::Readable).unwrap()
-    });
-}
-
-#[test]
-fn stream_monitor_preserves_progress_across_live_and_consumed_urgent_data() {
-    urgent_tcp_boundary(|selector, socket| {
-        selector
-            .socket_stream_monitor(socket, Interest::Readable)
-            .unwrap()
-    });
+    urgent_tcp_boundary(|selector, socket| selector.socket_monitor(socket, Interest::Readable));
 }
 
 #[test]
@@ -1593,17 +1500,12 @@ fn completion_releases_backend_storage_before_waking() {
     for finish in [false, true] {
         let (selector, _driver) = IoUringSelector::new(options()).unwrap();
         let (socket, _peer) = sockets(&selector);
-        let owner = Arc::new(
-            selector
-                .socket_monitor_state(&socket, Interest::Readable)
-                .unwrap(),
-        );
+        let storage = selector.socket_monitor(&socket, Interest::Readable);
         let observer = Arc::new(ObserveRelease {
-            owner: Arc::downgrade(&owner),
+            owner: storage.downgrade(),
             released: AtomicBool::new(false),
             woken: AtomicBool::new(false),
         });
-        let storage = MonitorStorage::from_arc(owner, |state| state);
         let submission = staged(&selector, &storage);
         storage.registration().status.lock().unwrap().waker =
             Some(Waker::from(Arc::clone(&observer)));
@@ -1643,9 +1545,7 @@ fn a_close_caller_can_release_its_socket_before_the_completion_wake_returns() {
     }
     let (selector, _driver) = IoUringSelector::new(options()).unwrap();
     let (socket, _peer) = sockets(&selector);
-    let mut monitor = selector
-        .socket_monitor(&socket, Interest::Readable)
-        .unwrap();
+    let mut monitor = selector.socket_monitor(&socket, Interest::Readable);
     let submission = staged(&selector, &monitor);
     let (entered, waking) = std::sync::mpsc::channel();
     let (resume, resumed) = std::sync::mpsc::channel();
@@ -1681,9 +1581,7 @@ fn repolling_a_pending_receive_can_read_before_the_driver_reports_readiness() {
     let waker = worker.waker();
     let mut context = Context::from_waker(&waker);
     let (socket, mut peer) = sockets(&selector);
-    let mut reader = selector
-        .socket_monitor(&socket, Interest::Readable)
-        .unwrap();
+    let mut reader = selector.socket_monitor(&socket, Interest::Readable);
     let never = Cancellation::never();
     let mut bytes = [0; 8];
     {
@@ -1729,9 +1627,7 @@ fn cancelling_a_pending_receive_preserves_bytes_that_are_already_available() {
     let waker = worker.waker();
     let mut context = Context::from_waker(&waker);
     let (socket, mut peer) = sockets(&selector);
-    let mut reader = selector
-        .socket_monitor(&socket, Interest::Readable)
-        .unwrap();
+    let mut reader = selector.socket_monitor(&socket, Interest::Readable);
     let cancellation = Cancellation::new();
     let mut bytes = [0; 8];
     {
@@ -1768,9 +1664,7 @@ fn cancelling_a_pending_receive_preserves_bytes_that_are_already_available() {
 fn cancellation_racing_would_block_does_not_wait_for_readiness() {
     let (selector, _driver) = IoUringSelector::new(options()).unwrap();
     let (socket, _peer) = sockets(&selector);
-    let mut reader = selector
-        .socket_monitor(&socket, Interest::Readable)
-        .unwrap();
+    let mut reader = selector.socket_monitor(&socket, Interest::Readable);
     let cancellation = Cancellation::new();
     let signal = cancellation.clone();
     super::super::tests::BEFORE_SYSCALL.with(|hook| {

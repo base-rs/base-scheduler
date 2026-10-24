@@ -2,6 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use super::*;
+use core_scheduler::{FileReader, FileReading, IoBufMut};
 use futures_lite::future::{block_on, poll_once};
 use std::sync::{
     Arc,
@@ -44,7 +45,12 @@ fn invalid_options_and_closed_services_return_errors_and_buffers() {
     scheduler.close();
     let buffer = vec![1; 4];
     let allocation = buffer.as_ptr();
-    let (result, buffer) = block_on(scheduler.file_read(&file, buffer, &Cancellation::never()));
+    let (result, buffer) = block_on(
+        scheduler
+            .file_reader(&file)
+            .unwrap()
+            .read(buffer, &Cancellation::never()),
+    );
     assert_eq!(result.unwrap_err().kind(), io::ErrorKind::BrokenPipe);
     assert_eq!(buffer.as_ptr(), allocation);
     assert_eq!(
@@ -79,7 +85,12 @@ fn startup_failures_preserve_io_ownership_and_report_cleanup_errors() {
     let mut scheduler = scheduler(1);
     scheduler.work.fail_start_at = Some(0);
     let file = TokioFile::from_std(tempfile::tempfile().unwrap());
-    let (result, buffer) = block_on(scheduler.file_read(&file, vec![9], &Cancellation::never()));
+    let (result, buffer) = block_on(
+        scheduler
+            .file_reader(&file)
+            .unwrap()
+            .read(vec![9], &Cancellation::never()),
+    );
     assert_eq!(buffer, vec![9]);
     assert_eq!(
         result.unwrap_err().to_string(),
@@ -247,10 +258,12 @@ fn abandoned_io_and_scheduler_drop_retain_worker_access_until_retirement() {
         completion: Some(completion),
     };
     let never = Cancellation::never();
-    let mut reading = Box::pin(scheduler.file_read(&file, buffer, &never));
+    let mut reader = scheduler.file_reader(&file).unwrap();
+    let mut reading = Box::pin(reader.read(buffer, &never));
     assert!(block_on(poll_once(&mut reading)).is_none());
     start.recv_timeout(TIMEOUT).unwrap();
     drop(reading);
+    drop(reader);
     drop(file);
     assert_eq!(retained.strong_count(), 1);
     assert_eq!(dropped.load(Ordering::SeqCst), 0);

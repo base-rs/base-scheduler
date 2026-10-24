@@ -1,6 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
+use crate::{Interest, SocketMessage};
 use crate::{
     NativeSocket, ReadinessSelector,
     blocking_pool::admission_error,
@@ -174,8 +175,8 @@ impl SocketAccept for ReadinessSelector {
     }
 }
 
-impl SocketRead for ReadinessSelector {
-    async fn socket_read<B: IoBufMut>(
+impl ReadinessSelector {
+    pub(crate) async fn socket_read<B: IoBufMut>(
         &self,
         socket: &NativeSocket,
         buffer: B,
@@ -192,8 +193,8 @@ impl SocketRead for ReadinessSelector {
     }
 }
 
-impl SocketWrite for ReadinessSelector {
-    async fn socket_write<B: IoBuf>(
+impl ReadinessSelector {
+    pub(crate) async fn socket_write<B: IoBuf>(
         &self,
         socket: &NativeSocket,
         buffer: B,
@@ -210,8 +211,8 @@ impl SocketWrite for ReadinessSelector {
     }
 }
 
-impl SocketRecvPoll for ReadinessSelector {
-    async fn socket_recv_poll(
+impl ReadinessSelector {
+    pub(crate) async fn socket_recv_poll(
         &self,
         socket: &NativeSocket,
         buffer: &mut [u8],
@@ -230,8 +231,8 @@ impl SocketRecvPoll for ReadinessSelector {
     }
 }
 
-impl SocketSendPoll for ReadinessSelector {
-    async fn socket_send_poll(
+impl ReadinessSelector {
+    pub(crate) async fn socket_send_poll(
         &self,
         socket: &NativeSocket,
         buffer: &[u8],
@@ -250,8 +251,8 @@ impl SocketSendPoll for ReadinessSelector {
     }
 }
 
-impl SocketRecvMsgPoll for ReadinessSelector {
-    async fn socket_recvmsg_poll(
+impl ReadinessSelector {
+    pub(crate) async fn socket_recvmsg_poll(
         &self,
         socket: &NativeSocket,
         buffer: &mut [std::io::IoSliceMut<'_>],
@@ -270,8 +271,8 @@ impl SocketRecvMsgPoll for ReadinessSelector {
     }
 }
 
-impl SocketSendMsgPoll for ReadinessSelector {
-    async fn socket_sendmsg_poll(
+impl ReadinessSelector {
+    pub(crate) async fn socket_sendmsg_poll(
         &self,
         socket: &NativeSocket,
         buffer: &[std::io::IoSlice<'_>],
@@ -291,8 +292,8 @@ impl SocketSendMsgPoll for ReadinessSelector {
     }
 }
 
-impl SocketWait for ReadinessSelector {
-    async fn socket_wait(
+impl ReadinessSelector {
+    pub(crate) async fn socket_wait(
         &self,
         socket: &NativeSocket,
         interest: Interest,
@@ -306,8 +307,8 @@ impl SocketWait for ReadinessSelector {
     }
 }
 
-impl SocketSendMsg for ReadinessSelector {
-    async fn socket_sendmsg<B: IoBufSequence>(
+impl ReadinessSelector {
+    pub(crate) async fn socket_sendmsg<B: IoBufSequence>(
         &self,
         socket: &NativeSocket,
         message: SocketMessage<B>,
@@ -326,8 +327,8 @@ impl SocketSendMsg for ReadinessSelector {
     }
 }
 
-impl SocketRecvMsg for ReadinessSelector {
-    async fn socket_recvmsg<B: IoBufSequenceMut>(
+impl ReadinessSelector {
+    pub(crate) async fn socket_recvmsg<B: IoBufSequenceMut>(
         &self,
         socket: &NativeSocket,
         buffers: B,
@@ -395,17 +396,9 @@ impl SocketShutdown for ReadinessSelector {
 #[cfg(test)]
 mod tests;
 
-impl SocketMonitoring for ReadinessSelector {
-    type MonitorRegistration = ();
-    fn socket_type(&self, socket: &Self::Socket) -> io::Result<SocketType> {
+impl ReadinessSelector {
+    pub(crate) fn socket_type(&self, socket: &NativeSocket) -> io::Result<SocketType> {
         self.check_open()?;
         crate::socket_io::recvmsg_socket_type(socket.get_ref())
-    }
-    fn socket_monitor_state(
-        &self,
-        socket: &Self::Socket,
-        interest: Interest,
-    ) -> io::Result<SocketMonitor<Self::Socket, ()>> {
-        Ok(SocketMonitor::new(socket.retain(), interest, ()))
     }
 }

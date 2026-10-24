@@ -4,10 +4,13 @@
 #[cfg(target_os = "linux")]
 mod linux {
     use core_scheduler::{
-        Cancellation, FileClose, FileMonitor, FileMonitoring, FileOpen, FileOptions,
+        BufferResult, Cancellation, FileClose, FileOpen, FileOptions, FileReader, FileReading,
+        FileWriter, FileWriting,
     };
-    use core_scheduler_iouring::{IoUringFileRegistration, IoUringOptions, IoUringSelector};
-    use core_scheduler_selector::{NativeFile, SelectorDriver, SelectorWorker};
+    use core_scheduler_iouring::{
+        IoUringFileReader, IoUringFileWriter, IoUringOptions, IoUringSelector,
+    };
+    use core_scheduler_selector::{SelectorDriver, SelectorWorker};
     use futures_lite::future::block_on;
     use std::{
         future::Future,
@@ -17,10 +20,31 @@ mod linux {
         time::Instant,
     };
 
-    type Monitor = FileMonitor<NativeFile, IoUringFileRegistration>;
-    type Payload = (Monitor, Vec<u8>);
-    struct Batch {
-        payload: Payload,
+    enum Lane<'a> {
+        Reader(IoUringFileReader<'a>),
+        Writer(IoUringFileWriter<'a>),
+    }
+    impl Lane<'_> {
+        async fn transfer(
+            &mut self,
+            buffer: Vec<u8>,
+            cancellation: &Cancellation,
+        ) -> BufferResult<Vec<u8>> {
+            match self {
+                Self::Reader(reader) => reader.read_at(buffer, 0, cancellation).await,
+                Self::Writer(writer) => writer.write_at(buffer, 0, cancellation).await,
+            }
+        }
+        async fn close(&mut self) -> std::io::Result<()> {
+            match self {
+                Self::Reader(reader) => reader.close().await,
+                Self::Writer(writer) => writer.close().await,
+            }
+        }
+    }
+    type Payload<'a> = (Lane<'a>, Vec<u8>);
+    struct Batch<'a> {
+        payload: Payload<'a>,
         count: usize,
     }
 
@@ -82,131 +106,130 @@ mod linux {
         )
         .unwrap();
         let selector = Arc::new(selector);
-        let (reply, returned) = mpsc::channel::<Payload>();
-        let (started, startup) = mpsc::channel::<(usize, Waker)>();
-        let mut senders = Vec::new();
-        let mut threads = Vec::new();
-        for (index, driver) in drivers.into_iter().enumerate() {
-            let (sender, inbox) = mpsc::channel::<Batch>();
-            senders.push(sender);
-            let selector = Arc::clone(&selector);
-            let reply = reply.clone();
-            let started = started.clone();
-            let cpu = worker_cpus[index];
-            threads.push(std::thread::spawn(move || {
-                pin_thread(cpu);
-                let mut worker = driver.enter();
-                let waker = worker.waker();
-                started.send((index, waker.clone())).unwrap();
-                let mut context = Context::from_waker(&waker);
-                loop {
-                    if let Ok(Batch {
-                        payload: (mut monitor, mut buffer),
+        std::thread::scope(|scope| {
+            let (reply, returned) = mpsc::channel::<Payload<'_>>();
+            let (started, startup) = mpsc::channel::<(usize, Waker)>();
+            let mut senders = Vec::new();
+            let mut threads = Vec::new();
+            for (index, driver) in drivers.into_iter().enumerate() {
+                let (sender, inbox) = mpsc::channel::<Batch<'_>>();
+                senders.push(sender);
+                let reply = reply.clone();
+                let started = started.clone();
+                let cpu = worker_cpus[index];
+                threads.push(scope.spawn(move || {
+                    pin_thread(cpu);
+                    let mut worker = driver.enter();
+                    let waker = worker.waker();
+                    started.send((index, waker.clone())).unwrap();
+                    let mut context = Context::from_waker(&waker);
+                    loop {
+                        if let Ok(Batch {
+                            payload: (mut monitor, mut buffer),
+                            count,
+                        }) = inbox.try_recv()
+                        {
+                            let never = Cancellation::never();
+                            let mut operation = pin!(async {
+                                for _ in 0..count {
+                                    let result;
+                                    (result, buffer) = monitor.transfer(buffer, &never).await;
+                                    assert_eq!(result.unwrap(), size);
+                                    assert_eq!(buffer[0], 42);
+                                    std::hint::black_box(&buffer);
+                                }
+                                (monitor, buffer)
+                            });
+                            let payload = loop {
+                                if let Poll::Ready(payload) = operation.as_mut().poll(&mut context)
+                                {
+                                    break payload;
+                                }
+                                worker.turn(None).unwrap();
+                            };
+                            reply.send(payload).unwrap();
+                        }
+                        if worker.turn(None).unwrap() {
+                            break;
+                        }
+                    }
+                }));
+            }
+            drop((reply, started));
+            let mut wakers = vec![None; workers];
+            for _ in 0..workers {
+                let (index, waker) = startup.recv().unwrap();
+                wakers[index] = Some(waker);
+            }
+            let wakers: Vec<_> = wakers.into_iter().map(Option::unwrap).collect();
+            pin_thread(cpus[0]);
+            let directory = tempfile::tempdir().unwrap();
+            let path = directory.path().join("data");
+            std::fs::write(&path, vec![42; size]).unwrap();
+            let never = Cancellation::never();
+            let file = block_on(selector.file_open(
+                &path,
+                FileOptions {
+                    read: true,
+                    write: true,
+                    ..Default::default()
+                },
+                &never,
+            ))
+            .unwrap();
+            let lane = if write {
+                Lane::Writer(selector.file_writer(&file).unwrap())
+            } else {
+                Lane::Reader(selector.file_reader(&file).unwrap())
+            };
+            let mut payload = Some((lane, vec![42; size]));
+            let mut exchange = |index: usize, count: usize| {
+                senders[index]
+                    .send(Batch {
+                        payload: payload.take().unwrap(),
                         count,
-                    }) = inbox.try_recv()
-                    {
-                        let never = Cancellation::never();
-                        let mut operation = pin!(async {
-                            for _ in 0..count {
-                                let result;
-                                (result, buffer) = if write {
-                                    selector
-                                        .file_monitor_write_at(&mut monitor, buffer, 0, &never)
-                                        .await
-                                } else {
-                                    selector
-                                        .file_monitor_read_at(&mut monitor, buffer, 0, &never)
-                                        .await
-                                };
-                                assert_eq!(result.unwrap(), size);
-                                assert_eq!(buffer[0], 42);
-                                std::hint::black_box(&buffer);
-                            }
-                            (monitor, buffer)
-                        });
-                        let payload = loop {
-                            if let Poll::Ready(payload) = operation.as_mut().poll(&mut context) {
-                                break payload;
-                            }
-                            worker.turn(None).unwrap();
-                        };
-                        reply.send(payload).unwrap();
-                    }
-                    if worker.turn(None).unwrap() {
-                        break;
-                    }
-                }
-            }));
-        }
-        drop((reply, started));
-        let mut wakers = vec![None; workers];
-        for _ in 0..workers {
-            let (index, waker) = startup.recv().unwrap();
-            wakers[index] = Some(waker);
-        }
-        let wakers: Vec<_> = wakers.into_iter().map(Option::unwrap).collect();
-        pin_thread(cpus[0]);
-        let directory = tempfile::tempdir().unwrap();
-        let path = directory.path().join("data");
-        std::fs::write(&path, vec![42; size]).unwrap();
-        let never = Cancellation::never();
-        let file = block_on(selector.file_open(
-            &path,
-            FileOptions {
-                read: true,
-                write: true,
-                ..Default::default()
-            },
-            &never,
-        ))
-        .unwrap();
-        let mut payload = Some((selector.file_monitor(&file).unwrap(), vec![42; size]));
-        let mut exchange = |index: usize, count: usize| {
-            senders[index]
-                .send(Batch {
-                    payload: payload.take().unwrap(),
-                    count,
-                })
-                .unwrap();
-            wakers[index].wake_by_ref();
-            payload = Some(returned.recv().unwrap());
-        };
-        // Visit every ring to initialize its table and queues and reuse request storage.
-        // Invalidation intentionally replaces registrations at each migration; only retention keeps every lease warm.
-        for index in 0..workers {
-            exchange(index, burst);
-        }
-        // Start timing immediately after the last warm route; the first measured batch remains on that ring.
-        let mut times = Vec::with_capacity(rounds);
-        let start = Instant::now();
-        for round in 0..rounds {
-            let batch_start = Instant::now();
-            exchange((workers - 1 + round) % workers, burst);
-            times.push(batch_start.elapsed().as_nanos() as u64);
-        }
-        let loop_elapsed = start.elapsed();
-        let (mut monitor, buffer) = payload.take().unwrap();
-        block_on(selector.file_monitor_close(&mut monitor)).unwrap();
-        let elapsed = start.elapsed();
-        drop((monitor, buffer));
-        block_on(selector.file_close(file)).unwrap();
-        block_on(selector.shutdown());
-        for thread in threads {
-            thread.join().unwrap();
-        }
-        times.sort_unstable();
-        drop(restore);
-        let migrations = if workers == 1 { 0 } else { rounds - 1 };
-        serde_json::json!({
-            "coordinator_cpu": cpus[0], "worker_cpus": worker_cpus,
-            "workers": workers, "burst": burst, "rounds": rounds, "size": size,
-            "write": write, "registered": registered, "operations": rounds * burst,
-            "migrations": migrations, "seconds": elapsed.as_secs_f64(),
-            "loop_seconds": loop_elapsed.as_secs_f64(),
-            "operations_per_second": (rounds * burst) as f64 / elapsed.as_secs_f64(),
-            "mean_batch_ns": loop_elapsed.as_nanos() as f64 / rounds as f64,
-            "p50_batch_ns": times[times.len()/2],
-            "p99_batch_ns": times[(times.len()*99/100).min(times.len()-1)],
+                    })
+                    .unwrap();
+                wakers[index].wake_by_ref();
+                payload = Some(returned.recv().unwrap());
+            };
+            // Visit every ring to initialize its table and queues and reuse request storage.
+            // Invalidation intentionally replaces registrations at each migration; only retention keeps every lease warm.
+            for index in 0..workers {
+                exchange(index, burst);
+            }
+            // Start timing immediately after the last warm route; the first measured batch remains on that ring.
+            let mut times = Vec::with_capacity(rounds);
+            let start = Instant::now();
+            for round in 0..rounds {
+                let batch_start = Instant::now();
+                exchange((workers - 1 + round) % workers, burst);
+                times.push(batch_start.elapsed().as_nanos() as u64);
+            }
+            let loop_elapsed = start.elapsed();
+            let (mut monitor, buffer) = payload.take().unwrap();
+            block_on(monitor.close()).unwrap();
+            let elapsed = start.elapsed();
+            drop((monitor, buffer));
+            block_on(selector.file_close(file)).unwrap();
+            block_on(selector.shutdown());
+            for thread in threads {
+                thread.join().unwrap();
+            }
+            times.sort_unstable();
+            drop(restore);
+            let migrations = if workers == 1 { 0 } else { rounds - 1 };
+            serde_json::json!({
+                "coordinator_cpu": cpus[0], "worker_cpus": worker_cpus,
+                "workers": workers, "burst": burst, "rounds": rounds, "size": size,
+                "write": write, "registered": registered, "operations": rounds * burst,
+                "migrations": migrations, "seconds": elapsed.as_secs_f64(),
+                "loop_seconds": loop_elapsed.as_secs_f64(),
+                "operations_per_second": (rounds * burst) as f64 / elapsed.as_secs_f64(),
+                "mean_batch_ns": loop_elapsed.as_nanos() as f64 / rounds as f64,
+                "p50_batch_ns": times[times.len()/2],
+                "p99_batch_ns": times[(times.len()*99/100).min(times.len()-1)],
+            })
         })
     }
 }

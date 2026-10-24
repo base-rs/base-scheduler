@@ -3,19 +3,20 @@
 
 use super::socket::retain_socket;
 use super::*;
-use std::io::{IoSlice, IoSliceMut};
+use crate::Interest;
 
-// Readiness requests retain only the socket. Borrowed payloads and I/O vectors never enter the ring or its request bookkeeping.
-struct ReadinessRequest {
+// Transient retry waits retain the owned input and socket through retirement. The kernel accesses only the socket; no borrowed payload or I/O-vector pointer enters this request.
+struct ReadinessRequest<Input: Send + 'static> {
     identifier: u64,
     _permit: Permit,
     socket: Option<RegisteredSocket>,
     interest: Interest,
-    reply: Cell<Option<oneshot::Sender<io::Result<usize>>>>,
+    input: Option<Input>,
+    reply: Cell<Option<oneshot::Sender<RawBufferResult<Input>>>>,
     cancelling: Cell<bool>,
 }
 
-impl PendingRequest for ReadinessRequest {
+impl<Input: Send + 'static> PendingRequest for ReadinessRequest<Input> {
     fn identifier(&self) -> u64 {
         self.identifier
     }
@@ -36,14 +37,15 @@ impl PendingRequest for ReadinessRequest {
         false
     }
 
-    fn finish(self: Box<Self>, result: io::Result<usize>) {
+    fn finish(mut self: Box<Self>, result: io::Result<usize>) {
         let reply = self
             .reply
             .take()
             .expect("unfinished request retains its sender");
-        // Release the socket and capacity before waking a caller that may close the socket or start another wait.
+        let input = self.input.take().unwrap();
+        // Release socket and capacity before returning the retained owner, whose destructor may publish lane retirement.
         drop(self);
-        discard(reply.send(result));
+        discard(reply.send((result, input)));
     }
 
     fn begin_cancellation(&self) -> bool {
@@ -57,150 +59,77 @@ impl PendingRequest for ReadinessRequest {
     }
 }
 
-impl Drop for ReadinessRequest {
+impl<Input: Send + 'static> Drop for ReadinessRequest<Input> {
     fn drop(&mut self) {
         drop(self.socket.take());
         // An unpublished request may be discarded during shutdown. Unknown in-flight requests follow the driver's existing retention policy.
         if let Some(reply) = self.reply.take() {
-            discard(reply.send(Err(io::Error::new(
-                io::ErrorKind::BrokenPipe,
-                "selector closed before readiness submission",
-            ))));
+            discard(reply.send((
+                Err(io::Error::new(
+                    io::ErrorKind::BrokenPipe,
+                    "selector closed before readiness submission",
+                )),
+                self.input.take().unwrap(),
+            )));
         }
     }
 }
 
 impl IoUringSelector {
+    #[cfg(test)]
     pub(super) async fn wait_ready(
         &self,
         controller: Arc<Controller>,
-        socket: &NativeSocket,
+        socket: &impl SocketSource,
         interest: Interest,
         cancellation: &Cancellation,
     ) -> OperationResult<()> {
-        cancellation.check()?;
-        self.check_open()?;
-        let permit = operation_result(
-            controller.capacity.acquire(cancellation).await,
-            cancellation,
-        )?;
-        let identifier = controller.next_identifier()?;
+        self.wait_ready_owned(controller, socket, (), interest, cancellation)
+            .await
+            .0
+    }
+
+    pub(super) async fn wait_ready_owned<Input: Send + 'static>(
+        &self,
+        controller: Arc<Controller>,
+        socket: &impl SocketSource,
+        input: Input,
+        interest: Interest,
+        cancellation: &Cancellation,
+    ) -> (OperationResult<()>, Input) {
+        if let Err(error) = cancellation
+            .check()
+            .map_err(OperationError::from)
+            .and_then(|()| self.check_open().map_err(Into::into))
+        {
+            return (Err(error), input);
+        }
+        let permit = match controller.capacity.acquire(cancellation).await {
+            Ok(permit) => permit,
+            Err(error) => return (operation_result(Err(error), cancellation), input),
+        };
+        let identifier = match controller.next_identifier() {
+            Ok(identifier) => identifier,
+            Err(error) => return (Err(error.into()), input),
+        };
         let (reply, result) = oneshot::channel();
         let request = ReadinessRequest {
             identifier,
             _permit: permit,
             socket: Some(retain_socket(socket)),
             interest,
+            input: Some(input),
             reply: Cell::new(Some(reply)),
             cancelling: Cell::new(false),
         };
-        operation_result(
-            Self::submit(controller, Box::new(request), result, cancellation).await,
-            cancellation,
-        )
-        .map(drop)
-    }
-
-    async fn socket_poll<T>(
-        &self,
-        socket: &NativeSocket,
-        interest: Interest,
-        cancellation: &Cancellation,
-        mut operation: impl FnMut() -> io::Result<T> + Send,
-    ) -> OperationResult<T> {
-        cancellation.check()?;
-        self.check_open()?;
-        let mut controller = None;
-        loop {
-            match operation() {
-                Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
-                    // Ready I/O needs neither routing nor request storage. Keep the first wait's ring across retries and task migration.
-                    let controller = controller.get_or_insert_with(|| self.route());
-                    self.wait_ready(Arc::clone(controller), socket, interest, cancellation)
-                        .await?;
-                }
-                Err(error) if error.kind() == io::ErrorKind::Interrupted => {
-                    cancellation.check()?;
-                    self.check_open()?;
-                }
-                result => return result.map_err(Into::into),
-            }
-        }
-    }
-}
-
-impl SocketWait for IoUringSelector {
-    async fn socket_wait(
-        &self,
-        socket: &NativeSocket,
-        interest: Interest,
-        cancellation: &Cancellation,
-    ) -> OperationResult<()> {
-        self.wait_ready(self.route(), socket, interest, cancellation)
-            .await
-    }
-}
-
-impl SocketRecvPoll for IoUringSelector {
-    async fn socket_recv_poll(
-        &self,
-        socket: &NativeSocket,
-        buffer: &mut [u8],
-        flags: SocketRecvFlags,
-        cancellation: &Cancellation,
-    ) -> OperationResult<usize> {
-        self.socket_poll(socket, Interest::Readable, cancellation, || {
-            socket.try_recv(buffer, flags)
-        })
-        .await
-    }
-}
-
-impl SocketSendPoll for IoUringSelector {
-    async fn socket_send_poll(
-        &self,
-        socket: &NativeSocket,
-        buffer: &[u8],
-        flags: SocketSendFlags,
-        cancellation: &Cancellation,
-    ) -> OperationResult<usize> {
-        self.socket_poll(socket, Interest::Writable, cancellation, || {
-            socket.try_send(buffer, flags)
-        })
-        .await
-    }
-}
-
-impl SocketRecvMsgPoll for IoUringSelector {
-    async fn socket_recvmsg_poll(
-        &self,
-        socket: &NativeSocket,
-        buffers: &mut [IoSliceMut<'_>],
-        flags: SocketRecvFlags,
-        cancellation: &Cancellation,
-    ) -> OperationResult<SocketRecvResult> {
-        self.socket_poll(socket, Interest::Readable, cancellation, || {
-            socket.try_recvmsg(buffers, flags)
-        })
-        .await
-    }
-}
-
-impl SocketSendMsgPoll for IoUringSelector {
-    async fn socket_sendmsg_poll(
-        &self,
-        socket: &NativeSocket,
-        buffers: &[IoSlice<'_>],
-        address: Option<SocketAddress>,
-        flags: SocketSendFlags,
-        cancellation: &Cancellation,
-    ) -> OperationResult<usize> {
-        self.socket_poll(socket, Interest::Writable, cancellation, || {
-            socket.try_sendmsg(buffers, address, flags)
-        })
-        .await
+        let (result, input) =
+            Self::submit(controller, Box::new(request), result, cancellation).await;
+        (operation_result(result, cancellation).map(drop), input)
     }
 }
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod rejection_tests;

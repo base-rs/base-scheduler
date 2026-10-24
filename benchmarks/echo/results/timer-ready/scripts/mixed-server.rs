@@ -3,8 +3,8 @@
 
 use crate::Result;
 use core_scheduler::{
-    Cancellation, IoBuf, SocketAccept, SocketRead, SocketRecvFlags, SocketRecvPoll,
-    SocketRegistration, SocketSendFlags, SocketSendPoll, SocketSetOption, SocketWrite, Spawn,
+    Cancellation, IoBuf, SocketAccept, backend::SocketRead, SocketRecvFlags, backend::SocketRecvPoll,
+    SocketRegistration, SocketSendFlags, backend::SocketSendPoll, SocketSetOption, backend::SocketWrite, Spawn,
     TcpNoDelay,
 };
 use core_scheduler_tokio::TokioScheduler;

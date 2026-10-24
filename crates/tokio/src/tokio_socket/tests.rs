@@ -117,7 +117,7 @@ fn transient_would_block_retries_with_the_requested_readiness_direction() {
             assert_eq!(&buffer, b"x");
             assert!(reads >= 2);
             // Confirm normal public operations still use the same registration.
-            use core_scheduler::{SocketClose, SocketWait};
+            use core_scheduler::SocketClose;
             scheduler
                 .socket_wait(&client, Interest::Writable, &Cancellation::never())
                 .await

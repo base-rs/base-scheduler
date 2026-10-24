@@ -7,7 +7,6 @@
 mod native_executor_options;
 mod native_options;
 mod native_scheduler;
-mod native_stream_writer;
 mod native_task;
 mod panic;
 mod selector_operations;
@@ -27,9 +26,6 @@ pub use core_scheduler_selector::{
 pub use native_executor_options::NativeExecutorOptions;
 pub use native_options::NativeOptions;
 pub use native_scheduler::NativeScheduler;
-pub use native_stream_writer::NativeStreamWriter;
 pub use native_task::NativeTask;
-
-pub use selector_operations::NativeRecvMsgReceiver;
 
 pub use worker_timers::NativeTimer;

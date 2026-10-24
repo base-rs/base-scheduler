@@ -18,8 +18,8 @@ use std::future::Future;
 /// ```
 ///
 /// ```compile_fail
-/// use core_scheduler::{AddressResolution, AddressHints, AddressService, Cancellation, SocketScheduler};
-/// async fn resolve<S: SocketScheduler>(scheduler: &S) {
+/// use core_scheduler::{AddressResolution, AddressHints, AddressService, Cancellation, SocketOperation};
+/// async fn resolve<S: SocketOperation>(scheduler: &S) {
 ///     scheduler.address_resolve(Some("localhost"), AddressService::Port(80), AddressHints::default(), &Cancellation::never()).await;
 /// }
 /// ```

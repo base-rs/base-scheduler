@@ -2,6 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use super::*;
+use crate::{Interest, SocketMessage};
 use futures_lite::future::{block_on, poll_once};
 use std::{
     sync::{Arc, mpsc},

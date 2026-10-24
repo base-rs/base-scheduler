@@ -7,16 +7,19 @@
 The workspace is not published yet. Add this package from Git with `cargo add core-scheduler core-scheduler-direct --git https://github.com/core-rs/core-scheduler`.
 
 ```rust
-use core_scheduler::{Cancellation, FileClose, FileOpen, FileOptions, FileRead};
+use core_scheduler::{Cancellation, FileClose, FileOpen, FileOptions, FileReader, FileReading};
 use core_scheduler_direct::{DirectOptions, DirectScheduler};
 
 # async fn example(path: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
 let scheduler = DirectScheduler::new(DirectOptions::default())?;
 let cancellation = Cancellation::new();
 let file = scheduler.file_open(path, FileOptions::READ, &cancellation).await?;
-let (result, buffer) = scheduler.file_read(&file, vec![0; 4096], &cancellation).await;
+let mut reader = scheduler.file_reader(&file)?;
+let (result, buffer) = reader.read(vec![0; 4096], &cancellation).await;
 let count = result?;
 assert!(count <= buffer.len());
+reader.close().await?;
+drop(reader);
 scheduler.file_close(file).await?;
 scheduler.shutdown().await;
 # Ok(()) }
@@ -24,7 +27,7 @@ scheduler.shutdown().await;
 
 ## Ownership and shutdown
 
-Each operation receives the scheduler and cancellation explicitly. `DirectFile` and `DirectSocket` contain no scheduler or registration affinity; successive operations can use different direct instances. Open files through `FileOpen`; native file import and access are deferred until descriptor flags and aliases can preserve positioned-write and exclusive-close guarantees.
+Construct readers and writers from an explicit scheduler and pass cancellation to each operation. The bound handle keeps its selected scheduler. `DirectFile` and `DirectSocket` contain no scheduler or registration affinity; separate bound handles can select different direct instances. Open files through `FileOpen`; native file import and access are deferred until descriptor flags and aliases can preserve positioned-write and exclusive-close guarantees.
 
 Admission is bounded by queued plus running jobs. Cancellation prevents admission or queued I/O execution; a running syscall preserves its actual result. Dropping an I/O future does not release its resources while a worker still uses them. General blocking-job handles own queued execution; dropping one can skip queued work, but cannot interrupt a running closure.
 
@@ -52,11 +55,11 @@ Linux `FileAllocate` invokes `fallocate64`, including `KEEP_SIZE`, without emula
 
 ## Socket I/O
 
-Sockets stay nonblocking throughout their lifetime. Each syscall attempt uses the ordinary bounded pool. `WouldBlock` and interrupted attempts return their worker and admission slot before waiting for a scheduler-local retry pulse, so pending reads do not consume the capacity needed by writes. One lazily started retry thread wakes waiting operations approximately every two milliseconds and sleeps while none are waiting. This deliberately simple reference policy trades latency and repeated attempts for avoiding a reactor, a thread per socket operation, or blocking workers on network traffic. Capacity bounds queued/running attempts, not the number of caller-owned pending socket futures. General blocking closures and synchronous file calls can still occupy ordinary workers; applications must arrange their eventual completion.
+Sockets stay nonblocking throughout their lifetime. Borrowed reader and writer operations attempt synchronous nonblocking syscalls in the polling task. Owned completion operations dispatch each syscall attempt through the ordinary bounded pool. `WouldBlock` and interrupted attempts return their worker and admission slot before waiting for a scheduler-local retry pulse, so pending reads do not consume the capacity needed by writes. One lazily started retry thread wakes waiting operations approximately every two milliseconds and sleeps while none are waiting. This deliberately simple reference policy trades latency and repeated attempts for avoiding a reactor, a thread per socket operation, or blocking workers on network traffic. Capacity bounds queued/running attempts, not the number of caller-owned pending socket futures. General blocking closures and synchronous file calls can still occupy ordinary workers; applications must arrange their eventual completion.
 
-`SocketSendMsg` and `SocketRecvMsg` use prepared `IoBuffers`/`IoBuffersMut` arrays directly during synchronous `sendmsg`/`recvmsg` or non-overlapped Winsock calls. Other sequences build native vectors in scratch storage reused across attempts. Each operation makes one transfer, preserves short counts and datagram boundaries, and returns the unchanged collection owner. Unix reports discarded control data when the OS supplies `MSG_CTRUNC`; the Windows payload/address path has no control metadata. No syscall retains vector or payload pointers after that attempt returns. Accepted attempts retain the entire owner even if the waiting future or scheduler is dropped. Between attempts, the future owns its input with no backend access remaining; dropping it safely ends retries. Scheduler shutdown wakes pending retry waiters and drains accepted attempts and cleanup, without requiring abandoned futures to be polled.
+The readers’ `read_owned_vectored` and writers’ `write_owned_vectored` methods use prepared `IoBuffers`/`IoBuffersMut` arrays directly during synchronous `sendmsg`/`recvmsg` or non-overlapped Winsock calls. Other sequences build native vectors in scratch storage reused across attempts. Each operation makes one transfer, preserves short counts and datagram boundaries, and returns the unchanged collection owner. Unix reports discarded control data when the OS supplies `MSG_CTRUNC`; the Windows payload/address path has no control metadata. No syscall retains vector or payload pointers after that attempt returns. Accepted attempts retain the entire owner even if the waiting future or scheduler is dropped. Between attempts, the future owns its input with no backend access remaining; dropping it safely ends retries. Scheduler shutdown wakes pending retry waiters and drains accepted attempts and cleanup, without requiring abandoned futures to be polled.
 
-Construct scheduler-bound stream and packet readers and writers for application I/O, and file readers and writers for repeated file operations. Their operations take cancellation without another scheduler argument. Borrowed-only readers allocate no payload pool; owned reads use lazy default storage or an explicit shared pool. Close and drop every handle before exclusively closing its underlying resource. See the [I/O usage guide](../../context/io.md) for the recommended paths.
+Construct scheduler-bound stream and packet readers and writers for application I/O, and file readers and writers for repeated file operations. Their operations take cancellation without another scheduler argument. Scalar and vectored calls with explicit flags preserve peeking and routing semantics without exposing dispatch hooks. File readers and writers also expose submission/completion separation; accepted file work retires independently of collecting its completion. Borrowed-only readers allocate no payload pool; owned reads use lazy default storage or an explicit shared pool. Close and drop every handle before exclusively closing its underlying resource. See the [I/O usage guide](../../context/io.md) for the recommended paths.
 
 ## Development
 

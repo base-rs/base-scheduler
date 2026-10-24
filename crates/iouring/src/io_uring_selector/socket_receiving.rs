@@ -3,18 +3,16 @@
 
 use super::provided_buffers::WorkerBuffers;
 use super::*;
-use crate::io_uring_receiver::Strategy;
-use crate::{IoUringBuffer, IoUringReceiver};
+use crate::IoUringBuffer;
 use std::cell::UnsafeCell;
-impl SocketReceiving for IoUringSelector {
-    type PooledReceiver = IoUringReceiver;
-    async fn socket_receiver(
+impl IoUringSelector {
+    pub(crate) async fn socket_receiver(
         &self,
-        socket: &Self::Socket,
-        pool: Self::Pool,
+        socket: &impl SocketSource,
+        pool: crate::IoUringBufferPool,
         flags: SocketRecvFlags,
         cancellation: &Cancellation,
-    ) -> OperationResult<Self::PooledReceiver> {
+    ) -> OperationResult<multishot::RecvMsgMultishot<IoUringBuffer>> {
         cancellation.check()?;
         self.check_open()?;
         if !Weak::ptr_eq(&pool.0.selector, &Arc::downgrade(&self.group)) {
@@ -35,18 +33,12 @@ impl SocketReceiving for IoUringSelector {
         let stream =
             syscall("socket-type", || retained.get_ref().r#type())? == socket2::Type::STREAM;
         let controller = self.route();
-        let Some(buffers) = pool.worker(&controller) else {
-            let kind = if stream {
-                SocketType::Stream
-            } else {
-                SocketType::Datagram
-            };
-            return self
-                .socket_monitor(socket, Interest::Readable)
-                .and_then(|monitor| SocketReceiver::new(monitor, pool, kind, flags))
-                .map(|receiver| IoUringReceiver(Strategy::Demand(receiver)))
-                .map_err(Into::into);
-        };
+        let buffers = pool.worker(&controller).ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "receive-ahead requires a worker-provided pool",
+            )
+        })?;
         let buffers = Arc::clone(buffers);
         let socket = retained;
         let permit = operation_result(
@@ -72,17 +64,15 @@ impl SocketReceiving for IoUringSelector {
             finished: false,
         };
         controller.submit(Box::new(request));
-        Ok(IoUringReceiver(Strategy::Provided(
-            multishot::RecvMsgMultishot {
-                cancel_on_wait: false,
-                state,
-                cancel: CancelOnDrop {
-                    controller,
-                    identifier,
-                    armed: true,
-                },
+        Ok(multishot::RecvMsgMultishot {
+            cancel_on_wait: false,
+            state,
+            cancel: CancelOnDrop {
+                controller,
+                identifier,
+                armed: true,
             },
-        )))
+        })
     }
 }
 

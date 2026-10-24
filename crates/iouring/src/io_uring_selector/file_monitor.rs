@@ -9,7 +9,7 @@ use super::{
 use std::{any::Any, sync::Mutex};
 
 /// Reusable file request storage associated with one io_uring selector group. The request can select a different worker between completed operations.
-pub struct IoUringFileRegistration {
+pub(crate) struct IoUringFileRegistration {
     owner: Weak<DriverGroup>,
     shared: Arc<Shared>,
     cached: Option<Box<dyn Any + Send>>,
@@ -22,6 +22,7 @@ pub struct IoUringFileRegistration {
 }
 
 enum Completion {
+    Cached(Box<dyn Any + Send>),
     Request(io::Result<usize>, Box<dyn Any + Send>),
     Rejected(Box<dyn Any + Send>),
     Failed,
@@ -30,18 +31,71 @@ enum Completion {
 struct Shared {
     result: Mutex<Option<Completion>>,
     ready: AtomicBool,
+    failed: AtomicBool,
+    collecting: AtomicBool,
     waker: atomic_waker::AtomicWaker,
+    retirement_waker: atomic_waker::AtomicWaker,
 }
 
 impl Shared {
     fn publish(&self, result: Completion) {
-        *self.result.lock().unwrap() = Some(result);
+        if matches!(&result, Completion::Failed) {
+            self.failed.store(true, Ordering::Release);
+        }
+        let abandoned = {
+            let mut slot = self.result.lock().unwrap();
+            if self.collecting.load(Ordering::Acquire) {
+                *slot = Some(result);
+                None
+            } else {
+                Some(result)
+            }
+        };
+        // Abandonment and publication serialize through the result lock, so either side releases a retired owner without waiting for lane reuse.
+        discard(abandoned);
         self.ready.store(true, Ordering::Release);
         self.waker.wake();
+        self.retirement_waker.wake();
     }
 
-    fn take(&self) -> Completion {
-        self.result.lock().unwrap().take().unwrap()
+    fn take(&self) -> Option<Completion> {
+        self.result.lock().unwrap().take()
+    }
+}
+
+// Abandoned owners may run arbitrary destructors. Their disposal must not unwind the worker publishing the last retirement.
+impl Drop for Shared {
+    fn drop(&mut self) {
+        discard(
+            self.result
+                .get_mut()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .take(),
+        );
+    }
+}
+
+// Collection can outlive its lane. Close retires backend access without consuming a live completion's owner; abandonment releases this claim and requests cancellation.
+struct CompletionWait {
+    cancel: CancelOnDrop,
+    shared: Arc<Shared>,
+}
+impl CompletionWait {
+    fn disarm(&mut self) {
+        self.cancel.armed = false;
+    }
+}
+impl Drop for CompletionWait {
+    fn drop(&mut self) {
+        let abandoned = {
+            let mut result = self.shared.result.lock().unwrap();
+            self.shared.collecting.store(false, Ordering::Release);
+            match result.as_ref() {
+                Some(Completion::Cached(_)) => None,
+                _ => result.take(),
+            }
+        };
+        discard(abandoned);
     }
 }
 
@@ -135,31 +189,19 @@ impl Drop for Failure {
 }
 
 impl IoUringSelector {
-    fn check_file_monitor(
-        &self,
-        monitor: &FileMonitor<NativeFile, IoUringFileRegistration>,
-    ) -> io::Result<()> {
-        if !std::ptr::eq(
-            monitor.registration().owner.as_ptr(),
-            Arc::as_ptr(&self.group),
-        ) {
+    fn check_file_monitor(&self, monitor: &IoUringFileRegistration) -> io::Result<()> {
+        if !std::ptr::eq(monitor.owner.as_ptr(), Arc::as_ptr(&self.group)) {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "file monitor belongs to a different selector",
             ));
         }
-        if !monitor.file().owns_native(&monitor.registration().file) {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "file monitor registration belongs to a different file",
-            ));
-        }
         Ok(())
     }
 
-    async fn file_monitor_operation<B: IoBuf>(
+    pub(crate) async fn file_monitor_operation<B: IoBuf>(
         &self,
-        monitor: &mut FileMonitor<NativeFile, IoUringFileRegistration>,
+        monitor: &mut IoUringFileRegistration,
         buffer: B,
         offset: Option<u64>,
         write: bool,
@@ -175,15 +217,15 @@ impl IoUringSelector {
         }
     }
 
-    async fn file_monitor_operation_submit<B: IoBuf>(
+    pub(crate) async fn file_monitor_operation_submit<B: IoBuf>(
         &self,
-        monitor: &mut FileMonitor<NativeFile, IoUringFileRegistration>,
+        monitor: &mut IoUringFileRegistration,
         buffer: B,
         offset: Option<u64>,
         write: bool,
         pointer: fn(&mut B) -> *mut u8,
         cancellation: &Cancellation,
-    ) -> Result<impl Future<Output = BufferResult<B>> + Send, (OperationError, B)> {
+    ) -> Result<impl Future<Output = BufferResult<B>> + Send + 'static, (OperationError, B)> {
         let check = cancellation
             .check()
             .map_err(OperationError::from)
@@ -197,8 +239,8 @@ impl IoUringSelector {
                 buffer,
             ));
         }
-        let registration = monitor.registration_mut();
-        if registration.closed {
+        let registration = &mut *monitor;
+        if registration.closed || registration.shared.failed.load(Ordering::Acquire) {
             return Err((
                 io::Error::new(io::ErrorKind::BrokenPipe, "file monitor is closed").into(),
                 buffer,
@@ -215,23 +257,20 @@ impl IoUringSelector {
                     buffer,
                 ));
             }
+            if registration.shared.collecting.load(Ordering::Acquire) {
+                return Err((
+                    io::Error::new(
+                        io::ErrorKind::WouldBlock,
+                        "file operation result has not been collected",
+                    )
+                    .into(),
+                    buffer,
+                ));
+            }
             registration.running = None;
-            // Abandonment forfeits the old buffer to retirement. Dispose of it without a completion lock held.
-            match registration.shared.take() {
-                Completion::Request(_, cached) => registration.cached = Some(cached),
-                Completion::Rejected(buffer) => drop(buffer),
-                Completion::Failed => {
-                    registration.closed = true;
-                    registration.failed = true;
-                    return Err((
-                        io::Error::new(
-                            io::ErrorKind::BrokenPipe,
-                            "selector failed with an operation in flight",
-                        )
-                        .into(),
-                        buffer,
-                    ));
-                }
+            // Abandonment clears an uncollected owner under the result lock. Only a successfully collected request leaves reusable storage.
+            if let Some(Completion::Cached(cached)) = registration.shared.take() {
+                registration.cached = Some(cached);
             }
         }
         if let Err(error) = self.check_open() {
@@ -252,7 +291,7 @@ impl IoUringSelector {
             Ok(identifier) => identifier,
             Err(error) => return Err((error.into(), buffer)),
         };
-        let cached = monitor.registration_mut().cached.take();
+        let cached = monitor.cached.take();
         let mut request = cached
             .and_then(|cached| cached.downcast::<FileRequest<B>>().ok())
             .unwrap_or_else(|| {
@@ -271,7 +310,7 @@ impl IoUringSelector {
         drop(request.buffer.take());
         request.identifier = identifier;
         request.permit = Some(permit);
-        let registration = monitor.registration_mut();
+        let registration = &mut *monitor;
         // Keep only the current registration; unfinished or failed releases remain observable until close.
         registration.retiring.retain(|file| !file.released());
         if !registration.files.matches(&controller) {
@@ -293,7 +332,8 @@ impl IoUringSelector {
         request.reply.set(Some(Arc::clone(&shared)));
         request.cancelling.set(false);
         shared.ready.store(false, Ordering::Relaxed);
-        monitor.registration_mut().running = Some(RingBinding::new(&controller, identifier));
+        monitor.running = Some(RingBinding::new(&controller, identifier));
+        shared.collecting.store(true, Ordering::Release);
         if let Err(mpsc::SendError(Command::Submit(request))) =
             controller.send(Command::Submit(request))
         {
@@ -302,10 +342,15 @@ impl IoUringSelector {
                 "io_uring selector has exited",
             )));
         }
-        let mut cancel = CancelOnDrop {
+        let cancel = CancelOnDrop {
             controller,
             identifier,
             armed: true,
+        };
+        let cancellation = cancellation.clone();
+        let mut completion = CompletionWait {
+            cancel,
+            shared: Arc::clone(&shared),
         };
         Ok(async move {
             let mut cancelled = pin!(cancellation.cancelled());
@@ -314,21 +359,23 @@ impl IoUringSelector {
                 if shared.ready.load(Ordering::Acquire) {
                     return Poll::Ready(());
                 }
-                if cancel.armed && cancelled.as_mut().poll(context).is_ready() {
-                    cancel.request();
+                if completion.cancel.armed && cancelled.as_mut().poll(context).is_ready() {
+                    completion.cancel.request();
                 }
                 Poll::Pending
             })
             .await;
-            cancel.armed = false;
-            drop(cancel);
-            monitor.registration_mut().running = None;
-            match shared.take() {
+            completion.disarm();
+            let mut result_slot = shared.result.lock().unwrap();
+            match result_slot
+                .take()
+                .expect("accepted file work publishes one completion")
+            {
                 Completion::Request(result, cached) => {
                     let mut request = cached.downcast::<FileRequest<B>>().ok().unwrap();
                     let buffer = request.buffer.take().unwrap();
-                    monitor.registration_mut().cached = Some(request);
-                    (operation_result(result, cancellation), buffer)
+                    *result_slot = Some(Completion::Cached(request));
+                    (operation_result(result, &cancellation), buffer)
                 }
                 Completion::Rejected(buffer) => (
                     Err(io::Error::new(
@@ -339,22 +386,25 @@ impl IoUringSelector {
                     *buffer.downcast::<B>().ok().unwrap(),
                 ),
                 Completion::Failed => {
-                    monitor.registration_mut().closed = true;
-                    monitor.registration_mut().failed = true;
+                    shared.failed.store(true, Ordering::Release);
+                    drop(result_slot);
                     panic!("io_uring selector failed with an operation in flight");
+                }
+                Completion::Cached(_) => {
+                    unreachable!("each accepted file operation has only one completion future")
                 }
             }
         })
     }
 }
 
-impl FileMonitorSubmission for IoUringSelector {
-    async fn file_monitor_read_submit<B: IoBufMut>(
+impl IoUringSelector {
+    pub(crate) async fn file_monitor_read_submit<B: IoBufMut>(
         &self,
-        monitor: &mut FileMonitor<NativeFile, IoUringFileRegistration>,
+        monitor: &mut IoUringFileRegistration,
         buffer: B,
         cancellation: &Cancellation,
-    ) -> Result<impl Future<Output = BufferResult<B>> + Send, (OperationError, B)> {
+    ) -> Result<impl Future<Output = BufferResult<B>> + Send + 'static, (OperationError, B)> {
         self.file_monitor_operation_submit(
             monitor,
             buffer,
@@ -366,12 +416,12 @@ impl FileMonitorSubmission for IoUringSelector {
         .await
     }
 
-    async fn file_monitor_write_submit<B: IoBuf>(
+    pub(crate) async fn file_monitor_write_submit<B: IoBuf>(
         &self,
-        monitor: &mut FileMonitor<NativeFile, IoUringFileRegistration>,
+        monitor: &mut IoUringFileRegistration,
         buffer: B,
         cancellation: &Cancellation,
-    ) -> Result<impl Future<Output = BufferResult<B>> + Send, (OperationError, B)> {
+    ) -> Result<impl Future<Output = BufferResult<B>> + Send + 'static, (OperationError, B)> {
         self.file_monitor_operation_submit(
             monitor,
             buffer,
@@ -383,13 +433,13 @@ impl FileMonitorSubmission for IoUringSelector {
         .await
     }
 
-    async fn file_monitor_read_at_submit<B: IoBufMut>(
+    pub(crate) async fn file_monitor_read_at_submit<B: IoBufMut>(
         &self,
-        monitor: &mut FileMonitor<NativeFile, IoUringFileRegistration>,
+        monitor: &mut IoUringFileRegistration,
         buffer: B,
         offset: u64,
         cancellation: &Cancellation,
-    ) -> Result<impl Future<Output = BufferResult<B>> + Send, (OperationError, B)> {
+    ) -> Result<impl Future<Output = BufferResult<B>> + Send + 'static, (OperationError, B)> {
         self.file_monitor_operation_submit(
             monitor,
             buffer,
@@ -401,13 +451,13 @@ impl FileMonitorSubmission for IoUringSelector {
         .await
     }
 
-    async fn file_monitor_write_at_submit<B: IoBuf>(
+    pub(crate) async fn file_monitor_write_at_submit<B: IoBuf>(
         &self,
-        monitor: &mut FileMonitor<NativeFile, IoUringFileRegistration>,
+        monitor: &mut IoUringFileRegistration,
         buffer: B,
         offset: u64,
         cancellation: &Cancellation,
-    ) -> Result<impl Future<Output = BufferResult<B>> + Send, (OperationError, B)> {
+    ) -> Result<impl Future<Output = BufferResult<B>> + Send + 'static, (OperationError, B)> {
         self.file_monitor_operation_submit(
             monitor,
             buffer,
@@ -420,35 +470,32 @@ impl FileMonitorSubmission for IoUringSelector {
     }
 }
 
-impl FileMonitoring for IoUringSelector {
-    type FileRegistration = IoUringFileRegistration;
-
-    fn file_monitor(
-        &self,
-        file: &NativeFile,
-    ) -> io::Result<FileMonitor<NativeFile, IoUringFileRegistration>> {
-        self.fallback.file_monitor(file).map(|monitor| {
-            monitor.map_registration(|()| IoUringFileRegistration {
-                owner: Arc::downgrade(&self.group),
-                cached: None,
-                running: None,
-                file: retain_file(file),
-                files: RingCache::default(),
-                retiring: Vec::new(),
-                closed: false,
-                failed: false,
-                shared: Arc::new(Shared {
-                    result: Mutex::new(None),
-                    ready: AtomicBool::new(false),
-                    waker: atomic_waker::AtomicWaker::new(),
-                }),
-            })
+impl IoUringSelector {
+    pub(crate) fn file_monitor(&self, file: &NativeFile) -> io::Result<IoUringFileRegistration> {
+        self.check_open()?;
+        Ok(IoUringFileRegistration {
+            owner: Arc::downgrade(&self.group),
+            cached: None,
+            running: None,
+            file: retain_file(file),
+            files: RingCache::default(),
+            retiring: Vec::new(),
+            closed: false,
+            failed: false,
+            shared: Arc::new(Shared {
+                result: Mutex::new(None),
+                ready: AtomicBool::new(false),
+                failed: AtomicBool::new(false),
+                collecting: AtomicBool::new(false),
+                waker: atomic_waker::AtomicWaker::new(),
+                retirement_waker: atomic_waker::AtomicWaker::new(),
+            }),
         })
     }
 
-    async fn file_monitor_read<B: IoBufMut>(
+    pub(crate) async fn file_monitor_read<B: IoBufMut>(
         &self,
-        monitor: &mut FileMonitor<NativeFile, IoUringFileRegistration>,
+        monitor: &mut IoUringFileRegistration,
         buffer: B,
         cancellation: &Cancellation,
     ) -> BufferResult<B> {
@@ -462,9 +509,9 @@ impl FileMonitoring for IoUringSelector {
         )
         .await
     }
-    async fn file_monitor_write<B: IoBuf>(
+    pub(crate) async fn file_monitor_write<B: IoBuf>(
         &self,
-        monitor: &mut FileMonitor<NativeFile, IoUringFileRegistration>,
+        monitor: &mut IoUringFileRegistration,
         buffer: B,
         cancellation: &Cancellation,
     ) -> BufferResult<B> {
@@ -478,9 +525,9 @@ impl FileMonitoring for IoUringSelector {
         )
         .await
     }
-    async fn file_monitor_read_at<B: IoBufMut>(
+    pub(crate) async fn file_monitor_read_at<B: IoBufMut>(
         &self,
-        monitor: &mut FileMonitor<NativeFile, IoUringFileRegistration>,
+        monitor: &mut IoUringFileRegistration,
         buffer: B,
         offset: u64,
         cancellation: &Cancellation,
@@ -495,9 +542,9 @@ impl FileMonitoring for IoUringSelector {
         )
         .await
     }
-    async fn file_monitor_write_at<B: IoBuf>(
+    pub(crate) async fn file_monitor_write_at<B: IoBuf>(
         &self,
-        monitor: &mut FileMonitor<NativeFile, IoUringFileRegistration>,
+        monitor: &mut IoUringFileRegistration,
         buffer: B,
         offset: u64,
         cancellation: &Cancellation,
@@ -513,25 +560,30 @@ impl FileMonitoring for IoUringSelector {
         .await
     }
 
-    async fn file_monitor_close(
+    pub(crate) async fn file_monitor_close(
         &self,
-        monitor: &mut FileMonitor<NativeFile, IoUringFileRegistration>,
+        monitor: &mut IoUringFileRegistration,
     ) -> io::Result<()> {
         self.check_file_monitor(monitor)?;
-        let registration = monitor.registration_mut();
+        let registration = &mut *monitor;
         registration.closed = true;
-        if registration.failed {
+        if registration.failed || registration.shared.failed.load(Ordering::Acquire) {
             return Err(io::Error::new(
                 io::ErrorKind::BrokenPipe,
                 "selector failed before file retirement",
             ));
         }
         if let Some(binding) = &registration.running {
-            if !registration.shared.ready.load(Ordering::Acquire) {
+            if !registration.shared.ready.load(Ordering::Acquire)
+                && !registration.shared.collecting.load(Ordering::Acquire)
+            {
                 let _ = binding.controller.send(Command::Cancel(binding.state));
             }
             poll_fn(|context| {
-                registration.shared.waker.register(context.waker());
+                registration
+                    .shared
+                    .retirement_waker
+                    .register(context.waker());
                 if registration.shared.ready.load(Ordering::Acquire) {
                     return Poll::Ready(());
                 }
@@ -539,15 +591,16 @@ impl FileMonitoring for IoUringSelector {
             })
             .await;
             registration.running = None;
-            let completion = registration.shared.take();
-            if matches!(completion, Completion::Failed) {
+            if registration.shared.failed.load(Ordering::Acquire) {
                 registration.failed = true;
                 return Err(io::Error::new(
                     io::ErrorKind::BrokenPipe,
                     "selector failed before file retirement",
                 ));
             }
-            drop(completion);
+            if !registration.shared.collecting.load(Ordering::Acquire) {
+                drop(registration.shared.take());
+            }
         }
         drop(registration.cached.take());
         for file in registration.files.values() {

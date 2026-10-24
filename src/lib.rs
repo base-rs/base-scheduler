@@ -17,12 +17,6 @@ mod advice_mode;
 mod allocation_mode;
 mod blocking;
 mod blocking_error;
-mod bound_file_reader;
-mod bound_file_writer;
-mod bound_socket_packet_reader;
-mod bound_socket_packet_writer;
-mod bound_socket_stream_reader;
-mod bound_socket_stream_writer;
 mod buffer_lease;
 mod buffer_pool;
 mod buffer_pool_options;
@@ -38,40 +32,26 @@ mod file_advice;
 mod file_allocate;
 mod file_close;
 mod file_metadata;
-mod file_monitor;
-mod file_monitor_submission;
-mod file_monitoring;
 mod file_open;
 mod file_operation;
 mod file_options;
-mod file_read;
-mod file_read_at;
 mod file_reader;
 mod file_reading;
-mod file_receiver;
-mod file_scheduler;
 mod file_seek;
 mod file_stat;
-mod file_submission;
 mod file_sync;
 mod file_truncate;
 mod file_type;
-mod file_write;
-mod file_write_all;
-mod file_write_at;
 mod file_writer;
 mod file_writing;
 mod frozen_buffer;
 mod heap_buffer_pool;
-mod interest;
 mod io_buf;
 mod io_buf_mut;
 mod io_buf_sequence;
 mod io_buf_sequence_mut;
 mod io_buffers;
 mod io_buffers_mut;
-mod monitor_state;
-mod monitor_storage;
 mod notify;
 mod operation_error;
 mod owned_socket_recv_message;
@@ -87,11 +67,6 @@ mod socket_get_option;
 mod socket_keepalive;
 mod socket_listen;
 mod socket_local_address;
-mod socket_message;
-mod socket_messages;
-mod socket_monitor;
-mod socket_monitor_state;
-mod socket_monitoring;
 mod socket_open;
 mod socket_operation;
 mod socket_option;
@@ -102,37 +77,20 @@ mod socket_packet_writer;
 mod socket_packet_writing;
 mod socket_peer_address;
 mod socket_protocol;
-mod socket_read;
-mod socket_receiver;
-mod socket_receiving;
 mod socket_recv_flags;
 mod socket_recv_message;
 mod socket_recv_message_mut;
-mod socket_recv_msg;
-mod socket_recv_msg_poll;
-mod socket_recv_msg_receiver;
-mod socket_recv_poll;
 mod socket_recv_result;
 mod socket_registration;
 mod socket_reuse_address;
-mod socket_scheduler;
 mod socket_send_flags;
-mod socket_send_msg;
-mod socket_send_msg_poll;
-mod socket_send_poll;
 mod socket_set_option;
 mod socket_shutdown;
-mod socket_stream_monitor;
-mod socket_stream_output;
-mod socket_stream_outputting;
 mod socket_stream_reader;
 mod socket_stream_reading;
 mod socket_stream_writer;
 mod socket_stream_writing;
 mod socket_type;
-mod socket_wait;
-mod socket_write;
-mod socket_write_state;
 mod spawn;
 mod spawn_error;
 mod sync_mode;
@@ -166,46 +124,26 @@ pub use file_advice::FileAdvice;
 pub use file_allocate::FileAllocate;
 pub use file_close::FileClose;
 pub use file_metadata::FileMetadata;
-#[doc(hidden)]
-pub use file_monitor::FileMonitor;
-#[doc(hidden)]
-pub use file_monitoring::FileMonitoring;
 pub use file_open::FileOpen;
 pub use file_operation::FileOperation;
 pub use file_options::FileOptions;
-#[doc(hidden)]
-pub use file_read::FileRead;
-#[doc(hidden)]
-pub use file_read_at::FileReadAt;
-#[doc(hidden)]
-pub use file_receiver::FileReceiver;
-pub use file_scheduler::FileScheduler;
+pub use file_reader::FileReader;
+pub use file_reading::FileReading;
 pub use file_seek::FileSeek;
 pub use file_stat::FileStat;
-#[doc(hidden)]
-pub use file_submission::FileSubmission;
 pub use file_sync::FileSync;
 pub use file_truncate::FileTruncate;
 pub use file_type::FileType;
-#[doc(hidden)]
-pub use file_write::FileWrite;
-#[doc(hidden)]
-pub use file_write_all::{file_write_all, file_write_all_submit};
-#[doc(hidden)]
-pub use file_write_at::FileWriteAt;
+pub use file_writer::FileWriter;
+pub use file_writing::FileWriting;
 pub use frozen_buffer::FrozenBuffer;
 pub use heap_buffer_pool::HeapBufferPool;
-pub use interest::Interest;
 pub use io_buf::IoBuf;
 pub use io_buf_mut::IoBufMut;
 pub use io_buf_sequence::IoBufSequence;
 pub use io_buf_sequence_mut::IoBufSequenceMut;
 pub use io_buffers::IoBuffers;
 pub use io_buffers_mut::IoBuffersMut;
-#[doc(hidden)]
-pub use monitor_state::MonitorState;
-#[doc(hidden)]
-pub use monitor_storage::MonitorStorage;
 pub use notify::Notify;
 pub use operation_error::{OperationError, OperationResult};
 pub use owned_socket_recv_message::OwnedSocketRecvMessage;
@@ -221,64 +159,30 @@ pub use socket_get_option::SocketGetOption;
 pub use socket_keepalive::SocketKeepalive;
 pub use socket_listen::SocketListen;
 pub use socket_local_address::SocketLocalAddress;
-pub use socket_message::SocketMessage;
-pub use socket_messages::SocketMessages;
-#[doc(hidden)]
-pub use socket_monitor::SocketMonitor;
-#[doc(hidden)]
-pub use socket_monitor_state::SocketMonitorState;
-#[doc(hidden)]
-pub use socket_monitoring::SocketMonitoring;
 pub use socket_open::SocketOpen;
 pub use socket_operation::SocketOperation;
 pub use socket_option::SocketOption;
 pub use socket_options::SocketOptions;
+pub use socket_packet_reader::SocketPacketReader;
+pub use socket_packet_reading::SocketPacketReading;
+pub use socket_packet_writer::SocketPacketWriter;
+pub use socket_packet_writing::SocketPacketWriting;
 pub use socket_peer_address::SocketPeerAddress;
 pub use socket_protocol::SocketProtocol;
-#[doc(hidden)]
-pub use socket_read::SocketRead;
-#[doc(hidden)]
-pub use socket_receiver::SocketReceiver;
-#[doc(hidden)]
-pub use socket_receiving::SocketReceiving;
 pub use socket_recv_flags::SocketRecvFlags;
 pub use socket_recv_message::SocketRecvMessage;
 pub use socket_recv_message_mut::SocketRecvMessageMut;
-#[doc(hidden)]
-pub use socket_recv_msg::SocketRecvMsg;
-#[doc(hidden)]
-pub use socket_recv_msg_poll::SocketRecvMsgPoll;
-#[doc(hidden)]
-pub use socket_recv_msg_receiver::SocketRecvMsgReceiver;
-#[doc(hidden)]
-pub use socket_recv_poll::SocketRecvPoll;
 pub use socket_recv_result::SocketRecvResult;
 pub use socket_registration::SocketRegistration;
 pub use socket_reuse_address::SocketReuseAddress;
-pub use socket_scheduler::SocketScheduler;
 pub use socket_send_flags::SocketSendFlags;
-#[doc(hidden)]
-pub use socket_send_msg::SocketSendMsg;
-#[doc(hidden)]
-pub use socket_send_msg_poll::SocketSendMsgPoll;
-#[doc(hidden)]
-pub use socket_send_poll::SocketSendPoll;
 pub use socket_set_option::SocketSetOption;
 pub use socket_shutdown::SocketShutdown;
-#[doc(hidden)]
-pub use socket_stream_monitor::SocketStreamMonitor;
-#[doc(hidden)]
-pub use socket_stream_output::SocketStreamOutput;
-#[doc(hidden)]
-pub use socket_stream_outputting::SocketStreamOutputting;
+pub use socket_stream_reader::SocketStreamReader;
+pub use socket_stream_reading::SocketStreamReading;
+pub use socket_stream_writer::SocketStreamWriter;
 pub use socket_stream_writing::SocketStreamWriting;
 pub use socket_type::SocketType;
-#[doc(hidden)]
-pub use socket_wait::SocketWait;
-#[doc(hidden)]
-pub use socket_write::SocketWrite;
-#[doc(hidden)]
-pub use socket_write_state::SocketWriteState;
 pub use spawn::Spawn;
 pub use spawn_error::SpawnError;
 pub use sync_mode::SyncMode;
@@ -288,40 +192,3 @@ pub use timers::Timers;
 
 /// An IP endpoint, compatible with standard-library socket addresses.
 pub use std::net::SocketAddr as SocketAddress;
-
-pub use bound_socket_stream_reader::BoundSocketStreamReader;
-
-pub use bound_socket_stream_writer::BoundSocketStreamWriter;
-
-pub use socket_stream_reader::SocketStreamReader;
-
-pub use socket_stream_reading::SocketStreamReading;
-
-pub use socket_stream_writer::SocketStreamWriter;
-
-pub use file_reader::FileReader;
-
-pub use file_reading::FileReading;
-
-pub use file_writer::FileWriter;
-
-pub use file_writing::FileWriting;
-
-pub use bound_file_reader::BoundFileReader;
-
-pub use bound_file_writer::BoundFileWriter;
-
-#[doc(hidden)]
-pub use file_monitor_submission::FileMonitorSubmission;
-
-pub use socket_packet_reader::SocketPacketReader;
-
-pub use socket_packet_writer::SocketPacketWriter;
-
-pub use socket_packet_reading::SocketPacketReading;
-
-pub use socket_packet_writing::SocketPacketWriting;
-
-pub use bound_socket_packet_reader::BoundSocketPacketReader;
-
-pub use bound_socket_packet_writer::BoundSocketPacketWriter;

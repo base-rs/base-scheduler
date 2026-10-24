@@ -3,8 +3,8 @@
 
 use crate::{Result, Workload, prepare};
 use core_scheduler::{
-    BufferLease, Cancellation, HeapBufferPool, Interest, SocketMonitoring, SocketRecvFlags,
-    SocketRegistration, SocketSendFlags, SocketStreamOutput, SocketStreamOutputting, Spawn,
+    BufferLease, Cancellation, HeapBufferPool, SocketRegistration, SocketStreamReader,
+    SocketStreamReading, SocketStreamWriter, SocketStreamWriting, Spawn,
 };
 use core_scheduler_tokio::TokioScheduler;
 use std::{
@@ -49,25 +49,16 @@ async fn monitor_connection<S, const ALTERNATE: bool>(
     workload: Workload,
 ) -> Result<()>
 where
-    S: SocketMonitoring + 'static,
+    S: SocketStreamReading + SocketStreamWriting + 'static,
     S::Socket: 'static,
 {
     let pool = HeapBufferPool::new(2, workload.bytes).expect("validated buffer pool dimensions");
     let never = Cancellation::never();
-    let mut reader = scheduler.socket_stream_monitor(&socket, Interest::Readable)?;
-    let mut writer = scheduler.socket_stream_monitor(&socket, Interest::Writable)?;
+    let mut reader = scheduler.socket_stream_reader(&socket)?;
+    let mut writer = scheduler.socket_stream_writer(&socket)?;
     let result = async {
         let mut request = [0];
-        while scheduler
-            .socket_monitor_recv_poll(
-                &mut reader,
-                &mut request,
-                SocketRecvFlags::default(),
-                &never,
-            )
-            .await?
-            != 0
-        {
+        while reader.read_into(&mut request, &never).await? != 0 {
             if !matches!(request[0], 1 | 2) {
                 return Err("invalid request".into());
             }
@@ -86,14 +77,7 @@ where
                 );
                 let mut sent = 0;
                 while sent < workload.bytes {
-                    let count = scheduler
-                        .socket_monitor_send_poll(
-                            &mut writer,
-                            &buffer.as_ref()[sent..],
-                            SocketSendFlags::default(),
-                            &never,
-                        )
-                        .await?;
+                    let count = writer.write(&buffer.as_ref()[sent..], &never).await?;
                     if count == 0 {
                         return Err(io::Error::from(io::ErrorKind::WriteZero).into());
                     }
@@ -107,8 +91,8 @@ where
         Ok(())
     }
     .await;
-    let reader_closed = scheduler.socket_monitor_close(&mut reader).await;
-    let writer_closed = scheduler.socket_monitor_close(&mut writer).await;
+    let reader_closed = reader.close().await;
+    let writer_closed = writer.close().await;
     reader_closed?;
     writer_closed?;
     result
@@ -120,25 +104,16 @@ async fn writer_connection<S>(
     workload: Workload,
 ) -> Result<()>
 where
-    S: SocketMonitoring + SocketStreamOutputting + 'static,
+    S: SocketStreamReading + SocketStreamWriting + 'static,
     S::Socket: 'static,
 {
     let pool = HeapBufferPool::new(2, workload.bytes).expect("validated buffer pool dimensions");
     let never = Cancellation::never();
-    let mut reader = scheduler.socket_stream_monitor(&socket, Interest::Readable)?;
-    let mut writer = scheduler.socket_stream_output::<BufferLease>(&socket)?;
+    let mut reader = scheduler.socket_stream_reader(&socket)?;
+    let mut writer = scheduler.socket_stream_writer_with_buffer::<BufferLease>(&socket)?;
     let result = async {
         let mut request = [0];
-        while scheduler
-            .socket_monitor_recv_poll(
-                &mut reader,
-                &mut request,
-                SocketRecvFlags::default(),
-                &never,
-            )
-            .await?
-            != 0
-        {
+        while reader.read_into(&mut request, &never).await? != 0 {
             if !matches!(request[0], 1 | 2) {
                 return Err("invalid request".into());
             }
@@ -153,17 +128,17 @@ where
                     workload.work,
                 );
                 writer
-                    .submit(scheduler.as_ref(), buffer, &never)
+                    .submit(buffer, &never)
                     .await
                     .map_err(|(error, _buffer)| error)?;
             }
-            writer.flush(scheduler.as_ref(), &never).await?;
+            writer.flush(&never).await?;
         }
         Ok(())
     }
     .await;
-    let reader_closed = scheduler.socket_monitor_close(&mut reader).await;
-    let writer_closed = writer.close(scheduler.as_ref()).await;
+    let reader_closed = reader.close().await;
+    let writer_closed = writer.close().await;
     reader_closed?;
     writer_closed?;
     result

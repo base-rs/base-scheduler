@@ -12,6 +12,7 @@ readme = "readme.md"
 core-scheduler = { path = "../..", version = "=0.0.0" }
 event-listener = "5.4.2"
 futures-channel = "0.3.31"
+futures-lite = "2.6.1"
 socket2 = { version = "0.6.3", features = ["all"] }
 async-io = "2.6.0"
 
@@ -24,7 +25,6 @@ windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Network
 
 [dev-dependencies]
 core-scheduler-conformance = { path = "../conformance", version = "=0.0.0" }
-futures-lite = "2.6.1"
 tempfile = "3"
 allocation-counter = "0.8.1"
 

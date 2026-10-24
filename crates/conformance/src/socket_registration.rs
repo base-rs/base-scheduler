@@ -3,6 +3,7 @@
 
 //! Standard-library TCP import retains established connections and listeners.
 
+use crate::SocketTestScheduler;
 use core_scheduler::*;
 use std::{
     io::{Read, Write},
@@ -17,18 +18,13 @@ fn listener(domain: SocketDomain) -> TcpListener {
     .unwrap()
 }
 
-async fn exchange<S: SocketRead + SocketWrite>(
-    scheduler: &S,
-    socket: &S::Socket,
-    peer: &mut TcpStream,
-) {
+async fn exchange<S: SocketTestScheduler>(scheduler: &S, socket: &S::Socket, peer: &mut TcpStream) {
     let never = Cancellation::never();
     let mut source = b"hello".to_vec();
     let mut sent = 0;
     while sent < 5 {
-        let (result, returned) = scheduler
-            .socket_write(socket, source.slice(sent..), &never)
-            .await;
+        let (result, returned) =
+            crate::io::socket_write(scheduler, socket, source.slice(sent..), &never).await;
         let count = result.unwrap();
         assert!(count > 0 && count <= 5 - sent);
         sent += count;
@@ -40,9 +36,8 @@ async fn exchange<S: SocketRead + SocketWrite>(
     peer.write_all(b"reply").unwrap();
     let mut received = Vec::new();
     while received.len() < 5 {
-        let (result, buffer) = scheduler
-            .socket_read(socket, vec![0; 5 - received.len()], &never)
-            .await;
+        let (result, buffer) =
+            crate::io::socket_read(scheduler, socket, vec![0; 5 - received.len()], &never).await;
         let count = result.unwrap();
         assert!(count > 0 && count <= 5 - received.len());
         received.extend_from_slice(&buffer[..count]);
@@ -53,8 +48,8 @@ async fn exchange<S: SocketRead + SocketWrite>(
 /// Import an established stream, preserving endpoints and bidirectional data, then observe native peer closure as EOF.
 pub async fn stream<
     S: SocketRegistration
-        + SocketRead
-        + SocketWrite
+        + SocketTestScheduler
+        + SocketTestScheduler
         + SocketClose
         + SocketLocalAddress
         + SocketPeerAddress,
@@ -72,9 +67,8 @@ pub async fn stream<
     assert_eq!(scheduler.socket_peer_address(&socket).unwrap(), remote);
     exchange(scheduler, &socket, &mut peer).await;
     drop(peer);
-    let (result, _) = scheduler
-        .socket_read(&socket, vec![0; 1], &Cancellation::never())
-        .await;
+    let (result, _) =
+        crate::io::socket_read(scheduler, &socket, vec![0; 1], &Cancellation::never()).await;
     assert_eq!(result.unwrap(), 0);
     scheduler.socket_close(socket).await.unwrap();
 }
@@ -83,8 +77,8 @@ pub async fn stream<
 pub async fn listening<
     S: SocketRegistration
         + SocketAccept
-        + SocketRead
-        + SocketWrite
+        + SocketTestScheduler
+        + SocketTestScheduler
         + SocketClose
         + SocketLocalAddress
         + SocketPeerAddress,

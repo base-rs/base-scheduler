@@ -51,11 +51,33 @@ pub use system_file_metadata::SystemFileMetadata;
 
 pub use timer_service::DirectTimer;
 
-mod file_monitoring;
-
-mod file_submission;
-
 mod socket_receiving;
 
 mod direct_stream_writer;
-pub use direct_stream_writer::DirectStreamWriter;
+
+mod direct_file_reader;
+mod direct_file_writer;
+mod file_state;
+pub use direct_file_reader::DirectFileReader;
+pub use direct_file_writer::DirectFileWriter;
+
+mod direct_socket_stream_reader;
+
+mod direct_socket_packet_reader;
+
+mod direct_socket_packet_writer;
+
+mod socket_write_state;
+
+#[cfg(test)]
+mod socket_tests;
+
+mod operation_state;
+
+mod interest;
+mod socket_message;
+use interest::Interest;
+use socket_message::SocketMessage;
+
+#[cfg(test)]
+mod bound_io_tests;

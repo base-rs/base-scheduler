@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::Interest;
+use crate::Interest;
 #[cfg(unix)]
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::{io, net::SocketAddr, sync::Arc};

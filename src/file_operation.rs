@@ -7,14 +7,14 @@
 ///
 /// A submitted operation must retain every resource and buffer it can still access, even if its waiting future is dropped. Applications finish outstanding work before explicitly closing a resource; close never cancels or joins other operations.
 ///
-/// Implementations document resource compatibility, including affinity to particular scheduler instances. Successive operations may use different compatible instances. Incompatible pairings must be rejected with `std::io::ErrorKind::InvalidInput` before submission when the type system cannot reject them. Rebinding or conversion is an explicit backend operation. A resource may retain registration state for safety without replacing the scheduler explicitly supplied for each operation.
+/// Implementations document resource compatibility, including affinity to particular scheduler instances. Successive operations may use different compatible instances. Incompatible pairings must be rejected with `std::io::ErrorKind::InvalidInput` before submission when the type system cannot reject them. Rebinding or conversion is an explicit backend operation. Bound reader and writer handles fix their compatible scheduler at construction; per-operation calls do not rebind them.
 ///
 /// Selecting a resource type does not supply any operations:
 ///
 /// ```compile_fail,E0599
-/// use core_scheduler::{Cancellation, FileOperation, FileRead};
+/// use core_scheduler::{Cancellation, FileOperation};
 /// async fn read<S: FileOperation>(scheduler: &S, file: &S::File) {
-///     scheduler.file_read(file, vec![0; 16], &Cancellation::never()).await;
+///     scheduler.file_reader(file);
 /// }
 /// ```
 pub trait FileOperation: Send + Sync {

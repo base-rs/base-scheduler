@@ -1,8 +1,8 @@
-use crate::RecvMsgMultishotOptions;
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
 use super::*;
+use crate::RecvMsgMultishotOptions;
 use crate::io_uring_selector::tests::{BEFORE_SYSCALL, Failures, drain, drive, pair};
 use futures_lite::future::block_on;
 
@@ -11,17 +11,13 @@ fn receiver(
     socket: &NativeSocket,
     pool: crate::IoUringBufferPool,
 ) -> multishot::RecvMsgMultishot<IoUringBuffer> {
-    let receiving = block_on(selector.socket_receiver(
+    block_on(selector.socket_receiver(
         socket,
         pool,
         SocketRecvFlags::default(),
         &Cancellation::never(),
     ))
-    .unwrap();
-    let IoUringReceiver(Strategy::Provided(receiving)) = receiving else {
-        panic!("a worker pool selects provided-buffer reception")
-    };
-    receiving
+    .unwrap()
 }
 
 #[test]
@@ -44,7 +40,7 @@ fn receive_failures_and_abandonment_preserve_retained_storage() {
         let never = Cancellation::never();
         if failure == "queued" {
             drop(driver);
-            assert!(block_on(receiving.recv(&selector, &never)).is_err());
+            assert!(block_on(receiving.recv(&never)).is_err());
             continue;
         }
         sender
@@ -53,22 +49,20 @@ fn receive_failures_and_abandonment_preserve_retained_storage() {
         if failure == "register-buffer-ring" {
             let _failures =
                 Failures::new([("register-buffer-ring", io::ErrorKind::Unsupported.into())]);
-            assert!(drive(&mut driver, receiving.recv(&selector, &never)).is_err());
+            assert!(drive(&mut driver, receiving.recv(&never)).is_err());
             drain(&selector, &mut driver);
             continue;
         }
-        let message = drive(&mut driver, receiving.recv(&selector, &never))
-            .unwrap()
-            .unwrap();
+        let message = drive(&mut driver, receiving.recv(&never)).unwrap().unwrap();
         if failure == "driver" {
             drop(driver);
-            assert!(block_on(receiving.recv(&selector, &never)).is_err());
+            assert!(block_on(receiving.recv(&never)).is_err());
         } else {
             let _failures = Failures::new([(
                 "unregister-buffer-ring",
                 io::ErrorKind::PermissionDenied.into(),
             )]);
-            assert!(drive(&mut driver, receiving.close(&selector)).is_err());
+            assert!(drive(&mut driver, receiving.close()).is_err());
             drain(&selector, &mut driver);
         }
         drop((selector, receiving));
@@ -91,7 +85,7 @@ fn invalid_sockets_report_receive_errors_and_detach_their_pool() {
         .buffer_pool_per_worker(BufferPoolOptions::new(1, 32))
         .unwrap();
     let mut receiving = receiver(&selector, &socket, pool.clone());
-    assert!(drive(&mut driver, receiving.recv(&selector, &never)).is_err());
+    assert!(drive(&mut driver, receiving.recv(&never)).is_err());
     drain(&selector, &mut driver);
     assert!(pool.try_acquire().is_some());
 }
@@ -109,6 +103,12 @@ fn factory_preserves_admission_errors_and_socket_type_failure() {
         selector
             .buffer_pool_per_worker(BufferPoolOptions::new(0, 16))
             .is_err()
+    );
+    let ordinary_pool =
+        core_scheduler::BufferPooling::buffer_pool(&selector, BufferPoolOptions::new(2, 16))
+            .unwrap();
+    assert!(
+        matches!(block_on(selector.socket_receiver(&socket, ordinary_pool, SocketRecvFlags::default(), &never)), Err(OperationError::Io(error)) if error.kind() == io::ErrorKind::InvalidInput)
     );
     let pool = selector
         .buffer_pool_per_worker(BufferPoolOptions::new(2, 16))
@@ -205,9 +205,9 @@ fn selected_terminal_completion_returns_its_lease_and_close_accepts_exhaustion()
         request.completion(result, flags); // Optional IORING_CQE_F_BUFFER, buffer zero, no MORE.
         request.retire_completion(&reactor.ring.submitter(), result);
         if result == -libc::ECONNRESET {
-            assert!(block_on(receiving.recv(&selector, &Cancellation::never())).is_err());
+            assert!(block_on(receiving.recv(&Cancellation::never())).is_err());
         } else {
-            block_on(receiving.close(&selector)).unwrap();
+            block_on(receiving.close()).unwrap();
         }
         assert!(pool.try_acquire().is_some());
         drain(&selector, &mut driver);
@@ -229,19 +229,16 @@ fn repeated_unregister_failure_stops_the_driver_without_recycling_unknown_storag
     sender
         .try_send(b"held", SocketSendFlags::default())
         .unwrap();
-    let message = drive(
-        &mut driver,
-        receiving.recv(&selector, &Cancellation::never()),
-    )
-    .unwrap()
-    .unwrap();
+    let message = drive(&mut driver, receiving.recv(&Cancellation::never()))
+        .unwrap()
+        .unwrap();
     let _failures = Failures::new((0..4).map(|_| {
         (
             "unregister-buffer-ring",
             io::ErrorKind::PermissionDenied.into(),
         )
     }));
-    let mut closing = Box::pin(receiving.close(&selector));
+    let mut closing = Box::pin(receiving.close());
     assert!(block_on(poll_once(&mut closing)).is_none());
     let mut failed = false;
     for _ in 0..100 {
@@ -278,7 +275,7 @@ fn registration_capacity_errors_are_not_confused_with_receive_exhaustion() {
                 .buffer_pool_per_worker(BufferPoolOptions::new(2, 32))
                 .unwrap();
             let mut receiving = receiver(&selector, &socket, pool);
-            drive(&mut driver, receiving.recv(&selector, &never)).map(|_| ())
+            drive(&mut driver, receiving.recv(&never)).map(|_| ())
         } else {
             let mut receiving = block_on(selector.socket_recvmsg_multishot(
                 &socket,
@@ -287,7 +284,7 @@ fn registration_capacity_errors_are_not_confused_with_receive_exhaustion() {
                 &never,
             ))
             .unwrap();
-            drive(&mut driver, receiving.recv(&selector, &never)).map(|_| ())
+            drive(&mut driver, receiving.recv(&never)).map(|_| ())
         };
         assert!(
             matches!(result, Err(OperationError::Io(error)) if error.raw_os_error() == Some(libc::ENOBUFS))
@@ -619,9 +616,7 @@ fn exhausted_receivers_resume_from_their_own_groups_only() {
     ))
     .unwrap();
     sender.try_send(b"ab", SocketSendFlags::default()).unwrap();
-    let old_message = drive(&mut driver, legacy.recv(&selector, &never))
-        .unwrap()
-        .unwrap();
+    let old_message = drive(&mut driver, legacy.recv(&never)).unwrap().unwrap();
     let deadline = std::time::Instant::now() + Duration::from_secs(3);
     while driver.reactor.as_ref().unwrap().dormant.is_empty() {
         driver.turn(Some(Duration::from_millis(1))).unwrap();
@@ -635,15 +630,13 @@ fn exhausted_receivers_resume_from_their_own_groups_only() {
     driver.turn(Some(Duration::ZERO)).unwrap();
     assert_eq!(driver.reactor.as_ref().unwrap().dormant.len(), 2);
     drop(held);
-    let message = drive(&mut driver, pooled.recv(&selector, &never))
-        .unwrap()
-        .unwrap();
+    let message = drive(&mut driver, pooled.recv(&never)).unwrap().unwrap();
     assert_eq!(message.payload(), b"b");
     drop(message);
     driver.turn(Some(Duration::ZERO)).unwrap();
-    assert!(block_on(poll_once(legacy.recv(&selector, &never))).is_none());
-    drive(&mut driver, pooled.close(&selector)).unwrap();
-    drive(&mut driver, legacy.close(&selector)).unwrap();
+    assert!(block_on(poll_once(legacy.recv(&never))).is_none());
+    drive(&mut driver, pooled.close()).unwrap();
+    drive(&mut driver, legacy.close()).unwrap();
     drop(old_message);
     drain(&selector, &mut driver);
 }
@@ -745,5 +738,78 @@ fn exhausted_request_identifiers_reject_receiver_admission() {
     selector.controllers[0]
         .next_identifier
         .store(0, Ordering::Relaxed);
+    drain(&selector, &mut driver);
+}
+
+#[test]
+fn receive_ahead_preserves_retirement_errors_from_its_receiver() {
+    let (selector, mut driver) = pair(2);
+    let (sender, socket) = block_on(core_scheduler_conformance::socket::stream_pair(
+        &selector,
+        SocketDomain::Ipv4,
+    ));
+    let pool = selector
+        .buffer_pool_per_worker(BufferPoolOptions::new(2, 32))
+        .unwrap();
+    let never = Cancellation::never();
+    let mut ahead = crate::receive_ahead::ReceiveAhead::default();
+    sender
+        .try_send(b"received", SocketSendFlags::default())
+        .unwrap();
+    let message = drive(&mut driver, ahead.read(&selector, &socket, &pool, &never))
+        .unwrap()
+        .unwrap();
+    assert_eq!(message.payload(), b"received");
+    drop(message);
+    {
+        let _failures = Failures::new([(
+            "unregister-buffer-ring",
+            io::ErrorKind::PermissionDenied.into(),
+        )]);
+        assert_eq!(
+            drive(&mut driver, ahead.close()).unwrap_err().kind(),
+            io::ErrorKind::PermissionDenied
+        );
+    }
+    drive(&mut driver, ahead.close()).unwrap();
+    drop(ahead);
+    block_on(selector.socket_close(socket)).unwrap();
+    block_on(selector.socket_close(sender)).unwrap();
+    drain(&selector, &mut driver);
+}
+
+#[test]
+fn queued_datagrams_survive_pool_drop_and_preserve_batch_order() {
+    let (selector, mut driver) = pair(2);
+    let never = Cancellation::never();
+    let socket =
+        block_on(selector.socket_open(SocketDomain::Ipv4, SocketType::Datagram, None, &never))
+            .unwrap();
+    block_on(selector.socket_bind(&socket, "127.0.0.1:0".parse().unwrap(), &never)).unwrap();
+    let peer = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
+    let pool = selector
+        .buffer_pool_per_worker(BufferPoolOptions::new(4, 16))
+        .unwrap();
+    let mut receiving = receiver(&selector, &socket, pool.clone());
+    for payload in [b"first".as_slice(), b"second", b"third"] {
+        peer.send_to(payload, socket.local_addr().unwrap()).unwrap();
+    }
+    let deadline = std::time::Instant::now() + Duration::from_secs(3);
+    while receiving.statistics().messages != 3 {
+        driver.turn(Some(Duration::from_millis(1))).unwrap();
+        assert!(std::time::Instant::now() < deadline);
+    }
+    // A second admitted receive retains the same worker pool while the first retires; no more packets are sent while these readers compete.
+    let mut idle_receiver = receiver(&selector, &socket, pool.clone());
+    // Live receivers and queued leases retain their worker storage independently of the application's pool handle.
+    drop(pool);
+    for payload in [b"first".as_slice(), b"second", b"third"] {
+        let message = block_on(receiving.recv(&never)).unwrap().unwrap();
+        assert_eq!(message.payload(), payload);
+    }
+    drive(&mut driver, receiving.close()).unwrap();
+    drive(&mut driver, idle_receiver.close()).unwrap();
+    drop((receiving, idle_receiver));
+    block_on(selector.socket_close(socket)).unwrap();
     drain(&selector, &mut driver);
 }

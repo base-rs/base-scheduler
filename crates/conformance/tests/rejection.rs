@@ -1,18 +1,13 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::{
-    Blocking, BlockingError, BufferResult, Cancellation, FileOperation, FileRead, FileWrite, IoBuf,
-    IoBufMut, TaskError,
-};
-use core_scheduler::{
-    Interest, IoBufSequence, IoBufSequenceMut, OperationResult, SocketMessage, SocketOperation,
-    SocketRead, SocketRecvFlags, SocketRecvMsg, SocketRecvResult, SocketSendFlags, SocketSendMsg,
-    SocketShutdown, SocketWait, SocketWrite,
-};
+#[path = "support/socket_model.rs"]
+mod socket_model;
+use core_scheduler::*;
 use core_scheduler_conformance::{blocking, file};
 use core_scheduler_conformance::{socket, socket_messages};
 use futures_lite::future::block_on;
+use socket_model::{SocketModel, socket_factories};
 use std::{
     future::{Ready, ready},
     panic::{AssertUnwindSafe, catch_unwind},
@@ -23,14 +18,43 @@ struct IncorrectFile;
 impl FileOperation for IncorrectFile {
     type File = ();
 }
-impl FileRead for IncorrectFile {
-    async fn file_read<B: IoBufMut>(&self, _: &(), buffer: B, _: &Cancellation) -> BufferResult<B> {
+impl FileReader for IncorrectFile {
+    async fn read<B: IoBufMut>(&mut self, buffer: B, _: &Cancellation) -> BufferResult<B> {
         (Ok(0), buffer)
     }
+    async fn read_at<B: IoBufMut>(
+        &mut self,
+        buffer: B,
+        _: u64,
+        _: &Cancellation,
+    ) -> BufferResult<B> {
+        (Ok(0), buffer)
+    }
+    async fn close(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
 }
-impl FileWrite for IncorrectFile {
-    async fn file_write<B: IoBuf>(&self, _: &(), buffer: B, _: &Cancellation) -> BufferResult<B> {
+impl FileReading for IncorrectFile {
+    type Reader<'a> = Self;
+    fn file_reader(&self, _: &()) -> std::io::Result<Self> {
+        Ok(Self)
+    }
+}
+impl FileWriter for IncorrectFile {
+    async fn write<B: IoBuf>(&mut self, buffer: B, _: &Cancellation) -> BufferResult<B> {
         (Ok(buffer.as_ref().len()), buffer)
+    }
+    async fn write_at<B: IoBuf>(&mut self, buffer: B, _: u64, _: &Cancellation) -> BufferResult<B> {
+        (Ok(buffer.as_ref().len()), buffer)
+    }
+    async fn close(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+impl FileWriting for IncorrectFile {
+    type Writer<'a> = Self;
+    fn file_writer(&self, _: &()) -> std::io::Result<Self> {
+        Ok(Self)
     }
 }
 #[test]
@@ -108,65 +132,25 @@ fn rejects_eager_submission_ignored_cancellation_and_lost_panics() {
 }
 
 struct IncorrectSocket;
+impl SocketModel for IncorrectSocket {
+    fn recv(&self, _: &(), _: &mut [u8], _: &Cancellation) -> OperationResult<usize> {
+        Ok(0)
+    }
+    fn send(&self, _: &(), _: &[u8], _: &Cancellation) -> OperationResult<usize> {
+        Ok(0)
+    }
+}
+socket_factories!(IncorrectSocket);
 impl SocketOperation for IncorrectSocket {
     type Socket = ();
 }
-impl SocketRead for IncorrectSocket {
-    async fn socket_read<B: IoBufMut>(
-        &self,
-        _: &(),
-        buffer: B,
-        _: &Cancellation,
-    ) -> BufferResult<B> {
-        (Ok(0), buffer)
-    }
-}
-impl SocketWrite for IncorrectSocket {
-    async fn socket_write<B: IoBuf>(&self, _: &(), buffer: B, _: &Cancellation) -> BufferResult<B> {
-        (Ok(0), buffer)
-    }
-}
-impl SocketWait for IncorrectSocket {
-    async fn socket_wait(&self, _: &(), _: Interest, _: &Cancellation) -> OperationResult<()> {
-        Ok(())
-    }
-}
+
 impl SocketShutdown for IncorrectSocket {
     async fn socket_shutdown(&self, _: &(), _: std::net::Shutdown) -> std::io::Result<()> {
         Ok(())
     }
     async fn socket_shutdown_submit(&self, _: &(), _: std::net::Shutdown) -> std::io::Result<()> {
         Ok(())
-    }
-}
-impl SocketSendMsg for IncorrectSocket {
-    async fn socket_sendmsg<B: IoBufSequence>(
-        &self,
-        _: &(),
-        message: SocketMessage<B>,
-        _: SocketSendFlags,
-        _: &Cancellation,
-    ) -> (OperationResult<usize>, SocketMessage<B>) {
-        (Ok(0), message)
-    }
-}
-impl SocketRecvMsg for IncorrectSocket {
-    async fn socket_recvmsg<B: IoBufSequenceMut>(
-        &self,
-        _: &(),
-        buffers: B,
-        _: SocketRecvFlags,
-        _: &Cancellation,
-    ) -> (OperationResult<SocketRecvResult>, B) {
-        (
-            Ok(SocketRecvResult {
-                bytes: 0,
-                address: None,
-                truncated: false,
-                control_truncated: false,
-            }),
-            buffers,
-        )
     }
 }
 
@@ -184,17 +168,15 @@ struct ShortSend(usize);
 impl SocketOperation for ShortSend {
     type Socket = ();
 }
-impl SocketSendMsg for ShortSend {
-    async fn socket_sendmsg<B: IoBufSequence>(
-        &self,
-        _: &(),
-        message: SocketMessage<B>,
-        _: SocketSendFlags,
-        _: &Cancellation,
-    ) -> (OperationResult<usize>, SocketMessage<B>) {
-        (Ok(self.0), message)
+impl SocketModel for ShortSend {
+    fn recv(&self, _: &(), _: &mut [u8], _: &Cancellation) -> OperationResult<usize> {
+        Ok(0)
+    }
+    fn send(&self, _: &(), _: &[u8], _: &Cancellation) -> OperationResult<usize> {
+        Ok(self.0)
     }
 }
+socket_factories!(ShortSend);
 
 #[test]
 fn short_send_assertions_cover_advancement_and_reject_zero_and_full_counts() {
@@ -245,76 +227,22 @@ impl SideEffectSocket {
         Ok(count)
     }
 }
+impl SocketModel for SideEffectSocket {
+    fn recv(
+        &self,
+        _: &(),
+        buffer: &mut [u8],
+        cancellation: &Cancellation,
+    ) -> OperationResult<usize> {
+        self.recv(buffer, cancellation)
+    }
+    fn send(&self, _: &(), buffer: &[u8], cancellation: &Cancellation) -> OperationResult<usize> {
+        self.send(buffer, cancellation)
+    }
+}
+socket_factories!(SideEffectSocket);
 impl SocketOperation for SideEffectSocket {
     type Socket = ();
-}
-impl SocketWrite for SideEffectSocket {
-    async fn socket_write<B: IoBuf>(
-        &self,
-        _: &(),
-        buffer: B,
-        cancellation: &Cancellation,
-    ) -> BufferResult<B> {
-        (self.send(buffer.as_ref(), cancellation), buffer)
-    }
-}
-impl SocketRead for SideEffectSocket {
-    async fn socket_read<B: IoBufMut>(
-        &self,
-        _: &(),
-        mut buffer: B,
-        cancellation: &Cancellation,
-    ) -> BufferResult<B> {
-        (self.recv(buffer.as_mut(), cancellation), buffer)
-    }
-}
-impl SocketWait for SideEffectSocket {
-    async fn socket_wait(
-        &self,
-        _: &(),
-        _: Interest,
-        cancellation: &Cancellation,
-    ) -> OperationResult<()> {
-        cancellation.check().map_err(Into::into)
-    }
-}
-impl SocketSendMsg for SideEffectSocket {
-    async fn socket_sendmsg<B: IoBufSequence>(
-        &self,
-        _: &(),
-        message: SocketMessage<B>,
-        _: SocketSendFlags,
-        cancellation: &Cancellation,
-    ) -> (OperationResult<usize>, SocketMessage<B>) {
-        let result = (0..message.buffers.buffer_count()).try_fold(0, |total, index| {
-            self.send(message.buffers.buffer(index), cancellation)
-                .map(|bytes| total + bytes)
-        });
-        (result, message)
-    }
-}
-impl SocketRecvMsg for SideEffectSocket {
-    async fn socket_recvmsg<B: IoBufSequenceMut>(
-        &self,
-        _: &(),
-        mut buffers: B,
-        _: SocketRecvFlags,
-        cancellation: &Cancellation,
-    ) -> (OperationResult<SocketRecvResult>, B) {
-        let result = (0..buffers.buffer_count()).try_fold(0, |total, index| {
-            self.recv(buffers.buffer_mut(index), cancellation)
-                .map(|bytes| total + bytes)
-        });
-        (
-            result.map(|bytes| SocketRecvResult {
-                bytes,
-                address: None,
-                truncated: false,
-                control_truncated: false,
-            }),
-            buffers,
-        )
-    }
 }
 
 #[test]

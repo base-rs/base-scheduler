@@ -2,11 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use super::*;
-use core_scheduler::{
-    IoBuf, MonitorStorage, OperationError, OperationResult, SocketAddress, SocketMonitor,
-    SocketMonitorState, SocketOperation, SocketRecvMsgPoll, SocketRecvPoll, SocketRecvResult,
-    SocketSendMsgPoll, SocketSendPoll, SocketWait, SpawnError, TaskError,
-};
+use core_scheduler::*;
 use std::{collections::VecDeque, io::ErrorKind, marker::PhantomData, pin::Pin, sync::Mutex};
 
 // A script describes one observable operation per step. It verifies retirement order as well as failures, without replacing any production syscall.
@@ -32,124 +28,127 @@ impl SocketOperation for Script {
     type Socket = ();
 }
 
-impl SocketRecvPoll for Script {
-    async fn socket_recv_poll(
-        &self,
-        _: &(),
-        buffer: &mut [u8],
-        _: SocketRecvFlags,
-        _: &Cancellation,
-    ) -> OperationResult<usize> {
-        let request = self.step("receive")?;
+impl BufferPooling for Script {
+    type Pool = HeapBufferPool;
+    fn buffer_pool(&self, options: BufferPoolOptions) -> io::Result<Self::Pool> {
+        HeapBufferPool::with_options(options)
+    }
+}
+struct Reader<'a>(&'a Script);
+impl SocketStreamReader for Reader<'_> {
+    type Buffer = BufferLease;
+    async fn read(&mut self, _: &Cancellation) -> OperationResult<Option<BufferLease>> {
+        Err(io::Error::from(ErrorKind::Unsupported).into())
+    }
+    async fn read_into(&mut self, buffer: &mut [u8], _: &Cancellation) -> OperationResult<usize> {
+        let request = self.0.step("receive")?;
         buffer[0] = request as u8;
         Ok(usize::from(request != 0))
     }
-}
-
-impl SocketSendPoll for Script {
-    async fn socket_send_poll(
-        &self,
-        _: &(),
-        _: &[u8],
-        _: SocketSendFlags,
+    async fn read_vectored(
+        &mut self,
+        _: &mut [io::IoSliceMut<'_>],
         _: &Cancellation,
     ) -> OperationResult<usize> {
-        Ok(self.step("send")?)
+        Err(io::Error::from(ErrorKind::Unsupported).into())
     }
-}
-
-impl SocketRecvMsgPoll for Script {
-    async fn socket_recvmsg_poll(
-        &self,
-        _: &(),
+    async fn read_vectored_with_flags(
+        &mut self,
         _: &mut [io::IoSliceMut<'_>],
         _: SocketRecvFlags,
         _: &Cancellation,
     ) -> OperationResult<SocketRecvResult> {
         Err(io::Error::from(ErrorKind::Unsupported).into())
     }
+    async fn read_owned_vectored<B: IoBufSequenceMut>(
+        &mut self,
+        buffers: B,
+        _: SocketRecvFlags,
+        _: &Cancellation,
+    ) -> (OperationResult<SocketRecvResult>, B) {
+        (Err(io::Error::from(ErrorKind::Unsupported).into()), buffers)
+    }
+    async fn close(&mut self) -> io::Result<()> {
+        self.0.step("close reader").map(|_| ())
+    }
 }
-
-impl SocketSendMsgPoll for Script {
-    async fn socket_sendmsg_poll(
-        &self,
-        _: &(),
+struct Writer<'a, B: IoBuf>(&'a Script, PhantomData<B>);
+impl<B: IoBuf> SocketStreamWriter for Writer<'_, B> {
+    type Buffer = B;
+    async fn write(&mut self, _: &[u8], _: &Cancellation) -> OperationResult<usize> {
+        Ok(self.0.step("send")?)
+    }
+    async fn write_vectored(
+        &mut self,
         _: &[io::IoSlice<'_>],
-        _: Option<SocketAddress>,
+        _: &Cancellation,
+    ) -> OperationResult<usize> {
+        Err(io::Error::from(ErrorKind::Unsupported).into())
+    }
+    async fn submit(
+        &mut self,
+        buffer: B,
+        _: &Cancellation,
+    ) -> std::result::Result<(), (OperationError, B)> {
+        self.0
+            .step("submit")
+            .map(|_| ())
+            .map_err(|error| (error.into(), buffer))
+    }
+    async fn flush(&mut self, _: &Cancellation) -> OperationResult<()> {
+        self.0.step("flush").map(|_| ()).map_err(Into::into)
+    }
+    async fn write_vectored_with_flags(
+        &mut self,
+        _: &[io::IoSlice<'_>],
         _: SocketSendFlags,
         _: &Cancellation,
     ) -> OperationResult<usize> {
         Err(io::Error::from(ErrorKind::Unsupported).into())
     }
-}
-
-impl SocketWait for Script {
-    async fn socket_wait(&self, _: &(), _: Interest, _: &Cancellation) -> OperationResult<()> {
-        Err(io::Error::from(ErrorKind::Unsupported).into())
-    }
-}
-
-impl SocketMonitoring for Script {
-    fn socket_type(&self, _: &()) -> io::Result<core_scheduler::SocketType> {
-        Ok(core_scheduler::SocketType::Stream)
-    }
-    type MonitorRegistration = ();
-
-    fn socket_monitor_state(
-        &self,
-        _: &(),
-        interest: Interest,
-    ) -> io::Result<SocketMonitor<(), ()>> {
-        self.step("monitor")?;
-        Ok(SocketMonitor::new((), interest, ()))
-    }
-
-    async fn socket_monitor_close<M>(&self, monitor: &mut MonitorStorage<M>) -> io::Result<()>
-    where
-        M: SocketMonitorState<(), ()>,
-    {
-        let interest = monitor.as_ref().as_ref().interest();
-        let name = if interest == Interest::Readable {
-            "close reader"
-        } else {
-            "close writer"
-        };
-        self.step(name).map(|_| ())
-    }
-}
-
-struct Writer<B>(PhantomData<B>);
-
-impl SocketStreamOutputting for Script {
-    type Writer<B: IoBuf> = Writer<B>;
-
-    fn socket_stream_output<B: IoBuf>(&self, _: &()) -> io::Result<Writer<B>> {
-        self.step("writer")?;
-        Ok(Writer(PhantomData))
-    }
-}
-
-impl<B: IoBuf> SocketStreamOutput<Script> for Writer<B> {
-    type Buffer = B;
-
-    async fn submit(
+    async fn write_owned_vectored<Buffers: IoBufSequence>(
         &mut self,
-        scheduler: &Script,
-        buffer: B,
+        buffers: Buffers,
+        _: SocketSendFlags,
         _: &Cancellation,
-    ) -> std::result::Result<(), (OperationError, B)> {
-        scheduler
-            .step("submit")
-            .map(|_| ())
-            .map_err(|error| (error.into(), buffer))
+    ) -> (OperationResult<usize>, Buffers) {
+        (Err(io::Error::from(ErrorKind::Unsupported).into()), buffers)
     }
-
-    async fn flush(&mut self, scheduler: &Script, _: &Cancellation) -> OperationResult<()> {
-        scheduler.step("flush").map(|_| ()).map_err(Into::into)
+    async fn close(&mut self) -> io::Result<()> {
+        self.0.step("close writer").map(|_| ())
     }
-
-    async fn close(&mut self, scheduler: &Script) -> io::Result<()> {
-        scheduler.step("close writer").map(|_| ())
+}
+impl SocketStreamReading for Script {
+    fn socket_stream_reader<'a>(
+        &'a self,
+        _: &(),
+    ) -> io::Result<impl SocketStreamReader<Buffer = BufferLease> + 'a> {
+        self.step("monitor")?;
+        Ok(Reader(self))
+    }
+    fn socket_stream_reader_with_pool<'a>(
+        &'a self,
+        _: &(),
+        _: Self::Pool,
+    ) -> io::Result<impl SocketStreamReader<Buffer = BufferLease> + 'a> {
+        self.step("monitor")?;
+        Ok(Reader(self))
+    }
+}
+impl SocketStreamWriting for Script {
+    fn socket_stream_writer<'a>(
+        &'a self,
+        _: &(),
+    ) -> io::Result<impl SocketStreamWriter<Buffer = BufferLease> + 'a> {
+        self.step("monitor")?;
+        Ok(Writer(self, PhantomData))
+    }
+    fn socket_stream_writer_with_buffer<'a, B: IoBuf>(
+        &'a self,
+        _: &(),
+    ) -> io::Result<impl SocketStreamWriter<Buffer = B> + 'a> {
+        self.step("writer")?;
+        Ok(Writer(self, PhantomData))
     }
 }
 
@@ -412,28 +411,18 @@ fn script_rejects_operations_outside_the_benchmark_contract() {
     let runtime = crate::runtime(1);
     runtime.block_on(async {
         let never = Cancellation::never();
+        let mut reader = Reader(scheduler.as_ref());
         assert_eq!(
-            scheduler
-                .socket_wait(&(), Interest::Readable, &never)
+            reader
+                .read_vectored(&mut [], &never)
                 .await
                 .unwrap_err()
                 .kind(),
             ErrorKind::Unsupported
         );
+        let mut writer = Writer::<Vec<u8>>(scheduler.as_ref(), PhantomData);
         assert_eq!(
-            scheduler
-                .socket_recvmsg_poll(&(), &mut [], SocketRecvFlags::default(), &never)
-                .await
-                .unwrap_err()
-                .kind(),
-            ErrorKind::Unsupported
-        );
-        assert_eq!(
-            scheduler
-                .socket_sendmsg_poll(&(), &[], None, SocketSendFlags::default(), &never)
-                .await
-                .unwrap_err()
-                .kind(),
+            writer.write_vectored(&[], &never).await.unwrap_err().kind(),
             ErrorKind::Unsupported
         );
     });

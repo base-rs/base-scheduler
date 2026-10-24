@@ -28,13 +28,13 @@ A runner receives one async closure and creates a **fresh isolated fixture for e
 | --- | --- | --- |
 | `blocking_tests!` | Scheduler | `Blocking` |
 | `blocking_queue_tests!` | Fixture | `blocking::BlockingFixture` |
-| `file_tests!` | Fixture | `FileTestFixture` with the complete `FileScheduler` profile |
-| `socket_tests!` | Scheduler and fresh connected stream pair | `SocketRead`, `SocketWrite`, `SocketWait`, `SocketShutdown` |
-| `socket_message_tests!` | Scheduler and fresh connected stream pair | `SocketSendMsg`, `SocketRecvMsg` |
-| `socket_datagram_tests!` | Scheduler and fresh bound, unconnected datagram pair | `SocketSendMsg`, `SocketRecvMsg`, `SocketLocalAddress` |
-| `socket_poll_tests!` | Scheduler and fresh connected stream pair | `SocketRecvPoll`, `SocketSendPoll`, `SocketShutdown` |
-| `socket_message_poll_tests!` | Scheduler and fresh connected stream pair | `SocketRecvMsgPoll`, `SocketSendMsgPoll` |
-| `socket_datagram_poll_tests!` | Scheduler and fresh bound, unconnected datagram pair | `SocketRecvMsgPoll`, `SocketSendMsgPoll`, `SocketLocalAddress` |
+| `file_tests!` | Fixture | `FileTestFixture` with the complete `FileTestScheduler` profile |
+| `socket_tests!` | Scheduler and fresh connected stream pair | `SocketTestScheduler`, `SocketShutdown` |
+| `socket_message_tests!` | Scheduler and fresh connected stream pair | `SocketTestScheduler` |
+| `socket_datagram_tests!` | Scheduler and fresh bound, unconnected datagram pair | `SocketTestScheduler`, `SocketLocalAddress` |
+| `socket_poll_tests!` | Scheduler and fresh connected stream pair | `SocketTestScheduler`, `SocketShutdown` |
+| `socket_message_poll_tests!` | Scheduler and fresh connected stream pair | `SocketTestScheduler` |
+| `socket_datagram_poll_tests!` | Scheduler and fresh bound, unconnected datagram pair | `SocketTestScheduler`, `SocketLocalAddress` |
 | `socket_io_tests!` | Fixture | `SocketIoFixture` |
 | `clock_tests!` | Fixture | `ClockFixture` |
 | `spawn_tests!` | Fixture | `SpawnFixture` |
@@ -63,19 +63,19 @@ mod resolution_ipv4 {
 }
 ```
 
-Run socket suites separately for each supported address family and the I/O lifecycle suite for each supported operation/input representation. Use individual assertion helpers for capability combinations smaller than a suite. Unsupported capabilities must not be presented as passing tests.
+Run socket suites separately for each supported address family and the I/O lifecycle suite for each supported operation/input representation. `SocketTestScheduler` is the loopback fixture profile: the four public stream and packet factories with owned resource types. It introduces no backend implementation hooks. Other assertion helpers request their public capabilities individually. Unsupported capabilities must not be presented as passing tests.
 
-The runner drives its executor and services, awaits the supplied closure exactly once, enforces a deadline covering setup, assertions, and cleanup, and propagates assertion panics to the generated test. Cleanup must also run after assertion failure: release held execution boundaries, let accepted operations retire, and await backend shutdown before destroying temporary storage. Do not catch and discard a panic. The [Direct file/blocking runners](../direct/tests/conformance.rs), [socket runners](../direct/tests/sockets.rs), and [Tokio runtime runners](../tokio/tests/runtime_conformance.rs) provide complete integrations.
+The runner drives its executor and services, awaits the supplied closure exactly once, enforces a deadline covering setup, assertions, and cleanup, and propagates assertion panics to the generated test. Cleanup must also run after assertion failure: release held execution boundaries, let accepted operations retire, and await backend shutdown before destroying temporary storage. Do not catch and discard a panic. The [Direct file/blocking runners](../direct/tests/conformance.rs), [socket runners](../direct/src/socket_tests.rs), and [Tokio runtime runners](../tokio/tests/runtime_conformance.rs) provide complete integrations.
 
 ## Assertions and fixtures
 
-File helpers accept backend-created resources and paths and require only the capabilities they exercise. `FileTestFixture` additionally supplies independent backing-store observations, so the complete file suite checks contents without relying on the same scheduler implementation to verify its own writes. Each file case starts with an absent path, creates and seeds its own regular file, and closes it after its assertions.
+File helpers construct bound readers and writers from backend-created files and accept paths and require only the capabilities they exercise. `FileTestFixture` additionally supplies independent backing-store observations, so the complete file suite checks contents without relying on the same scheduler implementation to verify its own writes. Each file case starts with an absent path, creates and seeds its own regular file, and closes it after its assertions.
 
-Socket assertions cover separate creation/binding/listening/connection/acceptance, scalar and prepared message I/O, short transfers, EOF, readiness, IPv4/IPv6 addresses, datagram boundaries, peek, truncation, empty datagrams, cancellation, and ownership. `socket::stream_pair` creates an isolated loopback fixture; individual I/O assertions also accept backend-created sockets. Borrowed polling suites additionally exercise stack payloads and vectors, explicit advancement, cancellation wakeups, and safe reuse of storage after dropping or forgetting pending receives. `SocketIoFixture` and `SocketIoGuard` expose a backend-controlled access boundary for deterministic completion/cancellation races and buffer retention after waiter abandonment. Fixtures must release blocked access on destruction. Blocking queue fixtures hold execution at a known boundary to check cancellation, admission, and handle abandonment without assuming global FIFO order.
+Socket assertions cover separate creation/binding/listening/connection/acceptance, owned and borrowed resource I/O, short transfers, EOF, IPv4/IPv6 addresses, datagram boundaries, peek, truncation, empty datagrams, cancellation, and ownership. `socket::stream_pair` creates an isolated loopback fixture; individual I/O assertions also accept backend-created sockets. Borrowed polling suites additionally exercise stack payloads and vectors, explicit advancement, cancellation wakeups, and safe reuse of storage after dropping or forgetting pending receives. `SocketIoFixture` and `SocketIoGuard` expose a backend-controlled access boundary for deterministic completion/cancellation races and buffer retention after waiter abandonment. Fixtures must release blocked access on destruction. Blocking queue fixtures hold execution at a known boundary to check cancellation, admission, and handle abandonment without assuming global FIFO order.
 
 Tests panic on contract violations. Existing aggregate helpers remain available. No test assumes one runtime, task order, concrete descriptor, or prompt cancellation of a running syscall. Scheduler shutdown, capacity/progress policy, platform-specific behavior, and unsupported capabilities still need backend-specific tests. Fixtures and assertions live here; backend-specific internal checks belong in backend crates. Future adapters can use the same suites without depending on direct.
 
-## Remaining capability suites
+## Other capability suites
 
 `ClockFixture` provides a controlled clock domain with independently observed timer registrations. Time advances through its test driver, without real sleeps. Cases cover lazy construction, registration release on drop/completion/cancellation, absolute deadlines and wakeups, relative waits starting at first poll, pre-cancellation before elapsed deadlines and overflow, and expiry winning cancellation observed at the same poll. A production backend can expose its paused clock or a test driver at the same timer boundary.
 

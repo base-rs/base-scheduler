@@ -2,7 +2,8 @@
 // Copyright, 2026, by Samuel Williams.
 
 use core_scheduler::{
-    Cancellation, FileClose, FileMonitoring, FileOpen, FileOptions, FileReadAt, FileWriteAt,
+    Cancellation, FileClose, FileOpen, FileOptions, FileReader, FileReading, FileWriter,
+    FileWriting,
 };
 use core_scheduler_iouring::{IoUringOptions, IoUringSelector};
 use futures_lite::future::block_on;
@@ -46,40 +47,50 @@ pub fn run_migration(
             )
             .await
             .unwrap();
-        let mut monitor = selector.file_monitor(&file).unwrap();
+        let mut reader = (!write).then(|| selector.file_reader(&file).unwrap());
+        let mut writer = write.then(|| selector.file_writer(&file).unwrap());
         let mut buffer = vec![42; size];
         // Warm every route before timing; one route is visited on every successive operation.
         for _ in 0..workers {
-            let (result, returned) = selector
-                .file_monitor_read_at(&mut monitor, buffer, 0, &never)
-                .await;
+            let (result, returned) = if let Some(reader) = reader.as_mut() {
+                reader.read_at(buffer, 0, &never).await
+            } else {
+                writer.as_mut().unwrap().write_at(buffer, 0, &never).await
+            };
             assert_eq!(result.unwrap(), size);
             buffer = returned;
         }
         let start = Instant::now();
         for _ in 0..iterations {
             let (result, returned) = match (monitored, write) {
-                (true, false) => {
-                    selector
-                        .file_monitor_read_at(&mut monitor, buffer, 0, &never)
-                        .await
+                (true, false) => reader.as_mut().unwrap().read_at(buffer, 0, &never).await,
+                (true, true) => writer.as_mut().unwrap().write_at(buffer, 0, &never).await,
+                (false, false) => {
+                    let mut reader = selector.file_reader(&file).unwrap();
+                    let result = reader.read_at(buffer, 0, &never).await;
+                    reader.close().await.unwrap();
+                    result
                 }
-                (true, true) => {
-                    selector
-                        .file_monitor_write_at(&mut monitor, buffer, 0, &never)
-                        .await
+                (false, true) => {
+                    let mut writer = selector.file_writer(&file).unwrap();
+                    let result = writer.write_at(buffer, 0, &never).await;
+                    writer.close().await.unwrap();
+                    result
                 }
-                (false, false) => selector.file_read_at(&file, buffer, 0, &never).await,
-                (false, true) => selector.file_write_at(&file, buffer, 0, &never).await,
             };
             assert_eq!(result.unwrap(), size);
             buffer = returned;
             std::hint::black_box(buffer[0]);
         }
         let task_elapsed = start.elapsed();
-        selector.file_monitor_close(&mut monitor).await.unwrap();
+        if let Some(reader) = reader.as_mut() {
+            reader.close().await.unwrap();
+        }
+        if let Some(writer) = writer.as_mut() {
+            writer.close().await.unwrap();
+        }
         let elapsed = start.elapsed();
-        drop(monitor);
+        drop((reader, writer));
         selector.file_close(file).await.unwrap();
         selector.shutdown().await;
         (elapsed, task_elapsed)

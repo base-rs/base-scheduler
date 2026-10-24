@@ -3,7 +3,6 @@
 
 use super::super::tests::{drain, drive, pair};
 use super::*;
-use core_scheduler::SocketRecvMsgReceiver;
 use futures_lite::future::{block_on, poll_once};
 
 use core_scheduler_selector::{SelectorDriver, SelectorWorker};
@@ -51,9 +50,7 @@ fn persistent_stream_reuses_one_submission_and_keeps_leases_alive_after_shutdown
     for index in 0..20 {
         let bytes = [index; 4];
         sender.try_send(&bytes, SocketSendFlags::default()).unwrap();
-        let message = drive(&mut driver, receiving.recv(&selector, &never))
-            .unwrap()
-            .unwrap();
+        let message = drive(&mut driver, receiving.recv(&never)).unwrap().unwrap();
         assert_eq!(message.payload(), &bytes);
         if index == 0 {
             saved = Some(message);
@@ -61,7 +58,7 @@ fn persistent_stream_reuses_one_submission_and_keeps_leases_alive_after_shutdown
     }
     assert_eq!(receiving.statistics().submissions, 1);
     assert_eq!(receiving.statistics().messages, 20);
-    drive(&mut driver, receiving.close(&selector)).unwrap();
+    drive(&mut driver, receiving.close()).unwrap();
     drain(&selector, &mut driver);
     drop(receiving);
     drop(sender);
@@ -101,12 +98,9 @@ fn empty_datagrams_truncation_and_exhaustion_preserve_message_boundaries() {
     sender
         .send_to(b"abcdef", socket.local_addr().unwrap())
         .unwrap();
-    let first = drive(
-        &mut driver,
-        receiving.recv(&selector, &Cancellation::never()),
-    )
-    .unwrap()
-    .unwrap();
+    let first = drive(&mut driver, receiving.recv(&Cancellation::never()))
+        .unwrap()
+        .unwrap();
     assert_eq!(first.payload(), b"abcd");
     assert!(first.truncated());
     assert_eq!(
@@ -121,17 +115,14 @@ fn empty_datagrams_truncation_and_exhaustion_preserve_message_boundaries() {
     }
     assert!(!driver.reactor.as_ref().unwrap().dormant.is_empty());
     drop(first);
-    let second = drive(
-        &mut driver,
-        receiving.recv(&selector, &Cancellation::never()),
-    )
-    .unwrap()
-    .unwrap();
+    let second = drive(&mut driver, receiving.recv(&Cancellation::never()))
+        .unwrap()
+        .unwrap();
     assert!(second.payload().is_empty());
     assert!(!second.truncated());
     assert!(receiving.statistics().submissions >= 2);
     drop(second);
-    drive(&mut driver, receiving.close(&selector)).unwrap();
+    drive(&mut driver, receiving.close()).unwrap();
     drain(&selector, &mut driver);
 }
 
@@ -149,7 +140,7 @@ fn cancellation_and_abandonment_retire_before_exclusive_socket_close() {
             drop(receiving);
         } else {
             let token = Cancellation::new();
-            let mut next = Box::pin(receiving.recv(&selector, &token));
+            let mut next = Box::pin(receiving.recv(&token));
             assert!(block_on(poll_once(&mut next)).is_none());
             token.cancel();
             assert!(matches!(
@@ -242,12 +233,9 @@ fn eof_follows_data_and_leases_support_owned_writes() {
     sender
         .try_send(b"echo", SocketSendFlags::default())
         .unwrap();
-    let message = drive(
-        &mut driver,
-        receiving.recv(&selector, &Cancellation::never()),
-    )
-    .unwrap()
-    .unwrap();
+    let message = drive(&mut driver, receiving.recv(&Cancellation::never()))
+        .unwrap()
+        .unwrap();
     let pointer = message.payload().as_ptr();
     let (result, returned) = drive(
         &mut driver,
@@ -273,14 +261,11 @@ fn eof_follows_data_and_leases_support_owned_writes() {
     drop(returned);
     drop(sender);
     assert!(
-        drive(
-            &mut driver,
-            receiving.recv(&selector, &Cancellation::never())
-        )
-        .unwrap()
-        .is_none()
+        drive(&mut driver, receiving.recv(&Cancellation::never()))
+            .unwrap()
+            .is_none()
     );
-    drive(&mut driver, receiving.close(&selector)).unwrap();
+    drive(&mut driver, receiving.close()).unwrap();
     block_on(selector.socket_close(socket)).unwrap();
     drain(&selector, &mut driver);
 }
@@ -296,20 +281,14 @@ fn remote_return_rearms_the_original_pool_and_forgotten_receivers_drain_on_shutd
     sender
         .try_send(b"first", SocketSendFlags::default())
         .unwrap();
-    let first = drive(
-        &mut driver,
-        receiving.recv(&selector, &Cancellation::never()),
-    )
-    .unwrap()
-    .unwrap();
+    let first = drive(&mut driver, receiving.recv(&Cancellation::never()))
+        .unwrap()
+        .unwrap();
     assert_eq!(first.payload(), b"firs");
     std::thread::spawn(move || drop(first)).join().unwrap();
-    let second = drive(
-        &mut driver,
-        receiving.recv(&selector, &Cancellation::never()),
-    )
-    .unwrap()
-    .unwrap();
+    let second = drive(&mut driver, receiving.recv(&Cancellation::never()))
+        .unwrap()
+        .unwrap();
     assert_eq!(second.payload(), b"t");
     drop(second);
     std::mem::forget(receiving);
@@ -334,8 +313,8 @@ fn unpublished_receivers_are_notified_when_the_driver_is_dropped() {
         };
         let mut receiving = receiver(&selector, &socket, 1, 8);
         drop(owner);
-        assert!(block_on(receiving.recv(&selector, &Cancellation::never())).is_err());
-        assert!(block_on(receiving.close(&selector)).is_ok());
+        assert!(block_on(receiving.recv(&Cancellation::never())).is_err());
+        assert!(block_on(receiving.close()).is_ok());
     }
 }
 
@@ -355,18 +334,12 @@ fn pool_errors_and_driver_failure_notify_the_receiver() {
         let _failures = Failures::new([(failure, io::Error::from_raw_os_error(libc::EIO))]);
         match failure {
             "register-buffer-ring" => {
-                assert!(
-                    drive(
-                        &mut driver,
-                        receiving.recv(&selector, &Cancellation::never())
-                    )
-                    .is_err()
-                );
-                assert!(drive(&mut driver, receiving.close(&selector)).is_ok());
+                assert!(drive(&mut driver, receiving.recv(&Cancellation::never())).is_err());
+                assert!(drive(&mut driver, receiving.close()).is_ok());
             }
             "unregister-buffer-ring" => {
                 assert_eq!(
-                    drive(&mut driver, receiving.close(&selector))
+                    drive(&mut driver, receiving.close())
                         .unwrap_err()
                         .raw_os_error(),
                     Some(libc::EIO)
@@ -375,8 +348,8 @@ fn pool_errors_and_driver_failure_notify_the_receiver() {
             _ => {
                 // Consume the initial remote-submission notification before reaching the injected idle wait.
                 while driver.turn(Some(Duration::from_millis(1))).is_ok() {}
-                assert!(block_on(receiving.recv(&selector, &Cancellation::never())).is_err());
-                assert!(block_on(receiving.close(&selector)).is_ok());
+                assert!(block_on(receiving.recv(&Cancellation::never())).is_err());
+                assert!(block_on(receiving.close()).is_ok());
             }
         }
         drop(_failures);
@@ -396,12 +369,9 @@ fn dormant_close_and_shutdown_leave_held_leases_valid() {
         sender
             .try_send(b"abcdefgh", SocketSendFlags::default())
             .unwrap();
-        let message = drive(
-            &mut driver,
-            receiving.recv(&selector, &Cancellation::never()),
-        )
-        .unwrap()
-        .unwrap();
+        let message = drive(&mut driver, receiving.recv(&Cancellation::never()))
+            .unwrap()
+            .unwrap();
         let deadline = std::time::Instant::now() + Duration::from_secs(3);
         while driver.reactor.as_ref().unwrap().dormant.is_empty() {
             driver.turn(Some(Duration::from_millis(1))).unwrap();
@@ -410,13 +380,13 @@ fn dormant_close_and_shutdown_leave_held_leases_valid() {
         if shutdown {
             drain(&selector, &mut driver);
             assert!(matches!(
-                block_on(receiving.recv(&selector, &Cancellation::never())),
+                block_on(receiving.recv(&Cancellation::never())),
                 Err(OperationError::Io(_))
             ));
         } else {
-            drive(&mut driver, receiving.close(&selector)).unwrap();
+            drive(&mut driver, receiving.close()).unwrap();
             assert!(
-                block_on(receiving.recv(&selector, &Cancellation::never()))
+                block_on(receiving.recv(&Cancellation::never()))
                     .unwrap()
                     .is_none()
             );
@@ -453,10 +423,10 @@ fn selected_error_and_eof_buffers_are_returned_without_reading_a_header() {
             Ok(0)
         });
         if result < 0 {
-            assert!(block_on(receiving.recv(&selector, &Cancellation::never())).is_err());
+            assert!(block_on(receiving.recv(&Cancellation::never())).is_err());
         } else {
             assert!(
-                block_on(receiving.recv(&selector, &Cancellation::never()))
+                block_on(receiving.recv(&Cancellation::never()))
                     .unwrap()
                     .is_none()
             );
@@ -482,12 +452,9 @@ fn local_returns_publish_directly_and_only_exhaustion_queues_a_rearm() {
                 SocketSendFlags::default(),
             )
             .unwrap();
-        let first = driven(
-            &mut worker,
-            receiving.recv(&selector, &Cancellation::never()),
-        )
-        .unwrap()
-        .unwrap();
+        let first = driven(&mut worker, receiving.recv(&Cancellation::never()))
+            .unwrap()
+            .unwrap();
         if exhaust {
             let deadline = std::time::Instant::now() + Duration::from_secs(3);
             while receiving.statistics().buffer_exhaustions == 0 {
@@ -500,12 +467,9 @@ fn local_returns_publish_directly_and_only_exhaustion_queues_a_rearm() {
         let held = if exhaust {
             assert!(matches!(command, Some(Command::Rearm(_))));
             selector.controllers[0].send(command.unwrap()).unwrap();
-            let second = driven(
-                &mut worker,
-                receiving.recv(&selector, &Cancellation::never()),
-            )
-            .unwrap()
-            .unwrap();
+            let second = driven(&mut worker, receiving.recv(&Cancellation::never()))
+                .unwrap()
+                .unwrap();
             assert_eq!(second.payload(), b"efgh");
             Some(second)
         } else {
@@ -515,12 +479,9 @@ fn local_returns_publish_directly_and_only_exhaustion_queues_a_rearm() {
                 sender
                     .try_send(b"next", SocketSendFlags::default())
                     .unwrap();
-                let message = driven(
-                    &mut worker,
-                    receiving.recv(&selector, &Cancellation::never()),
-                )
-                .unwrap()
-                .unwrap();
+                let message = driven(&mut worker, receiving.recv(&Cancellation::never()))
+                    .unwrap()
+                    .unwrap();
                 assert_eq!(message.payload(), b"next");
                 drop(message);
                 assert!(crate::io_uring_worker::pop(&selector.controllers[0]).is_none());
@@ -528,7 +489,7 @@ fn local_returns_publish_directly_and_only_exhaustion_queues_a_rearm() {
             assert_eq!(receiving.statistics().submissions, 1);
             None
         };
-        driven(&mut worker, receiving.close(&selector)).unwrap();
+        driven(&mut worker, receiving.close()).unwrap();
         // A lease can return after retirement. Its late rearm notification must be harmless even though the original request has already been removed.
         drop(held);
         worker.turn(Some(Duration::ZERO)).unwrap();
@@ -548,7 +509,7 @@ fn precancelled_receive_preserves_a_live_stream_and_admission_cancels_without_su
     let token = Cancellation::new();
     token.cancel();
     assert!(matches!(
-        block_on(receiving.recv(&selector, &token)),
+        block_on(receiving.recv(&token)),
         Err(OperationError::Cancelled(_))
     ));
     let admission = Cancellation::new();
@@ -567,15 +528,12 @@ fn precancelled_receive_preserves_a_live_stream_and_admission_cancels_without_su
     sender
         .try_send(b"live", SocketSendFlags::default())
         .unwrap();
-    let message = drive(
-        &mut driver,
-        receiving.recv(&selector, &Cancellation::never()),
-    )
-    .unwrap()
-    .unwrap();
+    let message = drive(&mut driver, receiving.recv(&Cancellation::never()))
+        .unwrap()
+        .unwrap();
     assert_eq!(message.payload(), b"live");
     assert_eq!(receiving.statistics().submissions, 1);
-    drive(&mut driver, receiving.close(&selector)).unwrap();
+    drive(&mut driver, receiving.close()).unwrap();
     drain(&selector, &mut driver);
 }
 
@@ -609,9 +567,9 @@ fn construction_failures_release_admission_and_close_races_notify_the_receiver()
         if failure == "close" {
             let mut receiving = result.unwrap();
             assert!(
-                matches!(block_on(receiving.recv(&selector, &Cancellation::never())), Err(OperationError::Io(error)) if error.kind() == io::ErrorKind::BrokenPipe)
+                matches!(block_on(receiving.recv(&Cancellation::never())), Err(OperationError::Io(error)) if error.kind() == io::ErrorKind::BrokenPipe)
             );
-            assert!(block_on(receiving.close(&selector)).is_ok());
+            assert!(block_on(receiving.close()).is_ok());
         } else {
             assert!(matches!(result, Err(OperationError::Io(_))));
         }
@@ -638,7 +596,7 @@ fn cancellation_reports_retirement_failure() {
     let mut receiving = receiver(&selector, &socket, 2, 8);
     driver.turn(Some(Duration::ZERO)).unwrap();
     let token = Cancellation::new();
-    let mut next = Box::pin(receiving.recv(&selector, &token));
+    let mut next = Box::pin(receiving.recv(&token));
     assert!(block_on(poll_once(&mut next)).is_none());
     let _failures = super::super::tests::Failures::new([(
         "unregister-buffer-ring",
@@ -720,12 +678,9 @@ fn dropping_pending_dormant_and_prepared_requests_notifies_receivers() {
             sender
                 .try_send(b"abcdefgh", SocketSendFlags::default())
                 .unwrap();
-            let message = drive(
-                &mut driver,
-                receiving.recv(&selector, &Cancellation::never()),
-            )
-            .unwrap()
-            .unwrap();
+            let message = drive(&mut driver, receiving.recv(&Cancellation::never()))
+                .unwrap()
+                .unwrap();
             let deadline = std::time::Instant::now() + Duration::from_secs(3);
             while driver.reactor.as_ref().unwrap().dormant.is_empty() {
                 driver.turn(Some(Duration::from_millis(1))).unwrap();
@@ -748,7 +703,7 @@ fn dropping_pending_dormant_and_prepared_requests_notifies_receivers() {
         };
         drop(driver);
         assert!(matches!(
-            block_on(receiving.recv(&selector, &Cancellation::never())),
+            block_on(receiving.recv(&Cancellation::never())),
             Err(OperationError::Io(_))
         ));
         if let Some(message) = held {
@@ -768,12 +723,9 @@ fn a_returned_buffer_before_terminal_collection_allows_immediate_resubmission() 
     sender
         .try_send(b"abcd", SocketSendFlags::default())
         .unwrap();
-    let first = drive(
-        &mut driver,
-        receiving.recv(&selector, &Cancellation::never()),
-    )
-    .unwrap()
-    .unwrap();
+    let first = drive(&mut driver, receiving.recv(&Cancellation::never()))
+        .unwrap()
+        .unwrap();
     assert_eq!(first.payload(), b"abcd");
     sender
         .try_send(b"efgh", SocketSendFlags::default())
@@ -792,51 +744,13 @@ fn a_returned_buffer_before_terminal_collection_allows_immediate_resubmission() 
         assert!(std::time::Instant::now() < deadline);
     }
     drop(first);
-    let second = drive(
-        &mut driver,
-        receiving.recv(&selector, &Cancellation::never()),
-    )
-    .unwrap()
-    .unwrap();
+    let second = drive(&mut driver, receiving.recv(&Cancellation::never()))
+        .unwrap()
+        .unwrap();
     assert_eq!(second.payload(), b"efgh");
     drop(second);
-    drive(&mut driver, receiving.close(&selector)).unwrap();
+    drive(&mut driver, receiving.close()).unwrap();
     drain(&selector, &mut driver);
-}
-
-#[test]
-fn incompatible_selector_preserves_receiver_and_queued_data() {
-    let (selector, mut driver) = pair(2);
-    let (other, mut other_driver) = pair(1);
-    let (sender, socket) = block_on(core_scheduler_conformance::socket::stream_pair(
-        &selector,
-        SocketDomain::Ipv4,
-    ));
-    let mut receiving = receiver(&selector, &socket, 3, 8);
-    assert!(
-        matches!(block_on(receiving.recv(&other, &Cancellation::never())), Err(OperationError::Io(error)) if error.kind() == io::ErrorKind::InvalidInput)
-    );
-    assert_eq!(
-        block_on(receiving.close(&other)).unwrap_err().kind(),
-        io::ErrorKind::InvalidInput
-    );
-    let (result, _) = drive(
-        &mut driver,
-        selector.socket_write(&sender, b"safe".to_vec(), &Cancellation::never()),
-    );
-    assert_eq!(result.unwrap(), 4);
-    let message = drive(
-        &mut driver,
-        receiving.recv(&selector, &Cancellation::never()),
-    )
-    .unwrap()
-    .unwrap();
-    assert_eq!(message.payload(), b"safe");
-    drive(&mut driver, receiving.close(&selector)).unwrap();
-    drop(message);
-    drop(receiving);
-    drain(&selector, &mut driver);
-    drain(&other, &mut other_driver);
 }
 
 #[test]
@@ -858,16 +772,13 @@ fn retained_leases_can_be_released_after_worker_thread_locals_are_destroyed() {
             sender
                 .try_send(b"retained", SocketSendFlags::default())
                 .unwrap();
-            let message = driven(
-                &mut worker,
-                receiving.recv(&selector, &Cancellation::never()),
-            )
-            .unwrap()
-            .unwrap();
+            let message = driven(&mut worker, receiving.recv(&Cancellation::never()))
+                .unwrap()
+                .unwrap();
             assert_eq!(message.payload(), b"retained");
             let payload = message.into_payload();
             let controller = payload.pool.controller.clone();
-            driven(&mut worker, receiving.close(&selector)).unwrap();
+            driven(&mut worker, receiving.close()).unwrap();
             drop(receiving);
             selector.close();
             while !worker.turn(Some(Duration::from_millis(1))).unwrap() {}
@@ -905,12 +816,39 @@ fn concurrent_completion_publication_preserves_receive_wakeups() {
         if index % 2 == 0 {
             std::thread::yield_now();
         }
-        let message = block_on(receiving.recv(&selector, &never))
-            .unwrap()
-            .unwrap();
+        let message = block_on(receiving.recv(&never)).unwrap().unwrap();
         assert_eq!(message.payload(), bytes);
     }
-    block_on(receiving.close(&selector)).unwrap();
+    block_on(receiving.close()).unwrap();
     selector.close();
     driver.join().unwrap();
+}
+
+#[test]
+fn a_completion_batch_preserves_every_queued_datagram() {
+    let (selector, mut driver) = pair(2);
+    let never = Cancellation::never();
+    let socket =
+        block_on(selector.socket_open(SocketDomain::Ipv4, SocketType::Datagram, None, &never))
+            .unwrap();
+    block_on(selector.socket_bind(&socket, "127.0.0.1:0".parse().unwrap(), &never)).unwrap();
+    let peer = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
+    let mut receiving = receiver(&selector, &socket, 4, 16);
+    for payload in [b"first".as_slice(), b"second", b"third"] {
+        peer.send_to(payload, socket.local_addr().unwrap()).unwrap();
+    }
+    let deadline = std::time::Instant::now() + Duration::from_secs(3);
+    while receiving.statistics().messages != 3 {
+        driver.turn(Some(Duration::from_millis(1))).unwrap();
+        assert!(std::time::Instant::now() < deadline);
+    }
+    for payload in [b"first".as_slice(), b"second", b"third"] {
+        let message = block_on(receiving.recv(&never)).unwrap().unwrap();
+        assert_eq!(message.payload(), payload);
+    }
+    assert_eq!(receiving.statistics().submissions, 1);
+    drive(&mut driver, receiving.close()).unwrap();
+    drop(receiving);
+    block_on(selector.socket_close(socket)).unwrap();
+    drain(&selector, &mut driver);
 }

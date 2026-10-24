@@ -2,13 +2,11 @@
 // Copyright, 2026, by Samuel Williams.
 
 use core_scheduler::*;
-#[cfg(target_os = "linux")]
 #[path = "../multishot.rs"]
 mod multishot;
-#[cfg(not(target_os = "linux"))]
-use core_scheduler::SocketReceiving as Multishot;
-#[cfg(target_os = "linux")]
 use multishot::Multishot;
+#[cfg(target_os = "linux")]
+use multishot::Receiver;
 use std::{
     io::{IoSliceMut, Read, Write},
     net::{TcpListener, UdpSocket},
@@ -44,7 +42,15 @@ async fn run<S>(
     group: &ConnectionGroup<S::Pool>,
 ) -> serde_json::Value
 where
-    S: SocketScheduler + SocketMonitoring + Multishot + SocketSetOption<TcpNoDelay>,
+    S: SocketOpen
+        + SocketConnect
+        + SocketClose
+        + SocketStreamReading
+        + SocketStreamWriting
+        + SocketPacketReading
+        + SocketPacketWriting
+        + Multishot
+        + SocketSetOption<TcpNoDelay>,
     S::Socket: 'static,
 {
     let mode = workload.mode.as_str();
@@ -133,27 +139,34 @@ where
             .await
             .unwrap();
     }
-    let mut receiver = if matches!(mode, "pool" | "shared") {
+    let mut stream_input = if !udp {
         Some(
             scheduler
-                .socket_receiver(
-                    &socket,
-                    group.pool.clone(),
-                    SocketRecvFlags::default(),
-                    &never,
-                )
-                .await
+                .socket_stream_reader_with_pool(&socket, group.pool.clone())
                 .unwrap(),
         )
     } else {
         None
     };
-    let mut readable = scheduler
-        .socket_monitor(&socket, Interest::Readable)
-        .unwrap();
-    let mut writable = scheduler
-        .socket_monitor(&socket, Interest::Writable)
-        .unwrap();
+    let mut packet_input = if udp {
+        Some(
+            scheduler
+                .socket_packet_reader_with_pool(&socket, group.pool.clone())
+                .unwrap(),
+        )
+    } else {
+        None
+    };
+    let mut stream_output = if !udp {
+        Some(scheduler.socket_stream_writer(&socket).unwrap())
+    } else {
+        None
+    };
+    let mut packet_output = if udp {
+        Some(scheduler.socket_packet_writer(&socket).unwrap())
+    } else {
+        None
+    };
     #[cfg(target_os = "linux")]
     let mut multishot = if matches!(mode, "multi" | "multi-retain") {
         Some(
@@ -192,15 +205,20 @@ where
         for _ in 0..if receive_only { 1 } else { window } {
             let mut sent = 0;
             while sent < outgoing.len() {
-                let count = scheduler
-                    .socket_monitor_send_poll(
-                        &mut writable,
-                        &outgoing[sent..],
-                        SocketSendFlags::default(),
-                        &never,
-                    )
-                    .await
-                    .unwrap();
+                let count = if udp {
+                    packet_output
+                        .as_mut()
+                        .unwrap()
+                        .write(&outgoing[sent..], None, &never)
+                        .await
+                } else {
+                    stream_output
+                        .as_mut()
+                        .unwrap()
+                        .write(&outgoing[sent..], &never)
+                        .await
+                }
+                .unwrap();
                 assert!(count > 0);
                 if udp {
                     assert_eq!(count, outgoing.len());
@@ -212,36 +230,55 @@ where
         while received < size * window {
             let count = match mode {
                 "raw" => {
-                    let result = scheduler
-                        .socket_monitor_recvmsg_poll(
-                            &mut readable,
-                            &mut [IoSliceMut::new(&mut raw)],
-                            SocketRecvFlags::default(),
-                            &never,
-                        )
-                        .await
-                        .unwrap();
+                    let result = if udp {
+                        packet_input
+                            .as_mut()
+                            .unwrap()
+                            .read_vectored(&mut [IoSliceMut::new(&mut raw)], &never)
+                            .await
+                    } else {
+                        stream_input
+                            .as_mut()
+                            .unwrap()
+                            .read_vectored_with_flags(
+                                &mut [IoSliceMut::new(&mut raw)],
+                                SocketRecvFlags::default(),
+                                &never,
+                            )
+                            .await
+                    }
+                    .unwrap();
                     assert!(!result.truncated);
                     assert_eq!(raw[0], 42);
                     std::hint::black_box(&raw[..result.bytes]);
                     result.bytes
                 }
                 "pool" | "shared" => {
-                    let message = receiver
-                        .as_mut()
-                        .unwrap()
-                        .recv(scheduler, &never)
-                        .await
-                        .unwrap()
-                        .unwrap();
-                    assert!(!message.truncated());
-                    let count = message.payload().len();
-                    assert_eq!(message.payload()[0], 42);
-                    if mode == "shared" {
-                        let frozen = message.into_payload().freeze();
-                        retained = Some(frozen.slice(..count));
+                    let buffer = if udp {
+                        let message = packet_input
+                            .as_mut()
+                            .unwrap()
+                            .read(&never)
+                            .await
+                            .unwrap()
+                            .unwrap();
+                        assert!(!message.truncated());
+                        message.into_payload()
                     } else {
-                        std::hint::black_box(message.payload());
+                        stream_input
+                            .as_mut()
+                            .unwrap()
+                            .read(&never)
+                            .await
+                            .unwrap()
+                            .unwrap()
+                    };
+                    let count = buffer.as_ref().len();
+                    assert_eq!(buffer.as_ref()[0], 42);
+                    if mode == "shared" {
+                        retained = Some(buffer.freeze().slice(..count));
+                    } else {
+                        std::hint::black_box(buffer.as_ref());
                     }
                     count
                 }
@@ -250,7 +287,7 @@ where
                     let message = multishot
                         .as_mut()
                         .unwrap()
-                        .recv(scheduler, &never)
+                        .recv(&never)
                         .await
                         .unwrap()
                         .unwrap();
@@ -281,15 +318,21 @@ where
     drop(retained_multi);
     #[cfg(target_os = "linux")]
     if let Some(mut multishot) = multishot {
-        multishot.close(scheduler).await.unwrap();
+        multishot.close().await.unwrap();
     }
-    if let Some(receiver) = receiver.as_mut() {
-        receiver.close(scheduler).await.unwrap();
+    if let Some(reader) = stream_input.as_mut() {
+        reader.close().await.unwrap();
     }
-    drop(receiver);
-    scheduler.socket_monitor_close(&mut readable).await.unwrap();
-    scheduler.socket_monitor_close(&mut writable).await.unwrap();
-    drop((readable, writable));
+    if let Some(reader) = packet_input.as_mut() {
+        reader.close().await.unwrap();
+    }
+    if let Some(writer) = stream_output.as_mut() {
+        writer.close().await.unwrap();
+    }
+    if let Some(writer) = packet_output.as_mut() {
+        writer.close().await.unwrap();
+    }
+    drop((stream_input, packet_input, stream_output, packet_output));
     scheduler.socket_close(socket).await.unwrap();
     peer.join().unwrap();
     serde_json::json!({"transport":transport,"mode":mode,"size":size,"iterations":iterations,"seconds":elapsed.as_secs_f64(),"round_trips_per_second":iterations as f64/elapsed.as_secs_f64(),"window":window,"messages_per_second":(iterations * window) as f64 / elapsed.as_secs_f64(),"receive_calls":receive_calls,"short_receives":short_receives,"bytes_received":iterations * window * size})
@@ -297,8 +340,13 @@ where
 
 async fn run_group<S>(scheduler: Arc<S>, workload: Workload, pool: S::Pool) -> serde_json::Value
 where
-    S: SocketScheduler
-        + SocketMonitoring
+    S: SocketOpen
+        + SocketConnect
+        + SocketClose
+        + SocketStreamReading
+        + SocketStreamWriting
+        + SocketPacketReading
+        + SocketPacketWriting
         + Multishot
         + SocketSetOption<TcpNoDelay>
         + Spawn

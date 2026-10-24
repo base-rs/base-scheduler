@@ -2,6 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use super::*;
+use crate::Interest;
 
 #[test]
 fn direct_nonblocking_calls_support_scalar_and_vectored_datagrams() {

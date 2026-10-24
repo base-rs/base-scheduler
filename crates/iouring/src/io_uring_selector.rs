@@ -2,6 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::{IoUringDriver, IoUringOptions};
+use crate::{MonitorStorage, SocketMonitor, retained_socket::SocketSource};
 use core_scheduler::*;
 use core_scheduler_selector::{NativeFile, NativeSocket, ReadinessSelector, Selector};
 use event_listener::Event as CompletionEvent;
@@ -92,18 +93,12 @@ fn discard<T>(value: T) {
 
 type RawBufferResult<B> = (io::Result<usize>, B);
 
-type RegisteredSocket = Arc<async_io::Async<socket2::Socket>>;
-
-enum Resource {
-    Socket(RegisteredSocket),
-    // None uses the shared OS cursor; Some is a validated explicit offset.
-    File(Arc<StdFile>, Option<u64>),
-}
+pub(crate) type RegisteredSocket = Arc<async_io::Async<socket2::Socket>>;
 
 struct Request<B: IoBuf = Vec<u8>> {
     identifier: u64,
     _permit: Permit,
-    resource: Option<Resource>,
+    socket: Option<RegisteredSocket>,
     buffer: Option<B>,
     pointer: fn(&mut B) -> *mut u8,
     write: bool,
@@ -116,33 +111,14 @@ impl<B: IoBuf> Request<B> {
         let buffer = self.buffer.as_mut().expect("request retains its buffer");
         let length = buffer.as_ref().len().min(i32::MAX as usize) as u32;
         let pointer = (self.pointer)(buffer);
-        let entry = match self
-            .resource
-            .as_ref()
-            .expect("request retains its resource")
-        {
-            Resource::Socket(socket) => {
-                let descriptor = types::Fd(socket.get_ref().as_raw_fd());
-                if self.write {
-                    opcode::Send::new(descriptor, pointer, length)
-                        .flags(libc::MSG_NOSIGNAL)
-                        .build()
-                } else {
-                    opcode::Recv::new(descriptor, pointer, length).build()
-                }
-            }
-            Resource::File(file, offset) => {
-                let descriptor = types::Fd(file.as_raw_fd());
-                if self.write {
-                    opcode::Write::new(descriptor, pointer, length)
-                        .offset(offset.unwrap_or(u64::MAX))
-                        .build()
-                } else {
-                    opcode::Read::new(descriptor, pointer, length)
-                        .offset(offset.unwrap_or(u64::MAX))
-                        .build()
-                }
-            }
+        let socket = self.socket.as_ref().expect("request retains its socket");
+        let descriptor = types::Fd(socket.get_ref().as_raw_fd());
+        let entry = if self.write {
+            opcode::Send::new(descriptor, pointer, length)
+                .flags(libc::MSG_NOSIGNAL)
+                .build()
+        } else {
+            opcode::Recv::new(descriptor, pointer, length).build()
         };
         entry.user_data(self.identifier)
     }
@@ -161,7 +137,7 @@ impl<B: IoBuf> Request<B> {
 
 impl<B: IoBuf> Drop for Request<B> {
     fn drop(&mut self) {
-        drop(self.resource.take());
+        drop(self.socket.take());
         // A submission can race Shutdown and remain in the incoming queue as the selector exits. Such requests have never reached the kernel and can return their buffers normally. InFlight deliberately suppresses this destructor for requests whose completion is unknown.
         if let Some(reply) = self.reply.take() {
             discard(reply.send((
@@ -640,14 +616,14 @@ impl IoUringSelector {
     async fn operation<B: IoBuf>(
         &self,
         controller: Arc<Controller>,
-        resource: Resource,
+        socket: RegisteredSocket,
         buffer: B,
         write: bool,
         pointer: fn(&mut B) -> *mut u8,
         cancellation: &Cancellation,
     ) -> RawBufferResult<B> {
         match self
-            .operation_submit(controller, resource, buffer, write, pointer, cancellation)
+            .operation_submit(controller, socket, buffer, write, pointer, cancellation)
             .await
         {
             Ok(completion) => completion.await,
@@ -658,7 +634,7 @@ impl IoUringSelector {
     async fn operation_submit<B: IoBuf>(
         &self,
         controller: Arc<Controller>,
-        resource: Resource,
+        socket: RegisteredSocket,
         buffer: B,
         write: bool,
         pointer: fn(&mut B) -> *mut u8,
@@ -673,12 +649,6 @@ impl IoUringSelector {
         if let Err(error) = self.check_open() {
             return Err((error, buffer));
         }
-        if matches!(&resource, Resource::File(_, Some(offset)) if *offset > i64::MAX as u64) {
-            return Err((
-                io::Error::new(io::ErrorKind::InvalidInput, "file offset exceeds i64::MAX"),
-                buffer,
-            ));
-        }
         let permit = match controller.capacity.acquire(cancellation).await {
             Ok(permit) => permit,
             Err(error) => return Err((error, buffer)),
@@ -691,7 +661,7 @@ impl IoUringSelector {
         let request = Request {
             identifier,
             _permit: permit,
-            resource: Some(resource),
+            socket: Some(socket),
             buffer: Some(buffer),
             pointer,
             write,
@@ -760,91 +730,6 @@ fn operation_result<T>(result: io::Result<T>, cancellation: &Cancellation) -> Op
             Err(core_scheduler::Cancelled.into())
         }
         result => result.map_err(Into::into),
-    }
-}
-impl FileRead for IoUringSelector {
-    async fn file_read<B: IoBufMut>(
-        &self,
-        file: &Self::File,
-        buffer: B,
-        cancellation: &Cancellation,
-    ) -> BufferResult<B> {
-        let (result, buffer) = self
-            .operation(
-                self.route(),
-                Resource::File(retain_file(file), None),
-                buffer,
-                false,
-                |buffer| buffer.as_mut().as_mut_ptr(),
-                cancellation,
-            )
-            .await;
-        (operation_result(result, cancellation), buffer)
-    }
-}
-
-impl FileWrite for IoUringSelector {
-    async fn file_write<B: IoBuf>(
-        &self,
-        file: &Self::File,
-        buffer: B,
-        cancellation: &Cancellation,
-    ) -> BufferResult<B> {
-        let (result, buffer) = self
-            .operation(
-                self.route(),
-                Resource::File(retain_file(file), None),
-                buffer,
-                true,
-                |buffer| buffer.as_ref().as_ptr().cast_mut(),
-                cancellation,
-            )
-            .await;
-        (operation_result(result, cancellation), buffer)
-    }
-}
-
-impl FileReadAt for IoUringSelector {
-    async fn file_read_at<B: IoBufMut>(
-        &self,
-        file: &Self::File,
-        buffer: B,
-        offset: u64,
-        cancellation: &Cancellation,
-    ) -> BufferResult<B> {
-        let (result, buffer) = self
-            .operation(
-                self.route(),
-                Resource::File(retain_file(file), Some(offset)),
-                buffer,
-                false,
-                |buffer| buffer.as_mut().as_mut_ptr(),
-                cancellation,
-            )
-            .await;
-        (operation_result(result, cancellation), buffer)
-    }
-}
-
-impl FileWriteAt for IoUringSelector {
-    async fn file_write_at<B: IoBuf>(
-        &self,
-        file: &Self::File,
-        buffer: B,
-        offset: u64,
-        cancellation: &Cancellation,
-    ) -> BufferResult<B> {
-        let (result, buffer) = self
-            .operation(
-                self.route(),
-                Resource::File(retain_file(file), Some(offset)),
-                buffer,
-                true,
-                |buffer| buffer.as_ref().as_ptr().cast_mut(),
-                cancellation,
-            )
-            .await;
-        (operation_result(result, cancellation), buffer)
     }
 }
 
@@ -1389,7 +1274,7 @@ impl std::task::Wake for Controller {
 }
 
 mod buffer_pooling;
-mod message;
+pub(crate) mod message;
 pub(crate) mod monitor;
 pub(crate) mod multishot;
 mod readiness;
@@ -1401,8 +1286,6 @@ mod socket;
 mod tests;
 
 pub(crate) mod file_monitor;
-
-mod file_submission;
 
 mod socket_receiving;
 

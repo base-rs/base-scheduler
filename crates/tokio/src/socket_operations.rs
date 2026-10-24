@@ -1,6 +1,8 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
+use crate::Interest;
+use crate::SocketMessage;
 use crate::{
     TokioScheduler, TokioSocket,
     blocking_pool::admission_error,
@@ -186,8 +188,8 @@ impl SocketAccept for TokioScheduler {
     }
 }
 
-impl SocketRead for TokioScheduler {
-    async fn socket_read<B: IoBufMut>(
+impl TokioScheduler {
+    pub(crate) async fn socket_read<B: IoBufMut>(
         &self,
         socket: &TokioSocket,
         mut buffer: B,
@@ -206,8 +208,8 @@ impl SocketRead for TokioScheduler {
     }
 }
 
-impl SocketWrite for TokioScheduler {
-    async fn socket_write<B: IoBuf>(
+impl TokioScheduler {
+    pub(crate) async fn socket_write<B: IoBuf>(
         &self,
         socket: &TokioSocket,
         buffer: B,
@@ -224,8 +226,8 @@ impl SocketWrite for TokioScheduler {
     }
 }
 
-impl SocketRecvPoll for TokioScheduler {
-    async fn socket_recv_poll(
+impl TokioScheduler {
+    pub(crate) async fn socket_recv_poll(
         &self,
         socket: &TokioSocket,
         buffer: &mut [u8],
@@ -246,8 +248,8 @@ impl SocketRecvPoll for TokioScheduler {
     }
 }
 
-impl SocketSendPoll for TokioScheduler {
-    async fn socket_send_poll(
+impl TokioScheduler {
+    pub(crate) async fn socket_send_poll(
         &self,
         socket: &TokioSocket,
         buffer: &[u8],
@@ -266,8 +268,8 @@ impl SocketSendPoll for TokioScheduler {
     }
 }
 
-impl SocketRecvMsgPoll for TokioScheduler {
-    async fn socket_recvmsg_poll(
+impl TokioScheduler {
+    pub(crate) async fn socket_recvmsg_poll(
         &self,
         socket: &TokioSocket,
         buffer: &mut [std::io::IoSliceMut<'_>],
@@ -286,8 +288,8 @@ impl SocketRecvMsgPoll for TokioScheduler {
     }
 }
 
-impl SocketSendMsgPoll for TokioScheduler {
-    async fn socket_sendmsg_poll(
+impl TokioScheduler {
+    pub(crate) async fn socket_sendmsg_poll(
         &self,
         socket: &TokioSocket,
         buffer: &[std::io::IoSlice<'_>],
@@ -307,8 +309,8 @@ impl SocketSendMsgPoll for TokioScheduler {
     }
 }
 
-impl SocketWait for TokioScheduler {
-    async fn socket_wait(
+impl TokioScheduler {
+    pub(crate) async fn socket_wait(
         &self,
         socket: &TokioSocket,
         interest: Interest,
@@ -319,8 +321,8 @@ impl SocketWait for TokioScheduler {
     }
 }
 
-impl SocketSendMsg for TokioScheduler {
-    async fn socket_sendmsg<B: IoBufSequence>(
+impl TokioScheduler {
+    pub(crate) async fn socket_sendmsg<B: IoBufSequence>(
         &self,
         socket: &TokioSocket,
         message: SocketMessage<B>,
@@ -339,8 +341,8 @@ impl SocketSendMsg for TokioScheduler {
     }
 }
 
-impl SocketRecvMsg for TokioScheduler {
-    async fn socket_recvmsg<B: IoBufSequenceMut>(
+impl TokioScheduler {
+    pub(crate) async fn socket_recvmsg<B: IoBufSequenceMut>(
         &self,
         socket: &TokioSocket,
         buffers: B,
@@ -408,26 +410,9 @@ impl SocketShutdown for TokioScheduler {
 #[cfg(test)]
 mod tests;
 
-impl SocketMonitoring for TokioScheduler {
-    type MonitorRegistration = ();
-    fn socket_type(&self, socket: &Self::Socket) -> io::Result<SocketType> {
+impl TokioScheduler {
+    pub(crate) fn socket_type(&self, socket: &TokioSocket) -> io::Result<SocketType> {
         self.check_socket(socket)?;
         crate::socket_io::recvmsg_socket_type(socket.get_ref())
-    }
-    async fn socket_monitor_close<
-        M: SocketMonitorState<Self::Socket, Self::MonitorRegistration>,
-    >(
-        &self,
-        monitor: &mut MonitorStorage<M>,
-    ) -> io::Result<()> {
-        self.check_socket_compatibility(monitor.as_ref().socket())
-    }
-
-    fn socket_monitor_state(
-        &self,
-        socket: &Self::Socket,
-        interest: Interest,
-    ) -> io::Result<SocketMonitor<Self::Socket, ()>> {
-        Ok(SocketMonitor::new(socket.retain(), interest, ()))
     }
 }

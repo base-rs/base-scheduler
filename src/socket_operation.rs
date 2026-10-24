@@ -7,16 +7,16 @@
 ///
 /// Creation, binding, listening, and connecting are separate operations. All operation futures are lazy. Pre-cancellation prevents a syscall; successful progress wins a cancellation race. Cancelling or abandoning a pending connect does not roll back kernel connection state: discard that socket before trying another connection. Completion backends retain owned buffers until the original operation completes.
 ///
-/// File and socket resources remain distinct. There is no common descriptor trait, protocol buffering, or automatic close coordination. Message/address I/O belongs to the optional `SocketSendMsg` and `SocketRecvMsg` capabilities. Non-IP families remain an extension.
+/// File and socket resources remain distinct. There is no common descriptor trait, protocol buffering, or automatic close coordination. Stream and packet I/O belongs to scheduler-bound reader and writer capabilities. Non-IP families remain an extension.
 ///
-/// Implementations document resource compatibility, including affinity to particular scheduler instances. Successive operations may use different compatible instances. Incompatible pairings must be rejected with `std::io::ErrorKind::InvalidInput` before submission when the type system cannot reject them. Rebinding or conversion is an explicit backend operation. A resource may retain registration state for safety without replacing the scheduler explicitly supplied for each operation.
+/// Implementations document resource compatibility, including affinity to particular scheduler instances. Successive operations may use different compatible instances. Incompatible pairings must be rejected with `std::io::ErrorKind::InvalidInput` before submission when the type system cannot reject them. Rebinding or conversion is an explicit backend operation. Bound reader and writer handles fix their compatible scheduler at construction; per-operation calls do not rebind them.
 ///
 /// Selecting a socket resource type does not supply reads:
 ///
 /// ```compile_fail,E0599
-/// use core_scheduler::{Cancellation, SocketOperation, SocketRead};
+/// use core_scheduler::{Cancellation, SocketOperation};
 /// async fn read<S: SocketOperation>(scheduler: &S, socket: &S::Socket) {
-///     scheduler.socket_read(socket, vec![0; 16], &Cancellation::never()).await;
+///     scheduler.socket_stream_reader(socket);
 /// }
 /// ```
 pub trait SocketOperation: Send + Sync {

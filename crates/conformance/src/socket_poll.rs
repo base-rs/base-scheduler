@@ -3,6 +3,7 @@
 
 //! Borrowed nonblocking I/O assertions. Fixtures provide fresh sockets and drive readiness while enforcing test deadlines.
 
+use crate::SocketTestScheduler;
 use crate::probe::WakeProbe;
 use core_scheduler::*;
 use futures_lite::future::poll_once;
@@ -21,74 +22,43 @@ fn cancelled<T>(result: OperationResult<T>) {
 /// With a queued datagram, a fresh borrowed message receive must attempt and complete in its first poll. Empty datagrams also consume a message and cannot be withheld across `Pending`.
 pub async fn datagram_first_poll<S>(scheduler: &S, sender: &S::Socket, receiver: &S::Socket)
 where
-    S: SocketMonitoring + SocketSendMsgPoll + SocketLocalAddress,
-    S::Socket: 'static,
+    S: SocketTestScheduler + SocketLocalAddress,
 {
     let never = Cancellation::never();
     let destination = scheduler.socket_local_address(receiver).unwrap();
-    let mut monitor = scheduler
-        .socket_monitor(receiver, Interest::Readable)
-        .unwrap();
-    for monitored in [false, true] {
-        for payload in [b"".as_slice(), b"x"] {
-            assert_eq!(
-                scheduler
-                    .socket_sendmsg_poll(
-                        sender,
-                        &[IoSlice::new(payload)],
-                        Some(destination),
-                        SocketSendFlags::default(),
-                        &never,
-                    )
-                    .await
-                    .unwrap(),
-                payload.len()
-            );
-            // Peek confirms that the actual datagram is queued; advisory readiness alone could be spurious.
-            let mut peek = [0];
-            assert_eq!(
-                scheduler
-                    .socket_recvmsg_poll(
-                        receiver,
-                        &mut [IoSliceMut::new(&mut peek)],
-                        SocketRecvFlags { peek: true },
-                        &never,
-                    )
-                    .await
-                    .unwrap()
-                    .bytes,
-                payload.len()
-            );
-            let mut target = [0x5a];
-            let mut buffers = [IoSliceMut::new(&mut target)];
-            let result = if monitored {
-                poll_once(pin!(scheduler.socket_monitor_recvmsg_poll(
-                    &mut monitor,
-                    &mut buffers,
-                    SocketRecvFlags::default(),
-                    &never,
-                )))
+    let mut reader = scheduler.socket_packet_reader(receiver).unwrap();
+    let mut writer = scheduler.socket_packet_writer(sender).unwrap();
+    for payload in [b"".as_slice(), b"x"] {
+        assert_eq!(
+            writer
+                .write(payload, Some(destination), &never)
                 .await
-            } else {
-                poll_once(pin!(scheduler.socket_recvmsg_poll(
-                    receiver,
-                    &mut buffers,
-                    SocketRecvFlags::default(),
-                    &never,
-                )))
+                .unwrap(),
+            payload.len()
+        );
+        let mut peek = [0];
+        assert_eq!(
+            reader
+                .read_into_with_flags(&mut peek, SocketRecvFlags { peek: true }, &never)
                 .await
-            }
-            .expect("a fresh borrowed receive deferred its first attempt on a readable socket")
+                .unwrap()
+                .bytes,
+            payload.len()
+        );
+        let mut target = [0x5a];
+        let result = poll_once(pin!(reader.read_into(&mut target, &never)))
+            .await
+            .expect("a borrowed receive deferred its first attempt on a queued packet")
             .unwrap();
-            assert_eq!(result.bytes, payload.len());
-            assert_eq!(&target[..payload.len()], payload);
-        }
+        assert_eq!(result.bytes, payload.len());
+        assert_eq!(&target[..payload.len()], payload);
     }
-    scheduler.socket_monitor_close(&mut monitor).await.unwrap();
+    reader.close().await.unwrap();
+    writer.close().await.unwrap();
 }
 
 /// Pre-cancelled scalar operations leave storage and the receive queue unchanged. Unpolled operations perform no I/O.
-pub async fn scalar_pre_cancelled<S: SocketRecvPoll + SocketSendPoll>(
+pub async fn scalar_pre_cancelled<S: SocketTestScheduler>(
     scheduler: &S,
     sender: &S::Socket,
     receiver: &S::Socket,
@@ -97,38 +67,70 @@ pub async fn scalar_pre_cancelled<S: SocketRecvPoll + SocketSendPoll>(
     token.cancel();
     let never = Cancellation::never();
     let mut target = [0x5a; 1];
-    drop(scheduler.socket_send_poll(sender, b"unpolled", SocketSendFlags::default(), &never));
+    drop(crate::io::socket_send_poll(
+        scheduler,
+        sender,
+        b"unpolled",
+        SocketSendFlags::default(),
+        &never,
+    ));
     cancelled(
-        scheduler
-            .socket_send_poll(sender, b"cancelled", SocketSendFlags::default(), &token)
-            .await,
+        crate::io::socket_send_poll(
+            scheduler,
+            sender,
+            b"cancelled",
+            SocketSendFlags::default(),
+            &token,
+        )
+        .await,
     );
     assert_eq!(
-        scheduler
-            .socket_send_poll(sender, &[0xff], SocketSendFlags::default(), &never)
-            .await
-            .unwrap(),
+        crate::io::socket_send_poll(
+            scheduler,
+            sender,
+            &[0xff],
+            SocketSendFlags::default(),
+            &never
+        )
+        .await
+        .unwrap(),
         1
     );
-    drop(scheduler.socket_recv_poll(receiver, &mut target, SocketRecvFlags::default(), &never));
+    drop(crate::io::socket_recv_poll(
+        scheduler,
+        receiver,
+        &mut target,
+        SocketRecvFlags::default(),
+        &never,
+    ));
     cancelled(
-        scheduler
-            .socket_recv_poll(receiver, &mut target, SocketRecvFlags::default(), &token)
-            .await,
+        crate::io::socket_recv_poll(
+            scheduler,
+            receiver,
+            &mut target,
+            SocketRecvFlags::default(),
+            &token,
+        )
+        .await,
     );
     assert_eq!(target, [0x5a]);
     assert_eq!(
-        scheduler
-            .socket_recv_poll(receiver, &mut target, SocketRecvFlags::default(), &never)
-            .await
-            .unwrap(),
+        crate::io::socket_recv_poll(
+            scheduler,
+            receiver,
+            &mut target,
+            SocketRecvFlags::default(),
+            &never
+        )
+        .await
+        .unwrap(),
         1
     );
     assert_eq!(target, [0xff]);
 }
 
 /// Stack buffers support short reads and semantic peek flags without losing stream data.
-pub async fn scalar_transfer<S: SocketRecvPoll + SocketSendPoll>(
+pub async fn scalar_transfer<S: SocketTestScheduler>(
     scheduler: &S,
     sender: &S::Socket,
     receiver: &S::Socket,
@@ -137,19 +139,29 @@ pub async fn scalar_transfer<S: SocketRecvPoll + SocketSendPoll>(
     let source = *b"abcdef";
     let mut sent = 0;
     while sent < source.len() {
-        let count = scheduler
-            .socket_send_poll(sender, &source[sent..], SocketSendFlags::default(), &never)
-            .await
-            .unwrap();
+        let count = crate::io::socket_send_poll(
+            scheduler,
+            sender,
+            &source[sent..],
+            SocketSendFlags::default(),
+            &never,
+        )
+        .await
+        .unwrap();
         assert!(count > 0 && count <= source.len() - sent);
         sent += count;
     }
     let mut peek = [0; 1];
     assert_eq!(
-        scheduler
-            .socket_recv_poll(receiver, &mut peek, SocketRecvFlags { peek: true }, &never)
-            .await
-            .unwrap(),
+        crate::io::socket_recv_poll(
+            scheduler,
+            receiver,
+            &mut peek,
+            SocketRecvFlags { peek: true },
+            &never
+        )
+        .await
+        .unwrap(),
         1
     );
     assert_eq!(peek, [b'a']);
@@ -157,15 +169,15 @@ pub async fn scalar_transfer<S: SocketRecvPoll + SocketSendPoll>(
     let mut received = 0;
     while received < target.len() {
         let mut chunk = [0; 2];
-        let count = scheduler
-            .socket_recv_poll(
-                receiver,
-                &mut chunk[..(6 - received).min(2)],
-                SocketRecvFlags::default(),
-                &never,
-            )
-            .await
-            .unwrap();
+        let count = crate::io::socket_recv_poll(
+            scheduler,
+            receiver,
+            &mut chunk[..(6 - received).min(2)],
+            SocketRecvFlags::default(),
+            &never,
+        )
+        .await
+        .unwrap();
         assert!(count > 0 && count <= 2);
         target[received..received + count].copy_from_slice(&chunk[..count]);
         received += count;
@@ -174,11 +186,12 @@ pub async fn scalar_transfer<S: SocketRecvPoll + SocketSendPoll>(
 }
 
 /// Quiet scalar receives must register a cancellation wakeup and leave initialized storage unchanged.
-pub async fn scalar_cancellation<S: SocketRecvPoll>(scheduler: &S, receiver: &S::Socket) {
+pub async fn scalar_cancellation<S: SocketTestScheduler>(scheduler: &S, receiver: &S::Socket) {
     let token = Cancellation::new();
     let mut target = [0x5a; 8];
     {
-        let mut receiving = pin!(scheduler.socket_recv_poll(
+        let mut receiving = pin!(crate::io::socket_recv_poll(
+            scheduler,
             receiver,
             &mut target,
             SocketRecvFlags::default(),
@@ -203,49 +216,42 @@ pub async fn scalar_cancellation<S: SocketRecvPoll>(scheduler: &S, receiver: &S:
 }
 
 /// Dropping or forgetting a pending receive releases the borrow safely. Subsequent I/O must neither access its old stack bytes nor consume data on its behalf.
-pub async fn scalar_abandonment<S: SocketRecvPoll + SocketSendPoll>(
+pub async fn scalar_abandonment<S: SocketTestScheduler>(
     scheduler: &S,
     sender: &S::Socket,
     receiver: &S::Socket,
 ) {
     let never = Cancellation::never();
+    let mut writer = scheduler.socket_stream_writer(sender).unwrap();
     for forget in [false, true] {
+        let mut reader = scheduler.socket_stream_reader(receiver).unwrap();
         let mut old = [0x5a; 8];
-        let mut receiving = Box::pin(scheduler.socket_recv_poll(
-            receiver,
-            &mut old,
-            SocketRecvFlags::default(),
-            &never,
-        ));
-        assert!(poll_once(&mut receiving).await.is_none());
-        if forget {
-            std::mem::forget(receiving);
-        } else {
-            drop(receiving);
+        {
+            let mut receiving = Box::pin(reader.read_into(&mut old, &never));
+            assert!(poll_once(&mut receiving).await.is_none());
+            if forget {
+                std::mem::forget(receiving);
+            } else {
+                drop(receiving);
+            }
         }
         old.fill(0xa5);
-        assert_eq!(
-            scheduler
-                .socket_send_poll(sender, b"x", SocketSendFlags::default(), &never)
-                .await
-                .unwrap(),
-            1
-        );
+        // An abandoned readiness registration may keep this lane busy. Closing establishes retirement without relying on the forgotten future's destructor.
+        reader.close().await.unwrap();
+        drop(reader);
+        let mut reader = scheduler.socket_stream_reader(receiver).unwrap();
+        assert_eq!(writer.write(b"x", &never).await.unwrap(), 1);
         let mut target = [0; 1];
-        assert_eq!(
-            scheduler
-                .socket_recv_poll(receiver, &mut target, SocketRecvFlags::default(), &never)
-                .await
-                .unwrap(),
-            1
-        );
+        assert_eq!(reader.read_into(&mut target, &never).await.unwrap(), 1);
         assert_eq!(target, *b"x");
         assert_eq!(old, [0xa5; 8]);
+        reader.close().await.unwrap();
     }
+    writer.close().await.unwrap();
 }
 
 /// A pending receive wakes when data arrives; write shutdown produces EOF without modifying storage.
-pub async fn scalar_readiness_and_eof<S: SocketRecvPoll + SocketSendPoll + SocketShutdown>(
+pub async fn scalar_readiness_and_eof<S: SocketTestScheduler + SocketShutdown>(
     scheduler: &S,
     sender: &S::Socket,
     receiver: &S::Socket,
@@ -253,7 +259,8 @@ pub async fn scalar_readiness_and_eof<S: SocketRecvPoll + SocketSendPoll + Socke
     let never = Cancellation::never();
     let mut target = [0x5a; 2];
     {
-        let mut receiving = pin!(scheduler.socket_recv_poll(
+        let mut receiving = pin!(crate::io::socket_recv_poll(
+            scheduler,
             receiver,
             &mut target,
             SocketRecvFlags::default(),
@@ -261,10 +268,15 @@ pub async fn scalar_readiness_and_eof<S: SocketRecvPoll + SocketSendPoll + Socke
         ));
         assert!(poll_once(&mut receiving).await.is_none());
         assert_eq!(
-            scheduler
-                .socket_send_poll(sender, b"x", SocketSendFlags::default(), &never)
-                .await
-                .unwrap(),
+            crate::io::socket_send_poll(
+                scheduler,
+                sender,
+                b"x",
+                SocketSendFlags::default(),
+                &never
+            )
+            .await
+            .unwrap(),
             1
         );
         assert_eq!(receiving.await.unwrap(), 1);
@@ -275,17 +287,22 @@ pub async fn scalar_readiness_and_eof<S: SocketRecvPoll + SocketSendPoll + Socke
         .await
         .unwrap();
     assert_eq!(
-        scheduler
-            .socket_recv_poll(receiver, &mut target, SocketRecvFlags::default(), &never)
-            .await
-            .unwrap(),
+        crate::io::socket_recv_poll(
+            scheduler,
+            receiver,
+            &mut target,
+            SocketRecvFlags::default(),
+            &never
+        )
+        .await
+        .unwrap(),
         0
     );
     assert_eq!(target, [b'x', 0x5a]);
 }
 
 /// Pre-cancelled and unpolled vector operations preserve both the queue and initialized stack storage.
-pub async fn message_pre_cancelled<S: SocketRecvMsgPoll + SocketSendMsgPoll>(
+pub async fn message_pre_cancelled<S: SocketTestScheduler>(
     scheduler: &S,
     sender: &S::Socket,
     receiver: &S::Socket,
@@ -294,59 +311,78 @@ pub async fn message_pre_cancelled<S: SocketRecvMsgPoll + SocketSendMsgPoll>(
     token.cancel();
     let never = Cancellation::never();
     let source = [IoSlice::new(b"unpolled")];
-    drop(scheduler.socket_sendmsg_poll(sender, &source, None, SocketSendFlags::default(), &never));
+    drop(crate::io::socket_sendmsg_poll(
+        scheduler,
+        sender,
+        &source,
+        None,
+        SocketSendFlags::default(),
+        &never,
+    ));
     cancelled(
-        scheduler
-            .socket_sendmsg_poll(sender, &source, None, SocketSendFlags::default(), &token)
-            .await,
+        crate::io::socket_sendmsg_poll(
+            scheduler,
+            sender,
+            &source,
+            None,
+            SocketSendFlags::default(),
+            &token,
+        )
+        .await,
     );
     assert_eq!(
-        scheduler
-            .socket_sendmsg_poll(
-                sender,
-                &[IoSlice::new(&[0xff])],
-                None,
-                SocketSendFlags::default(),
-                &never
-            )
-            .await
-            .unwrap(),
+        crate::io::socket_sendmsg_poll(
+            scheduler,
+            sender,
+            &[IoSlice::new(&[0xff])],
+            None,
+            SocketSendFlags::default(),
+            &never
+        )
+        .await
+        .unwrap(),
         1
     );
     let mut target = [0x5a; 2];
     {
         let mut vectors = [IoSliceMut::new(&mut target)];
-        drop(scheduler.socket_recvmsg_poll(
+        drop(crate::io::socket_recvmsg_poll(
+            scheduler,
             receiver,
             &mut vectors,
             SocketRecvFlags::default(),
             &never,
         ));
         cancelled(
-            scheduler
-                .socket_recvmsg_poll(receiver, &mut vectors, SocketRecvFlags::default(), &token)
-                .await,
+            crate::io::socket_recvmsg_poll(
+                scheduler,
+                receiver,
+                &mut vectors,
+                SocketRecvFlags::default(),
+                &token,
+            )
+            .await,
         );
     }
     assert_eq!(target, [0x5a; 2]);
     assert_eq!(
-        scheduler
-            .socket_recvmsg_poll(
-                receiver,
-                &mut [IoSliceMut::new(&mut target)],
-                SocketRecvFlags::default(),
-                &never
-            )
-            .await
-            .unwrap()
-            .bytes,
+        crate::io::socket_recvmsg_poll(
+            scheduler,
+            receiver,
+            &mut [IoSliceMut::new(&mut target)],
+            SocketRecvFlags::default(),
+            &never
+        )
+        .await
+        .unwrap()
+        .bytes,
         1
     );
     assert_eq!(target, [0xff, 0x5a]);
 }
 
 /// Stack vectors and payloads reach stream I/O with explicit advancement after short transfers. Neither send nor receive advances the caller's vector entries.
-pub async fn message_transfer<S: SocketRecvMsgPoll + SocketSendMsgPoll>(
+pub async fn message_transfer<S: SocketTestScheduler>(
     scheduler: &S,
     sender: &S::Socket,
     receiver: &S::Socket,
@@ -358,10 +394,16 @@ pub async fn message_transfer<S: SocketRecvMsgPoll + SocketSendMsgPoll>(
     let mut pending = &mut source[..];
     while !pending.is_empty() {
         let before: usize = pending.iter().map(|buffer| buffer.len()).sum();
-        let count = scheduler
-            .socket_sendmsg_poll(sender, pending, None, SocketSendFlags::default(), &never)
-            .await
-            .unwrap();
+        let count = crate::io::socket_sendmsg_poll(
+            scheduler,
+            sender,
+            pending,
+            None,
+            SocketSendFlags::default(),
+            &never,
+        )
+        .await
+        .unwrap();
         assert!(count > 0 && count <= before);
         assert_eq!(
             pending.iter().map(|buffer| buffer.len()).sum::<usize>(),
@@ -377,10 +419,15 @@ pub async fn message_transfer<S: SocketRecvMsgPoll + SocketSendMsgPoll>(
         let mut received = 0;
         while !pending.is_empty() {
             let before: usize = pending.iter().map(|buffer| buffer.len()).sum();
-            let result = scheduler
-                .socket_recvmsg_poll(receiver, pending, SocketRecvFlags::default(), &never)
-                .await
-                .unwrap();
+            let result = crate::io::socket_recvmsg_poll(
+                scheduler,
+                receiver,
+                pending,
+                SocketRecvFlags::default(),
+                &never,
+            )
+            .await
+            .unwrap();
             assert!(result.bytes > 0 && result.bytes <= before);
             assert_eq!(
                 pending.iter().map(|buffer| buffer.len()).sum::<usize>(),
@@ -396,14 +443,15 @@ pub async fn message_transfer<S: SocketRecvMsgPoll + SocketSendMsgPoll>(
 }
 
 /// A quiet vector receive registers cancellation and readiness wakeups; its stack vectors remain unchanged on cancellation.
-pub async fn message_cancellation<S: SocketRecvMsgPoll>(scheduler: &S, receiver: &S::Socket) {
+pub async fn message_cancellation<S: SocketTestScheduler>(scheduler: &S, receiver: &S::Socket) {
     let token = Cancellation::new();
     let mut target = [0x5a; 8];
     {
         let mut vectors = [IoSliceMut::new(&mut target)];
         let pointer = vectors[0].as_ptr();
         {
-            let mut receiving = pin!(scheduler.socket_recvmsg_poll(
+            let mut receiving = pin!(crate::io::socket_recvmsg_poll(
+                scheduler,
                 receiver,
                 &mut vectors,
                 SocketRecvFlags::default(),
@@ -428,22 +476,19 @@ pub async fn message_cancellation<S: SocketRecvMsgPoll>(scheduler: &S, receiver:
 }
 
 /// Neither dropping nor forgetting a pending vector receive leaves access to its stack vectors or payload.
-pub async fn message_abandonment<S: SocketRecvMsgPoll + SocketSendMsgPoll>(
+pub async fn message_abandonment<S: SocketTestScheduler>(
     scheduler: &S,
     sender: &S::Socket,
     receiver: &S::Socket,
 ) {
     let never = Cancellation::never();
+    let mut writer = scheduler.socket_stream_writer(sender).unwrap();
     for forget in [false, true] {
+        let mut reader = scheduler.socket_stream_reader(receiver).unwrap();
         let mut old = [0x5a; 8];
         {
             let mut vectors = [IoSliceMut::new(&mut old)];
-            let mut receiving = Box::pin(scheduler.socket_recvmsg_poll(
-                receiver,
-                &mut vectors,
-                SocketRecvFlags::default(),
-                &never,
-            ));
+            let mut receiving = Box::pin(reader.read_vectored(&mut vectors, &never));
             assert!(poll_once(&mut receiving).await.is_none());
             if forget {
                 std::mem::forget(receiving);
@@ -452,40 +497,22 @@ pub async fn message_abandonment<S: SocketRecvMsgPoll + SocketSendMsgPoll>(
             }
         }
         old.fill(0xa5);
-        assert_eq!(
-            scheduler
-                .socket_sendmsg_poll(
-                    sender,
-                    &[IoSlice::new(b"x")],
-                    None,
-                    SocketSendFlags::default(),
-                    &never
-                )
-                .await
-                .unwrap(),
-            1
-        );
+        // An abandoned readiness registration may keep this lane busy. Closing establishes retirement without relying on the forgotten future's destructor.
+        reader.close().await.unwrap();
+        drop(reader);
+        let mut reader = scheduler.socket_stream_reader(receiver).unwrap();
+        assert_eq!(writer.write(b"x", &never).await.unwrap(), 1);
         let mut target = [0; 1];
-        assert_eq!(
-            scheduler
-                .socket_recvmsg_poll(
-                    receiver,
-                    &mut [IoSliceMut::new(&mut target)],
-                    SocketRecvFlags::default(),
-                    &never
-                )
-                .await
-                .unwrap()
-                .bytes,
-            1
-        );
+        assert_eq!(reader.read_into(&mut target, &never).await.unwrap(), 1);
         assert_eq!(target, *b"x");
         assert_eq!(old, [0xa5; 8]);
+        reader.close().await.unwrap();
     }
+    writer.close().await.unwrap();
 }
 
 /// A pending vector receive resumes on readiness and preserves initialized bytes beyond its returned count.
-pub async fn message_readiness<S: SocketRecvMsgPoll + SocketSendMsgPoll>(
+pub async fn message_readiness<S: SocketTestScheduler>(
     scheduler: &S,
     sender: &S::Socket,
     receiver: &S::Socket,
@@ -495,7 +522,8 @@ pub async fn message_readiness<S: SocketRecvMsgPoll + SocketSendMsgPoll>(
     let mut second = [0x5a; 2];
     {
         let mut vectors = [IoSliceMut::new(&mut first), IoSliceMut::new(&mut second)];
-        let mut receiving = pin!(scheduler.socket_recvmsg_poll(
+        let mut receiving = pin!(crate::io::socket_recvmsg_poll(
+            scheduler,
             receiver,
             &mut vectors,
             SocketRecvFlags::default(),
@@ -503,16 +531,16 @@ pub async fn message_readiness<S: SocketRecvMsgPoll + SocketSendMsgPoll>(
         ));
         assert!(poll_once(&mut receiving).await.is_none());
         assert_eq!(
-            scheduler
-                .socket_sendmsg_poll(
-                    sender,
-                    &[IoSlice::new(b"x")],
-                    None,
-                    SocketSendFlags::default(),
-                    &never
-                )
-                .await
-                .unwrap(),
+            crate::io::socket_sendmsg_poll(
+                scheduler,
+                sender,
+                &[IoSlice::new(b"x")],
+                None,
+                SocketSendFlags::default(),
+                &never
+            )
+            .await
+            .unwrap(),
             1
         );
         assert_eq!(receiving.await.unwrap().bytes, 1);
@@ -522,7 +550,7 @@ pub async fn message_readiness<S: SocketRecvMsgPoll + SocketSendMsgPoll>(
 }
 
 /// Addressed borrowed messages preserve peek, truncation, discard, source metadata, and datagram boundaries.
-pub async fn datagram_truncation<S: SocketRecvMsgPoll + SocketSendMsgPoll + SocketLocalAddress>(
+pub async fn datagram_truncation<S: SocketTestScheduler + SocketLocalAddress>(
     scheduler: &S,
     sender: &S::Socket,
     receiver: &S::Socket,
@@ -533,70 +561,70 @@ pub async fn datagram_truncation<S: SocketRecvMsgPoll + SocketSendMsgPoll + Sock
     let header = *b"abc";
     let body = *b"def";
     assert_eq!(
-        scheduler
-            .socket_sendmsg_poll(
-                sender,
-                &[IoSlice::new(&header), IoSlice::new(&body)],
-                Some(destination),
-                SocketSendFlags { dont_route: true },
-                &never
-            )
-            .await
-            .unwrap(),
+        crate::io::socket_sendmsg_poll(
+            scheduler,
+            sender,
+            &[IoSlice::new(&header), IoSlice::new(&body)],
+            Some(destination),
+            SocketSendFlags { dont_route: true },
+            &never
+        )
+        .await
+        .unwrap(),
         6
     );
     let mut first = [0; 2];
     let mut second = [0; 2];
-    let result = scheduler
-        .socket_recvmsg_poll(
-            receiver,
-            &mut [IoSliceMut::new(&mut first), IoSliceMut::new(&mut second)],
-            SocketRecvFlags { peek: true },
-            &never,
-        )
-        .await
-        .unwrap();
+    let result = crate::io::socket_recvmsg_poll(
+        scheduler,
+        receiver,
+        &mut [IoSliceMut::new(&mut first), IoSliceMut::new(&mut second)],
+        SocketRecvFlags { peek: true },
+        &never,
+    )
+    .await
+    .unwrap();
     assert_eq!(result.bytes, 4);
     assert_eq!(result.address, Some(source));
     assert!(result.truncated);
     assert_eq!(first, *b"ab");
     assert_eq!(second, *b"cd");
     let mut target = [0; 3];
-    let result = scheduler
-        .socket_recvmsg_poll(
-            receiver,
-            &mut [IoSliceMut::new(&mut target)],
-            SocketRecvFlags::default(),
-            &never,
-        )
-        .await
-        .unwrap();
+    let result = crate::io::socket_recvmsg_poll(
+        scheduler,
+        receiver,
+        &mut [IoSliceMut::new(&mut target)],
+        SocketRecvFlags::default(),
+        &never,
+    )
+    .await
+    .unwrap();
     assert_eq!(result.bytes, 3);
     assert!(result.truncated);
     assert_eq!(target, *b"abc");
     assert_eq!(
-        scheduler
-            .socket_sendmsg_poll(
-                sender,
-                &[IoSlice::new(b"next")],
-                Some(destination),
-                SocketSendFlags::default(),
-                &never
-            )
-            .await
-            .unwrap(),
+        crate::io::socket_sendmsg_poll(
+            scheduler,
+            sender,
+            &[IoSlice::new(b"next")],
+            Some(destination),
+            SocketSendFlags::default(),
+            &never
+        )
+        .await
+        .unwrap(),
         4
     );
     let mut target = [0x5a; 8];
-    let result = scheduler
-        .socket_recvmsg_poll(
-            receiver,
-            &mut [IoSliceMut::new(&mut target)],
-            SocketRecvFlags::default(),
-            &never,
-        )
-        .await
-        .unwrap();
+    let result = crate::io::socket_recvmsg_poll(
+        scheduler,
+        receiver,
+        &mut [IoSliceMut::new(&mut target)],
+        SocketRecvFlags::default(),
+        &never,
+    )
+    .await
+    .unwrap();
     assert_eq!(result.bytes, 4);
     assert_eq!(result.address, Some(source));
     assert!(!result.truncated && !result.control_truncated);
@@ -605,7 +633,7 @@ pub async fn datagram_truncation<S: SocketRecvMsgPoll + SocketSendMsgPoll + Sock
 }
 
 /// Empty vector arrays still represent real empty datagrams and provide a usable zero-capacity receive.
-pub async fn datagram_empty<S: SocketRecvMsgPoll + SocketSendMsgPoll + SocketLocalAddress>(
+pub async fn datagram_empty<S: SocketTestScheduler + SocketLocalAddress>(
     scheduler: &S,
     sender: &S::Socket,
     receiver: &S::Socket,
@@ -614,47 +642,52 @@ pub async fn datagram_empty<S: SocketRecvMsgPoll + SocketSendMsgPoll + SocketLoc
     let destination = scheduler.socket_local_address(receiver).unwrap();
     let source = scheduler.socket_local_address(sender).unwrap();
     assert_eq!(
-        scheduler
-            .socket_sendmsg_poll(
-                sender,
-                &[],
-                Some(destination),
-                SocketSendFlags::default(),
-                &never
-            )
-            .await
-            .unwrap(),
+        crate::io::socket_sendmsg_poll(
+            scheduler,
+            sender,
+            &[],
+            Some(destination),
+            SocketSendFlags::default(),
+            &never
+        )
+        .await
+        .unwrap(),
         0
     );
-    let result = scheduler
-        .socket_recvmsg_poll(receiver, &mut [], SocketRecvFlags::default(), &never)
-        .await
-        .unwrap();
+    let result = crate::io::socket_recvmsg_poll(
+        scheduler,
+        receiver,
+        &mut [],
+        SocketRecvFlags::default(),
+        &never,
+    )
+    .await
+    .unwrap();
     assert_eq!(result.bytes, 0);
     // Zero-capacity receive consumption, sender metadata, and truncation reporting are OS-specific.
     assert_eq!(
-        scheduler
-            .socket_sendmsg_poll(
-                sender,
-                &[IoSlice::new(&[])],
-                Some(destination),
-                SocketSendFlags::default(),
-                &never
-            )
-            .await
-            .unwrap(),
+        crate::io::socket_sendmsg_poll(
+            scheduler,
+            sender,
+            &[IoSlice::new(&[])],
+            Some(destination),
+            SocketSendFlags::default(),
+            &never
+        )
+        .await
+        .unwrap(),
         0
     );
     let mut target = [0x5a; 1];
-    let result = scheduler
-        .socket_recvmsg_poll(
-            receiver,
-            &mut [IoSliceMut::new(&mut target)],
-            SocketRecvFlags::default(),
-            &never,
-        )
-        .await
-        .unwrap();
+    let result = crate::io::socket_recvmsg_poll(
+        scheduler,
+        receiver,
+        &mut [IoSliceMut::new(&mut target)],
+        SocketRecvFlags::default(),
+        &never,
+    )
+    .await
+    .unwrap();
     assert_eq!(result.bytes, 0);
     assert_eq!(result.address, Some(source));
     assert_eq!(target, [0x5a]);

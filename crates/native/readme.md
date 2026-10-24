@@ -63,7 +63,7 @@ Selectors may supply their own progress mechanism. The readiness selector is ind
 
 Construct scheduler-bound stream and packet readers and writers for application I/O, and file readers and writers for repeated file operations. Their operations take cancellation without another scheduler argument. Borrowed-only readers allocate no payload pool; owned reads use lazy default storage or an explicit shared pool. Close and drop every handle before exclusively closing its underlying resource. See the [I/O usage guide](../../context/io.md) for the recommended paths.
 
-Available I/O capabilities follow the selected backend. Ordered stream output is currently supplied by the io\_uring selector; the default readiness selector does not implement `SocketStreamWriting`.
+Native forwards the selected backend’s bound reader and writer factories directly. Both readiness and io\_uring provide stream and packet readers and writers, plus file readers and writers; registration and retirement state remain private to those handles.
 
 ## Releasing
 

@@ -3,6 +3,7 @@
 
 use super::socket::{retain_socket, retry_operation};
 use super::*;
+use crate::{Interest, SocketMessage};
 use std::cell::UnsafeCell;
 
 type MessageResult<B> = (io::Result<SocketRecvResult>, B);
@@ -167,7 +168,10 @@ impl<B: IoBufSequence> Drop for MessageRequest<B> {
     }
 }
 
-fn validate_lengths(count: usize, mut lengths: impl Iterator<Item = usize>) -> io::Result<()> {
+pub(crate) fn validate_lengths(
+    count: usize,
+    mut lengths: impl Iterator<Item = usize>,
+) -> io::Result<()> {
     if count > i32::MAX as usize
         || lengths
             .try_fold(0usize, usize::checked_add)
@@ -243,7 +247,7 @@ impl IoUringSelector {
     async fn message_operation<B: IoBufSequence>(
         &self,
         controller: Arc<Controller>,
-        socket: &NativeSocket,
+        socket: &impl SocketSource,
         buffers: B,
         operation: MessageOperation,
         prepare: Prepare<B>,
@@ -280,10 +284,10 @@ impl IoUringSelector {
     }
 }
 
-impl SocketSendMsg for IoUringSelector {
-    async fn socket_sendmsg<B: IoBufSequence>(
+impl IoUringSelector {
+    pub(crate) async fn socket_sendmsg<B: IoBufSequence>(
         &self,
-        socket: &Self::Socket,
+        socket: &impl SocketSource,
         message: SocketMessage<B>,
         flags: SocketSendFlags,
         cancellation: &Cancellation,
@@ -323,10 +327,10 @@ impl SocketSendMsg for IoUringSelector {
     }
 }
 
-impl SocketRecvMsg for IoUringSelector {
-    async fn socket_recvmsg<B: IoBufSequenceMut>(
+impl IoUringSelector {
+    pub(crate) async fn socket_recvmsg<B: IoBufSequenceMut>(
         &self,
-        socket: &Self::Socket,
+        socket: &impl SocketSource,
         buffers: B,
         flags: SocketRecvFlags,
         cancellation: &Cancellation,

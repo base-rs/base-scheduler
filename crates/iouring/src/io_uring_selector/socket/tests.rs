@@ -3,6 +3,7 @@
 
 use super::super::tests::{Failures, drain, drive, pair};
 use super::*;
+use crate::Interest;
 use futures_lite::future::{block_on, poll_once};
 
 #[test]
@@ -418,5 +419,42 @@ fn empty_owned_write_sends_one_udp_datagram_and_returns_the_owner() {
             .load(Ordering::Relaxed),
         0
     );
+    drain(&selector, &mut driver);
+}
+
+#[test]
+fn abandoned_retry_wait_retains_the_owned_lane_until_poll_retirement() {
+    let (selector, mut driver) = pair(1);
+    let never = Cancellation::never();
+    let socket =
+        block_on(selector.socket_open(SocketDomain::Ipv4, SocketType::Datagram, None, &never))
+            .unwrap();
+    block_on(selector.socket_bind(&socket, "127.0.0.1:0".parse().unwrap(), &never)).unwrap();
+    let controller = selector.route();
+    let mut state = crate::operation_state::OperationState::default();
+    let owner = state.begin(vec![9]).unwrap();
+    let mut operation = Box::pin(retry_operation(
+        &selector,
+        &controller,
+        &socket,
+        owner,
+        |owner| async { (Err::<usize, _>(io::ErrorKind::WouldBlock.into()), owner) },
+        Interest::Readable,
+        &never,
+    ));
+    assert!(block_on(poll_once(operation.as_mut())).is_none());
+    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+    while driver.reactor.as_ref().unwrap().in_flight.0.is_empty() {
+        driver.turn(Some(Duration::ZERO)).unwrap();
+        assert!(std::time::Instant::now() < deadline);
+    }
+    drop(operation);
+    let mut close = Box::pin(state.close());
+    assert!(
+        block_on(poll_once(close.as_mut())).is_none(),
+        "raw readiness retains its socket until the original poll retires"
+    );
+    drive(&mut driver, close);
+    block_on(selector.socket_close(socket)).unwrap();
     drain(&selector, &mut driver);
 }

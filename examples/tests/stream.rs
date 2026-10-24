@@ -11,97 +11,59 @@ use std::{
     pin::pin,
 };
 
-struct FailedMonitor(bool);
-impl SocketOperation for FailedMonitor {
+struct FailedReaderFactory(bool);
+impl SocketOperation for FailedReaderFactory {
     type Socket = ();
 }
-impl BufferPooling for FailedMonitor {
+impl BufferPooling for FailedReaderFactory {
     type Pool = HeapBufferPool;
     fn buffer_pool(&self, options: BufferPoolOptions) -> io::Result<Self::Pool> {
         HeapBufferPool::with_options(options)
     }
 }
-impl SocketMonitoring for FailedMonitor {
-    fn socket_type(&self, _: &()) -> io::Result<SocketType> {
-        Ok(SocketType::Stream)
+struct EmptyReader;
+impl SocketStreamReader for EmptyReader {
+    type Buffer = BufferLease;
+    async fn read(&mut self, _: &Cancellation) -> OperationResult<Option<Self::Buffer>> {
+        Ok(None)
     }
-
-    type MonitorRegistration = ();
-    fn socket_monitor_state(
-        &self,
-        _: &(),
-        interest: Interest,
-    ) -> io::Result<SocketMonitor<(), ()>> {
-        if self.0 {
-            Err(io::ErrorKind::PermissionDenied.into())
-        } else {
-            Ok(SocketMonitor::new((), interest, ()))
-        }
+    async fn read_into(&mut self, _: &mut [u8], _: &Cancellation) -> OperationResult<usize> {
+        Ok(0)
     }
-    async fn socket_monitor_close<M: SocketMonitorState<(), ()>>(
-        &self,
-        _: &mut MonitorStorage<M>,
-    ) -> io::Result<()> {
-        Err(io::ErrorKind::BrokenPipe.into())
-    }
-}
-impl SocketRecvPoll for FailedMonitor {
-    async fn socket_recv_poll(
-        &self,
-        _: &(),
-        _: &mut [u8],
-        _: SocketRecvFlags,
+    async fn read_vectored(
+        &mut self,
+        _: &mut [io::IoSliceMut<'_>],
         _: &Cancellation,
     ) -> OperationResult<usize> {
         Ok(0)
     }
-}
-impl SocketSendPoll for FailedMonitor {
-    async fn socket_send_poll(
-        &self,
-        _: &(),
-        _: &[u8],
-        _: SocketSendFlags,
-        _: &Cancellation,
-    ) -> OperationResult<usize> {
-        unreachable!()
-    }
-}
-impl SocketRecvMsgPoll for FailedMonitor {
-    async fn socket_recvmsg_poll(
-        &self,
-        _: &(),
-        _: &mut [std::io::IoSliceMut<'_>],
+    async fn read_vectored_with_flags(
+        &mut self,
+        _: &mut [io::IoSliceMut<'_>],
         _: SocketRecvFlags,
         _: &Cancellation,
     ) -> OperationResult<SocketRecvResult> {
-        unreachable!()
+        unreachable!("This recipe only reads contiguous storage")
     }
-}
-impl SocketSendMsgPoll for FailedMonitor {
-    async fn socket_sendmsg_poll(
-        &self,
-        _: &(),
-        _: &[std::io::IoSlice<'_>],
-        _: Option<SocketAddress>,
-        _: SocketSendFlags,
+    async fn read_owned_vectored<B: IoBufSequenceMut>(
+        &mut self,
+        _: B,
+        _: SocketRecvFlags,
         _: &Cancellation,
-    ) -> OperationResult<usize> {
-        unreachable!()
+    ) -> (OperationResult<SocketRecvResult>, B) {
+        unreachable!("This recipe only reads contiguous storage")
     }
-}
-impl SocketWait for FailedMonitor {
-    async fn socket_wait(&self, _: &(), _: Interest, _: &Cancellation) -> OperationResult<()> {
-        unreachable!()
+    async fn close(&mut self) -> io::Result<()> {
+        Err(io::ErrorKind::BrokenPipe.into())
     }
 }
 
 #[test]
-fn stream_reports_monitor_setup_and_close_failures() {
+fn stream_reports_reader_setup_and_close_failures() {
     block_on(async {
         for fail_setup in [false, true] {
             let error = stream::receive(
-                &FailedMonitor(fail_setup),
+                &FailedReaderFactory(fail_setup),
                 &(),
                 &mut [0; 1],
                 &Cancellation::never(),
@@ -181,4 +143,22 @@ fn stream_cleanup_allows_exclusive_close_after_cancellation_and_consumer_errors(
     });
 }
 
-impl SocketStreamReading for FailedMonitor {}
+impl SocketStreamReading for FailedReaderFactory {
+    fn socket_stream_reader(
+        &self,
+        _: &(),
+    ) -> io::Result<impl SocketStreamReader<Buffer = BufferLease> + '_> {
+        if self.0 {
+            Err(io::ErrorKind::PermissionDenied.into())
+        } else {
+            Ok(EmptyReader)
+        }
+    }
+    fn socket_stream_reader_with_pool(
+        &self,
+        socket: &(),
+        _: HeapBufferPool,
+    ) -> io::Result<impl SocketStreamReader<Buffer = BufferLease> + '_> {
+        self.socket_stream_reader(socket)
+    }
+}

@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-/// Generate borrowed socket tests. The runner supplies `(scheduler, sender, receiver)` as references to a fresh connected stream pair. Requires `SocketRecvPoll`, `SocketSendPoll`, and `SocketShutdown`.
+/// Generate borrowed socket tests. The runner supplies `(scheduler, sender, receiver)` as references to a fresh connected stream pair. Requires `SocketTestScheduler` and `SocketShutdown`.
 ///
 /// Invoke inside a dedicated module. The runner must create a fresh isolated fixture, await the closure, clean up, enforce a deadline, and propagate panics. Async closures require Rust 1.85 or later.
 #[macro_export]

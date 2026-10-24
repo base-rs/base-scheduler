@@ -1,14 +1,14 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
+use crate::socket_write_state::SocketWriteState;
 use crate::{DirectScheduler, DirectSocket, DirectTask, socket_io, socket_retry::SocketRetry};
 use core_scheduler::{
-    Cancellation, IoBuf, OperationError, OperationResult, SocketStreamOutput,
-    SocketStreamOutputting, SocketWriteState,
+    Cancellation, IoBuf, OperationError, OperationResult, SocketSendFlags, SocketStreamWriter,
 };
 use std::{
     future::{Future, poll_fn},
-    io,
+    io::{self, IoSlice},
     marker::PhantomData,
     pin::pin,
     sync::Arc,
@@ -16,16 +16,19 @@ use std::{
 };
 
 /// Ordered output which completes ready sends inline and retries stalled writes on the direct task service.
-pub struct DirectStreamWriter<B> {
+pub(crate) struct DirectStreamWriter<'scheduler, B> {
+    scheduler: &'scheduler DirectScheduler,
+    operations: crate::operation_state::OperationState,
     socket: DirectSocket,
     state: SocketWriteState<DirectTask<OperationResult<()>>>,
     buffer: PhantomData<fn(B)>,
 }
 
-impl SocketStreamOutputting for DirectScheduler {
-    type Writer<B: IoBuf> = DirectStreamWriter<B>;
-
-    fn socket_stream_output<B: IoBuf>(&self, socket: &DirectSocket) -> io::Result<Self::Writer<B>> {
+impl DirectScheduler {
+    pub(crate) fn socket_stream_output<B: IoBuf>(
+        &self,
+        socket: &DirectSocket,
+    ) -> io::Result<DirectStreamWriter<'_, B>> {
         self.socket_retry.check_open()?;
         if socket_io::recvmsg_socket_type(&socket.0)? != core_scheduler::SocketType::Stream {
             return Err(io::Error::new(
@@ -34,6 +37,8 @@ impl SocketStreamOutputting for DirectScheduler {
             ));
         }
         Ok(DirectStreamWriter {
+            scheduler: self,
+            operations: Default::default(),
             socket: DirectSocket(socket.retain()),
             state: SocketWriteState::default(),
             buffer: PhantomData,
@@ -41,15 +46,128 @@ impl SocketStreamOutputting for DirectScheduler {
     }
 }
 
-impl<B: IoBuf> SocketStreamOutput<DirectScheduler> for DirectStreamWriter<B> {
+impl<B> DirectStreamWriter<'_, B> {
+    fn check_open(&self) -> OperationResult<()> {
+        self.state.check_open()?;
+        self.operations.check_idle()?;
+        Ok(())
+    }
+}
+
+impl<B: IoBuf> SocketStreamWriter for DirectStreamWriter<'_, B> {
     type Buffer = B;
+
+    async fn write(
+        &mut self,
+        buffer: &[u8],
+        cancellation: &Cancellation,
+    ) -> OperationResult<usize> {
+        self.check_open()?;
+        if self.state.is_pending() {
+            self.state.flush(cancellation).await?;
+        }
+        self.scheduler
+            .socket_send_poll(
+                &self.socket,
+                buffer,
+                SocketSendFlags::default(),
+                cancellation,
+            )
+            .await
+    }
+
+    async fn write_vectored(
+        &mut self,
+        buffers: &[IoSlice<'_>],
+        cancellation: &Cancellation,
+    ) -> OperationResult<usize> {
+        self.write_vectored_with_flags(buffers, SocketSendFlags::default(), cancellation)
+            .await
+    }
+
+    async fn write_vectored_with_flags(
+        &mut self,
+        buffers: &[std::io::IoSlice<'_>],
+        flags: core_scheduler::SocketSendFlags,
+        cancellation: &Cancellation,
+    ) -> OperationResult<usize> {
+        self.check_open()?;
+        if self.state.is_pending() {
+            self.state.flush(cancellation).await?;
+        }
+        self.scheduler
+            .socket_sendmsg_poll(&self.socket, buffers, None, flags, cancellation)
+            .await
+    }
+
+    async fn write_owned_vectored<Buffers: core_scheduler::IoBufSequence>(
+        &mut self,
+        buffers: Buffers,
+        flags: core_scheduler::SocketSendFlags,
+        cancellation: &Cancellation,
+    ) -> (OperationResult<usize>, Buffers) {
+        if let Err(error) = self.state.check_open() {
+            return (Err(error), buffers);
+        }
+        if self.state.is_pending() {
+            if let Err(error) = self.state.flush(cancellation).await {
+                return (Err(error), buffers);
+            }
+        }
+        if let Err(error) = cancellation.check() {
+            return (Err(error.into()), buffers);
+        }
+        let buffers = match self.operations.begin(buffers) {
+            Ok(buffers) => buffers,
+            Err((error, buffers)) => return (Err(error), buffers),
+        };
+        let message = crate::SocketMessage {
+            buffers,
+            address: None,
+        };
+        let (result, message) = self
+            .scheduler
+            .socket_sendmsg(&self.socket, message, flags, cancellation)
+            .await;
+        (result, message.buffers.into_inner())
+    }
+
+    async fn write_owned<Owned: core_scheduler::IoBuf>(
+        &mut self,
+        buffer: Owned,
+        cancellation: &Cancellation,
+    ) -> core_scheduler::BufferResult<Owned> {
+        if let Err(error) = self.state.check_open() {
+            return (Err(error), buffer);
+        }
+        if self.state.is_pending() {
+            if let Err(error) = self.state.flush(cancellation).await {
+                return (Err(error), buffer);
+            }
+        }
+        if let Err(error) = cancellation.check() {
+            return (Err(error.into()), buffer);
+        }
+        let buffer = match self.operations.begin(buffer) {
+            Ok(buffer) => buffer,
+            Err((error, buffer)) => return (Err(error), buffer),
+        };
+        let (result, buffer) = self
+            .scheduler
+            .socket_write(&self.socket, buffer, cancellation)
+            .await;
+        (result, buffer.into_inner())
+    }
 
     async fn submit(
         &mut self,
-        scheduler: &DirectScheduler,
         buffer: B,
         cancellation: &Cancellation,
     ) -> Result<(), (OperationError, B)> {
+        let scheduler = self.scheduler;
+        if let Err(error) = self.check_open() {
+            return Err((error, buffer));
+        }
         if let Err(error) = scheduler.socket_retry.check_open().map_err(Into::into) {
             return Err((error, buffer));
         }
@@ -116,15 +234,14 @@ impl<B: IoBuf> SocketStreamOutput<DirectScheduler> for DirectStreamWriter<B> {
         Ok(())
     }
 
-    async fn flush(
-        &mut self,
-        _scheduler: &DirectScheduler,
-        cancellation: &Cancellation,
-    ) -> OperationResult<()> {
+    async fn flush(&mut self, cancellation: &Cancellation) -> OperationResult<()> {
+        self.operations.check_idle()?;
         self.state.flush(cancellation).await
     }
 
-    async fn close(&mut self, _scheduler: &DirectScheduler) -> io::Result<()> {
+    async fn close(&mut self) -> io::Result<()> {
+        self.state.stop();
+        self.operations.close().await;
         self.state.close().await
     }
 }
@@ -189,7 +306,7 @@ impl core_scheduler::SocketStreamWriting for DirectScheduler {
     where
         Self::Socket: 'static,
     {
-        core_scheduler::BoundSocketStreamWriter::new(self, socket)
+        self.socket_stream_output(socket)
     }
 
     fn socket_stream_writer_with_buffer<'scheduler, B: IoBuf>(
@@ -199,6 +316,6 @@ impl core_scheduler::SocketStreamWriting for DirectScheduler {
     where
         Self::Socket: 'static,
     {
-        core_scheduler::BoundSocketStreamWriter::new(self, socket)
+        self.socket_stream_output(socket)
     }
 }

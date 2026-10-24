@@ -66,48 +66,7 @@ impl Spawn for Receives {
         }
     }
 }
-impl SocketRecvPoll for Receives {
-    async fn socket_recv_poll(
-        &self,
-        socket: &SocketType,
-        buffer: &mut [u8],
-        flags: SocketRecvFlags,
-        cancellation: &Cancellation,
-    ) -> OperationResult<usize> {
-        self.socket_recvmsg_poll(
-            socket,
-            &mut [io::IoSliceMut::new(buffer)],
-            flags,
-            cancellation,
-        )
-        .await
-        .map(|result| result.bytes)
-    }
-}
-impl SocketSendPoll for Receives {
-    async fn socket_send_poll(
-        &self,
-        _: &SocketType,
-        _: &[u8],
-        _: SocketSendFlags,
-        _: &Cancellation,
-    ) -> OperationResult<usize> {
-        unreachable!("receive examples do not send")
-    }
-}
-impl SocketSendMsgPoll for Receives {
-    async fn socket_sendmsg_poll(
-        &self,
-        _: &SocketType,
-        _: &[io::IoSlice<'_>],
-        _: Option<SocketAddress>,
-        _: SocketSendFlags,
-        _: &Cancellation,
-    ) -> OperationResult<usize> {
-        unreachable!("receive examples do not send")
-    }
-}
-impl SocketRecvMsgPoll for Receives {
+impl Receives {
     async fn socket_recvmsg_poll(
         &self,
         _: &SocketType,
@@ -146,43 +105,155 @@ impl SocketRecvMsgPoll for Receives {
         })
     }
 }
-impl SocketWait for Receives {
-    async fn socket_wait(
-        &self,
-        _: &SocketType,
-        _: Interest,
-        cancellation: &Cancellation,
-    ) -> OperationResult<()> {
-        cancellation.check()?;
-        if !self.packets.lock().unwrap().is_empty() {
-            return Ok(());
-        }
-        cancellation.cancelled().await;
-        Err(Cancelled.into())
-    }
+struct Reader<'a> {
+    source: &'a Receives,
+    pool: HeapBufferPool,
+    stream: bool,
+    closed: bool,
 }
-impl SocketMonitoring for Receives {
-    type MonitorRegistration = ();
-    fn socket_type(&self, socket: &SocketType) -> io::Result<SocketType> {
-        Ok(*socket)
+impl Reader<'_> {
+    async fn receive(
+        &mut self,
+        cancellation: &Cancellation,
+    ) -> OperationResult<Option<OwnedSocketRecvMessage<BufferLease>>> {
+        cancellation.check()?;
+        if self.closed {
+            return Ok(None);
+        }
+        let mut buffer = self.pool.acquire(cancellation).await?;
+        let result = self
+            .source
+            .socket_recvmsg_poll(
+                &SocketType::Datagram,
+                &mut [io::IoSliceMut::new(buffer.as_mut())],
+                SocketRecvFlags::default(),
+                cancellation,
+            )
+            .await?;
+        if self.stream && result.bytes == 0 {
+            return Ok(None);
+        }
+        buffer.truncate(result.bytes);
+        Ok(Some(OwnedSocketRecvMessage::new(result, buffer)))
     }
-    fn socket_monitor_state(
-        &self,
-        socket: &SocketType,
-        interest: Interest,
-    ) -> io::Result<SocketMonitor<SocketType, ()>> {
-        Ok(SocketMonitor::new(*socket, interest, ()))
-    }
-    async fn socket_monitor_close<M: SocketMonitorState<SocketType, ()>>(
-        &self,
-        _: &mut MonitorStorage<M>,
-    ) -> io::Result<()> {
-        self.closed.fetch_add(1, Ordering::Relaxed);
-        if self.fail_close {
+    fn retire(&mut self) -> io::Result<()> {
+        self.closed = true;
+        self.source.closed.fetch_add(1, Ordering::Relaxed);
+        if self.source.fail_close {
             Err(io::ErrorKind::BrokenPipe.into())
         } else {
             Ok(())
         }
+    }
+}
+impl SocketStreamReader for Reader<'_> {
+    type Buffer = BufferLease;
+    async fn read(&mut self, cancellation: &Cancellation) -> OperationResult<Option<Self::Buffer>> {
+        self.receive(cancellation)
+            .await
+            .map(|message| message.map(OwnedSocketRecvMessage::into_payload))
+    }
+    async fn read_into(
+        &mut self,
+        buffer: &mut [u8],
+        cancellation: &Cancellation,
+    ) -> OperationResult<usize> {
+        <Self as SocketStreamReader>::read_vectored(
+            self,
+            &mut [io::IoSliceMut::new(buffer)],
+            cancellation,
+        )
+        .await
+    }
+    async fn read_vectored(
+        &mut self,
+        buffers: &mut [io::IoSliceMut<'_>],
+        cancellation: &Cancellation,
+    ) -> OperationResult<usize> {
+        <Self as SocketStreamReader>::read_vectored_with_flags(
+            self,
+            buffers,
+            SocketRecvFlags::default(),
+            cancellation,
+        )
+        .await
+        .map(|result| result.bytes)
+    }
+    async fn read_vectored_with_flags(
+        &mut self,
+        buffers: &mut [io::IoSliceMut<'_>],
+        flags: SocketRecvFlags,
+        cancellation: &Cancellation,
+    ) -> OperationResult<SocketRecvResult> {
+        self.source
+            .socket_recvmsg_poll(&SocketType::Stream, buffers, flags, cancellation)
+            .await
+    }
+    async fn read_owned_vectored<B: IoBufSequenceMut>(
+        &mut self,
+        _: B,
+        _: SocketRecvFlags,
+        _: &Cancellation,
+    ) -> (OperationResult<SocketRecvResult>, B) {
+        unreachable!("The frame recipe receives pooled contiguous chunks")
+    }
+    async fn close(&mut self) -> io::Result<()> {
+        self.retire()
+    }
+}
+impl SocketPacketReader for Reader<'_> {
+    type Message = OwnedSocketRecvMessage<BufferLease>;
+    async fn read(
+        &mut self,
+        cancellation: &Cancellation,
+    ) -> OperationResult<Option<Self::Message>> {
+        self.receive(cancellation).await
+    }
+    async fn read_into(
+        &mut self,
+        buffer: &mut [u8],
+        cancellation: &Cancellation,
+    ) -> OperationResult<SocketRecvResult> {
+        <Self as SocketPacketReader>::read_vectored(
+            self,
+            &mut [io::IoSliceMut::new(buffer)],
+            cancellation,
+        )
+        .await
+    }
+    async fn read_vectored(
+        &mut self,
+        buffers: &mut [io::IoSliceMut<'_>],
+        cancellation: &Cancellation,
+    ) -> OperationResult<SocketRecvResult> {
+        <Self as SocketPacketReader>::read_vectored_with_flags(
+            self,
+            buffers,
+            SocketRecvFlags::default(),
+            cancellation,
+        )
+        .await
+    }
+    async fn read_vectored_with_flags(
+        &mut self,
+        buffers: &mut [io::IoSliceMut<'_>],
+        flags: SocketRecvFlags,
+        cancellation: &Cancellation,
+    ) -> OperationResult<SocketRecvResult> {
+        self.source
+            .socket_recvmsg_poll(&SocketType::Datagram, buffers, flags, cancellation)
+            .await
+    }
+    async fn read_owned_vectored<B: IoBufSequenceMut>(
+        &mut self,
+        _: B,
+        _: SocketRecvFlags,
+        _: &Cancellation,
+    ) -> (OperationResult<SocketRecvResult>, B) {
+        unreachable!("The packet recipe receives pooled contiguous chunks")
+    }
+    async fn close(&mut self) -> io::Result<()> {
+        self.retire()
     }
 }
 
@@ -409,5 +480,47 @@ fn frame_receiver_validates_setup_and_reports_close_failure() {
     });
 }
 
-impl SocketStreamReading for Receives {}
-impl SocketPacketReading for Receives {}
+impl SocketStreamReading for Receives {
+    fn socket_stream_reader(
+        &self,
+        socket: &SocketType,
+    ) -> io::Result<impl SocketStreamReader<Buffer = BufferLease> + '_> {
+        self.socket_stream_reader_with_pool(socket, HeapBufferPool::new(2, 64 * 1024)?)
+    }
+    fn socket_stream_reader_with_pool(
+        &self,
+        _: &SocketType,
+        pool: HeapBufferPool,
+    ) -> io::Result<impl SocketStreamReader<Buffer = BufferLease> + '_> {
+        Ok(Reader {
+            source: self,
+            pool,
+            stream: true,
+            closed: false,
+        })
+    }
+}
+impl SocketPacketReading for Receives {
+    fn socket_packet_reader(
+        &self,
+        socket: &SocketType,
+    ) -> io::Result<
+        impl SocketPacketReader<Message: SocketRecvMessageMut<Payload = BufferLease>> + '_,
+    > {
+        self.socket_packet_reader_with_pool(socket, HeapBufferPool::new(2, 64 * 1024)?)
+    }
+    fn socket_packet_reader_with_pool(
+        &self,
+        _: &SocketType,
+        pool: HeapBufferPool,
+    ) -> io::Result<
+        impl SocketPacketReader<Message: SocketRecvMessageMut<Payload = BufferLease>> + '_,
+    > {
+        Ok(Reader {
+            source: self,
+            pool,
+            stream: false,
+            closed: false,
+        })
+    }
+}
