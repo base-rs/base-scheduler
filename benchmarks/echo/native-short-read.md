@@ -136,6 +136,87 @@ Separate setup traces verify that all four bound workers actually accept `0x3200
 
 The early prototype's [regression patch](results/native-short-read/io-event/early-tests.patch) checks publication of deferred notification work within one nonblocking turn and transient/fatal flush errors. Its [successful crate test log](results/native-short-read/io-event/early-tests.log) covers 234 unit tests, 290 integration tests including the urgent-data fixture, and one doctest. An [initial parallel attempt](results/native-short-read/io-event/early-tests-parallel.log) failed one ring allocation with `ENOMEM`; the complete rerun used four test threads. Submission-first independently passes the same 290 [public integration tests](results/native-short-read/io-event/submission-first-integration-tests.log), including urgent-data handling, and [library Clippy](results/native-short-read/io-event/submission-first-clippy.log). The early prototype's internal error-injection tests are specific to its ordering and are not claimed as submission-first validation. These remain archived experiments; production runtime code is unchanged.
 
+## Wait-time processing
+
+These controls reserve explicit deferred-task-work processing for CQ waits: a driver turn with `None` or a positive timeout. A zero-timeout turn still publishes necessary SQEs and inspects already available CQEs. Unlike the boundary controls above, it does not enter merely because `SQ_TASKRUN` is set, and productive submissions use a raw entry without `GETEVENTS`. This bypasses the provider's automatic task-work flush. CQ overflow remains an immediate progress exception. A true completion wait retains the combined submit-and-wait entry rather than preceding it with a separate kernel flush.
+
+The [strict control](results/native-short-read/wait/strict.json) uses deferred/single-issuer setup and implements that timeout gate without a busy-loop fallback. The [source record](results/native-short-read/wait/strict-source.txt) identifies the exact runtime change. Its [gate test](results/native-short-read/wait/strict-gate.log) confirms that two zero-timeout turns leave known pending task work deferred, while `None`, one-nanosecond, and one-millisecond completion waits publish it.
+
+Strict wait-only processing can starve accepted I/O when runnable work never exhausts. Both [repeated zero-timeout polling](results/native-short-read/wait/strict-polling.log) and a [single-worker mixed workload](results/native-short-read/wait/strict-busy.log) reproduce this: pending notification work never reaches its consumer during the polling check, and a socket read times out while another task keeps waking itself. Each test records its observation before permitting a nonzero-timeout cleanup wait, so cleanup cannot mask the failed progress property. The [unit-test patch](results/native-short-read/wait/strict-tests.patch) and [public mixed-workload fixture](results/native-short-read/wait/busy-completions.rs) preserve the reproducers.
+
+The [bounded control](results/native-short-read/wait/fair.json) keeps CQ waits as the normal processing point and adds a private counter for zero-timeout turns observing pending `SQ_TASKRUN`. After 32 such turns it permits a nonblocking `GETEVENTS` entry and publishes the resulting CQEs. Unrelated commands and completions do not reset the counter; transient entry errors leave it due. A task-work-only flush leaves a fresh readiness batch staged, while overflow still submits and processes immediately. The [source record](results/native-short-read/wait/fair-source.txt) and [regression patch](results/native-short-read/wait/fair-tests.patch) preserve that intervention. The budget bounds driver turns, not elapsed time or arbitrary future-poll duration; 32 is a candidate progress budget, not a measured optimum.
+
+Bounded-control medians, with throughput in echoes/s and P99 round-trip latency in microseconds:
+
+| Workers | Connections | Current Native | Wait-time processing | Throughput change | Change vs Tokio | P99 current → wait |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 | 1 | 273,742 | 266,559 | -2.62% | -2.70% | 4.271 → 5.391 |
+| 1 | 32 | 634,736 | 674,602 | +6.28% | -5.03% | 54.847 → 52.287 |
+| 4 | 1 | 265,409 | 231,771 | -12.67% | -15.18% | 5.643 → 7.363 |
+| 4 | 32 | 1,740,473 | 1,754,200 | +0.79% | -0.24% | 52.479 → 54.207 |
+
+The separate strict screen changes its own baseline's corresponding throughputs by -2.64%, +4.43%, -11.34%, and -0.08%. Neither timeout gating nor its bounded variant resolves the deferred-ring tradeoff: busy single-worker throughput improves, while the four-worker/single-connection path regresses substantially. The retained latency samples also show increased single-connection P99. The closed-loop echo workload alone does not expose the strict policy's progress failure, because its ready queues can eventually empty.
+
+A [cooperative-ring control](results/native-short-read/wait/cooperative.json) retains `COOP_TASKRUN | TASKRUN_FLAG` while applying the same bounded timeout gate. Its four 64-byte median changes against its own interleaved baseline are +1.19%, -0.37%, +2.77%, and +0.76%, in the table's case order. The [source record](results/native-short-read/wait/cooperative-source.txt), [four-worker setup trace](results/native-short-read/wait/cooperative-setup.txt), and [test log](results/native-short-read/wait/cooperative-tests.log) preserve that control. The setup runner labels this executable `single`, but the accepted flags are `0x300`, without single-issuer or deferred mode. The four-worker deferred setup accepts `0x3200` in the [matching trace](results/native-short-read/wait/fair-setup.txt). These screens do not establish a general gain from timeout gating alone.
+
+Each wait-policy screen has 48 randomized samples: three repetitions of four variants, one/four workers, one/32 connections, and 64-byte payloads. The settings, executable hashes, frozen validating client, and measurements are retained in each JSON. They use the release profile and CPU placement described below. These are separate matrices; changes above compare each candidate against its own interleaved baseline.
+
+The bounded prototype passes its [complete crate test run](results/native-short-read/wait/fair-tests.log): 235 unit tests, 290 integration tests including the mixed-workload case, and one doctest, with four test threads. It also passes the separate [urgent-data fixture](results/native-short-read/wait/fair-urgent.log) and [all-target Clippy](results/native-short-read/wait/fair-clippy.log). Production runtime code remains unchanged.
+
+## Tokio work scheduling and affinity controls
+
+The comparison uses the resolved Tokio 1.53.3 implementation, rather than assuming that all work-stealing schedulers have the same scheduling policy. Its [worker implementation](https://github.com/tokio-rs/tokio/blob/tokio-1.53.3/tokio/src/runtime/scheduler/multi_thread/worker.rs), [idle coordination](https://github.com/tokio-rs/tokio/blob/tokio-1.53.3/tokio/src/runtime/scheduler/multi_thread/idle.rs), and [queue implementation](https://github.com/tokio-rs/tokio/blob/tokio-1.53.3/tokio/src/runtime/scheduler/multi_thread/queue.rs) establish these differences:
+
+| Behavior | Tokio 1.53.3 | Current Native |
+| --- | --- | --- |
+| Ordinary local wake | Private, unstealable LIFO slot; displace its previous task into a FIFO queue | Push into the next stealable FIFO generation |
+| Extra worker notification | First LIFO-slot fill does not notify; driver publication defers notification until returning from park | Every schedule considers waking the preferred worker or an idle helper; a multi-task batch also considers helpers |
+| Victim search | Random starting victim; roughly half the workers may search concurrently | Rotating starting victim; no shared searcher limit |
+| Local storage | Bounded 256-task queue, with overflow to global injection | Two unbounded Crossbeam FIFO generations, frozen at batch boundaries |
+| External wake | Shared injection queue | Last worker's inbox, also stealable |
+| Stolen work | Batch from a victim's queue | Batch from either FIFO generation or its inbox |
+
+Tokio caps immediate consecutive LIFO polls and shares a cooperative budget to prevent starvation. Native drains a frozen batch, then services its driver and timers before the next batch. Copying Tokio's unrestricted private slot would also change an existing Native behavior: a task can currently wake local work that an idle worker steals while the original task is still being polled. Native's `local_work_can_be_stolen_while_its_worker_is_busy` test relies on that availability. A private slot is therefore a diagnostic policy choice, not a behavior-neutral queue replacement.
+
+A [35-sample affinity matrix](results/native-short-read/wait/affinity/timing.json) compares seven frozen variants, with five randomized repetitions of four workers, one connection, and 64-byte payloads. The [runner](results/native-short-read/wait-affinity.py) retains settings and hashes. `no-steal` removes all victim searches but keeps the existing helper-notification policy. `owner` additionally removes the fallback helper scan in `wake_idle`, retaining the preferred-worker wake, initial fence/idle-count check, direct timer wakes, and shutdown wake-all. The cooperative variants retain the production submission path; deferred variants also use the bounded wait-time entry policy described above. Their paired gaps therefore do not isolate ring-setup flags. These diagnostics deliberately disable load balancing and are not production candidates.
+
+| Policy | Cooperative echoes/s | Deferred echoes/s | Cooperative P99 µs | Deferred P99 µs |
+| --- | ---: | ---: | ---: | ---: |
+| Current worker policy | 262,617 | 236,856 | 5.583 | 6.231 |
+| No stealing | 274,508 | 254,977 | 4.323 | 5.503 |
+| No stealing or helper fallback | 273,824 | 266,094 | 4.491 | 5.451 |
+| Raw Tokio | 276,746 | — | 4.343 | — |
+
+Eliminating search and migration recovers most of the cooperative policy's throughput deficit in this control. Deferred processing remains 7.11% behind its cooperative counterpart without stealing, and 2.82% behind with helper fallback also removed. This suggests an interaction with scheduling coordination, but the five-repeat ranges are wide; neither control isolates task migration from unsuccessful searches or proves the cause of the deferred penalty.
+
+Separate [CPU counters](results/native-short-read/wait/affinity/cpu.json) and [work counters](results/native-short-read/wait/affinity/work.json) use three randomized repetitions each, without warmup. Instrumentation changes timing substantially; their rates are not capacity measurements. Median userspace instructions per echo fall from about 4,839 to 3,298 for cooperative mode when stealing is disabled, and from 4,843 to 3,299 for deferred mode. Removing helper fallback changes these to about 3,284 and 3,285, respectively. This is evidence of work performed by the search path; it does not show that tasks were frequently stolen.
+
+The work-counter runs observe about one ring entry and one completion per echo for all Native policies. Eventfd-capable `write` calls are below 0.00006 per echo, and futex calls below 0.00005; these instrumented runs do not establish frequent helper interrupts or a wakeup storm. The CPU-migration counter measures OS thread migration, not asynchronous task stealing. The no-steal results therefore motivate testing the cost of unsuccessful victim searches and protecting local continuations separately from actual helper wakeups.
+
+### Preserving work stealing
+
+Three smaller worker controls retain normal task stealing and require no public API changes:
+
+- [Private continuation](results/native-short-read/wait/affinity/private-continuation-source.txt): reserve one locally published driver/timer continuation outside application polling in a private next slot. Displaced continuations remain stealable. Application-poll wakes keep their existing queue and helper notification, preserving the busy-parent behavior discussed above. The slot is consumed once at the next frozen batch boundary, without immediate repeated LIFO polling.
+- [Empty-victim checks](results/native-short-read/wait/affinity/empty-victims-source.txt): check each victim deque and inbox before attempting a batch steal. Crossbeam 0.8.8's deque steal path pins its epoch guard before discovering that the victim is empty. Its advisory emptiness check still uses a sequentially consistent fence, but avoids epoch entry on empty victims; nonempty victims pay the additional check. The existing idle publication, recheck, and wake protocol covers enqueues racing an empty snapshot.
+- [One steal-search phase](results/native-short-read/wait/affinity/single-search-source.txt): first check only local work; after publishing the sleeping state, retain the existing complete local/inbox/victim search before waiting. This removes the earlier victim scan. Successful steals now also pay idle-publication bookkeeping, so this is a phase-ordering control, rather than a pure reduction in unsuccessful-search instructions.
+
+An initial [30-sample single-search screen](results/native-short-read/wait/affinity/single-search-screen.json) changes cooperative four-worker/one-connection throughput from 265,093 to 272,052 echoes/s (+2.63%), against Tokio's 273,491. P99 changes from 5.543 to 4.783 µs. Its one-worker/32-connection result changes by -0.72%; the deferred variants change by +5.16% and +1.45%, respectively. The source intervention preserves task stealing and the existing wakeup race protection.
+
+The [combined 54-sample screen](results/native-short-read/wait/affinity/scheduling-rebuilt-screen.json) compares nine variants, with three randomized repetitions of four workers/one connection and one worker/32 connections, using 64-byte borrowed monitor I/O. Each scheduling control is tested with the production cooperative path and the bounded deferred path. Medians are echoes/s:
+
+| Worker policy | Cooperative 4w/1c | Deferred 4w/1c | Cooperative 1w/32c | Deferred 1w/32c |
+| --- | ---: | ---: | ---: | ---: |
+| Current | 253,533 | 242,370 | 635,180 | 669,832 |
+| Private continuation | 254,766 | 232,142 | 633,278 | 676,710 |
+| Empty-victim checks | 275,672 | 249,821 | 637,676 | 670,735 |
+| One steal-search phase | 276,852 | 238,683 | 631,356 | 677,495 |
+| Raw Tokio | 276,840 | — | 708,191 | — |
+
+With cooperative rings, the two search controls recover the four-worker/single-connection throughput gap in this screen. Their P99s are 4.831 and 4.843 µs, versus the baseline's 5.623 and Tokio's 4.471. The private slot supplies little benefit in the combined cooperative screen, and does not repair the deferred penalty. The single-search deferred result improves in the first screen but regresses in the second; it is not a demonstrated solution to the deferred-ring tradeoff. Together, these controls favor investigating unsuccessful-search costs over attributing this workload's gap to frequent task migration. Neither establishes general parity: the busy single-worker path remains slower, and these screens do not cover owned I/O, 4 KiB payloads, or four-worker/32-connection load balancing.
+
+The valid [private-slot build](results/native-short-read/wait/affinity/coop-private-continuation-build.log), [single-search build](results/native-short-read/wait/affinity/coop-single-search-build.log), and [rebuilt empty-check build](results/native-short-read/wait/affinity/coop-empty-victims-rebuilt-build.log) each compile all benchmark workspace crates. An earlier combined attempt was discarded after a shared Cargo target reused a previous worktree's executable for another purported variant. The final empty-check build explicitly cleans the workspace release artifacts first; the [runner](results/native-short-read/wait-affinity.py) now rejects duplicate backend/executable-hash identities before launching samples. All identities in the retained combined matrix are distinct. Private-slot and single-search controls pass the Native suite ([private](results/native-short-read/wait/affinity/private-continuation-tests.log), [single-search](results/native-short-read/wait/affinity/single-search-tests.log)); the [combined single-search/deferred test run](results/native-short-read/wait/affinity/deferred-single-search-tests.log) also passes the io_uring suite, including urgent-data handling. These are diagnostic prototypes; no runtime change has been selected or shipped.
+
 ## Local-wake policy screen
 
 A [60-sample screen](results/native-short-read/local-wakes/matrix.json) changes only native wake escalation. Local notifications outside task polling wait for the ready-batch boundary before waking idle helpers; application-poll and remote wakes retain immediate escalation. Task stealing remains enabled. The [source record](results/native-short-read/local-wakes/source.txt) preserves the runtime intervention and its polling-phase flag.
