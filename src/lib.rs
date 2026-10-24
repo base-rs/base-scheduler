@@ -152,23 +152,32 @@ pub use file_advice::FileAdvice;
 pub use file_allocate::FileAllocate;
 pub use file_close::FileClose;
 pub use file_metadata::FileMetadata;
+#[doc(hidden)]
 pub use file_monitor::FileMonitor;
+#[doc(hidden)]
 pub use file_monitoring::FileMonitoring;
 pub use file_open::FileOpen;
 pub use file_operation::FileOperation;
 pub use file_options::FileOptions;
+#[doc(hidden)]
 pub use file_read::FileRead;
+#[doc(hidden)]
 pub use file_read_at::FileReadAt;
+#[doc(hidden)]
 pub use file_receiver::FileReceiver;
 pub use file_scheduler::FileScheduler;
 pub use file_seek::FileSeek;
 pub use file_stat::FileStat;
+#[doc(hidden)]
 pub use file_submission::FileSubmission;
 pub use file_sync::FileSync;
 pub use file_truncate::FileTruncate;
 pub use file_type::FileType;
+#[doc(hidden)]
 pub use file_write::FileWrite;
+#[doc(hidden)]
 pub use file_write_all::{file_write_all, file_write_all_submit};
+#[doc(hidden)]
 pub use file_write_at::FileWriteAt;
 pub use frozen_buffer::FrozenBuffer;
 pub use heap_buffer_pool::HeapBufferPool;
@@ -179,7 +188,9 @@ pub use io_buf_sequence::IoBufSequence;
 pub use io_buf_sequence_mut::IoBufSequenceMut;
 pub use io_buffers::IoBuffers;
 pub use io_buffers_mut::IoBuffersMut;
+#[doc(hidden)]
 pub use monitor_state::MonitorState;
+#[doc(hidden)]
 pub use monitor_storage::MonitorStorage;
 pub use notify::Notify;
 pub use operation_error::{OperationError, OperationResult};
@@ -198,8 +209,11 @@ pub use socket_listen::SocketListen;
 pub use socket_local_address::SocketLocalAddress;
 pub use socket_message::SocketMessage;
 pub use socket_messages::SocketMessages;
+#[doc(hidden)]
 pub use socket_monitor::SocketMonitor;
+#[doc(hidden)]
 pub use socket_monitor_state::SocketMonitorState;
+#[doc(hidden)]
 pub use socket_monitoring::SocketMonitoring;
 pub use socket_open::SocketOpen;
 pub use socket_operation::SocketOperation;
@@ -207,31 +221,45 @@ pub use socket_option::SocketOption;
 pub use socket_options::SocketOptions;
 pub use socket_peer_address::SocketPeerAddress;
 pub use socket_protocol::SocketProtocol;
+#[doc(hidden)]
 pub use socket_read::SocketRead;
+#[doc(hidden)]
 pub use socket_receiver::SocketReceiver;
+#[doc(hidden)]
 pub use socket_receiving::SocketReceiving;
 pub use socket_recv_flags::SocketRecvFlags;
 pub use socket_recv_message::SocketRecvMessage;
 pub use socket_recv_message_mut::SocketRecvMessageMut;
+#[doc(hidden)]
 pub use socket_recv_msg::SocketRecvMsg;
+#[doc(hidden)]
 pub use socket_recv_msg_poll::SocketRecvMsgPoll;
+#[doc(hidden)]
 pub use socket_recv_msg_receiver::SocketRecvMsgReceiver;
+#[doc(hidden)]
 pub use socket_recv_poll::SocketRecvPoll;
 pub use socket_recv_result::SocketRecvResult;
 pub use socket_registration::SocketRegistration;
 pub use socket_reuse_address::SocketReuseAddress;
 pub use socket_scheduler::SocketScheduler;
 pub use socket_send_flags::SocketSendFlags;
+#[doc(hidden)]
 pub use socket_send_msg::SocketSendMsg;
+#[doc(hidden)]
 pub use socket_send_msg_poll::SocketSendMsgPoll;
+#[doc(hidden)]
 pub use socket_send_poll::SocketSendPoll;
 pub use socket_set_option::SocketSetOption;
 pub use socket_shutdown::SocketShutdown;
+#[doc(hidden)]
 pub use socket_stream_monitor::SocketStreamMonitor;
+#[doc(hidden)]
 pub use socket_stream_output::SocketStreamOutput;
 pub use socket_stream_writing::SocketStreamWriting;
 pub use socket_type::SocketType;
+#[doc(hidden)]
 pub use socket_wait::SocketWait;
+#[doc(hidden)]
 pub use socket_write::SocketWrite;
 #[doc(hidden)]
 pub use socket_write_state::SocketWriteState;

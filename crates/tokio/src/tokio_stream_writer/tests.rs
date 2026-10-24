@@ -75,6 +75,10 @@ fn rejects_datagrams_and_closed_admission() {
             let mut writer = scheduler.socket_stream_output::<Vec<u8>>(&sender).unwrap();
             scheduler.close();
             assert_eq!(
+                scheduler.socket_type(&sender).unwrap_err().kind(),
+                io::ErrorKind::BrokenPipe
+            );
+            assert_eq!(
                 scheduler
                     .socket_stream_output::<Vec<u8>>(&sender)
                     .err()

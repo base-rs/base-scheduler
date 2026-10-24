@@ -116,7 +116,9 @@ where
 
     async fn flush(&mut self, cancellation: &Cancellation) -> OperationResult<()> {
         self.check_open()?;
-        self.output.flush(self.scheduler, cancellation).await
+        self.output.flush(self.scheduler, cancellation).await?;
+        self.submitted = false;
+        Ok(())
     }
 
     async fn close(&mut self) -> io::Result<()> {

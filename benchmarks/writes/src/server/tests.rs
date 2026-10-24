@@ -90,6 +90,9 @@ impl SocketWait for Script {
 }
 
 impl SocketMonitoring for Script {
+    fn socket_type(&self, _: &()) -> io::Result<core_scheduler::SocketType> {
+        Ok(core_scheduler::SocketType::Stream)
+    }
     type MonitorRegistration = ();
 
     fn socket_monitor_state(

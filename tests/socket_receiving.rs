@@ -384,9 +384,14 @@ fn readiness_failures_follow_receive_error_policy() {
     });
 }
 
+thread_local! { static FAIL_POOL: std::cell::Cell<bool> = const { std::cell::Cell::new(false) }; }
+
 impl BufferPooling for Sockets {
     type Pool = HeapBufferPool;
     fn buffer_pool(&self, options: BufferPoolOptions) -> io::Result<Self::Pool> {
+        if FAIL_POOL.with(|flag| flag.replace(false)) {
+            return Err(io::ErrorKind::OutOfMemory.into());
+        }
         HeapBufferPool::with_options(options)
     }
 }
@@ -641,5 +646,41 @@ fn bound_stream_writer_preserves_ordering_after_abandoned_admission_and_errors()
         assert!(Sockets.socket_stream_writer(&socket).is_err());
         socket.store(202, Ordering::Relaxed);
         assert!(Sockets.socket_stream_writer(&socket).is_err());
+    });
+}
+
+#[test]
+fn bound_stream_reader_preserves_pool_failures_exhaustion_and_cancellation_at_eof() {
+    block_on(async {
+        let socket = Arc::new(AtomicUsize::new(1));
+        let never = Cancellation::never();
+        let mut reader = Sockets.socket_stream_reader(&socket).unwrap();
+        FAIL_POOL.with(|flag| flag.set(true));
+        assert_eq!(
+            reader.read(&never).await.unwrap_err().kind(),
+            io::ErrorKind::OutOfMemory
+        );
+        let pool = HeapBufferPool::new(1, 1).unwrap();
+        let held = pool.try_acquire().unwrap();
+        reader = reader.with_pool(pool);
+        let cancellation = Cancellation::new();
+        {
+            let mut reading = pin!(reader.read(&cancellation));
+            assert!(poll_once(reading.as_mut()).await.is_none());
+            cancellation.cancel();
+            assert!(reading.await.is_err());
+        }
+        drop(held);
+        socket.store(0, Ordering::Relaxed);
+        assert_eq!(
+            reader
+                .read_vectored(&mut [IoSliceMut::new(&mut [0; 1])], &never)
+                .await
+                .unwrap(),
+            0
+        );
+        assert!(reader.read_into(&mut [0; 1], &cancellation).await.is_err());
+        assert!(reader.read_vectored(&mut [], &cancellation).await.is_err());
+        reader.close().await.unwrap();
     });
 }

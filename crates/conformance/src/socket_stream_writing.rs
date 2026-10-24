@@ -166,25 +166,6 @@ fn completed_or_cancelled(result: OperationResult<()>) {
     assert!(matches!(result, Ok(()) | Err(OperationError::Cancelled(_))));
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn flush_accepts_completion_or_cancellation_and_rejects_other_errors() {
-        completed_or_cancelled(Ok(()));
-        completed_or_cancelled(Err(Cancelled.into()));
-        assert!(
-            std::panic::catch_unwind(|| {
-                completed_or_cancelled(
-                    Err(io::Error::from(io::ErrorKind::PermissionDenied).into()),
-                );
-            })
-            .is_err()
-        );
-    }
-}
-
 /// Borrowed scalar/vector I/O, owned input, and cancellation all reuse scheduler-bound state. The same input lane can alternate owned chunks and caller storage without copying already received payloads.
 pub async fn bound_io<S>(scheduler: &S, sender: &S::Socket, receiver: &S::Socket)
 where
@@ -231,10 +212,15 @@ where
                 .await
                 .unwrap();
             assert!(count > 0 && count <= 4);
-            let mut sent = count;
-            while sent < 4 {
-                sent += writer.write(&b"abcd"[sent..], &never).await.unwrap();
-            }
+            let pool = scheduler.buffer_pool(BufferPoolOptions::new(1, 4)).unwrap();
+            let mut suffix = pool.acquire(&never).await.unwrap();
+            suffix.as_mut()[..4 - count].copy_from_slice(&b"abcd"[count..]);
+            suffix.truncate(4 - count);
+            writer
+                .submit(suffix, &never)
+                .await
+                .map_err(|(error, _)| error)
+                .unwrap();
         },
     )
     .await;
@@ -269,4 +255,23 @@ where
     reader.close().await.unwrap();
     drop(reader);
     assert_eq!(chunk.as_ref(), b"x");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn flush_accepts_completion_or_cancellation_and_rejects_other_errors() {
+        completed_or_cancelled(Ok(()));
+        completed_or_cancelled(Err(Cancelled.into()));
+        assert!(
+            std::panic::catch_unwind(|| {
+                completed_or_cancelled(
+                    Err(io::Error::from(io::ErrorKind::PermissionDenied).into()),
+                );
+            })
+            .is_err()
+        );
+    }
 }

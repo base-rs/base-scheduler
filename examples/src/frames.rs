@@ -2,8 +2,8 @@
 // Copyright, 2026, by Samuel Williams.
 
 use core_scheduler::{
-    BufferSlice, Cancellation, IoBuf, OperationResult, ReceiveBuffer, SocketReceiving,
-    SocketRecvFlags, SocketRecvMessage, SocketRecvMsgReceiver,
+    BufferPool, BufferSlice, Cancellation, IoBuf, OperationResult, ReceiveBuffer,
+    SocketStreamReader, SocketStreamReading,
 };
 use std::io;
 
@@ -86,23 +86,23 @@ pub async fn receive<S, B, F>(
     mut consume: F,
 ) -> OperationResult<()>
 where
-    S: SocketReceiving,
+    S: SocketStreamReading,
+    S::Socket: 'static,
     B: ReceiveBuffer,
-    S::PooledReceiver: SocketRecvMsgReceiver<S, Message: SocketRecvMessage<Payload = B>>,
+    S::Pool: BufferPool<Buffer = B>,
     F: FnMut(Frame<B::Frozen>) -> OperationResult<()> + Send,
 {
     let mut decoder = FrameDecoder::new(frame_size)?;
-    let mut receiver = scheduler
-        .socket_receiver(socket, pool, SocketRecvFlags::default(), cancellation)
-        .await?;
+    cancellation.check()?;
+    let mut reader = scheduler.socket_stream_reader(socket)?.with_pool(pool);
     let result = async {
-        while let Some(message) = receiver.recv(scheduler, cancellation).await? {
-            decoder.push(message.into_payload().freeze(), &mut consume)?;
+        while let Some(chunk) = reader.read(cancellation).await? {
+            decoder.push(chunk.freeze(), &mut consume)?;
         }
         decoder.finish()?;
         Ok(())
     }
     .await;
-    receiver.close(scheduler).await?;
+    reader.close().await?;
     result
 }
