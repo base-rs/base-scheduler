@@ -38,7 +38,7 @@ async fn tokio_connection(socket: TcpStream, workload: Workload) -> Result<()> {
     Ok(())
 }
 
-async fn monitor_connection<S>(
+async fn monitor_connection<S, const ALTERNATE: bool>(
     scheduler: Arc<S>,
     socket: S::Socket,
     workload: Workload,
@@ -66,8 +66,11 @@ where
             if !matches!(request[0], 1 | 2) {
                 return Err("invalid request".into());
             }
+            let mut previous = None;
             for chunk in 0..workload.chunks {
                 let mut buffer = pool.acquire(&never).await?;
+                // The control retains the completed buffer until the next acquisition, forcing alternation between the same two slots without overlapping I/O.
+                drop(previous.take());
                 prepare(
                     buffer.as_mut(),
                     chunk + usize::from(request[0]) * workload.chunks,
@@ -87,6 +90,9 @@ where
                         return Err(io::Error::from(io::ErrorKind::WriteZero).into());
                     }
                     sent += count;
+                }
+                if ALTERNATE {
+                    previous = Some(buffer);
                 }
             }
         }
@@ -187,9 +193,12 @@ pub(crate) fn run(
         backend,
         "tokio"
             | "tokio-monitor"
+            | "tokio-monitor-alternating"
             | "tokio-writer"
             | "native-monitor"
+            | "native-monitor-alternating"
             | "iouring-monitor"
+            | "iouring-monitor-alternating"
             | "iouring-writer"
     ) {
         return Err("unknown write benchmark backend".into());
@@ -225,7 +234,7 @@ pub(crate) fn run(
             }
             Ok(())
         }),
-        "tokio-monitor" | "tokio-writer" => {
+        "tokio-monitor" | "tokio-monitor-alternating" | "tokio-writer" => {
             let runtime = crate::runtime(workers);
             let scheduler = Arc::new(TokioScheduler::new(runtime.handle().clone()));
             let result = if backend == "tokio-writer" {
@@ -235,35 +244,51 @@ pub(crate) fn run(
                     workload,
                     writer_connection,
                 ))
+            } else if backend.ends_with("-alternating") {
+                runtime.block_on(scheduler_server(
+                    Arc::clone(&scheduler),
+                    sockets,
+                    workload,
+                    monitor_connection::<_, true>,
+                ))
             } else {
                 runtime.block_on(scheduler_server(
                     Arc::clone(&scheduler),
                     sockets,
                     workload,
-                    monitor_connection,
+                    monitor_connection::<_, false>,
                 ))
             };
             runtime.block_on(scheduler.shutdown());
             result
         }
         #[cfg(target_os = "linux")]
-        "native-monitor" => {
+        "native-monitor" | "native-monitor-alternating" => {
             use core_scheduler_native::{NativeOptions, NativeScheduler};
             let scheduler = Arc::new(NativeScheduler::with_options(NativeOptions {
                 workers,
                 ..Default::default()
             })?);
-            let result = scheduler.block_on(scheduler_server(
-                Arc::clone(&scheduler),
-                sockets,
-                workload,
-                monitor_connection,
-            ));
+            let result = if backend.ends_with("-alternating") {
+                scheduler.block_on(scheduler_server(
+                    Arc::clone(&scheduler),
+                    sockets,
+                    workload,
+                    monitor_connection::<_, true>,
+                ))
+            } else {
+                scheduler.block_on(scheduler_server(
+                    Arc::clone(&scheduler),
+                    sockets,
+                    workload,
+                    monitor_connection::<_, false>,
+                ))
+            };
             scheduler.block_on(scheduler.shutdown());
             result
         }
         #[cfg(target_os = "linux")]
-        "iouring-monitor" | "iouring-writer" => {
+        "iouring-monitor" | "iouring-monitor-alternating" | "iouring-writer" => {
             use core_scheduler_iouring::{IoUringOptions, IoUringSelector};
             use core_scheduler_native::{NativeExecutorOptions, NativeScheduler};
             let (selector, drivers) = IoUringSelector::with_workers(
@@ -288,12 +313,19 @@ pub(crate) fn run(
                     workload,
                     writer_connection,
                 ))
+            } else if backend.ends_with("-alternating") {
+                scheduler.block_on(scheduler_server(
+                    Arc::clone(&scheduler),
+                    sockets,
+                    workload,
+                    monitor_connection::<_, true>,
+                ))
             } else {
                 scheduler.block_on(scheduler_server(
                     Arc::clone(&scheduler),
                     sockets,
                     workload,
-                    monitor_connection,
+                    monitor_connection::<_, false>,
                 ))
             };
             scheduler.block_on(scheduler.shutdown());

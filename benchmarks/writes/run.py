@@ -21,8 +21,8 @@ CASES = {
         (1, 1, 64, 1, 0, 0),
         (1, 32, 4096, 1, 0, 0),
         (1, 1, 65536, 8, 8, 0),
-        (1, 1, 65536, 8, 8, 4096),
-        (4, 32, 65536, 8, 8, 4096),
+        (1, 1, 262144, 8, 8, 65536),
+        (4, 32, 262144, 8, 8, 65536),
     ],
     "immediate": [
         (workers, connections, size, 1, 0, 0)
@@ -31,10 +31,10 @@ CASES = {
         for size in (64, 4096)
     ],
     "overlap": [
-        (workers, connections, 65536, 8, work, send_buffer)
+        (workers, connections, size, 8, work, send_buffer)
         for workers, connections in ((1, 1), (1, 32), (4, 32))
         for work in (0, 8)
-        for send_buffer in (0, 4096)
+        for size, send_buffer in ((65536, 0), (262144, 65536))
     ],
 }
 
@@ -98,6 +98,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--binary", default="target/release/core-scheduler-write-benchmark")
     parser.add_argument("--client-binary")
+    parser.add_argument("--variant", action="append", default=[], help="LABEL=BACKEND=SERVER_BINARY; use LABEL in --backends to compare isolated implementations")
     parser.add_argument("--backends", nargs="+", default=BACKENDS)
     parser.add_argument("--suite", choices=CASES, default="screen")
     parser.add_argument("--case", action="append", help="Override suite with workers,connections,bytes,chunks,work,send_buffer; repeatable")
@@ -114,6 +115,10 @@ def main():
         parser.error("each case has six integers and 1 or 4 workers")
     binary = str(Path(args.binary).resolve())
     client_binary = str(Path(args.client_binary or args.binary).resolve())
+    variants = {}
+    for item in args.variant:
+        label, backend, path = item.split("=", 2)
+        variants[label] = {"backend": backend, "binary": str(Path(path).resolve()), "binary_sha256": digest(path)}
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with open("/tmp/core-scheduler-perf.lock", "a") as lock:
         print("Waiting for /tmp/core-scheduler-perf.lock", flush=True)
@@ -130,6 +135,7 @@ def main():
             "binary_sha256": digest(binary),
             "client_binary": client_binary,
             "client_binary_sha256": digest(client_binary),
+            "variants": variants,
             "cargo_lock_sha256": digest("Cargo.lock"),
             "cpu": json.loads(command("lscpu", "-J")),
             "governors": {str(cpu): Path(f"/sys/devices/system/cpu/cpu{cpu}/cpufreq/scaling_governor").read_text().strip() for cpu in range(8)},
@@ -151,7 +157,10 @@ def main():
             print(f"{index + 1}/{len(schedule)}: {backend} {case} repetition={repetition}", flush=True)
             record = {"repetition": repetition, "started_unix": time.time()}
             try:
-                record.update(sample(binary, client_binary, backend, case, args.warmup, args.seconds))
+                variant = variants.get(backend, {"backend": backend, "binary": binary})
+                record.update(sample(variant["binary"], client_binary, variant["backend"], case, args.warmup, args.seconds))
+                record["server_backend"] = variant["backend"]
+                record["backend"] = backend
             except Exception as error:
                 record.update({"backend": backend, "case": case, "error": repr(error)})
                 report["samples"].append(record)

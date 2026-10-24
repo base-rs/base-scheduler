@@ -50,12 +50,21 @@ impl Drop for Server {
 }
 
 fn backends() -> Vec<&'static str> {
-    let mut backends = vec!["tokio", "tokio-monitor", "tokio-writer"];
+    let mut backends = vec![
+        "tokio",
+        "tokio-monitor",
+        "tokio-monitor-alternating",
+        "tokio-writer",
+    ];
     #[cfg(target_os = "linux")]
     {
-        backends.push("native-monitor");
+        backends.extend(["native-monitor", "native-monitor-alternating"]);
         if core_scheduler_iouring::IoUringSelector::new(Default::default()).is_ok() {
-            backends.extend(["iouring-monitor", "iouring-writer"]);
+            backends.extend([
+                "iouring-monitor",
+                "iouring-monitor-alternating",
+                "iouring-writer",
+            ]);
         }
     }
     backends.shrink_to_fit();
