@@ -54,6 +54,7 @@ impl<'a> IoUringSocketStreamReader<'a> {
         self
     }
 
+    #[inline]
     fn check_open(&self) -> OperationResult<()> {
         if self.closed {
             Err(io::Error::new(io::ErrorKind::BrokenPipe, "stream reader is closed").into())

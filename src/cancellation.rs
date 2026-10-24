@@ -142,6 +142,7 @@ impl Cancellation {
     }
 
     /// Whether cancellation has been requested.
+    #[inline]
     pub fn is_cancelled(&self) -> bool {
         self.node
             .as_ref()
@@ -149,6 +150,7 @@ impl Cancellation {
     }
 
     /// Check for cancellation at an explicit cooperative cancellation point.
+    #[inline]
     pub fn check(&self) -> Result<(), Cancelled> {
         if self.is_cancelled() {
             Err(Cancelled)

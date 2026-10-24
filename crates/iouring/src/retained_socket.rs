@@ -35,10 +35,14 @@ pub(crate) fn recv(
     flags: SocketRecvFlags,
 ) -> io::Result<usize> {
     // SAFETY: The mutable initialized range remains valid through this synchronous call. MSG_DONTWAIT never extends payload access beyond return.
-    let bytes = unsafe { std::slice::from_raw_parts_mut(bytes.as_mut_ptr().cast(), bytes.len()) };
-    socket
-        .get_ref()
-        .recv_with_flags(bytes, libc::MSG_DONTWAIT | recv_flags(flags))
+    result_count(unsafe {
+        libc::recv(
+            socket.as_raw_fd(),
+            bytes.as_mut_ptr().cast(),
+            bytes.len(),
+            libc::MSG_DONTWAIT | recv_flags(flags),
+        )
+    })
 }
 #[inline]
 pub(crate) fn send(
@@ -46,9 +50,15 @@ pub(crate) fn send(
     bytes: &[u8],
     flags: SocketSendFlags,
 ) -> io::Result<usize> {
-    socket
-        .get_ref()
-        .send_with_flags(bytes, libc::MSG_DONTWAIT | send_flags(flags))
+    // SAFETY: The readable range remains valid through this synchronous call. MSG_DONTWAIT never retains the payload beyond return.
+    result_count(unsafe {
+        libc::send(
+            socket.as_raw_fd(),
+            bytes.as_ptr().cast(),
+            bytes.len(),
+            libc::MSG_DONTWAIT | send_flags(flags),
+        )
+    })
 }
 #[inline]
 pub(crate) fn recvmsg(
@@ -153,6 +163,7 @@ fn send_flags(flags: SocketSendFlags) -> i32 {
 fn recv_flags(flags: SocketRecvFlags) -> i32 {
     if flags.peek { libc::MSG_PEEK } else { 0 }
 }
+#[inline]
 fn result_count(result: isize) -> io::Result<usize> {
     if result >= 0 {
         Ok(result as usize)
