@@ -194,7 +194,25 @@ impl BlockingPool {
         cancellation: &Cancellation,
         operation: impl FnOnce(&mut Input) -> io::Result<Output> + Send + 'static,
     ) -> Result<
-        impl Future<Output = (OperationResult<Output>, Input)> + Send,
+        impl Future<Output = (OperationResult<Output>, Input)> + Send + 'static,
+        (OperationError, Input),
+    >
+    where
+        Input: Send + 'static,
+        Output: Send + 'static,
+    {
+        self.execute_submit_retiring(input, cancellation, operation, |_| {})
+            .await
+    }
+
+    pub(crate) async fn execute_submit_retiring<Input, Output>(
+        &self,
+        input: Input,
+        cancellation: &Cancellation,
+        operation: impl FnOnce(&mut Input) -> io::Result<Output> + Send + 'static,
+        retire: impl FnOnce(&mut Input) + Send + 'static,
+    ) -> Result<
+        impl Future<Output = (OperationResult<Output>, Input)> + Send + 'static,
         (OperationError, Input),
     >
     where
@@ -215,6 +233,7 @@ impl BlockingPool {
                                 .check()
                                 .map_err(OperationError::from)
                                 .and_then(|()| operation(&mut input).map_err(OperationError::from));
+                            retire(&mut input);
                             (result, input)
                         }));
                         let _ = completion.send(result);

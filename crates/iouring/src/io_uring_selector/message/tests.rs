@@ -3,6 +3,7 @@
 
 use super::super::tests::{drain, drive, pair};
 use super::*;
+use crate::SocketMessage;
 use futures_lite::future::{block_on, poll_once};
 use std::sync::atomic::AtomicUsize;
 

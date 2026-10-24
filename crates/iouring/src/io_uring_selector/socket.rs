@@ -2,17 +2,17 @@
 // Copyright, 2026, by Samuel Williams.
 
 use super::*;
+use crate::Interest;
 
-pub(super) fn retain_socket(socket: &NativeSocket) -> RegisteredSocket {
-    // SAFETY: Every submitted request retains this owner through its original completion, releases it before notification, and never changes the handle or registration.
-    unsafe { socket.retain_native() }
+pub(super) fn retain_socket(socket: &impl SocketSource) -> RegisteredSocket {
+    socket.retain_socket()
 }
 
 // O_NONBLOCK sockets can complete with EAGAIN. Retire that attempt before waiting for readiness and retrying on the operation's original ring. No borrowed payload reaches the readiness service.
 pub(super) async fn retry_operation<B, T, O, F>(
     selector: &IoUringSelector,
     controller: &Arc<Controller>,
-    socket: &NativeSocket,
+    socket: &impl SocketSource,
     mut buffers: B,
     mut operation: O,
     interest: Interest,
@@ -46,10 +46,10 @@ where
     }
 }
 
-impl SocketRead for IoUringSelector {
-    async fn socket_read<B: IoBufMut>(
+impl IoUringSelector {
+    pub(crate) async fn socket_read<B: IoBufMut>(
         &self,
-        socket: &Self::Socket,
+        socket: &impl SocketSource,
         buffer: B,
         cancellation: &Cancellation,
     ) -> BufferResult<B> {
@@ -62,7 +62,7 @@ impl SocketRead for IoUringSelector {
             |buffer| {
                 self.operation(
                     Arc::clone(&controller),
-                    Resource::Socket(retain_socket(socket)),
+                    retain_socket(socket),
                     buffer,
                     false,
                     |buffer| buffer.as_mut().as_mut_ptr(),
@@ -77,10 +77,10 @@ impl SocketRead for IoUringSelector {
     }
 }
 
-impl SocketWrite for IoUringSelector {
-    async fn socket_write<B: IoBuf>(
+impl IoUringSelector {
+    pub(crate) async fn socket_write<B: IoBuf>(
         &self,
-        socket: &Self::Socket,
+        socket: &impl SocketSource,
         buffer: B,
         cancellation: &Cancellation,
     ) -> BufferResult<B> {
@@ -107,7 +107,7 @@ impl SocketWrite for IoUringSelector {
             |buffer| {
                 self.operation(
                     Arc::clone(&controller),
-                    Resource::Socket(retain_socket(socket)),
+                    retain_socket(socket),
                     buffer,
                     true,
                     |buffer| buffer.as_ref().as_ptr().cast_mut(),

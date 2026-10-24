@@ -8,6 +8,8 @@ use std::{
 };
 
 /// One ordered output lane on a stream socket, bound to its creating scheduler. Independent readers may operate concurrently. Separate writers or direct socket aliases do not share this handle's ordering.
+///
+/// If an owned-operation future is abandoned while backend access continues, subsequent operations may report `WouldBlock` until it retires. Await `close` to establish retirement; separate handles provide independent lanes.
 pub trait SocketStreamWriter: Send {
     type Buffer: IoBuf;
 
@@ -37,6 +39,47 @@ pub trait SocketStreamWriter: Send {
         &mut self,
         cancellation: &Cancellation,
     ) -> impl Future<Output = OperationResult<()>> + Send;
+
+    /// Perform one borrowed transfer with explicit portable flags. Payload access ends before each poll returns; successful progress is returned in that poll.
+    fn write_with_flags(
+        &mut self,
+        buffer: &[u8],
+        flags: crate::SocketSendFlags,
+        cancellation: &Cancellation,
+    ) -> impl Future<Output = OperationResult<usize>> + Send {
+        async move {
+            self.write_vectored_with_flags(&[std::io::IoSlice::new(buffer)], flags, cancellation)
+                .await
+        }
+    }
+
+    /// Perform one borrowed vectored transfer with explicit flags. Vectors are never advanced implicitly; a short result leaves their ranges unchanged.
+    fn write_vectored_with_flags(
+        &mut self,
+        buffers: &[std::io::IoSlice<'_>],
+        flags: crate::SocketSendFlags,
+        cancellation: &Cancellation,
+    ) -> impl Future<Output = OperationResult<usize>> + Send;
+
+    /// Perform one transfer while retaining a stable owner and return that original owner with every collected result. Backends may retain it independently until access retires after waiter abandonment.
+    fn write_owned<B: crate::IoBuf>(
+        &mut self,
+        buffer: B,
+        cancellation: &Cancellation,
+    ) -> impl Future<Output = crate::BufferResult<B>> + Send {
+        async move {
+            let result = self.write(buffer.as_ref(), cancellation).await;
+            (result, buffer)
+        }
+    }
+
+    /// Transfer one message using an owned buffer sequence with explicit flags. Return the original sequence and its unchanged ranges on success, error, and cancellation. Kernel or worker access retains the full owner and stable I/O vectors through retirement, including after future abandonment. This awaits earlier accepted output before transferring bytes.
+    fn write_owned_vectored<Buffers: crate::IoBufSequence>(
+        &mut self,
+        buffers: Buffers,
+        flags: crate::SocketSendFlags,
+        cancellation: &Cancellation,
+    ) -> impl Future<Output = (OperationResult<usize>, Buffers)> + Send;
 
     /// Stop admission, cancel unfinished output, and await backend access and registration retirement. Flush first when successful delivery is required. This does not shut down or close the socket. Drop requests retirement without blocking; retry an abandoned close to establish completion.
     fn close(&mut self) -> impl Future<Output = io::Result<()>> + Send;

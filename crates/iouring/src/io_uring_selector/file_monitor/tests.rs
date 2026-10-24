@@ -108,7 +108,7 @@ fn dropping_an_unpolled_monitor_completion_queues_cancellation_without_close() {
 fn write_all_reuses_one_request_type_across_short_transfers_and_logical_writes() {
     struct ShortWriter<'a> {
         selector: &'a IoUringSelector,
-        monitor: FileMonitor<NativeFile, IoUringFileRegistration>,
+        monitor: IoUringFileRegistration,
     }
     impl FileWriter for ShortWriter<'_> {
         async fn write<B: IoBuf>(
@@ -176,12 +176,11 @@ fn write_all_reuses_one_request_type_across_short_transfers_and_logical_writes()
                 "short write_all replaced its cached request"
             );
         }
-        let current = writer
-            .monitor
-            .registration()
-            .cached
-            .as_ref()
-            .unwrap()
+        let result = writer.monitor.shared.result.lock().unwrap();
+        let Some(Completion::Cached(cached_request)) = result.as_ref() else {
+            panic!("completed write retains request storage")
+        };
+        let current = cached_request
             .downcast_ref::<FileRequest<BufferSlice<BufferSlice<Vec<u8>>>>>()
             .unwrap() as *const _;
         if let Some(previous) = cached {
@@ -228,11 +227,11 @@ fn repeated_operations_reuse_request_storage_without_allocations() {
         if iteration >= 2 {
             assert_eq!(counts.count_total, 0, "ordinary monitor reuse allocated");
         }
-        let current = monitor
-            .registration()
-            .cached
-            .as_ref()
-            .unwrap()
+        let result = monitor.shared.result.lock().unwrap();
+        let Some(Completion::Cached(cached_request)) = result.as_ref() else {
+            panic!("completed read retains request storage")
+        };
+        let current = cached_request
             .downcast_ref::<FileRequest<Vec<u8>>>()
             .unwrap() as *const _;
         if let Some(previous) = address {
@@ -240,21 +239,6 @@ fn repeated_operations_reuse_request_storage_without_allocations() {
         }
         address = Some(current);
     }
-    let mut baseline_allocations = 0;
-    for _ in 0..32 {
-        let counts = allocation_counter::measure(|| {
-            let mut operation =
-                pin!(selector.file_read_at(&file, buffer.take().unwrap(), 0, &never));
-            let (result, returned) = drive(&mut worker, &mut context, operation.as_mut());
-            assert_eq!(result.unwrap(), 6);
-            buffer = Some(returned);
-        });
-        baseline_allocations += counts.count_total;
-    }
-    assert_eq!(
-        baseline_allocations, 64,
-        "ordinary operations allocate one request and one completion channel"
-    );
     assert_eq!(buffer.unwrap(), b"abcdef");
     drive(
         &mut worker,
@@ -267,7 +251,7 @@ fn repeated_operations_reuse_request_storage_without_allocations() {
 }
 
 #[test]
-fn abandoned_and_forgotten_operations_can_be_retired_and_reused() {
+fn abandoned_operations_can_be_reused_and_forgotten_completions_can_be_closed() {
     let (selector, driver) = IoUringSelector::new(Default::default()).unwrap();
     let mut worker = driver.enter();
     let waker = worker.waker();
@@ -296,15 +280,21 @@ fn abandoned_and_forgotten_operations_can_be_retired_and_reused() {
             .kind(),
             io::ErrorKind::WouldBlock
         );
-        while !monitor.registration().shared.ready.load(Ordering::Acquire) {
+        while !monitor.shared.ready.load(Ordering::Acquire) {
             worker.turn(Some(Duration::ZERO)).unwrap();
         }
-        {
-            let mut operation =
-                pin!(selector.file_monitor_read_at(&mut monitor, vec![0; 3], 0, &never));
-            let (result, buffer) = drive(&mut worker, &mut context, operation.as_mut());
-            assert_eq!(result.unwrap(), 3);
-            assert_eq!(buffer, b"abc");
+        if forget {
+            let (result, _) =
+                block_on(selector.file_monitor_read_at(&mut monitor, vec![0; 3], 0, &never));
+            assert_eq!(result.unwrap_err().kind(), io::ErrorKind::WouldBlock);
+        } else {
+            {
+                let mut operation =
+                    pin!(selector.file_monitor_read_at(&mut monitor, vec![0; 3], 0, &never));
+                let (result, buffer) = drive(&mut worker, &mut context, operation.as_mut());
+                assert_eq!(result.unwrap(), 3);
+                assert_eq!(buffer, b"abc");
+            }
         }
         drive(
             &mut worker,
@@ -324,82 +314,6 @@ fn abandoned_and_forgotten_operations_can_be_retired_and_reused() {
     }
     drop(monitor);
     block_on(selector.file_close(file)).unwrap();
-}
-
-#[test]
-fn swapped_registrations_cannot_redirect_file_operations() {
-    let (selector, driver) = IoUringSelector::new(Default::default()).unwrap();
-    let mut worker = driver.enter();
-    let waker = worker.waker();
-    let mut context = Context::from_waker(&waker);
-    let directory = tempfile::tempdir().unwrap();
-    let never = Cancellation::never();
-    let mut monitors = Vec::new();
-    let mut files = Vec::new();
-    for (name, contents) in [("first", b"first"), ("other", b"other")] {
-        let path = directory.path().join(name);
-        std::fs::write(&path, contents).unwrap();
-        let file = block_on(selector.file_open(
-            &path,
-            FileOptions {
-                write: true,
-                ..FileOptions::READ
-            },
-            &never,
-        ))
-        .unwrap();
-        let mut monitor = selector.file_monitor(&file).unwrap();
-        let (result, buffer) = drive(
-            &mut worker,
-            &mut context,
-            pin!(selector.file_monitor_read_at(&mut monitor, vec![0; 5], 0, &never)),
-        );
-        assert_eq!(result.unwrap(), 5);
-        assert_eq!(buffer, contents);
-        monitors.push(monitor);
-        files.push(file);
-    }
-    let [first, other] = monitors.as_mut_slice() else {
-        unreachable!("two monitors were created")
-    };
-    std::mem::swap(first.registration_mut(), other.registration_mut());
-    for monitor in [&mut *first, &mut *other] {
-        let (result, buffer) =
-            block_on(selector.file_monitor_read_at(monitor, vec![42; 5], 0, &never));
-        assert_eq!(result.unwrap_err().kind(), io::ErrorKind::InvalidInput);
-        assert_eq!(buffer, [42; 5]);
-        let (result, buffer) =
-            block_on(selector.file_monitor_write_at(monitor, vec![7; 5], 0, &never));
-        assert_eq!(result.unwrap_err().kind(), io::ErrorKind::InvalidInput);
-        assert_eq!(buffer, [7; 5]);
-        assert_eq!(
-            block_on(selector.file_monitor_close(monitor))
-                .unwrap_err()
-                .kind(),
-            io::ErrorKind::InvalidInput
-        );
-        assert!(!monitor.registration().closed);
-    }
-    std::mem::swap(first.registration_mut(), other.registration_mut());
-    for (monitor, contents) in [first, other].into_iter().zip([b"first", b"other"]) {
-        let (result, buffer) = drive(
-            &mut worker,
-            &mut context,
-            pin!(selector.file_monitor_read_at(monitor, vec![0; 5], 0, &never)),
-        );
-        assert_eq!(result.unwrap(), 5);
-        assert_eq!(buffer, contents);
-        drive(
-            &mut worker,
-            &mut context,
-            pin!(selector.file_monitor_close(monitor)),
-        )
-        .unwrap();
-    }
-    drop(monitors);
-    for file in files {
-        block_on(selector.file_close(file)).unwrap();
-    }
 }
 
 #[test]
@@ -570,7 +484,7 @@ fn rejected_abandoned_command_is_reclaimed_before_reuse_reports_shutdown() {
         block_on(selector.file_monitor_read_at(&mut monitor, vec![43], 0, &never));
     assert_eq!(result.unwrap_err().kind(), io::ErrorKind::BrokenPipe);
     assert_eq!(buffer, [43]);
-    assert!(monitor.registration().running.is_none());
+    assert!(monitor.running.is_none());
     block_on(selector.file_monitor_close(&mut monitor)).unwrap();
 }
 
@@ -606,9 +520,9 @@ fn disposal_of_an_abandoned_owner_can_close_admission_before_publication() {
     };
     let mut operation = Box::pin(selector.file_monitor_write_at(&mut monitor, buffer, 0, &never));
     assert!(operation.as_mut().poll(&mut context).is_pending());
-    // Forget only the future; the queued request independently owns its buffer until retirement.
-    std::mem::forget(operation);
-    while !monitor.registration().shared.ready.load(Ordering::Acquire) {
+    // Abandon collection; the queued request still owns its buffer until retirement.
+    drop(operation);
+    while !monitor.shared.ready.load(Ordering::Acquire) {
         worker.turn(Some(Duration::ZERO)).unwrap();
     }
     // Changing buffer type discards the cached owner after admission but before publishing the new command.
@@ -659,17 +573,17 @@ fn migration_invalidates_old_registrations_and_reuses_request_storage() {
         if let Some(retired) = retired_registration.take() {
             assert!(retired.upgrade().is_none());
         }
-        let registration = monitor.registration().files.values().next().unwrap();
+        let registration = monitor.files.values().next().unwrap();
         if let Some(previous) = previous_registration.replace(Arc::clone(registration)) {
             assert!(!Arc::ptr_eq(&previous, registration));
             assert!(previous.released());
             retired_registration = Some(Arc::downgrade(&previous));
         }
-        let current = monitor
-            .registration()
-            .cached
-            .as_ref()
-            .unwrap()
+        let result = monitor.shared.result.lock().unwrap();
+        let Some(Completion::Cached(cached_request)) = result.as_ref() else {
+            panic!("completed read retains request storage")
+        };
+        let current = cached_request
             .downcast_ref::<FileRequest<Vec<u8>>>()
             .unwrap() as *const _;
         if let Some(previous) = request_address {
@@ -677,8 +591,8 @@ fn migration_invalidates_old_registrations_and_reuses_request_storage() {
         }
         request_address = Some(current);
     }
-    assert_eq!(monitor.registration().files.values().count(), 1);
-    for file in monitor.registration().files.values() {
+    assert_eq!(monitor.files.values().count(), 1);
+    for file in monitor.files.values() {
         assert_eq!(file.index().unwrap().0, 0);
     }
     {
@@ -737,7 +651,7 @@ fn active_request_keeps_its_ring_when_polling_moves_to_another_worker() {
             .0
             .unwrap();
     }
-    assert_eq!(monitor.registration().files.values().count(), 1);
+    assert_eq!(monitor.files.values().count(), 1);
     let mut close = pin!(selector.file_monitor_close(&mut monitor));
     loop {
         if let Poll::Ready(result) = close.as_mut().poll(&mut context) {
@@ -783,7 +697,7 @@ fn unavailable_fixed_files_fall_back_without_changing_io_results() {
             assert_eq!(result.unwrap(), 6);
             assert_eq!(buffer, b"abcdef");
             drop(operation);
-            let cached = monitor.registration().files.values().next().unwrap();
+            let cached = monitor.files.values().next().unwrap();
             let registered = (failure == "full" && index == 0)
                 || (failure == "fixed-file-register" && index == 1);
             assert_eq!(cached.index().is_some(), registered);
@@ -835,17 +749,7 @@ fn abandoned_close_preserves_release_and_retry_waits_for_every_registration() {
     )
     .0
     .unwrap();
-    assert_eq!(
-        next.registration()
-            .files
-            .values()
-            .next()
-            .unwrap()
-            .index()
-            .unwrap()
-            .0,
-        0
-    );
+    assert_eq!(next.files.values().next().unwrap().index().unwrap().0, 0);
     drive(
         &mut worker,
         &mut context,
@@ -928,13 +832,7 @@ fn failed_eviction_remains_observable_after_another_migration() {
             }
         }
     }
-    assert!(
-        monitor
-            .registration()
-            .retiring
-            .iter()
-            .any(|file| !file.released())
-    );
+    assert!(monitor.retiring.iter().any(|file| !file.released()));
     for _ in 0..2 {
         let mut close = pin!(selector.file_monitor_close(&mut monitor));
         loop {
@@ -966,8 +864,8 @@ fn close_waits_for_migration_release_on_the_original_ring_after_abandonment() {
         .0
         .unwrap();
     }
-    assert_eq!(monitor.registration().retiring.len(), 1);
-    assert!(!monitor.registration().retiring[0].released());
+    assert_eq!(monitor.retiring.len(), 1);
+    assert!(!monitor.retiring[0].released());
     {
         let mut close = pin!(selector.file_monitor_close(&mut monitor));
         assert!(close.as_mut().poll(&mut context).is_pending());
@@ -975,14 +873,131 @@ fn close_waits_for_migration_release_on_the_original_ring_after_abandonment() {
         assert!(close.as_mut().poll(&mut context).is_pending());
         // Leaving this scope drops the wait; the next close must finish retirement.
     }
-    assert!(!monitor.registration().retiring[0].released());
+    assert!(!monitor.retiring[0].released());
     {
         let mut close = pin!(selector.file_monitor_close(&mut monitor));
         assert!(close.as_mut().poll(&mut context).is_pending());
         drivers[0].turn(Some(Duration::ZERO)).unwrap();
         block_on(close).unwrap();
     }
-    assert!(monitor.registration().retiring[0].released());
+    assert!(monitor.retiring[0].released());
     drop(monitor);
+    block_on(selector.file_close(file)).unwrap();
+}
+
+#[test]
+fn concurrent_completion_and_close_keep_independent_wakers_and_release_file_access() {
+    struct Wakes(AtomicUsize);
+    impl std::task::Wake for Wakes {
+        fn wake(self: Arc<Self>) {
+            self.0.fetch_add(1, Ordering::SeqCst);
+        }
+        fn wake_by_ref(self: &Arc<Self>) {
+            self.0.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+    let (selector, driver) = IoUringSelector::new(Default::default()).unwrap();
+    let mut worker = driver.enter();
+    let (_directory, file) = super::super::tests::file(&selector);
+    let never = Cancellation::never();
+    let mut lane = selector.file_monitor(&file).unwrap();
+    let mut completion = Box::pin(
+        block_on(selector.file_monitor_read_at_submit(&mut lane, vec![0; 6], 0, &never)).unwrap(),
+    );
+    let completion_wakes = Arc::new(Wakes(AtomicUsize::new(0)));
+    let completion_waker = std::task::Waker::from(Arc::clone(&completion_wakes));
+    let mut completion_context = Context::from_waker(&completion_waker);
+    assert!(
+        completion
+            .as_mut()
+            .poll(&mut completion_context)
+            .is_pending()
+    );
+    let close_wakes = Arc::new(Wakes(AtomicUsize::new(0)));
+    let close_waker = std::task::Waker::from(Arc::clone(&close_wakes));
+    let mut close_context = Context::from_waker(&close_waker);
+    let mut close = Box::pin(selector.file_monitor_close(&mut lane));
+    assert!(close.as_mut().poll(&mut close_context).is_pending());
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while completion_wakes.0.load(Ordering::SeqCst) == 0
+        || close_wakes.0.load(Ordering::SeqCst) == 0
+    {
+        worker.turn(Some(Duration::ZERO)).unwrap();
+        assert!(
+            Instant::now() < deadline,
+            "both independent waiters must be woken"
+        );
+    }
+    drive(&mut worker, &mut close_context, close.as_mut()).unwrap();
+    drop(close);
+    drop(lane);
+    block_on(selector.file_close(file)).unwrap();
+    let (result, buffer) = block_on(completion);
+    // Close may have requested cancellation, but successful original completion still wins.
+    if result.is_ok() {
+        assert_eq!(buffer, b"abcdef");
+    }
+}
+
+#[test]
+fn dropping_a_cancelled_completion_releases_its_retired_owner_without_lane_reuse() {
+    let (selector, driver) = IoUringSelector::new(Default::default()).unwrap();
+    let mut worker = driver.enter();
+    let waker = worker.waker();
+    let mut context = Context::from_waker(&waker);
+    let (_directory, file) = super::super::tests::file(&selector);
+    let mut lane = selector.file_monitor(&file).unwrap();
+    let cancellation = Cancellation::new();
+    let pool = core_scheduler::HeapBufferPool::new(1, 6).unwrap();
+    let buffer = pool.try_acquire().unwrap();
+    let mut completion = Box::pin(
+        block_on(selector.file_monitor_read_at_submit(&mut lane, buffer, 0, &cancellation))
+            .unwrap(),
+    );
+    assert!(completion.as_mut().poll(&mut context).is_pending());
+    cancellation.cancel();
+    // Polling cancellation sends its request; it does not collect the original owner.
+    assert!(completion.as_mut().poll(&mut context).is_pending());
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while !lane.shared.ready.load(Ordering::Acquire) {
+        worker.turn(Some(Duration::ZERO)).unwrap();
+        assert!(Instant::now() < deadline);
+    }
+    assert!(pool.try_acquire().is_none());
+    drop(completion);
+    assert!(pool.try_acquire().is_some());
+    drive(
+        &mut worker,
+        &mut context,
+        pin!(selector.file_monitor_close(&mut lane)),
+    )
+    .unwrap();
+    drop(lane);
+    block_on(selector.file_close(file)).unwrap();
+}
+
+#[test]
+fn synchronous_submission_rejection_preserves_the_original_completion_owner() {
+    let (selector, _driver) = IoUringSelector::new(Default::default()).unwrap();
+    let (_directory, file) = super::super::tests::file(&selector);
+    let never = Cancellation::never();
+    let mut lane = selector.file_monitor(&file).unwrap();
+    let controller = Arc::clone(&selector.controllers[0]);
+    super::super::tests::BEFORE_CAPACITY_ADMISSION.with(|hook| {
+        // Admission wins its capacity race, but endpoint rejection finishes before submit returns the completion future.
+        *hook.borrow_mut() = Some(Box::new(move || {
+            controller.closed.store(true, Ordering::Release)
+        }));
+    });
+    let buffer = vec![42; 6];
+    let pointer = buffer.as_ptr();
+    let completion =
+        block_on(selector.file_monitor_read_at_submit(&mut lane, buffer, 0, &never)).unwrap();
+    let (result, buffer) = block_on(completion);
+    assert_eq!(result.unwrap_err().kind(), io::ErrorKind::BrokenPipe);
+    assert_eq!(buffer.as_ptr(), pointer);
+    assert_eq!(buffer, [42; 6]);
+    block_on(selector.file_monitor_close(&mut lane)).unwrap();
+    drop(lane);
     block_on(selector.file_close(file)).unwrap();
 }

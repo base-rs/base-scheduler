@@ -3,7 +3,7 @@
 
 use super::socket::retain_socket;
 use super::*;
-use std::io::{IoSlice, IoSliceMut};
+use crate::Interest;
 
 // Readiness requests retain only the socket. Borrowed payloads and I/O vectors never enter the ring or its request bookkeeping.
 struct ReadinessRequest {
@@ -74,7 +74,7 @@ impl IoUringSelector {
     pub(super) async fn wait_ready(
         &self,
         controller: Arc<Controller>,
-        socket: &NativeSocket,
+        socket: &impl SocketSource,
         interest: Interest,
         cancellation: &Cancellation,
     ) -> OperationResult<()> {
@@ -99,106 +99,6 @@ impl IoUringSelector {
             cancellation,
         )
         .map(drop)
-    }
-
-    async fn socket_poll<T>(
-        &self,
-        socket: &NativeSocket,
-        interest: Interest,
-        cancellation: &Cancellation,
-        mut operation: impl FnMut() -> io::Result<T> + Send,
-    ) -> OperationResult<T> {
-        cancellation.check()?;
-        self.check_open()?;
-        let mut controller = None;
-        loop {
-            match operation() {
-                Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
-                    // Ready I/O needs neither routing nor request storage. Keep the first wait's ring across retries and task migration.
-                    let controller = controller.get_or_insert_with(|| self.route());
-                    self.wait_ready(Arc::clone(controller), socket, interest, cancellation)
-                        .await?;
-                }
-                Err(error) if error.kind() == io::ErrorKind::Interrupted => {
-                    cancellation.check()?;
-                    self.check_open()?;
-                }
-                result => return result.map_err(Into::into),
-            }
-        }
-    }
-}
-
-impl SocketWait for IoUringSelector {
-    async fn socket_wait(
-        &self,
-        socket: &NativeSocket,
-        interest: Interest,
-        cancellation: &Cancellation,
-    ) -> OperationResult<()> {
-        self.wait_ready(self.route(), socket, interest, cancellation)
-            .await
-    }
-}
-
-impl SocketRecvPoll for IoUringSelector {
-    async fn socket_recv_poll(
-        &self,
-        socket: &NativeSocket,
-        buffer: &mut [u8],
-        flags: SocketRecvFlags,
-        cancellation: &Cancellation,
-    ) -> OperationResult<usize> {
-        self.socket_poll(socket, Interest::Readable, cancellation, || {
-            socket.try_recv(buffer, flags)
-        })
-        .await
-    }
-}
-
-impl SocketSendPoll for IoUringSelector {
-    async fn socket_send_poll(
-        &self,
-        socket: &NativeSocket,
-        buffer: &[u8],
-        flags: SocketSendFlags,
-        cancellation: &Cancellation,
-    ) -> OperationResult<usize> {
-        self.socket_poll(socket, Interest::Writable, cancellation, || {
-            socket.try_send(buffer, flags)
-        })
-        .await
-    }
-}
-
-impl SocketRecvMsgPoll for IoUringSelector {
-    async fn socket_recvmsg_poll(
-        &self,
-        socket: &NativeSocket,
-        buffers: &mut [IoSliceMut<'_>],
-        flags: SocketRecvFlags,
-        cancellation: &Cancellation,
-    ) -> OperationResult<SocketRecvResult> {
-        self.socket_poll(socket, Interest::Readable, cancellation, || {
-            socket.try_recvmsg(buffers, flags)
-        })
-        .await
-    }
-}
-
-impl SocketSendMsgPoll for IoUringSelector {
-    async fn socket_sendmsg_poll(
-        &self,
-        socket: &NativeSocket,
-        buffers: &[IoSlice<'_>],
-        address: Option<SocketAddress>,
-        flags: SocketSendFlags,
-        cancellation: &Cancellation,
-    ) -> OperationResult<usize> {
-        self.socket_poll(socket, Interest::Writable, cancellation, || {
-            socket.try_sendmsg(buffers, address, flags)
-        })
-        .await
     }
 }
 

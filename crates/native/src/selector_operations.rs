@@ -2,11 +2,10 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::{NativeScheduler, Selector};
-use core_scheduler::backend::*;
 use core_scheduler::*;
 use std::{
     io,
-    io::{IoSlice, IoSliceMut, SeekFrom},
+    io::SeekFrom,
     net::{Shutdown, TcpListener, TcpStream},
     path::Path,
 };
@@ -32,56 +31,6 @@ impl<S: Selector + FileClose> FileClose for NativeScheduler<S> {
     }
     async fn file_close_submit(&self, file: Self::File) -> std::io::Result<()> {
         self.selector().file_close_submit(file).await
-    }
-}
-
-impl<S: Selector + FileRead> FileRead for NativeScheduler<S> {
-    async fn file_read<B: IoBufMut>(
-        &self,
-        file: &Self::File,
-        buffer: B,
-        cancellation: &Cancellation,
-    ) -> BufferResult<B> {
-        self.selector().file_read(file, buffer, cancellation).await
-    }
-}
-
-impl<S: Selector + FileWrite> FileWrite for NativeScheduler<S> {
-    async fn file_write<B: IoBuf>(
-        &self,
-        file: &Self::File,
-        buffer: B,
-        cancellation: &Cancellation,
-    ) -> BufferResult<B> {
-        self.selector().file_write(file, buffer, cancellation).await
-    }
-}
-
-impl<S: Selector + FileReadAt> FileReadAt for NativeScheduler<S> {
-    async fn file_read_at<B: IoBufMut>(
-        &self,
-        file: &Self::File,
-        buffer: B,
-        offset: u64,
-        cancellation: &Cancellation,
-    ) -> BufferResult<B> {
-        self.selector()
-            .file_read_at(file, buffer, offset, cancellation)
-            .await
-    }
-}
-
-impl<S: Selector + FileWriteAt> FileWriteAt for NativeScheduler<S> {
-    async fn file_write_at<B: IoBuf>(
-        &self,
-        file: &Self::File,
-        buffer: B,
-        offset: u64,
-        cancellation: &Cancellation,
-    ) -> BufferResult<B> {
-        self.selector()
-            .file_write_at(file, buffer, offset, cancellation)
-            .await
     }
 }
 
@@ -252,45 +201,6 @@ impl<S: Selector + SocketPeerAddress> SocketPeerAddress for NativeScheduler<S> {
     }
 }
 
-impl<S: Selector + SocketRead> SocketRead for NativeScheduler<S> {
-    async fn socket_read<B: IoBufMut>(
-        &self,
-        socket: &Self::Socket,
-        buffer: B,
-        cancellation: &Cancellation,
-    ) -> BufferResult<B> {
-        self.selector()
-            .socket_read(socket, buffer, cancellation)
-            .await
-    }
-}
-
-impl<S: Selector + SocketWrite> SocketWrite for NativeScheduler<S> {
-    async fn socket_write<B: IoBuf>(
-        &self,
-        socket: &Self::Socket,
-        buffer: B,
-        cancellation: &Cancellation,
-    ) -> BufferResult<B> {
-        self.selector()
-            .socket_write(socket, buffer, cancellation)
-            .await
-    }
-}
-
-impl<S: Selector + SocketWait> SocketWait for NativeScheduler<S> {
-    async fn socket_wait(
-        &self,
-        socket: &Self::Socket,
-        interest: Interest,
-        cancellation: &Cancellation,
-    ) -> OperationResult<()> {
-        self.selector()
-            .socket_wait(socket, interest, cancellation)
-            .await
-    }
-}
-
 impl<S: Selector + SocketClose> SocketClose for NativeScheduler<S> {
     async fn socket_close(&self, socket: Self::Socket) -> io::Result<()> {
         self.selector().socket_close(socket).await
@@ -306,114 +216,6 @@ impl<S: Selector + SocketShutdown> SocketShutdown for NativeScheduler<S> {
     }
     async fn socket_shutdown_submit(&self, socket: &Self::Socket, how: Shutdown) -> io::Result<()> {
         self.selector().socket_shutdown_submit(socket, how).await
-    }
-}
-
-impl<S: Selector + SocketSendMsg> SocketSendMsg for NativeScheduler<S> {
-    async fn socket_sendmsg<Buffers: IoBufSequence>(
-        &self,
-        socket: &Self::Socket,
-        message: SocketMessage<Buffers>,
-        flags: SocketSendFlags,
-        cancellation: &Cancellation,
-    ) -> (OperationResult<usize>, SocketMessage<Buffers>) {
-        self.selector()
-            .socket_sendmsg(socket, message, flags, cancellation)
-            .await
-    }
-}
-
-impl<S: Selector + SocketRecvMsg> SocketRecvMsg for NativeScheduler<S> {
-    async fn socket_recvmsg<Buffers: IoBufSequenceMut>(
-        &self,
-        socket: &Self::Socket,
-        buffers: Buffers,
-        flags: SocketRecvFlags,
-        cancellation: &Cancellation,
-    ) -> (OperationResult<SocketRecvResult>, Buffers) {
-        self.selector()
-            .socket_recvmsg(socket, buffers, flags, cancellation)
-            .await
-    }
-}
-
-impl<S: Selector + SocketRecvPoll> SocketRecvPoll for NativeScheduler<S> {
-    async fn socket_recv_poll(
-        &self,
-        socket: &Self::Socket,
-        buffer: &mut [u8],
-        flags: SocketRecvFlags,
-        cancellation: &Cancellation,
-    ) -> OperationResult<usize> {
-        self.selector()
-            .socket_recv_poll(socket, buffer, flags, cancellation)
-            .await
-    }
-}
-
-impl<S: Selector + SocketSendPoll> SocketSendPoll for NativeScheduler<S> {
-    async fn socket_send_poll(
-        &self,
-        socket: &Self::Socket,
-        buffer: &[u8],
-        flags: SocketSendFlags,
-        cancellation: &Cancellation,
-    ) -> OperationResult<usize> {
-        self.selector()
-            .socket_send_poll(socket, buffer, flags, cancellation)
-            .await
-    }
-}
-
-impl<S: Selector + SocketRecvMsgPoll> SocketRecvMsgPoll for NativeScheduler<S> {
-    async fn socket_recvmsg_poll(
-        &self,
-        socket: &Self::Socket,
-        buffers: &mut [IoSliceMut<'_>],
-        flags: SocketRecvFlags,
-        cancellation: &Cancellation,
-    ) -> OperationResult<SocketRecvResult> {
-        self.selector()
-            .socket_recvmsg_poll(socket, buffers, flags, cancellation)
-            .await
-    }
-}
-
-/// A receive resource advanced through the Native scheduler's explicit selector.
-pub struct NativeRecvMsgReceiver<R>(R);
-
-impl<S, R> SocketRecvMsgReceiver<NativeScheduler<S>> for NativeRecvMsgReceiver<R>
-where
-    S: Selector,
-    R: SocketRecvMsgReceiver<S>,
-{
-    type Message = R::Message;
-
-    async fn recv(
-        &mut self,
-        scheduler: &NativeScheduler<S>,
-        cancellation: &Cancellation,
-    ) -> OperationResult<Option<Self::Message>> {
-        self.0.recv(scheduler.selector(), cancellation).await
-    }
-
-    async fn close(&mut self, scheduler: &NativeScheduler<S>) -> io::Result<()> {
-        self.0.close(scheduler.selector()).await
-    }
-}
-
-impl<S: Selector + SocketSendMsgPoll> SocketSendMsgPoll for NativeScheduler<S> {
-    async fn socket_sendmsg_poll(
-        &self,
-        socket: &Self::Socket,
-        buffers: &[IoSlice<'_>],
-        address: Option<SocketAddress>,
-        flags: SocketSendFlags,
-        cancellation: &Cancellation,
-    ) -> OperationResult<usize> {
-        self.selector()
-            .socket_sendmsg_poll(socket, buffers, address, flags, cancellation)
-            .await
     }
 }
 
@@ -497,276 +299,6 @@ impl<S: Selector + Signals> Signals for NativeScheduler<S> {
         Target: Notify<Self::Signal> + 'static,
     {
         self.selector().signal_subscribe(signals, target)
-    }
-}
-
-impl<S: Selector + SocketMonitoring> SocketMonitoring for NativeScheduler<S>
-where
-    S::Socket: 'static,
-{
-    type MonitorRegistration = S::MonitorRegistration;
-    fn socket_type(&self, socket: &Self::Socket) -> io::Result<SocketType> {
-        self.selector().socket_type(socket)
-    }
-    fn socket_monitor_state(
-        &self,
-        socket: &Self::Socket,
-        interest: Interest,
-    ) -> io::Result<SocketMonitor<Self::Socket, Self::MonitorRegistration>> {
-        self.selector().socket_monitor_state(socket, interest)
-    }
-    fn socket_stream_monitor_state(
-        &self,
-        socket: &Self::Socket,
-        interest: Interest,
-    ) -> io::Result<SocketStreamMonitor<Self::Socket, Self::MonitorRegistration>> {
-        self.selector()
-            .socket_stream_monitor_state(socket, interest)
-    }
-    async fn socket_monitor_wait<M: SocketMonitorState<Self::Socket, Self::MonitorRegistration>>(
-        &self,
-        monitor: &mut MonitorStorage<M>,
-        cancellation: &Cancellation,
-    ) -> OperationResult<()> {
-        self.selector()
-            .socket_monitor_wait(monitor, cancellation)
-            .await
-    }
-    async fn socket_monitor_close<
-        M: SocketMonitorState<Self::Socket, Self::MonitorRegistration>,
-    >(
-        &self,
-        monitor: &mut MonitorStorage<M>,
-    ) -> io::Result<()> {
-        self.selector().socket_monitor_close(monitor).await
-    }
-    async fn socket_monitor_recv_poll<
-        M: SocketMonitorState<Self::Socket, Self::MonitorRegistration>,
-    >(
-        &self,
-        monitor: &mut MonitorStorage<M>,
-        buffer: &mut [u8],
-        flags: SocketRecvFlags,
-        cancellation: &Cancellation,
-    ) -> OperationResult<usize> {
-        self.selector()
-            .socket_monitor_recv_poll(monitor, buffer, flags, cancellation)
-            .await
-    }
-    async fn socket_monitor_send_poll<
-        M: SocketMonitorState<Self::Socket, Self::MonitorRegistration>,
-    >(
-        &self,
-        monitor: &mut MonitorStorage<M>,
-        buffer: &[u8],
-        flags: SocketSendFlags,
-        cancellation: &Cancellation,
-    ) -> OperationResult<usize> {
-        self.selector()
-            .socket_monitor_send_poll(monitor, buffer, flags, cancellation)
-            .await
-    }
-    async fn socket_monitor_recvmsg_poll<
-        M: SocketMonitorState<Self::Socket, Self::MonitorRegistration>,
-    >(
-        &self,
-        monitor: &mut MonitorStorage<M>,
-        buffers: &mut [IoSliceMut<'_>],
-        flags: SocketRecvFlags,
-        cancellation: &Cancellation,
-    ) -> OperationResult<SocketRecvResult> {
-        self.selector()
-            .socket_monitor_recvmsg_poll(monitor, buffers, flags, cancellation)
-            .await
-    }
-    async fn socket_monitor_sendmsg_poll<
-        M: SocketMonitorState<Self::Socket, Self::MonitorRegistration>,
-    >(
-        &self,
-        monitor: &mut MonitorStorage<M>,
-        buffers: &[IoSlice<'_>],
-        address: Option<SocketAddress>,
-        flags: SocketSendFlags,
-        cancellation: &Cancellation,
-    ) -> OperationResult<usize> {
-        self.selector()
-            .socket_monitor_sendmsg_poll(monitor, buffers, address, flags, cancellation)
-            .await
-    }
-}
-
-impl<S: Selector + FileMonitoring> FileMonitoring for NativeScheduler<S> {
-    type FileRegistration = S::FileRegistration;
-    fn file_monitor(
-        &self,
-        file: &Self::File,
-    ) -> io::Result<FileMonitor<Self::File, Self::FileRegistration>> {
-        self.selector().file_monitor(file)
-    }
-    async fn file_monitor_read<B: IoBufMut>(
-        &self,
-        monitor: &mut FileMonitor<Self::File, Self::FileRegistration>,
-        buffer: B,
-        cancellation: &Cancellation,
-    ) -> BufferResult<B> {
-        self.selector()
-            .file_monitor_read(monitor, buffer, cancellation)
-            .await
-    }
-    async fn file_monitor_write<B: IoBuf>(
-        &self,
-        monitor: &mut FileMonitor<Self::File, Self::FileRegistration>,
-        buffer: B,
-        cancellation: &Cancellation,
-    ) -> BufferResult<B> {
-        self.selector()
-            .file_monitor_write(monitor, buffer, cancellation)
-            .await
-    }
-    async fn file_monitor_read_at<B: IoBufMut>(
-        &self,
-        monitor: &mut FileMonitor<Self::File, Self::FileRegistration>,
-        buffer: B,
-        offset: u64,
-        cancellation: &Cancellation,
-    ) -> BufferResult<B> {
-        self.selector()
-            .file_monitor_read_at(monitor, buffer, offset, cancellation)
-            .await
-    }
-    async fn file_monitor_write_at<B: IoBuf>(
-        &self,
-        monitor: &mut FileMonitor<Self::File, Self::FileRegistration>,
-        buffer: B,
-        offset: u64,
-        cancellation: &Cancellation,
-    ) -> BufferResult<B> {
-        self.selector()
-            .file_monitor_write_at(monitor, buffer, offset, cancellation)
-            .await
-    }
-    async fn file_monitor_close(
-        &self,
-        monitor: &mut FileMonitor<Self::File, Self::FileRegistration>,
-    ) -> io::Result<()> {
-        self.selector().file_monitor_close(monitor).await
-    }
-}
-
-impl<S: Selector + FileMonitorSubmission> FileMonitorSubmission for NativeScheduler<S> {
-    async fn file_monitor_read_submit<B: IoBufMut>(
-        &self,
-        monitor: &mut FileMonitor<Self::File, Self::FileRegistration>,
-        buffer: B,
-        cancellation: &Cancellation,
-    ) -> Result<impl std::future::Future<Output = BufferResult<B>> + Send, (OperationError, B)>
-    {
-        self.selector()
-            .file_monitor_read_submit(monitor, buffer, cancellation)
-            .await
-    }
-
-    async fn file_monitor_write_submit<B: IoBuf>(
-        &self,
-        monitor: &mut FileMonitor<Self::File, Self::FileRegistration>,
-        buffer: B,
-        cancellation: &Cancellation,
-    ) -> Result<impl std::future::Future<Output = BufferResult<B>> + Send, (OperationError, B)>
-    {
-        self.selector()
-            .file_monitor_write_submit(monitor, buffer, cancellation)
-            .await
-    }
-
-    async fn file_monitor_read_at_submit<B: IoBufMut>(
-        &self,
-        monitor: &mut FileMonitor<Self::File, Self::FileRegistration>,
-        buffer: B,
-        offset: u64,
-        cancellation: &Cancellation,
-    ) -> Result<impl std::future::Future<Output = BufferResult<B>> + Send, (OperationError, B)>
-    {
-        self.selector()
-            .file_monitor_read_at_submit(monitor, buffer, offset, cancellation)
-            .await
-    }
-
-    async fn file_monitor_write_at_submit<B: IoBuf>(
-        &self,
-        monitor: &mut FileMonitor<Self::File, Self::FileRegistration>,
-        buffer: B,
-        offset: u64,
-        cancellation: &Cancellation,
-    ) -> Result<impl std::future::Future<Output = BufferResult<B>> + Send, (OperationError, B)>
-    {
-        self.selector()
-            .file_monitor_write_at_submit(monitor, buffer, offset, cancellation)
-            .await
-    }
-}
-
-impl<S: Selector + FileSubmission> FileSubmission for NativeScheduler<S> {
-    async fn file_read_submit<B: IoBufMut>(
-        &self,
-        file: &Self::File,
-        buffer: B,
-        cancellation: &Cancellation,
-    ) -> Result<impl std::future::Future<Output = BufferResult<B>> + Send, (OperationError, B)>
-    {
-        self.selector()
-            .file_read_submit(file, buffer, cancellation)
-            .await
-    }
-    async fn file_write_submit<B: IoBuf>(
-        &self,
-        file: &Self::File,
-        buffer: B,
-        cancellation: &Cancellation,
-    ) -> Result<impl std::future::Future<Output = BufferResult<B>> + Send, (OperationError, B)>
-    {
-        self.selector()
-            .file_write_submit(file, buffer, cancellation)
-            .await
-    }
-    async fn file_read_at_submit<B: IoBufMut>(
-        &self,
-        file: &Self::File,
-        buffer: B,
-        offset: u64,
-        cancellation: &Cancellation,
-    ) -> Result<impl std::future::Future<Output = BufferResult<B>> + Send, (OperationError, B)>
-    {
-        self.selector()
-            .file_read_at_submit(file, buffer, offset, cancellation)
-            .await
-    }
-    async fn file_write_at_submit<B: IoBuf>(
-        &self,
-        file: &Self::File,
-        buffer: B,
-        offset: u64,
-        cancellation: &Cancellation,
-    ) -> Result<impl std::future::Future<Output = BufferResult<B>> + Send, (OperationError, B)>
-    {
-        self.selector()
-            .file_write_at_submit(file, buffer, offset, cancellation)
-            .await
-    }
-}
-
-impl<S: Selector + SocketReceiving> SocketReceiving for NativeScheduler<S> {
-    type PooledReceiver = NativeRecvMsgReceiver<S::PooledReceiver>;
-    async fn socket_receiver(
-        &self,
-        socket: &Self::Socket,
-        pool: Self::Pool,
-        flags: SocketRecvFlags,
-        cancellation: &Cancellation,
-    ) -> OperationResult<Self::PooledReceiver> {
-        self.selector()
-            .socket_receiver(socket, pool, flags, cancellation)
-            .await
-            .map(NativeRecvMsgReceiver)
     }
 }
 
@@ -869,5 +401,27 @@ impl<S: Selector + FileWriting> FileWriting for NativeScheduler<S> {
         Self: 'scheduler;
     fn file_writer(&self, file: &Self::File) -> io::Result<Self::Writer<'_>> {
         self.selector().file_writer(file)
+    }
+}
+
+impl<S: Selector + SocketStreamWriting> SocketStreamWriting for NativeScheduler<S> {
+    fn socket_stream_writer<'scheduler>(
+        &'scheduler self,
+        socket: &Self::Socket,
+    ) -> io::Result<impl SocketStreamWriter<Buffer = <Self::Pool as BufferPool>::Buffer> + 'scheduler>
+    where
+        Self::Socket: 'static,
+    {
+        self.selector().socket_stream_writer(socket)
+    }
+
+    fn socket_stream_writer_with_buffer<'scheduler, B: IoBuf>(
+        &'scheduler self,
+        socket: &Self::Socket,
+    ) -> io::Result<impl SocketStreamWriter<Buffer = B> + 'scheduler>
+    where
+        Self::Socket: 'static,
+    {
+        self.selector().socket_stream_writer_with_buffer(socket)
     }
 }

@@ -3,8 +3,7 @@
 
 use core_scheduler::{
     Cancellation, IoBufSequence, IoBufSequenceMut, IoBuffers, IoBuffersMut, OperationError,
-    OperationResult, SocketMessage, SocketOperation, SocketRecvFlags, SocketRecvResult,
-    SocketSendFlags, backend::SocketRecvMsg, backend::SocketSendMsg,
+    OperationResult, SocketOperation, SocketRecvFlags, SocketRecvResult, SocketSendFlags,
 };
 use futures_channel::oneshot;
 use std::future::Future;
@@ -15,6 +14,11 @@ use std::sync::{Arc, Mutex, mpsc};
 use std::task::{Context, Poll, Waker};
 use std::time::Duration;
 
+struct SocketMessage<Buffers = Vec<Vec<u8>>> {
+    buffers: Buffers,
+    address: Option<core_scheduler::SocketAddress>,
+}
+
 // A deliberately small message backend: one partial transfer, with no I/O-vector allocation.
 struct Messages;
 
@@ -22,7 +26,7 @@ impl SocketOperation for Messages {
     type Socket = bool; // Inject an I/O error independently of cancellation.
 }
 
-impl SocketSendMsg for Messages {
+impl Messages {
     async fn socket_sendmsg<Buffers: IoBufSequence>(
         &self,
         fail: &bool,
@@ -47,7 +51,7 @@ impl SocketSendMsg for Messages {
     }
 }
 
-impl SocketRecvMsg for Messages {
+impl Messages {
     async fn socket_recvmsg<Buffers: IoBufSequenceMut>(
         &self,
         fail: &bool,
@@ -254,7 +258,7 @@ impl SocketOperation for RetainingSender {
     type Socket = ();
 }
 
-impl SocketSendMsg for RetainingSender {
+impl RetainingSender {
     async fn socket_sendmsg<Buffers: IoBufSequence>(
         &self,
         _: &(),

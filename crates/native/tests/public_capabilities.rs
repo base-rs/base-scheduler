@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-// Deliberately import no core_scheduler::backend items: these factories must stand alone.
+// These factories depend only on the public resource capabilities.
 use core_scheduler::*;
 use core_scheduler_native::{NativeExecutorOptions, NativeScheduler};
 use core_scheduler_selector::Selector;
@@ -92,6 +92,33 @@ impl SocketStreamReader for Reader<'_> {
         }
         Ok(count)
     }
+    async fn read_vectored_with_flags(
+        &mut self,
+        buffers: &mut [IoSliceMut<'_>],
+        _: SocketRecvFlags,
+        cancellation: &Cancellation,
+    ) -> OperationResult<SocketRecvResult> {
+        SocketStreamReader::read_vectored(self, buffers, cancellation)
+            .await
+            .map(metadata)
+    }
+    async fn read_owned_vectored<B: IoBufSequenceMut>(
+        &mut self,
+        mut buffers: B,
+        _: SocketRecvFlags,
+        cancellation: &Cancellation,
+    ) -> (OperationResult<SocketRecvResult>, B) {
+        let result = self.check(cancellation).map(|()| {
+            let mut count = 0;
+            for i in 0..buffers.buffer_count() {
+                let bytes = buffers.buffer_mut(i);
+                bytes.fill(self.resource);
+                count += bytes.len();
+            }
+            metadata(count)
+        });
+        (result, buffers)
+    }
     async fn close(&mut self) -> io::Result<()> {
         self.finish()
     }
@@ -151,6 +178,33 @@ impl SocketPacketReader for Reader<'_> {
             .await
             .map(metadata)
     }
+    async fn read_vectored_with_flags(
+        &mut self,
+        buffers: &mut [IoSliceMut<'_>],
+        _: SocketRecvFlags,
+        cancellation: &Cancellation,
+    ) -> OperationResult<SocketRecvResult> {
+        SocketStreamReader::read_vectored(self, buffers, cancellation)
+            .await
+            .map(metadata)
+    }
+    async fn read_owned_vectored<B: IoBufSequenceMut>(
+        &mut self,
+        mut buffers: B,
+        _: SocketRecvFlags,
+        cancellation: &Cancellation,
+    ) -> (OperationResult<SocketRecvResult>, B) {
+        let result = self.check(cancellation).map(|()| {
+            let mut count = 0;
+            for i in 0..buffers.buffer_count() {
+                let bytes = buffers.buffer_mut(i);
+                bytes.fill(self.resource);
+                count += bytes.len();
+            }
+            metadata(count)
+        });
+        (result, buffers)
+    }
     async fn close(&mut self) -> io::Result<()> {
         self.finish()
     }
@@ -201,6 +255,28 @@ impl<B: IoBuf> SocketStreamWriter for Writer<'_, B> {
     async fn flush(&mut self, cancellation: &Cancellation) -> OperationResult<()> {
         cancellation.check().map_err(Into::into)
     }
+    async fn write_vectored_with_flags(
+        &mut self,
+        buffers: &[IoSlice<'_>],
+        _: SocketSendFlags,
+        cancellation: &Cancellation,
+    ) -> OperationResult<usize> {
+        SocketStreamWriter::write_vectored(self, buffers, cancellation).await
+    }
+    async fn write_owned_vectored<T: IoBufSequence>(
+        &mut self,
+        buffers: T,
+        _: SocketSendFlags,
+        cancellation: &Cancellation,
+    ) -> (OperationResult<usize>, T) {
+        let result = self.count(
+            (0..buffers.buffer_count())
+                .map(|i| buffers.buffer(i).len())
+                .sum(),
+            cancellation,
+        );
+        (result, buffers)
+    }
     async fn close(&mut self) -> io::Result<()> {
         self.finish()
     }
@@ -248,6 +324,30 @@ impl<B: Send> SocketPacketWriter for Writer<'_, B> {
         cancellation: &Cancellation,
     ) -> BufferResult<T> {
         (self.count(buffer.as_ref().len(), cancellation), buffer)
+    }
+    async fn write_vectored_with_flags(
+        &mut self,
+        buffers: &[IoSlice<'_>],
+        address: Option<SocketAddress>,
+        _: SocketSendFlags,
+        cancellation: &Cancellation,
+    ) -> OperationResult<usize> {
+        SocketPacketWriter::write_vectored(self, buffers, address, cancellation).await
+    }
+    async fn write_owned_vectored<T: IoBufSequence>(
+        &mut self,
+        buffers: T,
+        _: Option<SocketAddress>,
+        _: SocketSendFlags,
+        cancellation: &Cancellation,
+    ) -> (OperationResult<usize>, T) {
+        let result = self.count(
+            (0..buffers.buffer_count())
+                .map(|i| buffers.buffer(i).len())
+                .sum(),
+            cancellation,
+        );
+        (result, buffers)
     }
     async fn close(&mut self) -> io::Result<()> {
         self.finish()

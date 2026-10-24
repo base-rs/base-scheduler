@@ -3,7 +3,6 @@
 
 #![cfg(target_os = "linux")]
 
-use core_scheduler::backend::*;
 use core_scheduler::*;
 use core_scheduler_iouring::{IoUringDriver, IoUringSelector};
 use futures_lite::future::{block_on, or, poll_once};
@@ -70,8 +69,7 @@ fn worker_pools_preserve_independent_capacity_and_retained_payloads() {
                 .unwrap();
             receivers.push(
                 scheduler
-                    .socket_receiver(&socket, pool.clone(), SocketRecvFlags::default(), &never)
-                    .await
+                    .socket_packet_reader_with_pool(&socket, pool.clone())
                     .unwrap(),
             );
             sockets.push(socket);
@@ -82,7 +80,7 @@ fn worker_pools_preserve_independent_capacity_and_retained_payloads() {
                 scheduler.socket_local_address(&sockets[0]).unwrap(),
             )
             .unwrap();
-        let first = receivers[0].recv(scheduler, &never).await.unwrap().unwrap();
+        let first = receivers[0].read(&never).await.unwrap().unwrap();
         let address = first.payload().as_ptr() as usize;
         let retained = first.into_payload().freeze();
         for index in 1..4 {
@@ -92,11 +90,7 @@ fn worker_pools_preserve_independent_capacity_and_retained_payloads() {
                     scheduler.socket_local_address(&sockets[index]).unwrap(),
                 )
                 .unwrap();
-            let message = receivers[index]
-                .recv(scheduler, &never)
-                .await
-                .unwrap()
-                .unwrap();
+            let message = receivers[index].read(&never).await.unwrap().unwrap();
             assert_eq!(message.payload(), &[index as u8]);
             assert_eq!(
                 message.address().map(|address| address.to_socket_address()),
@@ -111,7 +105,7 @@ fn worker_pools_preserve_independent_capacity_and_retained_payloads() {
             .join()
             .unwrap();
         for mut receiver in receivers {
-            receiver.close(scheduler).await.unwrap();
+            receiver.close().await.unwrap();
         }
         for socket in sockets {
             scheduler.socket_close(socket).await.unwrap();
@@ -148,19 +142,18 @@ fn shared_receive_preserves_alignment_empty_datagrams_and_wait_cancellation() {
         let address = scheduler.socket_local_address(&socket).unwrap();
         let sender = UdpSocket::bind("127.0.0.1:0").unwrap();
         let mut receiver = scheduler
-            .socket_receiver(&socket, pool.clone(), SocketRecvFlags::default(), &never)
-            .await
+            .socket_packet_reader_with_pool(&socket, pool.clone())
             .unwrap();
         let token = Cancellation::new();
         {
-            let mut receiving = pin!(receiver.recv(scheduler, &token));
+            let mut receiving = pin!(receiver.read(&token));
             assert!(poll_once(receiving.as_mut()).await.is_none());
             token.cancel();
             assert!(receiving.await.is_err());
         }
         for (bytes, expected) in [(b"abcdef".as_slice(), b"abc".as_slice()), (b"", b"")] {
             sender.send_to(bytes, address).unwrap();
-            let mut message = receiver.recv(scheduler, &never).await.unwrap().unwrap();
+            let mut message = receiver.read(&never).await.unwrap().unwrap();
             assert_eq!(message.payload(), expected);
             assert_eq!(message.payload().as_ptr() as usize % 4096, 0);
             assert_eq!(message.truncated(), bytes.len() > 3);
@@ -168,7 +161,8 @@ fn shared_receive_preserves_alignment_empty_datagrams_and_wait_cancellation() {
                 message.payload_mut()[0] = b'X';
             }
         }
-        receiver.close(scheduler).await.unwrap();
+        receiver.close().await.unwrap();
+        drop(receiver);
         scheduler.socket_close(socket).await.unwrap();
         assert!(pool.try_acquire().is_some());
     });

@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-/// Generate prepared stream-message tests. The runner supplies `(scheduler, sender, receiver)` as references to a fresh connected pair. The scheduler needs `SocketSendMsg` and `SocketRecvMsg`.
+/// Generate prepared stream-message tests. The runner supplies `(scheduler, sender, receiver)` as references to a fresh connected pair. The scheduler needs the public `SocketTestScheduler` fixture profile.
 ///
 /// Invoke inside a dedicated module. Each generated test calls the runner once with an async closure; the runner must create a fresh isolated fixture, await the closure, perform cleanup, enforce a deadline, and propagate panics. Async closures require Rust 1.85 or later.
 #[macro_export]

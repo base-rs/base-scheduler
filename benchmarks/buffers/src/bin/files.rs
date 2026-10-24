@@ -1,13 +1,48 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::backend::*;
 use core_scheduler::*;
-use std::{sync::Arc, time::Instant};
+use std::{future::Future, sync::Arc, time::Instant};
+
+async fn read_pooled<R: FileReader, P: BufferPool>(
+    reader: &mut R,
+    pool: &P,
+    cancellation: &Cancellation,
+) -> OperationResult<Option<P::Buffer>> {
+    let buffer = pool.acquire(cancellation).await?;
+    let (result, mut buffer) = reader.read(buffer, cancellation).await;
+    let count = result?;
+    if count == 0 {
+        return Ok(None);
+    }
+    buffer.truncate(count);
+    Ok(Some(buffer))
+}
+
+// A submitted file transfer can complete short. Retry only the untransferred suffix, retaining its original owner until all access ends.
+async fn finish_write<W: FileWriter, B: IoBuf>(
+    writer: &mut W,
+    completion: impl Future<Output = BufferResult<B>>,
+    cancellation: &Cancellation,
+) -> OperationResult<()> {
+    let (result, buffer) = completion.await;
+    let written = result?;
+    let length = buffer.as_ref().len();
+    if written < length {
+        if written == 0 {
+            return Err(std::io::Error::from(std::io::ErrorKind::WriteZero).into());
+        }
+        let (result, _) = writer
+            .write_all(buffer.slice(written..), cancellation)
+            .await;
+        assert_eq!(result?, length - written);
+    }
+    Ok(())
+}
 
 async fn run<S>(scheduler: &S, mode: &str, size: usize, bytes: usize) -> serde_json::Value
 where
-    S: FileMonitoring + FileSubmission + FileOpen + FileClose + BufferPooling,
+    S: FileReading + FileWriting + FileOpen + FileClose + BufferPooling,
     <S::Pool as BufferPool>::Buffer: std::fmt::Debug,
 {
     assert!(size > 0, "buffer size must be positive");
@@ -41,31 +76,26 @@ where
         let pool = scheduler
             .buffer_pool(BufferPoolOptions::new(2, size))
             .unwrap();
-        let mut receiver = FileReceiver::new(scheduler.file_monitor(&input).unwrap(), pool);
+        let mut reader = scheduler.file_reader(&input).unwrap();
+        let mut writer = scheduler.file_writer(&output).unwrap();
         let started = Instant::now();
         let mut next = if mode == "vec-join" || mode == "vec-serial" {
-            let mut monitor = scheduler.file_monitor(&input).unwrap();
             let mut buffer = vec![0; size];
             let mut spare = vec![0; size];
             let count;
-            (count, buffer) = scheduler
-                .file_monitor_read(&mut monitor, buffer, &never)
-                .await;
+            (count, buffer) = reader.read(buffer, &never).await;
             let mut count = count.unwrap();
             let mut copied = 0;
             while count != 0 {
                 let (written, read) = if mode == "vec-join" {
                     futures_lite::future::zip(
-                        file_write_all(scheduler, &output, buffer.slice(..count), &never),
-                        scheduler.file_monitor_read(&mut monitor, spare, &never),
+                        writer.write_all(buffer.slice(..count), &never),
+                        reader.read(spare, &never),
                     )
                     .await
                 } else {
-                    let written =
-                        file_write_all(scheduler, &output, buffer.slice(..count), &never).await;
-                    let read = scheduler
-                        .file_monitor_read(&mut monitor, spare, &never)
-                        .await;
+                    let written = writer.write_all(buffer.slice(..count), &never).await;
+                    let read = reader.read(spare, &never).await;
                     (written, read)
                 };
                 assert_eq!(written.0.unwrap(), count);
@@ -75,45 +105,38 @@ where
                 count = read.0.unwrap();
             }
             assert_eq!(copied, bytes);
-            scheduler.file_monitor_close(&mut monitor).await.unwrap();
-            drop(monitor);
             None
         } else {
-            receiver.recv(scheduler, &never).await.unwrap()
+            read_pooled(&mut reader, &pool, &never).await.unwrap()
         };
         let mut copied = 0;
         while let Some(buffer) = next {
             let length = buffer.as_ref().len();
             next = match mode {
                 "serial" => {
-                    let (result, buffer) = file_write_all(scheduler, &output, buffer, &never).await;
+                    let (result, buffer) = writer.write_all(buffer, &never).await;
                     assert_eq!(result.unwrap(), length);
                     drop(buffer);
-                    receiver.recv(scheduler, &never).await.unwrap()
+                    read_pooled(&mut reader, &pool, &never).await.unwrap()
                 }
                 "join" => {
                     let (written, received) = futures_lite::future::zip(
                         async {
-                            let (result, buffer) =
-                                file_write_all(scheduler, &output, buffer, &never).await;
+                            let (result, buffer) = writer.write_all(buffer, &never).await;
                             drop(buffer);
                             result
                         },
-                        receiver.recv(scheduler, &never),
+                        read_pooled(&mut reader, &pool, &never),
                     )
                     .await;
                     assert_eq!(written.unwrap(), length);
                     received.unwrap()
                 }
                 "submit" => {
-                    let completion = file_write_all_submit(scheduler, &output, buffer, &never)
-                        .await
-                        .unwrap();
+                    let completion = writer.write_submit(buffer, &never).await.unwrap();
                     // The accepted write progresses while only the input completion is being polled.
-                    let received = receiver.recv(scheduler, &never).await;
-                    let (result, buffer) = completion.await;
-                    drop(buffer);
-                    assert_eq!(result.unwrap(), length);
+                    let received = read_pooled(&mut reader, &pool, &never).await;
+                    finish_write(&mut writer, completion, &never).await.unwrap();
                     received.unwrap()
                 }
                 _ => unreachable!("The pipeline mode was validated before execution"),
@@ -124,8 +147,9 @@ where
         if mode != "vec-join" && mode != "vec-serial" {
             assert_eq!(copied, bytes);
         }
-        receiver.close(scheduler).await.unwrap();
-        drop(receiver);
+        reader.close().await.unwrap();
+        writer.close().await.unwrap();
+        drop((reader, writer));
         scheduler.file_close(input).await.unwrap();
         scheduler.file_close(output).await.unwrap();
         assert_eq!(std::fs::read(&output_path).unwrap(), expected);
@@ -245,43 +269,5 @@ fn main() {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn pipelines_copy_partial_tails_on_each_backend() {
-        #[cfg(target_os = "linux")]
-        let backends = ["direct", "tokio", "native", "iouring"];
-        #[cfg(not(target_os = "linux"))]
-        let backends = ["direct", "tokio", "native"];
-        for backend in backends {
-            for mode in ["vec-serial", "vec-join", "serial", "join", "submit"] {
-                let args = ["files", backend, mode, "4096", "10001", "2"].map(str::to_owned);
-                let result = execute(&args);
-                assert_eq!(result["bytes"], 10001);
-                assert_eq!(result["backend"], backend);
-            }
-        }
-        assert_eq!(execute(&[])["mode"], "join");
-    }
-
-    #[test]
-    fn empty_input_returns_eof() {
-        assert_eq!(
-            execute(&["files", "direct", "join", "4096", "0", "1"].map(str::to_owned))["bytes"],
-            0
-        );
-    }
-
-    #[test]
-    #[should_panic(expected = "unknown pipeline mode")]
-    fn rejects_unknown_mode() {
-        execute(&["files", "direct", "unknown"].map(str::to_owned));
-    }
-
-    #[test]
-    #[should_panic(expected = "unknown backend")]
-    fn rejects_unknown_backend() {
-        execute(&["files", "unknown"].map(str::to_owned));
-    }
-}
+#[path = "files/tests.rs"]
+mod tests;

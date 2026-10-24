@@ -13,7 +13,7 @@ pub trait FileWriter: Send {
         cancellation: &Cancellation,
     ) -> impl Future<Output = BufferResult<B>> + Send;
 
-    /// Write once at an explicit offset, following [`FileWriteAt`](crate::backend::FileWriteAt)'s platform cursor semantics. The handle maintains no private cursor.
+    /// Write once at an explicit offset, requiring the offset to fit in `i64`. Unix implementations leave the shared cursor unchanged; Windows implementations may use `seek_write`, which changes it. The handle maintains no private cursor.
     fn write_at<B: IoBuf>(
         &mut self,
         buffer: B,
@@ -52,6 +52,47 @@ pub trait FileWriter: Send {
                 buffer = remaining.into_inner();
                 result = next;
             }
+        }
+    }
+
+    /// Await admission separately from collecting the original owner. Accepted work can complete independently of polling the returned future. The fallback completes the ordinary operation before returning; backends can admit independently progressing work earlier. Pre-cancellation rejects admission and returns the unchanged owner.
+    fn write_submit<B: IoBuf>(
+        &mut self,
+        buffer: B,
+        cancellation: &Cancellation,
+    ) -> impl Future<
+        Output = Result<
+            impl Future<Output = BufferResult<B>> + Send + 'static,
+            (crate::OperationError, B),
+        >,
+    > + Send {
+        async move {
+            if let Err(error) = cancellation.check() {
+                return Err((error.into(), buffer));
+            }
+            let result = self.write(buffer, cancellation).await;
+            Ok(async move { result })
+        }
+    }
+
+    /// Await admission separately from collecting the original owner. Accepted work can complete independently of polling the returned future. The fallback completes the ordinary operation before returning; backends can admit independently progressing work earlier. Pre-cancellation rejects admission and returns the unchanged owner.
+    fn write_at_submit<B: IoBuf>(
+        &mut self,
+        buffer: B,
+        offset: u64,
+        cancellation: &Cancellation,
+    ) -> impl Future<
+        Output = Result<
+            impl Future<Output = BufferResult<B>> + Send + 'static,
+            (crate::OperationError, B),
+        >,
+    > + Send {
+        async move {
+            if let Err(error) = cancellation.check() {
+                return Err((error.into(), buffer));
+            }
+            let result = self.write_at(buffer, offset, cancellation).await;
+            Ok(async move { result })
         }
     }
 

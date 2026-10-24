@@ -44,7 +44,7 @@ fn receive_failures_and_abandonment_preserve_retained_storage() {
         let never = Cancellation::never();
         if failure == "queued" {
             drop(driver);
-            assert!(block_on(receiving.recv(&selector, &never)).is_err());
+            assert!(block_on(receiving.recv(&never)).is_err());
             continue;
         }
         sender
@@ -53,22 +53,20 @@ fn receive_failures_and_abandonment_preserve_retained_storage() {
         if failure == "register-buffer-ring" {
             let _failures =
                 Failures::new([("register-buffer-ring", io::ErrorKind::Unsupported.into())]);
-            assert!(drive(&mut driver, receiving.recv(&selector, &never)).is_err());
+            assert!(drive(&mut driver, receiving.recv(&never)).is_err());
             drain(&selector, &mut driver);
             continue;
         }
-        let message = drive(&mut driver, receiving.recv(&selector, &never))
-            .unwrap()
-            .unwrap();
+        let message = drive(&mut driver, receiving.recv(&never)).unwrap().unwrap();
         if failure == "driver" {
             drop(driver);
-            assert!(block_on(receiving.recv(&selector, &never)).is_err());
+            assert!(block_on(receiving.recv(&never)).is_err());
         } else {
             let _failures = Failures::new([(
                 "unregister-buffer-ring",
                 io::ErrorKind::PermissionDenied.into(),
             )]);
-            assert!(drive(&mut driver, receiving.close(&selector)).is_err());
+            assert!(drive(&mut driver, receiving.close()).is_err());
             drain(&selector, &mut driver);
         }
         drop((selector, receiving));
@@ -91,7 +89,7 @@ fn invalid_sockets_report_receive_errors_and_detach_their_pool() {
         .buffer_pool_per_worker(BufferPoolOptions::new(1, 32))
         .unwrap();
     let mut receiving = receiver(&selector, &socket, pool.clone());
-    assert!(drive(&mut driver, receiving.recv(&selector, &never)).is_err());
+    assert!(drive(&mut driver, receiving.recv(&never)).is_err());
     drain(&selector, &mut driver);
     assert!(pool.try_acquire().is_some());
 }
@@ -205,9 +203,9 @@ fn selected_terminal_completion_returns_its_lease_and_close_accepts_exhaustion()
         request.completion(result, flags); // Optional IORING_CQE_F_BUFFER, buffer zero, no MORE.
         request.retire_completion(&reactor.ring.submitter(), result);
         if result == -libc::ECONNRESET {
-            assert!(block_on(receiving.recv(&selector, &Cancellation::never())).is_err());
+            assert!(block_on(receiving.recv(&Cancellation::never())).is_err());
         } else {
-            block_on(receiving.close(&selector)).unwrap();
+            block_on(receiving.close()).unwrap();
         }
         assert!(pool.try_acquire().is_some());
         drain(&selector, &mut driver);
@@ -229,19 +227,16 @@ fn repeated_unregister_failure_stops_the_driver_without_recycling_unknown_storag
     sender
         .try_send(b"held", SocketSendFlags::default())
         .unwrap();
-    let message = drive(
-        &mut driver,
-        receiving.recv(&selector, &Cancellation::never()),
-    )
-    .unwrap()
-    .unwrap();
+    let message = drive(&mut driver, receiving.recv(&Cancellation::never()))
+        .unwrap()
+        .unwrap();
     let _failures = Failures::new((0..4).map(|_| {
         (
             "unregister-buffer-ring",
             io::ErrorKind::PermissionDenied.into(),
         )
     }));
-    let mut closing = Box::pin(receiving.close(&selector));
+    let mut closing = Box::pin(receiving.close());
     assert!(block_on(poll_once(&mut closing)).is_none());
     let mut failed = false;
     for _ in 0..100 {
@@ -278,7 +273,7 @@ fn registration_capacity_errors_are_not_confused_with_receive_exhaustion() {
                 .buffer_pool_per_worker(BufferPoolOptions::new(2, 32))
                 .unwrap();
             let mut receiving = receiver(&selector, &socket, pool);
-            drive(&mut driver, receiving.recv(&selector, &never)).map(|_| ())
+            drive(&mut driver, receiving.recv(&never)).map(|_| ())
         } else {
             let mut receiving = block_on(selector.socket_recvmsg_multishot(
                 &socket,
@@ -287,7 +282,7 @@ fn registration_capacity_errors_are_not_confused_with_receive_exhaustion() {
                 &never,
             ))
             .unwrap();
-            drive(&mut driver, receiving.recv(&selector, &never)).map(|_| ())
+            drive(&mut driver, receiving.recv(&never)).map(|_| ())
         };
         assert!(
             matches!(result, Err(OperationError::Io(error)) if error.raw_os_error() == Some(libc::ENOBUFS))
@@ -619,9 +614,7 @@ fn exhausted_receivers_resume_from_their_own_groups_only() {
     ))
     .unwrap();
     sender.try_send(b"ab", SocketSendFlags::default()).unwrap();
-    let old_message = drive(&mut driver, legacy.recv(&selector, &never))
-        .unwrap()
-        .unwrap();
+    let old_message = drive(&mut driver, legacy.recv(&never)).unwrap().unwrap();
     let deadline = std::time::Instant::now() + Duration::from_secs(3);
     while driver.reactor.as_ref().unwrap().dormant.is_empty() {
         driver.turn(Some(Duration::from_millis(1))).unwrap();
@@ -635,15 +628,13 @@ fn exhausted_receivers_resume_from_their_own_groups_only() {
     driver.turn(Some(Duration::ZERO)).unwrap();
     assert_eq!(driver.reactor.as_ref().unwrap().dormant.len(), 2);
     drop(held);
-    let message = drive(&mut driver, pooled.recv(&selector, &never))
-        .unwrap()
-        .unwrap();
+    let message = drive(&mut driver, pooled.recv(&never)).unwrap().unwrap();
     assert_eq!(message.payload(), b"b");
     drop(message);
     driver.turn(Some(Duration::ZERO)).unwrap();
-    assert!(block_on(poll_once(legacy.recv(&selector, &never))).is_none());
-    drive(&mut driver, pooled.close(&selector)).unwrap();
-    drive(&mut driver, legacy.close(&selector)).unwrap();
+    assert!(block_on(poll_once(legacy.recv(&never))).is_none());
+    drive(&mut driver, pooled.close()).unwrap();
+    drive(&mut driver, legacy.close()).unwrap();
     drop(old_message);
     drain(&selector, &mut driver);
 }

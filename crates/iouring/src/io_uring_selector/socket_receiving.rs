@@ -3,18 +3,20 @@
 
 use super::provided_buffers::WorkerBuffers;
 use super::*;
+use crate::Interest;
+use crate::IoUringBuffer;
+use crate::demand_receiver::DemandReceiver;
+use crate::io_uring_receiver::IoUringReceiver;
 use crate::io_uring_receiver::Strategy;
-use crate::{IoUringBuffer, IoUringReceiver};
 use std::cell::UnsafeCell;
-impl SocketReceiving for IoUringSelector {
-    type PooledReceiver = IoUringReceiver;
-    async fn socket_receiver(
+impl IoUringSelector {
+    pub(crate) async fn socket_receiver(
         &self,
-        socket: &Self::Socket,
-        pool: Self::Pool,
+        socket: &impl SocketSource,
+        pool: crate::IoUringBufferPool,
         flags: SocketRecvFlags,
         cancellation: &Cancellation,
-    ) -> OperationResult<Self::PooledReceiver> {
+    ) -> OperationResult<IoUringReceiver> {
         cancellation.check()?;
         self.check_open()?;
         if !Weak::ptr_eq(&pool.0.selector, &Arc::downgrade(&self.group)) {
@@ -43,7 +45,7 @@ impl SocketReceiving for IoUringSelector {
             };
             return self
                 .socket_monitor(socket, Interest::Readable)
-                .and_then(|monitor| SocketReceiver::new(monitor, pool, kind, flags))
+                .and_then(|monitor| DemandReceiver::new(monitor, pool, kind, flags))
                 .map(|receiver| IoUringReceiver(Strategy::Demand(receiver)))
                 .map_err(Into::into);
         };

@@ -1,7 +1,6 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::backend::*;
 use core_scheduler::*;
 use core_scheduler_conformance::socket;
 use core_scheduler_native::{NativeOptions, NativeScheduler, NativeSocket};
@@ -260,14 +259,11 @@ fn sockets_move_between_threads_and_compatible_scheduler_instances() {
             std::thread::scope(|scope| {
                 let reader = scope.spawn(|| {
                     block_on(async {
+                        let mut input = second.socket_stream_reader(&server).unwrap();
                         let mut received = Vec::new();
                         while received.len() < 3 {
-                            let (result, buffer) = second
-                                .socket_read(
-                                    &server,
-                                    vec![0; 3 - received.len()],
-                                    &Cancellation::never(),
-                                )
+                            let (result, buffer) = input
+                                .read_owned(vec![0; 3 - received.len()], &Cancellation::never())
                                 .await;
                             let count = result.unwrap();
                             assert!(count > 0);
@@ -276,14 +272,12 @@ fn sockets_move_between_threads_and_compatible_scheduler_instances() {
                         received
                     })
                 });
+                let mut output = first.socket_stream_writer(&client).unwrap();
                 let mut sent = 0;
                 let mut buffer = b"abc".to_vec();
                 while sent < 3 {
-                    let (result, returned) = block_on(first.socket_write(
-                        &client,
-                        buffer.slice(sent..),
-                        &Cancellation::never(),
-                    ));
+                    let (result, returned) =
+                        block_on(output.write_owned(buffer.slice(sent..), &Cancellation::never()));
                     let count = result.unwrap();
                     assert!(count > 0);
                     sent += count;
@@ -313,48 +307,9 @@ fn failed_writes_return_the_original_buffer() {
                 )
                 .await
                 .unwrap();
-            assert_eq!(scheduler.socket_type(&socket).unwrap(), SocketType::Stream);
+            assert!(scheduler.socket_stream_reader(&socket).is_ok());
             socket::write_error(&scheduler, &socket).await;
             scheduler.socket_close(socket).await.unwrap();
-            scheduler.shutdown().await;
-        })
-    });
-}
-
-struct SpuriousReadiness<'a>(&'a NativeScheduler);
-impl SocketOperation for SpuriousReadiness<'_> {
-    type Socket = NativeSocket;
-}
-impl SocketRead for SpuriousReadiness<'_> {
-    async fn socket_read<B: IoBufMut>(
-        &self,
-        socket: &NativeSocket,
-        buffer: B,
-        cancellation: &Cancellation,
-    ) -> BufferResult<B> {
-        self.0.socket_read(socket, buffer, cancellation).await
-    }
-}
-impl SocketWait for SpuriousReadiness<'_> {
-    async fn socket_wait(
-        &self,
-        _: &NativeSocket,
-        _: Interest,
-        cancellation: &Cancellation,
-    ) -> OperationResult<()> {
-        cancellation.check().map_err(OperationError::from)
-    }
-}
-
-#[test]
-fn readiness_conformance_allows_spurious_notifications_while_preserving_cancellation() {
-    run(|| {
-        block_on(async {
-            let scheduler = scheduler();
-            let (client, server) = socket::stream_pair(&scheduler, SocketDomain::Ipv4).await;
-            socket::pending_cancellation(&SpuriousReadiness(&scheduler), &server).await;
-            scheduler.socket_close(client).await.unwrap();
-            scheduler.socket_close(server).await.unwrap();
             scheduler.shutdown().await;
         })
     });
@@ -397,8 +352,8 @@ fn pooled_stream_uses_the_explicit_native_scheduler() {
 }
 
 #[test]
-fn directional_socket_monitors_reuse_caller_owned_storage() {
+fn bound_socket_handles_reuse_storage() {
     run_stream(SocketDomain::Ipv4, async |scheduler, sender, receiver| {
-        core_scheduler_conformance::socket_monitoring::stream(scheduler, sender, receiver).await;
+        core_scheduler_conformance::socket_resources::stream(scheduler, sender, receiver).await;
     });
 }

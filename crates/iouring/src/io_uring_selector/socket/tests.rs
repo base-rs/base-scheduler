@@ -3,6 +3,7 @@
 
 use super::super::tests::{Failures, drain, drive, pair};
 use super::*;
+use crate::Interest;
 use futures_lite::future::{block_on, poll_once};
 
 #[test]

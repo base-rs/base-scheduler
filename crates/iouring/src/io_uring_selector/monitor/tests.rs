@@ -2,6 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use super::*;
+use crate::Interest;
 use core_scheduler_selector::{SelectorDriver, SelectorWorker};
 use futures_lite::future::{block_on, poll_once};
 use std::{
@@ -554,12 +555,6 @@ fn cancelled_and_dropped_waiters_leave_the_registration_active() {
         .kind(),
         io::ErrorKind::WouldBlock
     );
-    assert_eq!(
-        block_on(selector.socket_monitor_close(&mut alias))
-            .unwrap_err()
-            .kind(),
-        io::ErrorKind::WouldBlock
-    );
     worker.turn(Some(Duration::ZERO)).unwrap();
     token.cancel();
     assert!(matches!(
@@ -613,7 +608,7 @@ fn the_last_application_handle_retires_an_embedded_registration() {
     let (socket, _peer) = sockets(&selector);
     let owner = Arc::new(
         selector
-            .socket_stream_monitor_state(&socket, Interest::Readable)
+            .socket_monitor_state(&socket, Interest::Readable)
             .unwrap(),
     );
     let mut reader = MonitorStorage::from_arc(Arc::clone(&owner), |state| state);
@@ -950,7 +945,7 @@ fn interrupted_syscalls_retry_and_observe_cancellation_and_closure() {
     let cancellation = Cancellation::new();
     assert!(matches!(
         block_on(
-            selector.monitor_io::<(), _>(&writer, Interest::Writable, &cancellation, |_| {
+            selector.monitor_io::<()>(&writer, Interest::Writable, &cancellation, |_| {
                 cancellation.cancel();
                 Err(io::ErrorKind::Interrupted.into())
             })
@@ -965,7 +960,7 @@ fn interrupted_syscalls_retry_and_observe_cancellation_and_closure() {
             .unwrap();
         assert_eq!(
             block_on(
-                selector.monitor_io::<(), _>(&writer, Interest::Writable, &never, |_| {
+                selector.monitor_io::<()>(&writer, Interest::Writable, &never, |_| {
                     selector.close();
                     Err(kind.into())
                 })
@@ -1299,15 +1294,17 @@ fn forgetting_a_wait_cannot_prevent_last_handle_retirement() {
     let mut waiting = Box::pin(selector.socket_monitor_wait(&mut reader, &never));
     assert!(waiting.as_mut().poll(&mut context).is_pending());
     worker.turn(Some(Duration::ZERO)).unwrap();
-    // Forgetting leaks the future and its waiter claim. Neither is required to retire the kernel registration, whose storage has independent ownership.
+    // Forgetting leaks the future and its waiter claim. Explicit close still retires independently of that future's destructor.
     std::mem::forget(waiting);
     let inspect = reader.retained();
+    {
+        let mut close = pin!(selector.socket_monitor_close(&mut reader));
+        drive(&mut worker, &mut context, close.as_mut()).unwrap();
+    }
+    assert!(!inspect.registration().status.lock().unwrap().pending);
     drop(reader);
     assert_eq!(inspect.registration().users.load(Ordering::Acquire), 0);
     assert!(inspect.registration().claimed.load(Ordering::Acquire));
-    until(&mut worker, || {
-        !inspect.registration().status.lock().unwrap().pending
-    });
 }
 
 #[test]
@@ -1453,9 +1450,7 @@ fn a_stream_monitor_on_a_datagram_socket_keeps_message_semantics() {
     }
 }
 
-fn urgent_tcp_boundary<M: SocketMonitorState<NativeSocket, IoUringMonitorRegistration>>(
-    monitor: impl Fn(&IoUringSelector, &NativeSocket) -> MonitorStorage<M>,
-) {
+fn urgent_tcp_boundary(monitor: impl Fn(&IoUringSelector, &NativeSocket) -> Storage) {
     for (armed, inline, consumed) in [
         (false, false, false),
         (true, false, false),

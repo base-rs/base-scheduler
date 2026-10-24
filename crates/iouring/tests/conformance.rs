@@ -3,7 +3,6 @@
 
 #![cfg(target_os = "linux")]
 
-use core_scheduler::backend::*;
 use core_scheduler::*;
 use core_scheduler_conformance::FileTestFixture;
 use core_scheduler_iouring::{IoUringOptions, IoUringSelector};
@@ -185,19 +184,19 @@ ordered_writer_tests!(ordered_writer_worker_rings, run_native_workers);
 mod native_worker_rings {
     use super::*;
     core_scheduler_conformance::file_tests!(run: run_native_workers);
-    core_scheduler_conformance::file_monitor_tests!(run: run_native_workers);
+    core_scheduler_conformance::file_resource_tests!(run: run_native_workers);
     core_scheduler_conformance::file_submission_tests!(run: run_native_workers);
 }
 mod independent_selector {
     use super::*;
     core_scheduler_conformance::file_tests!(run: run_selector);
-    core_scheduler_conformance::file_monitor_tests!(run: run_selector);
+    core_scheduler_conformance::file_resource_tests!(run: run_selector);
     core_scheduler_conformance::file_submission_tests!(run: run_selector);
 }
 mod native_composition {
     use super::*;
     core_scheduler_conformance::file_tests!(run: run_native);
-    core_scheduler_conformance::file_monitor_tests!(run: run_native);
+    core_scheduler_conformance::file_resource_tests!(run: run_native);
     core_scheduler_conformance::file_submission_tests!(run: run_native);
 }
 
@@ -224,15 +223,16 @@ fn one_thread_can_poll_a_borrowing_future_and_drive_the_ring() {
                 )
                 .await
                 .unwrap();
-            let (result, _) = selector
-                .file_write_at(&file, value.as_ref().clone(), 0, &never)
-                .await;
+            let mut writer = selector.file_writer(&file).unwrap();
+            let mut reader = selector.file_reader(&file).unwrap();
+            let (result, _) = writer.write_at(value.as_ref().clone(), 0, &never).await;
             assert_eq!(result.unwrap(), value.len());
-            let (result, buffer) = selector
-                .file_read_at(&file, vec![0; value.len()], 0, &never)
-                .await;
+            let (result, buffer) = reader.read_at(vec![0; value.len()], 0, &never).await;
             assert_eq!(result.unwrap(), value.len());
             assert_eq!(&buffer, value.as_ref());
+            reader.close().await.unwrap();
+            writer.close().await.unwrap();
+            drop((reader, writer));
             selector.file_close(file).await.unwrap();
             selector.shutdown().await;
         });
@@ -343,13 +343,10 @@ fn fallback_capabilities_compose_with_completion_io() {
             .await
             .unwrap();
         let mut byte = [0];
-        assert_eq!(
-            scheduler
-                .socket_recv_poll(&server, &mut byte, SocketRecvFlags::default(), &never)
-                .await
-                .unwrap(),
-            0
-        );
+        let mut reader = scheduler.socket_stream_reader(&server).unwrap();
+        assert_eq!(reader.read_into(&mut byte, &never).await.unwrap(), 0);
+        reader.close().await.unwrap();
+        drop(reader);
         // Observing peer EOF does not guarantee that the submission-only shutdown has released its retained socket owner yet.
         drop(client);
         scheduler.socket_close(server).await.unwrap();
@@ -463,7 +460,7 @@ fn directional_monitors_work_with_an_independent_driver() {
         let scheduler = &fixture.scheduler;
         let (sender, receiver) =
             core_scheduler_conformance::socket::stream_pair(scheduler, SocketDomain::Ipv4).await;
-        core_scheduler_conformance::socket_monitoring::stream(scheduler, &sender, &receiver).await;
+        core_scheduler_conformance::socket_resources::stream(scheduler, &sender, &receiver).await;
         scheduler.socket_close(sender).await.unwrap();
         scheduler.socket_close(receiver).await.unwrap();
     });
@@ -475,7 +472,7 @@ fn directional_monitors_work_through_the_native_scheduler() {
         let scheduler = &fixture.scheduler;
         let (sender, receiver) =
             core_scheduler_conformance::socket::stream_pair(scheduler, SocketDomain::Ipv4).await;
-        core_scheduler_conformance::socket_monitoring::stream(scheduler, &sender, &receiver).await;
+        core_scheduler_conformance::socket_resources::stream(scheduler, &sender, &receiver).await;
         scheduler.socket_close(sender).await.unwrap();
         scheduler.socket_close(receiver).await.unwrap();
     });

@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 //! Ordered output assertions shared by completion and readiness backends.
-use core_scheduler::backend::*;
+use crate::SocketTestScheduler;
 use core_scheduler::*;
 use futures_lite::future::{poll_once, zip};
 use std::io;
@@ -10,7 +10,7 @@ use std::io;
 /// Empty writes, sequential ordering, pre-cancelled admission, flush, and repeatable cleanup.
 pub async fn ordering<S>(scheduler: &S, sender: &S::Socket, receiver: &S::Socket)
 where
-    S: SocketStreamWriting + SocketMonitoring + SocketRecvPoll + Sync,
+    S: SocketStreamWriting + SocketTestScheduler + Sync,
     S::Socket: 'static,
 {
     let never = Cancellation::never();
@@ -23,7 +23,7 @@ where
     let rejected = b"rejected".to_vec();
     let pointer = rejected.as_ptr();
     let (error, returned) = writer.submit(rejected, &cancellation).await.unwrap_err();
-    crate::socket_monitoring::cancelled::<()>(Err(error));
+    crate::socket_resources::cancelled::<()>(Err(error));
     assert_eq!(returned.as_ptr(), pointer);
     assert_eq!(returned, b"rejected");
     let ((), ()) = zip(
@@ -51,7 +51,7 @@ where
 /// An accepted large write and its partial retries progress without polling the writer. Its pooled owner is returned without calling flush.
 pub async fn independent_progress<S>(scheduler: &S, sender: &S::Socket, receiver: &S::Socket)
 where
-    S: SocketStreamWriting + SocketMonitoring + SocketRecvPoll + Sync,
+    S: SocketStreamWriting + SocketTestScheduler + Sync,
     S::Socket: 'static,
 {
     let never = Cancellation::never();
@@ -74,10 +74,15 @@ where
         let mut incoming = vec![0; 64 * 1024];
         let mut received = 0;
         while received < pool.buffer_size() {
-            let length = scheduler
-                .socket_recv_poll(receiver, &mut incoming, SocketRecvFlags::default(), &never)
-                .await
-                .unwrap();
+            let length = crate::io::socket_recv_poll(
+                scheduler,
+                receiver,
+                &mut incoming,
+                SocketRecvFlags::default(),
+                &never,
+            )
+            .await
+            .unwrap();
             assert!(length > 0);
             assert!(incoming[..length].iter().all(|byte| *byte == 0x5a));
             received += length;
@@ -94,7 +99,7 @@ where
 /// Abandoning a later admission wait leaves the first accepted write intact.
 pub async fn abandoned_admission<S>(scheduler: &S, sender: &S::Socket, receiver: &S::Socket)
 where
-    S: SocketStreamWriting + SocketMonitoring + SocketRecvPoll + Sync,
+    S: SocketStreamWriting + SocketTestScheduler + Sync,
     S::Socket: 'static,
 {
     let never = Cancellation::never();
@@ -126,7 +131,7 @@ where
 /// Cleanup can cancel blocked output without a peer consuming it, and releases retained pool storage.
 pub async fn close_pending<S>(scheduler: &S, sender: &S::Socket)
 where
-    S: SocketStreamWriting + SocketMonitoring + Sync,
+    S: SocketStreamWriting + Sync,
     S::Socket: 'static,
 {
     let never = Cancellation::never();
@@ -143,20 +148,20 @@ where
     assert!(pool.try_acquire().is_some());
 }
 
-async fn receive<S: SocketRecvPoll>(scheduler: &S, socket: &S::Socket, expected: &[u8]) {
+async fn receive<S: SocketTestScheduler>(scheduler: &S, socket: &S::Socket, expected: &[u8]) {
     let mut buffer = vec![0; expected.len().min(64 * 1024)];
     let mut received = 0;
     while received < expected.len() {
         let capacity = buffer.len().min(expected.len() - received);
-        let count = scheduler
-            .socket_recv_poll(
-                socket,
-                &mut buffer[..capacity],
-                SocketRecvFlags::default(),
-                &Cancellation::never(),
-            )
-            .await
-            .unwrap();
+        let count = crate::io::socket_recv_poll(
+            scheduler,
+            socket,
+            &mut buffer[..capacity],
+            SocketRecvFlags::default(),
+            &Cancellation::never(),
+        )
+        .await
+        .unwrap();
         assert!(count > 0);
         assert_eq!(&buffer[..count], &expected[received..received + count]);
         received += count;
@@ -186,7 +191,7 @@ where
         let mut reading = std::pin::pin!(reader.read_into(&mut storage, &cancelled));
         assert!(poll_once(reading.as_mut()).await.is_none());
         cancelled.cancel();
-        crate::socket_monitoring::cancelled(reading.await);
+        crate::socket_resources::cancelled(reading.await);
     }
     assert_eq!(reader.read_into(&mut [], &never).await.unwrap(), 0);
     assert_eq!(reader.read_vectored(&mut [], &never).await.unwrap(), 0);
@@ -197,8 +202,8 @@ where
             .unwrap(),
         0
     );
-    crate::socket_monitoring::cancelled(reader.read_into(&mut [], &cancelled).await);
-    crate::socket_monitoring::cancelled(reader.read_vectored(&mut [], &cancelled).await);
+    crate::socket_resources::cancelled(reader.read_into(&mut [], &cancelled).await);
+    crate::socket_resources::cancelled(reader.read_vectored(&mut [], &cancelled).await);
     let (count, ()) = zip(
         async {
             let mut received = 0;

@@ -3,17 +3,18 @@
 
 use super::ring_binding::RingBinding;
 use super::*;
+use crate::Interest;
 use std::sync::Mutex;
 use std::task::Waker;
 
 pub(super) const MONITOR_TAG: u64 = 1;
 const READY: u64 = 1;
 const NO_SLOT: usize = usize::MAX;
-type State = SocketMonitor<NativeSocket, IoUringMonitorRegistration>;
-pub(super) type Storage = MonitorStorage<State>;
+pub(crate) type State = SocketMonitor<RegisteredSocket, IoUringMonitorRegistration>;
+pub(crate) type Storage = MonitorStorage<State>;
 
 /// Persistent directional readiness registration. The ring retains its storage through the final original and cancellation completions; application handles independently control when the registration closes.
-pub struct IoUringMonitorRegistration {
+pub(crate) struct IoUringMonitorRegistration {
     group: Arc<DriverGroup>,
     slot: AtomicUsize,
     users: AtomicUsize,
@@ -30,6 +31,7 @@ struct Status {
     retiring: bool,
     error: Option<io::Error>,
     waker: Option<Waker>,
+    retirement_waker: Option<Waker>,
 }
 
 struct PollRegistration {
@@ -157,9 +159,9 @@ impl IoUringSelector {
         Ok(())
     }
 
-    async fn monitor_wait<M: SocketMonitorState<NativeSocket, IoUringMonitorRegistration>>(
+    async fn monitor_wait(
         &self,
-        monitor: &MonitorStorage<M>,
+        monitor: &Storage,
         cancellation: &Cancellation,
     ) -> OperationResult<()> {
         let state = monitor.as_ref();
@@ -180,9 +182,9 @@ impl IoUringSelector {
     }
 
     // The caller holds the waiter claim and checks cancellation and monitor compatibility before attempting readiness.
-    fn poll_monitor_wait<M: SocketMonitorState<NativeSocket, IoUringMonitorRegistration>>(
+    fn poll_monitor_wait(
         &self,
-        monitor: &MonitorStorage<M>,
+        monitor: &Storage,
         controller: &Arc<Controller>,
         context: &mut std::task::Context<'_>,
     ) -> Poll<OperationResult<()>> {
@@ -241,10 +243,7 @@ impl IoUringSelector {
         Poll::Pending
     }
 
-    async fn monitor_close<M: SocketMonitorState<NativeSocket, IoUringMonitorRegistration>>(
-        &self,
-        monitor: &MonitorStorage<M>,
-    ) -> io::Result<()> {
+    async fn monitor_close(&self, monitor: &Storage) -> io::Result<()> {
         let state = monitor.as_ref();
         let registration = state.registration();
         if !Arc::ptr_eq(&self.group, &registration.group) {
@@ -253,7 +252,6 @@ impl IoUringSelector {
                 "socket monitor belongs to another selector",
             ));
         }
-        let _wait = Wait::claim(state)?;
         registration.retire(true);
         poll_fn(|context| {
             let replacement = context.waker().clone();
@@ -262,7 +260,7 @@ impl IoUringSelector {
                 if !status.pending {
                     return Poll::Ready(Ok(()));
                 }
-                status.waker.replace(replacement)
+                status.retirement_waker.replace(replacement)
             };
             discard(previous);
             Poll::Pending
@@ -270,12 +268,12 @@ impl IoUringSelector {
         .await
     }
 
-    async fn monitor_io<T, M: SocketMonitorState<NativeSocket, IoUringMonitorRegistration>>(
+    async fn monitor_io<T>(
         &self,
-        monitor: &MonitorStorage<M>,
+        monitor: &Storage,
         interest: Interest,
         cancellation: &Cancellation,
-        mut operation: impl FnMut(&NativeSocket) -> io::Result<T> + Send,
+        mut operation: impl FnMut(&RegisteredSocket) -> io::Result<T> + Send,
     ) -> OperationResult<T> {
         let state = monitor.as_ref();
         let registration = state.registration();
@@ -309,19 +307,27 @@ impl IoUringSelector {
     }
 }
 
-impl SocketMonitoring for IoUringSelector {
-    type MonitorRegistration = IoUringMonitorRegistration;
-    fn socket_type(&self, socket: &Self::Socket) -> io::Result<SocketType> {
+impl IoUringSelector {
+    pub(crate) fn socket_type(&self, socket: &impl SocketSource) -> io::Result<SocketType> {
         self.check_open()?;
-        self.fallback.socket_type(socket)
+        socket::retain_socket(socket)
+            .get_ref()
+            .r#type()
+            .map(|kind| {
+                if kind == socket2::Type::STREAM {
+                    SocketType::Stream
+                } else {
+                    SocketType::Other(kind.into())
+                }
+            })
     }
-    fn socket_monitor_state(&self, socket: &NativeSocket, interest: Interest) -> io::Result<State> {
+    pub(crate) fn socket_monitor_state(
+        &self,
+        socket: &impl SocketSource,
+        interest: Interest,
+    ) -> io::Result<State> {
         self.check_open()?;
-        let (socket, ()) = self
-            .fallback
-            .socket_monitor_state(socket, interest)
-            .expect("readiness monitor construction only retains the socket")
-            .into_parts();
+        let socket = socket::retain_socket(socket);
         Ok(SocketMonitor::new(
             socket,
             interest,
@@ -337,28 +343,34 @@ impl SocketMonitoring for IoUringSelector {
             },
         ))
     }
-    async fn socket_monitor_wait<
-        M: SocketMonitorState<NativeSocket, IoUringMonitorRegistration>,
-    >(
+    pub(crate) fn socket_monitor(
         &self,
-        monitor: &mut MonitorStorage<M>,
+        socket: &impl SocketSource,
+        interest: Interest,
+    ) -> io::Result<Storage> {
+        self.socket_monitor_state(socket, interest)
+            .map(MonitorStorage::new)
+    }
+    pub(crate) fn socket_stream_monitor(
+        &self,
+        socket: &impl SocketSource,
+        interest: Interest,
+    ) -> io::Result<Storage> {
+        self.socket_monitor(socket, interest)
+    }
+    pub(crate) async fn socket_monitor_wait(
+        &self,
+        monitor: &mut Storage,
         cancellation: &Cancellation,
     ) -> OperationResult<()> {
         self.monitor_wait(monitor, cancellation).await
     }
-    async fn socket_monitor_close<
-        M: SocketMonitorState<NativeSocket, IoUringMonitorRegistration>,
-    >(
-        &self,
-        monitor: &mut MonitorStorage<M>,
-    ) -> io::Result<()> {
+    pub(crate) async fn socket_monitor_close(&self, monitor: &mut Storage) -> io::Result<()> {
         self.monitor_close(monitor).await
     }
-    async fn socket_monitor_recv_poll<
-        M: SocketMonitorState<NativeSocket, IoUringMonitorRegistration>,
-    >(
+    pub(crate) async fn socket_monitor_recv_poll(
         &self,
-        monitor: &mut MonitorStorage<M>,
+        monitor: &mut Storage,
         buffer: &mut [u8],
         flags: SocketRecvFlags,
         cancellation: &Cancellation,
@@ -368,11 +380,9 @@ impl SocketMonitoring for IoUringSelector {
         })
         .await
     }
-    async fn socket_monitor_send_poll<
-        M: SocketMonitorState<NativeSocket, IoUringMonitorRegistration>,
-    >(
+    pub(crate) async fn socket_monitor_send_poll(
         &self,
-        monitor: &mut MonitorStorage<M>,
+        monitor: &mut Storage,
         buffer: &[u8],
         flags: SocketSendFlags,
         cancellation: &Cancellation,
@@ -382,11 +392,9 @@ impl SocketMonitoring for IoUringSelector {
         })
         .await
     }
-    async fn socket_monitor_recvmsg_poll<
-        M: SocketMonitorState<NativeSocket, IoUringMonitorRegistration>,
-    >(
+    pub(crate) async fn socket_monitor_recvmsg_poll(
         &self,
-        monitor: &mut MonitorStorage<M>,
+        monitor: &mut Storage,
         buffers: &mut [std::io::IoSliceMut<'_>],
         flags: SocketRecvFlags,
         cancellation: &Cancellation,
@@ -396,11 +404,9 @@ impl SocketMonitoring for IoUringSelector {
         })
         .await
     }
-    async fn socket_monitor_sendmsg_poll<
-        M: SocketMonitorState<NativeSocket, IoUringMonitorRegistration>,
-    >(
+    pub(crate) async fn socket_monitor_sendmsg_poll(
         &self,
-        monitor: &mut MonitorStorage<M>,
+        monitor: &mut Storage,
         buffers: &[std::io::IoSlice<'_>],
         address: Option<SocketAddress>,
         flags: SocketSendFlags,
@@ -448,7 +454,7 @@ struct Retirement {
 }
 impl Drop for Retirement {
     fn drop(&mut self) {
-        let waker = {
+        let (waker, retirement_waker) = {
             let mut status = self.status.lock().unwrap();
             assert_eq!(
                 status.binding.as_ref().unwrap().state.generation,
@@ -460,9 +466,10 @@ impl Drop for Retirement {
                 status.error = self.error.take();
             }
             status.retiring = false;
-            status.waker.take()
+            (status.waker.take(), status.retirement_waker.take())
         };
         wake(waker);
+        wake(retirement_waker);
     }
 }
 
@@ -502,7 +509,7 @@ impl Monitors {
         };
         let entry = opcode::PollAdd::new(
             types::Fd(
-                super::socket::retain_socket(submission.storage.socket())
+                Arc::clone(submission.storage.socket())
                     .get_ref()
                     .as_raw_fd(),
             ),
@@ -636,64 +643,3 @@ impl Drop for Monitors {
 
 #[cfg(test)]
 mod tests;
-
-impl core_scheduler::SocketStreamReading for IoUringSelector {
-    fn socket_stream_reader<'scheduler>(
-        &'scheduler self,
-        socket: &Self::Socket,
-    ) -> std::io::Result<
-        impl core_scheduler::SocketStreamReader<
-            Buffer = <Self::Pool as core_scheduler::BufferPool>::Buffer,
-        > + 'scheduler,
-    > {
-        core_scheduler::backend::BoundSocketStreamReader::new(self, socket)
-    }
-    fn socket_stream_reader_with_pool<'scheduler>(
-        &'scheduler self,
-        socket: &Self::Socket,
-        pool: Self::Pool,
-    ) -> std::io::Result<
-        impl core_scheduler::SocketStreamReader<
-            Buffer = <Self::Pool as core_scheduler::BufferPool>::Buffer,
-        > + 'scheduler,
-    > {
-        core_scheduler::backend::BoundSocketStreamReader::new(self, socket)
-            .map(|reader| reader.with_pool(pool))
-    }
-}
-impl core_scheduler::SocketPacketReading for IoUringSelector {
-    fn socket_packet_reader<'scheduler>(
-        &'scheduler self,
-        socket: &Self::Socket,
-    ) -> std::io::Result<
-        impl core_scheduler::SocketPacketReader<
-            Message: core_scheduler::SocketRecvMessageMut<
-                Payload = <Self::Pool as core_scheduler::BufferPool>::Buffer,
-            >,
-        > + 'scheduler,
-    > {
-        core_scheduler::backend::BoundSocketPacketReader::new(self, socket)
-    }
-    fn socket_packet_reader_with_pool<'scheduler>(
-        &'scheduler self,
-        socket: &Self::Socket,
-        pool: Self::Pool,
-    ) -> std::io::Result<
-        impl core_scheduler::SocketPacketReader<
-            Message: core_scheduler::SocketRecvMessageMut<
-                Payload = <Self::Pool as core_scheduler::BufferPool>::Buffer,
-            >,
-        > + 'scheduler,
-    > {
-        core_scheduler::backend::BoundSocketPacketReader::new(self, socket)
-            .map(|reader| reader.with_pool(pool))
-    }
-}
-impl core_scheduler::SocketPacketWriting for IoUringSelector {
-    fn socket_packet_writer<'scheduler>(
-        &'scheduler self,
-        socket: &Self::Socket,
-    ) -> std::io::Result<impl core_scheduler::SocketPacketWriter + 'scheduler> {
-        core_scheduler::backend::BoundSocketPacketWriter::new(self, socket)
-    }
-}

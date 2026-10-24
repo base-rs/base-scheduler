@@ -11,7 +11,7 @@ use std::{
 /// One ordered stream of owned writes, retaining at most one unfinished logical write. Ready writes use a direct syscall; unfinished writes advance in their owning ring without an executor task.
 ///
 /// A stalled submission returns after its first SQE has been consumed by the kernel, or after an accepted failure. Ring sends request `MSG_WAITALL`, allowing the kernel to advance partial sends while the caller computes. Completion and buffer retirement remain independent of this submission acknowledgement.
-pub struct IoUringStreamWriter<B: IoBuf> {
+pub(crate) struct IoUringStreamWriter<B: IoBuf> {
     owner: Weak<DriverGroup>,
     socket: RegisteredSocket,
     shared: Arc<Shared<B>>,
@@ -320,10 +320,11 @@ impl<B: IoBuf> IoUringStreamWriter<B> {
     }
 }
 
-impl SocketStreamOutputting for IoUringSelector {
-    type Writer<B: IoBuf> = IoUringStreamWriter<B>;
-
-    fn socket_stream_output<B: IoBuf>(&self, socket: &Self::Socket) -> io::Result<Self::Writer<B>> {
+impl IoUringSelector {
+    pub(crate) fn socket_stream_output<B: IoBuf>(
+        &self,
+        socket: &NativeSocket,
+    ) -> io::Result<IoUringStreamWriter<B>> {
         self.check_open()?;
         let socket = socket::retain_socket(socket);
         if syscall("stream-socket-type", || socket.get_ref().r#type())? != socket2::Type::STREAM {
@@ -350,10 +351,8 @@ impl SocketStreamOutputting for IoUringSelector {
     }
 }
 
-impl<B: IoBuf> SocketStreamOutput<IoUringSelector> for IoUringStreamWriter<B> {
-    type Buffer = B;
-
-    async fn submit(
+impl<B: IoBuf> IoUringStreamWriter<B> {
+    pub(crate) async fn submit(
         &mut self,
         selector: &IoUringSelector,
         buffer: B,
@@ -467,7 +466,7 @@ impl<B: IoBuf> SocketStreamOutput<IoUringSelector> for IoUringStreamWriter<B> {
         Ok(())
     }
 
-    async fn flush(
+    pub(crate) async fn flush(
         &mut self,
         selector: &IoUringSelector,
         cancellation: &Cancellation,
@@ -479,7 +478,7 @@ impl<B: IoBuf> SocketStreamOutput<IoUringSelector> for IoUringStreamWriter<B> {
         self.wait(cancellation).await
     }
 
-    async fn close(&mut self, selector: &IoUringSelector) -> io::Result<()> {
+    pub(crate) async fn close(&mut self, selector: &IoUringSelector) -> io::Result<()> {
         self.check(selector)?;
         self.closed = true;
         if let Some(running) = &self.running {
@@ -512,29 +511,3 @@ impl<B: IoBuf> Drop for IoUringStreamWriter<B> {
 
 #[cfg(test)]
 mod tests;
-
-impl core_scheduler::SocketStreamWriting for IoUringSelector {
-    fn socket_stream_writer<'scheduler>(
-        &'scheduler self,
-        socket: &Self::Socket,
-    ) -> io::Result<
-        impl core_scheduler::SocketStreamWriter<
-            Buffer = <Self::Pool as core_scheduler::BufferPool>::Buffer,
-        > + 'scheduler,
-    >
-    where
-        Self::Socket: 'static,
-    {
-        core_scheduler::backend::BoundSocketStreamWriter::new(self, socket)
-    }
-
-    fn socket_stream_writer_with_buffer<'scheduler, B: IoBuf>(
-        &'scheduler self,
-        socket: &Self::Socket,
-    ) -> io::Result<impl core_scheduler::SocketStreamWriter<Buffer = B> + 'scheduler>
-    where
-        Self::Socket: 'static,
-    {
-        core_scheduler::backend::BoundSocketStreamWriter::new(self, socket)
-    }
-}

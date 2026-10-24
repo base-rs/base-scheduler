@@ -3,8 +3,8 @@
 
 //! Reusable IP socket assertions. Fixtures supply isolated connections and enforce test deadlines.
 
+use crate::SocketTestScheduler;
 use crate::{SocketIoFixture, SocketIoGuard};
-use core_scheduler::backend::*;
 use core_scheduler::*;
 use futures_lite::future::{poll_once, zip};
 use std::{
@@ -124,7 +124,7 @@ pub async fn stream_pair<
 }
 
 /// Check lazy and pre-cancelled scalar I/O, allocation identity, short reads, readiness, write shutdown, and EOF on a fresh connected pair.
-pub async fn stream<S: SocketRead + SocketWrite + SocketWait + SocketShutdown>(
+pub async fn stream<S: SocketTestScheduler + SocketShutdown>(
     scheduler: &S,
     sender: &S::Socket,
     receiver: &S::Socket,
@@ -135,7 +135,7 @@ pub async fn stream<S: SocketRead + SocketWrite + SocketWait + SocketShutdown>(
 }
 
 /// Pre-cancelled scalar I/O preserves the original owners and submits no payload.
-pub async fn pre_cancelled<S: SocketRead + SocketWrite + SocketWait>(
+pub async fn pre_cancelled<S: SocketTestScheduler>(
     scheduler: &S,
     sender: &S::Socket,
     receiver: &S::Socket,
@@ -143,36 +143,28 @@ pub async fn pre_cancelled<S: SocketRead + SocketWrite + SocketWait>(
     let never = Cancellation::never();
     let token = Cancellation::new();
     token.cancel();
-    cancelled(
-        scheduler
-            .socket_wait(sender, Interest::Writable, &token)
-            .await,
-    );
-    scheduler
-        .socket_wait(sender, Interest::Writable, &never)
-        .await
-        .unwrap();
+
     let source = b"abcdef".to_vec();
     let allocation = source.as_ptr() as usize;
-    let (result, source) = scheduler.socket_write(sender, source, &token).await;
+    let (result, source) = crate::io::socket_write(scheduler, sender, source, &token).await;
     cancelled(result);
     assert_eq!(source.as_ptr() as usize, allocation);
     // A distinct sentinel exposes writes which incorrectly transferred bytes while reporting cancellation, and reads which consumed data despite pre-cancellation.
-    let (result, _) = scheduler.socket_write(sender, vec![0xff], &never).await;
+    let (result, _) = crate::io::socket_write(scheduler, sender, vec![0xff], &never).await;
     assert_eq!(result.unwrap(), 1);
     let target = vec![0x5a; 2];
     let target_allocation = target.as_ptr() as usize;
-    let (result, target) = scheduler.socket_read(receiver, target, &token).await;
+    let (result, target) = crate::io::socket_read(scheduler, receiver, target, &token).await;
     cancelled(result);
     assert_eq!(target.as_ptr() as usize, target_allocation);
     assert_eq!(target, vec![0x5a; 2]);
-    let (result, buffer) = scheduler.socket_read(receiver, vec![0; 1], &never).await;
+    let (result, buffer) = crate::io::socket_read(scheduler, receiver, vec![0; 1], &never).await;
     assert_eq!(result.unwrap(), 1);
     assert_eq!(buffer, vec![0xff]);
 }
 
 /// Check lazy scalar operations, short transfers, readiness, payload, and allocation identity on a fresh stream.
-pub async fn transfer<S: SocketRead + SocketWrite + SocketWait>(
+pub async fn transfer<S: SocketTestScheduler>(
     scheduler: &S,
     sender: &S::Socket,
     receiver: &S::Socket,
@@ -182,26 +174,32 @@ pub async fn transfer<S: SocketRead + SocketWrite + SocketWait>(
     let allocation = source.as_ptr() as usize;
     let mut target = vec![0; 2];
     let target_allocation = target.as_ptr() as usize;
-    drop(scheduler.socket_write(sender, b"unpolled".to_vec(), &never));
+    drop(crate::io::socket_write(
+        scheduler,
+        sender,
+        b"unpolled".to_vec(),
+        &never,
+    ));
     let mut sent = 0;
     while sent < 6 {
-        let (result, view) = scheduler
-            .socket_write(sender, source.slice(sent..), &never)
-            .await;
+        let (result, view) =
+            crate::io::socket_write(scheduler, sender, source.slice(sent..), &never).await;
         let count = result.unwrap();
         assert!(count > 0 && count <= 6 - sent);
         sent += count;
         source = view.into_inner();
     }
     assert_eq!(source.as_ptr() as usize, allocation);
-    scheduler
-        .socket_wait(receiver, Interest::Readable, &never)
-        .await
-        .unwrap();
-    drop(scheduler.socket_read(receiver, vec![0; 6], &never));
+
+    drop(crate::io::socket_read(
+        scheduler,
+        receiver,
+        vec![0; 6],
+        &never,
+    ));
     let mut received = Vec::new();
     while received.len() < 6 {
-        let (result, returned) = scheduler.socket_read(receiver, target, &never).await;
+        let (result, returned) = crate::io::socket_read(scheduler, receiver, target, &never).await;
         let count = result.unwrap();
         assert!(count > 0 && count <= 2);
         assert_eq!(returned.as_ptr() as usize, target_allocation);
@@ -213,7 +211,7 @@ pub async fn transfer<S: SocketRead + SocketWrite + SocketWait>(
 }
 
 /// Check lazy write shutdown and EOF on a fresh stream.
-pub async fn shutdown<S: SocketRead + SocketWrite + SocketShutdown>(
+pub async fn shutdown<S: SocketTestScheduler + SocketShutdown>(
     scheduler: &S,
     sender: &S::Socket,
     receiver: &S::Socket,
@@ -223,31 +221,25 @@ pub async fn shutdown<S: SocketRead + SocketWrite + SocketShutdown>(
     let target_allocation = target.as_ptr() as usize;
     drop(scheduler.socket_shutdown(sender, Shutdown::Write));
     // The dropped shutdown must not prevent this write.
-    let (result, _) = scheduler.socket_write(sender, vec![7], &never).await;
+    let (result, _) = crate::io::socket_write(scheduler, sender, vec![7], &never).await;
     assert_eq!(result.unwrap(), 1);
-    let (result, _) = scheduler.socket_read(receiver, vec![0; 1], &never).await;
+    let (result, _) = crate::io::socket_read(scheduler, receiver, vec![0; 1], &never).await;
     assert_eq!(result.unwrap(), 1);
     scheduler
         .socket_shutdown(sender, Shutdown::Write)
         .await
         .unwrap();
-    let (result, returned) = scheduler.socket_read(receiver, target, &never).await;
+    let (result, returned) = crate::io::socket_read(scheduler, receiver, target, &never).await;
     assert_eq!(result.unwrap(), 0);
     assert_eq!(returned.as_ptr() as usize, target_allocation);
 }
 
-/// Cancel a pending read and readiness waiter on a quiet connected stream. No payload may arrive during these assertions.
-pub async fn pending_cancellation<S: SocketRead + SocketWait>(scheduler: &S, socket: &S::Socket) {
-    pending_read_cancellation(scheduler, socket).await;
-    pending_wait_cancellation(scheduler, socket).await;
-}
-
 /// Cancel a pending read on a quiet stream and check that initialized bytes and allocation identity survive.
-pub async fn pending_read_cancellation<S: SocketRead>(scheduler: &S, socket: &S::Socket) {
+pub async fn pending_read_cancellation<S: SocketTestScheduler>(scheduler: &S, socket: &S::Socket) {
     let token = Cancellation::new();
     let buffer = vec![0x5a; 8];
     let allocation = buffer.as_ptr() as usize;
-    let mut reading = pin!(scheduler.socket_read(socket, buffer, &token));
+    let mut reading = pin!(crate::io::socket_read(scheduler, socket, buffer, &token));
     assert!(
         poll_once(&mut reading).await.is_none(),
         "quiet stream read unexpectedly completed"
@@ -259,32 +251,29 @@ pub async fn pending_read_cancellation<S: SocketRead>(scheduler: &S, socket: &S:
     assert_eq!(buffer, vec![0x5a; 8]);
 }
 
-/// Cancel readiness waiting on a quiet stream, allowing spurious readiness notifications.
-pub async fn pending_wait_cancellation<S: SocketWait>(scheduler: &S, socket: &S::Socket) {
+/// Cancel a pending borrowed read on a quiet stream without accessing its stack storage after suspension.
+pub async fn pending_borrowed_cancellation<S: SocketTestScheduler>(
+    scheduler: &S,
+    socket: &S::Socket,
+) {
     let token = Cancellation::new();
-    let mut waiting = pin!(scheduler.socket_wait(socket, Interest::Readable, &token));
-    if let Some(result) = poll_once(&mut waiting).await {
-        // Readiness is allowed to be spurious. Pre-cancellation must still win on the next wait.
-        result.unwrap();
-        token.cancel();
-        cancelled(
-            scheduler
-                .socket_wait(socket, Interest::Readable, &token)
-                .await,
-        );
-    } else {
+    let mut reader = scheduler.socket_stream_reader(socket).unwrap();
+    let mut buffer = [0];
+    {
+        let mut waiting = pin!(reader.read_into(&mut buffer, &token));
+        assert!(poll_once(&mut waiting).await.is_none());
         token.cancel();
         cancelled(waiting.await);
     }
+    reader.close().await.unwrap();
 }
 
 /// Check that a failed write preserves the original owner. The fixture supplies a socket whose writes fail, without relying on portable error kinds for broken connections.
-pub async fn write_error<S: SocketWrite>(scheduler: &S, socket: &S::Socket) {
+pub async fn write_error<S: SocketTestScheduler>(scheduler: &S, socket: &S::Socket) {
     let buffer = vec![7; 3];
     let allocation = buffer.as_ptr() as usize;
-    let (result, buffer) = scheduler
-        .socket_write(socket, buffer, &Cancellation::never())
-        .await;
+    let (result, buffer) =
+        crate::io::socket_write(scheduler, socket, buffer, &Cancellation::never()).await;
     assert!(matches!(result, Err(OperationError::Io(_))));
     assert_eq!(buffer, vec![7; 3]);
     assert_eq!(buffer.as_ptr() as usize, allocation);

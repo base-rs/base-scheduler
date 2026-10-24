@@ -116,6 +116,10 @@ impl IoUringBufferPool {
         Ok(pool)
     }
 
+    pub(crate) fn is_provided(&self) -> bool {
+        matches!(self.0.storage, Storage::Workers(_))
+    }
+
     pub(crate) fn worker(&self, controller: &Controller) -> Option<&Arc<WorkerBuffers>> {
         match &self.0.storage {
             Storage::Shared(_) => None,

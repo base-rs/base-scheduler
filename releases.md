@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Separate application capabilities from the public `backend` namespace for monitors, dispatch, receivers, and reusable handle implementations. Make reader/writer factories independent of those hooks, select file handles through associated type families, and replace broad production scheduler bundles with capability-specific bounds.
+- Fold socket and file I/O into bound reader/writer capabilities and remove the public backend hooks, monitors, receivers, and generic handle wrappers. Preserve explicit flags, owned vectored transfers, and separate file admission/completion as resource methods; keep registration and retirement state private to adapters.
 
 - Make scheduler-bound stream and packet readers and writers the default socket interface, with per-operation cancellation, borrowed and owned receive forms, and explicit cleanup. Add bound file readers and writers using the OS cursor or explicit offsets, and retain monitors and dispatch hooks as backend machinery.
 

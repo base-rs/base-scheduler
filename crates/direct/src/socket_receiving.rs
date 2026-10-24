@@ -1,40 +1,19 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use crate::{DirectScheduler, DirectSocket};
-use core_scheduler::backend::*;
+use crate::DirectScheduler;
+use crate::direct_socket_packet_reader::DirectSocketPacketReader;
+use crate::direct_socket_packet_writer::DirectSocketPacketWriter;
+use crate::direct_socket_stream_reader::DirectSocketStreamReader;
 use core_scheduler::*;
 use std::io;
-impl SocketReceiving for DirectScheduler {
-    type PooledReceiver = SocketReceiver<
-        SocketMonitor<DirectSocket, <Self as SocketMonitoring>::MonitorRegistration>,
-    >;
-    async fn socket_receiver(
-        &self,
-        socket: &Self::Socket,
-        pool: Self::Pool,
-        flags: SocketRecvFlags,
-        cancellation: &Cancellation,
-    ) -> OperationResult<Self::PooledReceiver> {
-        cancellation.check()?;
-        self.socket_retry.check_open()?;
-        let kind = crate::socket_io::recvmsg_socket_type(&socket.0)?;
-        self.socket_monitor(socket, Interest::Readable)
-            .and_then(|monitor| SocketReceiver::new(monitor, pool, kind, flags))
-            .map_err(Into::into)
-    }
-}
-
-#[cfg(test)]
-mod tests;
-
 impl SocketStreamReading for DirectScheduler {
     fn socket_stream_reader<'scheduler>(
         &'scheduler self,
         socket: &Self::Socket,
     ) -> io::Result<impl SocketStreamReader<Buffer = <Self::Pool as BufferPool>::Buffer> + 'scheduler>
     {
-        BoundSocketStreamReader::new(self, socket)
+        DirectSocketStreamReader::new(self, socket)
     }
     fn socket_stream_reader_with_pool<'scheduler>(
         &'scheduler self,
@@ -42,7 +21,7 @@ impl SocketStreamReading for DirectScheduler {
         pool: Self::Pool,
     ) -> io::Result<impl SocketStreamReader<Buffer = <Self::Pool as BufferPool>::Buffer> + 'scheduler>
     {
-        BoundSocketStreamReader::new(self, socket).map(|reader| reader.with_pool(pool))
+        DirectSocketStreamReader::new(self, socket).map(|reader| reader.with_pool(pool))
     }
 }
 impl SocketPacketReading for DirectScheduler {
@@ -54,7 +33,7 @@ impl SocketPacketReading for DirectScheduler {
             Message: SocketRecvMessageMut<Payload = <Self::Pool as BufferPool>::Buffer>,
         > + 'scheduler,
     > {
-        BoundSocketPacketReader::new(self, socket)
+        DirectSocketPacketReader::new(self, socket)
     }
     fn socket_packet_reader_with_pool<'scheduler>(
         &'scheduler self,
@@ -65,7 +44,7 @@ impl SocketPacketReading for DirectScheduler {
             Message: SocketRecvMessageMut<Payload = <Self::Pool as BufferPool>::Buffer>,
         > + 'scheduler,
     > {
-        BoundSocketPacketReader::new(self, socket).map(|reader| reader.with_pool(pool))
+        DirectSocketPacketReader::new(self, socket).map(|reader| reader.with_pool(pool))
     }
 }
 impl SocketPacketWriting for DirectScheduler {
@@ -73,6 +52,9 @@ impl SocketPacketWriting for DirectScheduler {
         &'scheduler self,
         socket: &Self::Socket,
     ) -> io::Result<impl SocketPacketWriter + 'scheduler> {
-        BoundSocketPacketWriter::new(self, socket)
+        DirectSocketPacketWriter::new(self, socket)
     }
 }
+
+#[cfg(test)]
+mod tests;

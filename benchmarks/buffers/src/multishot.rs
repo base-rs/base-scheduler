@@ -3,12 +3,39 @@
 
 //! Keep the concrete io_uring control separate from the portable pooled receive benchmark.
 
-use core_scheduler::backend::*;
 use core_scheduler::*;
 
-pub trait Multishot: SocketReceiving + Sync {
-    type Receiver: SocketRecvMsgReceiver<Self>;
+#[cfg(target_os = "linux")]
+pub trait Receiver: Send {
+    type Message: SocketRecvMessage;
+    #[cfg(target_os = "linux")]
+    fn recv(
+        &mut self,
+        cancellation: &Cancellation,
+    ) -> impl std::future::Future<Output = OperationResult<Option<Self::Message>>> + Send;
+    #[cfg(target_os = "linux")]
+    fn close(&mut self) -> impl std::future::Future<Output = std::io::Result<()>> + Send;
+}
+#[cfg(target_os = "linux")]
+impl Receiver for std::convert::Infallible {
+    type Message = OwnedSocketRecvMessage<BufferLease>;
+    #[cfg(target_os = "linux")]
+    async fn recv(&mut self, _: &Cancellation) -> OperationResult<Option<Self::Message>> {
+        match *self {}
+    }
+    #[cfg(target_os = "linux")]
+    async fn close(&mut self) -> std::io::Result<()> {
+        match *self {}
+    }
+}
 
+pub trait Multishot: SocketOperation + BufferPooling + Sync {
+    #[cfg(target_os = "linux")]
+    type Receiver: Receiver;
+    #[cfg(all(not(target_os = "linux"), test))]
+    type Receiver: Send;
+
+    #[cfg(any(target_os = "linux", test))]
     fn multishot(
         &self,
         _socket: &Self::Socket,
@@ -27,15 +54,18 @@ pub trait Multishot: SocketReceiving + Sync {
 }
 
 impl Multishot for core_scheduler_direct::DirectScheduler {
-    type Receiver = <Self as SocketReceiving>::PooledReceiver;
+    #[cfg(any(target_os = "linux", test))]
+    type Receiver = std::convert::Infallible;
 }
 
 impl Multishot for core_scheduler_tokio::TokioScheduler {
-    type Receiver = <Self as SocketReceiving>::PooledReceiver;
+    #[cfg(any(target_os = "linux", test))]
+    type Receiver = std::convert::Infallible;
 }
 
 impl Multishot for core_scheduler_native::NativeScheduler {
-    type Receiver = <Self as SocketReceiving>::PooledReceiver;
+    #[cfg(any(target_os = "linux", test))]
+    type Receiver = std::convert::Infallible;
 }
 
 #[cfg(test)]
@@ -69,29 +99,26 @@ mod iouring {
     use core_scheduler_iouring::{IoUringSelector, RecvMsgMultishot, RecvMsgMultishotOptions};
     use core_scheduler_native::NativeScheduler;
 
-    pub struct Receiver(RecvMsgMultishot);
+    pub struct RingReceiver(RecvMsgMultishot);
 
-    impl SocketRecvMsgReceiver<NativeScheduler<IoUringSelector>> for Receiver {
-        type Message = <RecvMsgMultishot as SocketRecvMsgReceiver<IoUringSelector>>::Message;
+    impl Receiver for RingReceiver {
+        type Message =
+            core_scheduler_iouring::IoUringRecvMessage<core_scheduler_iouring::RecvMsgBuffer>;
 
         async fn recv(
             &mut self,
-            scheduler: &NativeScheduler<IoUringSelector>,
             cancellation: &Cancellation,
         ) -> OperationResult<Option<Self::Message>> {
-            self.0.recv(scheduler.selector(), cancellation).await
+            self.0.recv(cancellation).await
         }
 
-        async fn close(
-            &mut self,
-            scheduler: &NativeScheduler<IoUringSelector>,
-        ) -> std::io::Result<()> {
-            self.0.close(scheduler.selector()).await
+        async fn close(&mut self) -> std::io::Result<()> {
+            self.0.close().await
         }
     }
 
     impl Multishot for NativeScheduler<IoUringSelector> {
-        type Receiver = Receiver;
+        type Receiver = RingReceiver;
 
         async fn multishot(
             &self,
@@ -111,7 +138,7 @@ mod iouring {
                     cancellation,
                 )
                 .await
-                .map(Receiver)
+                .map(RingReceiver)
         }
     }
 }

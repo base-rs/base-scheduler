@@ -2,6 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use super::*;
+use crate::Interest;
 use futures_lite::future::{block_on, poll_once};
 use std::{sync::atomic::AtomicUsize, time::Instant};
 
@@ -9,7 +10,7 @@ use std::cell::RefCell;
 type SyscallHook = (&'static str, Box<dyn FnOnce()>);
 thread_local! {
     pub(super) static BEFORE_SYSCALL: RefCell<Option<SyscallHook>> = const { RefCell::new(None) };
-    static BEFORE_CAPACITY_ADMISSION: RefCell<Option<Box<dyn FnOnce()>>> = const { RefCell::new(None) };
+    pub(super) static BEFORE_CAPACITY_ADMISSION: RefCell<Option<Box<dyn FnOnce()>>> = const { RefCell::new(None) };
     static FAILURES: RefCell<VecDeque<(&'static str, Option<io::Error>)>> = const { RefCell::new(VecDeque::new()) };
 }
 
@@ -76,8 +77,10 @@ impl Drop for Failures {
 }
 
 pub(super) fn pair(capacity: usize) -> (IoUringSelector, IoUringDriver) {
+    // Driver wake tests avoid optional persistent file registrations; their lifecycle is covered by file-resource tests.
     IoUringSelector::new(IoUringOptions {
         capacity,
+        fixed_files: 0,
         ..Default::default()
     })
     .unwrap()
@@ -739,7 +742,10 @@ fn full_submission_queue_defers_cancellations_and_shutdown_tolerates_duplicate_r
 fn submission_racing_shutdown_or_driver_exit_returns_unpublished_storage() {
     for driver_exited in [false, true] {
         let (selector, driver) = pair(1);
-        let (_directory, file) = file(&selector);
+        let (socket, _peer) = block_on(core_scheduler_conformance::socket::stream_pair(
+            &selector,
+            SocketDomain::Ipv4,
+        ));
         let never = Cancellation::never();
         // Stage the legitimate interval after admission and request preparation but before publication, so shutdown can deterministically win that race.
         let permit = block_on(selector.controllers[0].capacity.acquire(&never)).unwrap();
@@ -747,7 +753,7 @@ fn submission_racing_shutdown_or_driver_exit_returns_unpublished_storage() {
         let request = Box::new(Request {
             identifier: selector.controllers[0].next_identifier().unwrap(),
             _permit: permit,
-            resource: Some(Resource::File(retain_file(&file), None)),
+            socket: Some(socket::retain_socket(&socket)),
             buffer: Some(vec![3]),
             pointer: |buffer| buffer.as_mut_ptr(),
             write: false,
@@ -1095,7 +1101,9 @@ fn native_workers_use_distinct_rings_without_external_submission_routing() {
                     let never = Cancellation::never();
                     for offset in 0..6 {
                         let (result, buffer) = scheduler2
-                            .file_read_at(&file, vec![0], offset, &never)
+                            .file_reader(&file)
+                            .unwrap()
+                            .read_at(vec![0], offset, &never)
                             .await;
                         assert_eq!(result.unwrap(), 1);
                         assert_eq!(buffer[0], b'a' + offset as u8);
@@ -2386,4 +2394,92 @@ fn notification_read_failure_after_an_idle_wait_stops_the_driver() {
     }
     assert!(driver.turn(None).unwrap());
     block_on(selector.shutdown());
+}
+
+// These fixtures preserve lifetime-sensitive driver tests while routing file I/O through the same public resources as applications.
+impl IoUringSelector {
+    pub(crate) async fn file_read<B: IoBufMut>(
+        &self,
+        file: &NativeFile,
+        buffer: B,
+        cancellation: &Cancellation,
+    ) -> BufferResult<B> {
+        if let Err(error) = cancellation.check() {
+            return (Err(error.into()), buffer);
+        }
+        match self.file_reader(file) {
+            Ok(mut lane) => lane.read(buffer, cancellation).await,
+            Err(error) => (Err(error.into()), buffer),
+        }
+    }
+    pub(crate) async fn file_write<B: IoBuf>(
+        &self,
+        file: &NativeFile,
+        buffer: B,
+        cancellation: &Cancellation,
+    ) -> BufferResult<B> {
+        if let Err(error) = cancellation.check() {
+            return (Err(error.into()), buffer);
+        }
+        match self.file_writer(file) {
+            Ok(mut lane) => lane.write(buffer, cancellation).await,
+            Err(error) => (Err(error.into()), buffer),
+        }
+    }
+    pub(crate) async fn file_read_at<B: IoBufMut>(
+        &self,
+        file: &NativeFile,
+        buffer: B,
+        offset: u64,
+        cancellation: &Cancellation,
+    ) -> BufferResult<B> {
+        if let Err(error) = cancellation.check() {
+            return (Err(error.into()), buffer);
+        }
+        match self.file_reader(file) {
+            Ok(mut lane) => lane.read_at(buffer, offset, cancellation).await,
+            Err(error) => (Err(error.into()), buffer),
+        }
+    }
+    pub(crate) async fn file_write_at<B: IoBuf>(
+        &self,
+        file: &NativeFile,
+        buffer: B,
+        offset: u64,
+        cancellation: &Cancellation,
+    ) -> BufferResult<B> {
+        if let Err(error) = cancellation.check() {
+            return (Err(error.into()), buffer);
+        }
+        match self.file_writer(file) {
+            Ok(mut lane) => lane.write_at(buffer, offset, cancellation).await,
+            Err(error) => (Err(error.into()), buffer),
+        }
+    }
+    pub(crate) async fn socket_wait(
+        &self,
+        socket: &impl SocketSource,
+        interest: Interest,
+        cancellation: &Cancellation,
+    ) -> OperationResult<()> {
+        self.wait_ready(self.route(), socket, interest, cancellation)
+            .await
+    }
+}
+
+impl IoUringSelector {
+    pub(crate) async fn socket_recv_poll(
+        &self,
+        socket: &NativeSocket,
+        buffer: &mut [u8],
+        flags: SocketRecvFlags,
+        cancellation: &Cancellation,
+    ) -> OperationResult<usize> {
+        let mut reader = self.socket_stream_reader(socket)?;
+        let result = reader
+            .read_into_with_flags(buffer, flags, cancellation)
+            .await;
+        reader.close().await?;
+        result
+    }
 }

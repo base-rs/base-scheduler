@@ -1,7 +1,6 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::backend::*;
 use core_scheduler::*;
 use core_scheduler_examples::files;
 use futures_lite::future::block_on;
@@ -49,7 +48,7 @@ impl Files {
 impl FileOperation for Files {
     type File = File;
 }
-impl FileRead for Files {
+impl Files {
     async fn file_read<B: IoBufMut>(
         &self,
         file: &File,
@@ -77,7 +76,7 @@ impl FileRead for Files {
         (Ok(count), buffer)
     }
 }
-impl FileWrite for Files {
+impl Files {
     async fn file_write<B: IoBuf>(
         &self,
         file: &File,
@@ -103,7 +102,7 @@ impl FileWrite for Files {
         (Ok(count), buffer)
     }
 }
-impl FileReadAt for Files {
+impl Files {
     async fn file_read_at<B: IoBufMut>(
         &self,
         _: &File,
@@ -114,7 +113,7 @@ impl FileReadAt for Files {
         unreachable!("Recipes use sequential reads")
     }
 }
-impl FileWriteAt for Files {
+impl Files {
     async fn file_write_at<B: IoBuf>(
         &self,
         _: &File,
@@ -125,19 +124,70 @@ impl FileWriteAt for Files {
         unreachable!("Recipes use sequential writes")
     }
 }
-impl FileMonitoring for Files {
-    type FileRegistration = ();
-    fn file_monitor(&self, file: &File) -> io::Result<FileMonitor<File>> {
+struct Reader<'a> {
+    scheduler: &'a Files,
+    file: File,
+}
+struct Writer<'a> {
+    scheduler: &'a Files,
+    file: File,
+}
+impl Files {
+    fn retain_file(&self, file: &File) -> io::Result<File> {
         if self.factory_calls.fetch_add(1, Ordering::Relaxed) == self.fail_factory {
             return Err(io::ErrorKind::PermissionDenied.into());
         }
-        Ok(FileMonitor::new(file.clone(), ()))
+        Ok(file.clone())
     }
-    async fn file_monitor_close(&self, _: &mut FileMonitor<File>) -> io::Result<()> {
+    fn retire(&self) -> io::Result<()> {
         if self.closed.fetch_add(1, Ordering::Relaxed) == self.fail_close {
             return Err(io::ErrorKind::PermissionDenied.into());
         }
         Ok(())
+    }
+}
+impl FileReader for Reader<'_> {
+    async fn read<B: IoBufMut>(
+        &mut self,
+        buffer: B,
+        cancellation: &Cancellation,
+    ) -> BufferResult<B> {
+        self.scheduler
+            .file_read(&self.file, buffer, cancellation)
+            .await
+    }
+    async fn read_at<B: IoBufMut>(
+        &mut self,
+        buffer: B,
+        offset: u64,
+        cancellation: &Cancellation,
+    ) -> BufferResult<B> {
+        self.scheduler
+            .file_read_at(&self.file, buffer, offset, cancellation)
+            .await
+    }
+    async fn close(&mut self) -> io::Result<()> {
+        self.scheduler.retire()
+    }
+}
+impl FileWriter for Writer<'_> {
+    async fn write<B: IoBuf>(&mut self, buffer: B, cancellation: &Cancellation) -> BufferResult<B> {
+        self.scheduler
+            .file_write(&self.file, buffer, cancellation)
+            .await
+    }
+    async fn write_at<B: IoBuf>(
+        &mut self,
+        buffer: B,
+        offset: u64,
+        cancellation: &Cancellation,
+    ) -> BufferResult<B> {
+        self.scheduler
+            .file_write_at(&self.file, buffer, offset, cancellation)
+            .await
+    }
+    async fn close(&mut self) -> io::Result<()> {
+        self.scheduler.retire()
     }
 }
 
@@ -193,7 +243,7 @@ fn copy_drives_reads_and_writes_together_and_advances_short_writes() {
 }
 
 #[test]
-fn copy_closes_both_monitors_on_cancellation_empty_input_and_write_failure() {
+fn copy_closes_both_handles_on_cancellation_empty_input_and_write_failure() {
     block_on(async {
         for limit in [0, usize::MAX, 2] {
             let scheduler = Files::new(limit, false);
@@ -240,15 +290,21 @@ fn copy_closes_both_monitors_on_cancellation_empty_input_and_write_failure() {
 }
 
 impl core_scheduler::FileReading for Files {
-    type Reader<'a> = core_scheduler::backend::BoundFileReader<'a, Self>;
+    type Reader<'a> = Reader<'a>;
     fn file_reader(&self, file: &Self::File) -> std::io::Result<Self::Reader<'_>> {
-        core_scheduler::backend::BoundFileReader::new(self, file)
+        Ok(Reader {
+            scheduler: self,
+            file: self.retain_file(file)?,
+        })
     }
 }
 
 impl core_scheduler::FileWriting for Files {
-    type Writer<'a> = core_scheduler::backend::BoundFileWriter<'a, Self>;
+    type Writer<'a> = Writer<'a>;
     fn file_writer(&self, file: &Self::File) -> std::io::Result<Self::Writer<'_>> {
-        core_scheduler::backend::BoundFileWriter::new(self, file)
+        Ok(Writer {
+            scheduler: self,
+            file: self.retain_file(file)?,
+        })
     }
 }

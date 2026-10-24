@@ -2,10 +2,9 @@
 // Copyright, 2026, by Samuel Williams.
 
 //! Assertions for independently implementable file capabilities. Fixtures supply regular files with exclusive test ownership and a cursor initially at zero unless documented otherwise.
-use core_scheduler::backend::{FileRead, FileReadAt, FileWrite, FileWriteAt};
 use core_scheduler::{
-    Cancellation, FileMetadata, FileSeek, FileStat, FileSync, FileTruncate, FileType, IoBuf,
-    OperationError, SyncMode,
+    Cancellation, FileMetadata, FileReading, FileSeek, FileStat, FileSync, FileTruncate, FileType,
+    FileWriting, IoBuf, OperationError, SyncMode,
 };
 use std::io::{self, SeekFrom};
 
@@ -17,20 +16,20 @@ pub(crate) fn cancelled<T>(result: Result<T, OperationError>) {
 }
 
 /// Check lazy, pre-cancelled, short, EOF, and owned-buffer reads of a known complete file.
-pub async fn read<S: FileRead>(scheduler: &S, file: &S::File, expected: &[u8]) {
+pub async fn read<S: FileReading>(scheduler: &S, file: &S::File, expected: &[u8]) {
     let cancellation = Cancellation::new();
     cancellation.cancel();
     let buffer = vec![0; 2];
     let allocation = buffer.as_ptr() as usize;
-    let (result, buffer) = scheduler.file_read(file, buffer, &cancellation).await;
+    let (result, buffer) = crate::io::file_read(scheduler, file, buffer, &cancellation).await;
     cancelled(result);
     assert_eq!(buffer.as_ptr() as usize, allocation);
     let never = Cancellation::never();
-    drop(scheduler.file_read(file, vec![0; 2], &never));
+    drop(crate::io::file_read(scheduler, file, vec![0; 2], &never));
     let mut actual = Vec::new();
     let mut buffer = buffer;
     loop {
-        let (result, returned) = scheduler.file_read(file, buffer, &never).await;
+        let (result, returned) = crate::io::file_read(scheduler, file, buffer, &never).await;
         let count = result.unwrap();
         assert_eq!(returned.as_ptr() as usize, allocation);
         assert!(count <= returned.len());
@@ -45,21 +44,25 @@ pub async fn read<S: FileRead>(scheduler: &S, file: &S::File, expected: &[u8]) {
 }
 
 /// Write all supplied bytes, respecting short writes and returning the original allocation. The fixture verifies the resulting contents separately.
-pub async fn write<S: FileWrite>(scheduler: &S, file: &S::File, bytes: &[u8]) {
+pub async fn write<S: FileWriting>(scheduler: &S, file: &S::File, bytes: &[u8]) {
     let cancellation = Cancellation::new();
     cancellation.cancel();
     let buffer = bytes.to_vec();
     let allocation = buffer.as_ptr() as usize;
-    let (result, mut buffer) = scheduler.file_write(file, buffer, &cancellation).await;
+    let (result, mut buffer) = crate::io::file_write(scheduler, file, buffer, &cancellation).await;
     cancelled(result);
     assert_eq!(buffer.as_ptr() as usize, allocation);
     let never = Cancellation::never();
-    drop(scheduler.file_write(file, bytes.to_vec(), &never));
+    drop(crate::io::file_write(
+        scheduler,
+        file,
+        bytes.to_vec(),
+        &never,
+    ));
     let mut offset = 0;
     while offset < bytes.len() {
-        let (result, view) = scheduler
-            .file_write(file, buffer.slice(offset..), &never)
-            .await;
+        let (result, view) =
+            crate::io::file_write(scheduler, file, buffer.slice(offset..), &never).await;
         let count = result.unwrap();
         assert!(count > 0 && count <= bytes.len() - offset);
         offset += count;
@@ -69,24 +72,29 @@ pub async fn write<S: FileWrite>(scheduler: &S, file: &S::File, bytes: &[u8]) {
 }
 
 /// Check positioned reads and range validation without assuming shared-cursor behavior. The fixture contains `expected` at `offset`.
-pub async fn read_at<S: FileReadAt>(scheduler: &S, file: &S::File, offset: u64, expected: &[u8]) {
+pub async fn read_at<S: FileReading>(scheduler: &S, file: &S::File, offset: u64, expected: &[u8]) {
     let cancelled_token = Cancellation::new();
     cancelled_token.cancel();
-    let (result, _) = scheduler
-        .file_read_at(file, vec![0; 2], u64::MAX, &cancelled_token)
-        .await;
+    let (result, _) =
+        crate::io::file_read_at(scheduler, file, vec![0; 2], u64::MAX, &cancelled_token).await;
     cancelled(result);
     let never = Cancellation::never();
     let buffer = vec![0; expected.len()];
     let allocation = buffer.as_ptr() as usize;
-    let (result, mut buffer) = scheduler.file_read_at(file, buffer, u64::MAX, &never).await;
+    let (result, mut buffer) =
+        crate::io::file_read_at(scheduler, file, buffer, u64::MAX, &never).await;
     assert_eq!(result.unwrap_err().kind(), io::ErrorKind::InvalidInput);
     assert_eq!(buffer.as_ptr() as usize, allocation);
     let mut read = 0;
     while read < expected.len() {
-        let (result, view) = scheduler
-            .file_read_at(file, buffer.slice(read..), offset + read as u64, &never)
-            .await;
+        let (result, view) = crate::io::file_read_at(
+            scheduler,
+            file,
+            buffer.slice(read..),
+            offset + read as u64,
+            &never,
+        )
+        .await;
         let count = result.unwrap();
         assert!(count > 0 && count <= expected.len() - read);
         read += count;
@@ -97,31 +105,29 @@ pub async fn read_at<S: FileReadAt>(scheduler: &S, file: &S::File, offset: u64, 
 }
 
 /// Check positioned writes and range validation. The fixture verifies resulting contents separately.
-pub async fn write_at<S: FileWriteAt>(scheduler: &S, file: &S::File, offset: u64, bytes: &[u8]) {
+pub async fn write_at<S: FileWriting>(scheduler: &S, file: &S::File, offset: u64, bytes: &[u8]) {
     let cancellation = Cancellation::new();
     cancellation.cancel();
-    let (result, _) = scheduler
-        .file_write_at(file, bytes.to_vec(), u64::MAX, &cancellation)
-        .await;
+    let (result, _) =
+        crate::io::file_write_at(scheduler, file, bytes.to_vec(), u64::MAX, &cancellation).await;
     cancelled(result);
     let never = Cancellation::never();
     let buffer = bytes.to_vec();
     let allocation = buffer.as_ptr() as usize;
-    let (result, mut buffer) = scheduler
-        .file_write_at(file, buffer, u64::MAX, &never)
-        .await;
+    let (result, mut buffer) =
+        crate::io::file_write_at(scheduler, file, buffer, u64::MAX, &never).await;
     assert_eq!(result.unwrap_err().kind(), io::ErrorKind::InvalidInput);
     assert_eq!(buffer.as_ptr() as usize, allocation);
     let mut written = 0;
     while written < bytes.len() {
-        let (result, view) = scheduler
-            .file_write_at(
-                file,
-                buffer.slice(written..),
-                offset + written as u64,
-                &never,
-            )
-            .await;
+        let (result, view) = crate::io::file_write_at(
+            scheduler,
+            file,
+            buffer.slice(written..),
+            offset + written as u64,
+            &never,
+        )
+        .await;
         let count = result.unwrap();
         assert!(count > 0 && count <= bytes.len() - written);
         written += count;
@@ -224,12 +230,11 @@ pub async fn sync<S: FileSync>(scheduler: &S, file: &S::File) {
 }
 
 /// Check a failed write preserves the original buffer owner on an error path supplied by the backend fixture.
-pub async fn write_error<S: FileWrite>(scheduler: &S, file: &S::File) {
+pub async fn write_error<S: FileWriting>(scheduler: &S, file: &S::File) {
     let buffer = vec![7; 3];
     let allocation = buffer.as_ptr() as usize;
-    let (result, buffer) = scheduler
-        .file_write(file, buffer, &Cancellation::never())
-        .await;
+    let (result, buffer) =
+        crate::io::file_write(scheduler, file, buffer, &Cancellation::never()).await;
     assert!(matches!(result, Err(OperationError::Io(_))));
     assert_eq!(buffer, vec![7; 3]);
     assert_eq!(buffer.as_ptr() as usize, allocation);

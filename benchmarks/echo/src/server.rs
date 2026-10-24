@@ -2,14 +2,13 @@
 // Copyright, 2026, by Samuel Williams.
 
 #[cfg(target_os = "linux")]
-use core_scheduler::{SocketRecvMessage, backend::SocketRecvMsgReceiver};
+use core_scheduler::{SocketRecvFlags, SocketRecvMessage};
 
 use crate::Result;
 use core_scheduler::{
-    BufferPooling, Cancellation, IoBuf, SocketAccept, SocketRecvFlags, SocketRegistration,
-    SocketSendFlags, SocketSetOption, SocketStreamReader, SocketStreamReading, SocketStreamWriter,
-    SocketStreamWriting, Spawn, TcpNoDelay, backend::SocketMonitoring, backend::SocketRead,
-    backend::SocketRecvPoll, backend::SocketSendPoll, backend::SocketWrite,
+    BufferPooling, Cancellation, IoBuf, SocketAccept, SocketRegistration, SocketSetOption,
+    SocketStreamReader, SocketStreamReading, SocketStreamWriter, SocketStreamWriting, Spawn,
+    TcpNoDelay,
 };
 use core_scheduler_tokio::TokioScheduler;
 use std::{
@@ -55,11 +54,20 @@ async fn tokio_server(listener: TcpListener, connections: usize) {
     }
 }
 
-async fn echo<S: SocketRead + SocketWrite>(scheduler: &S, socket: S::Socket) {
+async fn echo<S: SocketStreamReading + SocketStreamWriting>(scheduler: &S, socket: S::Socket)
+where
+    S::Socket: 'static,
+{
     let never = Cancellation::never();
+    let mut reader = scheduler
+        .socket_stream_reader(&socket)
+        .expect("stream reader");
+    let mut writer = scheduler
+        .socket_stream_writer(&socket)
+        .expect("stream writer");
     let mut buffer = vec![0; BUFFER_SIZE];
     loop {
-        let (result, returned) = scheduler.socket_read(&socket, buffer, &never).await;
+        let (result, returned) = reader.read_owned(buffer, &never).await;
         buffer = returned;
         let count = result.expect("echo operation");
         if count == 0 {
@@ -67,9 +75,7 @@ async fn echo<S: SocketRead + SocketWrite>(scheduler: &S, socket: S::Socket) {
         }
         let mut sent = 0;
         while sent < count {
-            let (result, returned) = scheduler
-                .socket_write(&socket, buffer.slice(sent..count), &never)
-                .await;
+            let (result, returned) = writer.write_owned(buffer.slice(sent..count), &never).await;
             buffer = returned.into_inner();
             let count = result.expect("echo operation");
             assert!(count != 0, "echo write made zero progress");
@@ -78,32 +84,12 @@ async fn echo<S: SocketRead + SocketWrite>(scheduler: &S, socket: S::Socket) {
     }
 }
 
-async fn echo_poll<S: SocketRecvPoll + SocketSendPoll>(scheduler: &S, socket: S::Socket) {
-    let never = Cancellation::never();
-    let mut buffer = vec![0; BUFFER_SIZE];
-    loop {
-        let count = scheduler
-            .socket_recv_poll(&socket, &mut buffer, SocketRecvFlags::default(), &never)
-            .await
-            .expect("echo operation");
-        if count == 0 {
-            return;
-        }
-        let mut sent = 0;
-        while sent < count {
-            let count = scheduler
-                .socket_send_poll(
-                    &socket,
-                    &buffer[sent..count],
-                    SocketSendFlags::default(),
-                    &never,
-                )
-                .await
-                .expect("echo operation");
-            assert!(count != 0, "echo write made zero progress");
-            sent += count;
-        }
-    }
+// The historical polling and monitor modes now share the bound borrowed fast path.
+async fn echo_poll<S: SocketStreamReading + SocketStreamWriting>(scheduler: &S, socket: S::Socket)
+where
+    S::Socket: 'static,
+{
+    echo_monitor(scheduler, socket).await;
 }
 
 async fn echo_monitor<S>(scheduler: &S, socket: S::Socket)
@@ -174,32 +160,20 @@ async fn multishot_server(
                         )
                         .await
                         .expect("start multishot receive");
-                    while let Some(message) = receiving
-                        .recv(shared.selector(), &never)
-                        .await
-                        .expect("multishot receive")
+                    let mut writer = shared.socket_stream_writer(&socket).expect("stream writer");
+                    while let Some(message) =
+                        receiving.recv(&never).await.expect("multishot receive")
                     {
                         let mut bytes = message.payload();
                         while !bytes.is_empty() {
-                            let sent = shared
-                                .socket_send_poll(
-                                    &socket,
-                                    bytes,
-                                    SocketSendFlags::default(),
-                                    &never,
-                                )
-                                .await
-                                .expect("echo write");
+                            let sent = writer.write(bytes, &never).await.expect("echo write");
                             assert_ne!(sent, 0, "echo write made zero progress");
                             bytes = &bytes[sent..];
                         }
                         // Return this lease to the backend's fixed receive pool.
                         drop(message);
                     }
-                    receiving
-                        .close(shared.selector())
-                        .await
-                        .expect("retire multishot receive");
+                    receiving.close().await.expect("retire multishot receive");
                 })
                 .expect("spawn echo task"),
         );
@@ -218,11 +192,6 @@ async fn scheduler_server<S>(
 ) where
     S: SocketRegistration
         + SocketAccept
-        + SocketRead
-        + SocketWrite
-        + SocketRecvPoll
-        + SocketSendPoll
-        + SocketMonitoring
         + SocketStreamWriting
         + SocketStreamReading
         + BufferPooling
@@ -231,6 +200,7 @@ async fn scheduler_server<S>(
         + Send
         + Sync
         + 'static,
+    S::Socket: 'static,
 {
     let listener = scheduler
         .register_listener(listener)

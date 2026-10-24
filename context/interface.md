@@ -28,7 +28,7 @@ Use one handle per sequential execution, with independent readers and writers fo
 
 The default stream writer accepts the same pooled owner type returned by the default stream reader, with no type annotation needed for borrowed-only output. `socket_stream_writer_with_buffer::<B>(K)` selects another stable owner type. Reader factories allocate no payload pool; the first owned read initializes default storage lazily. `socket_stream_reader_with_pool(K, pool)` and `socket_packet_reader_with_pool(K, pool)` select an application-owned shared budget at construction. Factories return implementation-selected handles through the reader/writer contracts; backends choose their composition without changing application operations.
 
-The Direct and Tokio backends provide all four socket handles. Native forwards its selector’s capabilities: io\_uring provides all four, while the readiness selector currently lacks ordered stream output (`SocketStreamWriting`).
+The Direct and Tokio backends provide all four socket handles. Native forwards its selector’s capabilities; both readiness and io\_uring provide all four.
 
 ### Stream input
 
@@ -77,7 +77,7 @@ The submission token continues to govern accepted output until its send result. 
 | `write_owned` | `(B: IoBuf, address, C) → BufferResult<B>` | Retain a stable owner through one send and return it alongside the result. |
 | `close` | `() → io::Result<()>` | Await registration retirement without closing or shutting down the socket. |
 
-`SocketRecvResult` contains the copied byte count, optional source address, payload truncation, and ancillary-data truncation. Ancillary bytes themselves are not exposed. Packet reads do not expose peeking or buffer registration as application policy choices.
+`SocketRecvResult` contains the copied byte count, optional source address, payload truncation, and ancillary-data truncation. Ancillary bytes themselves are not exposed. Ordinary packet reads consume packets; explicit receive flags can request peeking. Buffer registration remains an implementation strategy.
 
 ## Bound file I/O
 
@@ -92,19 +92,35 @@ The submission token continues to govern accepted output until its send result. 
 | `FileWriter::write_all` | `(B: IoBuf, C) → BufferResult<B>` | Sequence short writes; success reports the full length, and zero progress on nonempty output is `WriteZero`. The original owner is returned even after partial effects. |
 | Either handle's `close` | `() → io::Result<()>` | Stop admission and await accepted operation and registration retirement; drop the handle afterwards. Does not close the file. |
 
-Handles have no private logical position. Ordinary reads and writes share the underlying OS cursor with every file alias; serialize dependent cursor operations. Positioned operations follow the platform cursor rules of `FileReadAt` and `FileWriteAt`, rather than emulating an independent cursor. Success does not establish durability: finish writes before `file_sync`.
+Handles have no private logical position. Ordinary reads and writes share the underlying OS cursor with every file alias; serialize dependent cursor operations. Offsets must fit in `i64`. Unix positioned operations leave the shared cursor unchanged; Windows implementations may use `seek_read` and `seek_write`, which change it. Handles do not emulate a private cursor. Success does not establish durability: finish writes before `file_sync`.
 
-Owned file operations may outlive dropped futures. Reusing that sequential handle can return `WouldBlock` until backend access retires. Joining independent reader and writer futures overlaps work without an extra task or a submission-specific API.
+Owned file operations may outlive dropped futures. Reusing that sequential handle can return `WouldBlock` while accepted access or an uncollected completion reserves its reusable state. Joining independent reader and writer futures overlaps work without an extra task or a submission-specific API.
 
-### Optional file submission waits
+### Separate file submission waits
 
-The supplied `backend::BoundFileReader` and `backend::BoundFileWriter` handles expose `read_submit`, `read_at_submit`, `write_submit`, and `write_at_submit` when their scheduler implements `backend::FileMonitorSubmission`. The file factory traits select associated handle families, so concrete handles preserve these optional methods. A generic `FileReading` or `FileWriting` bound guarantees only the ordinary resource trait, independently of backend submission support. Their arguments match the corresponding ordinary methods, with per-call cancellation and no scheduler argument. Awaiting admission returns:
+`FileReader` exposes `read_submit` and `read_at_submit`; `FileWriter` exposes `write_submit` and `write_at_submit`. Arguments match the ordinary methods, with per-call cancellation and no scheduler argument. Awaiting admission returns:
 
 ```rust,ignore
-Result<impl Future<Output = BufferResult<B>> + Send, (OperationError, B)>
+Result<impl Future<Output = BufferResult<B>> + Send + 'static, (OperationError, B)>
 ```
 
-Rejection returns the input owner. Accepted work can progress before its completion future is polled; await that future to recover the owner and operation result. The completion borrows the handle until collection or drop. Dropping it requests retirement without making the handle immediately reusable: another operation can report `WouldBlock` until backend access ends, and `close()` waits for that retirement. Admission does not establish kernel execution, byte completion, or durability. Ordinary joined reader/writer operations remain the simple pipeline choice.
+Rejection returns the unchanged input owner without transferring bytes. After admission, the returned completion owns its operation state independently of the handle and cancellation reference. Accepted work can progress without polling it; a portable fallback may complete the ordinary operation before returning admission. Await completion to recover the owner and operation result. Dropping the completion forfeits recovery but never frees storage still in use. Another operation on that sequential handle can report `WouldBlock` while the operation or an uncollected completion reserves reusable state; `close()` waits for that retirement, even if the completion remains uncollected. Admission does not establish durability. Joining ordinary independent reader/writer operations remains the simple pipeline choice.
+
+## Explicit socket transfer options
+
+The ordinary methods remain the fast path. Use these variants when protocol semantics require flags or ownership of a complete scatter/gather sequence:
+
+| Method | Arguments → awaited result | Semantics |
+| --- | --- | --- |
+| Reader `read_into_with_flags` | `(&mut [u8], SocketRecvFlags, C) → usize` for streams, `SocketRecvResult` for packets | One borrowed receive; `peek` observes bytes without consuming them. |
+| Reader `read_vectored_with_flags` | `(&mut [IoSliceMut], SocketRecvFlags, C) → SocketRecvResult` | Borrowed scatter receive retaining metadata and truncation flags. |
+| Reader `read_owned` | `(B: IoBufMut, C) → (OperationResult<count>, B)` | Stable owner returned on every result; packet count includes receive metadata. |
+| Reader `read_owned_vectored` | `(Buffers: IoBufSequenceMut, SocketRecvFlags, C) → (OperationResult<SocketRecvResult>, Buffers)` | One owned scatter receive. The owner and its ranges are returned unchanged. |
+| Writer `write_with_flags` / `write_vectored_with_flags` | `(borrowed bytes/vectors, [destination], SocketSendFlags, C) → usize` | One borrowed transfer; `dont_route` requests local routing. Packets accept an optional destination. |
+| Writer `write_owned` | `(B: IoBuf, [destination], C) → BufferResult<B>` | One owned transfer returning the owner on every result. |
+| Writer `write_owned_vectored` | `(Buffers: IoBufSequence, [destination], SocketSendFlags, C) → (OperationResult<usize>, Buffers)` | One owned gather send; packets preserve one message boundary. |
+
+Destination arguments apply to packet writers only. Stream writes await earlier submitted output before making another transfer. No vectored method advances the caller's vectors. An owned sequence retains every buffer and stable native I/O vector until access retires, including after the waiter is dropped or forgotten. Borrowed variants access bytes only synchronously within each poll. These contracts do not prescribe copies, allocations, or a particular backend mechanism. Abandoning an owned operation can leave its sequential lane busy, with successors reporting `WouldBlock` until backend access retires. Await `close()` to establish retirement.
 
 ## Filesystem control
 
@@ -198,7 +214,7 @@ Dropping an ordinary clock wait releases its registration. Reusable timer waits 
 
 ## Backend composition and selector integration
 
-Application protocols use the crate-root bound resource traits above. Adapter authors use the public `core_scheduler::backend` module for owned and borrowed dispatch capabilities, monitor state, stable registration storage, receivers, and reusable `Bound*` implementations. These items have no crate-root aliases. The public factory traits do not inherit the backend hooks: an implementation can select its own handles without implementing monitor dispatch. Full file-test profiles belong to `core_scheduler_conformance::FileTestScheduler`, rather than a production scheduler aggregate. Those hooks retain explicit scheduler arguments for backend dispatch and conformance; they do not require application callers to select a polling or completion mechanism. See [socket monitoring](design.md#directional-socket-monitor-machinery), [file monitoring](design.md#sequential-file-monitor-machinery), and [ring ownership](design.md#io_uring-ring-ownership-and-migration) for their lifetime rules.
+Application protocols and adapters share the resource contracts above. There is no separate public dispatch, monitor, or receiver protocol. Concrete adapters keep reusable registration, request, and retirement state private; Native forwards public factories directly without adding an I/O wrapper. The conformance crate tests public resources. Backend unit tests cover ring migration, aliasing, and completion retirement.
 
 The selector lifecycle hooks below live in `core-scheduler-selector`, not the portable interface. They let the Native executor drive independently selected I/O machinery.
 

@@ -1,39 +1,19 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use crate::{TokioScheduler, TokioSocket};
-use core_scheduler::backend::*;
+use crate::TokioScheduler;
+use crate::tokio_socket_packet_reader::TokioSocketPacketReader;
+use crate::tokio_socket_packet_writer::TokioSocketPacketWriter;
+use crate::tokio_socket_stream_reader::TokioSocketStreamReader;
 use core_scheduler::*;
 use std::io;
-impl SocketReceiving for TokioScheduler {
-    type PooledReceiver =
-        SocketReceiver<SocketMonitor<TokioSocket, <Self as SocketMonitoring>::MonitorRegistration>>;
-    async fn socket_receiver(
-        &self,
-        socket: &Self::Socket,
-        pool: Self::Pool,
-        flags: SocketRecvFlags,
-        cancellation: &Cancellation,
-    ) -> OperationResult<Self::PooledReceiver> {
-        cancellation.check()?;
-        self.check_socket(socket)?;
-        let kind = crate::socket_io::recvmsg_socket_type(socket.get_ref())?;
-        self.socket_monitor(socket, Interest::Readable)
-            .and_then(|monitor| SocketReceiver::new(monitor, pool, kind, flags))
-            .map_err(Into::into)
-    }
-}
-
-#[cfg(test)]
-mod tests;
-
 impl SocketStreamReading for TokioScheduler {
     fn socket_stream_reader<'scheduler>(
         &'scheduler self,
         socket: &Self::Socket,
     ) -> io::Result<impl SocketStreamReader<Buffer = <Self::Pool as BufferPool>::Buffer> + 'scheduler>
     {
-        BoundSocketStreamReader::new(self, socket)
+        TokioSocketStreamReader::new(self, socket)
     }
     fn socket_stream_reader_with_pool<'scheduler>(
         &'scheduler self,
@@ -41,7 +21,7 @@ impl SocketStreamReading for TokioScheduler {
         pool: Self::Pool,
     ) -> io::Result<impl SocketStreamReader<Buffer = <Self::Pool as BufferPool>::Buffer> + 'scheduler>
     {
-        BoundSocketStreamReader::new(self, socket).map(|reader| reader.with_pool(pool))
+        TokioSocketStreamReader::new(self, socket).map(|reader| reader.with_pool(pool))
     }
 }
 impl SocketPacketReading for TokioScheduler {
@@ -53,7 +33,7 @@ impl SocketPacketReading for TokioScheduler {
             Message: SocketRecvMessageMut<Payload = <Self::Pool as BufferPool>::Buffer>,
         > + 'scheduler,
     > {
-        BoundSocketPacketReader::new(self, socket)
+        TokioSocketPacketReader::new(self, socket)
     }
     fn socket_packet_reader_with_pool<'scheduler>(
         &'scheduler self,
@@ -64,7 +44,7 @@ impl SocketPacketReading for TokioScheduler {
             Message: SocketRecvMessageMut<Payload = <Self::Pool as BufferPool>::Buffer>,
         > + 'scheduler,
     > {
-        BoundSocketPacketReader::new(self, socket).map(|reader| reader.with_pool(pool))
+        TokioSocketPacketReader::new(self, socket).map(|reader| reader.with_pool(pool))
     }
 }
 impl SocketPacketWriting for TokioScheduler {
@@ -72,6 +52,9 @@ impl SocketPacketWriting for TokioScheduler {
         &'scheduler self,
         socket: &Self::Socket,
     ) -> io::Result<impl SocketPacketWriter + 'scheduler> {
-        BoundSocketPacketWriter::new(self, socket)
+        TokioSocketPacketWriter::new(self, socket)
     }
 }
+
+#[cfg(test)]
+mod tests;

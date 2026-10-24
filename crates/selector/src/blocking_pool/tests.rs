@@ -12,7 +12,7 @@ const TIMEOUT: Duration = Duration::from_secs(10);
 #[test]
 fn prepared_work_allocates_only_jobs_and_completion_channels() {
     use crate::{NativeFile, ReadinessSelector};
-    use core_scheduler::{Blocking, backend::FileReadAt, backend::FileWriteAt};
+    use core_scheduler::Blocking;
     use std::task::{Context, Waker};
     use std::time::Instant;
 
@@ -72,13 +72,23 @@ fn prepared_work_allocates_only_jobs_and_completion_channels() {
             assert_eq!(wait(task).unwrap(), 42);
             wait(scheduler.work.drain());
 
-            let (result, returned) = wait(scheduler.file_write_at(&file, buffer, 0, &token));
+            let (result, returned) = wait(scheduler.buffer_operation(
+                &file,
+                buffer,
+                &token,
+                |file, buffer| crate::file_io::write_at(file, buffer.as_ref(), 0),
+            ));
             assert_eq!(result.unwrap(), 8);
             buffer = returned;
             wait(scheduler.work.drain());
 
             buffer.fill(0);
-            let (result, returned) = wait(scheduler.file_read_at(&file, buffer, 0, &token));
+            let (result, returned) = wait(scheduler.buffer_operation(
+                &file,
+                buffer,
+                &token,
+                |file, buffer| crate::file_io::read_at(file, buffer.as_mut(), 0),
+            ));
             assert_eq!(result.unwrap(), 8);
             buffer = returned;
             assert_eq!(buffer, [7; 8]);

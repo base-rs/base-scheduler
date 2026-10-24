@@ -12,7 +12,7 @@ const TIMEOUT: Duration = Duration::from_secs(10);
 #[test]
 fn prepared_work_allocates_only_jobs_and_completion_channels() {
     use crate::{DirectFile, DirectScheduler};
-    use core_scheduler::{Blocking, backend::FileReadAt, backend::FileWriteAt};
+    use core_scheduler::{Blocking, FileReader, FileReading, FileWriter, FileWriting};
     use std::task::{Context, Waker};
     use std::time::Instant;
 
@@ -64,6 +64,12 @@ fn prepared_work_allocates_only_jobs_and_completion_channels() {
     wait(wait(scheduler.spawn_blocking(|| (), &token)).unwrap()).unwrap();
     wait(scheduler.work.drain());
 
+    let mut writer = scheduler.file_writer(&file).unwrap();
+    let mut reader = scheduler.file_reader(&file).unwrap();
+    let (_, buffer) = wait(writer.write_at(buffer, 0, &token));
+    let (_, buffer) = wait(reader.read_at(buffer, 0, &token));
+    wait(scheduler.work.drain());
+
     const REPETITIONS: u64 = 16;
     let allocations = allocation_counter::measure(|| {
         let mut buffer = buffer;
@@ -72,13 +78,13 @@ fn prepared_work_allocates_only_jobs_and_completion_channels() {
             assert_eq!(wait(task).unwrap(), 42);
             wait(scheduler.work.drain());
 
-            let (result, returned) = wait(scheduler.file_write_at(&file, buffer, 0, &token));
+            let (result, returned) = wait(writer.write_at(buffer, 0, &token));
             assert_eq!(result.unwrap(), 8);
             buffer = returned;
             wait(scheduler.work.drain());
 
             buffer.fill(0);
-            let (result, returned) = wait(scheduler.file_read_at(&file, buffer, 0, &token));
+            let (result, returned) = wait(reader.read_at(buffer, 0, &token));
             assert_eq!(result.unwrap(), 8);
             buffer = returned;
             assert_eq!(buffer, [7; 8]);

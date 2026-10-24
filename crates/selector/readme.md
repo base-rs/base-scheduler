@@ -28,7 +28,7 @@ Call `shutdown().await` after coordinating application cancellation and cleanup.
 
 `SelectorDriver` and `SelectorWorker` support executor-owned event loops. A movable driver enters one worker, consuming itself into a possibly thread-bound owner. That owner provides interruptible waits and bounded completion batches. Completion processing wakes tasks; the executor polls its ready queue only after the driver returns. Selectors with independent progress, such as `ReadinessSelector`, do not need to implement this optional driving contract.
 
-The readiness selector supplies bound stream readers, packet readers and writers, and file readers and writers. It does not currently implement `SocketStreamWriting`, whose owned submissions require independently progressing ordered output. Operations take cancellation without another scheduler argument. Borrowed-only readers allocate no payload pool; owned reads use lazy default storage or an explicit shared pool. Close and drop handles before exclusively closing their underlying resources. See the [I/O usage guide](../../context/io.md).
+The readiness selector supplies bound stream, packet, and file readers and writers. Ready stream submissions complete inline; stalled owned output progresses through the existing bounded worker service, with cancellation and retirement independent of the caller polling its completion. Operations take cancellation without another scheduler argument. Borrowed-only readers allocate no payload pool; owned reads use lazy default storage or an explicit shared pool. Close and drop handles before exclusively closing their underlying resources. See the [I/O usage guide](../../context/io.md).
 
 ## Releasing
 

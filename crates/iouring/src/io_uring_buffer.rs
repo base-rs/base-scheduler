@@ -11,6 +11,11 @@ pub struct IoUringBuffer {
     range: Range<usize>,
 }
 impl IoUringBuffer {
+    pub(crate) fn advance(&mut self, bytes: usize) {
+        assert!(bytes <= self.range.len());
+        self.range.start += bytes;
+    }
+
     pub(crate) fn new(buffer: BufferLease, offset: usize, length: usize) -> Self {
         assert!(offset <= buffer.as_ref().len() && length <= buffer.as_ref().len() - offset);
         Self {

@@ -1,18 +1,20 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
+#[path = "support/socket_model.rs"]
+mod socket_model;
 mod support;
-use core_scheduler::backend::*;
 use core_scheduler::*;
 use core_scheduler_conformance::{
     SocketOptionFixture, SocketRegistrationFixture, socket_options, socket_registration,
 };
 use futures_lite::future::block_on;
+use socket_model::{SocketModel, socket_factories};
 use std::{
     io::{self, Read, Write},
     net::{TcpListener, TcpStream},
     sync::{
-        Mutex,
+        Arc, Mutex,
         atomic::{AtomicUsize, Ordering},
     },
 };
@@ -40,9 +42,10 @@ impl Native {
         }
     }
 }
+#[derive(Clone)]
 enum Socket {
-    Stream(Mutex<TcpStream>),
-    Listener(TcpListener),
+    Stream(Arc<Mutex<TcpStream>>),
+    Listener(Arc<TcpListener>),
     Failing,
 }
 impl Socket {
@@ -101,40 +104,34 @@ impl SocketRegistration for Native {
         if self.fault == Fault::RejectStream {
             return Ok(Socket::Failing);
         }
-        Ok(Socket::Stream(Mutex::new(socket)))
+        Ok(Socket::Stream(Arc::new(Mutex::new(socket))))
     }
     fn register_listener(&self, listener: TcpListener) -> io::Result<Socket> {
-        Ok(Socket::Listener(listener))
+        Ok(Socket::Listener(Arc::new(listener)))
     }
 }
-impl SocketRead for Native {
-    async fn socket_read<B: IoBufMut>(
+
+impl SocketModel for Native {
+    fn recv(
         &self,
         socket: &Socket,
-        mut buffer: B,
+        buffer: &mut [u8],
         cancellation: &Cancellation,
-    ) -> BufferResult<B> {
-        let result = (|| {
-            cancellation.check()?;
-            Ok(socket.stream()?.lock().unwrap().read(buffer.as_mut())?)
-        })();
-        (result, buffer)
+    ) -> OperationResult<usize> {
+        cancellation.check()?;
+        Ok(socket.stream()?.lock().unwrap().read(buffer)?)
     }
-}
-impl SocketWrite for Native {
-    async fn socket_write<B: IoBuf>(
+    fn send(
         &self,
         socket: &Socket,
-        buffer: B,
+        buffer: &[u8],
         cancellation: &Cancellation,
-    ) -> BufferResult<B> {
-        let result = (|| {
-            cancellation.check()?;
-            Ok(socket.stream()?.lock().unwrap().write(buffer.as_ref())?)
-        })();
-        (result, buffer)
+    ) -> OperationResult<usize> {
+        cancellation.check()?;
+        Ok(socket.stream()?.lock().unwrap().write(buffer)?)
     }
 }
+socket_factories!(Native);
 impl SocketAccept for Native {
     async fn socket_accept(
         &self,
@@ -146,7 +143,7 @@ impl SocketAccept for Native {
             return Err(io::Error::other("not a listener").into());
         };
         let (stream, address) = listener.accept()?;
-        Ok((Socket::Stream(Mutex::new(stream)), address))
+        Ok((Socket::Stream(Arc::new(Mutex::new(stream))), address))
     }
 }
 impl SocketClose for Native {
@@ -246,7 +243,7 @@ impl<S: Calls + From<Native>> OptionsFixture<S> {
         let (stream, _) = listener.accept().unwrap();
         Self {
             scheduler: Native::new(fault).into(),
-            socket: Socket::Stream(Mutex::new(stream)),
+            socket: Socket::Stream(Arc::new(Mutex::new(stream))),
             failing: Socket::Failing,
             _peer: peer,
         }

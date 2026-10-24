@@ -1,13 +1,14 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
+use crate::Interest;
+use crate::SocketMessage;
 use crate::{
     DirectScheduler, DirectSocket,
     blocking_pool::admission_error,
     direct_scheduler::wait_close,
     socket_io::{self, IoVectors},
 };
-use core_scheduler::backend::*;
 use core_scheduler::*;
 use socket2::Socket;
 use std::{io, net::Shutdown};
@@ -162,8 +163,8 @@ impl SocketAccept for DirectScheduler {
     }
 }
 
-impl SocketRead for DirectScheduler {
-    async fn socket_read<B: IoBufMut>(
+impl DirectScheduler {
+    pub(crate) async fn socket_read<B: IoBufMut>(
         &self,
         socket: &DirectSocket,
         buffer: B,
@@ -176,8 +177,8 @@ impl SocketRead for DirectScheduler {
     }
 }
 
-impl SocketWrite for DirectScheduler {
-    async fn socket_write<B: IoBuf>(
+impl DirectScheduler {
+    pub(crate) async fn socket_write<B: IoBuf>(
         &self,
         socket: &DirectSocket,
         buffer: B,
@@ -190,8 +191,8 @@ impl SocketWrite for DirectScheduler {
     }
 }
 
-impl SocketRecvPoll for DirectScheduler {
-    async fn socket_recv_poll(
+impl DirectScheduler {
+    pub(crate) async fn socket_recv_poll(
         &self,
         socket: &DirectSocket,
         buffer: &mut [u8],
@@ -205,8 +206,8 @@ impl SocketRecvPoll for DirectScheduler {
     }
 }
 
-impl SocketSendPoll for DirectScheduler {
-    async fn socket_send_poll(
+impl DirectScheduler {
+    pub(crate) async fn socket_send_poll(
         &self,
         socket: &DirectSocket,
         buffer: &[u8],
@@ -220,8 +221,8 @@ impl SocketSendPoll for DirectScheduler {
     }
 }
 
-impl SocketRecvMsgPoll for DirectScheduler {
-    async fn socket_recvmsg_poll(
+impl DirectScheduler {
+    pub(crate) async fn socket_recvmsg_poll(
         &self,
         socket: &DirectSocket,
         buffer: &mut [std::io::IoSliceMut<'_>],
@@ -235,8 +236,8 @@ impl SocketRecvMsgPoll for DirectScheduler {
     }
 }
 
-impl SocketSendMsgPoll for DirectScheduler {
-    async fn socket_sendmsg_poll(
+impl DirectScheduler {
+    pub(crate) async fn socket_sendmsg_poll(
         &self,
         socket: &DirectSocket,
         buffer: &[std::io::IoSlice<'_>],
@@ -251,8 +252,8 @@ impl SocketSendMsgPoll for DirectScheduler {
     }
 }
 
-impl SocketWait for DirectScheduler {
-    async fn socket_wait(
+impl DirectScheduler {
+    pub(crate) async fn socket_wait(
         &self,
         socket: &DirectSocket,
         interest: Interest,
@@ -266,8 +267,8 @@ impl SocketWait for DirectScheduler {
     }
 }
 
-impl SocketSendMsg for DirectScheduler {
-    async fn socket_sendmsg<B: IoBufSequence>(
+impl DirectScheduler {
+    pub(crate) async fn socket_sendmsg<B: IoBufSequence>(
         &self,
         socket: &DirectSocket,
         message: SocketMessage<B>,
@@ -282,8 +283,8 @@ impl SocketSendMsg for DirectScheduler {
     }
 }
 
-impl SocketRecvMsg for DirectScheduler {
-    async fn socket_recvmsg<B: IoBufSequenceMut>(
+impl DirectScheduler {
+    pub(crate) async fn socket_recvmsg<B: IoBufSequenceMut>(
         &self,
         socket: &DirectSocket,
         buffers: B,
@@ -343,21 +344,9 @@ impl SocketShutdown for DirectScheduler {
 #[cfg(test)]
 mod tests;
 
-impl SocketMonitoring for DirectScheduler {
-    type MonitorRegistration = ();
-    fn socket_type(&self, socket: &Self::Socket) -> io::Result<SocketType> {
+impl DirectScheduler {
+    pub(crate) fn socket_type(&self, socket: &DirectSocket) -> io::Result<SocketType> {
         self.socket_retry.check_open()?;
         crate::socket_io::recvmsg_socket_type(&socket.0)
-    }
-    fn socket_monitor_state(
-        &self,
-        socket: &Self::Socket,
-        interest: Interest,
-    ) -> io::Result<SocketMonitor<Self::Socket, ()>> {
-        Ok(SocketMonitor::new(
-            DirectSocket(socket.retain()),
-            interest,
-            (),
-        ))
     }
 }

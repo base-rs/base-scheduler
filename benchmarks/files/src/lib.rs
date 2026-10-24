@@ -2,7 +2,8 @@
 // Copyright, 2026, by Samuel Williams.
 
 use core_scheduler::{
-    Cancellation, FileClose, FileOpen, FileOptions, Spawn, backend::FileMonitoring,
+    Cancellation, FileClose, FileOpen, FileOptions, FileReader, FileReading, FileWriter,
+    FileWriting, Spawn,
 };
 use std::{sync::Arc, time::Instant};
 
@@ -15,7 +16,7 @@ pub async fn run<S>(
     size: usize,
 ) -> serde_json::Value
 where
-    S: FileMonitoring + FileOpen + FileClose + Spawn + Send + Sync + 'static,
+    S: FileReading + FileWriting + FileOpen + FileClose + Spawn + Send + Sync + 'static,
     S::File: 'static,
 {
     assert!(tasks > 0 && iterations > 0 && size > 0);
@@ -40,11 +41,9 @@ where
     );
     let mut handles = Vec::new();
     // Warm up outside the timed interval, including worker startup and request allocation.
-    let mut warm = scheduler.file_monitor(&file).unwrap();
-    let (_, buffer) = scheduler
-        .file_monitor_read_at(&mut warm, vec![0; size], 0, &never)
-        .await;
-    scheduler.file_monitor_close(&mut warm).await.unwrap();
+    let mut warm = scheduler.file_reader(&file).unwrap();
+    let (_, buffer) = warm.read_at(vec![0; size], 0, &never).await;
+    warm.close().await.unwrap();
     drop((warm, buffer));
     let started = Instant::now();
     for _ in 0..tasks {
@@ -55,7 +54,10 @@ where
             Arc::clone(&scheduler)
                 .spawn(async move {
                     let never = Cancellation::never();
-                    let mut monitor = scheduler.file_monitor(&file).unwrap();
+                    let mut reader =
+                        (workload == "read-at").then(|| scheduler.file_reader(&file).unwrap());
+                    let mut writer =
+                        (workload == "write-at").then(|| scheduler.file_writer(&file).unwrap());
                     let mut buffer = vec![42; size];
                     let mut steady_start = Instant::now();
                     // Measure each task's steady-state loop, excluding its first operation.
@@ -63,20 +65,24 @@ where
                         let result;
                         (result, buffer) = match (monitored, workload.as_str()) {
                             (true, "read-at") => {
-                                scheduler
-                                    .file_monitor_read_at(&mut monitor, buffer, 0, &never)
-                                    .await
+                                reader.as_mut().unwrap().read_at(buffer, 0, &never).await
                             }
                             (false, "read-at") => {
-                                scheduler.file_read_at(&file, buffer, 0, &never).await
-                            }
-                            (true, "write-at") => {
                                 scheduler
-                                    .file_monitor_write_at(&mut monitor, buffer, 0, &never)
+                                    .file_reader(&file)
+                                    .unwrap()
+                                    .read_at(buffer, 0, &never)
                                     .await
                             }
+                            (true, "write-at") => {
+                                writer.as_mut().unwrap().write_at(buffer, 0, &never).await
+                            }
                             (false, "write-at") => {
-                                scheduler.file_write_at(&file, buffer, 0, &never).await
+                                scheduler
+                                    .file_writer(&file)
+                                    .unwrap()
+                                    .write_at(buffer, 0, &never)
+                                    .await
                             }
                             _ => panic!("unknown workload"),
                         };
@@ -86,7 +92,12 @@ where
                             steady_start = Instant::now();
                         }
                     }
-                    scheduler.file_monitor_close(&mut monitor).await.unwrap();
+                    if let Some(reader) = reader.as_mut() {
+                        reader.close().await.unwrap();
+                    }
+                    if let Some(writer) = writer.as_mut() {
+                        writer.close().await.unwrap();
+                    }
                     steady_start.elapsed().as_nanos() as u64
                 })
                 .unwrap(),
