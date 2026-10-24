@@ -9,6 +9,8 @@ use std::{
 };
 
 /// One ordered stream of owned writes, retaining at most one unfinished logical write. Ready writes use a direct syscall; unfinished writes advance in their owning ring without an executor task.
+///
+/// A stalled submission returns after its first SQE has been consumed by the kernel, or after an accepted failure. Ring sends request `MSG_WAITALL`, allowing the kernel to advance partial sends while the caller computes. Completion and buffer retirement remain independent of this submission acknowledgement.
 pub struct IoUringStreamWriter<B: IoBuf> {
     owner: Weak<DriverGroup>,
     socket: RegisteredSocket,
