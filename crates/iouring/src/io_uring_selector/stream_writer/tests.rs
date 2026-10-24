@@ -57,6 +57,23 @@ fn small_send_buffer(socket: &NativeSocket) {
         .unwrap();
 }
 
+fn drive_all<F: Future>(drivers: &mut [crate::IoUringDriver], future: F) -> F::Output {
+    let mut future = pin!(future);
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        if let Some(result) = block_on(poll_once(future.as_mut())) {
+            return result;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "multi-ring writer test timed out"
+        );
+        for driver in &mut *drivers {
+            driver.turn(Some(Duration::ZERO)).unwrap();
+        }
+    }
+}
+
 #[test]
 fn immediate_writes_release_buffers_and_reuse_writer_without_allocating() {
     let (selector, mut driver) = pair(16);
@@ -138,7 +155,11 @@ fn stalled_write_finishes_and_releases_its_owner_without_polling_a_writer_future
     let drops = Arc::new(AtomicUsize::new(0));
     let never = Cancellation::never();
     let length = 1024 * 1024;
-    block_on(writer.submit(&selector, buffer(length, 0x5a, &drops), &never)).unwrap();
+    drive(
+        &mut driver,
+        writer.submit(&selector, buffer(length, 0x5a, &drops), &never),
+    )
+    .unwrap();
     assert!(
         writer.running.is_some(),
         "small send capacity must leave a pending write"
@@ -164,7 +185,11 @@ fn stalled_write_finishes_and_releases_its_owner_without_polling_a_writer_future
     assert_eq!(drops.load(Ordering::Acquire), 1);
     block_on(writer.flush(&selector, &never)).unwrap();
     assert!(writer.cached.is_some());
-    block_on(writer.submit(&selector, buffer(length, 0x6b, &drops), &never)).unwrap();
+    drive(
+        &mut driver,
+        writer.submit(&selector, buffer(length, 0x6b, &drops), &never),
+    )
+    .unwrap();
     drive(&mut driver, writer.close(&selector)).unwrap();
     assert_eq!(drops.load(Ordering::Acquire), 2);
     drop(writer);
@@ -181,7 +206,18 @@ fn cancelled_flush_does_not_cancel_accepted_output_but_submission_token_does() {
         let mut writer = selector.socket_stream_writer::<Buffer>(&sender).unwrap();
         let drops = Arc::new(AtomicUsize::new(0));
         let token = Cancellation::new();
-        block_on(writer.submit(&selector, buffer(4 * 1024 * 1024, 7, &drops), &token)).unwrap();
+        if before_preparation {
+            let mut submission =
+                Box::pin(writer.submit(&selector, buffer(4 * 1024 * 1024, 7, &drops), &token));
+            assert!(block_on(poll_once(submission.as_mut())).is_none());
+            drop(submission);
+        } else {
+            drive(
+                &mut driver,
+                writer.submit(&selector, buffer(4 * 1024 * 1024, 7, &drops), &token),
+            )
+            .unwrap();
+        }
         assert!(writer.running.is_some());
         let wait = Cancellation::new();
         wait.cancel();
@@ -228,7 +264,11 @@ fn next_submission_waits_and_cancelled_admission_does_not_touch_the_previous_wri
     small_send_buffer(&sender);
     let mut writer = selector.socket_stream_writer::<Vec<u8>>(&sender).unwrap();
     let never = Cancellation::never();
-    block_on(writer.submit(&selector, vec![1; 4 * 1024 * 1024], &never)).unwrap();
+    drive(
+        &mut driver,
+        writer.submit(&selector, vec![1; 4 * 1024 * 1024], &never),
+    )
+    .unwrap();
     let token = Cancellation::new();
     let mut next = Box::pin(writer.submit(&selector, vec![2; 16], &token));
     assert!(block_on(poll_once(&mut next)).is_none());
@@ -264,11 +304,14 @@ fn direct_send_errors_are_accepted_then_reported_and_drop_retires_pending_output
     small_send_buffer(&sender);
     let drops = Arc::new(AtomicUsize::new(0));
     let mut writer = selector.socket_stream_writer::<Buffer>(&sender).unwrap();
-    block_on(writer.submit(
-        &selector,
-        buffer(4 * 1024 * 1024, 2, &drops),
-        &Cancellation::never(),
-    ))
+    drive(
+        &mut driver,
+        writer.submit(
+            &selector,
+            buffer(4 * 1024 * 1024, 2, &drops),
+            &Cancellation::never(),
+        ),
+    )
     .unwrap();
     drop(writer);
     let deadline = Instant::now() + Duration::from_secs(5);
@@ -350,6 +393,7 @@ fn make_request(
     let shared = Arc::new(Shared {
         result: Mutex::new(None),
         ready: AtomicBool::new(false),
+        submitted: AtomicBool::new(false),
         waker: atomic_waker::AtomicWaker::new(),
     });
     let mut request = Box::new(WriteRequest::empty());
@@ -527,9 +571,12 @@ fn completion_callbacks_can_cancel_or_close_a_waiting_admission_before_its_first
                 returned.store(true, Ordering::Release);
             })),
         };
-        block_on(writer.submit(&selector, first, &Cancellation::never()))
-            .map_err(|(error, _)| error)
-            .unwrap();
+        drive(
+            &mut driver,
+            writer.submit(&selector, first, &Cancellation::never()),
+        )
+        .map_err(|(error, _)| error)
+        .unwrap();
         let second = AfterDrop {
             bytes: vec![2; 8],
             action: None,
@@ -584,7 +631,11 @@ fn completed_writes_can_migrate_rings_while_reusing_the_request_allocation() {
     let mut previous_request = None;
     for iteration in 0..8 {
         let _failure = Failures::new([("stream-write", io::ErrorKind::WouldBlock.into())]);
-        block_on(writer.submit(&selector, vec![iteration; 16], &never)).unwrap();
+        drive_all(
+            &mut drivers,
+            writer.submit(&selector, vec![iteration; 16], &never),
+        )
+        .unwrap();
         let worker = writer.running.as_ref().unwrap().controller.worker;
         if let Some(previous) = previous_worker {
             assert_ne!(worker, previous);
@@ -600,9 +651,15 @@ fn completed_writes_can_migrate_rings_while_reusing_the_request_allocation() {
         let mut incoming = [0; 16];
         let mut received = 0;
         while received < incoming.len() {
-            received += receiver
-                .try_recv(&mut incoming[received..], SocketRecvFlags::default())
-                .unwrap();
+            assert!(Instant::now() < deadline);
+            match receiver.try_recv(&mut incoming[received..], SocketRecvFlags::default()) {
+                Ok(count) => {
+                    assert!(count > 0);
+                    received += count;
+                }
+                Err(error) if error.kind() == io::ErrorKind::WouldBlock => {}
+                Err(error) => panic!("receive failed: {error}"),
+            }
         }
         assert_eq!(incoming, [iteration; 16]);
         block_on(writer.flush(&selector, &never)).unwrap();
@@ -614,7 +671,7 @@ fn completed_writes_can_migrate_rings_while_reusing_the_request_allocation() {
     }
     // Completion was published before close; close must collect it without sending another cancellation.
     let _failure = Failures::new([("stream-write", io::ErrorKind::WouldBlock.into())]);
-    block_on(writer.submit(&selector, vec![9; 16], &never)).unwrap();
+    drive_all(&mut drivers, writer.submit(&selector, vec![9; 16], &never)).unwrap();
     while !writer.shared.ready.load(Ordering::Acquire) {
         for driver in &mut drivers {
             driver.turn(Some(Duration::ZERO)).unwrap();

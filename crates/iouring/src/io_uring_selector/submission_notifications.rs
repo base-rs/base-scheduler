@@ -24,6 +24,7 @@ impl SubmissionNotifications {
     }
 
     pub fn consumed(&mut self, before: usize, after: usize) {
+        // The reactor is the exclusive issuer and does not enable SQPOLL. Only its explicit enter calls consume this SQ, and no entries are appended between these two snapshots. An independently consumed submission queue would require tracking the shared head directly instead.
         self.consumed = self.consumed.wrapping_add(before - after);
         // Ring capacity is far below isize::MAX, so a signed wrapping distance distinguishes pending markers even after the cumulative counter wraps.
         while self
@@ -134,10 +135,7 @@ mod tests {
 
     #[test]
     fn issuance_handles_full_submission_queues_and_abandoned_waiters() {
-        use super::super::{
-            socket::retain_socket,
-            tests::drive,
-        };
+        use super::super::{socket::retain_socket, tests::drive};
         use core_scheduler::*;
         use futures_lite::future::{block_on, poll_once};
         use std::time::Duration;
@@ -215,6 +213,91 @@ mod tests {
         ));
         drive(&mut driver, writer.close(&selector)).unwrap();
         drop(writer);
+        block_on(selector.socket_close(sender)).unwrap();
+        block_on(selector.socket_close(receiver)).unwrap();
+    }
+
+    #[test]
+    fn mixed_submissions_allow_receipt_wakers_to_enqueue_more_work() {
+        use super::super::{
+            Command, Controller,
+            tests::{Failures, drive, file, pair},
+        };
+        use core_scheduler::*;
+        use futures_lite::future::{block_on, poll_once};
+        use std::{
+            future::Future,
+            io,
+            sync::Mutex,
+            task::{Context, Wake, Waker},
+            time::Duration,
+        };
+
+        struct Enqueue {
+            controller: Arc<Controller>,
+            command: Mutex<Option<Command>>,
+            published: AtomicUsize,
+        }
+        impl Wake for Enqueue {
+            fn wake(self: Arc<Self>) {
+                self.wake_by_ref();
+            }
+            fn wake_by_ref(self: &Arc<Self>) {
+                let command = self.command.lock().unwrap().take();
+                if let Some(command) = command {
+                    assert!(self.controller.send(command).is_ok());
+                    self.published.fetch_add(1, Ordering::Release);
+                }
+            }
+        }
+
+        let (selector, mut driver) = pair(16);
+        let (_directory, file) = file(&selector);
+        let (sender, receiver) = block_on(core_scheduler_conformance::socket::stream_pair(
+            &selector,
+            SocketDomain::Ipv4,
+        ));
+        let never = Cancellation::never();
+        let mut later = Box::pin(selector.file_read_at(&file, vec![0; 6], 0, &never));
+        assert!(block_on(poll_once(later.as_mut())).is_none());
+        let command = driver
+            .reactor
+            .as_mut()
+            .unwrap()
+            .incoming
+            .try_recv()
+            .unwrap();
+        assert!(matches!(&command, Command::Submit(_)));
+        let enqueue = Arc::new(Enqueue {
+            controller: Arc::clone(&selector.controllers[0]),
+            command: Mutex::new(Some(command)),
+            published: AtomicUsize::new(0),
+        });
+        let waker = Waker::from(Arc::clone(&enqueue));
+        let mut context = Context::from_waker(&waker);
+
+        // Ordinary unmarked file I/O precedes the writer's marked Send in the same batch. The notification PollAdd follows it.
+        let mut first = Box::pin(selector.file_read_at(&file, vec![0; 1], 0, &never));
+        assert!(block_on(poll_once(first.as_mut())).is_none());
+        let mut writer = selector.socket_stream_writer::<Vec<u8>>(&sender).unwrap();
+        let _failure = Failures::new([("stream-write", io::ErrorKind::WouldBlock.into())]);
+        let mut submission = Box::pin(writer.submit(&selector, vec![1; 16], &never));
+        assert!(submission.as_mut().poll(&mut context).is_pending());
+        driver.turn(Some(Duration::ZERO)).unwrap();
+        assert_eq!(enqueue.published.load(Ordering::Acquire), 1);
+        assert!(matches!(
+            submission.as_mut().poll(&mut context),
+            std::task::Poll::Ready(Ok(()))
+        ));
+        drop(submission);
+        let (result, bytes) = drive(&mut driver, later);
+        assert_eq!(result.unwrap(), 6);
+        assert_eq!(bytes, b"abcdef");
+        assert_eq!(drive(&mut driver, first).0.unwrap(), 1);
+        drive(&mut driver, writer.flush(&selector, &never)).unwrap();
+        drive(&mut driver, writer.close(&selector)).unwrap();
+        drop(writer);
+        block_on(selector.file_close(file)).unwrap();
         block_on(selector.socket_close(sender)).unwrap();
         block_on(selector.socket_close(receiver)).unwrap();
     }
