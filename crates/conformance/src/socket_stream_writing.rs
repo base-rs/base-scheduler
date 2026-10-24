@@ -188,6 +188,16 @@ where
         crate::socket_monitoring::cancelled(reading.await);
     }
     assert_eq!(reader.read_into(&mut [], &never).await.unwrap(), 0);
+    assert_eq!(reader.read_vectored(&mut [], &never).await.unwrap(), 0);
+    assert_eq!(
+        reader
+            .read_vectored(&mut [IoSliceMut::new(&mut [])], &never)
+            .await
+            .unwrap(),
+        0
+    );
+    crate::socket_monitoring::cancelled(reader.read_into(&mut [], &cancelled).await);
+    crate::socket_monitoring::cancelled(reader.read_vectored(&mut [], &cancelled).await);
     let (count, ()) = zip(
         async {
             let mut received = 0;

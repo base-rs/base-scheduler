@@ -123,7 +123,7 @@ where
         cancellation: &Cancellation,
     ) -> OperationResult<usize> {
         self.check_open()?;
-        if self.eof {
+        if self.eof || buffer.is_empty() {
             cancellation.check()?;
             return Ok(0);
         }
@@ -136,7 +136,7 @@ where
                 cancellation,
             )
             .await?;
-        if count == 0 && !buffer.is_empty() {
+        if count == 0 {
             self.eof = true;
         }
         Ok(count)
@@ -148,7 +148,7 @@ where
         cancellation: &Cancellation,
     ) -> OperationResult<usize> {
         self.check_open()?;
-        if self.eof {
+        if self.eof || buffers.iter().all(|buffer| buffer.is_empty()) {
             cancellation.check()?;
             return Ok(0);
         }
@@ -161,7 +161,7 @@ where
                 cancellation,
             )
             .await?;
-        if result.bytes == 0 && buffers.iter().any(|buffer| !buffer.is_empty()) {
+        if result.bytes == 0 {
             self.eof = true;
         }
         Ok(result.bytes)

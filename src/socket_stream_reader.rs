@@ -19,14 +19,14 @@ pub trait SocketStreamReader: Send {
         cancellation: &Cancellation,
     ) -> impl Future<Output = OperationResult<Option<Self::Buffer>>> + Send;
 
-    /// Read once into borrowed storage, returning a possibly short count. Zero with nonempty storage is EOF; an empty destination does not establish EOF. Successful progress wins concurrent cancellation.
+    /// Read once into borrowed storage, returning a possibly short count. Zero with nonempty storage is EOF. An empty destination completes with zero after admission and cancellation checks, without establishing EOF. Successful progress wins concurrent cancellation.
     fn read_into(
         &mut self,
         buffer: &mut [u8],
         cancellation: &Cancellation,
     ) -> impl Future<Output = OperationResult<usize>> + Send;
 
-    /// Scatter a single read across borrowed ranges without allocating an I/O-vector array or copying payloads.
+    /// Scatter a single read across borrowed ranges without allocating an I/O-vector array or copying payloads. Entirely empty storage follows `read_into`'s zero-capacity behavior.
     fn read_vectored(
         &mut self,
         buffers: &mut [IoSliceMut<'_>],
