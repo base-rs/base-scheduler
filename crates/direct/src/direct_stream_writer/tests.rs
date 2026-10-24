@@ -258,6 +258,52 @@ fn inject(results: impl IntoIterator<Item = io::Result<usize>>) {
 }
 
 #[test]
+fn partial_initial_sends_continue_from_the_accepted_offset() {
+    crate::test_support::run(|| {
+        let scheduler = crate::test_support::scheduler();
+        futures_lite::future::block_on(async {
+            let never = Cancellation::never();
+            let (sender, receiver) =
+                core_scheduler_conformance::socket::stream_pair(&scheduler, SocketDomain::Ipv4)
+                    .await;
+            // Deliver the prefix represented by the injected partial syscall result.
+            assert_eq!(
+                scheduler
+                    .socket_send_poll(&sender, b"a", SocketSendFlags::default(), &never)
+                    .await
+                    .unwrap(),
+                1
+            );
+            let mut writer = scheduler.socket_stream_writer(&sender).unwrap();
+            inject([Ok(1)]);
+            writer
+                .submit(&scheduler, b"abc".to_vec(), &never)
+                .await
+                .unwrap();
+            writer.flush(&scheduler, &never).await.unwrap();
+            let mut incoming = [0; 3];
+            let mut received = 0;
+            while received < incoming.len() {
+                let count = scheduler
+                    .socket_recv_poll(
+                        &receiver,
+                        &mut incoming[received..],
+                        SocketRecvFlags::default(),
+                        &never,
+                    )
+                    .await
+                    .unwrap();
+                assert!(count > 0);
+                received += count;
+            }
+            assert_eq!(&incoming, b"abc");
+            writer.close(&scheduler).await.unwrap();
+            scheduler.shutdown().await;
+        });
+    });
+}
+
+#[test]
 fn syscall_and_task_admission_failures_are_retained_after_acceptance() {
     crate::test_support::run(|| {
         let scheduler = crate::test_support::scheduler();
