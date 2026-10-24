@@ -125,6 +125,61 @@ fn run_native_workers(
         }
     });
 }
+
+macro_rules! ordered_writer_tests {
+    ($module:ident, $run:ident) => {
+        mod $module {
+            use super::*;
+            macro_rules! case {
+                ($name:ident) => {
+                    #[test]
+                    fn $name() {
+                        $run(async |fixture| {
+                            let scheduler = &fixture.scheduler;
+                            let (sender, receiver) =
+                                core_scheduler_conformance::socket::stream_pair(
+                                    scheduler,
+                                    SocketDomain::Ipv4,
+                                )
+                                .await;
+                            core_scheduler_conformance::socket_stream_writing::$name(
+                                scheduler, &sender, &receiver,
+                            )
+                            .await;
+                            scheduler.socket_close(sender).await.unwrap();
+                            scheduler.socket_close(receiver).await.unwrap();
+                        });
+                    }
+                };
+            }
+            case!(ordering);
+            case!(independent_progress);
+            case!(abandoned_admission);
+            #[test]
+            fn close_pending() {
+                $run(async |fixture| {
+                    let scheduler = &fixture.scheduler;
+                    let (sender, receiver) = core_scheduler_conformance::socket::stream_pair(
+                        scheduler,
+                        SocketDomain::Ipv4,
+                    )
+                    .await;
+                    core_scheduler_conformance::socket_stream_writing::close_pending(
+                        scheduler, &sender,
+                    )
+                    .await;
+                    scheduler.socket_close(sender).await.unwrap();
+                    scheduler.socket_close(receiver).await.unwrap();
+                });
+            }
+        }
+    };
+}
+
+ordered_writer_tests!(ordered_writer_selector, run_selector);
+ordered_writer_tests!(ordered_writer_native, run_native);
+ordered_writer_tests!(ordered_writer_worker_rings, run_native_workers);
+
 mod native_worker_rings {
     use super::*;
     core_scheduler_conformance::file_tests!(run: run_native_workers);
