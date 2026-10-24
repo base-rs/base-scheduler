@@ -73,7 +73,7 @@ struct WriteRequest<B: IoBuf> {
     cancelling: Cell<bool>,
     cancellation: Cancellation,
     watch: Option<Pin<Box<dyn Future<Output = ()> + Send>>>,
-    cancel_waker: Option<Waker>,
+    cancel_waker: Option<Arc<CancelWrite>>,
     reply: Cell<Option<Arc<Shared<B>>>>,
     announced: bool,
 }
@@ -101,8 +101,28 @@ impl<B: IoBuf> WriteRequest<B> {
         discard(self.buffer.take());
         drop(self.socket.take());
         drop(self.watch.take());
-        drop(self.cancel_waker.take());
         self.cancellation = Cancellation::never();
+    }
+
+    fn watch_cancellation(&mut self, controller: &Arc<Controller>, cancellation: &Cancellation) {
+        self.cancellation = cancellation.clone();
+        if cancellation.is_never() {
+            self.watch = None;
+            self.cancel_waker = None;
+            return;
+        }
+        // A delayed notification may retain an old waker after its listener is removed. Reuse storage only with exclusive ownership, preserving the old request ID in every surviving clone.
+        if let Some(waker) = self.cancel_waker.as_mut().and_then(Arc::get_mut) {
+            waker.controller = Arc::clone(controller);
+            waker.identifier = self.identifier;
+        } else {
+            self.cancel_waker = Some(Arc::new(CancelWrite {
+                controller: Arc::clone(controller),
+                identifier: self.identifier,
+            }));
+        }
+        let token = cancellation.clone();
+        self.watch = Some(Box::pin(async move { token.cancelled().await }));
     }
 }
 
@@ -114,16 +134,12 @@ impl<B: IoBuf> PendingRequest for WriteRequest<B> {
     fn prepare(&mut self, _ring: &io_uring::Submitter<'_>) -> io::Result<()> {
         // Pending cancellations retire directly, and cancelling in-flight requests never retry. Preparation therefore needs only the submission token's persistent cancellation state.
         // Register only after Submit has reached the owning driver. A concurrent cancellation can then safely refer to an already published request, including when it crosses the local and remote command queues.
-        let mut context = Context::from_waker(self.cancel_waker.as_ref().unwrap());
-        if self
-            .watch
-            .as_mut()
-            .unwrap()
-            .as_mut()
-            .poll(&mut context)
-            .is_ready()
-        {
-            return Err(io::ErrorKind::Interrupted.into());
+        if let Some(watch) = self.watch.as_mut() {
+            let waker = Waker::from(Arc::clone(self.cancel_waker.as_ref().unwrap()));
+            let mut context = Context::from_waker(&waker);
+            if watch.as_mut().poll(&mut context).is_ready() {
+                return Err(io::ErrorKind::Interrupted.into());
+            }
         }
         Ok(())
     }
@@ -428,13 +444,7 @@ impl<B: IoBuf> SocketStreamWriter<IoUringSelector> for IoUringStreamWriter<B> {
         request.offset.set(offset);
         request.polling.set(false);
         request.cancelling.set(false);
-        request.cancellation = cancellation.clone();
-        let token = cancellation.clone();
-        request.watch = Some(Box::pin(async move { token.cancelled().await }));
-        request.cancel_waker = Some(Waker::from(Arc::new(CancelWrite {
-            controller: Arc::clone(&controller),
-            identifier,
-        })));
+        request.watch_cancellation(&controller, cancellation);
         request.reply.set(Some(Arc::clone(&self.shared)));
         request.announced = false;
         self.shared.ready.store(false, Ordering::Relaxed);

@@ -31,6 +31,7 @@ Tables omit `&self` and spell an asynchronous method's **awaited result**, not i
 | `clone`, `child` | `&Cancellation → Cancellation` | Clone shares the signal; a child receives ancestor cancellation but does not cancel ancestors or siblings. A child of `never` is independently cancellable. |
 | `cancel` | `() → bool` | Synchronously request cancellation of this signal and descendants; true only on its first request. Does not await their work. |
 | `is_cancelled`, `check` | `() → bool` / `Result<(), Cancelled>` | Observe the persistent request. Dropping a token never requests cancellation. |
+| `is_never` | `() → bool` | Whether this signal can never be cancelled, allowing backends to omit cancellation registration. Children of `never` are independently cancellable. |
 | `cancelled` | `() → ()` asynchronously | Wait for notification; dropping the wait removes its listener only. |
 | `defer_cancel` | `(C, future, on_cancel: FnOnce()) → future output` | Invoke the synchronous callback once when cancellation is observed, then keep awaiting the protected future. Does not prevent the wrapper being dropped. |
 | [`Spawn::spawn`](https://github.com/core-rs/core-scheduler/blob/main/src/spawn.rs) | `(future) → Result<Handle<T>, SpawnError>` synchronously | Register `Send + 'static` work before making it runnable. Handle owns execution lifetime; dropping it requests destruction after an active poll returns. Await yields `Result<T, TaskError>`. Closed admission rejects the future without polling it. |

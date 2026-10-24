@@ -87,6 +87,11 @@ impl Cancellation {
         Self { node: None }
     }
 
+    /// Whether this signal can never be cancelled. This is true for [`Self::never`] and its clones; its children are independently cancellable. Backends can omit cancellation registration for these signals.
+    pub const fn is_never(&self) -> bool {
+        self.node.is_none()
+    }
+
     /// Create a signal cancelled by this signal or any of its ancestors. A child of an already-cancelled signal starts cancelled. A child of a never-cancelled signal is an independent, cancellable signal.
     pub fn child(&self) -> Self {
         let Some(parent) = &self.node else {

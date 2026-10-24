@@ -401,14 +401,72 @@ fn make_request(
     request.socket = Some(socket::retain_socket(sender));
     request.buffer = Some(vec![1; 4]);
     request.length = 4;
-    request.cancellation = token.clone();
-    request.watch = Some(Box::pin(async move { token.cancelled().await }));
-    request.cancel_waker = Some(Waker::from(Arc::new(CancelWrite {
-        controller: Arc::clone(&selector.controllers[0]),
-        identifier: request.identifier,
-    })));
+    request.watch_cancellation(&selector.controllers[0], &token);
     request.reply.set(Some(Arc::clone(&shared)));
     (request, shared)
+}
+
+#[test]
+fn delayed_cancellation_wakes_cannot_cancel_a_reused_request() {
+    for retain_old_waker in [false, true] {
+        let (selector, mut driver) = pair(16);
+        let (sender, receiver) = stream(&selector);
+        let token = Cancellation::new();
+        let (mut request, completed) = make_request(&selector, &sender, token);
+        let old_waker = retain_old_waker
+            .then(|| Waker::from(Arc::clone(request.cancel_waker.as_ref().unwrap())));
+        request.offset.set(request.length);
+        request.finish(Ok(4));
+        let Some(Completion::Retired(Ok(()), Some(mut request))) =
+            completed.result.lock().unwrap().take()
+        else {
+            panic!("expected a reusable completed request")
+        };
+        let shared = Arc::clone(&completed);
+        shared.ready.store(false, Ordering::Relaxed);
+        request.identifier = selector.controllers[0].next_identifier().unwrap();
+        request.socket = Some(socket::retain_socket(&sender));
+        request.buffer = Some(vec![2; 4]);
+        request.offset.set(0);
+        request.reply.set(Some(Arc::clone(&shared)));
+        request.announced = false;
+        request.watch_cancellation(&selector.controllers[0], &Cancellation::new());
+        selector.controllers[0].submit(request);
+        // This notification belongs to the retired write even though its request storage has been reused.
+        if let Some(old_waker) = old_waker {
+            old_waker.wake_by_ref();
+        }
+        drive(&mut driver, async {
+            poll_fn(|context| {
+                shared.waker.register(context.waker());
+                if shared.ready.load(Ordering::Acquire) {
+                    Poll::Ready(())
+                } else {
+                    Poll::Pending
+                }
+            })
+            .await;
+        });
+        assert!(matches!(
+            shared.result.lock().unwrap().take(),
+            Some(Completion::Retired(Ok(()), Some(_)))
+        ));
+        let mut bytes = [0; 4];
+        let count = drive(
+            &mut driver,
+            selector.socket_recv_poll(
+                &receiver,
+                &mut bytes,
+                SocketRecvFlags::default(),
+                &Cancellation::never(),
+            ),
+        )
+        .unwrap();
+        assert_eq!(count, 4);
+        assert_eq!(bytes, [2; 4]);
+        block_on(selector.socket_close(sender)).unwrap();
+        block_on(selector.socket_close(receiver)).unwrap();
+    }
 }
 
 #[test]

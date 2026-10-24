@@ -4,6 +4,8 @@
 
 - Prototype ordered stream writers with owned submission, autonomous partial-write progress, explicit flush and retirement, and matched output benchmarks.
 
+- Expose `Cancellation::is_never` so backends can omit unnecessary cancellation registration, and reuse stalled stream-write cancellation wake storage when no older notification retains it.
+
 - Retry io_uring monitor I/O directly on wake, keeping readiness bookkeeping on the `WouldBlock` path while preserving cancellation and owned registration lifetimes.
 
 - Avoid intermediate future-state copies when constructing Tokio socket operations, preserving the existing cancellation and readiness behavior.
