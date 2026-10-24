@@ -104,11 +104,16 @@ impl<B: IoBuf> PendingRequest for WriteRequest<B> {
             return Err(io::ErrorKind::Interrupted.into());
         }
         // Register only after Submit has reached the owning driver. A concurrent cancellation can then safely refer to an already published request, including when it crosses the local and remote command queues.
-        if let Some(watch) = &mut self.watch {
-            let mut context = Context::from_waker(self.cancel_waker.as_ref().unwrap());
-            if watch.as_mut().poll(&mut context).is_ready() {
-                return Err(io::ErrorKind::Interrupted.into());
-            }
+        let mut context = Context::from_waker(self.cancel_waker.as_ref().unwrap());
+        if self
+            .watch
+            .as_mut()
+            .unwrap()
+            .as_mut()
+            .poll(&mut context)
+            .is_ready()
+        {
+            return Err(io::ErrorKind::Interrupted.into());
         }
         Ok(())
     }
@@ -231,26 +236,25 @@ impl<B: IoBuf> IoUringStreamWriter<B> {
     }
 
     fn collect(&mut self) {
-        if self.running.is_some() && self.shared.ready.load(Ordering::Acquire) {
-            self.running = None;
-            let completion = self.shared.result.lock().unwrap().take().unwrap();
-            match completion {
-                Completion::Retired(result, cached) => {
-                    self.cached = cached;
-                    if let Err(error) = result {
-                        self.error = Some(error);
-                    }
+        // Only wait calls this method, after observing the published completion with acquire ordering.
+        self.running = None;
+        let completion = self.shared.result.lock().unwrap().take().unwrap();
+        match completion {
+            Completion::Retired(result, cached) => {
+                self.cached = cached;
+                if let Err(error) = result {
+                    self.error = Some(error);
                 }
-                Completion::Failed => {
-                    self.failed = true;
-                    self.error = Some(
-                        io::Error::new(
-                            io::ErrorKind::BrokenPipe,
-                            "writer retirement could not be established",
-                        )
-                        .into(),
-                    );
-                }
+            }
+            Completion::Failed => {
+                self.failed = true;
+                self.error = Some(
+                    io::Error::new(
+                        io::ErrorKind::BrokenPipe,
+                        "writer retirement could not be established",
+                    )
+                    .into(),
+                );
             }
         }
     }
@@ -284,7 +288,7 @@ impl SocketStreamWriting for IoUringSelector {
     fn socket_stream_writer<B: IoBuf>(&self, socket: &Self::Socket) -> io::Result<Self::Writer<B>> {
         self.check_open()?;
         let socket = socket::retain_socket(socket);
-        if socket.get_ref().r#type()? != socket2::Type::STREAM {
+        if syscall("stream-socket-type", || socket.get_ref().r#type())? != socket2::Type::STREAM {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "ordered writers require a stream socket",
@@ -344,12 +348,19 @@ impl<B: IoBuf> SocketStreamWriter<IoUringSelector> for IoUringStreamWriter<B> {
         if length == 0 {
             return Ok(());
         }
-        let offset = match syscall("stream-write", || {
-            self.socket.get_ref().send_with_flags(
-                &buffer.as_ref()[..length.min(i32::MAX as usize)],
-                libc::MSG_NOSIGNAL | libc::MSG_DONTWAIT,
-            )
-        }) {
+        let send = || {
+            syscall("stream-write", || {
+                self.socket.get_ref().send_with_flags(
+                    &buffer.as_ref()[..length.min(i32::MAX as usize)],
+                    libc::MSG_NOSIGNAL | libc::MSG_DONTWAIT,
+                )
+            })
+        };
+        #[cfg(test)]
+        let result = tests::send(send);
+        #[cfg(not(test))]
+        let result = send();
+        let offset = match result {
             Ok(count) if count == length => return Ok(()),
             Ok(0) => {
                 self.error = Some(io::Error::from(io::ErrorKind::WriteZero).into());
