@@ -71,7 +71,7 @@ where
         let cancellation = Cancellation::new();
         cancellation.cancel();
         let result = writer.flush(scheduler, &cancellation).await;
-        assert!(matches!(result, Ok(()) | Err(OperationError::Cancelled(_))));
+        completed_or_cancelled(result);
         let mut incoming = vec![0; 64 * 1024];
         let mut received = 0;
         while received < pool.buffer_size() {
@@ -159,5 +159,28 @@ async fn receive<S: SocketRecvPoll>(scheduler: &S, socket: &S::Socket, expected:
         assert!(count > 0);
         assert_eq!(&buffer[..count], &expected[received..received + count]);
         received += count;
+    }
+}
+
+fn completed_or_cancelled(result: OperationResult<()>) {
+    assert!(matches!(result, Ok(()) | Err(OperationError::Cancelled(_))));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn flush_accepts_completion_or_cancellation_and_rejects_other_errors() {
+        completed_or_cancelled(Ok(()));
+        completed_or_cancelled(Err(Cancelled.into()));
+        assert!(
+            std::panic::catch_unwind(|| {
+                completed_or_cancelled(
+                    Err(io::Error::from(io::ErrorKind::PermissionDenied).into()),
+                );
+            })
+            .is_err()
+        );
     }
 }
