@@ -14,7 +14,7 @@ use std::{
 };
 
 /// A scheduler-bound stream reader with reusable registration and lazily allocated receive storage. Normally obtained through [`SocketStreamReading`](crate::SocketStreamReading).
-pub struct MonitoredSocketStreamReader<'a, S: SocketMonitoring + BufferPooling + ?Sized>
+pub struct BoundSocketStreamReader<'a, S: SocketMonitoring + BufferPooling + ?Sized>
 where
     S::Socket: 'static,
 {
@@ -25,7 +25,7 @@ where
     closed: bool,
 }
 
-impl<'a, S> MonitoredSocketStreamReader<'a, S>
+impl<'a, S> BoundSocketStreamReader<'a, S>
 where
     S: SocketMonitoring + BufferPooling + Sync + ?Sized,
     S::Socket: 'static,
@@ -64,7 +64,7 @@ where
     }
 }
 
-impl<S> SocketStreamReader for MonitoredSocketStreamReader<'_, S>
+impl<S> SocketStreamReader for BoundSocketStreamReader<'_, S>
 where
     S: SocketMonitoring + BufferPooling + Sync + ?Sized,
     S::Socket: 'static,

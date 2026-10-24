@@ -17,6 +17,12 @@ mod advice_mode;
 mod allocation_mode;
 mod blocking;
 mod blocking_error;
+mod bound_file_reader;
+mod bound_file_writer;
+mod bound_socket_packet_reader;
+mod bound_socket_packet_writer;
+mod bound_socket_stream_reader;
+mod bound_socket_stream_writer;
 mod buffer_lease;
 mod buffer_pool;
 mod buffer_pool_options;
@@ -33,12 +39,15 @@ mod file_allocate;
 mod file_close;
 mod file_metadata;
 mod file_monitor;
+mod file_monitor_submission;
 mod file_monitoring;
 mod file_open;
 mod file_operation;
 mod file_options;
 mod file_read;
 mod file_read_at;
+mod file_reader;
+mod file_reading;
 mod file_receiver;
 mod file_scheduler;
 mod file_seek;
@@ -50,6 +59,8 @@ mod file_type;
 mod file_write;
 mod file_write_all;
 mod file_write_at;
+mod file_writer;
+mod file_writing;
 mod frozen_buffer;
 mod heap_buffer_pool;
 mod interest;
@@ -61,8 +72,6 @@ mod io_buffers;
 mod io_buffers_mut;
 mod monitor_state;
 mod monitor_storage;
-mod monitored_socket_stream_reader;
-mod monitored_socket_stream_writer;
 mod notify;
 mod operation_error;
 mod owned_socket_recv_message;
@@ -87,6 +96,10 @@ mod socket_open;
 mod socket_operation;
 mod socket_option;
 mod socket_options;
+mod socket_packet_reader;
+mod socket_packet_reading;
+mod socket_packet_writer;
+mod socket_packet_writing;
 mod socket_peer_address;
 mod socket_protocol;
 mod socket_read;
@@ -273,12 +286,39 @@ pub use timers::Timers;
 /// An IP endpoint, compatible with standard-library socket addresses.
 pub use std::net::SocketAddr as SocketAddress;
 
-pub use monitored_socket_stream_reader::MonitoredSocketStreamReader;
+pub use bound_socket_stream_reader::BoundSocketStreamReader;
 
-pub use monitored_socket_stream_writer::MonitoredSocketStreamWriter;
+pub use bound_socket_stream_writer::BoundSocketStreamWriter;
 
 pub use socket_stream_reader::SocketStreamReader;
 
 pub use socket_stream_reading::SocketStreamReading;
 
 pub use socket_stream_writer::SocketStreamWriter;
+
+pub use file_reader::FileReader;
+
+pub use file_reading::FileReading;
+
+pub use file_writer::FileWriter;
+
+pub use file_writing::FileWriting;
+
+pub use bound_file_reader::BoundFileReader;
+
+pub use bound_file_writer::BoundFileWriter;
+
+#[doc(hidden)]
+pub use file_monitor_submission::FileMonitorSubmission;
+
+pub use socket_packet_reader::SocketPacketReader;
+
+pub use socket_packet_writer::SocketPacketWriter;
+
+pub use socket_packet_reading::SocketPacketReading;
+
+pub use socket_packet_writing::SocketPacketWriting;
+
+pub use bound_socket_packet_reader::BoundSocketPacketReader;
+
+pub use bound_socket_packet_writer::BoundSocketPacketWriter;

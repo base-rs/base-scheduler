@@ -9,11 +9,8 @@ use crate::{
 use std::io::{self, IoSlice};
 
 /// A scheduler-bound output lane combining borrowed writes with ordered owned submission. Construct through [`SocketStreamWriting`].
-pub struct MonitoredSocketStreamWriter<
-    'a,
-    S: SocketStreamWriting + SocketMonitoring + ?Sized,
-    B: IoBuf,
-> where
+pub struct BoundSocketStreamWriter<'a, S: SocketStreamWriting + SocketMonitoring + ?Sized, B: IoBuf>
+where
     S::Socket: 'static,
 {
     scheduler: &'a S,
@@ -23,7 +20,7 @@ pub struct MonitoredSocketStreamWriter<
     submitted: bool,
 }
 
-impl<'a, S, B> MonitoredSocketStreamWriter<'a, S, B>
+impl<'a, S, B> BoundSocketStreamWriter<'a, S, B>
 where
     S: SocketStreamWriting + SocketMonitoring + Sync + ?Sized,
     S::Socket: 'static,
@@ -50,7 +47,7 @@ where
     }
 }
 
-impl<S, B> SocketStreamWriter for MonitoredSocketStreamWriter<'_, S, B>
+impl<S, B> SocketStreamWriter for BoundSocketStreamWriter<'_, S, B>
 where
     S: SocketStreamWriting + SocketMonitoring + Sync + ?Sized,
     S::Socket: 'static,

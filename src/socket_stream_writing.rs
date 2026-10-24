@@ -2,8 +2,8 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::{
-    BufferPool, BufferPooling, IoBuf, MonitoredSocketStreamWriter, SocketMonitoring,
-    SocketOperation, SocketStreamOutput,
+    BoundSocketStreamWriter, BufferPool, BufferPooling, IoBuf, SocketMonitoring, SocketOperation,
+    SocketStreamOutput,
 };
 use std::io;
 
@@ -20,23 +20,23 @@ pub trait SocketStreamWriting: SocketOperation {
     fn socket_stream_writer(
         &self,
         socket: &Self::Socket,
-    ) -> io::Result<MonitoredSocketStreamWriter<'_, Self, <Self::Pool as BufferPool>::Buffer>>
+    ) -> io::Result<BoundSocketStreamWriter<'_, Self, <Self::Pool as BufferPool>::Buffer>>
     where
         Self: SocketMonitoring + BufferPooling + Sync,
         Self::Socket: 'static,
     {
-        MonitoredSocketStreamWriter::new(self, socket)
+        BoundSocketStreamWriter::new(self, socket)
     }
 
     /// Select another stable owner type, such as `Vec<u8>` or an application lease. This changes storage compatibility, not the writer's ordering or backend execution strategy.
     fn socket_stream_writer_with_buffer<B: IoBuf>(
         &self,
         socket: &Self::Socket,
-    ) -> io::Result<MonitoredSocketStreamWriter<'_, Self, B>>
+    ) -> io::Result<BoundSocketStreamWriter<'_, Self, B>>
     where
         Self: SocketMonitoring + Sync,
         Self::Socket: 'static,
     {
-        MonitoredSocketStreamWriter::new(self, socket)
+        BoundSocketStreamWriter::new(self, socket)
     }
 }

@@ -16,7 +16,7 @@ use std::{
 /// A packet reader retaining one scheduler and readable monitor. Borrowed reads allocate no payload storage; the first owned read lazily constructs a two-slot, 64 KiB-per-slot pool. Idle readiness waits return their unused lease to the pool.
 ///
 /// This demand-driven composition does not receive ahead or select a backend's provided-buffer receiver. Cancellation and ordinary receive errors leave it usable. Close retires its registration; drop the handle afterward to release its retained socket before exclusive socket close.
-pub struct MonitoredSocketPacketReader<'a, S>
+pub struct BoundSocketPacketReader<'a, S>
 where
     S: SocketMonitoring + BufferPooling + Sync,
     S::Socket: 'static,
@@ -27,7 +27,7 @@ where
     closing: bool,
 }
 
-impl<'a, S> MonitoredSocketPacketReader<'a, S>
+impl<'a, S> BoundSocketPacketReader<'a, S>
 where
     S: SocketMonitoring + BufferPooling + Sync,
     S::Socket: 'static,
@@ -54,7 +54,7 @@ where
     }
 }
 
-impl<S> SocketPacketReader for MonitoredSocketPacketReader<'_, S>
+impl<S> SocketPacketReader for BoundSocketPacketReader<'_, S>
 where
     S: SocketMonitoring + BufferPooling + Sync,
     S::Socket: 'static,

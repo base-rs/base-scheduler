@@ -8,7 +8,7 @@ use crate::{
 use std::io::{self, IoSlice};
 
 /// A packet writer retaining one scheduler and writable monitor. All writes use a single nonblocking message-send operation, without payload allocation or packet splitting. Cancellation and send errors leave it usable.
-pub struct MonitoredSocketPacketWriter<'a, S>
+pub struct BoundSocketPacketWriter<'a, S>
 where
     S: SocketMonitoring + Sync,
     S::Socket: 'static,
@@ -18,7 +18,7 @@ where
     closing: bool,
 }
 
-impl<'a, S> MonitoredSocketPacketWriter<'a, S>
+impl<'a, S> BoundSocketPacketWriter<'a, S>
 where
     S: SocketMonitoring + Sync,
     S::Socket: 'static,
@@ -38,7 +38,7 @@ where
     }
 }
 
-impl<S> SocketPacketWriter for MonitoredSocketPacketWriter<'_, S>
+impl<S> SocketPacketWriter for BoundSocketPacketWriter<'_, S>
 where
     S: SocketMonitoring + Sync,
     S::Socket: 'static,

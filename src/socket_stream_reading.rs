@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use crate::{BufferPooling, MonitoredSocketStreamReader, SocketMonitoring};
+use crate::{BoundSocketStreamReader, BufferPooling, SocketMonitoring};
 use std::io;
 
 /// Construct a sequential stream input lane bound to this scheduler. Protocol consumers can depend on [`SocketStreamReader`](crate::SocketStreamReader) without requiring unrelated scheduler capabilities.
@@ -10,11 +10,11 @@ pub trait SocketStreamReading: SocketMonitoring + BufferPooling + Sync {
     fn socket_stream_reader(
         &self,
         socket: &Self::Socket,
-    ) -> io::Result<MonitoredSocketStreamReader<'_, Self>>
+    ) -> io::Result<BoundSocketStreamReader<'_, Self>>
     where
         Self::Socket: 'static,
     {
-        MonitoredSocketStreamReader::new(self, socket)
+        BoundSocketStreamReader::new(self, socket)
     }
 }
 impl<S: SocketMonitoring + BufferPooling + Sync + ?Sized> SocketStreamReading for S {}
