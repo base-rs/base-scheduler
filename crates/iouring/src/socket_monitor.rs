@@ -7,7 +7,7 @@ use std::io;
 
 /// Persistent state for one direction of a socket. Create separate readable and writable monitors for concurrent reader and writer tasks.
 ///
-/// `Registration` belongs to the backend. The socket owner outlives every retained registration, including after future abandonment. A monitor does not replace the scheduler explicitly passed to an operation. Await `socket_monitor_close`, then drop all monitor handles before exclusively closing their socket. Dropping the last handle requests retirement but does not wait for it.
+/// `Registration` belongs to the backend. The socket owner outlives every retained registration, including after future abandonment. A monitor does not replace the scheduler explicitly passed to an operation. Await `socket_monitor_close`, then drop the monitor before exclusively closing its socket. Dropping the monitor requests retirement but does not wait for it.
 pub(crate) struct SocketMonitor {
     socket: RegisteredSocket,
     interest: Interest,

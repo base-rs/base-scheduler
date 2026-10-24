@@ -823,3 +823,32 @@ fn concurrent_completion_publication_preserves_receive_wakeups() {
     selector.close();
     driver.join().unwrap();
 }
+
+#[test]
+fn a_completion_batch_preserves_every_queued_datagram() {
+    let (selector, mut driver) = pair(2);
+    let never = Cancellation::never();
+    let socket =
+        block_on(selector.socket_open(SocketDomain::Ipv4, SocketType::Datagram, None, &never))
+            .unwrap();
+    block_on(selector.socket_bind(&socket, "127.0.0.1:0".parse().unwrap(), &never)).unwrap();
+    let peer = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
+    let mut receiving = receiver(&selector, &socket, 4, 16);
+    for payload in [b"first".as_slice(), b"second", b"third"] {
+        peer.send_to(payload, socket.local_addr().unwrap()).unwrap();
+    }
+    let deadline = std::time::Instant::now() + Duration::from_secs(3);
+    while receiving.statistics().messages != 3 {
+        driver.turn(Some(Duration::from_millis(1))).unwrap();
+        assert!(std::time::Instant::now() < deadline);
+    }
+    for payload in [b"first".as_slice(), b"second", b"third"] {
+        let message = block_on(receiving.recv(&never)).unwrap().unwrap();
+        assert_eq!(message.payload(), payload);
+    }
+    assert_eq!(receiving.statistics().submissions, 1);
+    drive(&mut driver, receiving.close()).unwrap();
+    drop(receiving);
+    block_on(selector.socket_close(socket)).unwrap();
+    drain(&selector, &mut driver);
+}

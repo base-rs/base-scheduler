@@ -160,3 +160,6 @@ fn result_count(result: isize) -> io::Result<usize> {
         Err(io::Error::last_os_error())
     }
 }
+
+#[cfg(all(test, target_pointer_width = "64"))]
+mod tests;

@@ -110,9 +110,10 @@ impl IoUringSelector {
             Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
             result => return (operation_result(result, cancellation), buffer),
         }
+        // The idle check and synchronous probe retain exclusive lane access without suspension; concurrent retirement can only leave the lane idle.
         let buffer = match operations.begin(buffer) {
             Ok(buffer) => buffer,
-            Err((error, buffer)) => return (Err(error), buffer),
+            Err(_) => unreachable!("exclusive idle lane cannot acquire another operation"),
         };
         let controller = self.route();
         let (result, buffer) = retry_operation(

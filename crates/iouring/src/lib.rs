@@ -56,3 +56,6 @@ mod interest;
 mod socket_message;
 use interest::Interest;
 use socket_message::SocketMessage;
+
+#[cfg(all(test, target_pointer_width = "64"))]
+mod test_buffers;

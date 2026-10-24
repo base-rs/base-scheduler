@@ -514,36 +514,18 @@ fn cancelled_and_dropped_waiters_leave_the_registration_active() {
     let mut context = Context::from_waker(&wake);
     let (socket, mut peer) = sockets(&selector);
     let mut reader = selector.socket_monitor(&socket, Interest::Readable);
-    let mut alias = reader.clone();
+    let inspect = reader.retained();
     let never = Cancellation::never();
     let token = Cancellation::new();
     let mut waiting = Box::pin(selector.socket_monitor_wait(&mut reader, &token));
     assert!(waiting.as_mut().poll(&mut context).is_pending());
-    assert_eq!(
-        block_on(selector.socket_monitor_wait(&mut alias, &never))
-            .unwrap_err()
-            .kind(),
-        io::ErrorKind::WouldBlock
-    );
-    let mut unavailable = [0];
-    assert_eq!(
-        block_on(selector.socket_monitor_recv_poll(
-            &mut alias,
-            &mut unavailable,
-            SocketRecvFlags::default(),
-            &never
-        ))
-        .unwrap_err()
-        .kind(),
-        io::ErrorKind::WouldBlock
-    );
     worker.turn(Some(Duration::ZERO)).unwrap();
     token.cancel();
     assert!(matches!(
         block_on(waiting),
         Err(OperationError::Cancelled(_))
     ));
-    let generation = alias
+    let generation = inspect
         .registration()
         .status
         .lock()
@@ -556,7 +538,7 @@ fn cancelled_and_dropped_waiters_leave_the_registration_active() {
     let mut pending = Box::pin(selector.socket_monitor_wait(&mut reader, &never));
     assert!(pending.as_mut().poll(&mut context).is_pending());
     drop(pending);
-    assert!(alias.registration().status.lock().unwrap().pending);
+    assert!(inspect.registration().status.lock().unwrap().pending);
     peer.write_all(b"x").unwrap();
     let mut byte = [0];
     let mut read = pin!(selector.socket_monitor_recv_poll(
@@ -567,7 +549,7 @@ fn cancelled_and_dropped_waiters_leave_the_registration_active() {
     ));
     drive(&mut worker, &mut context, read.as_mut()).unwrap();
     assert_eq!(
-        alias
+        inspect
             .registration()
             .status
             .lock()
@@ -582,14 +564,13 @@ fn cancelled_and_dropped_waiters_leave_the_registration_active() {
 }
 
 #[test]
-fn the_last_application_handle_retires_its_registration() {
+fn dropping_the_resource_retires_its_registration() {
     let (selector, driver) = IoUringSelector::new(options()).unwrap();
     let mut worker = driver.enter();
     let wake = worker.waker();
     let mut context = Context::from_waker(&wake);
     let (socket, _peer) = sockets(&selector);
     let mut reader = selector.socket_monitor(&socket, Interest::Readable);
-    let alias = reader.clone();
     let inspect = reader.retained();
     let never = Cancellation::never();
     let mut waiting = Box::pin(selector.socket_monitor_wait(&mut reader, &never));
@@ -597,8 +578,6 @@ fn the_last_application_handle_retires_its_registration() {
     worker.turn(Some(Duration::ZERO)).unwrap();
     drop(waiting);
     drop(reader);
-    assert!(!inspect.registration().status.lock().unwrap().retiring);
-    drop(alias);
     assert!(inspect.registration().status.lock().unwrap().retiring);
     until(&mut worker, || {
         !inspect.registration().status.lock().unwrap().pending
@@ -794,6 +773,12 @@ fn incompatible_closed_selectors_and_exhausted_ids_reject_waits() {
     let (other, other_driver) = IoUringSelector::new(options()).unwrap();
     let (socket, _peer) = sockets(&selector);
     let mut reader = selector.socket_monitor(&socket, Interest::Readable);
+    let cancelled = Cancellation::new();
+    cancelled.cancel();
+    assert!(matches!(
+        block_on(selector.socket_monitor_wait(&mut reader, &cancelled)),
+        Err(OperationError::Cancelled(_))
+    ));
     assert_eq!(
         block_on(other.socket_monitor_wait(&mut reader, &Cancellation::never()))
             .unwrap_err()
@@ -1247,7 +1232,7 @@ fn forgetting_a_wait_cannot_prevent_last_handle_retirement() {
     }
     assert!(!inspect.registration().status.lock().unwrap().pending);
     drop(reader);
-    assert_eq!(inspect.registration().users.load(Ordering::Acquire), 0);
+    assert!(inspect.registration().closed.load(Ordering::Acquire));
     assert!(inspect.registration().claimed.load(Ordering::Acquire));
 }
 

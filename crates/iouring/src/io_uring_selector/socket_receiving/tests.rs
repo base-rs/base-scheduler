@@ -740,3 +740,76 @@ fn exhausted_request_identifiers_reject_receiver_admission() {
         .store(0, Ordering::Relaxed);
     drain(&selector, &mut driver);
 }
+
+#[test]
+fn receive_ahead_preserves_retirement_errors_from_its_receiver() {
+    let (selector, mut driver) = pair(2);
+    let (sender, socket) = block_on(core_scheduler_conformance::socket::stream_pair(
+        &selector,
+        SocketDomain::Ipv4,
+    ));
+    let pool = selector
+        .buffer_pool_per_worker(BufferPoolOptions::new(2, 32))
+        .unwrap();
+    let never = Cancellation::never();
+    let mut ahead = crate::receive_ahead::ReceiveAhead::default();
+    sender
+        .try_send(b"received", SocketSendFlags::default())
+        .unwrap();
+    let message = drive(&mut driver, ahead.read(&selector, &socket, &pool, &never))
+        .unwrap()
+        .unwrap();
+    assert_eq!(message.payload(), b"received");
+    drop(message);
+    {
+        let _failures = Failures::new([(
+            "unregister-buffer-ring",
+            io::ErrorKind::PermissionDenied.into(),
+        )]);
+        assert_eq!(
+            drive(&mut driver, ahead.close()).unwrap_err().kind(),
+            io::ErrorKind::PermissionDenied
+        );
+    }
+    drive(&mut driver, ahead.close()).unwrap();
+    drop(ahead);
+    block_on(selector.socket_close(socket)).unwrap();
+    block_on(selector.socket_close(sender)).unwrap();
+    drain(&selector, &mut driver);
+}
+
+#[test]
+fn queued_datagrams_survive_pool_drop_and_preserve_batch_order() {
+    let (selector, mut driver) = pair(2);
+    let never = Cancellation::never();
+    let socket =
+        block_on(selector.socket_open(SocketDomain::Ipv4, SocketType::Datagram, None, &never))
+            .unwrap();
+    block_on(selector.socket_bind(&socket, "127.0.0.1:0".parse().unwrap(), &never)).unwrap();
+    let peer = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
+    let pool = selector
+        .buffer_pool_per_worker(BufferPoolOptions::new(4, 16))
+        .unwrap();
+    let mut receiving = receiver(&selector, &socket, pool.clone());
+    for payload in [b"first".as_slice(), b"second", b"third"] {
+        peer.send_to(payload, socket.local_addr().unwrap()).unwrap();
+    }
+    let deadline = std::time::Instant::now() + Duration::from_secs(3);
+    while receiving.statistics().messages != 3 {
+        driver.turn(Some(Duration::from_millis(1))).unwrap();
+        assert!(std::time::Instant::now() < deadline);
+    }
+    // A second admitted receive retains the same worker pool while the first retires; no more packets are sent while these readers compete.
+    let mut idle_receiver = receiver(&selector, &socket, pool.clone());
+    // Live receivers and queued leases retain their worker storage independently of the application's pool handle.
+    drop(pool);
+    for payload in [b"first".as_slice(), b"second", b"third"] {
+        let message = block_on(receiving.recv(&never)).unwrap().unwrap();
+        assert_eq!(message.payload(), payload);
+    }
+    drive(&mut driver, receiving.close()).unwrap();
+    drive(&mut driver, idle_receiver.close()).unwrap();
+    drop((receiving, idle_receiver));
+    block_on(selector.socket_close(socket)).unwrap();
+    drain(&selector, &mut driver);
+}

@@ -193,6 +193,14 @@ fn message_admission_is_lazy_cancellable_and_reports_closure_or_exhaustion() {
         let socket = socket(&selector).await;
         let never = Cancellation::never();
         for send in [false, true] {
+            let cancelled = Cancellation::new();
+            cancelled.cancel();
+            let buffers = [vec![42]];
+            let pointer = buffers[0].as_ptr();
+            let (result, buffers) = operation(&selector, &socket, buffers, send, &cancelled).await;
+            assert!(matches!(result, Err(OperationError::Cancelled(_))));
+            assert_eq!(buffers, [vec![42]]);
+            assert_eq!(buffers[0].as_ptr(), pointer);
             drop(operation(&selector, &socket, [vec![1]], send, &never));
             assert!(
                 driver

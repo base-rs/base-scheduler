@@ -206,7 +206,7 @@ impl SocketStreamReader for IoUringSocketStreamReader<'_> {
     ) -> OperationResult<core_scheduler::SocketRecvResult> {
         if self.ahead.active() {
             self.check_open()?;
-            self.operations.check_idle()?;
+            // Receive-ahead acquires this lane only after raw operations retire; all later owned reads stay with that receiver.
             if self.eof || buffers.iter().all(|buffer| buffer.is_empty()) {
                 cancellation.check()?;
                 return Ok(core_scheduler::SocketRecvResult {

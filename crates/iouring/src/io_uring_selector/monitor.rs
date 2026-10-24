@@ -13,11 +13,10 @@ const NO_SLOT: usize = usize::MAX;
 pub(crate) type State = SocketMonitor;
 pub(crate) type Storage = MonitorStorage;
 
-/// Persistent directional readiness registration. The ring retains its storage through the final original and cancellation completions; application handles independently control when the registration closes.
+/// Persistent directional readiness registration. The ring retains its storage through the final original and cancellation completions; the bound resource controls when the registration closes.
 pub(crate) struct IoUringMonitorRegistration {
     group: Arc<DriverGroup>,
     slot: AtomicUsize,
-    users: AtomicUsize,
     closed: AtomicBool,
     claimed: AtomicBool,
     readiness: AtomicU64,
@@ -75,7 +74,7 @@ impl IoUringMonitorRegistration {
         wake(waker);
     }
 
-    fn retire(&self, close: bool) {
+    pub(crate) fn retire(&self, close: bool) {
         if close {
             self.closed.store(true, Ordering::Release);
         }
@@ -93,17 +92,6 @@ impl IoUringMonitorRegistration {
             )
         };
         discard(command.0.send(Command::MonitorCancel(command.1, command.2)));
-    }
-}
-
-impl IoUringMonitorRegistration {
-    pub(crate) fn acquire(&self) {
-        self.users.fetch_add(1, Ordering::Relaxed);
-    }
-    pub(crate) fn release(&self) {
-        if self.users.fetch_sub(1, Ordering::AcqRel) == 1 {
-            self.retire(false);
-        }
     }
 }
 
@@ -329,7 +317,6 @@ impl IoUringSelector {
             IoUringMonitorRegistration {
                 group: Arc::clone(&self.group),
                 slot: AtomicUsize::new(NO_SLOT),
-                users: AtomicUsize::new(0),
                 closed: AtomicBool::new(false),
                 readiness: AtomicU64::new(0),
                 multishot: AtomicBool::new(true),

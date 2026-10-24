@@ -72,9 +72,6 @@ impl ReceiveAhead {
             buffers.len(),
             buffers.iter().map(|buffer| buffer.len()),
         )?;
-        if stream && buffers.iter().all(|buffer| buffer.is_empty()) {
-            return Ok(empty_result());
-        }
         let Some(message) = self.pending(cancellation).await? else {
             return Ok(empty_result());
         };
@@ -158,3 +155,6 @@ fn empty_result() -> SocketRecvResult {
         control_truncated: false,
     }
 }
+
+#[cfg(test)]
+mod tests;

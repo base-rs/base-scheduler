@@ -4,14 +4,13 @@
 use crate::SocketMonitor;
 use std::{ops::Deref, sync::Arc};
 
-// Application handles request retirement when the last one is dropped. A ring submission independently retains the same stable allocation until its final CQE.
+// The resource handle requests retirement when dropped. A ring submission independently retains the same stable allocation until its final CQE.
 pub(crate) struct MonitorStorage {
     state: Arc<SocketMonitor>,
     application: bool,
 }
 impl MonitorStorage {
     pub fn new(state: SocketMonitor) -> Self {
-        state.registration().acquire();
         Self {
             state: Arc::new(state),
             application: true,
@@ -31,17 +30,6 @@ impl MonitorStorage {
         Arc::downgrade(&self.state)
     }
 }
-impl Clone for MonitorStorage {
-    fn clone(&self) -> Self {
-        if self.application {
-            self.registration().acquire();
-        }
-        Self {
-            state: Arc::clone(&self.state),
-            application: self.application,
-        }
-    }
-}
 impl Deref for MonitorStorage {
     type Target = SocketMonitor;
     fn deref(&self) -> &SocketMonitor {
@@ -56,7 +44,7 @@ impl AsRef<SocketMonitor> for MonitorStorage {
 impl Drop for MonitorStorage {
     fn drop(&mut self) {
         if self.application {
-            self.registration().release();
+            self.registration().retire(false);
         }
     }
 }

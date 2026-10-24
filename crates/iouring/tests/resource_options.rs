@@ -172,6 +172,7 @@ fn stream_flags_owned_vectors_and_default_pool_preserve_byte_order() {
                 .0
                 .is_err()
         );
+        assert!(writer.write_vectored(&[], &never).await.is_err());
         drop((reader, writer));
         scheduler.socket_close(sender).await.unwrap();
         scheduler.socket_close(receiver).await.unwrap();
@@ -638,6 +639,31 @@ fn abandoned_operations_reject_owned_successors_until_retirement() {
         let mut reading = Box::pin(reader.read_owned(vec![0; 8], &never));
         assert!(poll_once(reading.as_mut()).await.is_none());
         drop(reading);
+        assert_eq!(
+            reader.read(&never).await.err().unwrap().kind(),
+            io::ErrorKind::WouldBlock
+        );
+        let mut target = [0; 1];
+        assert_eq!(
+            reader
+                .read_vectored(&mut [IoSliceMut::new(&mut target)], &never)
+                .await
+                .unwrap_err()
+                .kind(),
+            io::ErrorKind::WouldBlock
+        );
+        assert_eq!(
+            reader
+                .read_vectored_with_flags(
+                    &mut [IoSliceMut::new(&mut target)],
+                    SocketRecvFlags::default(),
+                    &never
+                )
+                .await
+                .unwrap_err()
+                .kind(),
+            io::ErrorKind::WouldBlock
+        );
         let bytes = vec![0x5a; 4];
         let pointer = bytes.as_ptr();
         let (result, bytes) = reader.read_owned(bytes, &never).await;
@@ -682,6 +708,23 @@ fn abandoned_operations_reject_owned_successors_until_retirement() {
         ));
         assert!(poll_once(reading.as_mut()).await.is_none());
         drop(reading);
+        assert_eq!(
+            reader.read(&never).await.err().unwrap().kind(),
+            io::ErrorKind::WouldBlock
+        );
+        let mut target = [0; 1];
+        assert_eq!(
+            reader
+                .read_vectored_with_flags(
+                    &mut [IoSliceMut::new(&mut target)],
+                    SocketRecvFlags::default(),
+                    &never
+                )
+                .await
+                .unwrap_err()
+                .kind(),
+            io::ErrorKind::WouldBlock
+        );
         let (result, parts) = reader
             .read_owned_vectored(vec![vec![0x5a; 4]], SocketRecvFlags::default(), &never)
             .await;
@@ -698,6 +741,19 @@ fn abandoned_operations_reject_owned_successors_until_retirement() {
         ));
         assert!(poll_once(writing.as_mut()).await.is_none());
         drop(writing);
+        assert_eq!(
+            writer
+                .write_vectored_with_flags(
+                    &[IoSlice::new(b"busy")],
+                    Some(destination),
+                    SocketSendFlags::default(),
+                    &never
+                )
+                .await
+                .unwrap_err()
+                .kind(),
+            io::ErrorKind::WouldBlock
+        );
         let (result, parts) = writer
             .write_owned_vectored(
                 vec![vec![0x5a; 4]],
@@ -713,4 +769,158 @@ fn abandoned_operations_reject_owned_successors_until_retirement() {
         scheduler.socket_close(sender).await.unwrap();
         scheduler.socket_close(receiver).await.unwrap();
     });
+}
+
+#[test]
+fn stream_read_errors_and_cancellation_release_pool_capacity() {
+    run(async |scheduler| {
+        let never = Cancellation::never();
+        let unconnected = scheduler
+            .socket_open(SocketDomain::Ipv4, SocketType::Stream, None, &never)
+            .await
+            .unwrap();
+        let mut reader = scheduler.socket_stream_reader(&unconnected).unwrap();
+        assert!(reader.read(&never).await.is_err());
+        let mut bytes = [0x5a; 4];
+        assert!(
+            reader
+                .read_vectored(&mut [IoSliceMut::new(&mut bytes)], &never)
+                .await
+                .is_err()
+        );
+        assert_eq!(bytes, [0x5a; 4]);
+        reader.close().await.unwrap();
+        drop(reader);
+        scheduler.socket_close(unconnected).await.unwrap();
+
+        let (sender, receiver) = stream_pair(scheduler).await;
+        let pool = scheduler.buffer_pool(BufferPoolOptions::new(1, 8)).unwrap();
+        let mut reader = scheduler
+            .socket_stream_reader_with_pool(&receiver, pool.clone())
+            .unwrap();
+        let cancelled = Cancellation::new();
+        cancelled.cancel();
+        assert!(reader.read(&cancelled).await.is_err());
+        // The first wait exhausts storage without registering I/O. The second has capacity and must retire its quiet socket readiness registration.
+        for exhausted in [true, false] {
+            let held = exhausted.then(|| pool.try_acquire().unwrap());
+            let cancellation = Cancellation::new();
+            {
+                let mut reading = Box::pin(reader.read(&cancellation));
+                assert!(poll_once(reading.as_mut()).await.is_none());
+                cancellation.cancel();
+                assert!(reading.await.is_err());
+            }
+            drop(held);
+            assert!(pool.try_acquire().is_some());
+        }
+        reader.close().await.unwrap();
+        drop(reader);
+        scheduler
+            .socket_shutdown(&sender, std::net::Shutdown::Write)
+            .await
+            .unwrap();
+        let mut reader = scheduler.socket_stream_reader(&receiver).unwrap();
+        assert_eq!(
+            reader
+                .read_vectored(&mut [IoSliceMut::new(&mut bytes)], &never)
+                .await
+                .unwrap(),
+            0
+        );
+        assert_eq!(
+            reader
+                .read_vectored(&mut [IoSliceMut::new(&mut bytes)], &never)
+                .await
+                .unwrap(),
+            0
+        );
+        reader.close().await.unwrap();
+        drop(reader);
+        scheduler.socket_close(sender).await.unwrap();
+        scheduler.socket_close(receiver).await.unwrap();
+    });
+}
+
+#[test]
+fn provided_stream_read_cancellation_and_closed_admission_retire_receiver_state() {
+    run(async |scheduler| {
+        let (sender, receiver) = stream_pair(scheduler).await;
+        let pool = scheduler
+            .buffer_pool_per_worker(BufferPoolOptions::new(4, 64))
+            .unwrap();
+        let mut reader = scheduler
+            .socket_stream_reader_with_pool(&receiver, pool)
+            .unwrap();
+        let cancellation = Cancellation::new();
+        {
+            let mut reading = Box::pin(reader.read(&cancellation));
+            assert!(poll_once(reading.as_mut()).await.is_none());
+            cancellation.cancel();
+            assert!(reading.await.is_err());
+        }
+        reader.close().await.unwrap();
+        drop(reader);
+        scheduler.socket_close(sender).await.unwrap();
+        scheduler.socket_close(receiver).await.unwrap();
+    });
+    run(async |scheduler| {
+        let (sender, receiver) = stream_pair(scheduler).await;
+        let pool = scheduler
+            .buffer_pool_per_worker(BufferPoolOptions::new(4, 64))
+            .unwrap();
+        let mut reader = scheduler
+            .socket_stream_reader_with_pool(&receiver, pool)
+            .unwrap();
+        scheduler.close();
+        assert!(reader.read(&Cancellation::never()).await.is_err());
+        reader.close().await.unwrap();
+        drop((reader, sender, receiver));
+    });
+}
+
+#[test]
+fn provided_stream_socket_failures_preserve_borrowed_and_owned_storage() {
+    for owned in [false, true] {
+        run(async |scheduler| {
+            let never = Cancellation::never();
+            let socket = scheduler
+                .socket_open(SocketDomain::Ipv4, SocketType::Stream, None, &never)
+                .await
+                .unwrap();
+            let pool = scheduler
+                .buffer_pool_per_worker(BufferPoolOptions::new(4, 64))
+                .unwrap();
+            let mut reader = scheduler
+                .socket_stream_reader_with_pool(&socket, pool)
+                .unwrap();
+            // Cancelling only this wait leaves the provided receiver admitted. The following read observes the real ENOTCONN completion, with its own caller storage untouched.
+            let cancellation = Cancellation::new();
+            {
+                let mut first = Box::pin(reader.read(&cancellation));
+                assert!(poll_once(first.as_mut()).await.is_none());
+                cancellation.cancel();
+                assert!(first.await.is_err());
+            }
+            if owned {
+                let (result, parts) = reader
+                    .read_owned_vectored(vec![vec![0x5a; 4]], SocketRecvFlags::default(), &never)
+                    .await;
+                assert!(result.is_err());
+                assert_eq!(parts, [[0x5a; 4]]);
+            } else {
+                let mut bytes = [0x5a; 4];
+                assert!(
+                    reader
+                        .read_vectored(&mut [IoSliceMut::new(&mut bytes)], &never)
+                        .await
+                        .is_err()
+                );
+                assert_eq!(bytes, [0x5a; 4]);
+            }
+            reader.close().await.unwrap();
+            drop(reader);
+            scheduler.socket_close(socket).await.unwrap();
+        });
+    }
 }
