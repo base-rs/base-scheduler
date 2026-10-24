@@ -1,0 +1,43 @@
+{
+  "source": "4d6764a",
+  "macos": {
+    "coverage": {
+      "covered_regions": 23918,
+      "measured_regions": 23918,
+      "excluded_invariant_unreachable_regions": 3
+    },
+    "fmt": "passed",
+    "clippy": "workspace all-targets all-features, warnings denied, passed",
+    "rustdoc": "workspace all-features, warnings denied, passed",
+    "msrv": "Rust 1.85.1 root/native/direct/tokio check passed"
+  },
+  "linux": {
+    "new_production_regions": {
+      "stream_writer.rs": [
+        514,
+        514
+      ],
+      "submission_notifications.rs": [
+        511,
+        511
+      ]
+    },
+    "package_tests": 451,
+    "package_measured_regions": [
+      6823,
+      6836
+    ],
+    "package_remaining_gaps": "13 earlier package-only baseline gaps are covered by the full workspace gate",
+    "msrv": "Rust 1.85.1 io_uring target including tests passed",
+    "workspace_coverage": {
+      "source": "684e25d",
+      "equivalent_root_commit": "4d6764a",
+      "covered_regions": 34527,
+      "measured_regions": 34527,
+      "excluded_invariant_unreachable_regions": 12,
+      "result": "passed"
+    }
+  },
+  "independent_review": "Approved production source78846c3, benchmark invariant684e25d /4d6764a and final report",
+  "measured_source": "78846c3"
+}
