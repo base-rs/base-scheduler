@@ -1,0 +1,9 @@
+--- a/crates/native/src/worker.rs
++++ b/crates/native/src/worker.rs
+@@ -345,3 +345,6 @@
+ 
+ #[cfg(test)]
+ mod tests;
++
++#[cfg(test)]
++mod stealing_benchmark;

@@ -123,6 +123,10 @@ fn search(shared: &Shared, local: &LocalWorker, iteration: usize) -> Steal<Runna
     if let Some(runnable) = local.ready.pop() {
         return Steal::Success(runnable);
     }
+    // Every queued or currently polled runnable holds an existing outstanding token. A racing publication still follows the idle fence, recheck, and wake protocol.
+    if shared.workers.len() == 1 || !shared.has_runnables() {
+        return search_result(retry);
+    }
     // Only steal after exhausting this worker's own work. Rotate the first victim so idle workers do not always contend on worker zero.
     for offset in 0..shared.workers.len() {
         let victim = local

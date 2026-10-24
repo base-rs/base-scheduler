@@ -6,6 +6,8 @@ Compare pure Tokio, `TokioScheduler`, and `NativeScheduler<IoUringSelector>` usi
 
 The [private I/O boundary comparison](results/private-io/readme.md) checks borrowed and owned paths after removing public backend plumbing, including the detected and corrected owned-write regression.
 
+The [idle-search comparison](results/idle-search/readme.md) measures skipping Native victim searches when no outstanding runnable work exists, including a disabled-stealing baseline, uneven-load latency, and user-space versus kernel costs.
+
 The [initial Aiko results](results.md) include throughput, latency, variation across repetitions, and raw samples.
 
 The [Native monitor polling investigation](native-monitor.md) measures syscall-first resumption and records the rejected monitor-bookkeeping and ring-send experiments.
