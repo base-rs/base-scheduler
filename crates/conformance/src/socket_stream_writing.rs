@@ -111,7 +111,7 @@ where
         // A platform may have buffered the whole first write already. Account for the second admission if it completed synchronously.
         let appended = accepted.is_some();
         if let Some(result) = accepted {
-            result.map_err(|(error, _)| error).unwrap();
+            result.unwrap();
         }
         drop(next);
         receive(scheduler, receiver, &expected).await;
