@@ -353,6 +353,18 @@ fn background_retry_errors_and_pending_close_preserve_the_result() {
                 stopping.cancel();
                 assert_cancelled(pending.await);
             }
+            // A close requested before the background task starts must also stop without sending.
+            assert_cancelled(
+                write_remaining(
+                    &sender.0,
+                    &mut buffer,
+                    0,
+                    &scheduler.socket_retry,
+                    &never,
+                    &stopping,
+                )
+                .await,
+            );
             scheduler.shutdown().await;
         });
     });
