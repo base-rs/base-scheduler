@@ -17,16 +17,16 @@ Tables omit `&self` or `&mut self` and show each asynchronous method's awaited r
 
 ## Bound socket I/O
 
-Use one handle per sequential execution, with independent readers and writers for concurrent input and output. Factories retain resource ownership and reusable backend state; they perform no payload I/O. Stream factories require stream sockets, and packet factories require datagram sockets.
+Use one handle per sequential execution, with independent readers and writers for concurrent input and output. Factories retain resource ownership and reusable backend state; they perform no payload I/O. Stream factories require stream sockets, and packet factories reject stream sockets and support packet-oriented transports such as datagrams.
 
 | Factory capability | Constructor | Resource trait |
 | --- | --- | --- |
 | [`SocketStreamReading`](https://github.com/core-rs/core-scheduler/blob/main/src/socket_stream_reading.rs) | `socket_stream_reader(K)` | `SocketStreamReader` |
-| [`SocketStreamWriting`](https://github.com/core-rs/core-scheduler/blob/main/src/socket_stream_writing.rs) | `socket_stream_writer::<B>(K)` | `SocketStreamWriter<Buffer = B>` |
+| [`SocketStreamWriting`](https://github.com/core-rs/core-scheduler/blob/main/src/socket_stream_writing.rs) | `socket_stream_writer(K)` | `SocketStreamWriter<Buffer = Pool::Buffer>` |
 | [`SocketPacketReading`](https://github.com/core-rs/core-scheduler/blob/main/src/socket_packet_reading.rs) | `socket_packet_reader(K)` | `SocketPacketReader` |
 | [`SocketPacketWriting`](https://github.com/core-rs/core-scheduler/blob/main/src/socket_packet_writing.rs) | `socket_packet_writer(K)` | `SocketPacketWriter` |
 
-The stream writer's owner type is normally inferred from `submit`. Borrowed-only output can specify `Vec<u8>` as its unused owner type. Reader factories allocate no payload pool. The first owned read creates default storage lazily; `with_pool(pool)` configures shared storage for subsequent owned reads. It consumes and returns the handle, so replacement happens between operations. Previously returned chunks retain their original pool independently.
+The default stream writer accepts the same pooled owner type returned by the default stream reader, with no type annotation needed for borrowed-only output. `socket_stream_writer_with_buffer::<B>(K)` selects another stable owner type. Reader factories allocate no payload pool; the first owned read initializes default storage lazily. `socket_stream_reader_with_pool(K, pool)` and `socket_packet_reader_with_pool(K, pool)` select an application-owned shared budget at construction. Factories return implementation-selected handles through the reader/writer contracts; backends can override the default composition without changing application operations.
 
 ### Stream input
 
