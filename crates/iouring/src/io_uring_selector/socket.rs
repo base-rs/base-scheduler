@@ -88,7 +88,7 @@ impl IoUringSelector {
 impl IoUringSelector {
     pub(crate) async fn socket_write_owned<B: IoBuf>(
         &self,
-        socket: &impl SocketSource,
+        socket: &RegisteredSocket,
         buffer: B,
         operations: &mut crate::operation_state::OperationState,
         cancellation: &Cancellation,
@@ -104,7 +104,7 @@ impl IoUringSelector {
         }
         // A ready socket can finish synchronously without publishing a request. No access to the owned buffer survives this nonblocking syscall.
         match syscall("socket-write", || {
-            socket.try_send(buffer.as_ref(), SocketSendFlags::default())
+            crate::retained_socket::send(socket, buffer.as_ref(), SocketSendFlags::default())
         }) {
             Err(error) if error.kind() == io::ErrorKind::WouldBlock => {}
             Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
@@ -146,8 +146,13 @@ impl IoUringSelector {
         buffer: B,
         cancellation: &Cancellation,
     ) -> BufferResult<B> {
-        self.socket_write_owned(socket, buffer, &mut Default::default(), cancellation)
-            .await
+        self.socket_write_owned(
+            &socket.retain_socket(),
+            buffer,
+            &mut Default::default(),
+            cancellation,
+        )
+        .await
     }
 }
 

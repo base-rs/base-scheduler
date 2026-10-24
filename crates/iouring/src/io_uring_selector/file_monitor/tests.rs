@@ -1001,3 +1001,33 @@ fn synchronous_submission_rejection_preserves_the_original_completion_owner() {
     drop(lane);
     block_on(selector.file_close(file)).unwrap();
 }
+
+#[test]
+fn a_driver_failure_wakes_close_that_already_waits_for_retirement() {
+    let (selector, driver) = IoUringSelector::new(Default::default()).unwrap();
+    let mut worker = driver.enter();
+    let waker = worker.waker();
+    let mut context = Context::from_waker(&waker);
+    let (_directory, file) = super::super::tests::file(&selector);
+    let never = Cancellation::never();
+    let mut monitor = selector.file_monitor(&file).unwrap();
+    let completion =
+        block_on(selector.file_monitor_read_at_submit(&mut monitor, vec![42], 0, &never)).unwrap();
+    worker.turn(Some(Duration::ZERO)).unwrap();
+    drop(completion);
+    {
+        let mut close = pin!(selector.file_monitor_close(&mut monitor));
+        assert!(close.as_mut().poll(&mut context).is_pending());
+        drop(worker);
+        assert_eq!(
+            block_on(close).unwrap_err().kind(),
+            io::ErrorKind::BrokenPipe
+        );
+    }
+    assert_eq!(
+        block_on(selector.file_monitor_close(&mut monitor))
+            .unwrap_err()
+            .kind(),
+        io::ErrorKind::BrokenPipe
+    );
+}

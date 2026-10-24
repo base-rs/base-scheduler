@@ -24,7 +24,7 @@ impl<'a, B: IoBuf> IoUringSocketStreamWriter<'a, B> {
     /// Construct the default backend composition without submitting payload I/O. Applications normally use the scheduler factory.
     pub(crate) fn new(scheduler: &'a IoUringSelector, socket: &NativeSocket) -> io::Result<Self> {
         let output = scheduler.socket_stream_output(socket)?;
-        let monitor = scheduler.socket_stream_monitor(socket, Interest::Writable)?;
+        let monitor = scheduler.socket_monitor(socket, Interest::Writable);
         Ok(Self {
             scheduler,
             operations: Default::default(),

@@ -30,7 +30,7 @@ impl<'a> IoUringSocketPacketWriter<'a> {
         Ok(Self {
             scheduler,
             operations: Default::default(),
-            monitor: scheduler.socket_monitor(socket, Interest::Writable)?,
+            monitor: scheduler.socket_monitor(socket, Interest::Writable),
             closing: false,
         })
     }

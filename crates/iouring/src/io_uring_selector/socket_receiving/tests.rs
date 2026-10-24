@@ -104,6 +104,12 @@ fn factory_preserves_admission_errors_and_socket_type_failure() {
             .buffer_pool_per_worker(BufferPoolOptions::new(0, 16))
             .is_err()
     );
+    let ordinary_pool =
+        core_scheduler::BufferPooling::buffer_pool(&selector, BufferPoolOptions::new(2, 16))
+            .unwrap();
+    assert!(
+        matches!(block_on(selector.socket_receiver(&socket, ordinary_pool, SocketRecvFlags::default(), &never)), Err(OperationError::Io(error)) if error.kind() == io::ErrorKind::InvalidInput)
+    );
     let pool = selector
         .buffer_pool_per_worker(BufferPoolOptions::new(2, 16))
         .unwrap();

@@ -38,7 +38,7 @@ impl<'a> IoUringSocketStreamReader<'a> {
         Ok(Self {
             scheduler,
             operations: Default::default(),
-            monitor: scheduler.socket_stream_monitor(socket, Interest::Readable)?,
+            monitor: scheduler.socket_monitor(socket, Interest::Readable),
             pool: None,
             ahead: Default::default(),
             eof: false,

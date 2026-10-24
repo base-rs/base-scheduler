@@ -377,10 +377,12 @@ mod cancellation_tests {
         ))
         .map_err(|(error, _)| error)
         .unwrap();
-        assert!(matches!(
-            block_on(writer.flush(&Cancellation::never())),
-            Err(OperationError::Cancelled(_))
-        ));
+        let error = block_on(writer.flush(&Cancellation::never())).unwrap_err();
+        assert!(
+            std::error::Error::source(&error)
+                .unwrap()
+                .is::<core_scheduler::Cancelled>()
+        );
         block_on(writer.close()).unwrap();
         drop(writer);
         block_on(scheduler.socket_close(sender)).unwrap();

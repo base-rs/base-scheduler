@@ -268,24 +268,9 @@ impl IoUringSelector {
                 ));
             }
             registration.running = None;
-            // Abandonment forfeits the old buffer to retirement. Dispose of it without a completion lock held.
-            match registration.shared.take() {
-                None => (),
-                Some(Completion::Cached(cached)) => registration.cached = Some(cached),
-                Some(Completion::Request(_, cached)) => registration.cached = Some(cached),
-                Some(Completion::Rejected(buffer)) => drop(buffer),
-                Some(Completion::Failed) => {
-                    registration.closed = true;
-                    registration.failed = true;
-                    return Err((
-                        io::Error::new(
-                            io::ErrorKind::BrokenPipe,
-                            "selector failed with an operation in flight",
-                        )
-                        .into(),
-                        buffer,
-                    ));
-                }
+            // Abandonment clears an uncollected owner under the result lock. Only a successfully collected request leaves reusable storage.
+            if let Some(Completion::Cached(cached)) = registration.shared.take() {
+                registration.cached = Some(cached);
             }
         }
         if let Err(error) = self.check_open() {

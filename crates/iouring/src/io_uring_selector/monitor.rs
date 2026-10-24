@@ -321,15 +321,10 @@ impl IoUringSelector {
                 }
             })
     }
-    pub(crate) fn socket_monitor_state(
-        &self,
-        socket: &impl SocketSource,
-        interest: Interest,
-    ) -> io::Result<State> {
-        self.check_open()?;
-        let socket = socket::retain_socket(socket);
-        Ok(SocketMonitor::new(
-            socket,
+    // Factories validate admission and socket kind before creating this inert record. Registration starts only when an operation needs readiness.
+    pub(crate) fn socket_monitor(&self, socket: &impl SocketSource, interest: Interest) -> Storage {
+        MonitorStorage::new(SocketMonitor::new(
+            socket::retain_socket(socket),
             interest,
             IoUringMonitorRegistration {
                 group: Arc::clone(&self.group),
@@ -342,21 +337,6 @@ impl IoUringSelector {
                 status: Arc::new(Mutex::new(Status::default())),
             },
         ))
-    }
-    pub(crate) fn socket_monitor(
-        &self,
-        socket: &impl SocketSource,
-        interest: Interest,
-    ) -> io::Result<Storage> {
-        self.socket_monitor_state(socket, interest)
-            .map(MonitorStorage::new)
-    }
-    pub(crate) fn socket_stream_monitor(
-        &self,
-        socket: &impl SocketSource,
-        interest: Interest,
-    ) -> io::Result<Storage> {
-        self.socket_monitor(socket, interest)
     }
     pub(crate) async fn socket_monitor_wait(
         &self,
@@ -376,7 +356,9 @@ impl IoUringSelector {
         cancellation: &Cancellation,
     ) -> OperationResult<usize> {
         self.monitor_io(monitor, Interest::Readable, cancellation, |socket| {
-            syscall("monitor-recv", || socket.try_recv(buffer, flags))
+            syscall("monitor-recv", || {
+                crate::retained_socket::recv(socket, buffer, flags)
+            })
         })
         .await
     }
@@ -388,7 +370,7 @@ impl IoUringSelector {
         cancellation: &Cancellation,
     ) -> OperationResult<usize> {
         self.monitor_io(monitor, Interest::Writable, cancellation, |socket| {
-            socket.try_send(buffer, flags)
+            crate::retained_socket::send(socket, buffer, flags)
         })
         .await
     }
@@ -400,7 +382,7 @@ impl IoUringSelector {
         cancellation: &Cancellation,
     ) -> OperationResult<SocketRecvResult> {
         self.monitor_io(monitor, Interest::Readable, cancellation, |socket| {
-            socket.try_recvmsg(buffers, flags)
+            crate::retained_socket::recvmsg(socket, buffers, flags)
         })
         .await
     }
@@ -413,7 +395,7 @@ impl IoUringSelector {
         cancellation: &Cancellation,
     ) -> OperationResult<usize> {
         self.monitor_io(monitor, Interest::Writable, cancellation, |socket| {
-            socket.try_sendmsg(buffers, address, flags)
+            crate::retained_socket::sendmsg(socket, buffers, address, flags)
         })
         .await
     }

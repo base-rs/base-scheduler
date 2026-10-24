@@ -114,7 +114,6 @@ mod linux {
             for (index, driver) in drivers.into_iter().enumerate() {
                 let (sender, inbox) = mpsc::channel::<Batch<'_>>();
                 senders.push(sender);
-                let selector = selector.as_ref();
                 let reply = reply.clone();
                 let started = started.clone();
                 let cpu = worker_cpus[index];

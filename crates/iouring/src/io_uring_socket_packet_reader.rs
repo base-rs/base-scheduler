@@ -40,7 +40,7 @@ impl<'a> IoUringSocketPacketReader<'a> {
         Ok(Self {
             scheduler,
             operations: Default::default(),
-            monitor: scheduler.socket_monitor(socket, Interest::Readable)?,
+            monitor: scheduler.socket_monitor(socket, Interest::Readable),
             pool: None,
             ahead: Default::default(),
             closing: false,
