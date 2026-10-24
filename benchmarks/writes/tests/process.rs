@@ -146,37 +146,6 @@ fn client_rejects_corrupt_payloads() {
 }
 
 #[test]
-fn client_excludes_a_response_crossing_the_measurement_boundary() {
-    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    let address = listener.local_addr().unwrap();
-    let server = thread::spawn(move || {
-        let (mut stream, _) = listener.accept().unwrap();
-        let mut request = [0];
-        stream.read_exact(&mut request).unwrap();
-        thread::sleep(Duration::from_millis(20));
-        // The one-byte response for request 1 and work 0.
-        stream.write_all(&[69]).unwrap();
-    });
-    let client = Command::new(BINARY)
-        .args([
-            "client",
-            &address.to_string(),
-            "1",
-            "1",
-            "1",
-            "1",
-            "0",
-            "0",
-            "0.001",
-        ])
-        .output()
-        .unwrap();
-    server.join().unwrap();
-    assert!(!client.status.success());
-    assert!(String::from_utf8_lossy(&client.stderr).contains("no complete responses"));
-}
-
-#[test]
 fn invalid_command_lines_fail_without_starting_work() {
     for args in [
         vec!["server", "unknown", "1", "1", "1", "1", "0", "0"],

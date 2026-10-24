@@ -1,0 +1,26 @@
+[
+  {
+    "variant": "raw",
+    "requests": 2051417,
+    "instructions_per_request": 15282.002199942772,
+    "cycles_per_request": 7896.413788127914,
+    "recv_per_request": 1.0000331478192879,
+    "send_per_request": 1.0000165739096438
+  },
+  {
+    "variant": "conservative",
+    "requests": 1934259,
+    "instructions_per_request": 16780.3979249935,
+    "cycles_per_request": 8363.25930188253,
+    "recv_per_request": 2.000032570612312,
+    "send_per_request": 1.0000175777907716
+  },
+  {
+    "variant": "adapter",
+    "requests": 1891029,
+    "instructions_per_request": 17313.750688117423,
+    "cycles_per_request": 8548.05278025879,
+    "recv_per_request": 2.0000470643231805,
+    "send_per_request": 1.0000179796290802
+  }
+]

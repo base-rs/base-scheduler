@@ -1,0 +1,16 @@
+diff --git a/crates/native/src/worker.rs b/crates/native/src/worker.rs
+index 4fed893..9862749 100644
+--- a/crates/native/src/worker.rs
++++ b/crates/native/src/worker.rs
+@@ -305,9 +305,9 @@ fn run_loop(
+         let Some(runnable) = runnable else {
+             continue;
+         };
+-        // Publish completions before freezing a runnable batch. If no task is ready, the idle path can submit and wait in one driver turn.
+-        drive(&mut driver, Some(Duration::ZERO));
+         run_ready_batch(&shared, runnable);
++        // Publish the available completion batch before starting the next task batch.
++        drive(&mut driver, Some(Duration::ZERO));
+     }
+     CURRENT_WORKER.with(|current| current.take());
+ }

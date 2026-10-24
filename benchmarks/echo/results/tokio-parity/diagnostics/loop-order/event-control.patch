@@ -1,0 +1,196 @@
+diff --git a/crates/iouring/src/operation_state.rs b/crates/iouring/src/operation_state.rs
+index ec5e5c7..a823d3d 100644
+--- a/crates/iouring/src/operation_state.rs
++++ b/crates/iouring/src/operation_state.rs
+@@ -1,28 +1,24 @@
+ // Released under the MIT License.
+ // Copyright, 2026, by Samuel Williams.
+ 
+-use atomic_waker::AtomicWaker;
+ use core_scheduler::{IoBuf, IoBufMut, IoBufSequence, IoBufSequenceMut, OperationError};
++use event_listener::Event;
+ use std::{
+-    future::poll_fn,
+     io,
+     sync::{
+         Arc,
+         atomic::{AtomicBool, Ordering},
+     },
+-    task::Poll,
+ };
+ 
+-/// Lazily allocated retirement state shared by a bound resource and its owned operation.
++/// Lazily allocated retirement state shared by the two directions' owned operation paths.
+ #[derive(Default)]
+ pub(crate) struct OperationState {
+     activity: Option<Arc<Activity>>,
+ }
+-
+ struct Activity {
+     running: AtomicBool,
+-    // Close borrows its lane mutably, so at most one retirement waiter can register.
+-    retired: AtomicWaker,
++    retired: Event,
+ }
+ 
+ // Field order releases the owner before publishing retirement, including during unwinding.
+@@ -31,16 +27,10 @@ pub(crate) struct OperationGuard<T> {
+     _retirement: Retirement,
+ }
+ struct Retirement(Arc<Activity>);
+-struct RetirementWait<'a>(&'a AtomicWaker);
+-impl Drop for RetirementWait<'_> {
+-    fn drop(&mut self) {
+-        self.0.take();
+-    }
+-}
+ impl Drop for Retirement {
+     fn drop(&mut self) {
+         self.0.running.store(false, Ordering::Release);
+-        self.0.retired.wake();
++        self.0.retired.notify(usize::MAX);
+     }
+ }
+ impl<T> OperationGuard<T> {
+@@ -102,9 +92,11 @@ impl OperationState {
+     }
+     pub(crate) fn begin<T>(&mut self, value: T) -> Result<OperationGuard<T>, (OperationError, T)> {
+         let activity = self.activity.get_or_insert_with(|| {
++            let retired = Event::new();
++            retired.notify(0);
+             Arc::new(Activity {
+                 running: AtomicBool::new(false),
+-                retired: AtomicWaker::new(),
++                retired,
+             })
+         });
+         if activity.running.swap(true, Ordering::AcqRel) {
+@@ -117,19 +109,13 @@ impl OperationState {
+     }
+     pub(crate) async fn close(&mut self) {
+         if let Some(activity) = &self.activity {
+-            let _wait = RetirementWait(&activity.retired);
+-            poll_fn(|context| {
+-                activity.retired.register(context.waker());
++            loop {
++                event_listener::listener!(activity.retired => listener);
+                 if !activity.running.load(Ordering::Acquire) {
+-                    Poll::Ready(())
+-                } else {
+-                    Poll::Pending
++                    break;
+                 }
+-            })
+-            .await;
++                listener.await;
++            }
+         }
+     }
+ }
+-
+-#[cfg(test)]
+-mod tests;
+diff --git a/crates/iouring/src/operation_state/tests.rs b/crates/iouring/src/operation_state/tests.rs
+deleted file mode 100644
+index 4fe5736..0000000
+--- a/crates/iouring/src/operation_state/tests.rs
++++ /dev/null
+@@ -1,82 +0,0 @@
+-// Released under the MIT License.
+-// Copyright, 2026, by Samuel Williams.
+-
+-use super::*;
+-use futures_lite::future::block_on;
+-use std::{
+-    future::Future,
+-    sync::atomic::AtomicUsize,
+-    task::{Context, Wake, Waker},
+-};
+-
+-#[derive(Default)]
+-struct Wakes(AtomicUsize);
+-impl Wake for Wakes {
+-    fn wake(self: Arc<Self>) {
+-        self.0.fetch_add(1, Ordering::SeqCst);
+-    }
+-}
+-
+-#[test]
+-fn close_unregisters_abandoned_waiters_and_can_wait_again() {
+-    let mut state = OperationState::default();
+-    block_on(state.close());
+-    let guard = state.begin(()).unwrap();
+-    assert!(state.check_idle().is_err());
+-    let wakes = Arc::new(Wakes::default());
+-    let waker = Waker::from(Arc::clone(&wakes));
+-    let mut context = Context::from_waker(&waker);
+-    let owners = Arc::strong_count(&wakes);
+-    let mut closing = Box::pin(state.close());
+-    assert!(closing.as_mut().poll(&mut context).is_pending());
+-    assert_eq!(Arc::strong_count(&wakes), owners + 1);
+-    drop(closing);
+-    assert_eq!(Arc::strong_count(&wakes), owners);
+-    let mut closing = Box::pin(state.close());
+-    assert!(closing.as_mut().poll(&mut context).is_pending());
+-    std::thread::spawn(move || drop(guard)).join().unwrap();
+-    assert_eq!(wakes.0.load(Ordering::SeqCst), 1);
+-    assert!(closing.as_mut().poll(&mut context).is_ready());
+-    drop(closing);
+-    assert_eq!(Arc::strong_count(&wakes), owners);
+-    state.check_idle().unwrap();
+-    block_on(state.close());
+-}
+-
+-#[test]
+-fn retirement_releases_the_owned_value_before_waking_close() {
+-    struct Owner(Arc<AtomicBool>);
+-    impl Drop for Owner {
+-        fn drop(&mut self) {
+-            self.0.store(true, Ordering::Release);
+-        }
+-    }
+-    struct CheckRetired(Arc<AtomicBool>);
+-    impl Wake for CheckRetired {
+-        fn wake(self: Arc<Self>) {
+-            assert!(self.0.load(Ordering::Acquire));
+-        }
+-    }
+-    let mut state = OperationState::default();
+-    let retired = Arc::new(AtomicBool::new(false));
+-    let guard = state.begin(Owner(Arc::clone(&retired))).ok().unwrap();
+-    let waker = Waker::from(Arc::new(CheckRetired(Arc::clone(&retired))));
+-    let mut context = Context::from_waker(&waker);
+-    let mut closing = Box::pin(state.close());
+-    assert!(closing.as_mut().poll(&mut context).is_pending());
+-    drop(guard);
+-    assert!(closing.as_mut().poll(&mut context).is_ready());
+-    assert!(retired.load(Ordering::Acquire));
+-}
+-
+-#[test]
+-fn retirement_racing_close_cannot_lose_its_wakeup() {
+-    for _ in 0..128 {
+-        let mut state = OperationState::default();
+-        let guard = state.begin(()).unwrap();
+-        let retiring = std::thread::spawn(move || drop(guard));
+-        block_on(state.close());
+-        retiring.join().unwrap();
+-        state.check_idle().unwrap();
+-    }
+-}
+diff --git a/crates/native/src/worker.rs b/crates/native/src/worker.rs
+index 4fed893..9862749 100644
+--- a/crates/native/src/worker.rs
++++ b/crates/native/src/worker.rs
+@@ -305,9 +305,9 @@ fn run_loop(
+         let Some(runnable) = runnable else {
+             continue;
+         };
+-        // Publish completions before freezing a runnable batch. If no task is ready, the idle path can submit and wait in one driver turn.
+-        drive(&mut driver, Some(Duration::ZERO));
+         run_ready_batch(&shared, runnable);
++        // Publish the available completion batch before starting the next task batch.
++        drive(&mut driver, Some(Duration::ZERO));
+     }
+     CURRENT_WORKER.with(|current| current.take());
+ }
