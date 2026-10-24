@@ -139,7 +139,7 @@ impl<B: IoBuf> PendingRequest for WriteRequest<B> {
                 bytes.as_ptr(),
                 bytes.len().min(i32::MAX as usize) as u32,
             )
-            .flags(libc::MSG_NOSIGNAL)
+            .flags(libc::MSG_NOSIGNAL | libc::MSG_WAITALL)
             .build()
         };
         entry.user_data(self.identifier)
