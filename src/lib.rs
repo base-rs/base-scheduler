@@ -113,6 +113,7 @@ mod socket_stream_writing;
 mod socket_type;
 mod socket_wait;
 mod socket_write;
+mod socket_write_state;
 mod spawn;
 mod spawn_error;
 mod sync_mode;
@@ -227,6 +228,8 @@ pub use socket_stream_writing::SocketStreamWriting;
 pub use socket_type::SocketType;
 pub use socket_wait::SocketWait;
 pub use socket_write::SocketWrite;
+#[doc(hidden)]
+pub use socket_write_state::SocketWriteState;
 pub use spawn::Spawn;
 pub use spawn_error::SpawnError;
 pub use sync_mode::SyncMode;
