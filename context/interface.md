@@ -138,6 +138,18 @@ These are single transfers, not read-exact or write-all operations. Owned reads 
 
 The `_poll` methods are ordinary awaitable futures, not raw `Context → Poll` hooks. They enforce nonblocking attempts: Unix uses `MSG_DONTWAIT`; Windows sets `FIONBIO` and leaves the socket nonblocking. External aliases must not concurrently restore blocking mode. Message receive attempts I/O on the first poll after validation; consumed bytes, EOF, and empty datagrams are returned in that same poll. `Pending` consumes nothing. Scalar receive can use readiness-first optimizations. This permits stack buffers while retaining safe abandonment.
 
+## Ordered stream writers
+
+`SocketStreamWriting::socket_stream_writer<B>(K) → io::Result<Writer<B>>` constructs typed output state synchronously, rejects non-stream sockets, and performs no writes. The associated resource implements `SocketStreamWriter<S>`; `B: IoBuf` identifies the accepted owner type.
+
+| Hook | Arguments → awaited result | Semantics |
+| --- | --- | --- |
+| `submit` | `(&mut writer, &S, B, C) → Result<(), (OperationError, B)>` | Admit one whole logical write in order, transferring its owner. Rejection returns untouched input. Accepted work and partial-write retries progress without further writer polling. |
+| `flush` | `(&mut writer, &S, C) → OperationResult<()>` | Await all accepted bytes or the terminal write error. Cancellation ends only this wait. Socket acceptance does not imply peer acknowledgement or buffer retirement for future zero-copy implementations. |
+| `close` | `(&mut writer, &S) → io::Result<()>` | Stop admission, cancel unfinished output, and await backend retirement. Repeatable uncancellable cleanup; no implicit flush or socket shutdown. |
+
+The writer admits at most one unfinished logical write. Submission cancellation continues to govern that accepted write; an accepted error or cancellation makes the sequence terminal. Completed owners are dropped independently of flush, allowing pool capacity to return while application code waits elsewhere. After close begins only close retries are allowed. Flush before closing for successful output, close even after errors, then drop the writer before exclusively closing its socket. Separate writers and direct writes through aliases do not share ordering. The scalar prototype implements no zero-copy dispatch, vectored writer, or file writer.
+
 ## Persistent socket monitors
 
 [`SocketMonitoring`](https://github.com/core-rs/core-scheduler/blob/main/src/socket_monitoring.rs) associates `MonitorRegistration: MonitorState`. Construction takes `(K, Interest)` synchronously and returns `io::Result`:

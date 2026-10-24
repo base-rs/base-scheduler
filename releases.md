@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Prototype ordered stream writers with owned submission, autonomous partial-write progress, explicit flush and retirement, and matched output benchmarks.
+
 - Retry io_uring monitor I/O directly on wake, keeping readiness bookkeeping on the `WouldBlock` path while preserving cancellation and owned registration lifetimes.
 
 - Avoid intermediate future-state copies when constructing Tokio socket operations, preserving the existing cancellation and readiness behavior.
