@@ -1,0 +1,78 @@
+diff --git a/crates/native/src/native_scheduler/driver_tests.rs b/crates/native/src/native_scheduler/driver_tests.rs
+index 4fa400b..95bc5ec 100644
+--- a/crates/native/src/native_scheduler/driver_tests.rs
++++ b/crates/native/src/native_scheduler/driver_tests.rs
+@@ -28,6 +28,7 @@ struct State {
+     idle: AtomicBool,
+     batches: AtomicUsize,
+     turns: AtomicUsize,
++    published_at: AtomicUsize,
+     dropped: AtomicUsize,
+     retired: AtomicBool,
+     only_idle_completions: AtomicBool,
+@@ -74,7 +75,7 @@ impl SelectorWorker for Driver {
+         self.0.closed.store(true, Ordering::SeqCst);
+     }
+     fn turn(&mut self, timeout: Option<Duration>) -> io::Result<bool> {
+-        self.0.turns.fetch_add(1, Ordering::SeqCst);
++        let turn = self.0.turns.fetch_add(1, Ordering::SeqCst) + 1;
+         if self.0.failed.load(Ordering::SeqCst) {
+             self.0.retired.store(true, Ordering::SeqCst);
+             return Err(io::Error::other("driver failure"));
+@@ -86,6 +87,7 @@ impl SelectorWorker for Driver {
+             let batch = std::mem::take(&mut *self.0.queued.lock().unwrap());
+             if !batch.is_empty() {
+                 self.0.inside_turn.store(true, Ordering::SeqCst);
++                self.0.published_at.store(turn, Ordering::SeqCst);
+                 let interrupts = self.0.interrupts.load(Ordering::SeqCst);
+                 for sender in batch {
+                     let _ = sender.send(());
+@@ -179,6 +181,11 @@ fn idle_completions_resume_tasks_without_interrupting_their_own_worker() {
+                 for _ in 0..32 {
+                     observed.operation().await.unwrap();
+                     assert!(!observed.inside_turn.load(Ordering::SeqCst));
++                    assert_eq!(
++                        observed.turns.load(Ordering::SeqCst),
++                        observed.published_at.load(Ordering::SeqCst),
++                        "idle completion must resume its consumer before another driver turn"
++                    );
+                 }
+                 42
+             })
+diff --git a/crates/native/src/worker.rs b/crates/native/src/worker.rs
+index 4fed893..21293e3 100644
+--- a/crates/native/src/worker.rs
++++ b/crates/native/src/worker.rs
+@@ -267,6 +267,7 @@ fn run_loop(
+         }))
+     });
+     let mut iteration = 0usize;
++    let mut driven = false;
+     loop {
+         iteration = iteration.wrapping_add(1);
+         crate::worker_timers::turn(&shared, identifier);
+@@ -296,7 +297,8 @@ fn run_loop(
+                         drive(
+                             &mut driver,
+                             crate::worker_timers::timeout(&shared, identifier),
+-                        )
++                        );
++                        driven = true;
+                     },
+                 )
+             }
+@@ -305,9 +307,12 @@ fn run_loop(
+         let Some(runnable) = runnable else {
+             continue;
+         };
+-        // Publish completions before freezing a runnable batch. If no task is ready, the idle path can submit and wait in one driver turn.
+-        drive(&mut driver, Some(Duration::ZERO));
++        // Each batch follows a driver turn. An idle wait already provides that turn.
++        if !driven {
++            drive(&mut driver, Some(Duration::ZERO));
++        }
+         run_ready_batch(&shared, runnable);
++        driven = false;
+     }
+     CURRENT_WORKER.with(|current| current.take());
+ }

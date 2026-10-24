@@ -1,0 +1,17 @@
+49202e58690c795f63985cd0acddab460a05387c
+ M crates/native/src/native_scheduler/driver_tests.rs
+ M crates/native/src/worker.rs
+?? benchmarks/echo/results/loop-serviced/
+ crates/native/src/native_scheduler/driver_tests.rs |  9 ++++++++-
+ crates/native/src/worker.rs                        | 11 ++++++++---
+ 2 files changed, 16 insertions(+), 4 deletions(-)
+936b7a2890406848b72af621aa1e8c56ce460b8d83de68154c2135b723f2276b  crates/native/src/worker.rs
+a97d0cfe8916a1debf0adb2a6507c5be54551a7249fa69b644f15aa64f5313c4  crates/native/src/native_scheduler/driver_tests.rs
+f0158fa15d2240ffd9a9ee2cd167f362cc4eda276e9d3a152563fd17a1d0a52b  crates/iouring/src/io_uring_selector/monitor.rs
+2352d12b6433c0357b5f861ba4c693b78e6553c0912cc8384a8464ea64886104  crates/iouring/src/io_uring_selector/socket_read.rs
+99cd3182a8c7d34cb31ff17eb243714f40ee70cc6efa0151ba1c9a792dcf0d29  crates/iouring/src/io_uring_worker.rs
+1d798b2b385b0a4db95092f8d7e981a83867c0921f9e2f2f338d3fc66ae5ee42  crates/iouring/src/operation_state.rs
+66aa27833c188039cc9e0c6c71632c6b59b0cee5a246f4d77ce6adb96e294b8c  -
+a15ec3bbb0aa898a2d51002d5d7070761529fe69834c67ed9f2bbe2b89544f81  /home/samuel/.cache/core-scheduler-parity/final
+bf9082d98ad36c3dea0c5538688c25d0383d27aab57266535e80c13d720180d3  /home/samuel/.cache/core-scheduler-parity/final-loop-serviced
+c72f7aea7151fb83020b096cfdaccc46a70b0eeff6bbb0a0e4ea4157d1aeb071  /home/samuel/.cache/core-scheduler-parity/client

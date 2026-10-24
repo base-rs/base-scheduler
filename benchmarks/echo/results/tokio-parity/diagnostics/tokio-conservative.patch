@@ -1,0 +1,30 @@
+diff --git a/benchmarks/echo/src/server.rs b/benchmarks/echo/src/server.rs
+index a0a4ec9..59970b1 100644
+--- a/benchmarks/echo/src/server.rs
++++ b/benchmarks/echo/src/server.rs
+@@ -16,7 +16,7 @@ use std::{
+     net::TcpListener,
+     sync::Arc,
+ };
+-use tokio::io::{AsyncReadExt, AsyncWriteExt};
++use tokio::io::AsyncWriteExt;
+ 
+ const BUFFER_SIZE: usize = 65536;
+ 
+@@ -38,7 +38,15 @@ async fn tokio_server(listener: TcpListener, connections: usize) {
+         tasks.push(tokio::spawn(async move {
+             let mut buffer = vec![0; BUFFER_SIZE];
+             loop {
+-                let count = socket.read(&mut buffer).await.expect("echo read");
++                let count = loop {
++                    std::future::poll_fn(|context| socket.poll_read_ready(context))
++                        .await
++                        .expect("echo readiness");
++                    match socket.try_read(&mut buffer) {
++                        Err(error) if error.kind() == io::ErrorKind::WouldBlock => continue,
++                        result => break result.expect("echo read"),
++                    }
++                };
+                 if count == 0 {
+                     return;
+                 }

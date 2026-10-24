@@ -1,0 +1,15 @@
+49202e58690c795f63985cd0acddab460a05387c
+ M crates/iouring/src/operation_state.rs
+ D crates/iouring/src/operation_state/tests.rs
+ M crates/native/src/worker.rs
+ crates/iouring/src/operation_state.rs       | 38 +++++--------
+ crates/iouring/src/operation_state/tests.rs | 82 -----------------------------
+ crates/native/src/worker.rs                 |  4 +-
+ 3 files changed, 14 insertions(+), 110 deletions(-)
+3e061ee6b8bc599bbc03df0f8a2e02830af6f02448501d43fa4bf64ad7f53df7  crates/native/src/worker.rs
+0232bf32e7b9b465c7dc54a941319b373f66962c66036c710374eac8c7995b14  crates/iouring/src/operation_state.rs
+f0158fa15d2240ffd9a9ee2cd167f362cc4eda276e9d3a152563fd17a1d0a52b  crates/iouring/src/io_uring_selector/monitor.rs
+2352d12b6433c0357b5f861ba4c693b78e6553c0912cc8384a8464ea64886104  crates/iouring/src/io_uring_selector/socket_read.rs
+99cd3182a8c7d34cb31ff17eb243714f40ee70cc6efa0151ba1c9a792dcf0d29  crates/iouring/src/io_uring_worker.rs
+7f6ca3e7e9b599fee28a8a2af04c125daf381e9ea42ad4122df82be6e132f46c  -
+69f530c4a0f99b45b85abddf8beee5cc5e08de2e224571e49c6b3d8d6f4e9475  /home/samuel/.cache/core-scheduler-parity/final-loop-event

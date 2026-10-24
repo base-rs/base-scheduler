@@ -1,0 +1,31 @@
+   Compiling core-scheduler-timers v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-parity-loop-serviced/crates/timers)
+   Compiling core-scheduler v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-parity-loop-serviced)
+   Compiling core-scheduler-selector v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-parity-loop-serviced/crates/selector)
+   Compiling core-scheduler-conformance v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-parity-loop-serviced/crates/conformance)
+   Compiling core-scheduler-native v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-parity-loop-serviced/crates/native)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.65s
+     Running unittests src/lib.rs (/home/samuel/.cache/core-scheduler-parity/tokio-build/debug/deps/core_scheduler_native-e2e36531bb780049)
+
+running 1 test
+test native_scheduler::driver_tests::idle_completions_resume_tasks_without_interrupting_their_own_worker ... FAILED
+
+failures:
+
+---- native_scheduler::driver_tests::idle_completions_resume_tasks_without_interrupting_their_own_worker stdout ----
+
+thread 'core-native-task' (860302) panicked at crates/native/src/native_scheduler/driver_tests.rs:184:21:
+assertion `left == right` failed: idle completion must resume its consumer before another driver turn
+  left: 3
+ right: 2
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread '<unnamed>' (860301) panicked at crates/native/src/native_scheduler/driver_tests.rs:193:35:
+called `Result::unwrap()` on an `Err` value: Panicked(Any { .. })
+
+
+failures:
+    native_scheduler::driver_tests::idle_completions_resume_tasks_without_interrupting_their_own_worker
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 72 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p core-scheduler-native --lib`
