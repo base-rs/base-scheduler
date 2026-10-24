@@ -71,9 +71,7 @@ where
         let cancellation = Cancellation::new();
         cancellation.cancel();
         let result = writer.flush(scheduler, &cancellation).await;
-        if let Err(error) = result {
-            crate::socket_monitoring::cancelled::<()>(Err(error));
-        }
+        assert!(matches!(result, Ok(()) | Err(OperationError::Cancelled(_))));
         let mut incoming = vec![0; 64 * 1024];
         let mut received = 0;
         while received < pool.buffer_size() {
@@ -111,15 +109,15 @@ where
         let mut next = Box::pin(writer.submit(scheduler, b"tail".to_vec(), &never));
         let accepted = poll_once(next.as_mut()).await;
         // A platform may have buffered the whole first write already. Account for the second admission if it completed synchronously.
-        let appended = accepted.is_some();
-        if let Some(result) = accepted {
-            result.unwrap();
-        }
+        let appended = accepted
+            .map(|result| {
+                result.unwrap();
+                b"tail".as_slice()
+            })
+            .unwrap_or_default();
         drop(next);
         receive(scheduler, receiver, &expected).await;
-        if appended {
-            receive(scheduler, receiver, b"tail").await;
-        }
+        receive(scheduler, receiver, appended).await;
         writer.flush(scheduler, &never).await.unwrap();
         writer.close(scheduler).await.unwrap();
     }
