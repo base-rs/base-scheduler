@@ -321,6 +321,7 @@ impl IoUringSelector {
             })
             .await;
             cancel.armed = false;
+            drop(cancel);
             monitor.registration_mut().running = None;
             match shared.take() {
                 Completion::Request(result, cached) => {

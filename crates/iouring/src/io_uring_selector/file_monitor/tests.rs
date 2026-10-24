@@ -76,6 +76,126 @@ fn ordinary_and_submitted_monitor_operations_share_admission_and_retirement() {
 }
 
 #[test]
+fn dropping_an_unpolled_monitor_completion_queues_cancellation_without_close() {
+    macro_rules! check {
+        ($submit:ident $(, $offset:expr)?) => {{
+            let (selector, mut driver) = super::super::tests::pair(1);
+            let (_directory, file) = super::super::tests::file(&selector);
+            let never = Cancellation::never();
+            let mut monitor = selector.file_monitor(&file).unwrap();
+            let completion = block_on(selector.$submit(&mut monitor, vec![42], $($offset,)? &never)).unwrap();
+            let incoming = &driver.reactor.as_mut().unwrap().incoming;
+            let request = match incoming.try_recv().unwrap() {
+                Command::Submit(request) => request,
+                _ => panic!("expected the accepted file request"),
+            };
+            let identifier = request.identifier();
+            assert!(incoming.try_recv().is_err(), "admission must not cancel the accepted request");
+            drop(completion);
+            assert!(matches!(incoming.try_recv().unwrap(), Command::Cancel(cancelled) if cancelled == identifier));
+            drop(request);
+            drop(monitor);
+            super::super::tests::drain(&selector, &mut driver);
+        }};
+    }
+    check!(file_monitor_read_submit);
+    check!(file_monitor_write_submit);
+    check!(file_monitor_read_at_submit, 0);
+    check!(file_monitor_write_at_submit, 0);
+}
+
+#[test]
+fn write_all_reuses_one_request_type_across_short_transfers_and_logical_writes() {
+    struct ShortWriter<'a> {
+        selector: &'a IoUringSelector,
+        monitor: FileMonitor<NativeFile, IoUringFileRegistration>,
+    }
+    impl FileWriter for ShortWriter<'_> {
+        async fn write<B: IoBuf>(
+            &mut self,
+            buffer: B,
+            cancellation: &Cancellation,
+        ) -> BufferResult<B> {
+            let length = buffer.as_ref().len().min(2);
+            let (result, buffer) = self
+                .selector
+                .file_monitor_write(&mut self.monitor, buffer.slice(..length), cancellation)
+                .await;
+            (result, buffer.into_inner())
+        }
+        async fn write_at<B: IoBuf>(
+            &mut self,
+            buffer: B,
+            offset: u64,
+            cancellation: &Cancellation,
+        ) -> BufferResult<B> {
+            self.selector
+                .file_monitor_write_at(&mut self.monitor, buffer, offset, cancellation)
+                .await
+        }
+        async fn close(&mut self) -> io::Result<()> {
+            self.selector.file_monitor_close(&mut self.monitor).await
+        }
+    }
+    let (selector, driver) = IoUringSelector::new(Default::default()).unwrap();
+    let mut worker = driver.enter();
+    let waker = worker.waker();
+    let mut context = Context::from_waker(&waker);
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("file");
+    std::fs::write(&path, b"").unwrap();
+    let never = Cancellation::never();
+    let file = block_on(selector.file_open(
+        &path,
+        FileOptions {
+            write: true,
+            ..FileOptions::READ
+        },
+        &never,
+    ))
+    .unwrap();
+    let mut writer = ShortWriter {
+        selector: &selector,
+        monitor: selector.file_monitor(&file).unwrap(),
+    };
+    let mut buffer = Some(b"abcdef".to_vec());
+    let mut cached = None;
+    for iteration in 0..8 {
+        let counts = allocation_counter::measure(|| {
+            let (result, returned) = drive(
+                &mut worker,
+                &mut context,
+                pin!(writer.write_all(buffer.take().unwrap(), &never)),
+            );
+            assert_eq!(result.unwrap(), 6);
+            buffer = Some(returned);
+        });
+        if iteration >= 2 {
+            assert_eq!(
+                counts.count_total, 0,
+                "short write_all replaced its cached request"
+            );
+        }
+        let current = writer
+            .monitor
+            .registration()
+            .cached
+            .as_ref()
+            .unwrap()
+            .downcast_ref::<FileRequest<BufferSlice<BufferSlice<Vec<u8>>>>>()
+            .unwrap() as *const _;
+        if let Some(previous) = cached {
+            assert_eq!(current, previous);
+        }
+        cached = Some(current);
+    }
+    assert_eq!(std::fs::read(path).unwrap(), b"abcdef".repeat(8));
+    drive(&mut worker, &mut context, pin!(writer.close())).unwrap();
+    drop(writer);
+    block_on(selector.file_close(file)).unwrap();
+}
+
+#[test]
 fn repeated_operations_reuse_request_storage_without_allocations() {
     let (selector, driver) = IoUringSelector::new(IoUringOptions {
         entries: 16,

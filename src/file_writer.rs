@@ -28,8 +28,9 @@ pub trait FileWriter: Send {
         cancellation: &Cancellation,
     ) -> impl Future<Output = BufferResult<B>> + Send {
         async move {
-            let (mut result, mut buffer) = self.write(buffer, cancellation).await;
             let length = buffer.as_ref().len();
+            let (mut result, remaining) = self.write(buffer.slice(..), cancellation).await;
+            let mut buffer = remaining.into_inner();
             let mut written = 0;
             loop {
                 match result {
