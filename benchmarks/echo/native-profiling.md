@@ -61,6 +61,8 @@ The focused one-worker/32-connection gains are **6.49% and 5.45%**. Remaining ga
 
 ## Testing the latency tradeoff
 
+The tail also regresses in the full normal-policy matrix. For the single-connection, 64-byte cases, taking the median reported percentile across five runs, one-worker P99 rises from **4.283 to 9.247 µs**, while P50 falls from 3.521 to 3.411 µs. With four workers, P99 rises from **5.571 to 9.231 µs** and P50 from 3.551 to 3.991 µs. These are closed-loop client round trips, including client and kernel scheduling. The one-worker distribution is another reason not to equate lower CPU cost with uniformly lower latency.
+
 Two follow-up code experiments were rejected:
 
 - **Collect CQEs immediately after a nonblocking submission.** At 32 connections, this was roughly neutral for 64 bytes and 1.2% slower at 4 KiB relative to deferred processing alone. In a five-repeat single-connection comparison, it improved the one-worker median from 259,354 to 267,041 echoes/s, still below the 275,127 baseline; the four-worker median fell from 235,382 to 232,341. It did not resolve the regression. See [throughput controls](results/native-profiles/collect-comparison/aiko.json), [latency controls](results/native-profiles/latency-comparison/aiko.json), and [patch](results/native-profiles/deferred-collect.patch).
