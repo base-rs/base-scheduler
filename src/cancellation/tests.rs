@@ -4,6 +4,18 @@
 use super::*;
 
 #[test]
+fn never_signals_need_no_cancellation_registration() {
+    let never = Cancellation::never();
+    assert!(never.is_never());
+    assert!(never.clone().is_never());
+    assert!(!never.child().is_never());
+    let token = Cancellation::new();
+    assert!(!token.is_never());
+    token.cancel();
+    assert!(!token.is_never());
+}
+
+#[test]
 fn dropped_children_release_their_registrations_and_ancestors() {
     let root = Cancellation::new();
     let node = root.node.as_ref().unwrap();

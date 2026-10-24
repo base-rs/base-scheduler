@@ -1,0 +1,396 @@
+diff --git a/crates/iouring/src/io_uring_selector.rs b/crates/iouring/src/io_uring_selector.rs
+index 4d0f6a3..94dc1cc 100644
+--- a/crates/iouring/src/io_uring_selector.rs
++++ b/crates/iouring/src/io_uring_selector.rs
+@@ -188,6 +188,11 @@ pub(crate) trait PendingRequest: Send {
+         None
+     }
+     fn entry(&mut self) -> squeue::Entry;
++    fn submission_notification(
++        &mut self,
++    ) -> Option<Arc<dyn submission_notifications::SubmissionNotification>> {
++        None
++    }
+     // Buffer accessors may run arbitrary user code, including waking tasks. Such requests must return to the executor after preparation instead of waiting.
+     fn entry_may_wake(&self) -> bool {
+         true
+@@ -874,6 +879,7 @@ pub(crate) struct Reactor {
+     cancellations: VecDeque<u64>,
+     closing: bool,
+     notification_armed: bool,
++    submission_notifications: submission_notifications::SubmissionNotifications,
+ }
+ 
+ impl Reactor {
+@@ -901,6 +907,7 @@ impl Reactor {
+             cancellations: VecDeque::new(),
+             closing: false,
+             notification_armed: false,
++            submission_notifications: submission_notifications::SubmissionNotifications::default(),
+         }
+     }
+ 
+@@ -1233,6 +1240,10 @@ impl Reactor {
+                 // SAFETY: InFlight owns the buffer allocation and descriptor before publication. Neither is released or accessed until the original CQE, even when cancellation completes first. A failed push does not publish the entry.
+                 unsafe { submissions.push(&entry) }
+                     .expect("submission capacity was checked and the local queue has not changed");
++                if let Some(notification) = request.submission_notification() {
++                    self.submission_notifications
++                        .push(submissions.len(), notification);
++                }
+             }
+             while !submissions.is_full() {
+                 let Some(submission) = self.pending_monitors.pop_front() else {
+@@ -1282,6 +1293,8 @@ impl Reactor {
+ 
+         // Nonblocking turns may stage one readiness-only batch for the next turn. An idle wait submits it and waits in one entry; a busy worker submits it on its next nonblocking turn. Overflow and task work always enter. Short-circuiting preserves the local permit through productive turns. At the actual wait decision, consume it; the armed poll retains remote notifications until their CQE drains the counter.
+         let return_to_executor = progressed
++            // Issuance waiters may need to run before their I/O can complete. Never enter a blocking completion wait while an unconsumed SQE still owes its caller a submission notification.
++            || self.submission_notifications.pending()
+             || command_batch_full
+             || timeout == Some(Duration::ZERO)
+             || !self.pending.is_empty()
+@@ -1297,7 +1310,16 @@ impl Reactor {
+                     || submissions.taskrun()
+             };
+             if needs_submit {
+-                match syscall("submit", || self.ring.submit()) {
++                let before = self
++                    .submission_notifications
++                    .pending()
++                    .then(|| self.ring.submission().len());
++                let result = syscall("submit", || self.ring.submit());
++                if let Some(before) = before {
++                    self.submission_notifications
++                        .consumed(before, self.ring.submission().len());
++                }
++                match result {
+                     Err(error)
+                         if error.kind() == io::ErrorKind::Interrupted
+                             || matches!(error.raw_os_error(), Some(libc::EBUSY | libc::EAGAIN)) =>
+@@ -1385,3 +1407,4 @@ mod socket_receiving;
+ pub(crate) mod provided_buffers;
+ 
+ pub(crate) mod stream_writer;
++mod submission_notifications;
+diff --git a/crates/iouring/src/io_uring_selector/stream_writer.rs b/crates/iouring/src/io_uring_selector/stream_writer.rs
+index 3b7db68..d4426d6 100644
+--- a/crates/iouring/src/io_uring_selector/stream_writer.rs
++++ b/crates/iouring/src/io_uring_selector/stream_writer.rs
+@@ -23,6 +23,7 @@ pub struct IoUringStreamWriter<B: IoBuf> {
+ struct Shared<B: IoBuf> {
+     result: Mutex<Option<Completion<B>>>,
+     ready: AtomicBool,
++    submitted: AtomicBool,
+     waker: atomic_waker::AtomicWaker,
+ }
+ 
+@@ -39,6 +40,13 @@ impl<B: IoBuf> Shared<B> {
+     }
+ }
+ 
++impl<B: IoBuf> submission_notifications::SubmissionNotification for Shared<B> {
++    fn submitted(&self) {
++        self.submitted.store(true, Ordering::Release);
++        self.waker.wake();
++    }
++}
++
+ struct CancelWrite {
+     controller: Arc<Controller>,
+     identifier: u64,
+@@ -65,6 +73,7 @@ struct WriteRequest<B: IoBuf> {
+     watch: Option<Pin<Box<dyn Future<Output = ()> + Send>>>,
+     cancel_waker: Option<Waker>,
+     reply: Cell<Option<Arc<Shared<B>>>>,
++    announced: bool,
+ }
+ 
+ impl<B: IoBuf> WriteRequest<B> {
+@@ -81,6 +90,7 @@ impl<B: IoBuf> WriteRequest<B> {
+             watch: None,
+             cancel_waker: None,
+             reply: Cell::new(None),
++            announced: false,
+         }
+     }
+ 
+@@ -130,6 +140,18 @@ impl<B: IoBuf> PendingRequest for WriteRequest<B> {
+         entry.user_data(self.identifier)
+     }
+ 
++    fn submission_notification(
++        &mut self,
++    ) -> Option<Arc<dyn submission_notifications::SubmissionNotification>> {
++        if self.announced {
++            return None;
++        }
++        self.announced = true;
++        let shared = self.reply.take().unwrap();
++        self.reply.set(Some(Arc::clone(&shared)));
++        Some(shared)
++    }
++
+     fn completion(&self, result: i32, _flags: u32) {
+         if self.polling.get() {
+             if result >= 0 {
+@@ -296,6 +318,7 @@ impl SocketStreamWriting for IoUringSelector {
+             shared: Arc::new(Shared {
+                 result: Mutex::new(None),
+                 ready: AtomicBool::new(false),
++                submitted: AtomicBool::new(false),
+                 waker: atomic_waker::AtomicWaker::new(),
+             }),
+             cached: None,
+@@ -396,10 +419,24 @@ impl<B: IoBuf> SocketStreamWriter<IoUringSelector> for IoUringStreamWriter<B> {
+             identifier,
+         })));
+         request.reply.set(Some(Arc::clone(&self.shared)));
++        request.announced = false;
+         self.shared.ready.store(false, Ordering::Relaxed);
++        self.shared.submitted.store(false, Ordering::Relaxed);
+         self.running = Some(RingBinding::new(&controller, identifier));
+         // The persistent writer bounds itself to one active logical write, just as a persistent readiness monitor bounds itself to one waiter. It does not occupy the transient-operation admission pool.
+         controller.submit(request);
++        // A complete immediate send returns above. An asynchronous send returns only after the driver observes the kernel consume its SQE, or the accepted write ends before that acknowledgement. This crosses a real loop boundary even if the caller is stolen to another worker.
++        poll_fn(|context| {
++            self.shared.waker.register(context.waker());
++            if self.shared.submitted.load(Ordering::Acquire)
++                || self.shared.ready.load(Ordering::Acquire)
++            {
++                Poll::Ready(())
++            } else {
++                Poll::Pending
++            }
++        })
++        .await;
+         Ok(())
+     }
+ 
+diff --git a/crates/iouring/src/io_uring_selector/submission_notifications.rs b/crates/iouring/src/io_uring_selector/submission_notifications.rs
+new file mode 100644
+index 0000000..edc97fc
+--- /dev/null
++++ b/crates/iouring/src/io_uring_selector/submission_notifications.rs
+@@ -0,0 +1,221 @@
++// Released under the MIT License.
++// Copyright, 2026, by Samuel Williams.
++
++use std::{collections::VecDeque, sync::Arc};
++
++pub(crate) trait SubmissionNotification: Send + Sync {
++    fn submitted(&self);
++}
++
++#[derive(Default)]
++pub(super) struct SubmissionNotifications {
++    consumed: usize,
++    pending: VecDeque<(usize, Arc<dyn SubmissionNotification>)>,
++}
++
++impl SubmissionNotifications {
++    pub fn pending(&self) -> bool {
++        !self.pending.is_empty()
++    }
++
++    pub fn push(&mut self, queue_length: usize, notification: Arc<dyn SubmissionNotification>) {
++        self.pending
++            .push_back((self.consumed.wrapping_add(queue_length), notification));
++    }
++
++    pub fn consumed(&mut self, before: usize, after: usize) {
++        self.consumed = self.consumed.wrapping_add(before - after);
++        // Ring capacity is far below isize::MAX, so a signed wrapping distance distinguishes pending markers even after the cumulative counter wraps.
++        while self
++            .pending
++            .front()
++            .is_some_and(|(position, _)| position.wrapping_sub(self.consumed) as isize <= 0)
++        {
++            let (_, notification) = self.pending.pop_front().unwrap();
++            notification.submitted();
++        }
++        if self.pending.is_empty() {
++            self.consumed = 0;
++        }
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use std::sync::atomic::{AtomicUsize, Ordering};
++
++    struct Notification(Arc<AtomicUsize>);
++    impl SubmissionNotification for Notification {
++        fn submitted(&self) {
++            self.0.fetch_add(1, Ordering::Relaxed);
++        }
++    }
++
++    #[test]
++    fn partial_submission_notifies_only_consumed_entries_even_with_later_refills() {
++        let completed = Arc::new(AtomicUsize::new(0));
++        let mut notices = SubmissionNotifications::default();
++        notices.push(2, Arc::new(Notification(Arc::clone(&completed))));
++        notices.push(4, Arc::new(Notification(Arc::clone(&completed))));
++        notices.consumed(5, 4);
++        assert_eq!(completed.load(Ordering::Relaxed), 0);
++        notices.push(6, Arc::new(Notification(Arc::clone(&completed))));
++        notices.consumed(6, 4);
++        assert_eq!(completed.load(Ordering::Relaxed), 1);
++        notices.consumed(4, 3);
++        assert_eq!(completed.load(Ordering::Relaxed), 2);
++        notices.consumed(3, 0);
++        assert_eq!(completed.load(Ordering::Relaxed), 3);
++        assert!(!notices.pending());
++    }
++
++    #[test]
++    fn consumed_counter_wrap_preserves_order() {
++        let completed = Arc::new(AtomicUsize::new(0));
++        let mut notices = SubmissionNotifications {
++            consumed: usize::MAX - 1,
++            ..Default::default()
++        };
++        notices.push(3, Arc::new(Notification(Arc::clone(&completed))));
++        notices.consumed(4, 2);
++        assert_eq!(completed.load(Ordering::Relaxed), 0);
++        notices.consumed(2, 1);
++        assert_eq!(completed.load(Ordering::Relaxed), 1);
++        assert!(!notices.pending());
++    }
++
++    #[test]
++    fn issuance_is_acknowledged_after_kernel_entry_without_waiting_for_output_completion() {
++        use super::super::{
++            socket::retain_socket,
++            tests::{Failures, drive, pair},
++        };
++        use core_scheduler::*;
++        use futures_lite::future::{block_on, poll_once};
++        use std::{io, time::Duration};
++
++        let (selector, mut driver) = pair(16);
++        let (sender, receiver) = block_on(core_scheduler_conformance::socket::stream_pair(
++            &selector,
++            SocketDomain::Ipv4,
++        ));
++        retain_socket(&sender)
++            .get_ref()
++            .set_send_buffer_size(4096)
++            .unwrap();
++        let mut writer = selector.socket_stream_writer::<Vec<u8>>(&sender).unwrap();
++        let never = Cancellation::never();
++        let mut submission = Box::pin(writer.submit(&selector, vec![1; 4 * 1024 * 1024], &never));
++        assert!(block_on(poll_once(submission.as_mut())).is_none());
++        {
++            let _failure = Failures::new([("submit", io::ErrorKind::Interrupted.into())]);
++            driver.turn(Some(Duration::ZERO)).unwrap();
++        }
++        assert!(
++            block_on(poll_once(submission.as_mut())).is_none(),
++            "staging without kernel entry must not acknowledge issuance"
++        );
++        // No peer is consuming bytes. A blocking completion wait here would deadlock issuance, so pending receipts force a nonblocking submission turn.
++        driver.turn(None).unwrap();
++        assert!(matches!(
++            block_on(poll_once(submission.as_mut())),
++            Some(Ok(()))
++        ));
++        drop(submission);
++        let mut flush = Box::pin(writer.flush(&selector, &never));
++        assert!(block_on(poll_once(flush.as_mut())).is_none());
++        drop(flush);
++        drive(&mut driver, writer.close(&selector)).unwrap();
++        drop(writer);
++        block_on(selector.socket_close(sender)).unwrap();
++        block_on(selector.socket_close(receiver)).unwrap();
++    }
++
++    #[test]
++    fn issuance_handles_full_submission_queues_and_abandoned_waiters() {
++        use super::super::{
++            socket::retain_socket,
++            tests::drive,
++        };
++        use core_scheduler::*;
++        use futures_lite::future::{block_on, poll_once};
++        use std::time::Duration;
++
++        let (selector, mut driver) = crate::IoUringSelector::new(crate::IoUringOptions {
++            entries: 1,
++            ..Default::default()
++        })
++        .unwrap();
++        let (sender, receiver) = block_on(core_scheduler_conformance::socket::stream_pair(
++            &selector,
++            SocketDomain::Ipv4,
++        ));
++        let (other_sender, other_receiver) = block_on(
++            core_scheduler_conformance::socket::stream_pair(&selector, SocketDomain::Ipv4),
++        );
++        retain_socket(&sender)
++            .get_ref()
++            .set_send_buffer_size(4096)
++            .unwrap();
++        retain_socket(&other_sender)
++            .get_ref()
++            .set_send_buffer_size(4096)
++            .unwrap();
++        let mut first = selector.socket_stream_writer::<Vec<u8>>(&sender).unwrap();
++        let mut second = selector
++            .socket_stream_writer::<Vec<u8>>(&other_sender)
++            .unwrap();
++        let never = Cancellation::never();
++        let mut a = Box::pin(first.submit(&selector, vec![1; 4 * 1024 * 1024], &never));
++        let mut b = Box::pin(second.submit(&selector, vec![2; 4 * 1024 * 1024], &never));
++        assert!(block_on(poll_once(a.as_mut())).is_none());
++        assert!(block_on(poll_once(b.as_mut())).is_none());
++        driver.turn(Some(Duration::ZERO)).unwrap();
++        assert!(matches!(block_on(poll_once(a.as_mut())), Some(Ok(()))));
++        assert!(block_on(poll_once(b.as_mut())).is_none());
++        drop(a);
++        // Accepted storage remains owned by the second writer even when its receipt waiter is abandoned.
++        drop(b);
++        drive(&mut driver, first.close(&selector)).unwrap();
++        drive(&mut driver, second.close(&selector)).unwrap();
++        drop(first);
++        drop(second);
++        for socket in [sender, receiver, other_sender, other_receiver] {
++            block_on(selector.socket_close(socket)).unwrap();
++        }
++    }
++
++    #[test]
++    fn terminal_failure_before_issuance_still_resolves_accepted_submission() {
++        use super::super::tests::{drive, pair};
++        use core_scheduler::*;
++        use futures_lite::future::{block_on, poll_once};
++        use std::time::Duration;
++
++        let (selector, mut driver) = pair(16);
++        let (sender, receiver) = block_on(core_scheduler_conformance::socket::stream_pair(
++            &selector,
++            SocketDomain::Ipv4,
++        ));
++        let mut writer = selector.socket_stream_writer::<Vec<u8>>(&sender).unwrap();
++        let token = Cancellation::new();
++        let mut submission = Box::pin(writer.submit(&selector, vec![1; 8 * 1024 * 1024], &token));
++        assert!(block_on(poll_once(submission.as_mut())).is_none());
++        token.cancel();
++        driver.turn(Some(Duration::ZERO)).unwrap();
++        assert!(matches!(
++            block_on(poll_once(submission.as_mut())),
++            Some(Ok(()))
++        ));
++        drop(submission);
++        assert!(matches!(
++            block_on(writer.flush(&selector, &Cancellation::never())),
++            Err(OperationError::Cancelled(_))
++        ));
++        drive(&mut driver, writer.close(&selector)).unwrap();
++        drop(writer);
++        block_on(selector.socket_close(sender)).unwrap();
++        block_on(selector.socket_close(receiver)).unwrap();
++    }
++}

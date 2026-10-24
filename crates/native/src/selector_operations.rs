@@ -504,6 +504,9 @@ where
     S::Socket: 'static,
 {
     type MonitorRegistration = S::MonitorRegistration;
+    fn socket_type(&self, socket: &Self::Socket) -> io::Result<SocketType> {
+        self.selector().socket_type(socket)
+    }
     fn socket_monitor_state(
         &self,
         socket: &Self::Socket,
@@ -649,6 +652,58 @@ impl<S: Selector + FileMonitoring> FileMonitoring for NativeScheduler<S> {
     }
 }
 
+impl<S: Selector + FileMonitorSubmission> FileMonitorSubmission for NativeScheduler<S> {
+    async fn file_monitor_read_submit<B: IoBufMut>(
+        &self,
+        monitor: &mut FileMonitor<Self::File, Self::FileRegistration>,
+        buffer: B,
+        cancellation: &Cancellation,
+    ) -> Result<impl std::future::Future<Output = BufferResult<B>> + Send, (OperationError, B)>
+    {
+        self.selector()
+            .file_monitor_read_submit(monitor, buffer, cancellation)
+            .await
+    }
+
+    async fn file_monitor_write_submit<B: IoBuf>(
+        &self,
+        monitor: &mut FileMonitor<Self::File, Self::FileRegistration>,
+        buffer: B,
+        cancellation: &Cancellation,
+    ) -> Result<impl std::future::Future<Output = BufferResult<B>> + Send, (OperationError, B)>
+    {
+        self.selector()
+            .file_monitor_write_submit(monitor, buffer, cancellation)
+            .await
+    }
+
+    async fn file_monitor_read_at_submit<B: IoBufMut>(
+        &self,
+        monitor: &mut FileMonitor<Self::File, Self::FileRegistration>,
+        buffer: B,
+        offset: u64,
+        cancellation: &Cancellation,
+    ) -> Result<impl std::future::Future<Output = BufferResult<B>> + Send, (OperationError, B)>
+    {
+        self.selector()
+            .file_monitor_read_at_submit(monitor, buffer, offset, cancellation)
+            .await
+    }
+
+    async fn file_monitor_write_at_submit<B: IoBuf>(
+        &self,
+        monitor: &mut FileMonitor<Self::File, Self::FileRegistration>,
+        buffer: B,
+        offset: u64,
+        cancellation: &Cancellation,
+    ) -> Result<impl std::future::Future<Output = BufferResult<B>> + Send, (OperationError, B)>
+    {
+        self.selector()
+            .file_monitor_write_at_submit(monitor, buffer, offset, cancellation)
+            .await
+    }
+}
+
 impl<S: Selector + FileSubmission> FileSubmission for NativeScheduler<S> {
     async fn file_read_submit<B: IoBufMut>(
         &self,
@@ -718,5 +773,80 @@ impl<S: Selector + BufferPooling> BufferPooling for NativeScheduler<S> {
     type Pool = S::Pool;
     fn buffer_pool(&self, options: BufferPoolOptions) -> io::Result<Self::Pool> {
         self.selector().buffer_pool(options)
+    }
+}
+
+impl<S: Selector + SocketStreamReading> SocketStreamReading for NativeScheduler<S>
+where
+    S::Socket: 'static,
+{
+    fn socket_stream_reader<'scheduler>(
+        &'scheduler self,
+        socket: &Self::Socket,
+    ) -> io::Result<impl SocketStreamReader<Buffer = <Self::Pool as BufferPool>::Buffer> + 'scheduler>
+    where
+        Self::Socket: 'static,
+    {
+        self.selector().socket_stream_reader(socket)
+    }
+
+    fn socket_stream_reader_with_pool<'scheduler>(
+        &'scheduler self,
+        socket: &Self::Socket,
+        pool: Self::Pool,
+    ) -> io::Result<impl SocketStreamReader<Buffer = <Self::Pool as BufferPool>::Buffer> + 'scheduler>
+    where
+        Self::Socket: 'static,
+    {
+        self.selector().socket_stream_reader_with_pool(socket, pool)
+    }
+}
+
+impl<S: Selector + SocketPacketReading> SocketPacketReading for NativeScheduler<S>
+where
+    S::Socket: 'static,
+{
+    fn socket_packet_reader<'scheduler>(
+        &'scheduler self,
+        socket: &Self::Socket,
+    ) -> io::Result<
+        impl SocketPacketReader<
+            Message: SocketRecvMessageMut<Payload = <Self::Pool as BufferPool>::Buffer>,
+        > + 'scheduler,
+    >
+    where
+        Self::Socket: 'static,
+    {
+        self.selector().socket_packet_reader(socket)
+    }
+
+    fn socket_packet_reader_with_pool<'scheduler>(
+        &'scheduler self,
+        socket: &Self::Socket,
+        pool: Self::Pool,
+    ) -> io::Result<
+        impl SocketPacketReader<
+            Message: SocketRecvMessageMut<Payload = <Self::Pool as BufferPool>::Buffer>,
+        > + 'scheduler,
+    >
+    where
+        Self::Socket: 'static,
+    {
+        self.selector().socket_packet_reader_with_pool(socket, pool)
+    }
+}
+
+impl<S: Selector + SocketPacketWriting> SocketPacketWriting for NativeScheduler<S>
+where
+    S::Socket: 'static,
+{
+    fn socket_packet_writer<'scheduler>(
+        &'scheduler self,
+        socket: &Self::Socket,
+    ) -> io::Result<impl SocketPacketWriter + 'scheduler>
+    where
+        Self::Socket: 'static,
+    {
+        self.selector().socket_packet_writer(socket)
     }
 }

@@ -15,7 +15,17 @@ struct FailedMonitor(bool);
 impl SocketOperation for FailedMonitor {
     type Socket = ();
 }
+impl BufferPooling for FailedMonitor {
+    type Pool = HeapBufferPool;
+    fn buffer_pool(&self, options: BufferPoolOptions) -> io::Result<Self::Pool> {
+        HeapBufferPool::with_options(options)
+    }
+}
 impl SocketMonitoring for FailedMonitor {
+    fn socket_type(&self, _: &()) -> io::Result<SocketType> {
+        Ok(SocketType::Stream)
+    }
+
     type MonitorRegistration = ();
     fn socket_monitor_state(
         &self,
@@ -170,3 +180,5 @@ fn stream_cleanup_allows_exclusive_close_after_cancellation_and_consumer_errors(
         scheduler.shutdown().await;
     });
 }
+
+impl SocketStreamReading for FailedMonitor {}

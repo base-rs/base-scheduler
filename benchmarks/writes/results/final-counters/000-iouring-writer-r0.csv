@@ -1,0 +1,8 @@
+# started on Sat Oct 24 14:49:22 2026
+
+15351179547,,cycles,2910439037,100.00,,
+62463171950,,instructions,2910439037,100.00,,
+143852218,,cache-misses,2910439037,100.00,,
+26092,,syscalls:sys_enter_io_uring_enter,2910439037,100.00,,
+208728,,syscalls:sys_enter_sendto,2910439037,100.00,,
+0,,io_uring:io_uring_submit_req,2910439037,100.00,,

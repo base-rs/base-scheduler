@@ -1,42 +1,53 @@
 # Writing efficient I/O
 
-Start with the data's lifetime. Use **persistent monitors for borrowed I/O** and **pooled receivers for independently owned received data**. These are recommended compositions of the [scheduler interface](interface.md), not a ranking of syscalls. A pooled receiver can itself use a persistent monitor and borrowed nonblocking I/O. Pooling supplies ownership, retention, reuse, and backpressure; it does not inherently make a receive faster.
+Use scheduler-bound readers and writers for repeated I/O. Construct them once from the selected scheduler and resource, retain them across operations, and pass cancellation to each call. This keeps reusable backend state on the ordinary application path without choosing polling, registered buffers, multishot, or worker routing.
 
-## Choose by application behavior
+## Choose by the resource and data lifetime
 
 | Application requirement | Starting point |
 | --- | --- |
-| Consume stream bytes before reusing storage | One readable stream monitor and a reused borrowed slice. |
-| Retain complete frames while receiving more bytes | A scheduler-created pool and socket receiver; freeze completed storage and retain ranges. |
-| Process each datagram entirely inside its receive loop | One general readable socket monitor and borrowed message receive. |
-| Hand packets to independent tasks | A pooled socket receiver and bounded task handoff; move the complete message when peer metadata is needed. |
-| Send data that remains available until the awaited write finishes | One writable monitor and borrowed scalar or vectored sends, advancing after short writes. |
-| Copy or transform files | Sequential file monitors, reusable owned buffers, and joined independent reads/writes. |
+| Read a TCP or other byte stream | `scheduler.socket_stream_reader(&socket)`; use `read_into` for reused parser storage or `read` for independently owned chunks. |
+| Write a byte stream | `scheduler.socket_stream_writer(&socket)`; use `write` or `write_vectored` for borrowed output, and `submit` when accepted owned output should progress while the application prepares more work. |
+| Receive UDP or other packets | `scheduler.socket_packet_reader(&socket)`; use `read_into` or `read_vectored` inside a receive loop, or `read` to hand complete owned messages to independent tasks. |
+| Send packets | `scheduler.socket_packet_writer(&socket)`; use `write` or `write_vectored` for borrowed storage, or `write_owned` to transfer a stable owner through completion. |
+| Copy or transform files | `scheduler.file_reader(&input)` and `scheduler.file_writer(&output)`, reusable owned buffers, and joined independent reads/writes. |
 
-Borrowed storage may be inline or a reusable `Vec`; prefer the storage layout the parser needs. Stack placement alone is not the optimization. Construct monitors and storage outside repeated-operation loops. Use one monitor per sequential execution, with independent readable and writable monitors for concurrent tasks. Use stream monitors only for byte streams and general socket monitors for datagrams.
+Each handle represents one sequential operation stream. Create independent readers and writers for concurrent execution; several file readers or writers may share the same underlying file. Keep the scheduler and its drivers alive while those handles operate and close. A task moving to another worker does not change its handle's selected scheduler; the backend handles worker-local registration and migration internally.
 
-Owned operations remain useful for completion-based dispatch and buffers that must retire independently of their caller's future. One-off operations need not manufacture persistent state. The `_poll` suffix names the borrowed readiness contract; these are ordinary async methods called with `.await`, not raw `Poll` methods.
+## Own chunks only when useful
 
-## Keep protocol state explicit
+A stream reader's `read(cancellation)` returns an owned chunk or `None` at EOF. A packet reader's `read(cancellation)` returns an owned message or `None` after local close; an empty datagram is a real message. Completed storage may be parsed, frozen, retained, or moved to another task while later receives continue. `address()` and `payload()` borrow the message's metadata and completed bytes. Preserve the peer endpoint before extracting payload ownership if it is needed afterwards, and inspect packet truncation flags.
 
-Pass scheduler capabilities and cancellation to operations. Retain resources, monitors, parsers, and storage in protocol objects without implicitly selecting a scheduler. Require the individual capabilities used by that protocol, rather than a universal backend or scheduler aggregate. A different scheduler argument still has to be compatible with the retained resources.
+For parser-owned scratch storage, reuse `read_into(&mut bytes, cancellation)` or `read_vectored(&mut slices, cancellation)` on the same reader. Borrowed bytes are accessed only synchronously inside a poll; a pending operation leaves no independent kernel or worker access to them. Storage may be inline or a reused `Vec`; choose the layout the parser needs. Stack placement alone is not the optimization.
 
-Use `scheduler.buffer_pool(options)` and `scheduler.socket_receiver(...)` for portable owned reception. Application code chooses a memory budget and required ownership; the backend chooses allocation, registration, publication, and receive strategy. Do not put worker IDs, ring IDs, buffer group IDs, multishot selection, or registration switches into ordinary protocol call sites. Concrete backend experiments belong in backend-specific benchmarks until measurements and semantics justify an application-visible choice.
+Readers create default pool storage lazily for owned reception. Borrowed-only use does not allocate a receive pool. To share a specific budget across connections, create it with `scheduler.buffer_pool(options)` and pass `pool.clone()` to `socket_stream_reader_with_pool` or `socket_packet_reader_with_pool`. Pooling supplies ownership, retention, reuse, and backpressure; it does not inherently make a receive faster. The backend retains control of allocation, registration, publication, and hot-buffer reuse.
 
-## Bound retention and finish cleanup
+Parse while a chunk is uniquely writable when mutation is useful. Freeze it before retaining immutable views. Completed frames wholly inside one chunk can retain ranges; copy or assemble only the incomplete frame crossing chunks when contiguous records are required. A small long-lived view can pin an entire slot, so selective copying can improve memory use. Framing, decryption, and compaction belong to the protocol.
 
-Parse while a received lease is uniquely writable when mutation is useful. Freeze it before retaining immutable views. Completed frames wholly inside a chunk can retain ranges; copy or assemble only the incomplete frame crossing chunks when contiguous records are required. A small long-lived view can pin an entire slot, so selective copying can improve memory use. Framing, decryption, and compaction belong to the protocol.
+Budget for application-held views and in-flight operations. Bound packet tasks and retained frames; holding every slot while awaiting another read prevents progress. `BufferPoolOptions::buffers` is the exact shared count, independent of worker count, and exhaustion backpressures rather than growing. Do not depend on worker-local allocation or a particular recycling order.
 
-Budget for application-held views and in-flight operations. Bound packet tasks and retained frames; keeping every slot while awaiting another receive deadlocks progress. `BufferPoolOptions::buffers` is the exact shared count, independent of worker count, and exhaustion backpressures rather than growing. Do not depend on worker-local allocation or particular recycling order.
+## Preserve output ordering
 
-Handle partial stream and file transfers. Zero bytes on a nonempty stream read means EOF; an empty datagram is a real message. Check packet truncation and preserve the peer address when dispatching. Borrowed address views cannot outlive their message; convert the endpoint before extracting payload ownership if it is needed afterwards.
+A stream writer's `write` and `write_vectored` make one possibly partial transfer. Advance the borrowed slices after a short result. Keep one writer for each ordered output sequence; separate writers and socket aliases do not share ordering.
 
-For file pipelines, poll both independent operations with `zip`/join. Merely constructing a read and a write does not submit them. Two reusable buffers suffice for a one-read/one-write pipeline. If using pooled buffers, release a completed write's owner inside its branch so a capacity-waiting read can progress. Explicit submission remains available when acceptance itself is required; it is not the default pipeline optimization.
+Use `submit(owner, cancellation)` when retaining owned output lets the application prepare or receive the next chunk while the accepted write progresses. Submission finishes its predecessor before accepting the new owner. Rejection returns the new owner unchanged. Accepted partial-write retries progress independently of further writer calls, and completed owners are released without requiring `flush` to collect them. `flush(cancellation)` awaits acceptance of every submitted byte by the socket; it does not establish peer acknowledgement. Its cancellation ends only that flush wait.
 
-Cancellation requests progress toward shutdown, not rollback. Capture the loop's result, await uncancellable monitor/receiver close, then return the result. Await all accepted task handles, including on failure; dropping a handle requests task destruction. Close and drop every monitor/receiver before exclusively closing its resource. Only successful close proves retirement; stop using the handle once close begins, even if cleanup fails. Applications decide how to report an operation failure alongside a cleanup failure. The examples prioritize cleanup failures.
+For packets, each write preserves one message boundary and accepts an optional destination address; `None` uses a connected peer. `write_owned` returns the owner alongside the completed result. Retain the complete received message when handing it to a task that also needs its source metadata.
+
+## Keep file position explicit
+
+`FileReader::read` and `FileWriter::write` use the underlying OS file cursor. Handles do not invent private logical positions. Multiple handles or aliases share that cursor, so serialize dependent cursor operations. Use `read_at(buffer, offset, cancellation)` and `write_at(buffer, offset, cancellation)` for explicit positions, subject to the documented platform cursor behavior. `write_all` sequences short writes and returns the original owner even on error or cancellation; success is not a durability guarantee.
+
+For a file pipeline, poll independent reads and writes together with `zip`/join. Merely constructing both futures submits neither. Two reusable buffers suffice for a one-read/one-write pipeline. If using pooled buffers, release a completed write's owner inside its branch so a capacity-waiting read can progress. The concrete file handles also offer optional submission/completion methods when supported by their backend. Use them when the acceptance boundary itself matters; ordinary overlap needs only the joined operations.
+
+## Finish cleanup
+
+Cancellation requests progress toward shutdown, not rollback. A successful transfer can win a cancellation race. Capture a loop's result, await the reader or writer's uncancellable `close()`, drop the handle, then return the result. Flush stream output before close on success; close still runs after an operation error. Only successful close proves backend retirement. Once close begins, perform only close retries through that handle.
+
+Close and drop every reader and writer before exclusively closing its socket or file. Await all accepted task handles, including on failure; dropping a task handle requests task destruction. Applications decide how to report an operation failure alongside a cleanup failure. The examples prioritize cleanup failures.
 
 ## Keep examples and measurements aligned
 
-Use the [canonical I/O recipes](https://github.com/core-rs/core-scheduler/tree/main/examples) as starting points. The runnable driver, correctness tests, and benchmarks call the same recipe functions on Direct, Tokio, Native readiness, and Native io_uring. Extend these workloads when changing the recommendation rather than creating an unrelated favorable microbenchmark.
+Use the [canonical I/O recipes](https://github.com/core-rs/core-scheduler/tree/main/examples) as starting points. Extend those workloads when changing a recommendation rather than creating an unrelated favorable microbenchmark.
 
-Use optimized builds, execute I/O on scheduler workers, validate received contents, and record setup, warmup, timing boundaries, payload sizes, pool budgets, worker counts, environment, and source revision. Compare equivalent ownership and parser behavior: immediate borrowed consumption and retaining frames solve different problems. A pooled receive is not universally faster than reused borrowed storage, and multishot, registered buffers, and zero-copy sends are backend mechanisms with workload-dependent benefits. Keep the recommended path simple until repeatable measurements support a change.
+Use optimized builds, execute I/O on scheduler workers, validate received contents, and record setup, warmup, timing boundaries, payload sizes, pool budgets, worker counts, environment, and source revision. Compare equivalent ownership and parser behavior: immediate borrowed consumption and retaining frames solve different problems. Monitors, receivers, operation dispatch, and selector registration are backend implementation tools. Keep them out of ordinary protocol call sites, and measure multishot, registered buffers, and zero-copy mechanisms behind the same reader/writer interface.

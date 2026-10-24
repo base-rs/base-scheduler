@@ -397,6 +397,10 @@ mod tests;
 
 impl SocketMonitoring for ReadinessSelector {
     type MonitorRegistration = ();
+    fn socket_type(&self, socket: &Self::Socket) -> io::Result<SocketType> {
+        self.check_open()?;
+        crate::socket_io::recvmsg_socket_type(socket.get_ref())
+    }
     fn socket_monitor_state(
         &self,
         socket: &Self::Socket,

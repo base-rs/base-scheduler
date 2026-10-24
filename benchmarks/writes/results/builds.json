@@ -1,0 +1,30 @@
+[
+  {
+    "variant": "base",
+    "source": "49c8e5cf80eddd43c7830a0f64bbfc0e2ce4c027",
+    "binary": "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/base-shared-prepare-server",
+    "sha256": "00e1f7dfd17043341d12e5ad1303bc2fc648ea16a7bef4c9383def4a9200f0c4",
+    "prepare_symbol": "000000000007e6b0 T core_scheduler_write_benchmark::prepare"
+  },
+  {
+    "variant": "yield",
+    "source": "c8d8a1f841973f481bfedd968ca2af66f157794c",
+    "binary": "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/yield-shared-prepare-server",
+    "sha256": "fa211f2f08a83f22016e54e85dbcb29ae6cff0da2da11171bb9459db5b2845cb",
+    "prepare_symbol": "000000000007e160 T core_scheduler_write_benchmark::prepare"
+  },
+  {
+    "variant": "issued",
+    "source": "a7edb88c46ec4975409a0ecb423b73280b345d4d",
+    "binary": "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/issued-shared-prepare-server",
+    "sha256": "047445ed1d90c6aa337ce8fc7605df21a892fa75f2bbbeba2106a429773942d0",
+    "prepare_symbol": "000000000007e720 T core_scheduler_write_benchmark::prepare"
+  },
+  {
+    "variant": "waitall",
+    "source": "dc22b1635014cdc65888c4b21d2fd5568eba2c9c",
+    "binary": "/home/samuel/.cache/core-scheduler-ordered-writer-benchmark/waitall-shared-prepare-server",
+    "sha256": "b515111d5a2e01aaf55cd10deeae1cf2b31c822aa78afdfd62239afe1449823d",
+    "prepare_symbol": "000000000007e720 T core_scheduler_write_benchmark::prepare"
+  }
+]

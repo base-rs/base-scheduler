@@ -25,3 +25,7 @@ impl SocketReceiving for DirectScheduler {
 
 #[cfg(test)]
 mod tests;
+
+impl core_scheduler::SocketStreamReading for DirectScheduler {}
+impl core_scheduler::SocketPacketReading for DirectScheduler {}
+impl core_scheduler::SocketPacketWriting for DirectScheduler {}

@@ -1,0 +1,30 @@
+diff --git a/crates/iouring/src/io_uring_selector.rs b/crates/iouring/src/io_uring_selector.rs
+index d6043f5..5464f67 100644
+--- a/crates/iouring/src/io_uring_selector.rs
++++ b/crates/iouring/src/io_uring_selector.rs
+@@ -546,7 +546,13 @@ impl IoUringSelector {
+         group: Arc<DriverGroup>,
+         worker: usize,
+     ) -> io::Result<IoUringDriver> {
+-        let ring = syscall("ring", || IoUring::new(options.entries))?;
++        let ring = syscall("ring", || {
++            let mut builder = IoUring::builder();
++            if std::env::var("CORE_SCHEDULER_TASKWORK").as_deref() == Ok("cooperative") {
++                builder.setup_coop_taskrun().setup_taskrun_flag();
++            }
++            builder.build(options.entries)
++        })?;
+         syscall("completion-support", || {
+             validate_completion_support(
+                 ring.params().is_feature_nodrop(),
+@@ -1289,7 +1295,9 @@ impl Reactor {
+         if return_to_executor {
+             let needs_submit = {
+                 let submissions = self.ring.submission();
+-                (!submissions.is_empty() && !defer_submission) || submissions.cq_overflow()
++                (!submissions.is_empty() && !defer_submission)
++                    || submissions.cq_overflow()
++                    || submissions.taskrun()
+             };
+             if needs_submit {
+                 let before = self

@@ -114,7 +114,7 @@ pub trait FileMonitoring: FileRead + FileWrite + FileReadAt + FileWriteAt {
     }
 }
 
-fn begin<F, R, B>(
+pub(crate) fn begin<F, R, B>(
     monitor: &mut FileMonitor<F, R>,
     buffer: B,
     cancellation: &Cancellation,
@@ -147,7 +147,7 @@ fn begin<F, R, B>(
     })
 }
 
-fn finish<B>((result, mut buffer): BufferResult<MonitoredBuffer<B>>) -> BufferResult<B> {
+pub(crate) fn finish<B>((result, mut buffer): BufferResult<MonitoredBuffer<B>>) -> BufferResult<B> {
     let owner = buffer.buffer.take().unwrap();
     drop(buffer);
     (result, owner)

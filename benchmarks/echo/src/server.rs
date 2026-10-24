@@ -6,9 +6,10 @@ use core_scheduler::{SocketRecvMessage, SocketRecvMsgReceiver};
 
 use crate::Result;
 use core_scheduler::{
-    Cancellation, IoBuf, SocketAccept, SocketMonitoring, SocketRead, SocketRecvFlags,
-    SocketRecvPoll, SocketRegistration, SocketSendFlags, SocketSendPoll, SocketSetOption,
-    SocketWrite, Spawn, TcpNoDelay,
+    BufferPooling, Cancellation, IoBuf, SocketAccept, SocketMonitoring, SocketRead,
+    SocketRecvFlags, SocketRecvPoll, SocketRegistration, SocketSendFlags, SocketSendPoll,
+    SocketSetOption, SocketStreamReader, SocketStreamReading, SocketStreamWriter,
+    SocketStreamWriting, SocketWrite, Spawn, TcpNoDelay,
 };
 use core_scheduler_tokio::TokioScheduler;
 use std::{
@@ -105,38 +106,34 @@ async fn echo_poll<S: SocketRecvPoll + SocketSendPoll>(scheduler: &S, socket: S:
     }
 }
 
-async fn echo_monitor<S: SocketMonitoring>(scheduler: &S, socket: S::Socket)
+async fn echo_monitor<S>(scheduler: &S, socket: S::Socket)
 where
+    S: SocketStreamReading + SocketStreamWriting,
     S::Socket: 'static,
 {
     let never = Cancellation::never();
     let mut reader = scheduler
-        .socket_stream_monitor(&socket, core_scheduler::Interest::Readable)
-        .expect("read monitor");
+        .socket_stream_reader(&socket)
+        .expect("stream reader");
     let mut writer = scheduler
-        .socket_stream_monitor(&socket, core_scheduler::Interest::Writable)
-        .expect("write monitor");
+        .socket_stream_writer(&socket)
+        .expect("stream writer");
     let mut buffer = vec![0; BUFFER_SIZE];
     loop {
-        let count = scheduler
-            .socket_monitor_recv_poll(&mut reader, &mut buffer, SocketRecvFlags::default(), &never)
+        let count = reader
+            .read_into(&mut buffer, &never)
             .await
-            .expect("monitor receive");
+            .expect("stream read");
         if count == 0 {
             return;
         }
         let mut sent = 0;
         while sent < count {
-            let written = scheduler
-                .socket_monitor_send_poll(
-                    &mut writer,
-                    &buffer[sent..count],
-                    SocketSendFlags::default(),
-                    &never,
-                )
+            let written = writer
+                .write(&buffer[sent..count], &never)
                 .await
-                .expect("monitor send");
-            assert!(written != 0, "monitor write made zero progress");
+                .expect("stream write");
+            assert!(written != 0, "stream write made zero progress");
             sent += written;
         }
     }
@@ -226,6 +223,9 @@ async fn scheduler_server<S>(
         + SocketRecvPoll
         + SocketSendPoll
         + SocketMonitoring
+        + SocketStreamWriting
+        + SocketStreamReading
+        + BufferPooling
         + SocketSetOption<TcpNoDelay>
         + Spawn
         + Send

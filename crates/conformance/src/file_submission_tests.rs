@@ -6,6 +6,32 @@
 macro_rules! file_submission_tests {
     (run: $run:path $(,)?) => {
         $crate::__file_test_cases! { $run;
+            bound_file_submissions_separate_acceptance_from_owner_collection => |fixture, scheduler, file| {
+                use $crate::__core_scheduler::{FileReader as _, FileReading as _, FileWriter as _, FileWriting as _};
+                let never = $crate::__core_scheduler::Cancellation::never();
+                let mut reader = scheduler.file_reader(&file).unwrap();
+                let mut writer = scheduler.file_writer(&file).unwrap();
+                let storage = ::std::vec![0; 3];
+                let pointer = storage.as_ptr();
+                let completion = reader.read_submit(storage, &never).await.unwrap();
+                let (result, storage) = completion.await;
+                assert_eq!(result.unwrap(), 3);
+                assert_eq!(storage, b"abc");
+                assert_eq!(storage.as_ptr(), pointer);
+                let (result, storage) = reader.read_at_submit(storage, 3, &never).await.unwrap().await;
+                assert_eq!(result.unwrap(), 3);
+                assert_eq!(storage, b"def");
+                let (result, storage) = writer.write_at_submit(storage, 0, &never).await.unwrap().await;
+                assert_eq!(result.unwrap(), 3);
+                assert_eq!(storage.as_ptr(), pointer);
+                scheduler.file_seek(&file, ::std::io::SeekFrom::Start(3), &never).await.unwrap();
+                let (result, storage) = writer.write_submit(storage, &never).await.unwrap().await;
+                assert_eq!(result.unwrap(), 3);
+                assert_eq!(storage.as_ptr(), pointer);
+                fixture.assert_contents(b"defdef");
+                reader.close().await.unwrap();
+                writer.close().await.unwrap();
+            },
             submission_is_lazy_and_pre_cancelled_admission_returns_the_owner => |fixture, scheduler, file| {
                 use $crate::__core_scheduler::FileSubmission as _;
                 let never = $crate::__core_scheduler::Cancellation::never();

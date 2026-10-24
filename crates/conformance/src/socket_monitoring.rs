@@ -296,7 +296,7 @@ async fn monitor<S, M>(
         .unwrap();
 }
 
-fn cancelled<T>(result: OperationResult<T>) {
+pub(crate) fn cancelled<T>(result: OperationResult<T>) {
     assert!(
         matches!(result, Err(OperationError::Cancelled(_))),
         "expected cooperative cancellation"

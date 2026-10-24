@@ -122,6 +122,13 @@ impl SocketWait for Sockets {
     }
 }
 impl SocketMonitoring for Sockets {
+    fn socket_type(&self, socket: &Self::Socket) -> io::Result<SocketType> {
+        match socket.load(Ordering::Relaxed) {
+            200 => Ok(SocketType::Datagram),
+            201 => Err(io::ErrorKind::PermissionDenied.into()),
+            _ => Ok(SocketType::Stream),
+        }
+    }
     type MonitorRegistration = ();
     async fn socket_monitor_close<M: SocketMonitorState<Self::Socket, ()>>(
         &self,
@@ -139,6 +146,9 @@ impl SocketMonitoring for Sockets {
         socket: &Self::Socket,
         interest: Interest,
     ) -> io::Result<SocketMonitor<Self::Socket, ()>> {
+        if socket.load(Ordering::Relaxed) == 202 {
+            return Err(io::ErrorKind::PermissionDenied.into());
+        }
         Ok(SocketMonitor::new(socket.clone(), interest, ()))
     }
 }
@@ -372,4 +382,365 @@ fn readiness_failures_follow_receive_error_policy() {
                 .unwrap();
         }
     });
+}
+
+thread_local! { static FAIL_POOL: std::cell::Cell<bool> = const { std::cell::Cell::new(false) }; }
+
+impl BufferPooling for Sockets {
+    type Pool = HeapBufferPool;
+    fn buffer_pool(&self, options: BufferPoolOptions) -> io::Result<Self::Pool> {
+        if FAIL_POOL.with(|flag| flag.replace(false)) {
+            return Err(io::ErrorKind::OutOfMemory.into());
+        }
+        HeapBufferPool::with_options(options)
+    }
+}
+
+#[test]
+fn bound_stream_reader_preserves_borrowing_eof_and_owned_chunks() {
+    block_on(async {
+        let socket = Arc::new(AtomicUsize::new(1));
+        let never = Cancellation::never();
+        let mut reader = BoundSocketStreamReader::new(&Sockets, &socket).unwrap();
+        assert_eq!(reader.read_into(&mut [], &never).await.unwrap(), 0);
+        let mut bytes = [0; 4];
+        assert_eq!(reader.read_into(&mut bytes, &never).await.unwrap(), 4);
+        assert_eq!(bytes, [42; 4]);
+        let mut vectors = [IoSliceMut::new(&mut bytes)];
+        assert_eq!(reader.read_vectored(&mut vectors, &never).await.unwrap(), 4);
+        let owned = reader.read(&never).await.unwrap().unwrap();
+        assert_eq!(owned.as_ref().len(), 64 * 1024);
+        let pool = HeapBufferPool::new(1, 8).unwrap();
+        reader = reader.with_pool(pool.clone());
+        let owned = reader.read(&never).await.unwrap().unwrap();
+        assert_eq!(owned.as_ref(), [42; 8]);
+        socket.store(0, Ordering::Relaxed);
+        drop(owned);
+        assert_eq!(reader.read_into(&mut bytes, &never).await.unwrap(), 0);
+        assert!(reader.read(&never).await.unwrap().is_none());
+        assert_eq!(
+            reader
+                .read_vectored(&mut [IoSliceMut::new(&mut bytes)], &never)
+                .await
+                .unwrap(),
+            0
+        );
+        reader.close().await.unwrap();
+        assert_eq!(
+            reader
+                .read_into(&mut bytes, &never)
+                .await
+                .unwrap_err()
+                .kind(),
+            io::ErrorKind::BrokenPipe
+        );
+        reader.close().await.unwrap();
+    });
+}
+
+#[test]
+fn bound_stream_reader_empty_vectors_do_not_establish_eof() {
+    block_on(async {
+        let socket = Arc::new(AtomicUsize::new(0));
+        let never = Cancellation::never();
+        let mut reader = Sockets.socket_stream_reader(&socket).unwrap();
+        let mut empty = [];
+        assert_eq!(
+            reader
+                .read_vectored(&mut [IoSliceMut::new(&mut empty)], &never)
+                .await
+                .unwrap(),
+            0
+        );
+        socket.store(1, Ordering::Relaxed);
+        assert!(reader.read(&never).await.unwrap().is_some());
+        socket.store(0, Ordering::Relaxed);
+        assert!(reader.read(&never).await.unwrap().is_none());
+        assert_eq!(reader.read_into(&mut [0; 1], &never).await.unwrap(), 0);
+        reader.close().await.unwrap();
+    });
+}
+
+#[test]
+fn bound_stream_reader_returns_idle_capacity_and_retries_cancelled_waits() {
+    block_on(async {
+        let socket = Arc::new(AtomicUsize::new(6));
+        let never = Cancellation::never();
+        let pool = HeapBufferPool::new(1, 8).unwrap();
+        let mut reader = Sockets
+            .socket_stream_reader_with_pool(&socket, pool.clone())
+            .unwrap();
+        let cancellation = Cancellation::new();
+        {
+            let mut reading = pin!(reader.read(&cancellation));
+            assert!(poll_once(reading.as_mut()).await.is_none());
+            assert!(pool.try_acquire().is_some());
+            cancellation.cancel();
+            assert!(reading.await.is_err());
+        }
+        socket.store(7, Ordering::Relaxed);
+        let chunk = reader.read(&never).await.unwrap().unwrap();
+        assert_eq!(chunk.as_ref(), [42; 8]);
+        {
+            let mut reading = pin!(reader.read(&cancellation));
+            assert!(poll_once(reading.as_mut()).await.unwrap().is_err());
+        }
+        reader.close().await.unwrap();
+        assert_eq!(chunk.as_ref(), [42; 8]);
+        assert!(reader.read(&never).await.unwrap().is_none());
+    });
+}
+
+#[test]
+fn bound_stream_reader_errors_and_abandoned_close_do_not_reopen_input() {
+    block_on(async {
+        let socket = Arc::new(AtomicUsize::new(4));
+        let never = Cancellation::never();
+        let mut reader = Sockets.socket_stream_reader(&socket).unwrap();
+        assert!(reader.read(&never).await.is_err());
+        assert!(reader.read_into(&mut [0; 1], &never).await.is_err());
+        assert!(
+            reader
+                .read_vectored(&mut [IoSliceMut::new(&mut [0; 1])], &never)
+                .await
+                .is_err()
+        );
+        socket.store(8, Ordering::Relaxed);
+        assert!(reader.read(&never).await.is_err());
+        socket.store(100, Ordering::Relaxed);
+        {
+            let mut close = pin!(reader.close());
+            assert!(poll_once(close.as_mut()).await.is_none());
+        }
+        assert!(reader.read(&never).await.unwrap().is_none());
+        assert!(reader.read_vectored(&mut [], &never).await.is_err());
+        socket.store(102, Ordering::Relaxed);
+        assert!(reader.close().await.is_err());
+        socket.store(1, Ordering::Relaxed);
+        reader.close().await.unwrap();
+    });
+}
+
+#[test]
+fn bound_stream_reader_rejects_invalid_socket_kinds_and_setup_failures() {
+    for state in [200, 201, 202] {
+        let socket = Arc::new(AtomicUsize::new(state));
+        assert!(Sockets.socket_stream_reader(&socket).is_err());
+        assert!(
+            Sockets
+                .socket_stream_reader_with_pool(&socket, HeapBufferPool::new(1, 8).unwrap())
+                .is_err()
+        );
+    }
+}
+
+struct Output<B> {
+    socket: Arc<AtomicUsize>,
+    marker: std::marker::PhantomData<B>,
+}
+impl SocketStreamOutputting for Sockets {
+    type Writer<B: IoBuf> = Output<B>;
+    fn socket_stream_output<B: IoBuf>(&self, socket: &Self::Socket) -> io::Result<Self::Writer<B>> {
+        if socket.load(Ordering::Relaxed) == 200 {
+            return Err(io::ErrorKind::InvalidInput.into());
+        }
+        Ok(Output {
+            socket: socket.clone(),
+            marker: std::marker::PhantomData,
+        })
+    }
+}
+impl<B: IoBuf> SocketStreamOutput<Sockets> for Output<B> {
+    type Buffer = B;
+    async fn submit(
+        &mut self,
+        _: &Sockets,
+        buffer: B,
+        cancellation: &Cancellation,
+    ) -> Result<(), (OperationError, B)> {
+        if let Err(error) = cancellation.check() {
+            return Err((error.into(), buffer));
+        }
+        if self.socket.load(Ordering::Relaxed) == 105 {
+            std::future::pending::<()>().await;
+        }
+        Ok(())
+    }
+    async fn flush(&mut self, _: &Sockets, cancellation: &Cancellation) -> OperationResult<()> {
+        cancellation.check()?;
+        if self.socket.load(Ordering::Relaxed) == 104 {
+            return Err(io::Error::from(io::ErrorKind::BrokenPipe).into());
+        }
+        Ok(())
+    }
+    async fn close(&mut self, _: &Sockets) -> io::Result<()> {
+        if self.socket.load(Ordering::Relaxed) == 103 {
+            return Err(io::ErrorKind::BrokenPipe.into());
+        }
+        Ok(())
+    }
+}
+
+#[test]
+fn bound_stream_writer_combines_borrowed_and_owned_output() {
+    block_on(async {
+        let never = Cancellation::never();
+        let socket = Arc::new(AtomicUsize::new(1));
+        let mut writer = Sockets.socket_stream_writer(&socket).unwrap();
+        assert_eq!(writer.write(b"borrowed", &never).await.unwrap(), 8);
+        assert_eq!(
+            writer
+                .write_vectored(&[IoSlice::new(b"vector")], &never)
+                .await
+                .unwrap(),
+            0
+        );
+        let pool = HeapBufferPool::new(1, 8).unwrap();
+        writer
+            .submit(pool.acquire(&never).await.unwrap(), &never)
+            .await
+            .map_err(|(e, _)| e)
+            .unwrap();
+        assert_eq!(writer.write(b"next", &never).await.unwrap(), 4);
+        writer
+            .submit(pool.acquire(&never).await.unwrap(), &never)
+            .await
+            .map_err(|(e, _)| e)
+            .unwrap();
+        assert_eq!(writer.write_vectored(&[], &never).await.unwrap(), 0);
+        writer.flush(&never).await.unwrap();
+        drop(writer.close());
+        writer.close().await.unwrap();
+        writer.close().await.unwrap();
+        assert!(writer.write(b"closed", &never).await.is_err());
+        assert!(writer.write_vectored(&[], &never).await.is_err());
+        assert!(writer.flush(&never).await.is_err());
+        let returned = pool.acquire(&never).await.unwrap();
+        let address = returned.as_ref().as_ptr();
+        let (error, returned) = writer.submit(returned, &never).await.unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::BrokenPipe);
+        assert_eq!(returned.as_ref().as_ptr(), address);
+        drop(returned);
+    });
+}
+
+#[test]
+fn bound_stream_writer_preserves_ordering_after_abandoned_admission_and_errors() {
+    block_on(async {
+        let never = Cancellation::never();
+        let socket = Arc::new(AtomicUsize::new(105));
+        let mut writer = Sockets
+            .socket_stream_writer_with_buffer::<Vec<u8>>(&socket)
+            .unwrap();
+        {
+            let mut submitting = pin!(writer.submit(b"pending".to_vec(), &never));
+            assert!(poll_once(submitting.as_mut()).await.is_none());
+        }
+        socket.store(104, Ordering::Relaxed);
+        assert!(writer.write(b"next", &never).await.is_err());
+        assert!(writer.write_vectored(&[], &never).await.is_err());
+        assert!(writer.flush(&never).await.is_err());
+        socket.store(103, Ordering::Relaxed);
+        assert!(writer.close().await.is_err());
+        socket.store(102, Ordering::Relaxed);
+        assert!(writer.close().await.is_err());
+        socket.store(1, Ordering::Relaxed);
+        writer.close().await.unwrap();
+        socket.store(200, Ordering::Relaxed);
+        assert!(Sockets.socket_stream_writer(&socket).is_err());
+        socket.store(202, Ordering::Relaxed);
+        assert!(Sockets.socket_stream_writer(&socket).is_err());
+    });
+}
+
+#[test]
+fn bound_stream_reader_preserves_pool_failures_exhaustion_and_cancellation_at_eof() {
+    block_on(async {
+        let socket = Arc::new(AtomicUsize::new(1));
+        let never = Cancellation::never();
+        let mut reader = BoundSocketStreamReader::new(&Sockets, &socket).unwrap();
+        FAIL_POOL.with(|flag| flag.set(true));
+        assert_eq!(
+            reader.read(&never).await.unwrap_err().kind(),
+            io::ErrorKind::OutOfMemory
+        );
+        let pool = HeapBufferPool::new(1, 1).unwrap();
+        let held = pool.try_acquire().unwrap();
+        reader = reader.with_pool(pool);
+        let cancellation = Cancellation::new();
+        {
+            let mut reading = pin!(reader.read(&cancellation));
+            assert!(poll_once(reading.as_mut()).await.is_none());
+            cancellation.cancel();
+            assert!(reading.await.is_err());
+        }
+        drop(held);
+        socket.store(0, Ordering::Relaxed);
+        assert_eq!(
+            reader
+                .read_vectored(&mut [IoSliceMut::new(&mut [0; 1])], &never)
+                .await
+                .unwrap(),
+            0
+        );
+        assert!(reader.read_into(&mut [0; 1], &cancellation).await.is_err());
+        assert!(reader.read_vectored(&mut [], &cancellation).await.is_err());
+        reader.close().await.unwrap();
+    });
+}
+
+impl SocketStreamReading for Sockets {}
+
+#[test]
+fn opaque_stream_factories_bind_the_scheduler_without_borrowing_the_input_reference() {
+    block_on(async {
+        let never = Cancellation::never();
+        let mut reader = {
+            let socket = Arc::new(AtomicUsize::new(1));
+            Sockets.socket_stream_reader(&socket).unwrap()
+        };
+        let chunk = reader.read(&never).await.unwrap().unwrap();
+        let mut writer = {
+            let socket = Arc::new(AtomicUsize::new(1));
+            Sockets.socket_stream_writer(&socket).unwrap()
+        };
+        writer.submit(chunk, &never).await.unwrap();
+        writer.flush(&never).await.unwrap();
+        writer.close().await.unwrap();
+        reader.close().await.unwrap();
+        let mut writer = {
+            let socket = Arc::new(AtomicUsize::new(1));
+            Sockets
+                .socket_stream_writer_with_buffer::<Vec<u8>>(&socket)
+                .unwrap()
+        };
+        writer.submit(b"typed".to_vec(), &never).await.unwrap();
+        writer.close().await.unwrap();
+    });
+}
+
+impl core_scheduler::SocketStreamWriting for Sockets {
+    fn socket_stream_writer<'scheduler>(
+        &'scheduler self,
+        socket: &Self::Socket,
+    ) -> io::Result<
+        impl core_scheduler::SocketStreamWriter<
+            Buffer = <Self::Pool as core_scheduler::BufferPool>::Buffer,
+        > + 'scheduler,
+    >
+    where
+        Self::Socket: 'static,
+    {
+        core_scheduler::BoundSocketStreamWriter::new(self, socket)
+    }
+
+    fn socket_stream_writer_with_buffer<'scheduler, B: IoBuf>(
+        &'scheduler self,
+        socket: &Self::Socket,
+    ) -> io::Result<impl core_scheduler::SocketStreamWriter<Buffer = B> + 'scheduler>
+    where
+        Self::Socket: 'static,
+    {
+        core_scheduler::BoundSocketStreamWriter::new(self, socket)
+    }
 }

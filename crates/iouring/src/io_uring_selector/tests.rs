@@ -9,7 +9,15 @@ use std::cell::RefCell;
 type SyscallHook = (&'static str, Box<dyn FnOnce()>);
 thread_local! {
     pub(super) static BEFORE_SYSCALL: RefCell<Option<SyscallHook>> = const { RefCell::new(None) };
+    static BEFORE_CAPACITY_ADMISSION: RefCell<Option<Box<dyn FnOnce()>>> = const { RefCell::new(None) };
     static FAILURES: RefCell<VecDeque<(&'static str, Option<io::Error>)>> = const { RefCell::new(VecDeque::new()) };
+}
+
+pub(super) fn before_capacity_admission() {
+    let hook = BEFORE_CAPACITY_ADMISSION.with(|hook| hook.borrow_mut().take());
+    if let Some(hook) = hook {
+        hook();
+    }
 }
 
 pub(super) fn syscall<T>(
@@ -1130,6 +1138,27 @@ fn partial_ring_construction_releases_previously_created_drivers() {
         io::ErrorKind::PermissionDenied
     );
     assert!(FAILURES.with(|failures| failures.borrow().is_empty()));
+}
+
+#[test]
+fn capacity_admission_rechecks_closure_after_a_competing_transition() {
+    let capacity = Arc::new(Capacity {
+        state: AtomicUsize::new(0),
+        available: CompletionEvent::new(),
+        limit: 1,
+    });
+    let closing = Arc::clone(&capacity);
+    BEFORE_CAPACITY_ADMISSION.with(|hook| {
+        *hook.borrow_mut() = Some(Box::new(move || closing.close()));
+    });
+    assert_eq!(
+        block_on(capacity.acquire(&Cancellation::never()))
+            .err()
+            .unwrap()
+            .kind(),
+        io::ErrorKind::BrokenPipe
+    );
+    assert_eq!(capacity.state.load(Ordering::Acquire), CAPACITY_CLOSED);
 }
 
 #[test]

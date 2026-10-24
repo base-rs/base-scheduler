@@ -20,6 +20,9 @@ pub trait SocketMonitoring:
 {
     type MonitorRegistration: MonitorState;
 
+    /// Inspect transport semantics and scheduler compatibility before constructing a directional reader or writer.
+    fn socket_type(&self, socket: &Self::Socket) -> io::Result<crate::SocketType>;
+
     /// Construct unregistered state. Embed it in an `Arc`-owned connection and project it with `MonitorStorage::from_arc`, or use `socket_monitor` for separate allocation.
     fn socket_monitor_state(
         &self,

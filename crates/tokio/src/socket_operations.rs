@@ -410,6 +410,10 @@ mod tests;
 
 impl SocketMonitoring for TokioScheduler {
     type MonitorRegistration = ();
+    fn socket_type(&self, socket: &Self::Socket) -> io::Result<SocketType> {
+        self.check_socket(socket)?;
+        crate::socket_io::recvmsg_socket_type(socket.get_ref())
+    }
     async fn socket_monitor_close<
         M: SocketMonitorState<Self::Socket, Self::MonitorRegistration>,
     >(

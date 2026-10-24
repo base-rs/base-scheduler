@@ -37,7 +37,7 @@ Each worker owns an unsynchronized timer queue and collects expiries in its even
 
 A sleep first polled on a worker registers directly with that worker. Root futures and other executors choose a worker by round robin and send it a registration command. A pending sleep retains its original owner when its future moves; waker changes, cancellation, and drop update that owner's queue. A subsequent sleep can choose the task's new worker. Shutdown wakes pending sleepers and waits for worker timer callbacks and driver retirement.
 
-The executor and readiness design come from [Socketry](https://github.com/core-rs/socketry-rust/tree/7a70586d5d37fb640d696d0c03a05b2ee3cbe06b/crates/executor). This adapter follows Core's current ownership, cancellation, and asynchronous shutdown contracts. It does not include Socketry's io_uring backend.
+The executor and readiness design come from [Socketry](https://github.com/core-rs/socketry-rust/tree/7a70586d5d37fb640d696d0c03a05b2ee3cbe06b/crates/executor). This adapter follows Core's current ownership, cancellation, and asynchronous shutdown contracts. It does not include Socketry's io\_uring backend.
 
 ## Selector composition
 
@@ -59,9 +59,11 @@ scheduler.block_on(scheduler.shutdown());
 # Ok::<(), std::io::Error>(())
 ```
 
-Selectors may supply their own progress mechanism. The readiness selector is independently driven by `async-io`. `with_drivers(selector, drivers, options)` instead assigns one driver to each task worker, with no separate ring thread. Each `SelectorDriver` enters its worker and supplies `SelectorWorker` event waits, interruptible wakeups, and bounded completion processing. Native polls ready tasks only after a complete driver turn publishes its completions. Workers continue retiring accepted I/O after tasks are abandoned, and can keep executing tasks after a driver has retired. See the [io_uring selector](../iouring/readme.md) for per-worker ring construction and routing.
+Selectors may supply their own progress mechanism. The readiness selector is independently driven by `async-io`. `with_drivers(selector, drivers, options)` instead assigns one driver to each task worker, with no separate ring thread. Each `SelectorDriver` enters its worker and supplies `SelectorWorker` event waits, interruptible wakeups, and bounded completion processing. Native polls ready tasks only after a complete driver turn publishes its completions. Workers continue retiring accepted I/O after tasks are abandoned, and can keep executing tasks after a driver has retired. See the [io\_uring selector](../iouring/readme.md) for per-worker ring construction and routing.
 
-`SocketReceiving` constructs a portable receiver from a scheduler-created buffer pool. Receive and close take the scheduler explicitly. Completed messages expose mutable payloads which can be frozen into retained views. Close awaits retirement without cancellation; drop the receiver afterwards to release its socket owner before exclusive socket close. Explicit multishot kernel control remains a concrete io_uring API accessed through the selector.
+Construct scheduler-bound stream and packet readers and writers for application I/O, and file readers and writers for repeated file operations. Their operations take cancellation without another scheduler argument. Borrowed-only readers allocate no payload pool; owned reads use lazy default storage or an explicit shared pool. Close and drop every handle before exclusively closing its underlying resource. See the [I/O usage guide](../../context/io.md) for the recommended paths.
+
+Available I/O capabilities follow the selected backend. Ordered stream output is currently supplied by the io\_uring selector; the default readiness selector does not implement `SocketStreamWriting`.
 
 ## Releasing
 

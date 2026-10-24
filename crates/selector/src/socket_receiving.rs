@@ -25,3 +25,7 @@ impl SocketReceiving for ReadinessSelector {
 
 #[cfg(test)]
 mod tests;
+
+impl core_scheduler::SocketStreamReading for ReadinessSelector {}
+impl core_scheduler::SocketPacketReading for ReadinessSelector {}
+impl core_scheduler::SocketPacketWriting for ReadinessSelector {}

@@ -21,6 +21,7 @@ mod io_uring_worker;
 pub use io_uring_worker::IoUringWorker;
 
 pub use io_uring_selector::file_monitor::IoUringFileRegistration;
+pub use io_uring_selector::stream_writer::IoUringStreamWriter;
 
 mod io_uring_buffer;
 mod io_uring_buffer_pool;

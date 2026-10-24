@@ -18,6 +18,7 @@ pub mod socket_monitoring;
 pub mod socket_options;
 pub mod socket_poll;
 pub mod socket_registration;
+pub mod socket_stream_writing;
 pub mod spawn;
 
 mod address_resolution_fixture;
@@ -79,3 +80,5 @@ mod file_submission_tests;
 pub mod socket_receiving;
 
 pub mod buffer_pool;
+
+pub mod socket_packet_io;

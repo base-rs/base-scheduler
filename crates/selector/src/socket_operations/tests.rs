@@ -591,3 +591,16 @@ fn pooled_receivers_preserve_messages_and_stream_eof() {
         scheduler.shutdown().await;
     });
 }
+
+#[test]
+fn directional_handle_factories_validate_transport_and_closed_admission() {
+    let scheduler = scheduler(1);
+    let socket = socket();
+    assert_ne!(scheduler.socket_type(&socket).unwrap(), SocketType::Stream);
+    scheduler.close();
+    assert_eq!(
+        scheduler.socket_type(&socket).unwrap_err().kind(),
+        io::ErrorKind::BrokenPipe
+    );
+    block_on(scheduler.shutdown());
+}

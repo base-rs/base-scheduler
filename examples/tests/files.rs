@@ -233,13 +233,7 @@ fn copy_closes_both_monitors_on_cancellation_empty_input_and_write_failure() {
                 .await
                 .is_err()
         );
-        let mut monitor = scheduler.file_monitor(&file).unwrap();
-        assert_eq!(
-            files::write_all(&scheduler, &mut monitor, vec![], &never)
-                .await
-                .0
-                .unwrap(),
-            0
-        );
+        let mut writer = scheduler.file_writer(&file).unwrap();
+        assert_eq!(writer.write_all(vec![], &never).await.0.unwrap(), 0);
     });
 }
