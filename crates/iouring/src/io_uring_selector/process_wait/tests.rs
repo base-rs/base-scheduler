@@ -148,7 +148,7 @@ fn detaching_a_wait_result_disconnects_its_receiver_exactly_once() {
     let (selector, driver) = IoUringSelector::new(Default::default()).unwrap();
     let controller = &selector.controllers[0];
     let permit = block_on(controller.capacity.acquire(&Cancellation::never())).unwrap();
-    let (reply, result) = oneshot::channel();
+    let (reply, mut result) = oneshot::channel();
     let request = WaitRequest {
         identifier: controller.next_identifier().unwrap(),
         _permit: permit,
@@ -162,7 +162,7 @@ fn detaching_a_wait_result_disconnects_its_receiver_exactly_once() {
     // Detaching the sender is independent of kernel completion: a stopped driver can disconnect the waiter while retaining the request's output storage.
     drop(request.take_reply().unwrap());
     assert!(request.take_reply().is_none());
-    assert!(block_on(result).is_err());
+    assert!(result.try_recv().is_err());
     drop(request);
     drop(driver);
     block_on(selector.shutdown());
