@@ -5,6 +5,8 @@ use crate::task_service::{TaskRegistration, TaskState};
 use core_scheduler::TaskError;
 use std::{
     future::Future,
+    marker::PhantomPinned,
+    mem::ManuallyDrop,
     panic::{AssertUnwindSafe, catch_unwind},
     pin::Pin,
     task::{Context, Poll},
@@ -25,34 +27,47 @@ impl<T> Future for NativeTask<T> {
 
 // async-task aborts if its future or stored output destructor unwinds. Keep both user-owned values behind guards, including when the task is abandoned.
 pub(crate) struct TaskFuture<F: Future> {
-    future: Option<Pin<Box<F>>>,
+    future: ManuallyDrop<F>,
+    live: bool,
     _registration: TaskRegistration,
+    _pin: PhantomPinned,
 }
 
 impl<F: Future> TaskFuture<F> {
     pub(crate) fn new(future: F, registration: TaskRegistration) -> Self {
         Self {
-            future: Some(Box::pin(future)),
+            future: ManuallyDrop::new(future),
+            live: true,
             _registration: registration,
+            _pin: PhantomPinned,
+        }
+    }
+
+    fn drop_future(&mut self) {
+        // Retire before invoking arbitrary user destruction, so an unwind cannot cause a second drop.
+        if std::mem::replace(&mut self.live, false) {
+            // SAFETY: The live future is dropped in place exactly once. The wrapper remains pinned until its own destruction, including after this field has retired.
+            unsafe { ManuallyDrop::drop(&mut self.future) };
         }
     }
 }
-
-impl<F: Future> Unpin for TaskFuture<F> {}
 
 impl<F: Future> Future for TaskFuture<F> {
     type Output = TaskOutcome<F::Output>;
 
     fn poll(self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Self::Output> {
-        let this = self.get_mut();
+        // SAFETY: The wrapper structurally pins its future and never moves that field. Retirement drops it in place; PhantomPinned also prevents moving the wrapper after its field retires.
+        let this = unsafe { self.get_unchecked_mut() };
         let mut result = match catch_unwind(AssertUnwindSafe(|| {
-            this.future.as_mut().unwrap().as_mut().poll(context)
+            assert!(this.live, "task future polled after completion");
+            // SAFETY: The projection above preserves the future's pinned address, and live excludes access after retirement.
+            unsafe { Pin::new_unchecked(&mut *this.future) }.poll(context)
         })) {
             Ok(Poll::Pending) => return Poll::Pending,
             Ok(Poll::Ready(output)) => Ok(output),
             Err(payload) => Err(TaskError::Panicked(payload)),
         };
-        if let Err(payload) = catch_unwind(AssertUnwindSafe(|| drop(this.future.take()))) {
+        if let Err(payload) = catch_unwind(AssertUnwindSafe(|| this.drop_future())) {
             crate::panic::discard(result);
             result = Err(TaskError::Panicked(payload));
         }
@@ -62,7 +77,7 @@ impl<F: Future> Future for TaskFuture<F> {
 
 impl<F: Future> Drop for TaskFuture<F> {
     fn drop(&mut self) {
-        crate::panic::discard(self.future.take());
+        crate::panic::contain(|| self.drop_future());
     }
 }
 

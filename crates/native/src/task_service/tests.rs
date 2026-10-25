@@ -427,3 +427,129 @@ fn intermediate_runnable_retirement_does_not_wake_drain_waiters() {
     shared.retire_runnable();
     assert!(block_on(futures_lite::future::poll_once(&mut listener)).is_some());
 }
+
+mod pinned_tasks {
+    use super::*;
+    use std::{cell::Cell, marker::PhantomPinned};
+
+    struct PinnedFuture {
+        address: Arc<AtomicUsize>,
+        drops: Arc<AtomicUsize>,
+        polls: Cell<usize>,
+        panic_poll: bool,
+        panic_drop: bool,
+        _pin: PhantomPinned,
+    }
+    impl PinnedFuture {
+        fn check_address(&self) {
+            let address = self as *const Self as usize;
+            match self
+                .address
+                .compare_exchange(0, address, Ordering::SeqCst, Ordering::SeqCst)
+            {
+                Ok(_) => {}
+                Err(previous) => assert_eq!(previous, address, "pinned future moved"),
+            }
+        }
+    }
+    impl Future for PinnedFuture {
+        type Output = usize;
+
+        fn poll(self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<usize> {
+            self.check_address();
+            assert!(!self.panic_poll, "poll panic");
+            let polls = self.polls.get();
+            self.polls.set(polls + 1);
+            if polls == 0 {
+                context.waker().wake_by_ref();
+                Poll::Pending
+            } else {
+                Poll::Ready(42)
+            }
+        }
+    }
+    impl Drop for PinnedFuture {
+        fn drop(&mut self) {
+            self.check_address();
+            assert_eq!(self.drops.fetch_add(1, Ordering::SeqCst), 0);
+            assert!(!self.panic_drop, "destructor panic");
+        }
+    }
+
+    fn run_on_another_thread(service: &TaskService) {
+        let shared = Arc::clone(&service.shared);
+        let runnable = loop {
+            match shared.workers[0].incoming.steal() {
+                crossbeam_deque::Steal::Success(runnable) => break runnable,
+                crossbeam_deque::Steal::Retry => continue,
+                crossbeam_deque::Steal::Empty => panic!("expected a scheduled task"),
+            }
+        };
+        std::thread::spawn(move || {
+            runnable.run();
+            shared.retire_runnable();
+        })
+        .join()
+        .unwrap();
+    }
+
+    #[test]
+    fn address_is_stable_through_thread_changes_completion_and_abandonment() {
+        for abandon in [false, true] {
+            for panic_drop in [false, true] {
+                let (service, _queues) = queued_service(1);
+                let drops = Arc::new(AtomicUsize::new(0));
+                let mut task = Some(
+                    service
+                        .spawn(PinnedFuture {
+                            address: Arc::new(AtomicUsize::new(0)),
+                            drops: Arc::clone(&drops),
+                            polls: Cell::new(0),
+                            panic_poll: false,
+                            panic_drop,
+                            _pin: PhantomPinned,
+                        })
+                        .unwrap(),
+                );
+                run_on_another_thread(&service);
+                assert_eq!(drops.load(Ordering::SeqCst), 0);
+                if abandon {
+                    drop(task.take());
+                }
+                run_on_another_thread(&service);
+                if let Some(task) = task {
+                    let result = block_on(task);
+                    if panic_drop {
+                        assert!(matches!(result, Err(TaskError::Panicked(_))));
+                    } else {
+                        assert_eq!(result.unwrap(), 42);
+                    }
+                }
+                block_on(service.drain());
+                assert_eq!(drops.load(Ordering::SeqCst), 1);
+            }
+        }
+    }
+
+    #[test]
+    fn poll_and_destructor_panics_retire_the_future_once() {
+        for panic_drop in [false, true] {
+            let (service, _queues) = queued_service(1);
+            let drops = Arc::new(AtomicUsize::new(0));
+            let task = service
+                .spawn(PinnedFuture {
+                    address: Arc::new(AtomicUsize::new(0)),
+                    drops: Arc::clone(&drops),
+                    polls: Cell::new(0),
+                    panic_poll: true,
+                    panic_drop,
+                    _pin: PhantomPinned,
+                })
+                .unwrap();
+            run_on_another_thread(&service);
+            assert!(matches!(block_on(task), Err(TaskError::Panicked(_))));
+            block_on(service.drain());
+            assert_eq!(drops.load(Ordering::SeqCst), 1);
+        }
+    }
+}
