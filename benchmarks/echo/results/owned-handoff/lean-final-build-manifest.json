@@ -1,0 +1,19 @@
+{
+  "commit": "83433057fc469e076dcd7e7f42a61b8147a91ced",
+  "sha256": "8ea109bf21845f3fa0aeee9964726a242b65dce08fe4262fe83e664f38d6c12b",
+  "rustc": "rustc 1.99.0 (b940084d7 2026-09-28) (Arch Linux rust 1:1.99.0-1)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+  "environment": {
+    "CARGO_TARGET_DIR": "/home/samuel/.cache/core-scheduler-owned-echo-diagnosis/target",
+    "CARGO_LLVM_COV_TARGET_DIR": "/home/samuel/.cache/core-scheduler-owned-dispatch/coverage-lean-read",
+    "LLVM_COV": "/home/samuel/.cache/core-scheduler-owned-receive-pr/tools/bin/llvm-cov",
+    "LLVM_PROFDATA": "/usr/bin/llvm-profdata",
+    "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_PROFILE_RELEASE_LTO": "false",
+    "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "16",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_ENCODED_RUSTFLAGS": "",
+    "RUSTFLAGS": "",
+    "RUST_TEST_THREADS": "1"
+  }
+}

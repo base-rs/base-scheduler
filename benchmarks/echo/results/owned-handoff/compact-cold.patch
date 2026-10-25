@@ -1,0 +1,141 @@
+diff --git a/crates/iouring/src/io_uring_selector/socket.rs b/crates/iouring/src/io_uring_selector/socket.rs
+index 0cb3b08..91c074c 100644
+--- a/crates/iouring/src/io_uring_selector/socket.rs
++++ b/crates/iouring/src/io_uring_selector/socket.rs
+@@ -116,27 +116,30 @@ impl IoUringSelector {
+             Ok(buffer) => buffer,
+             Err(_) => unreachable!("exclusive idle lane cannot acquire another operation"),
+         };
+-        let controller = self.route();
+-        let (result, buffer) = retry_operation(
+-            self,
+-            &controller,
+-            socket,
+-            buffer,
+-            |buffer| {
+-                self.operation(
+-                    Arc::clone(&controller),
+-                    retain_socket(socket),
+-                    buffer,
+-                    true,
+-                    |buffer| buffer.as_ref().as_ptr().cast_mut(),
+-                    cancellation,
+-                )
+-            },
+-            Interest::Writable,
+-            cancellation,
+-        )
+-        .await;
+-        (operation_result(result, cancellation), buffer.into_inner())
++        Box::pin(async move {
++            let controller = self.route();
++            let (result, buffer) = retry_operation(
++                self,
++                &controller,
++                socket,
++                buffer,
++                |buffer| {
++                    self.operation(
++                        Arc::clone(&controller),
++                        retain_socket(socket),
++                        buffer,
++                        true,
++                        |buffer| buffer.as_ref().as_ptr().cast_mut(),
++                        cancellation,
++                    )
++                },
++                Interest::Writable,
++                cancellation,
++            )
++            .await;
++            (operation_result(result, cancellation), buffer.into_inner())
++        })
++        .await
+     }
+ }
+ 
+diff --git a/crates/iouring/src/io_uring_selector/socket_read.rs b/crates/iouring/src/io_uring_selector/socket_read.rs
+index 1b4864d..ae24bab 100644
+--- a/crates/iouring/src/io_uring_selector/socket_read.rs
++++ b/crates/iouring/src/io_uring_selector/socket_read.rs
+@@ -272,15 +272,14 @@ impl State {
+             buffer = returned;
+             match result {
+                 Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+-                    let (result, returned) = selector
+-                        .wait_ready_owned(
+-                            Arc::clone(&controller),
+-                            socket,
+-                            buffer,
+-                            crate::Interest::Readable,
+-                            cancellation,
+-                        )
+-                        .await;
++                    let (result, returned) = Box::pin(selector.wait_ready_owned(
++                        Arc::clone(&controller),
++                        socket,
++                        buffer,
++                        crate::Interest::Readable,
++                        cancellation,
++                    ))
++                    .await;
+                     buffer = returned;
+                     if let Err(error) = result {
+                         return (Err(error), buffer);
+diff --git a/crates/iouring/src/io_uring_socket_stream_reader.rs b/crates/iouring/src/io_uring_socket_stream_reader.rs
+index 7a0b4d5..055b233 100644
+--- a/crates/iouring/src/io_uring_socket_stream_reader.rs
++++ b/crates/iouring/src/io_uring_socket_stream_reader.rs
+@@ -62,6 +62,27 @@ impl<'a> IoUringSocketStreamReader<'a> {
+             Ok(())
+         }
+     }
++
++    async fn read_ahead_into(
++        &mut self,
++        buffer: &mut [u8],
++        cancellation: &Cancellation,
++    ) -> OperationResult<usize> {
++        self.check_open()?;
++        if self.eof || buffer.is_empty() {
++            cancellation.check()?;
++            return Ok(0);
++        }
++        self.ahead
++            .read_vectored(
++                &mut [IoSliceMut::new(buffer)],
++                SocketRecvFlags::default(),
++                true,
++                cancellation,
++            )
++            .await
++            .map(|result| result.bytes)
++    }
+ }
+ 
+ impl SocketStreamReader for IoUringSocketStreamReader<'_> {
+@@ -137,14 +158,7 @@ impl SocketStreamReader for IoUringSocketStreamReader<'_> {
+         cancellation: &Cancellation,
+     ) -> OperationResult<usize> {
+         if self.ahead.active() {
+-            return self
+-                .read_vectored_with_flags(
+-                    &mut [IoSliceMut::new(buffer)],
+-                    SocketRecvFlags::default(),
+-                    cancellation,
+-                )
+-                .await
+-                .map(|result| result.bytes);
++            return self.read_ahead_into(buffer, cancellation).await;
+         }
+ 
+         self.check_open()?;
+@@ -290,7 +304,7 @@ impl SocketStreamReader for IoUringSocketStreamReader<'_> {
+     ) -> core_scheduler::BufferResult<B> {
+         if self.ahead.active() {
+             let mut buffer = buffer;
+-            let result = self.read_into(buffer.as_mut(), cancellation).await;
++            let result = self.read_ahead_into(buffer.as_mut(), cancellation).await;
+             return (result, buffer);
+         }
+ 

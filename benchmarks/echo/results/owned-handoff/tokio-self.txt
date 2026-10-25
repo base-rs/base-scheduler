@@ -1,0 +1,310 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 17K of event 'cycles:u'
+# Event count (approx.): 4277822759
+#
+# Overhead  Symbol                                                                                                                                                                                                                    IPC   [IPC Coverage]
+# ........  ........................................................................................................................................................................................................................  ....................
+#
+    15.99%  [.] <tokio::runtime::io::scheduled_io::ScheduledIo>::poll_readiness                                                                                                                                                       -      -            
+            |          
+            |--12.68%--<std::sys::sync::mutex::futex::Mutex>::lock (inlined)
+            |          <std::sync::poison::mutex::Mutex<tokio::runtime::io::scheduled_io::Waiters>>::lock (inlined)
+            |          <tokio::loom::std::mutex::Mutex<tokio::runtime::io::scheduled_io::Waiters>>::lock (inlined)
+            |          <tokio::runtime::io::scheduled_io::ScheduledIo>::poll_readiness
+            |          
+             --3.26%--<std::sys::sync::mutex::futex::Mutex>::unlock (inlined)
+                       <std::sync::poison::mutex::MutexGuard<tokio::runtime::io::scheduled_io::Waiters> as core::ops::drop::Drop>::drop (inlined)
+                       core::ptr::drop_glue::<std::sync::poison::mutex::MutexGuard<tokio::runtime::io::scheduled_io::Waiters>> (inlined)
+                       <tokio::runtime::io::scheduled_io::ScheduledIo>::poll_readiness
+                       0x7f067e012d57
+
+    10.21%  [k] 0xffffffff93200080                                                                                                                                                                                                    -      -            
+            |
+            ---0x7f06dd2a08f2
+               |          
+                --0.33%--epoll_wait
+
+     8.78%  [.] tokio::runtime::task::waker::wake_by_val                                                                                                                                                                              -      -            
+            |          
+             --8.77%--<tokio::runtime::task::state::Snapshot>::ref_count (inlined)
+                       <tokio::runtime::task::state::State>::ref_dec (inlined)
+                       <tokio::runtime::task::raw::RawTask>::drop_reference (inlined)
+                       <tokio::runtime::task::raw::RawTask>::wake_by_val (inlined)
+                       tokio::runtime::task::waker::wake_by_val
+
+     8.47%  [.] <tokio::runtime::scheduler::multi_thread::worker::Context>::run                                                                                                                                                       -      -            
+            |          
+            |--6.91%--<tokio::runtime::scheduler::multi_thread::queue::Local<alloc::sync::Arc<tokio::runtime::scheduler::multi_thread::handle::Handle>>>::pop (inlined)
+            |          <tokio::runtime::scheduler::multi_thread::worker::Core>::next_local_task::{closure#0} (inlined)
+            |          <core::option::Option<tokio::runtime::task::Notified<alloc::sync::Arc<tokio::runtime::scheduler::multi_thread::handle::Handle>>>>::or_else::<<tokio::runtime::scheduler::multi_thread::worker::Core>::next_local_task::{closure#0}> (inlined)
+            |          <tokio::runtime::scheduler::multi_thread::worker::Core>::next_local_task (inlined)
+            |          |          
+            |           --6.79%--<tokio::runtime::scheduler::multi_thread::worker::Core>::next_task (inlined)
+            |                     <tokio::runtime::scheduler::multi_thread::worker::Context>::run
+            |          
+            |--0.45%--<tokio::runtime::scheduler::multi_thread::worker::Core>::transition_to_searching (inlined)
+            |          <tokio::runtime::scheduler::multi_thread::worker::Core>::steal_work (inlined)
+            |          <tokio::runtime::scheduler::multi_thread::worker::Context>::run
+            |          
+            |--0.30%--<std::sys::sync::mutex::futex::Mutex>::lock (inlined)
+            |          <std::sync::poison::mutex::Mutex<tokio::runtime::scheduler::multi_thread::worker::Synced>>::lock (inlined)
+            |          <tokio::loom::std::mutex::Mutex<tokio::runtime::scheduler::multi_thread::worker::Synced>>::lock (inlined)
+            |          
+             --0.21%--<std::sys::sync::mutex::futex::Mutex>::unlock (inlined)
+                       <std::sync::poison::mutex::MutexGuard<tokio::runtime::scheduler::multi_thread::worker::Synced> as core::ops::drop::Drop>::drop (inlined)
+                       core::ptr::drop_glue::<std::sync::poison::mutex::MutexGuard<tokio::runtime::scheduler::multi_thread::worker::Synced>> (inlined)
+
+     6.39%  [.] <tokio::runtime::io::scheduled_io::ScheduledIo>::wake                                                                                                                                                                 -      -            
+            |          
+            |--3.72%--<std::sys::sync::mutex::futex::Mutex>::unlock (inlined)
+            |          <std::sync::poison::mutex::MutexGuard<tokio::runtime::io::scheduled_io::Waiters> as core::ops::drop::Drop>::drop (inlined)
+            |          core::ptr::drop_glue::<std::sync::poison::mutex::MutexGuard<tokio::runtime::io::scheduled_io::Waiters>> (inlined)
+            |          core::mem::drop::<std::sync::poison::mutex::MutexGuard<tokio::runtime::io::scheduled_io::Waiters>> (inlined)
+            |          <tokio::runtime::io::scheduled_io::ScheduledIo>::wake
+            |          
+             --2.67%--<std::sys::sync::mutex::futex::Mutex>::lock (inlined)
+                       <std::sync::poison::mutex::Mutex<tokio::runtime::io::scheduled_io::Waiters>>::lock (inlined)
+                       <tokio::loom::std::mutex::Mutex<tokio::runtime::io::scheduled_io::Waiters>>::lock (inlined)
+                       <tokio::runtime::io::scheduled_io::ScheduledIo>::wake
+
+     6.26%  [.] <tokio::runtime::task::state::State>::transition_to_idle                                                                                                                                                              -      -            
+            |
+            ---<tokio::runtime::task::state::State>::transition_to_idle
+               |          
+                --6.10%--0xc7
+
+     5.64%  [k] 0xffffffff93a0ded6                                                                                                                                                                                                    -      -            
+            |          
+            |--2.81%--0xffffffff94470e3e
+            |          0xffffffff94470fe4
+            |          0xffffffff9478cafa
+            |          0xffffffff9320012f
+            |          0x7f06dd2a08f2
+            |          send
+            |          <&std::net::tcp::TcpStream as core::io::write::Write>::write (inlined)
+            |          <&mio::net::tcp::stream::TcpStream as core::io::write::Write>::write::{closure#0} (inlined)
+            |          <mio::sys::unix::selector::stateless_io_source::IoSourceState>::do_io::<std::net::tcp::TcpStream, <&mio::net::tcp::stream::TcpStream as core::io::write::Write>::write::{closure#0}, usize> (inlined)
+            |          <mio::io_source::IoSource<std::net::tcp::TcpStream>>::do_io::<<&mio::net::tcp::stream::TcpStream as core::io::write::Write>::write::{closure#0}, usize> (inlined)
+            |          <&mio::net::tcp::stream::TcpStream as core::io::write::Write>::write
+            |          
+             --2.74%--0xffffffff944711ab
+                       0xffffffff944712b4
+                       0xffffffff9478cafa
+                       0xffffffff9320012f
+                       0x7f06dd2a08f2
+                       recv
+                       <&std::net::tcp::TcpStream as alloc::io::read::Read>::read
+                       <&mio::net::tcp::stream::TcpStream as alloc::io::read::Read>::read::{closure#0} (inlined)
+                       <mio::sys::unix::selector::stateless_io_source::IoSourceState>::do_io::<std::net::tcp::TcpStream, <&mio::net::tcp::stream::TcpStream as alloc::io::read::Read>::read::{closure#0}, usize> (inlined)
+                       <mio::io_source::IoSource<std::net::tcp::TcpStream>>::do_io::<<&mio::net::tcp::stream::TcpStream as alloc::io::read::Read>::read::{closure#0}, usize> (inlined)
+                       <&mio::net::tcp::stream::TcpStream as alloc::io::read::Read>::read
+
+     5.41%  [.] <tokio::runtime::task::state::State>::transition_to_running                                                                                                                                                           -      -            
+            |          
+             --5.30%--<tokio::runtime::task::state::State>::fetch_update_action::<<tokio::runtime::task::state::State>::transition_to_running::{closure#0}, tokio::runtime::task::state::TransitionToRunning> (inlined)
+                       <tokio::runtime::task::state::State>::transition_to_running
+
+     4.52%  [.] tokio::runtime::task::waker::clone_waker                                                                                                                                                                              -      -            
+            |
+            ---tokio::runtime::task::waker::clone_waker
+
+     3.93%  [.] <tokio::runtime::io::driver::Driver>::turn                                                                                                                                                                            -      -            
+            |
+            ---<core::sync::atomic::Atomic<usize>>::fetch_update::<<tokio::runtime::io::scheduled_io::ScheduledIo>::set_readiness<<tokio::runtime::io::driver::Driver>::turn::{closure#0}>::{closure#0}> (inlined)
+               <tokio::loom::std::atomic_usize::AtomicUsize>::fetch_update::<<tokio::runtime::io::scheduled_io::ScheduledIo>::set_readiness<<tokio::runtime::io::driver::Driver>::turn::{closure#0}>::{closure#0}> (inlined)
+               <tokio::runtime::io::scheduled_io::ScheduledIo>::set_readiness::<<tokio::runtime::io::driver::Driver>::turn::{closure#0}> (inlined)
+               <tokio::runtime::io::driver::Driver>::turn
+
+     3.86%  [.] <tokio::runtime::task::state::State>::transition_to_notified_by_val                                                                                                                                                   -      -            
+            |
+            ---<tokio::runtime::task::state::State>::transition_to_notified_by_val
+
+     3.19%  [.] <tokio::net::tcp::stream::TcpStream>::poll_read_priv                                                                                                                                                                  -      -            
+            |          
+             --3.13%--<core::sync::atomic::Atomic<usize>>::try_update::<<tokio::runtime::io::scheduled_io::ScheduledIo>::set_readiness<<tokio::runtime::io::scheduled_io::ScheduledIo>::clear_readiness::{closure#0}>::{closure#0}> (inlined)
+                       <core::sync::atomic::Atomic<usize>>::fetch_update::<<tokio::runtime::io::scheduled_io::ScheduledIo>::set_readiness<<tokio::runtime::io::scheduled_io::ScheduledIo>::clear_readiness::{closure#0}>::{closure#0}> (inlined)
+                       <tokio::loom::std::atomic_usize::AtomicUsize>::fetch_update::<<tokio::runtime::io::scheduled_io::ScheduledIo>::set_readiness<<tokio::runtime::io::scheduled_io::ScheduledIo>::clear_readiness::{closure#0}>::{closure#0}> (inlined)
+                       <tokio::runtime::io::scheduled_io::ScheduledIo>::set_readiness::<<tokio::runtime::io::scheduled_io::ScheduledIo>::clear_readiness::{closure#0}> (inlined)
+                       <tokio::runtime::io::scheduled_io::ScheduledIo>::clear_readiness (inlined)
+                       <tokio::runtime::io::registration::Registration>::clear_readiness (inlined)
+                       <tokio::io::poll_evented::PollEvented<mio::net::tcp::stream::TcpStream>>::poll_read (inlined)
+                       <tokio::net::tcp::stream::TcpStream>::poll_read_priv
+                       0xffff
+
+     1.78%  [.] __vdso_clock_gettime                                                                                                                                                                                                  -      -            
+            |
+            ---clock_gettime
+               <std::sys::pal::unix::time::Timespec>::now
+               |          
+               |--0.82%--<tokio::runtime::scheduler::multi_thread::stats::Stats>::end_processing_scheduled_tasks (inlined)
+               |          |          
+               |          |--0.62%--<tokio::runtime::scheduler::multi_thread::worker::Context>::run
+               |          |          
+               |           --0.21%--<tokio::runtime::scheduler::multi_thread::worker::Context>::maintenance (inlined)
+               |                     <tokio::runtime::scheduler::multi_thread::worker::Context>::run
+               |          
+               |--0.49%--<std::time::Instant>::elapsed
+               |          <tokio::runtime::metrics::batch::MetricsBatch>::end_processing_scheduled_tasks (inlined)
+               |          <tokio::runtime::scheduler::multi_thread::stats::Stats>::end_processing_scheduled_tasks (inlined)
+               |          |          
+               |           --0.30%--<tokio::runtime::scheduler::multi_thread::worker::Context>::run
+               |          
+                --0.21%--tokio::time::clock::now (inlined)
+                          <tokio::time::clock::Clock>::now (inlined)
+                          <tokio::runtime::time::source::TimeSource>::now (inlined)
+                          <tokio::runtime::time::handle::Handle>::process (inlined)
+                          <tokio::runtime::time::Driver>::park_internal
+
+     1.27%  [.] <tokio::runtime::time::handle::Handle>::process_at_time                                                                                                                                                               -      -            
+            |          
+            |--0.93%--<std::sys::sync::mutex::futex::Mutex>::lock (inlined)
+            |          <std::sync::poison::mutex::Mutex<tokio::runtime::time::InnerState>>::lock (inlined)
+            |          <tokio::loom::std::mutex::Mutex<tokio::runtime::time::InnerState>>::lock (inlined)
+            |          <tokio::runtime::time::Inner>::lock (inlined)
+            |          <tokio::runtime::time::handle::Handle>::process_at_time
+            |          |          
+            |           --0.58%--<tokio::runtime::io::registration::Registration>::poll_ready
+            |                     0x7f067e012d57
+            |          
+             --0.34%--<std::sys::sync::mutex::futex::Mutex>::unlock (inlined)
+                       <std::sync::poison::mutex::MutexGuard<tokio::runtime::time::InnerState> as core::ops::drop::Drop>::drop (inlined)
+                       core::ptr::drop_glue::<std::sync::poison::mutex::MutexGuard<tokio::runtime::time::InnerState>> (inlined)
+                       core::mem::drop::<std::sync::poison::mutex::MutexGuard<tokio::runtime::time::InnerState>> (inlined)
+                       <tokio::runtime::time::handle::Handle>::process_at_time
+
+     0.92%  [.] <tokio::runtime::scheduler::multi_thread::worker::Context>::park_internal                                                                                                                                             -      -            
+            |          
+            |--0.34%--<core::sync::atomic::Atomic<bool>>::compare_exchange (inlined)
+            |          <tokio::util::try_lock::TryLock<tokio::runtime::driver::Driver>>::try_lock (inlined)
+            |          |          
+            |           --0.23%--<tokio::runtime::scheduler::multi_thread::park::Parker>::park_timeout (inlined)
+            |                     <tokio::runtime::scheduler::multi_thread::worker::Context>::park_internal
+            |          
+             --0.32%--core::sync::atomic::atomic_compare_exchange::<usize> (inlined)
+                       <core::sync::atomic::Atomic<usize>>::compare_exchange (inlined)
+                       |          
+                        --0.23%--<tokio::runtime::scheduler::multi_thread::park::Inner>::park (inlined)
+                                  <tokio::runtime::scheduler::multi_thread::park::Parker>::park (inlined)
+                                  <tokio::runtime::scheduler::multi_thread::worker::Context>::park_internal
+
+     0.84%  [.] <tokio::runtime::scheduler::multi_thread::worker::Context>::run_task                                                                                                                                                  -      -            
+            |          
+             --0.83%--<tokio::runtime::scheduler::multi_thread::idle::State>::dec_num_searching (inlined)
+                       <tokio::runtime::scheduler::multi_thread::idle::Idle>::transition_worker_from_searching (inlined)
+                       <tokio::runtime::scheduler::multi_thread::handle::Handle>::transition_worker_from_searching (inlined)
+                       <tokio::runtime::scheduler::multi_thread::worker::Core>::transition_from_searching (inlined)
+                       <tokio::runtime::scheduler::multi_thread::worker::Context>::run_task
+
+     0.81%  [.] <tokio::runtime::scheduler::multi_thread::worker::Core>::maintenance                                                                                                                                                  -      -            
+            |          
+            |--0.47%--<std::sys::sync::mutex::futex::Mutex>::lock (inlined)
+            |          <std::sync::poison::mutex::Mutex<tokio::runtime::scheduler::multi_thread::worker::Synced>>::lock (inlined)
+            |          <tokio::loom::std::mutex::Mutex<tokio::runtime::scheduler::multi_thread::worker::Synced>>::lock (inlined)
+            |          <tokio::runtime::scheduler::multi_thread::worker::Core>::maintenance
+            |          0x564c00010000
+            |          
+             --0.34%--<std::sys::sync::mutex::futex::Mutex>::unlock (inlined)
+                       <std::sync::poison::mutex::MutexGuard<tokio::runtime::scheduler::multi_thread::worker::Synced> as core::ops::drop::Drop>::drop (inlined)
+                       core::ptr::drop_glue::<std::sync::poison::mutex::MutexGuard<tokio::runtime::scheduler::multi_thread::worker::Synced>> (inlined)
+                       <tokio::runtime::scheduler::multi_thread::worker::Core>::maintenance
+                       0x564c00010000
+
+     0.66%  [.] <tokio::runtime::scheduler::multi_thread::idle::Idle>::worker_to_notify                                                                                                                                               -      -            
+            |          
+             --0.38%--core::sync::atomic::atomic_add::<usize, usize> (inlined)
+                       <core::sync::atomic::Atomic<usize>>::fetch_add (inlined)
+                       <tokio::runtime::scheduler::multi_thread::idle::Idle>::notify_should_wakeup (inlined)
+                       <tokio::runtime::scheduler::multi_thread::idle::Idle>::worker_to_notify
+
+     0.59%  [k] 0xffffffff9320008f                                                                                                                                                                                                    -      -            
+            |
+            ---0x7f06dd2a08f2
+
+     0.46%  [.] <tokio::runtime::time::Driver>::park_internal                                                                                                                                                                         -      -            
+            |          
+            |--0.25%--<std::sys::sync::mutex::futex::Mutex>::unlock (inlined)
+            |          <std::sync::poison::mutex::MutexGuard<tokio::runtime::time::InnerState> as core::ops::drop::Drop>::drop (inlined)
+            |          core::ptr::drop_glue::<std::sync::poison::mutex::MutexGuard<tokio::runtime::time::InnerState>> (inlined)
+            |          core::mem::drop::<std::sync::poison::mutex::MutexGuard<tokio::runtime::time::InnerState>> (inlined)
+            |          <tokio::runtime::time::Driver>::park_internal
+            |          
+             --0.20%--<std::sys::sync::mutex::futex::Mutex>::lock (inlined)
+                       <std::sync::poison::mutex::Mutex<tokio::runtime::time::InnerState>>::lock (inlined)
+                       <tokio::loom::std::mutex::Mutex<tokio::runtime::time::InnerState>>::lock (inlined)
+                       <tokio::runtime::time::Inner>::lock (inlined)
+                       <tokio::runtime::time::Driver>::park_internal
+
+     0.41%  [k] 0xffffffff932000ad                                                                                                                                                                                                    -      -            
+     0.40%  [k] 0xffffffff94470dc8                                                                                                                                                                                                    -      -            
+            |
+            ---0xffffffff94470fe4
+               0xffffffff9478cafa
+               0xffffffff9320012f
+               0x7f06dd2a08f2
+               send
+               <&std::net::tcp::TcpStream as core::io::write::Write>::write (inlined)
+               <&mio::net::tcp::stream::TcpStream as core::io::write::Write>::write::{closure#0} (inlined)
+               <mio::sys::unix::selector::stateless_io_source::IoSourceState>::do_io::<std::net::tcp::TcpStream, <&mio::net::tcp::stream::TcpStream as core::io::write::Write>::write::{closure#0}, usize> (inlined)
+               <mio::io_source::IoSource<std::net::tcp::TcpStream>>::do_io::<<&mio::net::tcp::stream::TcpStream as core::io::write::Write>::write::{closure#0}, usize> (inlined)
+               <&mio::net::tcp::stream::TcpStream as core::io::write::Write>::write
+
+     0.36%  [k] 0xffffffff9478cac1                                                                                                                                                                                                    -      -            
+            |
+            ---0xffffffff9320012f
+               0x7f06dd2a08f2
+               |          
+                --0.24%--recv
+                          <&std::net::tcp::TcpStream as alloc::io::read::Read>::read
+                          <&mio::net::tcp::stream::TcpStream as alloc::io::read::Read>::read::{closure#0} (inlined)
+                          <mio::sys::unix::selector::stateless_io_source::IoSourceState>::do_io::<std::net::tcp::TcpStream, <&mio::net::tcp::stream::TcpStream as alloc::io::read::Read>::read::{closure#0}, usize> (inlined)
+                          <mio::io_source::IoSource<std::net::tcp::TcpStream>>::do_io::<<&mio::net::tcp::stream::TcpStream as alloc::io::read::Read>::read::{closure#0}, usize> (inlined)
+                          <&mio::net::tcp::stream::TcpStream as alloc::io::read::Read>::read
+
+     0.36%  [k] 0xffffffff932000ab                                                                                                                                                                                                    -      -            
+     0.35%  [k] 0xffffffff934aae30                                                                                                                                                                                                    -      -            
+            |
+            ---0xffffffff9478cafa
+               0xffffffff9320012f
+               0x7f06dd2a08f2
+               |          
+                --0.21%--recv
+                          <&std::net::tcp::TcpStream as alloc::io::read::Read>::read
+                          <&mio::net::tcp::stream::TcpStream as alloc::io::read::Read>::read::{closure#0} (inlined)
+                          <mio::sys::unix::selector::stateless_io_source::IoSourceState>::do_io::<std::net::tcp::TcpStream, <&mio::net::tcp::stream::TcpStream as alloc::io::read::Read>::read::{closure#0}, usize> (inlined)
+                          <mio::io_source::IoSource<std::net::tcp::TcpStream>>::do_io::<<&mio::net::tcp::stream::TcpStream as alloc::io::read::Read>::read::{closure#0}, usize> (inlined)
+                          <&mio::net::tcp::stream::TcpStream as alloc::io::read::Read>::read
+
+     0.29%  [k] 0xffffffff93a0de58                                                                                                                                                                                                    -      -            
+     0.27%  [k] 0xffffffff9478ca79                                                                                                                                                                                                    -      -            
+            |
+            ---0xffffffff9320012f
+               0x7f06dd2a08f2
+
+     0.24%  [k] 0xffffffff93a0dea5                                                                                                                                                                                                    -      -            
+     0.21%  [k] 0xffffffff93200087                                                                                                                                                                                                    -      -            
+            |
+            ---0x7f06dd2a08f2
+
+     0.21%  [k] 0xffffffff93ea87af                                                                                                                                                                                                    -      -            
+            |
+            ---0xffffffff94470e2f
+               0xffffffff94470fe4
+               0xffffffff9478cafa
+               0xffffffff9320012f
+               0x7f06dd2a08f2
+               send
+               <&std::net::tcp::TcpStream as core::io::write::Write>::write (inlined)
+               <&mio::net::tcp::stream::TcpStream as core::io::write::Write>::write::{closure#0} (inlined)
+               <mio::sys::unix::selector::stateless_io_source::IoSourceState>::do_io::<std::net::tcp::TcpStream, <&mio::net::tcp::stream::TcpStream as core::io::write::Write>::write::{closure#0}, usize> (inlined)
+               <mio::io_source::IoSource<std::net::tcp::TcpStream>>::do_io::<<&mio::net::tcp::stream::TcpStream as core::io::write::Write>::write::{closure#0}, usize> (inlined)
+               <&mio::net::tcp::stream::TcpStream as core::io::write::Write>::write
+
+
+
+#
+# (Tip: Show user configuration overrides: perf config --user --list)
+#

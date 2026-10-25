@@ -1,0 +1,17 @@
+diff --git a/crates/iouring/src/operation_state.rs b/crates/iouring/src/operation_state.rs
+index 025872e..654e175 100644
+--- a/crates/iouring/src/operation_state.rs
++++ b/crates/iouring/src/operation_state.rs
+@@ -108,9 +108,11 @@ impl OperationState {
+                 retired: AtomicWaker::new(),
+             })
+         });
+-        if activity.running.swap(true, Ordering::AcqRel) {
++        if activity.running.load(Ordering::Acquire) {
+             return Err((io::Error::from(io::ErrorKind::WouldBlock).into(), value));
+         }
++        // This lane is borrowed exclusively; only the previous guard can change running, and only by clearing it. The acquire above observes its retirement before a new operation starts.
++        activity.running.store(true, Ordering::Relaxed);
+         Ok(OperationGuard {
+             value: Some(value),
+             _retirement: Retirement(Arc::clone(activity)),

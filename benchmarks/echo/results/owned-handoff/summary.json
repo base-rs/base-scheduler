@@ -1,0 +1,1979 @@
+{
+  "codegen-screen.json": [
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "cgu-one-iouring",
+      "samples": 5,
+      "median": 266695.0,
+      "minimum": 259101.33333333334,
+      "maximum": 268532.3333333333,
+      "p99_median_us": 4.971
+    },
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "cgu-one-tokio",
+      "samples": 5,
+      "median": 278005.6666666667,
+      "minimum": 277429.3333333333,
+      "maximum": 279611.6666666667,
+      "p99_median_us": 4.263
+    },
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "lazy-quiescence-iouring",
+      "samples": 5,
+      "median": 262947.6666666667,
+      "minimum": 256074.0,
+      "maximum": 266630.0,
+      "p99_median_us": 5.123
+    },
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "lazy-quiescence-tokio",
+      "samples": 5,
+      "median": 274165.0,
+      "minimum": 272689.3333333333,
+      "maximum": 275972.0,
+      "p99_median_us": 4.303
+    },
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "thin-lto-iouring",
+      "samples": 5,
+      "median": 264645.6666666667,
+      "minimum": 255334.66666666666,
+      "maximum": 267264.3333333333,
+      "p99_median_us": 5.591
+    },
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "thin-lto-tokio",
+      "samples": 5,
+      "median": 275475.3333333333,
+      "minimum": 274623.6666666667,
+      "maximum": 277735.0,
+      "p99_median_us": 4.291
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "cgu-one-iouring",
+      "samples": 5,
+      "median": 644944.6666666666,
+      "minimum": 636237.3333333334,
+      "maximum": 650194.6666666666,
+      "p99_median_us": 53.567
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "cgu-one-tokio",
+      "samples": 5,
+      "median": 711030.6666666666,
+      "minimum": 707191.6666666666,
+      "maximum": 727515.3333333334,
+      "p99_median_us": 52.639
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "lazy-quiescence-iouring",
+      "samples": 5,
+      "median": 643825.6666666666,
+      "minimum": 635487.0,
+      "maximum": 644397.6666666666,
+      "p99_median_us": 54.175
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "lazy-quiescence-tokio",
+      "samples": 5,
+      "median": 704560.6666666666,
+      "minimum": 703342.0,
+      "maximum": 714482.0,
+      "p99_median_us": 53.151
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "thin-lto-iouring",
+      "samples": 5,
+      "median": 642878.3333333334,
+      "minimum": 632533.6666666666,
+      "maximum": 647604.0,
+      "p99_median_us": 54.047
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "thin-lto-tokio",
+      "samples": 5,
+      "median": 709082.3333333334,
+      "minimum": 705798.0,
+      "maximum": 717578.3333333334,
+      "p99_median_us": 52.863
+    }
+  ],
+  "compact-exclusive-screen.json": [
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "baseline",
+      "samples": 5,
+      "median": 262655.0,
+      "minimum": 247985.66666666666,
+      "maximum": 263754.6666666667,
+      "p99_median_us": 5.511
+    },
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "compact-ahead",
+      "samples": 5,
+      "median": 252611.33333333334,
+      "minimum": 248786.66666666666,
+      "maximum": 260374.33333333334,
+      "p99_median_us": 5.671
+    },
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "compact-cold",
+      "samples": 5,
+      "median": 267170.0,
+      "minimum": 260604.33333333334,
+      "maximum": 270450.3333333333,
+      "p99_median_us": 4.963
+    },
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "exclusive-admission",
+      "samples": 5,
+      "median": 267463.6666666667,
+      "minimum": 259945.33333333334,
+      "maximum": 268066.6666666667,
+      "p99_median_us": 5.043
+    },
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "exclusive-ownership",
+      "samples": 5,
+      "median": 256105.0,
+      "minimum": 252730.0,
+      "maximum": 264367.3333333333,
+      "p99_median_us": 5.571
+    },
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "ownership",
+      "samples": 5,
+      "median": 265776.6666666667,
+      "minimum": 249042.0,
+      "maximum": 267866.3333333333,
+      "p99_median_us": 5.011
+    },
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "tokio",
+      "samples": 5,
+      "median": 275798.0,
+      "minimum": 271530.3333333333,
+      "maximum": 277657.0,
+      "p99_median_us": 4.331
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "baseline",
+      "samples": 5,
+      "median": 646413.6666666666,
+      "minimum": 641144.0,
+      "maximum": 659242.6666666666,
+      "p99_median_us": 53.695
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "compact-ahead",
+      "samples": 5,
+      "median": 645341.6666666666,
+      "minimum": 642988.0,
+      "maximum": 653482.3333333334,
+      "p99_median_us": 53.727
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "compact-cold",
+      "samples": 5,
+      "median": 651336.3333333334,
+      "minimum": 646138.3333333334,
+      "maximum": 662154.3333333334,
+      "p99_median_us": 53.471
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "exclusive-admission",
+      "samples": 5,
+      "median": 645120.6666666666,
+      "minimum": 640759.0,
+      "maximum": 658442.3333333334,
+      "p99_median_us": 53.727
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "exclusive-ownership",
+      "samples": 5,
+      "median": 661062.0,
+      "minimum": 656170.0,
+      "maximum": 670908.6666666666,
+      "p99_median_us": 52.575
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "ownership",
+      "samples": 5,
+      "median": 652538.0,
+      "minimum": 648201.3333333334,
+      "maximum": 660498.6666666666,
+      "p99_median_us": 53.055
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "tokio",
+      "samples": 5,
+      "median": 707154.0,
+      "minimum": 701054.0,
+      "maximum": 715680.6666666666,
+      "p99_median_us": 53.215
+    }
+  ],
+  "cpu-causal-controls.json": [
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "kernel-conservative",
+      "samples": 2,
+      "median": 686661.3333333333,
+      "minimum": 685683.0,
+      "maximum": 687639.6666666666,
+      "p99_median_us": 51.022999999999996,
+      "counters_per_echo": {
+        "cycles:u": 210.26197759820323,
+        "cycles:k": 7560.261745060992,
+        "instructions:u": 287.65692440971543,
+        "instructions:k": 13918.064158869965,
+        "context-switches": 0.0003937063185725666,
+        "cpu-migrations": 0.0
+      }
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "kernel-owned",
+      "samples": 2,
+      "median": 788177.3333333333,
+      "minimum": 780514.6666666666,
+      "maximum": 795840.0,
+      "p99_median_us": 47.167,
+      "counters_per_echo": {
+        "cycles:u": 120.46249234516034,
+        "cycles:k": 6671.669718614045,
+        "instructions:u": 185.6595136634074,
+        "instructions:k": 12920.234421980567,
+        "context-switches": 0.0003040808681829273,
+        "cpu-migrations": 0.0
+      }
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "kernel-short",
+      "samples": 2,
+      "median": 726562.6666666667,
+      "minimum": 721971.0,
+      "maximum": 731154.3333333334,
+      "p99_median_us": 48.815,
+      "counters_per_echo": {
+        "cycles:u": 133.84721615140222,
+        "cycles:k": 7211.766403480498,
+        "instructions:u": 214.2665274260118,
+        "instructions:k": 13140.76642351102,
+        "context-switches": 0.0006468168432423041,
+        "cpu-migrations": 0.0
+      }
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "native-borrowed",
+      "samples": 2,
+      "median": 629562.0,
+      "minimum": 628950.0,
+      "maximum": 630174.0,
+      "p99_median_us": 55.407,
+      "counters_per_echo": {
+        "cycles:u": 921.7703854038223,
+        "cycles:k": 7562.619378723064,
+        "instructions:u": 1656.7392438358047,
+        "instructions:k": 13954.375841650393,
+        "context-switches": 8.312356618892387e-05,
+        "cpu-migrations": 0.0
+      }
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "native-owned",
+      "samples": 2,
+      "median": 640518.1666666666,
+      "minimum": 638103.6666666666,
+      "maximum": 642932.6666666666,
+      "p99_median_us": 53.95099999999999,
+      "counters_per_echo": {
+        "cycles:u": 1542.9125674004445,
+        "cycles:k": 6831.540568706882,
+        "instructions:u": 2503.5936982598196,
+        "instructions:k": 12986.794066440349,
+        "context-switches": 7.496000911507783e-05,
+        "cpu-migrations": 0.0
+      }
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "tokio",
+      "samples": 2,
+      "median": 701518.0,
+      "minimum": 696144.6666666666,
+      "maximum": 706891.3333333334,
+      "p99_median_us": 53.375,
+      "counters_per_echo": {
+        "cycles:u": 671.151947164451,
+        "cycles:k": 6956.617631735892,
+        "instructions:u": 1444.15400389018,
+        "instructions:k": 12853.549295930106,
+        "context-switches": 8.541007741571087e-05,
+        "cpu-migrations": 0.0
+      }
+    }
+  ],
+  "handoff-screen.json": [
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "inline-all",
+      "samples": 5,
+      "median": 263025.0,
+      "minimum": 246611.33333333334,
+      "maximum": 272218.6666666667,
+      "p99_median_us": 5.131
+    },
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "inline-combined",
+      "samples": 5,
+      "median": 259137.33333333334,
+      "minimum": 249987.0,
+      "maximum": 267870.0,
+      "p99_median_us": 5.603
+    },
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "inline-lazy",
+      "samples": 5,
+      "median": 265866.6666666667,
+      "minimum": 251790.33333333334,
+      "maximum": 267126.0,
+      "p99_median_us": 5.431
+    },
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "inline-ownership",
+      "samples": 5,
+      "median": 261775.66666666666,
+      "minimum": 249919.0,
+      "maximum": 269198.0,
+      "p99_median_us": 5.563
+    },
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "inline-retirement",
+      "samples": 5,
+      "median": 254764.33333333334,
+      "minimum": 246793.0,
+      "maximum": 263405.0,
+      "p99_median_us": 5.643
+    },
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "inline-slot-flag",
+      "samples": 5,
+      "median": 249815.0,
+      "minimum": 237792.0,
+      "maximum": 263757.6666666667,
+      "p99_median_us": 5.683
+    },
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "owned-lazy",
+      "samples": 5,
+      "median": 260055.0,
+      "minimum": 248384.0,
+      "maximum": 263477.6666666667,
+      "p99_median_us": 5.563
+    },
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "tokio",
+      "samples": 5,
+      "median": 275207.0,
+      "minimum": 273400.3333333333,
+      "maximum": 276232.3333333333,
+      "p99_median_us": 4.271
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "inline-all",
+      "samples": 5,
+      "median": 655632.0,
+      "minimum": 648308.3333333334,
+      "maximum": 668284.0,
+      "p99_median_us": 52.991
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "inline-combined",
+      "samples": 5,
+      "median": 648596.0,
+      "minimum": 644547.6666666666,
+      "maximum": 653211.6666666666,
+      "p99_median_us": 53.407
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "inline-lazy",
+      "samples": 5,
+      "median": 646472.6666666666,
+      "minimum": 636711.6666666666,
+      "maximum": 652373.0,
+      "p99_median_us": 53.791
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "inline-ownership",
+      "samples": 5,
+      "median": 656837.3333333334,
+      "minimum": 644427.3333333334,
+      "maximum": 660890.6666666666,
+      "p99_median_us": 52.991
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "inline-retirement",
+      "samples": 5,
+      "median": 638015.6666666666,
+      "minimum": 637824.3333333334,
+      "maximum": 651701.6666666666,
+      "p99_median_us": 53.919
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "inline-slot-flag",
+      "samples": 5,
+      "median": 647925.3333333334,
+      "minimum": 637801.6666666666,
+      "maximum": 650198.6666666666,
+      "p99_median_us": 53.503
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "owned-lazy",
+      "samples": 5,
+      "median": 649805.0,
+      "minimum": 636405.3333333334,
+      "maximum": 654155.6666666666,
+      "p99_median_us": 53.471
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "tokio",
+      "samples": 5,
+      "median": 700861.0,
+      "minimum": 688849.3333333334,
+      "maximum": 715118.3333333334,
+      "p99_median_us": 53.439
+    }
+  ],
+  "inq-screen.json": [
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "kernel-conservative",
+      "samples": 5,
+      "median": 279124.3333333333,
+      "minimum": 271492.3333333333,
+      "maximum": 281269.3333333333,
+      "p99_median_us": 4.991
+    },
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "kernel-inq",
+      "samples": 5,
+      "median": 277132.3333333333,
+      "minimum": 276129.6666666667,
+      "maximum": 281239.3333333333,
+      "p99_median_us": 4.243
+    },
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "kernel-short",
+      "samples": 5,
+      "median": 279819.3333333333,
+      "minimum": 278975.0,
+      "maximum": 283576.3333333333,
+      "p99_median_us": 4.403
+    },
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "native-borrowed",
+      "samples": 5,
+      "median": 272827.6666666667,
+      "minimum": 271324.0,
+      "maximum": 273562.3333333333,
+      "p99_median_us": 4.311
+    },
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "tokio",
+      "samples": 5,
+      "median": 273502.0,
+      "minimum": 271349.0,
+      "maximum": 277286.6666666667,
+      "p99_median_us": 4.331
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "kernel-conservative",
+      "samples": 5,
+      "median": 693594.6666666666,
+      "minimum": 688285.6666666666,
+      "maximum": 697048.6666666666,
+      "p99_median_us": 50.751
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "kernel-inq",
+      "samples": 5,
+      "median": 708046.0,
+      "minimum": 703471.6666666666,
+      "maximum": 712936.3333333334,
+      "p99_median_us": 49.791
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "kernel-short",
+      "samples": 5,
+      "median": 724868.6666666666,
+      "minimum": 722383.0,
+      "maximum": 735889.3333333334,
+      "p99_median_us": 49.119
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "native-borrowed",
+      "samples": 5,
+      "median": 628751.6666666666,
+      "minimum": 623300.0,
+      "maximum": 631349.0,
+      "p99_median_us": 55.391
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "tokio",
+      "samples": 5,
+      "median": 701011.3333333334,
+      "minimum": 699439.3333333334,
+      "maximum": 708481.3333333334,
+      "p99_median_us": 53.407
+    }
+  ],
+  "lean-confirmation.json": [
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "baseline",
+      "samples": 7,
+      "median": 260161.66666666666,
+      "minimum": 254474.66666666666,
+      "maximum": 269519.3333333333,
+      "p99_median_us": 5.611
+    },
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "candidate",
+      "samples": 7,
+      "median": 269854.3333333333,
+      "minimum": 265390.0,
+      "maximum": 272184.6666666667,
+      "p99_median_us": 4.771
+    },
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "tokio",
+      "samples": 7,
+      "median": 274636.3333333333,
+      "minimum": 272155.0,
+      "maximum": 276713.6666666667,
+      "p99_median_us": 4.283
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "baseline",
+      "samples": 7,
+      "median": 648318.3333333334,
+      "minimum": 639707.3333333334,
+      "maximum": 652884.3333333334,
+      "p99_median_us": 53.503
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "candidate",
+      "samples": 7,
+      "median": 662752.6666666666,
+      "minimum": 660179.3333333334,
+      "maximum": 675519.3333333334,
+      "p99_median_us": 52.351
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "tokio",
+      "samples": 7,
+      "median": 712051.3333333334,
+      "minimum": 701314.6666666666,
+      "maximum": 718072.6666666666,
+      "p99_median_us": 52.639
+    }
+  ],
+  "lean-cpu.json": [
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "baseline",
+      "samples": 3,
+      "median": 650121.0,
+      "minimum": 639929.0,
+      "maximum": 653334.6666666666,
+      "p99_median_us": 53.599,
+      "counters_per_echo": {
+        "cycles:u": 1541.7366311497324,
+        "cycles:k": 6712.1614996798035,
+        "instructions:u": 2505.367234964827,
+        "instructions:k": 12986.512426148363,
+        "context-switches": 7.434513472620225e-05,
+        "cpu-migrations": 0.0
+      }
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "candidate",
+      "samples": 3,
+      "median": 660521.3333333334,
+      "minimum": 658558.3333333334,
+      "maximum": 667915.3333333334,
+      "p99_median_us": 52.543,
+      "counters_per_echo": {
+        "cycles:u": 1292.35311711165,
+        "cycles:k": 6831.3604995851765,
+        "instructions:u": 2488.2728629277362,
+        "instructions:k": 12985.698045584195,
+        "context-switches": 8.0239649085268e-05,
+        "cpu-migrations": 0.0
+      }
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "tokio",
+      "samples": 3,
+      "median": 711017.0,
+      "minimum": 698232.3333333334,
+      "maximum": 717708.6666666666,
+      "p99_median_us": 52.831,
+      "counters_per_echo": {
+        "cycles:u": 663.479066839002,
+        "cycles:k": 6858.316939444955,
+        "instructions:u": 1441.1902944834626,
+        "instructions:k": 12850.497399733997,
+        "context-switches": 8.391735593757487e-05,
+        "cpu-migrations": 0.0
+      }
+    }
+  ],
+  "lean-wide.json": [
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "baseline-borrowed",
+      "samples": 3,
+      "median": 276133.0,
+      "minimum": 269804.6666666667,
+      "maximum": 276509.3333333333,
+      "p99_median_us": 4.263
+    },
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "baseline-owned",
+      "samples": 3,
+      "median": 260346.0,
+      "minimum": 253048.0,
+      "maximum": 261335.0,
+      "p99_median_us": 5.603
+    },
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "candidate-borrowed",
+      "samples": 3,
+      "median": 271946.6666666667,
+      "minimum": 271595.3333333333,
+      "maximum": 274037.6666666667,
+      "p99_median_us": 4.291
+    },
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "candidate-owned",
+      "samples": 3,
+      "median": 257561.33333333334,
+      "minimum": 250974.33333333334,
+      "maximum": 263034.3333333333,
+      "p99_median_us": 5.603
+    },
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "tokio",
+      "samples": 3,
+      "median": 275939.3333333333,
+      "minimum": 271948.6666666667,
+      "maximum": 277880.3333333333,
+      "p99_median_us": 4.291
+    },
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "tokio-adapter-borrowed",
+      "samples": 3,
+      "median": 273734.6666666667,
+      "minimum": 269859.3333333333,
+      "maximum": 274042.0,
+      "p99_median_us": 4.703
+    },
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "tokio-adapter-owned",
+      "samples": 3,
+      "median": 270359.6666666667,
+      "minimum": 269430.6666666667,
+      "maximum": 272041.6666666667,
+      "p99_median_us": 4.751
+    },
+    {
+      "case": [
+        1,
+        1,
+        4096
+      ],
+      "variant": "baseline-borrowed",
+      "samples": 3,
+      "median": 240174.0,
+      "minimum": 237692.33333333334,
+      "maximum": 244860.0,
+      "p99_median_us": 5.311
+    },
+    {
+      "case": [
+        1,
+        1,
+        4096
+      ],
+      "variant": "baseline-owned",
+      "samples": 3,
+      "median": 236159.33333333334,
+      "minimum": 230175.0,
+      "maximum": 236271.33333333334,
+      "p99_median_us": 5.411
+    },
+    {
+      "case": [
+        1,
+        1,
+        4096
+      ],
+      "variant": "candidate-borrowed",
+      "samples": 3,
+      "median": 239643.0,
+      "minimum": 237989.33333333334,
+      "maximum": 239898.0,
+      "p99_median_us": 5.291
+    },
+    {
+      "case": [
+        1,
+        1,
+        4096
+      ],
+      "variant": "candidate-owned",
+      "samples": 3,
+      "median": 238474.66666666666,
+      "minimum": 237749.0,
+      "maximum": 239189.33333333334,
+      "p99_median_us": 5.351
+    },
+    {
+      "case": [
+        1,
+        1,
+        4096
+      ],
+      "variant": "tokio",
+      "samples": 3,
+      "median": 241264.66666666666,
+      "minimum": 240982.33333333334,
+      "maximum": 243607.33333333334,
+      "p99_median_us": 5.331
+    },
+    {
+      "case": [
+        1,
+        1,
+        4096
+      ],
+      "variant": "tokio-adapter-borrowed",
+      "samples": 3,
+      "median": 238947.33333333334,
+      "minimum": 236815.0,
+      "maximum": 242758.33333333334,
+      "p99_median_us": 5.291
+    },
+    {
+      "case": [
+        1,
+        1,
+        4096
+      ],
+      "variant": "tokio-adapter-owned",
+      "samples": 3,
+      "median": 238663.66666666666,
+      "minimum": 238557.0,
+      "maximum": 242987.0,
+      "p99_median_us": 5.331
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "baseline-borrowed",
+      "samples": 3,
+      "median": 636007.0,
+      "minimum": 627859.0,
+      "maximum": 636148.6666666666,
+      "p99_median_us": 54.879
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "baseline-owned",
+      "samples": 3,
+      "median": 647192.0,
+      "minimum": 640760.6666666666,
+      "maximum": 654879.0,
+      "p99_median_us": 53.663
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "candidate-borrowed",
+      "samples": 3,
+      "median": 635091.6666666666,
+      "minimum": 634673.3333333334,
+      "maximum": 640676.6666666666,
+      "p99_median_us": 54.879
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "candidate-owned",
+      "samples": 3,
+      "median": 663109.3333333334,
+      "minimum": 658796.6666666666,
+      "maximum": 665916.3333333334,
+      "p99_median_us": 52.479
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "tokio",
+      "samples": 3,
+      "median": 706766.6666666666,
+      "minimum": 704991.3333333334,
+      "maximum": 711608.6666666666,
+      "p99_median_us": 53.087
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "tokio-adapter-borrowed",
+      "samples": 3,
+      "median": 644121.3333333334,
+      "minimum": 639332.3333333334,
+      "maximum": 647985.0,
+      "p99_median_us": 57.503
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "tokio-adapter-owned",
+      "samples": 3,
+      "median": 648762.0,
+      "minimum": 641840.3333333334,
+      "maximum": 652314.0,
+      "p99_median_us": 57.119
+    },
+    {
+      "case": [
+        1,
+        32,
+        4096
+      ],
+      "variant": "baseline-borrowed",
+      "samples": 3,
+      "median": 571190.0,
+      "minimum": 565335.3333333334,
+      "maximum": 573017.0,
+      "p99_median_us": 60.959
+    },
+    {
+      "case": [
+        1,
+        32,
+        4096
+      ],
+      "variant": "baseline-owned",
+      "samples": 3,
+      "median": 574237.0,
+      "minimum": 572332.0,
+      "maximum": 583047.0,
+      "p99_median_us": 60.351
+    },
+    {
+      "case": [
+        1,
+        32,
+        4096
+      ],
+      "variant": "candidate-borrowed",
+      "samples": 3,
+      "median": 564796.3333333334,
+      "minimum": 564675.0,
+      "maximum": 565388.0,
+      "p99_median_us": 61.631
+    },
+    {
+      "case": [
+        1,
+        32,
+        4096
+      ],
+      "variant": "candidate-owned",
+      "samples": 3,
+      "median": 601085.3333333334,
+      "minimum": 597006.6666666666,
+      "maximum": 603297.0,
+      "p99_median_us": 57.823
+    },
+    {
+      "case": [
+        1,
+        32,
+        4096
+      ],
+      "variant": "tokio",
+      "samples": 3,
+      "median": 635528.6666666666,
+      "minimum": 633686.3333333334,
+      "maximum": 639534.6666666666,
+      "p99_median_us": 58.815
+    },
+    {
+      "case": [
+        1,
+        32,
+        4096
+      ],
+      "variant": "tokio-adapter-borrowed",
+      "samples": 3,
+      "median": 585537.0,
+      "minimum": 576726.3333333334,
+      "maximum": 590566.3333333334,
+      "p99_median_us": 63.103
+    },
+    {
+      "case": [
+        1,
+        32,
+        4096
+      ],
+      "variant": "tokio-adapter-owned",
+      "samples": 3,
+      "median": 581222.6666666666,
+      "minimum": 579061.0,
+      "maximum": 587981.3333333334,
+      "p99_median_us": 63.455
+    },
+    {
+      "case": [
+        4,
+        1,
+        64
+      ],
+      "variant": "baseline-borrowed",
+      "samples": 3,
+      "median": 270308.6666666667,
+      "minimum": 268222.6666666667,
+      "maximum": 274497.0,
+      "p99_median_us": 4.743
+    },
+    {
+      "case": [
+        4,
+        1,
+        64
+      ],
+      "variant": "baseline-owned",
+      "samples": 3,
+      "median": 263296.3333333333,
+      "minimum": 261954.0,
+      "maximum": 264499.3333333333,
+      "p99_median_us": 5.591
+    },
+    {
+      "case": [
+        4,
+        1,
+        64
+      ],
+      "variant": "candidate-borrowed",
+      "samples": 3,
+      "median": 270204.3333333333,
+      "minimum": 268082.6666666667,
+      "maximum": 271404.0,
+      "p99_median_us": 4.811
+    },
+    {
+      "case": [
+        4,
+        1,
+        64
+      ],
+      "variant": "candidate-owned",
+      "samples": 3,
+      "median": 264038.3333333333,
+      "minimum": 263490.6666666667,
+      "maximum": 267191.6666666667,
+      "p99_median_us": 4.971
+    },
+    {
+      "case": [
+        4,
+        1,
+        64
+      ],
+      "variant": "tokio",
+      "samples": 3,
+      "median": 275017.6666666667,
+      "minimum": 272073.3333333333,
+      "maximum": 275725.0,
+      "p99_median_us": 4.523
+    },
+    {
+      "case": [
+        4,
+        1,
+        64
+      ],
+      "variant": "tokio-adapter-borrowed",
+      "samples": 3,
+      "median": 271037.6666666667,
+      "minimum": 270997.0,
+      "maximum": 271761.3333333333,
+      "p99_median_us": 4.771
+    },
+    {
+      "case": [
+        4,
+        1,
+        64
+      ],
+      "variant": "tokio-adapter-owned",
+      "samples": 3,
+      "median": 270083.0,
+      "minimum": 269321.3333333333,
+      "maximum": 270954.0,
+      "p99_median_us": 4.763
+    },
+    {
+      "case": [
+        4,
+        1,
+        4096
+      ],
+      "variant": "baseline-borrowed",
+      "samples": 3,
+      "median": 239024.33333333334,
+      "minimum": 236006.33333333334,
+      "maximum": 240378.33333333334,
+      "p99_median_us": 5.491
+    },
+    {
+      "case": [
+        4,
+        1,
+        4096
+      ],
+      "variant": "baseline-owned",
+      "samples": 3,
+      "median": 232705.0,
+      "minimum": 232002.0,
+      "maximum": 235105.0,
+      "p99_median_us": 6.091
+    },
+    {
+      "case": [
+        4,
+        1,
+        4096
+      ],
+      "variant": "candidate-borrowed",
+      "samples": 3,
+      "median": 237024.0,
+      "minimum": 236141.66666666666,
+      "maximum": 240749.66666666666,
+      "p99_median_us": 5.963
+    },
+    {
+      "case": [
+        4,
+        1,
+        4096
+      ],
+      "variant": "candidate-owned",
+      "samples": 3,
+      "median": 235588.33333333334,
+      "minimum": 234875.66666666666,
+      "maximum": 236197.33333333334,
+      "p99_median_us": 5.563
+    },
+    {
+      "case": [
+        4,
+        1,
+        4096
+      ],
+      "variant": "tokio",
+      "samples": 3,
+      "median": 241345.33333333334,
+      "minimum": 239929.0,
+      "maximum": 242698.0,
+      "p99_median_us": 5.383
+    },
+    {
+      "case": [
+        4,
+        1,
+        4096
+      ],
+      "variant": "tokio-adapter-borrowed",
+      "samples": 3,
+      "median": 238159.33333333334,
+      "minimum": 237977.0,
+      "maximum": 238929.0,
+      "p99_median_us": 5.531
+    },
+    {
+      "case": [
+        4,
+        1,
+        4096
+      ],
+      "variant": "tokio-adapter-owned",
+      "samples": 3,
+      "median": 238631.66666666666,
+      "minimum": 237120.0,
+      "maximum": 239529.66666666666,
+      "p99_median_us": 5.951
+    },
+    {
+      "case": [
+        4,
+        32,
+        64
+      ],
+      "variant": "baseline-borrowed",
+      "samples": 3,
+      "median": 1723072.6666666667,
+      "minimum": 1717752.6666666667,
+      "maximum": 1734383.6666666667,
+      "p99_median_us": 54.943
+    },
+    {
+      "case": [
+        4,
+        32,
+        64
+      ],
+      "variant": "baseline-owned",
+      "samples": 3,
+      "median": 1707118.6666666667,
+      "minimum": 1700726.0,
+      "maximum": 1723591.6666666667,
+      "p99_median_us": 56.767
+    },
+    {
+      "case": [
+        4,
+        32,
+        64
+      ],
+      "variant": "candidate-borrowed",
+      "samples": 3,
+      "median": 1747050.0,
+      "minimum": 1737450.0,
+      "maximum": 1788427.3333333333,
+      "p99_median_us": 54.463
+    },
+    {
+      "case": [
+        4,
+        32,
+        64
+      ],
+      "variant": "candidate-owned",
+      "samples": 3,
+      "median": 1725418.3333333333,
+      "minimum": 1697592.0,
+      "maximum": 1727987.6666666667,
+      "p99_median_us": 56.223
+    },
+    {
+      "case": [
+        4,
+        32,
+        64
+      ],
+      "variant": "tokio",
+      "samples": 3,
+      "median": 1738540.3333333333,
+      "minimum": 1732303.3333333333,
+      "maximum": 1761520.3333333333,
+      "p99_median_us": 52.223
+    },
+    {
+      "case": [
+        4,
+        32,
+        64
+      ],
+      "variant": "tokio-adapter-borrowed",
+      "samples": 3,
+      "median": 1705654.0,
+      "minimum": 1694894.3333333333,
+      "maximum": 1711894.6666666667,
+      "p99_median_us": 51.807
+    },
+    {
+      "case": [
+        4,
+        32,
+        64
+      ],
+      "variant": "tokio-adapter-owned",
+      "samples": 3,
+      "median": 1704807.6666666667,
+      "minimum": 1691447.0,
+      "maximum": 1705990.6666666667,
+      "p99_median_us": 52.159
+    },
+    {
+      "case": [
+        4,
+        32,
+        4096
+      ],
+      "variant": "baseline-borrowed",
+      "samples": 3,
+      "median": 1615520.6666666667,
+      "minimum": 1610331.6666666667,
+      "maximum": 1634272.6666666667,
+      "p99_median_us": 63.455
+    },
+    {
+      "case": [
+        4,
+        32,
+        4096
+      ],
+      "variant": "baseline-owned",
+      "samples": 3,
+      "median": 1590158.3333333333,
+      "minimum": 1586179.0,
+      "maximum": 1599141.3333333333,
+      "p99_median_us": 65.855
+    },
+    {
+      "case": [
+        4,
+        32,
+        4096
+      ],
+      "variant": "candidate-borrowed",
+      "samples": 3,
+      "median": 1588212.6666666667,
+      "minimum": 1582157.3333333333,
+      "maximum": 1619587.6666666667,
+      "p99_median_us": 63.903
+    },
+    {
+      "case": [
+        4,
+        32,
+        4096
+      ],
+      "variant": "candidate-owned",
+      "samples": 3,
+      "median": 1574055.3333333333,
+      "minimum": 1567412.6666666667,
+      "maximum": 1579449.0,
+      "p99_median_us": 65.727
+    },
+    {
+      "case": [
+        4,
+        32,
+        4096
+      ],
+      "variant": "tokio",
+      "samples": 3,
+      "median": 1617302.6666666667,
+      "minimum": 1609971.3333333333,
+      "maximum": 1641807.3333333333,
+      "p99_median_us": 59.231
+    },
+    {
+      "case": [
+        4,
+        32,
+        4096
+      ],
+      "variant": "tokio-adapter-borrowed",
+      "samples": 3,
+      "median": 1592721.0,
+      "minimum": 1588526.0,
+      "maximum": 1604569.0,
+      "p99_median_us": 59.199
+    },
+    {
+      "case": [
+        4,
+        32,
+        4096
+      ],
+      "variant": "tokio-adapter-owned",
+      "samples": 3,
+      "median": 1587069.0,
+      "minimum": 1583108.0,
+      "maximum": 1603317.0,
+      "p99_median_us": 58.911
+    }
+  ],
+  "local-lane-screen.json": [
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "baseline",
+      "samples": 5,
+      "median": 265540.3333333333,
+      "minimum": 252773.0,
+      "maximum": 266900.6666666667,
+      "p99_median_us": 5.143
+    },
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "exclusive-admission",
+      "samples": 5,
+      "median": 264708.0,
+      "minimum": 262070.33333333334,
+      "maximum": 267501.6666666667,
+      "p99_median_us": 5.431
+    },
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "lane-reuse",
+      "samples": 5,
+      "median": 265476.6666666667,
+      "minimum": 251270.66666666666,
+      "maximum": 269249.6666666667,
+      "p99_median_us": 5.243
+    },
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "local-lane-reuse",
+      "samples": 5,
+      "median": 270214.0,
+      "minimum": 264426.6666666667,
+      "maximum": 271620.0,
+      "p99_median_us": 4.911
+    },
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "local-single-wake",
+      "samples": 5,
+      "median": 263894.3333333333,
+      "minimum": 251967.0,
+      "maximum": 268331.3333333333,
+      "p99_median_us": 5.571
+    },
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "tokio",
+      "samples": 5,
+      "median": 274040.6666666667,
+      "minimum": 273296.3333333333,
+      "maximum": 276066.3333333333,
+      "p99_median_us": 4.303
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "baseline",
+      "samples": 5,
+      "median": 652284.6666666666,
+      "minimum": 641598.3333333334,
+      "maximum": 653363.0,
+      "p99_median_us": 53.343
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "exclusive-admission",
+      "samples": 5,
+      "median": 643892.3333333334,
+      "minimum": 639773.6666666666,
+      "maximum": 650594.0,
+      "p99_median_us": 53.791
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "lane-reuse",
+      "samples": 5,
+      "median": 649413.6666666666,
+      "minimum": 647182.0,
+      "maximum": 660219.3333333334,
+      "p99_median_us": 53.407
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "local-lane-reuse",
+      "samples": 5,
+      "median": 656056.3333333334,
+      "minimum": 654919.3333333334,
+      "maximum": 670327.0,
+      "p99_median_us": 52.799
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "local-single-wake",
+      "samples": 5,
+      "median": 655314.0,
+      "minimum": 649983.0,
+      "maximum": 659540.0,
+      "p99_median_us": 53.023
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "tokio",
+      "samples": 5,
+      "median": 709511.3333333334,
+      "minimum": 699845.3333333334,
+      "maximum": 715894.3333333334,
+      "p99_median_us": 52.831
+    }
+  ],
+  "wake-screen.json": [
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "inline-lazy",
+      "samples": 5,
+      "median": 265825.3333333333,
+      "minimum": 249830.33333333334,
+      "maximum": 267607.6666666667,
+      "p99_median_us": 5.203
+    },
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "owned-lazy",
+      "samples": 5,
+      "median": 263863.6666666667,
+      "minimum": 252882.33333333334,
+      "maximum": 265165.3333333333,
+      "p99_median_us": 5.563
+    },
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "slot-inline",
+      "samples": 5,
+      "median": 265344.0,
+      "minimum": 259132.66666666666,
+      "maximum": 268642.6666666667,
+      "p99_median_us": 5.531
+    },
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "slot-waker",
+      "samples": 5,
+      "median": 263283.0,
+      "minimum": 245290.66666666666,
+      "maximum": 268243.0,
+      "p99_median_us": 5.563
+    },
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "tokio",
+      "samples": 5,
+      "median": 272854.3333333333,
+      "minimum": 272552.0,
+      "maximum": 275991.0,
+      "p99_median_us": 4.251
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "inline-lazy",
+      "samples": 5,
+      "median": 653297.6666666666,
+      "minimum": 651294.3333333334,
+      "maximum": 659350.0,
+      "p99_median_us": 53.151
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "owned-lazy",
+      "samples": 5,
+      "median": 643807.3333333334,
+      "minimum": 642947.0,
+      "maximum": 648126.0,
+      "p99_median_us": 53.823
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "slot-inline",
+      "samples": 5,
+      "median": 647319.0,
+      "minimum": 639781.0,
+      "maximum": 657890.6666666666,
+      "p99_median_us": 53.535
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "slot-waker",
+      "samples": 5,
+      "median": 642591.6666666666,
+      "minimum": 640861.0,
+      "maximum": 650605.3333333334,
+      "p99_median_us": 53.823
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "tokio",
+      "samples": 5,
+      "median": 704390.0,
+      "minimum": 703571.3333333334,
+      "maximum": 708523.0,
+      "p99_median_us": 53.183
+    }
+  ]
+}

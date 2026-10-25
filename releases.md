@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Reduce repeated Native owned-read reference counting, operation-lane admission, and single-worker wake overhead while preserving cancellation, abandoned-operation retirement, and migration.
+
 - Arm Native runnable-quiescence notifications when first requested, preserving drain and shutdown wakeups while removing unused event work from ordinary dispatch.
 
 - Combine idle Native io\_uring receive preparation, submission, and waiting in one driver turn, preserving owned-buffer retirement and bounded driver progress between runnable batches.

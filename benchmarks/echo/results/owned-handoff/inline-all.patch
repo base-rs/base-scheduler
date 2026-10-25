@@ -1,0 +1,312 @@
+diff --git a/crates/iouring/src/io_uring_selector.rs b/crates/iouring/src/io_uring_selector.rs
+index 9037ce7..b5caf35 100644
+--- a/crates/iouring/src/io_uring_selector.rs
++++ b/crates/iouring/src/io_uring_selector.rs
+@@ -347,12 +347,12 @@ impl Drop for Controller {
+     }
+ }
+ 
+-struct CancelOnDrop {
+-    controller: Arc<Controller>,
++struct CancelOnDrop<C: std::ops::Deref<Target = Controller> = Arc<Controller>> {
++    controller: C,
+     identifier: u64,
+     armed: bool,
+ }
+-impl CancelOnDrop {
++impl<C: std::ops::Deref<Target = Controller>> CancelOnDrop<C> {
+     fn request(&mut self) {
+         if self.armed {
+             let _ = self.controller.send(Command::Cancel(self.identifier));
+@@ -360,7 +360,7 @@ impl CancelOnDrop {
+         }
+     }
+ }
+-impl Drop for CancelOnDrop {
++impl<C: std::ops::Deref<Target = Controller>> Drop for CancelOnDrop<C> {
+     fn drop(&mut self) {
+         self.request();
+     }
+diff --git a/crates/iouring/src/io_uring_selector/socket_read.rs b/crates/iouring/src/io_uring_selector/socket_read.rs
+index 1b4864d..1a33dca 100644
+--- a/crates/iouring/src/io_uring_selector/socket_read.rs
++++ b/crates/iouring/src/io_uring_selector/socket_read.rs
+@@ -2,7 +2,7 @@
+ // Copyright, 2026, by Samuel Williams.
+ 
+ use super::*;
+-use std::{any::Any, sync::Mutex};
++use std::{any::Any, sync::Mutex, task::Waker};
+ 
+ pub(crate) struct State {
+     shared: Arc<Shared>,
+@@ -16,9 +16,9 @@ impl Default for State {
+                 slot: Mutex::new(Slot {
+                     result: None,
+                     collecting: false,
++                    waker: None,
+                 }),
+                 ready: AtomicBool::new(false),
+-                waker: atomic_waker::AtomicWaker::new(),
+             }),
+             cached: None,
+         }
+@@ -33,15 +33,15 @@ enum Completion {
+ struct Slot {
+     result: Option<Completion>,
+     collecting: bool,
++    waker: Option<Waker>,
+ }
+ struct Shared {
+     slot: Mutex<Slot>,
+     ready: AtomicBool,
+-    waker: atomic_waker::AtomicWaker,
+ }
+ impl Shared {
+     fn publish(&self, result: Completion) {
+-        let abandoned = {
++        let (abandoned, waker) = {
+             let mut slot = self.slot.lock().unwrap();
+             let abandoned = if slot.collecting {
+                 slot.result = Some(result);
+@@ -49,28 +49,28 @@ impl Shared {
+             } else {
+                 Some(result)
+             };
+-            // Dropping a returned owner can retire its lane and permit immediate reuse. Publish readiness before releasing that owner or allowing collection to take it.
+             self.ready.store(true, Ordering::Release);
+-            abandoned
++            (abandoned, slot.waker.take())
+         };
+-        self.waker.wake();
++        if let Some(waker) = waker {
++            waker.wake();
++        }
+         discard(abandoned);
+     }
+ }
+ impl Drop for Shared {
+     fn drop(&mut self) {
+-        discard(
+-            self.slot
+-                .get_mut()
+-                .unwrap_or_else(std::sync::PoisonError::into_inner)
+-                .result
+-                .take(),
+-        );
++        let slot = self
++            .slot
++            .get_mut()
++            .unwrap_or_else(std::sync::PoisonError::into_inner);
++        discard(slot.result.take());
++        discard(slot.waker.take());
+     }
+ }
+ 
+ struct CompletionWait<'a> {
+-    cancel: CancelOnDrop,
++    cancel: CancelOnDrop<&'a Controller>,
+     shared: Option<&'a Shared>,
+ }
+ impl Drop for CompletionWait<'_> {
+@@ -78,12 +78,12 @@ impl Drop for CompletionWait<'_> {
+         let Some(shared) = self.shared.take() else {
+             return;
+         };
+-        let abandoned = {
++        let (abandoned, waker) = {
+             let mut slot = shared.slot.lock().unwrap();
+             slot.collecting = false;
+-            slot.result.take()
++            (slot.result.take(), slot.waker.take())
+         };
+-        shared.waker.take();
++        discard(waker);
+         discard(abandoned);
+     }
+ }
+@@ -119,7 +119,6 @@ impl<B: IoBufMut> PendingRequest for ReadRequest<B> {
+     }
+     fn finish(mut self: Box<Self>, result: io::Result<usize>) {
+         let shared = self.reply.take().unwrap();
+-        drop(self.socket.take());
+         drop(self.permit.take());
+         shared.publish(Completion::Request(result, self));
+     }
+@@ -152,8 +151,8 @@ impl State {
+     async fn attempt<B: IoBufMut>(
+         &mut self,
+         selector: &IoUringSelector,
+-        controller: Arc<Controller>,
+-        socket: RegisteredSocket,
++        controller: &Controller,
++        socket: &RegisteredSocket,
+         buffer: B,
+         cancellation: &Cancellation,
+     ) -> RawBufferResult<B> {
+@@ -190,7 +189,13 @@ impl State {
+             });
+         request.identifier = identifier;
+         request.permit = Some(permit);
+-        request.socket = Some(socket);
++        if !request
++            .socket
++            .as_ref()
++            .is_some_and(|held| Arc::ptr_eq(held, socket))
++        {
++            request.socket = Some(Arc::clone(socket));
++        }
+         request.buffer = Some(buffer);
+         // Derive the pointer after placing its owner in the request. Moving a Box-backed owner afterward can invalidate the pointer's provenance even if its address stays stable.
+         let buffer = request.buffer.as_mut().unwrap();
+@@ -210,14 +215,26 @@ impl State {
+         };
+         completion.cancel.controller.submit(request);
+         let mut cancelled = pin!(cancellation.cancelled());
+-        poll_fn(|context| {
++        let result = poll_fn(|context| {
+             if self.shared.ready.load(Ordering::Acquire) {
+-                return Poll::Ready(());
++                let mut slot = self.shared.slot.lock().unwrap();
++                slot.collecting = false;
++                return Poll::Ready(slot.result.take().unwrap());
+             }
+-            self.shared.waker.register(context.waker());
+-            if self.shared.ready.load(Ordering::Acquire) {
+-                self.shared.waker.take();
+-                return Poll::Ready(());
++            // Clone before locking: even a custom waker can complete this request reentrantly.
++            let replacement = context.waker().clone();
++            let (result, previous) = {
++                let mut slot = self.shared.slot.lock().unwrap();
++                if let Some(result) = slot.result.take() {
++                    slot.collecting = false;
++                    (Some(result), slot.waker.take())
++                } else {
++                    (None, slot.waker.replace(replacement))
++                }
++            };
++            discard(previous);
++            if let Some(result) = result {
++                return Poll::Ready(result);
+             }
+             if completion.cancel.armed && cancelled.as_mut().poll(context).is_ready() {
+                 completion.cancel.request();
+@@ -226,11 +243,6 @@ impl State {
+         })
+         .await;
+         completion.cancel.armed = false;
+-        let result = {
+-            let mut slot = self.shared.slot.lock().unwrap();
+-            slot.collecting = false;
+-            slot.result.take().unwrap()
+-        };
+         completion.shared = None;
+         drop(completion);
+         match result {
+@@ -251,30 +263,24 @@ impl State {
+     pub(crate) async fn read<B: IoBufMut>(
+         &mut self,
+         selector: &IoUringSelector,
+-        socket: &impl SocketSource,
++        socket: &RegisteredSocket,
+         mut buffer: B,
+         cancellation: &Cancellation,
+     ) -> BufferResult<B> {
+-        let controller = selector.route();
++        let controller = selector.route_ref();
+         loop {
+             if let Err(error) = cancellation.check() {
+                 return (Err(error.into()), buffer);
+             }
+             let (result, returned) = self
+-                .attempt(
+-                    selector,
+-                    Arc::clone(&controller),
+-                    socket.retain_socket(),
+-                    buffer,
+-                    cancellation,
+-                )
++                .attempt(selector, controller, socket, buffer, cancellation)
+                 .await;
+             buffer = returned;
+             match result {
+                 Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                     let (result, returned) = selector
+                         .wait_ready_owned(
+-                            Arc::clone(&controller),
++                            Arc::clone(controller),
+                             socket,
+                             buffer,
+                             crate::Interest::Readable,
+diff --git a/crates/iouring/src/io_uring_socket_stream_reader.rs b/crates/iouring/src/io_uring_socket_stream_reader.rs
+index 7a0b4d5..3a6c1c7 100644
+--- a/crates/iouring/src/io_uring_socket_stream_reader.rs
++++ b/crates/iouring/src/io_uring_socket_stream_reader.rs
+@@ -315,7 +315,7 @@ impl SocketStreamReader for IoUringSocketStreamReader<'_> {
+         if matches!(result, Ok(0)) {
+             self.eof = true;
+         }
+-        (result, buffer.into_inner())
++        (result, self.operations.complete(buffer))
+     }
+     async fn close(&mut self) -> io::Result<()> {
+         self.closed = true;
+diff --git a/crates/iouring/src/operation_state.rs b/crates/iouring/src/operation_state.rs
+index 025872e..6f495fd 100644
+--- a/crates/iouring/src/operation_state.rs
++++ b/crates/iouring/src/operation_state.rs
+@@ -30,7 +30,7 @@ pub(crate) struct OperationGuard<T> {
+     value: Option<T>,
+     _retirement: Retirement,
+ }
+-struct Retirement(Arc<Activity>);
++struct Retirement(Option<Arc<Activity>>);
+ struct RetirementWait<'a>(&'a AtomicWaker);
+ impl Drop for RetirementWait<'_> {
+     fn drop(&mut self) {
+@@ -39,8 +39,10 @@ impl Drop for RetirementWait<'_> {
+ }
+ impl Drop for Retirement {
+     fn drop(&mut self) {
+-        self.0.running.store(false, Ordering::Release);
+-        self.0.retired.wake();
++        if let Some(activity) = self.0.take() {
++            activity.running.store(false, Ordering::Release);
++            activity.retired.wake();
++        }
+     }
+ }
+ impl<T> OperationGuard<T> {
+@@ -113,9 +115,18 @@ impl OperationState {
+         }
+         Ok(OperationGuard {
+             value: Some(value),
+-            _retirement: Retirement(Arc::clone(activity)),
++            _retirement: Retirement(Some(Arc::clone(activity))),
+         })
+     }
++
++    // Result collection holds the lane exclusively, so no close can be waiting on this operation. Abandonment still retires through the guard's drop path and wakes close.
++    pub(crate) fn complete<T>(&mut self, mut guard: OperationGuard<T>) -> T {
++        let activity = guard._retirement.0.take().unwrap();
++        debug_assert!(Arc::ptr_eq(self.activity.as_ref().unwrap(), &activity));
++        let value = guard.value.take().unwrap();
++        activity.running.store(false, Ordering::Release);
++        value
++    }
+     pub(crate) async fn close(&mut self) {
+         if let Some(activity) = &self.activity {
+             let _wait = RetirementWait(&activity.retired);
+diff --git a/crates/native/src/native_task.rs b/crates/native/src/native_task.rs
+index c923910..d5af735 100644
+--- a/crates/native/src/native_task.rs
++++ b/crates/native/src/native_task.rs
+@@ -55,6 +55,7 @@ impl<F: Future> TaskFuture<F> {
+ impl<F: Future> Future for TaskFuture<F> {
+     type Output = TaskOutcome<F::Output>;
+ 
++    #[inline(always)]
+     fn poll(self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Self::Output> {
+         // SAFETY: The wrapper structurally pins its future and never moves that field. Retirement drops it in place; PhantomPinned also prevents moving the wrapper after its field retires.
+         let this = unsafe { self.get_unchecked_mut() };

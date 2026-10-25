@@ -1,0 +1,80 @@
+diff --git a/crates/iouring/src/io_uring_socket_stream_reader.rs b/crates/iouring/src/io_uring_socket_stream_reader.rs
+index 7a0b4d5..3a6c1c7 100644
+--- a/crates/iouring/src/io_uring_socket_stream_reader.rs
++++ b/crates/iouring/src/io_uring_socket_stream_reader.rs
+@@ -315,7 +315,7 @@ impl SocketStreamReader for IoUringSocketStreamReader<'_> {
+         if matches!(result, Ok(0)) {
+             self.eof = true;
+         }
+-        (result, buffer.into_inner())
++        (result, self.operations.complete(buffer))
+     }
+     async fn close(&mut self) -> io::Result<()> {
+         self.closed = true;
+diff --git a/crates/iouring/src/operation_state.rs b/crates/iouring/src/operation_state.rs
+index 025872e..13f9ce3 100644
+--- a/crates/iouring/src/operation_state.rs
++++ b/crates/iouring/src/operation_state.rs
+@@ -17,6 +17,7 @@ use std::{
+ #[derive(Default)]
+ pub(crate) struct OperationState {
+     activity: Option<Arc<Activity>>,
++    available: Option<Arc<Activity>>,
+ }
+ 
+ struct Activity {
+@@ -30,7 +31,7 @@ pub(crate) struct OperationGuard<T> {
+     value: Option<T>,
+     _retirement: Retirement,
+ }
+-struct Retirement(Arc<Activity>);
++struct Retirement(Option<Arc<Activity>>);
+ struct RetirementWait<'a>(&'a AtomicWaker);
+ impl Drop for RetirementWait<'_> {
+     fn drop(&mut self) {
+@@ -39,8 +40,10 @@ impl Drop for RetirementWait<'_> {
+ }
+ impl Drop for Retirement {
+     fn drop(&mut self) {
+-        self.0.running.store(false, Ordering::Release);
+-        self.0.retired.wake();
++        if let Some(activity) = self.0.take() {
++            activity.running.store(false, Ordering::Release);
++            activity.retired.wake();
++        }
+     }
+ }
+ impl<T> OperationGuard<T> {
+@@ -108,14 +111,30 @@ impl OperationState {
+                 retired: AtomicWaker::new(),
+             })
+         });
+-        if activity.running.swap(true, Ordering::AcqRel) {
++        if activity.running.load(Ordering::Acquire) {
+             return Err((io::Error::from(io::ErrorKind::WouldBlock).into(), value));
+         }
++        // Only this exclusively borrowed lane can start an operation; concurrent retirement can only clear the flag.
++        activity.running.store(true, Ordering::Relaxed);
+         Ok(OperationGuard {
+             value: Some(value),
+-            _retirement: Retirement(Arc::clone(activity)),
++            _retirement: Retirement(Some(
++                self.available
++                    .take()
++                    .unwrap_or_else(|| Arc::clone(activity)),
++            )),
+         })
+     }
++
++    // Result collection holds the lane exclusively, so no close can be waiting on this operation. Abandonment still retires through the guard's drop path and wakes close.
++    pub(crate) fn complete<T>(&mut self, mut guard: OperationGuard<T>) -> T {
++        let activity = guard._retirement.0.take().unwrap();
++        debug_assert!(Arc::ptr_eq(self.activity.as_ref().unwrap(), &activity));
++        let value = guard.value.take().unwrap();
++        activity.running.store(false, Ordering::Release);
++        self.available = Some(activity);
++        value
++    }
+     pub(crate) async fn close(&mut self) {
+         if let Some(activity) = &self.activity {
+             let _wait = RetirementWait(&activity.retired);
