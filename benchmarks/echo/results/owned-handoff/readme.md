@@ -65,6 +65,7 @@ Userspace cycles fall about 16% with little change in instruction count. Togethe
 
 All screens retain their complete sample sets and build manifests. Their candidates are exploratory patches against their recorded bases, not additional production changes.
 
+- `collector-screen.json`: moving collection interest to an atomic flag removes the admission mutex but changes busy medians by only −0.12% with one worker and −0.14% with four workers; serial improves 0.69%. Retain the simpler mutex-owned collection state. The archived patch is the benchmarked production-file prototype; later unmeasured local race-test additions are not part of it.
 - `wake-screen.json`: putting the completion waker under the existing result mutex gave no consistent improvement. Retain the existing AtomicWaker.
 - `handoff-screen.json`: inline polling, direct retirement, mutex-waker variants, and ownership reuse produced mixed results. Only the combined selected change has the separate seven-repeat confirmation above; do not attribute its gain to each component individually.
 - `compact-exclusive-screen.json`: outlining receive-ahead did not shrink the owned task and regressed its serial screen. Boxing rare readiness/write retries reduced the task from 1,240 to 1,016 bytes, with +1.72% serial and +0.76% busy medians in one screen. It adds allocation on those retry paths and was not selected.

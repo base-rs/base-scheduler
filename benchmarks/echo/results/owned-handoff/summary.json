@@ -1975,5 +1975,124 @@
       "maximum": 708523.0,
       "p99_median_us": 53.183
     }
+  ],
+  "collector-screen.json": [
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "baseline",
+      "samples": 5,
+      "median": 268590.6666666667,
+      "minimum": 267056.0,
+      "maximum": 270217.6666666667,
+      "p99_median_us": 4.983
+    },
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "candidate",
+      "samples": 5,
+      "median": 270437.3333333333,
+      "minimum": 265050.6666666667,
+      "maximum": 270807.3333333333,
+      "p99_median_us": 4.843
+    },
+    {
+      "case": [
+        1,
+        1,
+        64
+      ],
+      "variant": "tokio",
+      "samples": 5,
+      "median": 274805.3333333333,
+      "minimum": 273934.6666666667,
+      "maximum": 276951.0,
+      "p99_median_us": 4.291
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "baseline",
+      "samples": 5,
+      "median": 664094.6666666666,
+      "minimum": 661820.3333333334,
+      "maximum": 670181.6666666666,
+      "p99_median_us": 52.191
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "candidate",
+      "samples": 5,
+      "median": 663313.0,
+      "minimum": 661259.0,
+      "maximum": 675223.0,
+      "p99_median_us": 52.287
+    },
+    {
+      "case": [
+        1,
+        32,
+        64
+      ],
+      "variant": "tokio",
+      "samples": 5,
+      "median": 709672.6666666666,
+      "minimum": 704408.0,
+      "maximum": 711438.6666666666,
+      "p99_median_us": 52.799
+    },
+    {
+      "case": [
+        4,
+        32,
+        64
+      ],
+      "variant": "baseline",
+      "samples": 5,
+      "median": 1729486.6666666667,
+      "minimum": 1692091.0,
+      "maximum": 1745446.3333333333,
+      "p99_median_us": 56.639
+    },
+    {
+      "case": [
+        4,
+        32,
+        64
+      ],
+      "variant": "candidate",
+      "samples": 5,
+      "median": 1727056.0,
+      "minimum": 1693313.0,
+      "maximum": 1741948.3333333333,
+      "p99_median_us": 56.895
+    },
+    {
+      "case": [
+        4,
+        32,
+        64
+      ],
+      "variant": "tokio",
+      "samples": 5,
+      "median": 1752106.6666666667,
+      "minimum": 1706682.0,
+      "maximum": 1758568.6666666667,
+      "p99_median_us": 51.647
+    }
   ]
 }

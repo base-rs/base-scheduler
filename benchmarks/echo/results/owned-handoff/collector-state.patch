@@ -1,0 +1,92 @@
+diff --git a/crates/iouring/src/io_uring_selector/socket_read.rs b/crates/iouring/src/io_uring_selector/socket_read.rs
+index 97c80cd..9286f79 100644
+--- a/crates/iouring/src/io_uring_selector/socket_read.rs
++++ b/crates/iouring/src/io_uring_selector/socket_read.rs
+@@ -13,10 +13,8 @@ impl Default for State {
+     fn default() -> Self {
+         Self {
+             shared: Arc::new(Shared {
+-                slot: Mutex::new(Slot {
+-                    result: None,
+-                    collecting: false,
+-                }),
++                result: Mutex::new(None),
++                collecting: AtomicBool::new(false),
+                 ready: AtomicBool::new(false),
+                 waker: atomic_waker::AtomicWaker::new(),
+             }),
+@@ -30,21 +28,18 @@ enum Completion {
+     Rejected(Box<dyn Any + Send>),
+     Failed,
+ }
+-struct Slot {
+-    result: Option<Completion>,
+-    collecting: bool,
+-}
+ struct Shared {
+-    slot: Mutex<Slot>,
++    result: Mutex<Option<Completion>>,
++    collecting: AtomicBool,
+     ready: AtomicBool,
+     waker: atomic_waker::AtomicWaker,
+ }
+ impl Shared {
+     fn publish(&self, result: Completion) {
+         let abandoned = {
+-            let mut slot = self.slot.lock().unwrap();
+-            let abandoned = if slot.collecting {
+-                slot.result = Some(result);
++            let mut slot = self.result.lock().unwrap();
++            let abandoned = if self.collecting.load(Ordering::Acquire) {
++                *slot = Some(result);
+                 None
+             } else {
+                 Some(result)
+@@ -60,10 +55,9 @@ impl Shared {
+ impl Drop for Shared {
+     fn drop(&mut self) {
+         discard(
+-            self.slot
++            self.result
+                 .get_mut()
+                 .unwrap_or_else(std::sync::PoisonError::into_inner)
+-                .result
+                 .take(),
+         );
+     }
+@@ -79,9 +73,9 @@ impl Drop for CompletionWait<'_> {
+             return;
+         };
+         let abandoned = {
+-            let mut slot = shared.slot.lock().unwrap();
+-            slot.collecting = false;
+-            slot.result.take()
++            let mut slot = shared.result.lock().unwrap();
++            shared.collecting.store(false, Ordering::Release);
++            slot.take()
+         };
+         shared.waker.take();
+         discard(abandoned);
+@@ -204,7 +198,8 @@ impl State {
+         request.reply.set(Some(Arc::clone(&self.shared)));
+         request.cancelling.set(false);
+         self.shared.ready.store(false, Ordering::Relaxed);
+-        self.shared.slot.lock().unwrap().collecting = true;
++        // The exclusive lane has retired its previous request before admission. Publish collection interest before exposing the new request to its producer.
++        self.shared.collecting.store(true, Ordering::Release);
+         let mut completion = CompletionWait {
+             cancel: CancelOnDrop {
+                 controller,
+@@ -232,9 +227,9 @@ impl State {
+         .await;
+         completion.cancel.armed = false;
+         let result = {
+-            let mut slot = self.shared.slot.lock().unwrap();
+-            slot.collecting = false;
+-            slot.result.take().unwrap()
++            let mut slot = self.shared.result.lock().unwrap();
++            self.shared.collecting.store(false, Ordering::Release);
++            slot.take().unwrap()
+         };
+         completion.shared = None;
+         drop(completion);
