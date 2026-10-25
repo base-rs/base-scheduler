@@ -127,6 +127,40 @@ fn empty_datagrams_truncation_and_exhaustion_preserve_message_boundaries() {
 }
 
 #[test]
+fn shutdown_during_buffer_exhaustion_retires_without_a_transport_error() {
+    let (selector, mut driver) = pair(2);
+    let (sender, socket) = block_on(core_scheduler_conformance::socket::stream_pair(
+        &selector,
+        SocketDomain::Ipv4,
+    ));
+    let mut receiving = receiver(&selector, &socket, 1, 4);
+    sender
+        .try_send(b"abcdefgh", SocketSendFlags::default())
+        .unwrap();
+    driver.turn(Some(Duration::ZERO)).unwrap();
+    {
+        let reactor = driver.reactor.as_mut().unwrap();
+        let deadline = std::time::Instant::now() + Duration::from_secs(3);
+        let timeout = types::Timespec::new().nsec(1_000_000);
+        let arguments = types::SubmitArgs::new().timespec(&timeout);
+        // Keep the real CQEs queued until shutdown: the command notification, one selected buffer, and terminal ENOBUFS. No buffer has been returned for rearming.
+        while reactor.ring.completion().len() < 3 {
+            match reactor.ring.submitter().submit_with_args(3, &arguments) {
+                Ok(_) => {}
+                Err(error) if error.raw_os_error() == Some(libc::ETIME) => {}
+                Err(error) => panic!("receive did not complete: {error}"),
+            }
+            assert!(std::time::Instant::now() < deadline);
+        }
+    }
+    selector.close();
+    drive(&mut driver, receiving.close()).unwrap();
+    assert_eq!(receiving.statistics().messages, 1);
+    assert_eq!(receiving.statistics().buffer_exhaustions, 1);
+    drain(&selector, &mut driver);
+}
+
+#[test]
 fn cancellation_and_abandonment_retire_before_exclusive_socket_close() {
     for abandon in [false, true] {
         let (selector, mut driver) = pair(1);
