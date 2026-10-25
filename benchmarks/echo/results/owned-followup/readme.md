@@ -90,6 +90,14 @@ The [instruction-level annotation](native-echo-annotate.txt) contains samples ar
 
 Keep performance changes focused on eliminating work and redundant state. A more complex completion slot, special allocator, or custom task implementation needs a clear causal measurement and a repeatable gain under the same ownership, cancellation, and shutdown contracts. This archive records rejected experiments to avoid repeating them; it does not select a new runtime change.
 
+## Fusing a task transition
+
+A second async-task diagnostic folds the ordinary pending task's runnable-reference release into the compare-exchange which marks it idle. The closed and rescheduled paths retain their original handling. This removes one atomic read-modify-write from that normal path rather than adding a load or a new cache.
+
+Five-repeat echo medians change by +3.55% serially, +0.67% with one busy worker, and −0.11% with four workers. Serial baseline rates vary substantially in this screen; these samples do not establish a repeatable serial gain. The busy change is small, and Native still trails Tokio there by 5.36%. No production task dependency or new task crate is selected.
+
+The diagnostic passes 79 existing Native unit tests and the upstream task integration tests, including wake/drop/cancellation races. Those tests do not establish complete concurrency correctness for a production fork. See [the patch](async-task-fused-release.patch), [matrix](fused-release-screen.json), and [test logs](logs).
+
 ## Connection count and cache counters
 
 A separate three-repeat single-worker sweep uses the unchanged frozen executable for Native and Tokio:

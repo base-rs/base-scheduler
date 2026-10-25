@@ -1,0 +1,115 @@
+     Locking 1 package to highest Rust 1.85 compatible version
+      Adding async-task v4.7.1 (/home/samuel/.cache/core-scheduler-owned-dispatch/async-task-fused-release)
+   Compiling async-task v4.7.1 (/home/samuel/.cache/core-scheduler-owned-dispatch/async-task-fused-release)
+   Compiling core-scheduler-native v0.0.0 (/home/samuel/Developer/core-rs/core-scheduler-lean-owned-read/crates/native)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.46s
+     Running unittests src/lib.rs (/home/samuel/.cache/core-scheduler-owned-echo-diagnosis/target/debug/deps/core_scheduler_native-e5ab80e6fd5ac5ed)
+
+running 79 tests
+
+running 1 test
+
+thread 'core-native-task' (1371778) panicked at crates/native/src/task_service/tests.rs:266:13:
+Box<dyn Any>
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test native_scheduler::driver_tests::busy_tasks_do_not_starve_driver_turns ... ok
+test native_scheduler::driver_tests::remote_task_wakes_still_interrupt_an_idle_single_worker ... ok
+test native_scheduler::tests::zero_executor_workers_and_timer_slots_are_rejected ... ok
+
+thread '<unnamed>' (1371772) panicked at crates/native/src/task_service/tests.rs:253:13:
+abandoned destructor
+test native_scheduler::driver_tests::idle_completions_resume_tasks_without_interrupting_their_own_worker ... ok
+test native_scheduler::driver_tests::closed_workers_keep_driving_abandoned_operations_until_retirement ... ok
+
+thread 'core-native-task' (1371778) panicked at crates/native/src/task_service/tests.rs:292:28:
+Box<dyn Any>
+test native_scheduler::driver_tests::io_only_batches_collect_completions_without_a_zero_timeout_probe ... ok
+test native_scheduler::driver_tests::completion_batch_is_published_before_any_local_task_resumes ... ok
+
+thread '<unnamed>' (1371772) panicked at crates/native/src/task_service/tests.rs:253:13:
+abandoned destructor
+test native_scheduler::tests::block_on_inside_a_worker_is_rejected_without_stopping_execution ... ok
+test native_scheduler::driver_tests::invalid_configuration_and_partial_startup_drop_every_driver ... ok
+
+thread 'core-native-task' (1371778) panicked at crates/native/src/task_service/tests.rs:278:13:
+completed future destructor
+test native_scheduler::driver_tests::self_wakes_wait_for_the_next_driver_turn ... ok
+test task_service::tests::busy_local_queue_regularly_services_external_submissions ... ok
+
+thread 'core-native-task' (1371778) panicked at crates/native/src/task_service/tests.rs:253:13:
+abandoned destructor
+test task_service::tests::conformance::closed_service_rejects_unpolled_input ... ok
+test task_service::tests::intermediate_runnable_retirement_does_not_wake_drain_waiters ... ok
+test task_service::tests::initial_tasks_are_distributed_before_their_first_poll ... ok
+test task_service::tests::conformance::preserves_panic_payload ... ok
+test native_scheduler::driver_tests::tasks_keep_running_after_driver_retirement_or_failure ... ok
+test task_service::tests::conformance::abandonment_destroys_task ... ok
+test task_service::tests::conformance::registers_before_first_poll ... ok
+test task_service::tests::abandoned_task_destructor_panics_do_not_abort_or_stop_workers ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 78 filtered out; finished in 0.00s
+
+test task_service::tests::conformance::cooperative_cancellation ... ok
+test task_service::tests::conformance::abandoned_handle_releases_completed_output ... ok
+test task_service::tests::local_work_can_be_stolen_while_its_worker_is_busy ... ok
+test task_service::tests::task_wakes_retain_placement_without_advancing_admission ... ok
+test task_service::tests::pinned_tasks::poll_and_destructor_panics_retire_the_future_once ... ok
+test task_service::tests::dispatch::handle_drop_defers_destruction_until_active_poll_returns ... ok
+test worker::tests::batch_search_admits_incoming_tasks_before_local_work ... ok
+test worker::tests::idle_empty_search_parks_while_scheduler_is_running ... ok
+test worker::tests::idle_empty_search_skips_park_after_shutdown ... ok
+test worker::tests::idle_success_restores_worker_state_and_returns_the_runnable ... ok
+test task_service::tests::future_destructor_panic_is_reported_and_worker_stays_available ... ok
+test worker::tests::idle_wake_prefers_the_requested_sleeping_worker ... ok
+test worker::tests::local_worker_wake_clears_sleeping_without_interrupting_its_driver ... ok
+test task_service::tests::worker_startup_failures_are_reported ... ok
+test worker::tests::nested_admission_distributes_tasks_instead_of_inheriting_the_worker ... ok
+test task_service::tests::conformance::output_and_handle_transfer ... ok
+test task_service::tests::quiescence_before_listening_and_concurrent_abandoned_waiters_preserve_progress ... ok
+test task_service::tests::concurrent_spawners_share_initial_distribution ... ok
+test worker::tests::records_retry_separately_from_empty_and_success ... ok
+test task_service::tests::abandoned_task_destructor_panics_do_not_abort_or_stop_workers ... ok
+test worker::tests::publication_after_the_idle_recheck_retains_a_wake ... ok
+test test_support::watchdog_propagates_assertion_panics ... ok
+test worker::tests::idle_wake_falls_back_when_the_preferred_worker_is_busy ... ok
+test worker::tests::idle_retry_restores_worker_sleep_state ... ok
+test worker::tests::idle_worker_can_steal_both_ready_generations ... ok
+test worker::tests::idle_worker_steals_remote_wakes_when_preferred_worker_is_busy ... ok
+test task_service::tests::submissions_from_another_native_worker_use_the_selected_scheduler ... ok
+test native_scheduler::tests::default_scheduler_and_borrowed_non_send_root_future_work ... ok
+test task_service::tests::rejected_future_destructors_can_close_admission_again ... ok
+test worker::tests::idle_recheck_finds_work_published_after_a_quiescent_search ... ok
+test task_service::tests::tasks_progress_without_occupying_syscall_workers_and_survive_admission_close ... ok
+test worker::tests::search_reports_retry_only_when_a_queue_raced ... ok
+test worker::tests::remote_wake_retains_the_unpark_token_and_interrupts_the_driver_once ... ok
+test worker::tests::worker_yields_after_a_concurrent_steal_retry ... ok
+test task_service::tests::pinned_tasks::address_is_stable_through_thread_changes_completion_and_abandonment ... ok
+test worker_timers::tests::conformance::overflow_registers_no_timer ... ok
+test worker_timers::tests::closure_rejects_queued_registrations_and_notifies_late_updates ... ok
+test worker_timers::tests::conformance::absolute_deadline_and_wakeup ... ok
+test worker_timers::tests::conformance::pending_cancellation_and_wakeup ... ok
+test worker_timers::tests::conformance::expiry_wins_concurrent_cancellation ... ok
+test worker_timers::tests::conformance::lazy_registration_and_drop ... ok
+test worker_timers::tests::conformance::relative_wait_starts_on_poll ... ok
+test worker_timers::tests::worker_conformance::pre_cancelled ... ok
+test worker_timers::tests::dropping_unacknowledged_registration_releases_its_slot ... ok
+test worker_timers::tests::pending_registration_notifies_replacement_waker ... ok
+test worker_timers::tests::shutdown_waits_for_timer_callbacks_and_live_waits_can_outlast_workers ... ok
+test worker_timers::tests::worker_conformance::cancellation ... ok
+test worker_timers::tests::worker_conformance::overflow ... ok
+test worker_timers::tests::local_capacity_and_delayed_updates_obey_registration_ownership ... ok
+test worker_timers::tests::worker_conformance::deadline ... ok
+test worker_timers::tests::conformance::pre_cancelled_waits ... ok
+test worker_timers::tests::worker_conformance::expiry_wins ... ok
+test worker_timers::tests::worker_conformance::registration ... ok
+test worker_timers::tests::worker_conformance::relative ... ok
+test worker_timers::tests::full_capacity_reclaims_cancelled_timers_and_shutdown_rejects_waits ... ok
+test worker_timers::tests::worker_sleep_registration_repoll_and_drop_allocate_nothing ... ok
+test worker_timers::tests::moving_a_sleep_to_another_worker_updates_and_releases_its_original_queue ... ok
+test worker_timers::tests::calls_from_another_scheduler_use_the_explicitly_supplied_scheduler ... ok
+test worker_timers::tests::earlier_external_deadline_interrupts_worker_wait ... ok
+test worker_timers::tests::timer_wakers_can_reenter_and_panic_without_stopping_workers ... ok
+test native_scheduler::driver_tests::timer_deadlines_bound_driver_waits_and_survive_driver_retirement ... ok
+
+test result: ok. 79 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+

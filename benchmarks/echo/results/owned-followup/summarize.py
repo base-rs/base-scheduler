@@ -31,7 +31,8 @@ EXPERIMENTS = {'tokio-no-short': [('tokio-no-short', 'tokio-no-short', 'tokio-no
            ('boxed-cold-paths', 'boxed-cold-paths', 'boxed-cold-paths')],
  'lazy-write': [('lazy-write', 'lazy-owned-write', 'candidate')],
  'inline-lane': [('inline-lane', 'inline-owned-lane', 'candidate')],
- 'waker-slot': [('waker-slot', 'read-waker-slot', 'candidate')]}
+ 'waker-slot': [('waker-slot', 'read-waker-slot', 'candidate')],
+ 'fused-release': [('fused-release', 'async-task-fused-release', 'candidate')]}
 
 
 def read(name):

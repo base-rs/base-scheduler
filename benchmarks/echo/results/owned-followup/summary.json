@@ -1667,6 +1667,95 @@
       }
     ]
   },
+  "fused-release": {
+    "samples": 45,
+    "cases": [
+      {
+        "case": [
+          1,
+          1,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 260346.0,
+            "minimum": 245763.0,
+            "maximum": 267031.3333333333,
+            "median_sample_p99_us": 5.531
+          },
+          "candidate": {
+            "median": 269601.0,
+            "minimum": 256511.0,
+            "maximum": 270545.6666666667,
+            "median_sample_p99_us": 4.911,
+            "change_percent": 3.5548846534995793
+          },
+          "tokio": {
+            "median": 274269.0,
+            "minimum": 269201.0,
+            "maximum": 280527.3333333333,
+            "median_sample_p99_us": 4.311
+          }
+        }
+      },
+      {
+        "case": [
+          1,
+          32,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 662383.3333333334,
+            "minimum": 651394.3333333334,
+            "maximum": 672507.3333333334,
+            "median_sample_p99_us": 52.447
+          },
+          "candidate": {
+            "median": 666816.0,
+            "minimum": 659306.0,
+            "maximum": 672742.6666666666,
+            "median_sample_p99_us": 52.319,
+            "change_percent": 0.6691996074780437
+          },
+          "tokio": {
+            "median": 704577.0,
+            "minimum": 697964.6666666666,
+            "maximum": 706476.3333333334,
+            "median_sample_p99_us": 53.183
+          }
+        }
+      },
+      {
+        "case": [
+          4,
+          32,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 1712517.3333333333,
+            "minimum": 1695996.6666666667,
+            "maximum": 1722797.6666666667,
+            "median_sample_p99_us": 56.959
+          },
+          "candidate": {
+            "median": 1710695.6666666667,
+            "minimum": 1688148.3333333333,
+            "maximum": 1751664.0,
+            "median_sample_p99_us": 57.247,
+            "change_percent": -0.10637361918671706
+          },
+          "tokio": {
+            "median": 1745989.0,
+            "minimum": 1726857.6666666667,
+            "maximum": 1753625.3333333333,
+            "median_sample_p99_us": 51.743
+          }
+        }
+      }
+    ]
+  },
   "task-poll": {
     "samples": 40,
     "cases": {
