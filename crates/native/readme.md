@@ -6,7 +6,7 @@ Tasks run on worker-local queues with remote inboxes and work stealing. The defa
 
 ## Usage
 
-The workspace is not published yet. Add this package from Git with `cargo add core-scheduler core-scheduler-native --git https://github.com/core-rs/core-scheduler`.
+Add this package with `cargo add core-scheduler core-scheduler-native`.
 
 ```rust
 use core_scheduler::{Cancellation, Clock, Spawn};
@@ -73,7 +73,7 @@ This package releases with the workspace. Follow the [workspace release process]
 
 ## Releases
 
-See the shared [release notes](../../releases.md) for changes awaiting the first release.
+See the shared [release notes](../../releases.md).
 
 ## See Also
 

@@ -1,6 +1,6 @@
 [package]
 name = "core-scheduler-iouring"
-version = "0.0.0"
+version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
 license = "MIT"
@@ -9,8 +9,8 @@ description = "Independently driven io_uring file and socket operations for Core
 readme = "readme.md"
 
 [target.'cfg(target_os = "linux")'.dependencies]
-core-scheduler = { path = "../..", version = "=0.0.0" }
-core-scheduler-selector = { path = "../selector", version = "=0.0.0" }
+core-scheduler = { path = "../..", version = "0.1.0" }
+core-scheduler-selector = { path = "../selector", version = "0.1.0" }
 io-uring = { version = "0.7.11", features = ["io_safety"] }
 libc = "0.2"
 async-io = "2.6.0"
@@ -20,8 +20,8 @@ futures-channel = "0.3.31"
 atomic-waker = "1.1.2"
 
 [target.'cfg(target_os = "linux")'.dev-dependencies]
-core-scheduler-native = { path = "../native", version = "=0.0.0" }
-core-scheduler-conformance = { path = "../conformance", version = "=0.0.0" }
+core-scheduler-native = { path = "../native", version = "0.1.0" }
+core-scheduler-conformance = { path = "../conformance", version = "0.1.0" }
 futures-lite = "2.6.1"
 tempfile = "3"
 allocation-counter = "0.8.1"

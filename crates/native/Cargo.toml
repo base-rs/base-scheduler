@@ -1,6 +1,6 @@
 [package]
 name = "core-scheduler-native"
-version = "0.0.0"
+version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
 license = "MIT"
@@ -9,18 +9,18 @@ description = "Native work-stealing scheduler with readiness I/O and batched tim
 readme = "readme.md"
 
 [dependencies]
-core-scheduler-selector = { path = "../selector", version = "=0.0.0" }
-core-scheduler = { path = "../..", version = "=0.0.0" }
+core-scheduler-selector = { path = "../selector", version = "0.1.0" }
+core-scheduler = { path = "../..", version = "0.1.0" }
 event-listener = "5.4.2"
 futures-channel = "0.3.31"
 async-task = "4.7.1"
 crossbeam-deque = "0.8.7"
 crossbeam-queue = "0.3.12"
-core-scheduler-timers = { path = "../timers", version = "=0.0.0", features = ["local"] }
+core-scheduler-timers = { path = "../timers", version = "0.1.0", features = ["local"] }
 
 [dev-dependencies]
 socket2 = { version = "0.6.3", features = ["all"] }
-core-scheduler-conformance = { path = "../conformance", version = "=0.0.0" }
+core-scheduler-conformance = { path = "../conformance", version = "0.1.0" }
 futures-lite = "2.6.1"
 tempfile = "3"
 allocation-counter = "0.8.1"

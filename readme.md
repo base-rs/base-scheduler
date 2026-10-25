@@ -2,7 +2,7 @@
 
 Explicit scheduler capabilities for reusable Rust protocol libraries. Applications choose an execution environment; libraries ask for the operations they need.
 
-The root crate defines interfaces and runtime-independent support. It contains no executor, reactor, operating-system I/O implementation, or runtime adapter. The initial API is extracted from [Socketry](https://github.com/core-rs/socketry-rust), and is not yet published to crates.io.
+The root crate defines interfaces and runtime-independent support. It contains no executor, reactor, operating-system I/O implementation, or runtime adapter. The initial API is extracted from [Socketry](https://github.com/core-rs/socketry-rust).
 
 The workspace also contains seven companion crates, released together with the interface:
 
@@ -16,7 +16,7 @@ The workspace also contains seven companion crates, released together with the i
 
 ## Usage
 
-The workspace is not published yet. Add the interface from Git with `cargo add core-scheduler --git https://github.com/core-rs/core-scheduler`. Applications select a companion backend; reusable libraries depend on the interface capabilities they use.
+Add the interface with `cargo add core-scheduler`. Applications select a companion backend; reusable libraries depend on the interface capabilities they use.
 
 Construct readers and writers from the scheduler once, then pass cancellation to their operations. A protocol object can retain these bound capabilities alongside its parser and protocol state:
 
@@ -93,7 +93,7 @@ Prepare a release with `cargo bake cargo:version:patch` (or `minor`, `major`, or
 
 ## Releases
 
-The workspace has not been released. See [release notes](releases.md) for changes awaiting the first release.
+The initial v0.1.0 release provides explicit scheduler capabilities and companion backends. See the [release notes](releases.md).
 
 ## See Also
 
