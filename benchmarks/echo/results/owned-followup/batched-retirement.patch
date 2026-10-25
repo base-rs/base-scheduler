@@ -1,0 +1,45 @@
+diff --git a/crates/native/src/task_service.rs b/crates/native/src/task_service.rs
+index 41cbb26..732f551 100644
+--- a/crates/native/src/task_service.rs
++++ b/crates/native/src/task_service.rs
+@@ -148,7 +148,10 @@ impl Shared {
+         }
+     }
+     pub(crate) fn retire_runnable(&self) {
+-        if self.outstanding.fetch_sub(1, Ordering::AcqRel) == (NOTIFY_IDLE | 1) {
++        self.retire_runnables(1);
++    }
++    pub(crate) fn retire_runnables(&self, count: usize) {
++        if self.outstanding.fetch_sub(count, Ordering::AcqRel) == (NOTIFY_IDLE | count) {
+             // Draining waits for quiescence; intermediate retirements cannot satisfy that condition.
+             self.changed.notify(usize::MAX);
+         }
+diff --git a/crates/native/src/worker.rs b/crates/native/src/worker.rs
+index 8a2b3ff..cf28737 100644
+--- a/crates/native/src/worker.rs
++++ b/crates/native/src/worker.rs
+@@ -337,13 +337,14 @@ fn run_ready_batch(shared: &Shared, first: Runnable) {
+         shared.wake_idle(usize::MAX);
+     }
+     let mut runnable = Some(first);
++    let mut retired = 0;
+     while let Some(task) = runnable {
+         task.metadata().worker.store(identifier, Ordering::Relaxed);
+         // Contain task-machinery panics as well as the guarded future's panics.
+         crate::panic::contain(|| {
+             task.run();
+         });
+-        shared.retire_runnable();
++        retired += 1;
+         runnable = CURRENT_WORKER.with(|current| {
+             current
+                 .borrow()
+@@ -353,6 +354,8 @@ fn run_ready_batch(shared: &Shared, first: Runnable) {
+                 .pop()
+         });
+     }
++    // Earlier polls in this frozen batch cannot establish quiescence while its final runnable is still active. Retire their tokens together after that poll returns; stolen runnables retain their own tokens on the stealing worker.
++    shared.retire_runnables(retired);
+ }
+ 
+ #[cfg(test)]

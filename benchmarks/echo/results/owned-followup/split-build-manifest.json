@@ -1,0 +1,16 @@
+{
+  "base": "83433057fc469e076dcd7e7f42a61b8147a91ced",
+  "binary_sha256": "89719131c520acf2e9ab3c364bd6c2fe4ba404d54ae6157976e76fcdc83bce75",
+  "patch_sha256": "7e0a62d1d043ece2e30b0a72a391dc0d8048e943a119659a18a94752a9d8f2f8",
+  "environment": {
+    "CARGO_TARGET_DIR": "/home/samuel/.cache/core-scheduler-owned-echo-diagnosis/target",
+    "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_PROFILE_RELEASE_LTO": "false",
+    "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "16",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_ENCODED_RUSTFLAGS": "",
+    "RUSTFLAGS": "",
+    "RUST_TEST_THREADS": "1"
+  }
+}

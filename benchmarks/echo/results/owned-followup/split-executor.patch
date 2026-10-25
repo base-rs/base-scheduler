@@ -1,0 +1,99 @@
+diff --git a/benchmarks/echo/src/server.rs b/benchmarks/echo/src/server.rs
+index a0a4ec9..9eaa3e5 100644
+--- a/benchmarks/echo/src/server.rs
++++ b/benchmarks/echo/src/server.rs
+@@ -231,9 +231,94 @@ async fn scheduler_server<S>(
+     }
+ }
+ 
++#[cfg(target_os = "linux")]
++async fn split_server<E: Spawn>(
++    selector: Arc<core_scheduler_iouring::IoUringSelector>,
++    executor: &E,
++    listener: TcpListener,
++    connections: usize,
++) {
++    let listener = selector
++        .register_listener(listener)
++        .expect("register listener");
++    let never = Cancellation::never();
++    let mut tasks = Vec::with_capacity(connections);
++    for _ in 0..connections {
++        let (socket, _) = selector
++            .socket_accept(&listener, &never)
++            .await
++            .expect("accept");
++        selector
++            .socket_set_option(&socket, TcpNoDelay, true, &never)
++            .await
++            .expect("TCP_NODELAY");
++        let shared = Arc::clone(&selector);
++        tasks.push(
++            executor
++                .spawn(async move { echo(shared.as_ref(), socket).await })
++                .expect("spawn"),
++        );
++    }
++    for task in tasks {
++        task.await.expect("echo task failed");
++    }
++}
++
++#[cfg(target_os = "linux")]
++fn split_run(backend: &str, listener: TcpListener, workers: usize, connections: usize) {
++    use core_scheduler_iouring::{IoUringOptions, IoUringSelector};
++    use core_scheduler_native::{NativeExecutorOptions, NativeScheduler, Selector};
++    struct NoIo;
++    impl Selector for NoIo {
++        fn close(&self) {}
++        async fn shutdown(&self) {}
++    }
++    let (selector, driver) = IoUringSelector::new(IoUringOptions {
++        capacity: connections.saturating_mul(2).max(256),
++        ..Default::default()
++    })
++    .expect("ring setup");
++    let selector = Arc::new(selector);
++    let driver = std::thread::spawn(move || driver.run().expect("ring driver"));
++    if backend == "split-native" {
++        let executor = NativeScheduler::with_selector(
++            NoIo,
++            NativeExecutorOptions {
++                workers,
++                ..Default::default()
++            },
++        )
++        .expect("Native executor");
++        ready(&listener);
++        executor.block_on(split_server(
++            Arc::clone(&selector),
++            &executor,
++            listener,
++            connections,
++        ));
++        executor.block_on(selector.shutdown());
++        executor.block_on(executor.shutdown());
++    } else {
++        let runtime = crate::runtime(workers);
++        let executor = TokioScheduler::new(runtime.handle().clone());
++        ready(&listener);
++        runtime.block_on(split_server(
++            Arc::clone(&selector),
++            &executor,
++            listener,
++            connections,
++        ));
++        runtime.block_on(selector.shutdown());
++        runtime.block_on(executor.shutdown());
++    }
++    driver.join().expect("driver thread");
++}
++
+ pub(crate) fn run(backend: &str, workers: usize, connections: usize) -> Result<()> {
+     let listener = TcpListener::bind("127.0.0.1:0").expect("bind echo listener");
+     match backend {
++        #[cfg(target_os = "linux")]
++        "split-native" | "split-tokio" => split_run(backend, listener, workers, connections),
+         "tokio" => {
+             let runtime = crate::runtime(workers);
+             ready(&listener);

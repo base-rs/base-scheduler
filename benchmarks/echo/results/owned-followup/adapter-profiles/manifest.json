@@ -1,0 +1,88 @@
+{
+  "event": "cycles:u",
+  "frequency": 1999,
+  "seconds": 8,
+  "warmup": 1,
+  "note": "Profile-instrumented rates are not capacity measurements.",
+  "samples": [
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 42.78501892089844,
+      "requests": 5607918,
+      "requests_per_second": 700989.75,
+      "rtt_max_us": 3145.727,
+      "rtt_mean_us": 45.58279505798766,
+      "rtt_p50_us": 46.527,
+      "rtt_p95_us": 51.167,
+      "rtt_p99_us": 53.983,
+      "seconds": 8.0,
+      "warmup_seconds": 1.0,
+      "backend": "tokio",
+      "workers": 1,
+      "client_workers": 4,
+      "server_cpus": [
+        0
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ]
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 38.93583679199219,
+      "requests": 5103398,
+      "requests_per_second": 637924.75,
+      "rtt_max_us": 265.215,
+      "rtt_mean_us": 50.09484792994794,
+      "rtt_p50_us": 51.135,
+      "rtt_p95_us": 55.775,
+      "rtt_p99_us": 58.655,
+      "seconds": 8.0,
+      "warmup_seconds": 1.0,
+      "backend": "tokio-adapter",
+      "workers": 1,
+      "client_workers": 4,
+      "server_cpus": [
+        0
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ]
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 39.072418212890625,
+      "requests": 5121300,
+      "requests_per_second": 640162.5,
+      "rtt_max_us": 3151.871,
+      "rtt_mean_us": 49.917338250053724,
+      "rtt_p50_us": 50.975,
+      "rtt_p95_us": 55.615,
+      "rtt_p99_us": 58.463,
+      "seconds": 8.0,
+      "warmup_seconds": 1.0,
+      "backend": "tokio-adapter-monitor",
+      "workers": 1,
+      "client_workers": 4,
+      "server_cpus": [
+        0
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ]
+    }
+  ],
+  "binary_sha256": "8ea109bf21845f3fa0aeee9964726a242b65dce08fe4262fe83e664f38d6c12b"
+}

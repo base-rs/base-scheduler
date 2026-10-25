@@ -1,0 +1,12 @@
+diff --git a/crates/iouring/src/operation_state.rs b/crates/iouring/src/operation_state.rs
+index 8b29f99..e03c56a 100644
+--- a/crates/iouring/src/operation_state.rs
++++ b/crates/iouring/src/operation_state.rs
+@@ -105,6 +105,7 @@ impl OperationState {
+             Ok(())
+         }
+     }
++    #[inline]
+     pub(crate) fn begin<T>(&mut self, value: T) -> Result<OperationGuard<T>, (OperationError, T)> {
+         let activity = self.activity.get_or_insert_with(|| {
+             Arc::new(Activity {

@@ -1,0 +1,37 @@
+diff --git a/crates/native/src/task_service.rs b/crates/native/src/task_service.rs
+index 41cbb26..25fec15 100644
+--- a/crates/native/src/task_service.rs
++++ b/crates/native/src/task_service.rs
+@@ -97,6 +97,10 @@ impl Shared {
+     }
+ 
+     pub(crate) fn has_runnables(&self) -> bool {
++        if self.workers.len() == 1 {
++            // Diagnostic only: drain now waits for all tasks, not runnable quiescence.
++            return self.remaining.load(Ordering::Acquire) != 0;
++        }
+         self.outstanding.load(Ordering::Acquire) & !NOTIFY_IDLE != 0
+     }
+ 
+@@ -148,7 +152,9 @@ impl Shared {
+         }
+     }
+     pub(crate) fn retire_runnable(&self) {
+-        if self.outstanding.fetch_sub(1, Ordering::AcqRel) == (NOTIFY_IDLE | 1) {
++        if self.workers.len() != 1
++            && self.outstanding.fetch_sub(1, Ordering::AcqRel) == (NOTIFY_IDLE | 1)
++        {
+             // Draining waits for quiescence; intermediate retirements cannot satisfy that condition.
+             self.changed.notify(usize::MAX);
+         }
+@@ -221,7 +227,9 @@ impl TaskService {
+             .spawn(
+                 move |_| TaskFuture::new(future, registration),
+                 move |runnable| {
+-                    shared.outstanding.fetch_add(1, Ordering::AcqRel);
++                    if shared.workers.len() != 1 {
++                        shared.outstanding.fetch_add(1, Ordering::AcqRel);
++                    }
+                     worker::schedule(&shared, runnable);
+                 },
+             );

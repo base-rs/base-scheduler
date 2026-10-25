@@ -1,0 +1,477 @@
+{
+  "platform": "Linux-7.2.8-arch1-2-x86_64-with-glibc2.44",
+  "hostname": "aiko",
+  "rustc": "rustc 1.99.0 (b940084d7 2026-09-28) (Arch Linux rust 1:1.99.0-1)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+  "settings": {
+    "server_cpus": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "client_cpus": [
+      4,
+      5,
+      6,
+      7
+    ],
+    "client_binary": "/home/samuel/.cache/core-scheduler-single-worker-completions/bin/baseline",
+    "client_workers": 4,
+    "warmup": 0,
+    "seconds": 3
+  },
+  "variants": {
+    "tokio": {
+      "binary": "/home/samuel/.cache/core-scheduler-owned-dispatch/bin/lean-final",
+      "backend": "tokio",
+      "sha256": "8ea109bf21845f3fa0aeee9964726a242b65dce08fe4262fe83e664f38d6c12b"
+    },
+    "tokio-adapter": {
+      "binary": "/home/samuel/.cache/core-scheduler-owned-dispatch/bin/lean-final",
+      "backend": "tokio-adapter",
+      "sha256": "8ea109bf21845f3fa0aeee9964726a242b65dce08fe4262fe83e664f38d6c12b"
+    },
+    "tokio-adapter-monitor": {
+      "binary": "/home/samuel/.cache/core-scheduler-owned-dispatch/bin/lean-final",
+      "backend": "tokio-adapter-monitor",
+      "sha256": "8ea109bf21845f3fa0aeee9964726a242b65dce08fe4262fe83e664f38d6c12b"
+    }
+  },
+  "client_sha256": "a8c84568e0932f782179fbbb1c64272129c6af9a5f1344a8c84998b22527fc5f",
+  "cases": [
+    [
+      1,
+      32,
+      64
+    ]
+  ],
+  "repeats": 3,
+  "seed": 20261025,
+  "counter_mode": "socket",
+  "events": [
+    "syscalls:sys_enter_read",
+    "syscalls:sys_enter_recvfrom",
+    "syscalls:sys_enter_write",
+    "syscalls:sys_enter_sendto",
+    "syscalls:sys_enter_epoll_wait",
+    "syscalls:sys_enter_epoll_pwait",
+    "syscalls:sys_enter_futex"
+  ],
+  "note": "Counter-instrumented rates are mechanism checks, not capacity measurements.",
+  "samples": [
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 37.714192708333336,
+      "requests": 1853728,
+      "requests_per_second": 617909.3333333334,
+      "rtt_max_us": 98.431,
+      "rtt_mean_us": 51.715773364269246,
+      "rtt_p50_us": 52.863,
+      "rtt_p95_us": 57.279,
+      "rtt_p99_us": 59.679,
+      "seconds": 3.0,
+      "warmup_seconds": 0.0,
+      "backend": "tokio-adapter-monitor",
+      "workers": 1,
+      "client_workers": 4,
+      "server_cpus": [
+        0
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "repeat": 0,
+      "variant": "tokio-adapter-monitor",
+      "counters": {
+        "syscalls:sys_enter_read": 8.0,
+        "syscalls:sys_enter_recvfrom": 3707558.0,
+        "syscalls:sys_enter_write": 35.0,
+        "syscalls:sys_enter_sendto": 1853760.0,
+        "syscalls:sys_enter_epoll_wait": 70442.0,
+        "syscalls:sys_enter_epoll_pwait": 0.0,
+        "syscalls:sys_enter_futex": 80.0
+      },
+      "per_request": {
+        "syscalls:sys_enter_read": 4.315627751212691e-06,
+        "syscalls:sys_enter_recvfrom": 2.000055024253828,
+        "syscalls:sys_enter_write": 1.8880871411555526e-05,
+        "syscalls:sys_enter_sendto": 1.0000172625110049,
+        "syscalls:sys_enter_epoll_wait": 0.03800018125636555,
+        "syscalls:sys_enter_epoll_pwait": 0.0,
+        "syscalls:sys_enter_futex": 4.315627751212692e-05
+      }
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 37.804931640625,
+      "requests": 1858188,
+      "requests_per_second": 619396.0,
+      "rtt_max_us": 117.119,
+      "rtt_mean_us": 51.59460428761791,
+      "rtt_p50_us": 52.767,
+      "rtt_p95_us": 57.087,
+      "rtt_p99_us": 59.487,
+      "seconds": 3.0,
+      "warmup_seconds": 0.0,
+      "backend": "tokio-adapter",
+      "workers": 1,
+      "client_workers": 4,
+      "server_cpus": [
+        0
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "repeat": 1,
+      "variant": "tokio-adapter",
+      "counters": {
+        "syscalls:sys_enter_read": 8.0,
+        "syscalls:sys_enter_recvfrom": 3716478.0,
+        "syscalls:sys_enter_write": 35.0,
+        "syscalls:sys_enter_sendto": 1858220.0,
+        "syscalls:sys_enter_epoll_wait": 69869.0,
+        "syscalls:sys_enter_epoll_pwait": 0.0,
+        "syscalls:sys_enter_futex": 78.0
+      },
+      "per_request": {
+        "syscalls:sys_enter_read": 4.305269434524386e-06,
+        "syscalls:sys_enter_recvfrom": 2.00005489218529,
+        "syscalls:sys_enter_write": 1.8835553776044188e-05,
+        "syscalls:sys_enter_sendto": 1.000017221077738,
+        "syscalls:sys_enter_epoll_wait": 0.03760060876509804,
+        "syscalls:sys_enter_epoll_pwait": 0.0,
+        "syscalls:sys_enter_futex": 4.1976376986612763e-05
+      }
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 41.67706298828125,
+      "requests": 2048511,
+      "requests_per_second": 682837.0,
+      "rtt_max_us": 106.623,
+      "rtt_mean_us": 46.79607664445055,
+      "rtt_p50_us": 47.903,
+      "rtt_p95_us": 52.255,
+      "rtt_p99_us": 54.751,
+      "seconds": 3.0,
+      "warmup_seconds": 0.0,
+      "backend": "tokio",
+      "workers": 1,
+      "client_workers": 4,
+      "server_cpus": [
+        0
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "repeat": 0,
+      "variant": "tokio",
+      "counters": {
+        "syscalls:sys_enter_read": 8.0,
+        "syscalls:sys_enter_recvfrom": 2048575.0,
+        "syscalls:sys_enter_write": 35.0,
+        "syscalls:sys_enter_sendto": 2048543.0,
+        "syscalls:sys_enter_epoll_wait": 87702.0,
+        "syscalls:sys_enter_epoll_pwait": 0.0,
+        "syscalls:sys_enter_futex": 74.0
+      },
+      "per_request": {
+        "syscalls:sys_enter_read": 3.905275587975852e-06,
+        "syscalls:sys_enter_recvfrom": 1.0000312422047037,
+        "syscalls:sys_enter_write": 1.708558069739435e-05,
+        "syscalls:sys_enter_sendto": 1.0000156211023519,
+        "syscalls:sys_enter_epoll_wait": 0.04281255995208227,
+        "syscalls:sys_enter_epoll_pwait": 0.0,
+        "syscalls:sys_enter_futex": 3.6123799188776626e-05
+      }
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 41.245096842447914,
+      "requests": 2027279,
+      "requests_per_second": 675759.6666666666,
+      "rtt_max_us": 87.999,
+      "rtt_mean_us": 47.28377642297876,
+      "rtt_p50_us": 48.383,
+      "rtt_p95_us": 52.767,
+      "rtt_p99_us": 55.231,
+      "seconds": 3.0,
+      "warmup_seconds": 0.0,
+      "backend": "tokio",
+      "workers": 1,
+      "client_workers": 4,
+      "server_cpus": [
+        0
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "repeat": 1,
+      "variant": "tokio",
+      "counters": {
+        "syscalls:sys_enter_read": 8.0,
+        "syscalls:sys_enter_recvfrom": 2027343.0,
+        "syscalls:sys_enter_write": 34.0,
+        "syscalls:sys_enter_sendto": 2027311.0,
+        "syscalls:sys_enter_epoll_wait": 85070.0,
+        "syscalls:sys_enter_epoll_pwait": 0.0,
+        "syscalls:sys_enter_futex": 70.0
+      },
+      "per_request": {
+        "syscalls:sys_enter_read": 3.946176130665784e-06,
+        "syscalls:sys_enter_recvfrom": 1.0000315694090454,
+        "syscalls:sys_enter_write": 1.6771248555329584e-05,
+        "syscalls:sys_enter_sendto": 1.0000157847045226,
+        "syscalls:sys_enter_epoll_wait": 0.04196265042946728,
+        "syscalls:sys_enter_epoll_pwait": 0.0,
+        "syscalls:sys_enter_futex": 3.452904114332561e-05
+      }
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 36.797648111979164,
+      "requests": 1808678,
+      "requests_per_second": 602892.6666666666,
+      "rtt_max_us": 224.255,
+      "rtt_mean_us": 53.00998734600638,
+      "rtt_p50_us": 54.239,
+      "rtt_p95_us": 58.495,
+      "rtt_p99_us": 60.831,
+      "seconds": 3.0,
+      "warmup_seconds": 0.0,
+      "backend": "tokio-adapter-monitor",
+      "workers": 1,
+      "client_workers": 4,
+      "server_cpus": [
+        0
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "repeat": 1,
+      "variant": "tokio-adapter-monitor",
+      "counters": {
+        "syscalls:sys_enter_read": 8.0,
+        "syscalls:sys_enter_recvfrom": 3617448.0,
+        "syscalls:sys_enter_write": 35.0,
+        "syscalls:sys_enter_sendto": 1808710.0,
+        "syscalls:sys_enter_epoll_wait": 66171.0,
+        "syscalls:sys_enter_epoll_pwait": 0.0,
+        "syscalls:sys_enter_futex": 79.0
+      },
+      "per_request": {
+        "syscalls:sys_enter_read": 4.423120091027812e-06,
+        "syscalls:sys_enter_recvfrom": 2.0000508658810467,
+        "syscalls:sys_enter_write": 1.9351150398246674e-05,
+        "syscalls:sys_enter_sendto": 1.000017692480364,
+        "syscalls:sys_enter_epoll_wait": 0.036585284942925164,
+        "syscalls:sys_enter_epoll_pwait": 0.0,
+        "syscalls:sys_enter_futex": 4.367831089889964e-05
+      }
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 37.157002766927086,
+      "requests": 1826341,
+      "requests_per_second": 608780.3333333334,
+      "rtt_max_us": 227.967,
+      "rtt_mean_us": 52.493352990487516,
+      "rtt_p50_us": 53.663,
+      "rtt_p95_us": 58.047,
+      "rtt_p99_us": 60.479,
+      "seconds": 3.0,
+      "warmup_seconds": 0.0,
+      "backend": "tokio-adapter",
+      "workers": 1,
+      "client_workers": 4,
+      "server_cpus": [
+        0
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "repeat": 0,
+      "variant": "tokio-adapter",
+      "counters": {
+        "syscalls:sys_enter_read": 8.0,
+        "syscalls:sys_enter_recvfrom": 3652791.0,
+        "syscalls:sys_enter_write": 34.0,
+        "syscalls:sys_enter_sendto": 1826373.0,
+        "syscalls:sys_enter_epoll_wait": 68264.0,
+        "syscalls:sys_enter_epoll_pwait": 0.0,
+        "syscalls:sys_enter_futex": 88.0
+      },
+      "per_request": {
+        "syscalls:sys_enter_read": 4.380342991807116e-06,
+        "syscalls:sys_enter_recvfrom": 2.0000596821732635,
+        "syscalls:sys_enter_write": 1.8616457715180244e-05,
+        "syscalls:sys_enter_sendto": 1.0000175213719673,
+        "syscalls:sys_enter_epoll_wait": 0.03737746674909012,
+        "syscalls:sys_enter_epoll_pwait": 0.0,
+        "syscalls:sys_enter_futex": 4.818377290987827e-05
+      }
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 37.774922688802086,
+      "requests": 1856713,
+      "requests_per_second": 618904.3333333334,
+      "rtt_max_us": 3096.575,
+      "rtt_mean_us": 51.63491783113495,
+      "rtt_p50_us": 52.799,
+      "rtt_p95_us": 57.151,
+      "rtt_p99_us": 59.551,
+      "seconds": 3.0,
+      "warmup_seconds": 0.0,
+      "backend": "tokio-adapter",
+      "workers": 1,
+      "client_workers": 4,
+      "server_cpus": [
+        0
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "repeat": 2,
+      "variant": "tokio-adapter",
+      "counters": {
+        "syscalls:sys_enter_read": 8.0,
+        "syscalls:sys_enter_recvfrom": 3713527.0,
+        "syscalls:sys_enter_write": 33.0,
+        "syscalls:sys_enter_sendto": 1856745.0,
+        "syscalls:sys_enter_epoll_wait": 70217.0,
+        "syscalls:sys_enter_epoll_pwait": 0.0,
+        "syscalls:sys_enter_futex": 79.0
+      },
+      "per_request": {
+        "syscalls:sys_enter_read": 4.308689603616714e-06,
+        "syscalls:sys_enter_recvfrom": 2.0000543972062457,
+        "syscalls:sys_enter_write": 1.7773344614918945e-05,
+        "syscalls:sys_enter_sendto": 1.0000172347584144,
+        "syscalls:sys_enter_epoll_wait": 0.03781790723714435,
+        "syscalls:sys_enter_epoll_pwait": 0.0,
+        "syscalls:sys_enter_futex": 4.2548309835715054e-05
+      }
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 37.869547526041664,
+      "requests": 1861364,
+      "requests_per_second": 620454.6666666666,
+      "rtt_max_us": 226.431,
+      "rtt_mean_us": 51.50756046963405,
+      "rtt_p50_us": 52.671,
+      "rtt_p95_us": 56.991,
+      "rtt_p99_us": 59.423,
+      "seconds": 3.0,
+      "warmup_seconds": 0.0,
+      "backend": "tokio-adapter-monitor",
+      "workers": 1,
+      "client_workers": 4,
+      "server_cpus": [
+        0
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "repeat": 2,
+      "variant": "tokio-adapter-monitor",
+      "counters": {
+        "syscalls:sys_enter_read": 8.0,
+        "syscalls:sys_enter_recvfrom": 3722828.0,
+        "syscalls:sys_enter_write": 32.0,
+        "syscalls:sys_enter_sendto": 1861396.0,
+        "syscalls:sys_enter_epoll_wait": 69955.0,
+        "syscalls:sys_enter_epoll_pwait": 0.0,
+        "syscalls:sys_enter_futex": 72.0
+      },
+      "per_request": {
+        "syscalls:sys_enter_read": 4.297923458281131e-06,
+        "syscalls:sys_enter_recvfrom": 2.0000537240432283,
+        "syscalls:sys_enter_write": 1.7191693833124525e-05,
+        "syscalls:sys_enter_sendto": 1.0000171916938332,
+        "syscalls:sys_enter_epoll_wait": 0.03758265444050707,
+        "syscalls:sys_enter_epoll_pwait": 0.0,
+        "syscalls:sys_enter_futex": 3.868131112453018e-05
+      }
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 41.370096842447914,
+      "requests": 2033423,
+      "requests_per_second": 677807.6666666666,
+      "rtt_max_us": 221.311,
+      "rtt_mean_us": 47.142183896808454,
+      "rtt_p50_us": 48.223,
+      "rtt_p95_us": 52.575,
+      "rtt_p99_us": 55.071,
+      "seconds": 3.0,
+      "warmup_seconds": 0.0,
+      "backend": "tokio",
+      "workers": 1,
+      "client_workers": 4,
+      "server_cpus": [
+        0
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "repeat": 2,
+      "variant": "tokio",
+      "counters": {
+        "syscalls:sys_enter_read": 8.0,
+        "syscalls:sys_enter_recvfrom": 2033487.0,
+        "syscalls:sys_enter_write": 35.0,
+        "syscalls:sys_enter_sendto": 2033455.0,
+        "syscalls:sys_enter_epoll_wait": 83260.0,
+        "syscalls:sys_enter_epoll_pwait": 0.0,
+        "syscalls:sys_enter_futex": 72.0
+      },
+      "per_request": {
+        "syscalls:sys_enter_read": 3.934252735412159e-06,
+        "syscalls:sys_enter_recvfrom": 1.0000314740218832,
+        "syscalls:sys_enter_write": 1.7212355717428197e-05,
+        "syscalls:sys_enter_sendto": 1.0000157370109417,
+        "syscalls:sys_enter_epoll_wait": 0.04094573534380205,
+        "syscalls:sys_enter_epoll_pwait": 0.0,
+        "syscalls:sys_enter_futex": 3.5408274618709436e-05
+      }
+    }
+  ]
+}

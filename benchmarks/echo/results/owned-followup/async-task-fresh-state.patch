@@ -1,0 +1,10 @@
+--- async-task-4.7.1/src/raw.rs
++++ async-task-4.7.1/src/raw.rs
+@@ -610,6 +610,7 @@
+                 }
+             }
+             Poll::Pending => {
++                state = (*raw.header).state.load(Ordering::Acquire);
+                 let mut future_dropped = false;
+ 
+                 // The task is still not completed.

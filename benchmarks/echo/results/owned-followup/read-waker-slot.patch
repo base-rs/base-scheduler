@@ -1,0 +1,107 @@
+diff --git a/crates/iouring/src/io_uring_selector/socket_read.rs b/crates/iouring/src/io_uring_selector/socket_read.rs
+index 97c80cd..93ff3b8 100644
+--- a/crates/iouring/src/io_uring_selector/socket_read.rs
++++ b/crates/iouring/src/io_uring_selector/socket_read.rs
+@@ -16,9 +16,9 @@ impl Default for State {
+                 slot: Mutex::new(Slot {
+                     result: None,
+                     collecting: false,
++                    waker: None,
+                 }),
+                 ready: AtomicBool::new(false),
+-                waker: atomic_waker::AtomicWaker::new(),
+             }),
+             cached: None,
+         }
+@@ -33,15 +33,15 @@ enum Completion {
+ struct Slot {
+     result: Option<Completion>,
+     collecting: bool,
++    waker: Option<std::task::Waker>,
+ }
+ struct Shared {
+     slot: Mutex<Slot>,
+     ready: AtomicBool,
+-    waker: atomic_waker::AtomicWaker,
+ }
+ impl Shared {
+     fn publish(&self, result: Completion) {
+-        let abandoned = {
++        let (abandoned, waker) = {
+             let mut slot = self.slot.lock().unwrap();
+             let abandoned = if slot.collecting {
+                 slot.result = Some(result);
+@@ -51,9 +51,11 @@ impl Shared {
+             };
+             // Dropping a returned owner can retire its lane and permit immediate reuse. Publish readiness before releasing that owner or allowing collection to take it.
+             self.ready.store(true, Ordering::Release);
+-            abandoned
++            (abandoned, slot.waker.take())
+         };
+-        self.waker.wake();
++        if let Some(waker) = waker {
++            waker.wake();
++        }
+         discard(abandoned);
+     }
+ }
+@@ -78,12 +80,12 @@ impl Drop for CompletionWait<'_> {
+         let Some(shared) = self.shared.take() else {
+             return;
+         };
+-        let abandoned = {
++        let (abandoned, waker) = {
+             let mut slot = shared.slot.lock().unwrap();
+             slot.collecting = false;
+-            slot.result.take()
++            (slot.result.take(), slot.waker.take())
+         };
+-        shared.waker.take();
++        drop(waker);
+         discard(abandoned);
+     }
+ }
+@@ -215,14 +217,23 @@ impl State {
+         };
+         completion.cancel.controller.submit(request);
+         let mut cancelled = pin!(cancellation.cancelled());
+-        poll_fn(|context| {
+-            if self.shared.ready.load(Ordering::Acquire) {
+-                return Poll::Ready(());
+-            }
+-            self.shared.waker.register(context.waker());
+-            if self.shared.ready.load(Ordering::Acquire) {
+-                self.shared.waker.take();
+-                return Poll::Ready(());
++        let result = poll_fn(|context| {
++            // Clone outside the lock: custom waker callbacks may reenter the selector.
++            let waker =
++                (!self.shared.ready.load(Ordering::Acquire)).then(|| context.waker().clone());
++            let (result, previous, unused) = {
++                let mut slot = self.shared.slot.lock().unwrap();
++                if let Some(result) = slot.result.take() {
++                    slot.collecting = false;
++                    (Some(result), slot.waker.take(), waker)
++                } else {
++                    let waker = waker.expect("an incomplete read registers its waiter");
++                    (None, slot.waker.replace(waker), None)
++                }
++            };
++            drop((previous, unused));
++            if let Some(result) = result {
++                return Poll::Ready(result);
+             }
+             if completion.cancel.armed && cancelled.as_mut().poll(context).is_ready() {
+                 completion.cancel.request();
+@@ -231,11 +242,6 @@ impl State {
+         })
+         .await;
+         completion.cancel.armed = false;
+-        let result = {
+-            let mut slot = self.shared.slot.lock().unwrap();
+-            slot.collecting = false;
+-            slot.result.take().unwrap()
+-        };
+         completion.shared = None;
+         drop(completion);
+         match result {

@@ -1,0 +1,97 @@
+diff --git a/crates/iouring/src/io_uring_selector.rs b/crates/iouring/src/io_uring_selector.rs
+index b5caf35..704f98d 100644
+--- a/crates/iouring/src/io_uring_selector.rs
++++ b/crates/iouring/src/io_uring_selector.rs
+@@ -151,6 +151,13 @@ impl<B: IoBuf> Drop for Request<B> {
+     }
+ }
+ 
++pub(crate) struct PreparedSubmission {
++    identifier: u64,
++    entry: squeue::Entry,
++    may_wake: bool,
++    notification: Option<Arc<dyn submission_notifications::SubmissionNotification>>,
++}
++
+ // One erased request allocation lets a selector queue heterogeneous owned buffer types. Its typed completion returns the exact original owner. Only entry preparation (before publication) and original completion may access the request exclusively. In-flight bookkeeping uses shared access so inline UnsafeCell output can remain kernel-accessible without creating an aliasing mutable reference.
+ pub(crate) trait PendingRequest: Send {
+     fn identifier(&self) -> u64;
+@@ -160,6 +167,22 @@ pub(crate) trait PendingRequest: Send {
+     fn ready(&mut self, ring: &io_uring::Submitter<'_>) -> io::Result<bool> {
+         self.prepare(ring).map(|()| true)
+     }
++    fn submission(
++        &mut self,
++        ring: &io_uring::Submitter<'_>,
++    ) -> io::Result<Option<PreparedSubmission>> {
++        if !self.ready(ring)? {
++            return Ok(None);
++        }
++        let identifier = self.identifier();
++        let entry = self.entry();
++        Ok(Some(PreparedSubmission {
++            identifier,
++            entry,
++            may_wake: self.entry_may_wake(),
++            notification: self.submission_notification(),
++        }))
++    }
+     fn buffer_pool(&self) -> Option<&Arc<provided_buffers::WorkerBuffers>> {
+         None
+     }
+@@ -175,6 +198,10 @@ pub(crate) trait PendingRequest: Send {
+     }
+     fn finish(self: Box<Self>, result: io::Result<usize>);
+     fn completion(&self, _result: i32, _flags: u32) {}
++    fn completed(&self, result: i32, flags: u32) -> Option<bool> {
++        self.completion(result, flags);
++        self.retry(result)
++    }
+     // None retires; Some(true) resubmits now; Some(false) waits for a buffer return.
+     fn retry(&self, _result: i32) -> Option<bool> {
+         None
+@@ -890,8 +917,7 @@ impl Reactor {
+                 .0
+                 .remove(&identifier)
+                 .expect("original completion retains its in-flight request");
+-            request.completion(result, flags);
+-            if let Some(ready) = request.retry(result).filter(|_| !self.closing) {
++            if let Some(ready) = request.completed(result, flags).filter(|_| !self.closing) {
+                 if ready {
+                     self.pending.push_back(request);
+                 } else {
+@@ -1104,9 +1130,9 @@ impl Reactor {
+                 let Some(mut request) = self.pending.pop_front() else {
+                     break;
+                 };
+-                match request.ready(&submitter) {
+-                    Ok(true) => {}
+-                    Ok(false) => {
++                let submission = match request.submission(&submitter) {
++                    Ok(Some(submission)) => submission,
++                    Ok(None) => {
+                         self.dormant.insert(request.identifier(), request);
+                         continue;
+                     }
+@@ -1115,16 +1141,14 @@ impl Reactor {
+                         progressed = true;
+                         continue;
+                     }
+-                }
+-                let identifier = request.identifier();
+-                let request = self.in_flight.0.entry(identifier).or_insert(request);
+-                let entry = request.entry();
+-                progressed |= request.entry_may_wake();
++                };
++                self.in_flight.0.insert(submission.identifier, request);
++                progressed |= submission.may_wake;
+                 prepared = true;
+                 // SAFETY: InFlight owns the buffer allocation and descriptor before publication. Neither is released or accessed until the original CQE, even when cancellation completes first. A failed push does not publish the entry.
+-                unsafe { submissions.push(&entry) }
++                unsafe { submissions.push(&submission.entry) }
+                     .expect("submission capacity was checked and the local queue has not changed");
+-                if let Some(notification) = request.submission_notification() {
++                if let Some(notification) = submission.notification {
+                     self.submission_notifications
+                         .push(submissions.len(), notification);
+                 }
