@@ -425,3 +425,17 @@ impl<S: Selector + SocketStreamWriting> SocketStreamWriting for NativeScheduler<
         self.selector().socket_stream_writer_with_buffer(socket)
     }
 }
+
+impl<S: Selector + ProcessWait> ProcessWait for NativeScheduler<S> {
+    type ProcessId = S::ProcessId;
+    async fn process_wait(
+        &self,
+        process: Self::ProcessId,
+        flags: ProcessWaitFlags,
+        cancellation: &Cancellation,
+    ) -> OperationResult<Option<ProcessWaitResult>> {
+        self.selector()
+            .process_wait(process, flags, cancellation)
+            .await
+    }
+}

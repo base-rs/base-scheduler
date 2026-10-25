@@ -68,6 +68,7 @@ File and socket lifecycle operations remain explicit scheduler capabilities: ope
 | `Clock` | Monotonic observations and cancellable relative or absolute waits. |
 | `Spawn` | Task dispatch with implementation-associated, owning completion handles. |
 | `Blocking` | Bounded admission of owned synchronous work. |
+| `ProcessWait` | Individual child and Unix process-group status waits with cooperative cancellation. |
 | `Signals` | Notification subscriptions with implementation-associated guards and signal identifiers. |
 | `BufferPooling` | Shareable bounded storage with retained immutable views and cancellable capacity waits. |
 | Extension capabilities | Typed socket options, address resolution, standard TCP resource registration, file advice, and allocation. |

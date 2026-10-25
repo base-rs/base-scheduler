@@ -58,6 +58,8 @@ The companion `core-scheduler-conformance` crate is a development dependency. Sh
 
 This package releases with the workspace. Follow the [workspace release process](../../readme.md#releasing).
 
+`ProcessWait` uses this runtime’s reactor for Linux pidfd and macOS/FreeBSD process notifications. Group/state-change waits and unsupported platforms use the bounded work pool. Scheduler closure interrupts native notification waits without terminating children; a started blocking fallback can still reap and delay shutdown. See the [process-wait contract](../../context/interface.md#child-process-waits).
+
 ## Releases
 
 See the shared [release notes](../../releases.md) for changes awaiting the first release.

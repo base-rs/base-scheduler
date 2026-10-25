@@ -24,6 +24,7 @@ use std::{
 pub struct TokioScheduler {
     pub(crate) runtime: tokio::runtime::Handle,
     closed: AtomicBool,
+    pub(crate) process_closed: Cancellation,
     pub(crate) work: BlockingPool,
     pub(crate) cleanup: BlockingPool,
     pub(crate) tasks: crate::task_service::TaskService,
@@ -58,6 +59,7 @@ impl TokioScheduler {
             tasks: crate::task_service::TaskService::new(runtime.clone()),
             runtime,
             closed: AtomicBool::new(false),
+            process_closed: Cancellation::new(),
             work: BlockingPool::new(options),
             cleanup: BlockingPool::new(TokioOptions {
                 threads: 1,
@@ -98,9 +100,10 @@ impl TokioScheduler {
         }
         Ok(())
     }
-    /// Close admission without cancelling accepted socket or clock operations. Existing owning task handles remain valid; callers use their explicit cancellation tokens to stop pending operations. Accepted native I/O and cleanup retire normally, while queued general blocking jobs can be discarded and signal delivery stops.
+    /// Close admission without cancelling accepted socket or clock operations. Existing owning task handles remain valid; callers use their explicit cancellation tokens to stop pending operations. Accepted native I/O and cleanup retire normally, while queued general blocking jobs can be discarded, native process notifications are interrupted, and signal delivery stops.
     pub fn close(&self) {
         self.closed.store(true, Ordering::Release);
+        self.process_closed.cancel();
         self.tasks.close();
         self.work.close();
         self.cleanup.close();

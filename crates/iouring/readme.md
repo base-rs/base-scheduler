@@ -83,6 +83,8 @@ Ordinary request records and completion channels still allocate per ring request
 
 This package releases with the workspace. Follow the [workspace release process](../../readme.md#releasing).
 
+`ProcessWait` uses `WAITID` when opcode probing reports support, retaining its output until the original completion. Older kernels use the shared readiness/pool fallback. Exact-PID, any-child, group, nonblocking, and stopped/continued waits share the [process-wait contract](../../context/interface.md#child-process-waits).
+
 ## Releases
 
 See the shared [release notes](../../releases.md) for changes awaiting the first release.

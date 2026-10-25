@@ -34,6 +34,8 @@ The readiness selector supplies bound stream, packet, and file readers and write
 
 This package releases with the workspace. Follow the [workspace release process](../../readme.md#releasing).
 
+`ProcessWait` uses pidfd readiness on Linux and `EVFILT_PROC` on macOS/FreeBSD for individual exit waits. Group/state-change waits and unsupported platforms use the existing bounded worker pool. A started blocking fallback can still reap after cancellation and delay shutdown until the child changes state. See the [process-wait contract](../../context/interface.md#child-process-waits) for ownership and cancellation semantics.
+
 ## Releases
 
 See the shared [release notes](../../releases.md) for changes awaiting the first release.

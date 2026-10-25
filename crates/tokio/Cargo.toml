@@ -21,7 +21,7 @@ signal-hook = "0.4.5"
 
 [target.'cfg(windows)'.dependencies]
 async-io = "2.6.0"
-windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Networking_WinSock", "Win32_System_IO"] }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Networking_WinSock", "Win32_System_IO", "Win32_System_Threading"] }
 
 [dev-dependencies]
 tokio = { version = "1.53.3", features = ["rt-multi-thread", "test-util", "macros"] }

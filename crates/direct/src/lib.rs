@@ -81,3 +81,13 @@ use socket_message::SocketMessage;
 
 #[cfg(test)]
 mod bound_io_tests;
+
+mod process_io;
+mod process_wait;
+
+#[cfg(test)]
+#[test]
+#[ignore = "child fixture, invoked by process-wait conformance assertions"]
+fn process_child_fixture() {
+    core_scheduler_conformance::process_wait::child();
+}

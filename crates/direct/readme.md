@@ -69,6 +69,8 @@ Behavioral tests use the capability-specific `core-scheduler-conformance` macros
 
 This package releases with the workspace. Follow the [workspace release process](../../readme.md#releasing).
 
+`ProcessWait` supports individual child and Unix process-group status waits through the bounded work pool. Cancellation can prevent queued work from starting; a started blocking wait may reap after cancellation or abandonment and delay scheduler shutdown until the child changes state. No path terminates the child. Windows retains a process handle through the wait. See the [process-wait contract](../../context/interface.md#child-process-waits) for exclusive reaping ownership and `Child` interoperability.
+
 ## Releases
 
 See the shared [release notes](../../releases.md) for changes awaiting the first release.

@@ -95,6 +95,8 @@ The conformance crate's integration tests run all generated suites against contr
 
 This package releases with the workspace. Follow the [workspace release process](../../readme.md#releasing).
 
+`process_wait_tests!` runs individual exit, nonblocking, lazy, and cancellation cases. Invoke it at the root of a dedicated integration test; its ignored child and group fixtures are launched in isolated subprocesses. Unix group/state-change cases cannot reap another parallel test’s children. The separate `shutdown`, `suspended_shutdown`, and `abandonment` assertions accept backend lifecycle futures and verify retirement without child termination.
+
 ## Releases
 
 See the shared [release notes](../../releases.md) for changes awaiting the first release.
