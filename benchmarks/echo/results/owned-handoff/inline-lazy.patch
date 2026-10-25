@@ -1,0 +1,12 @@
+diff --git a/crates/native/src/native_task.rs b/crates/native/src/native_task.rs
+index c923910..d5af735 100644
+--- a/crates/native/src/native_task.rs
++++ b/crates/native/src/native_task.rs
+@@ -55,6 +55,7 @@ impl<F: Future> TaskFuture<F> {
+ impl<F: Future> Future for TaskFuture<F> {
+     type Output = TaskOutcome<F::Output>;
+ 
++    #[inline(always)]
+     fn poll(self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Self::Output> {
+         // SAFETY: The wrapper structurally pins its future and never moves that field. Retirement drops it in place; PhantomPinned also prevents moving the wrapper after its field retires.
+         let this = unsafe { self.get_unchecked_mut() };

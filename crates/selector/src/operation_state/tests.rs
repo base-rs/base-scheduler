@@ -66,3 +66,43 @@ fn retired_results_do_not_block_the_next_operation_or_close() {
     assert_eq!(second.into_inner(), &[2]);
     block_on(state.close());
 }
+
+#[test]
+fn admission_observes_cross_thread_retirement_before_reusing_the_lane() {
+    struct Owner(Arc<AtomicBool>);
+    impl Drop for Owner {
+        fn drop(&mut self) {
+            self.0.store(true, Ordering::Release);
+        }
+    }
+    let mut state = OperationState::default();
+    for _ in 0..16 {
+        let retired = Arc::new(AtomicBool::new(false));
+        let guard = state.begin(Owner(Arc::clone(&retired))).ok().unwrap();
+        let (error, returned) = state.begin(vec![1, 2, 3]).err().unwrap();
+        assert_eq!(error.kind(), io::ErrorKind::WouldBlock);
+        assert_eq!(returned, [1, 2, 3]);
+        let retiring = std::thread::spawn(move || drop(guard));
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        let mut value = returned;
+        let next = loop {
+            match state.begin(value) {
+                Ok(guard) => break guard,
+                Err((error, returned)) => {
+                    assert_eq!(error.kind(), io::ErrorKind::WouldBlock);
+                    assert!(
+                        std::time::Instant::now() < deadline,
+                        "operation did not retire"
+                    );
+                    value = returned;
+                    std::thread::yield_now();
+                }
+            }
+        };
+        assert!(retired.load(Ordering::Acquire));
+        assert!(state.begin(()).is_err());
+        assert_eq!(next.into_inner(), [1, 2, 3]);
+        retiring.join().unwrap();
+        block_on(state.close());
+    }
+}

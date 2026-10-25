@@ -1,0 +1,62 @@
+{
+  "event": "cycles:u",
+  "frequency": 1999,
+  "seconds": 8,
+  "warmup": 1,
+  "note": "Profile-instrumented rates are not capacity measurements.",
+  "samples": [
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 40.19390106201172,
+      "requests": 5268295,
+      "requests_per_second": 658536.875,
+      "rtt_max_us": 3110.911,
+      "rtt_mean_us": 48.52257529238581,
+      "rtt_p50_us": 48.351,
+      "rtt_p95_us": 51.359,
+      "rtt_p99_us": 53.439,
+      "seconds": 8.0,
+      "warmup_seconds": 1.0,
+      "backend": "iouring",
+      "workers": 1,
+      "client_workers": 4,
+      "server_cpus": [
+        0
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ]
+    },
+    {
+      "bytes": 64,
+      "connections": 32,
+      "payload_mib_per_second": 42.851966857910156,
+      "requests": 5616693,
+      "requests_per_second": 702086.625,
+      "rtt_max_us": 3149.823,
+      "rtt_mean_us": 45.510744391584204,
+      "rtt_p50_us": 46.463,
+      "rtt_p95_us": 51.071,
+      "rtt_p99_us": 53.887,
+      "seconds": 8.0,
+      "warmup_seconds": 1.0,
+      "backend": "tokio",
+      "workers": 1,
+      "client_workers": 4,
+      "server_cpus": [
+        0
+      ],
+      "client_cpus": [
+        4,
+        5,
+        6,
+        7
+      ]
+    }
+  ],
+  "binary_sha256": "8ea109bf21845f3fa0aeee9964726a242b65dce08fe4262fe83e664f38d6c12b"
+}

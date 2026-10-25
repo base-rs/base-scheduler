@@ -1,0 +1,71 @@
+diff --git a/crates/iouring/src/io_uring_socket_stream_reader.rs b/crates/iouring/src/io_uring_socket_stream_reader.rs
+index 7a0b4d5..3a6c1c7 100644
+--- a/crates/iouring/src/io_uring_socket_stream_reader.rs
++++ b/crates/iouring/src/io_uring_socket_stream_reader.rs
+@@ -315,7 +315,7 @@ impl SocketStreamReader for IoUringSocketStreamReader<'_> {
+         if matches!(result, Ok(0)) {
+             self.eof = true;
+         }
+-        (result, buffer.into_inner())
++        (result, self.operations.complete(buffer))
+     }
+     async fn close(&mut self) -> io::Result<()> {
+         self.closed = true;
+diff --git a/crates/iouring/src/operation_state.rs b/crates/iouring/src/operation_state.rs
+index 025872e..6f495fd 100644
+--- a/crates/iouring/src/operation_state.rs
++++ b/crates/iouring/src/operation_state.rs
+@@ -30,7 +30,7 @@ pub(crate) struct OperationGuard<T> {
+     value: Option<T>,
+     _retirement: Retirement,
+ }
+-struct Retirement(Arc<Activity>);
++struct Retirement(Option<Arc<Activity>>);
+ struct RetirementWait<'a>(&'a AtomicWaker);
+ impl Drop for RetirementWait<'_> {
+     fn drop(&mut self) {
+@@ -39,8 +39,10 @@ impl Drop for RetirementWait<'_> {
+ }
+ impl Drop for Retirement {
+     fn drop(&mut self) {
+-        self.0.running.store(false, Ordering::Release);
+-        self.0.retired.wake();
++        if let Some(activity) = self.0.take() {
++            activity.running.store(false, Ordering::Release);
++            activity.retired.wake();
++        }
+     }
+ }
+ impl<T> OperationGuard<T> {
+@@ -113,9 +115,18 @@ impl OperationState {
+         }
+         Ok(OperationGuard {
+             value: Some(value),
+-            _retirement: Retirement(Arc::clone(activity)),
++            _retirement: Retirement(Some(Arc::clone(activity))),
+         })
+     }
++
++    // Result collection holds the lane exclusively, so no close can be waiting on this operation. Abandonment still retires through the guard's drop path and wakes close.
++    pub(crate) fn complete<T>(&mut self, mut guard: OperationGuard<T>) -> T {
++        let activity = guard._retirement.0.take().unwrap();
++        debug_assert!(Arc::ptr_eq(self.activity.as_ref().unwrap(), &activity));
++        let value = guard.value.take().unwrap();
++        activity.running.store(false, Ordering::Release);
++        value
++    }
+     pub(crate) async fn close(&mut self) {
+         if let Some(activity) = &self.activity {
+             let _wait = RetirementWait(&activity.retired);
+diff --git a/crates/native/src/native_task.rs b/crates/native/src/native_task.rs
+index c923910..d5af735 100644
+--- a/crates/native/src/native_task.rs
++++ b/crates/native/src/native_task.rs
+@@ -55,6 +55,7 @@ impl<F: Future> TaskFuture<F> {
+ impl<F: Future> Future for TaskFuture<F> {
+     type Output = TaskOutcome<F::Output>;
+ 
++    #[inline(always)]
+     fn poll(self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Self::Output> {
+         // SAFETY: The wrapper structurally pins its future and never moves that field. Retirement drops it in place; PhantomPinned also prevents moving the wrapper after its field retires.
+         let this = unsafe { self.get_unchecked_mut() };

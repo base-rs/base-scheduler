@@ -109,9 +109,11 @@ impl OperationState {
                 retired,
             })
         });
-        if activity.running.swap(true, Ordering::AcqRel) {
+        if activity.running.load(Ordering::Acquire) {
             return Err((io::Error::from(io::ErrorKind::WouldBlock).into(), value));
         }
+        // This lane is borrowed exclusively; only the previous guard can change running, and only by clearing it. The acquire above observes its retirement before a new operation starts.
+        activity.running.store(true, Ordering::Relaxed);
         Ok(OperationGuard {
             value: Some(value),
             retirement: Retirement(Some(Arc::clone(activity))),

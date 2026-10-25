@@ -1,0 +1,25 @@
+{
+  "base": "ed607d5f13db66504893e754341a7151b6e6bee7",
+  "rustc": "rustc 1.99.0 (b940084d7 2026-09-28) (Arch Linux rust 1:1.99.0-1)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+  "environment": {
+    "CARGO_TARGET_DIR": "/home/samuel/.cache/core-scheduler-owned-echo-diagnosis/target",
+    "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_PROFILE_RELEASE_LTO": "false",
+    "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "16",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_ENCODED_RUSTFLAGS": "",
+    "RUSTFLAGS": "",
+    "RUST_TEST_THREADS": "1"
+  },
+  "variants": {
+    "compact-ahead": {
+      "sha256": "77863a6a24011956468a1831c9bc8a21259204a6d98380e3c77450cef8ab0d7c",
+      "patch_sha256": "6ae2f1d11b5c5baa7766fcade880c221a32189d6efbdda6462d3b6f94de1f47e"
+    },
+    "compact-cold": {
+      "sha256": "f8d190c6496fb3a68fae6566551af3193a87e30dce4f7f3a25756c0580ddd4e6",
+      "patch_sha256": "c4d3fb1862b3d675211600fed751b4acc45ac6051da824d60407114502f08045"
+    }
+  }
+}

@@ -1,0 +1,137 @@
+diff --git a/crates/iouring/src/io_uring_selector/socket_read.rs b/crates/iouring/src/io_uring_selector/socket_read.rs
+index 1b4864d..1dc9e41 100644
+--- a/crates/iouring/src/io_uring_selector/socket_read.rs
++++ b/crates/iouring/src/io_uring_selector/socket_read.rs
+@@ -2,7 +2,7 @@
+ // Copyright, 2026, by Samuel Williams.
+ 
+ use super::*;
+-use std::{any::Any, sync::Mutex};
++use std::{any::Any, sync::Mutex, task::Waker};
+ 
+ pub(crate) struct State {
+     shared: Arc<Shared>,
+@@ -16,9 +16,9 @@ impl Default for State {
+                 slot: Mutex::new(Slot {
+                     result: None,
+                     collecting: false,
++                    waker: None,
+                 }),
+                 ready: AtomicBool::new(false),
+-                waker: atomic_waker::AtomicWaker::new(),
+             }),
+             cached: None,
+         }
+@@ -33,15 +33,15 @@ enum Completion {
+ struct Slot {
+     result: Option<Completion>,
+     collecting: bool,
++    waker: Option<Waker>,
+ }
+ struct Shared {
+     slot: Mutex<Slot>,
+     ready: AtomicBool,
+-    waker: atomic_waker::AtomicWaker,
+ }
+ impl Shared {
+     fn publish(&self, result: Completion) {
+-        let abandoned = {
++        let (abandoned, waker) = {
+             let mut slot = self.slot.lock().unwrap();
+             let abandoned = if slot.collecting {
+                 slot.result = Some(result);
+@@ -49,23 +49,23 @@ impl Shared {
+             } else {
+                 Some(result)
+             };
+-            // Dropping a returned owner can retire its lane and permit immediate reuse. Publish readiness before releasing that owner or allowing collection to take it.
+             self.ready.store(true, Ordering::Release);
+-            abandoned
++            (abandoned, slot.waker.take())
+         };
+-        self.waker.wake();
++        if let Some(waker) = waker {
++            waker.wake();
++        }
+         discard(abandoned);
+     }
+ }
+ impl Drop for Shared {
+     fn drop(&mut self) {
+-        discard(
+-            self.slot
+-                .get_mut()
+-                .unwrap_or_else(std::sync::PoisonError::into_inner)
+-                .result
+-                .take(),
+-        );
++        let slot = self
++            .slot
++            .get_mut()
++            .unwrap_or_else(std::sync::PoisonError::into_inner);
++        discard(slot.result.take());
++        discard(slot.waker.take());
+     }
+ }
+ 
+@@ -78,12 +78,12 @@ impl Drop for CompletionWait<'_> {
+         let Some(shared) = self.shared.take() else {
+             return;
+         };
+-        let abandoned = {
++        let (abandoned, waker) = {
+             let mut slot = shared.slot.lock().unwrap();
+             slot.collecting = false;
+-            slot.result.take()
++            (slot.result.take(), slot.waker.take())
+         };
+-        shared.waker.take();
++        discard(waker);
+         discard(abandoned);
+     }
+ }
+@@ -210,14 +210,26 @@ impl State {
+         };
+         completion.cancel.controller.submit(request);
+         let mut cancelled = pin!(cancellation.cancelled());
+-        poll_fn(|context| {
++        let result = poll_fn(|context| {
+             if self.shared.ready.load(Ordering::Acquire) {
+-                return Poll::Ready(());
++                let mut slot = self.shared.slot.lock().unwrap();
++                slot.collecting = false;
++                return Poll::Ready(slot.result.take().unwrap());
+             }
+-            self.shared.waker.register(context.waker());
+-            if self.shared.ready.load(Ordering::Acquire) {
+-                self.shared.waker.take();
+-                return Poll::Ready(());
++            // Clone before locking: even a custom waker can complete this request reentrantly.
++            let replacement = context.waker().clone();
++            let (result, previous) = {
++                let mut slot = self.shared.slot.lock().unwrap();
++                if let Some(result) = slot.result.take() {
++                    slot.collecting = false;
++                    (Some(result), slot.waker.take())
++                } else {
++                    (None, slot.waker.replace(replacement))
++                }
++            };
++            discard(previous);
++            if let Some(result) = result {
++                return Poll::Ready(result);
+             }
+             if completion.cancel.armed && cancelled.as_mut().poll(context).is_ready() {
+                 completion.cancel.request();
+@@ -226,11 +238,6 @@ impl State {
+         })
+         .await;
+         completion.cancel.armed = false;
+-        let result = {
+-            let mut slot = self.shared.slot.lock().unwrap();
+-            slot.collecting = false;
+-            slot.result.take().unwrap()
+-        };
+         completion.shared = None;
+         drop(completion);
+         match result {

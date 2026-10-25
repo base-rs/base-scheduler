@@ -108,6 +108,9 @@ pub(crate) fn schedule(shared: &Arc<Shared>, runnable: Runnable) {
     });
     if let Some(runnable) = remote {
         shared.workers[preferred].incoming.push(runnable);
+    } else if shared.workers.len() == 1 {
+        // The sole worker is already executing this callback and will observe its local queue before waiting again.
+        return;
     }
     // Publication precedes the sleeping flag exchange. A worker publishes its sleeping flag before rechecking queues, so a racing wake is retained.
     shared.wake_idle(preferred);
