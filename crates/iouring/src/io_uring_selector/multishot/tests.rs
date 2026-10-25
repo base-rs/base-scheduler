@@ -869,7 +869,8 @@ fn completion_between_queue_probe_and_listener_registration_is_not_lost() {
             }
         }));
     });
-    let message = block_on(receiving.recv(&Cancellation::never()))
+    let message = block_on(poll_once(receiving.recv(&Cancellation::never())))
+        .expect("a CQE published before listener registration is ready on this poll")
         .unwrap()
         .unwrap();
     assert_eq!(message.payload(), b"message");
