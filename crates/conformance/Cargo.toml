@@ -12,6 +12,4 @@ readme = "readme.md"
 core-scheduler = { path = "../..", version = "=0.0.0" }
 futures-lite = "2.6.1"
 futures-channel = "0.3.31"
-
-[target.'cfg(unix)'.dependencies]
 libc = "0.2"

@@ -69,12 +69,13 @@ impl Drop for ChildProcess {
 pub fn child() {
     let mut input = Vec::new();
     std::io::stdin().read_to_end(&mut input).unwrap();
-    std::process::exit(
-        std::env::var("CORE_SCHEDULER_PROCESS_EXIT")
-            .unwrap()
-            .parse()
-            .unwrap(),
-    );
+    let code = std::env::var("CORE_SCHEDULER_PROCESS_EXIT")
+        .unwrap()
+        .parse()
+        .unwrap();
+    // Use C runtime exit so its atexit callbacks, including coverage recording on Windows, run before termination.
+    // SAFETY: This isolated child fixture has finished reading stdin and intentionally terminates with the requested status.
+    unsafe { libc::exit(code) };
 }
 
 /// Individual exit status and an already-available result.
@@ -370,10 +371,17 @@ pub async fn shutdown<S: ProcessWait>(
             .await
             .is_err()
     );
+    #[cfg(unix)]
     if !child.reaped {
         let status = child.child.wait().unwrap();
         child.reaped = true;
         assert_eq!(status.code(), Some(41));
+    }
+    #[cfg(windows)]
+    {
+        // Windows process handles remain waitable after another handle collects the status.
+        assert_eq!(child.child.wait().unwrap().code(), Some(41));
+        child.reaped = true;
     }
 }
 
@@ -400,13 +408,13 @@ where
     for (child, code) in [(&mut first, 43), (&mut second, 47)] {
         // Backend access has retired. A dropped result may have forfeited status; never send a signal through the stale Child in that case.
         child.reaped = true;
+        #[cfg(unix)]
         match child.child.wait() {
             Ok(status) => assert_eq!(status.code(), Some(code)),
-            #[cfg(unix)]
             Err(error) => assert_eq!(error.raw_os_error(), Some(libc::ECHILD)),
-            #[cfg(windows)]
-            Err(error) => panic!("retained Windows process handle must remain waitable: {error}"),
         }
+        #[cfg(windows)]
+        assert_eq!(child.child.wait().unwrap().code(), Some(code));
     }
 }
 

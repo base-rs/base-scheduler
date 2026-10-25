@@ -53,10 +53,7 @@ impl PendingRequest for WaitRequest {
         let result = result.and_then(|_| {
             // SAFETY: Only terminal original completion or rejection reaches finish. No kernel access remains, and this request exclusively owns the initialized siginfo storage.
             let info = unsafe { &*self.info.get() };
-            // SAFETY: WAITID initializes the SIGCHLD fields, and the no-status sentinel was zeroed before submission.
-            status(unsafe { info.si_pid() }, info.si_code, unsafe {
-                info.si_status()
-            })
+            status(info)
         });
         let reply = self
             .reply
@@ -83,10 +80,18 @@ impl Drop for WaitRequest {
     }
 }
 
-fn status(pid: i32, code: i32, value: i32) -> WaitResult {
-    if pid == 0 {
+fn status(info: &libc::siginfo_t) -> WaitResult {
+    // Older kernels leave stale child fields on WNOHANG without an event, but always clear si_signo. Check that sentinel before interpreting any child fields.
+    if info.si_signo == 0 {
         return Ok(None);
     }
+    // SAFETY: A completed WAITID with a signal reports the SIGCHLD fields. No union pointer is followed.
+    child_status(unsafe { info.si_pid() }, info.si_code, unsafe {
+        info.si_status()
+    })
+}
+
+fn child_status(pid: i32, code: i32, value: i32) -> WaitResult {
     let raw = match code {
         libc::CLD_EXITED => value << 8,
         libc::CLD_KILLED => value,

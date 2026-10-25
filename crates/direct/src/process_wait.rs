@@ -21,7 +21,7 @@ impl ProcessWait for DirectScheduler {
         let process = Process::open(process, flags)?;
         let (result, ()) = self
             .work
-            .execute((), cancellation, move |()| process.wait(false))
+            .execute((), cancellation, move |_| process.wait(false))
             .await;
         match result {
             Err(core_scheduler::OperationError::Io(error)) => {

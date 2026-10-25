@@ -22,9 +22,8 @@ impl Drop for Fallback {
 
 #[test]
 fn native_status_conversion_preserves_every_child_state() {
-    assert_eq!(status(0, 0, 0).unwrap(), None);
     assert_eq!(
-        status(123, libc::CLD_EXITED, 23)
+        child_status(123, libc::CLD_EXITED, 23)
             .unwrap()
             .unwrap()
             .status
@@ -32,7 +31,7 @@ fn native_status_conversion_preserves_every_child_state() {
         Some(23)
     );
     assert_eq!(
-        status(123, libc::CLD_KILLED, libc::SIGTERM)
+        child_status(123, libc::CLD_KILLED, libc::SIGTERM)
             .unwrap()
             .unwrap()
             .status
@@ -40,7 +39,7 @@ fn native_status_conversion_preserves_every_child_state() {
         Some(libc::SIGTERM)
     );
     assert!(
-        status(123, libc::CLD_DUMPED, libc::SIGABRT)
+        child_status(123, libc::CLD_DUMPED, libc::SIGABRT)
             .unwrap()
             .unwrap()
             .status
@@ -48,7 +47,7 @@ fn native_status_conversion_preserves_every_child_state() {
     );
     for code in [libc::CLD_STOPPED, libc::CLD_TRAPPED] {
         assert_eq!(
-            status(123, code, libc::SIGSTOP)
+            child_status(123, code, libc::SIGSTOP)
                 .unwrap()
                 .unwrap()
                 .status
@@ -57,16 +56,28 @@ fn native_status_conversion_preserves_every_child_state() {
         );
     }
     assert!(
-        status(123, libc::CLD_CONTINUED, 0)
+        child_status(123, libc::CLD_CONTINUED, 0)
             .unwrap()
             .unwrap()
             .status
             .continued()
     );
     assert_eq!(
-        status(123, -1, 0).unwrap_err().kind(),
+        child_status(123, -1, 0).unwrap_err().kind(),
         io::ErrorKind::InvalidData
     );
+}
+
+#[test]
+fn no_event_ignores_stale_kernel_child_fields() {
+    // SAFETY: siginfo_t contains C scalar fields and union storage, with no Rust validity restrictions on these bytes. No embedded pointer is followed.
+    let mut info = unsafe {
+        let mut info = std::mem::MaybeUninit::<libc::siginfo_t>::uninit();
+        std::ptr::write_bytes(info.as_mut_ptr(), 0x7f, 1);
+        info.assume_init()
+    };
+    info.si_signo = 0;
+    assert_eq!(status(&info).unwrap(), None);
 }
 
 #[test]

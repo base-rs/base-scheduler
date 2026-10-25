@@ -208,3 +208,24 @@ fn started_windows_wait_returns_status_after_cancellation() {
     );
     runtime.block_on(scheduler.shutdown());
 }
+
+#[cfg(windows)]
+#[test]
+fn windows_pool_start_failure_is_reported() {
+    use super::*;
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let mut scheduler = TokioScheduler::new(runtime.handle().clone());
+    scheduler.work.fail_start_at = Some(0);
+    let error = runtime
+        .block_on(scheduler.process_wait(
+            std::process::id(),
+            ProcessWaitFlags::default(),
+            &Cancellation::never(),
+        ))
+        .unwrap_err();
+    assert_eq!(error.to_string(), "injected thread startup failure");
+    runtime.block_on(scheduler.shutdown());
+}

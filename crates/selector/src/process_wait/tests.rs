@@ -200,3 +200,19 @@ fn started_windows_wait_returns_status_after_cancellation() {
     );
     futures_lite::future::block_on(scheduler.shutdown());
 }
+
+#[cfg(windows)]
+#[test]
+fn windows_pool_start_failure_is_reported() {
+    use super::*;
+    let mut scheduler = ReadinessSelector::new().unwrap();
+    scheduler.work.fail_start_at = Some(0);
+    let error = futures_lite::future::block_on(scheduler.process_wait(
+        std::process::id(),
+        ProcessWaitFlags::default(),
+        &Cancellation::never(),
+    ))
+    .unwrap_err();
+    assert_eq!(error.to_string(), "injected thread startup failure");
+    futures_lite::future::block_on(scheduler.shutdown());
+}
