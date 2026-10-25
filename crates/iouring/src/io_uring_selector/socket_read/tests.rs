@@ -71,6 +71,62 @@ fn repeated_owned_reads_reuse_request_and_completion_storage_without_allocations
 }
 
 #[test]
+fn prepared_receives_do_not_invoke_buffer_callbacks_on_the_ring_owner() {
+    struct ObservedBuffer {
+        bytes: Box<[u8]>,
+        accesses: Arc<AtomicUsize>,
+    }
+    impl AsRef<[u8]> for ObservedBuffer {
+        fn as_ref(&self) -> &[u8] {
+            self.accesses.fetch_add(1, Ordering::Relaxed);
+            &self.bytes
+        }
+    }
+    impl AsMut<[u8]> for ObservedBuffer {
+        fn as_mut(&mut self) -> &mut [u8] {
+            self.accesses.fetch_add(1, Ordering::Relaxed);
+            &mut self.bytes
+        }
+    }
+    // SAFETY: The exclusive Box owner retains one initialized allocation and range across moves.
+    unsafe impl IoBuf for ObservedBuffer {}
+    unsafe impl IoBufMut for ObservedBuffer {}
+
+    let (selector, driver) = IoUringSelector::new(Default::default()).unwrap();
+    let (socket, mut peer) = sockets(&selector);
+    let mut worker = driver.enter();
+    let wake = worker.waker();
+    let mut context = Context::from_waker(&wake);
+    let never = Cancellation::never();
+    let mut reader = selector.socket_stream_reader(&socket).unwrap();
+    let accesses = Arc::new(AtomicUsize::new(0));
+    let mut returned = Vec::new();
+    for byte in [5, 7] {
+        let buffer = ObservedBuffer {
+            bytes: vec![0; 16].into_boxed_slice(),
+            accesses: Arc::clone(&accesses),
+        };
+        let pointer = buffer.bytes.as_ptr();
+        let (result, buffer) = {
+            let mut reading = pin!(reader.read_owned(buffer, &never));
+            assert!(reading.as_mut().poll(&mut context).is_pending());
+            let before_entry = accesses.load(Ordering::Relaxed);
+            peer.write_all(&[byte]).unwrap();
+            let result = drive(&mut worker, &mut context, reading.as_mut());
+            assert_eq!(accesses.load(Ordering::Relaxed), before_entry);
+            result
+        };
+        assert_eq!(result.unwrap(), 1);
+        assert_eq!(buffer.bytes.as_ptr(), pointer);
+        assert_eq!(buffer.bytes[0], byte);
+        assert_eq!(buffer.bytes[1..], [0; 15]);
+        // Retain the first buffer so the cached request must target a distinct allocation on its next use.
+        returned.push(buffer);
+    }
+    drive(&mut worker, &mut context, pin!(reader.close())).unwrap();
+}
+
+#[test]
 fn abandoning_receive_retires_its_owner_and_allows_a_different_buffer_type() {
     let (selector, driver) = IoUringSelector::new(Default::default()).unwrap();
     let (socket, mut peer) = sockets(&selector);

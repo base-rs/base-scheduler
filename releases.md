@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Combine idle Native io\_uring receive preparation, submission, and waiting in one driver turn, preserving owned-buffer retirement and bounded driver progress between runnable batches.
+
 - Store Native task futures in the task allocation where their size permits, removing a second allocation and pointer indirection while preserving pinned addresses, abandonment, and panic containment.
 
 - Inline cancellation and Native I/O preflight checks across crate boundaries, and issue scalar Native socket calls directly with the same nonblocking flags and error semantics.

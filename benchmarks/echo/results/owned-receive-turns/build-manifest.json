@@ -1,0 +1,26 @@
+{
+  "base": "4c1db9d6569a284aaf696225d2f48235612927a3",
+  "candidate": "0e05e3f2c8edf091b732c9a5b6a2d27608db11f3",
+  "rustc": "rustc 1.99.0 (b940084d7 2026-09-28) (Arch Linux rust 1:1.99.0-1)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+  "release_profile": {
+    "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_PROFILE_RELEASE_LTO": "false",
+    "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "16",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_ENCODED_RUSTFLAGS": "",
+    "RUSTFLAGS": ""
+  },
+  "variants": {
+    "baseline": {
+      "commit": "4c1db9d6569a284aaf696225d2f48235612927a3",
+      "binary": "/home/samuel/.cache/core-scheduler-owned-receive-pr/bin/baseline",
+      "sha256": "544f169165aef2769e39aae356bd385dc7de53fac659614f7f2b7642f25cd08a"
+    },
+    "candidate": {
+      "commit": "0e05e3f2c8edf091b732c9a5b6a2d27608db11f3",
+      "binary": "/home/samuel/.cache/core-scheduler-owned-receive-pr/bin/candidate",
+      "sha256": "0fcfe97e105c4f8db91f11310648717b31c41311f7c5d08e79e8b2807a4bfbc1"
+    }
+  }
+}

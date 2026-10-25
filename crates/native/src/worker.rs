@@ -271,6 +271,7 @@ fn run_loop(
         }))
     });
     let mut iteration = 0usize;
+    let mut needs_turn = false;
     loop {
         iteration = iteration.wrapping_add(1);
         crate::worker_timers::turn(&shared, identifier);
@@ -297,6 +298,7 @@ fn run_loop(
                     find_work(&shared, iteration),
                     || !shared.finished(),
                     || {
+                        needs_turn = false;
                         drive(
                             &mut driver,
                             crate::worker_timers::timeout(&shared, identifier),
@@ -309,9 +311,12 @@ fn run_loop(
         let Some(runnable) = runnable else {
             continue;
         };
+        // Publish completions between ready batches. If the queue emptied, the idle path above already collected them with its actual wait timeout.
+        if needs_turn {
+            drive(&mut driver, Some(Duration::ZERO));
+        }
         run_ready_batch(&shared, runnable);
-        // Publish the available completion batch before starting the next task batch.
-        drive(&mut driver, Some(Duration::ZERO));
+        needs_turn = true;
     }
     CURRENT_WORKER.with(|current| current.take());
 }
