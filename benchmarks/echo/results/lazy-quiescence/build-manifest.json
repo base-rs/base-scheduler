@@ -1,0 +1,38 @@
+{
+  "baseline": {
+    "base": "05548997beabb48b05d350362b0db4b03468c511",
+    "rustc": "rustc 1.99.0 (b940084d7 2026-09-28) (Arch Linux rust 1:1.99.0-1)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+    "environment": {
+      "CARGO_TARGET_DIR": "/home/samuel/.cache/core-scheduler-owned-echo-diagnosis/target",
+      "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3",
+      "CARGO_PROFILE_RELEASE_DEBUG": "1",
+      "CARGO_PROFILE_RELEASE_LTO": "false",
+      "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "16",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_ENCODED_RUSTFLAGS": "",
+      "RUSTFLAGS": ""
+    },
+    "variants": {
+      "baseline": {
+        "binary": "/home/samuel/.cache/core-scheduler-owned-dispatch/bin/baseline",
+        "sha256": "97d6e1d7171df3e00d925d0d6a52430e03fe490a35e44da090a05d3a60d94658"
+      }
+    }
+  },
+  "candidate": {
+    "base": "05548997beabb48b05d350362b0db4b03468c511",
+    "environment": {
+      "CARGO_TARGET_DIR": "/home/samuel/.cache/core-scheduler-owned-echo-diagnosis/target",
+      "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3",
+      "CARGO_PROFILE_RELEASE_DEBUG": "1",
+      "CARGO_PROFILE_RELEASE_LTO": "false",
+      "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "16",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_ENCODED_RUSTFLAGS": "",
+      "RUSTFLAGS": ""
+    },
+    "binary": "/home/samuel/.cache/core-scheduler-owned-dispatch/bin/lazy-quiescence",
+    "sha256": "7a73f93bd4c0bd6766e68ddefa0f070db76fe14821e8833b0e1d5056b714c9e9",
+    "patch_sha256": "4d2db2d29eb21120ce8df0d45db0cad7cac6c85b988bc60c02f1203717d68d48"
+  }
+}
