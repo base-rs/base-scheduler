@@ -286,6 +286,7 @@ dependencies = [
  "core-scheduler",
  "futures-channel",
  "futures-lite",
+ "libc",
 ]
 
 [[package]]

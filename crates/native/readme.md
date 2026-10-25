@@ -69,6 +69,8 @@ Native forwards the selected backend’s bound reader and writer factories direc
 
 This package releases with the workspace. Follow the [workspace release process](../../readme.md#releasing).
 
+`ProcessWait` forwards to the selected I/O implementation: native process notifications for readiness, optional `WAITID` for io_uring, and the shared bounded-pool fallback where needed. See the [process-wait contract](../../context/interface.md#child-process-waits).
+
 ## Releases
 
 See the shared [release notes](../../releases.md) for changes awaiting the first release.

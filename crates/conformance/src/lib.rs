@@ -87,3 +87,6 @@ pub mod socket_receiving;
 pub mod buffer_pool;
 
 pub mod socket_packet_io;
+
+pub mod process_wait;
+mod process_wait_tests;

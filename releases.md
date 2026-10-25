@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add cancellable child process waits, Unix group selection and state-change flags, optional io\_uring `WAITID`, native process notifications, and bounded-pool fallbacks.
+
 - Remove experimental worker-provided receive pools and implicit receive-ahead from bound socket readers. Preserve reusable shared buffers and explicit read/write overlap through independent handles and owned stream submission; retain the standalone multishot benchmark API.
 
 - Reduce repeated Native owned-read reference counting, operation-lane admission, and single-worker wake overhead while preserving cancellation, abandoned-operation retirement, and migration.

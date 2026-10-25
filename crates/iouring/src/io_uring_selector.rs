@@ -260,6 +260,7 @@ pub(crate) struct Controller {
     buffer_groups: Arc<std::sync::Mutex<Vec<bool>>>,
     files: std::sync::Mutex<registered_file::Files>,
     closed: AtomicBool,
+    waitid_supported: bool,
     shutdown: Arc<Shutdown>,
 }
 
@@ -558,6 +559,7 @@ impl IoUringSelector {
         });
         let controller = Arc::new(Controller {
             worker,
+            waitid_supported: probe.is_supported(opcode::WaitId::CODE),
             capacity,
             commands,
             notification,
@@ -1230,3 +1232,5 @@ pub(crate) mod file_monitor;
 
 pub(crate) mod stream_writer;
 mod submission_notifications;
+
+mod process_wait;
