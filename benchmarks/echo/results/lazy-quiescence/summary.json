@@ -1,0 +1,518 @@
+{
+  "confirmation": {
+    "1/1/64": {
+      "borrowed-baseline": {
+        "requests_per_second": {
+          "median": 271194.0,
+          "minimum": 270268.3333333333,
+          "maximum": 274963.3333333333
+        },
+        "rtt_p99_us": {
+          "median": 4.303,
+          "minimum": 4.283,
+          "maximum": 4.311
+        }
+      },
+      "borrowed-lazy": {
+        "requests_per_second": {
+          "median": 272010.3333333333,
+          "minimum": 270076.3333333333,
+          "maximum": 274591.0
+        },
+        "rtt_p99_us": {
+          "median": 4.311,
+          "minimum": 4.291,
+          "maximum": 4.343
+        }
+      },
+      "owned-baseline": {
+        "requests_per_second": {
+          "median": 256609.0,
+          "minimum": 247226.66666666666,
+          "maximum": 262117.33333333334
+        },
+        "rtt_p99_us": {
+          "median": 5.683,
+          "minimum": 5.643,
+          "maximum": 5.691
+        }
+      },
+      "owned-lazy": {
+        "requests_per_second": {
+          "median": 263498.3333333333,
+          "minimum": 258197.0,
+          "maximum": 267892.0
+        },
+        "rtt_p99_us": {
+          "median": 5.443,
+          "minimum": 5.083,
+          "maximum": 5.691
+        }
+      },
+      "tokio": {
+        "requests_per_second": {
+          "median": 273292.6666666667,
+          "minimum": 271402.6666666667,
+          "maximum": 279397.3333333333
+        },
+        "rtt_p99_us": {
+          "median": 4.331,
+          "minimum": 4.263,
+          "maximum": 4.403
+        }
+      },
+      "owned-change-percent": 2.68475904326555,
+      "borrowed-change-percent": 0.3010145258867558
+    },
+    "1/32/64": {
+      "borrowed-baseline": {
+        "requests_per_second": {
+          "median": 632292.3333333334,
+          "minimum": 626907.0,
+          "maximum": 634313.6666666666
+        },
+        "rtt_p99_us": {
+          "median": 55.167,
+          "minimum": 54.975,
+          "maximum": 55.583
+        }
+      },
+      "borrowed-lazy": {
+        "requests_per_second": {
+          "median": 634456.0,
+          "minimum": 626647.3333333334,
+          "maximum": 640388.0
+        },
+        "rtt_p99_us": {
+          "median": 55.007,
+          "minimum": 54.559,
+          "maximum": 55.583
+        }
+      },
+      "owned-baseline": {
+        "requests_per_second": {
+          "median": 645982.6666666666,
+          "minimum": 637095.6666666666,
+          "maximum": 648396.0
+        },
+        "rtt_p99_us": {
+          "median": 53.791,
+          "minimum": 53.439,
+          "maximum": 54.143
+        }
+      },
+      "owned-lazy": {
+        "requests_per_second": {
+          "median": 642574.3333333334,
+          "minimum": 638214.0,
+          "maximum": 647906.0
+        },
+        "rtt_p99_us": {
+          "median": 53.919,
+          "minimum": 53.631,
+          "maximum": 54.207
+        }
+      },
+      "tokio": {
+        "requests_per_second": {
+          "median": 701639.3333333334,
+          "minimum": 698825.0,
+          "maximum": 718388.3333333334
+        },
+        "rtt_p99_us": {
+          "median": 53.375,
+          "minimum": 52.319,
+          "maximum": 53.567
+        }
+      },
+      "owned-change-percent": -0.5276199361386236,
+      "borrowed-change-percent": 0.342194037884358
+    }
+  },
+  "wide": {
+    "1/1/4096": {
+      "borrowed-baseline": {
+        "requests_per_second": {
+          "median": 241257.33333333334,
+          "minimum": 238835.33333333334,
+          "maximum": 241382.33333333334
+        },
+        "rtt_p99_us": {
+          "median": 5.323,
+          "minimum": 5.283,
+          "maximum": 5.823
+        }
+      },
+      "borrowed-lazy": {
+        "requests_per_second": {
+          "median": 237919.66666666666,
+          "minimum": 233357.0,
+          "maximum": 241238.33333333334
+        },
+        "rtt_p99_us": {
+          "median": 5.343,
+          "minimum": 5.271,
+          "maximum": 5.463
+        }
+      },
+      "owned-baseline": {
+        "requests_per_second": {
+          "median": 230295.0,
+          "minimum": 230061.33333333334,
+          "maximum": 232787.66666666666
+        },
+        "rtt_p99_us": {
+          "median": 5.443,
+          "minimum": 5.431,
+          "maximum": 5.451
+        }
+      },
+      "owned-lazy": {
+        "requests_per_second": {
+          "median": 233519.0,
+          "minimum": 228240.0,
+          "maximum": 234018.33333333334
+        },
+        "rtt_p99_us": {
+          "median": 5.431,
+          "minimum": 5.383,
+          "maximum": 5.463
+        }
+      },
+      "tokio": {
+        "requests_per_second": {
+          "median": 238337.66666666666,
+          "minimum": 234891.33333333334,
+          "maximum": 239840.66666666666
+        },
+        "rtt_p99_us": {
+          "median": 5.311,
+          "minimum": 5.291,
+          "maximum": 5.343
+        }
+      },
+      "owned-change-percent": 1.3999435506632851,
+      "borrowed-change-percent": -1.3834467207905377
+    },
+    "1/32/4096": {
+      "borrowed-baseline": {
+        "requests_per_second": {
+          "median": 568631.6666666666,
+          "minimum": 565233.0,
+          "maximum": 578816.3333333334
+        },
+        "rtt_p99_us": {
+          "median": 61.375,
+          "minimum": 60.319,
+          "maximum": 61.535
+        }
+      },
+      "borrowed-lazy": {
+        "requests_per_second": {
+          "median": 565713.3333333334,
+          "minimum": 561657.6666666666,
+          "maximum": 567344.0
+        },
+        "rtt_p99_us": {
+          "median": 61.599,
+          "minimum": 61.311,
+          "maximum": 61.983
+        }
+      },
+      "owned-baseline": {
+        "requests_per_second": {
+          "median": 584886.6666666666,
+          "minimum": 582204.3333333334,
+          "maximum": 594403.0
+        },
+        "rtt_p99_us": {
+          "median": 59.391,
+          "minimum": 58.623,
+          "maximum": 59.679
+        }
+      },
+      "owned-lazy": {
+        "requests_per_second": {
+          "median": 577451.6666666666,
+          "minimum": 575834.0,
+          "maximum": 583052.0
+        },
+        "rtt_p99_us": {
+          "median": 60.063,
+          "minimum": 59.615,
+          "maximum": 60.351
+        }
+      },
+      "tokio": {
+        "requests_per_second": {
+          "median": 623642.6666666666,
+          "minimum": 619762.0,
+          "maximum": 624346.0
+        },
+        "rtt_p99_us": {
+          "median": 59.935,
+          "minimum": 59.775,
+          "maximum": 60.223
+        }
+      },
+      "owned-change-percent": -1.2711864406779627,
+      "borrowed-change-percent": -0.5132203330216578
+    },
+    "4/1/64": {
+      "borrowed-baseline": {
+        "requests_per_second": {
+          "median": 269636.3333333333,
+          "minimum": 268958.6666666667,
+          "maximum": 271304.0
+        },
+        "rtt_p99_us": {
+          "median": 4.603,
+          "minimum": 4.563,
+          "maximum": 4.751
+        }
+      },
+      "borrowed-lazy": {
+        "requests_per_second": {
+          "median": 269158.6666666667,
+          "minimum": 269038.3333333333,
+          "maximum": 270248.3333333333
+        },
+        "rtt_p99_us": {
+          "median": 4.603,
+          "minimum": 4.543,
+          "maximum": 4.923
+        }
+      },
+      "owned-baseline": {
+        "requests_per_second": {
+          "median": 262514.3333333333,
+          "minimum": 259516.0,
+          "maximum": 263960.0
+        },
+        "rtt_p99_us": {
+          "median": 5.631,
+          "minimum": 5.583,
+          "maximum": 5.671
+        }
+      },
+      "owned-lazy": {
+        "requests_per_second": {
+          "median": 264851.6666666667,
+          "minimum": 257550.33333333334,
+          "maximum": 266527.6666666667
+        },
+        "rtt_p99_us": {
+          "median": 5.003,
+          "minimum": 4.911,
+          "maximum": 5.671
+        }
+      },
+      "tokio": {
+        "requests_per_second": {
+          "median": 273988.6666666667,
+          "minimum": 272700.0,
+          "maximum": 275002.0
+        },
+        "rtt_p99_us": {
+          "median": 4.563,
+          "minimum": 4.511,
+          "maximum": 4.811
+        }
+      },
+      "owned-change-percent": 0.8903640817073066,
+      "borrowed-change-percent": -0.1771521889359473
+    },
+    "4/1/4096": {
+      "borrowed-baseline": {
+        "requests_per_second": {
+          "median": 240077.33333333334,
+          "minimum": 237380.33333333334,
+          "maximum": 240580.66666666666
+        },
+        "rtt_p99_us": {
+          "median": 5.463,
+          "minimum": 5.351,
+          "maximum": 6.023
+        }
+      },
+      "borrowed-lazy": {
+        "requests_per_second": {
+          "median": 238656.33333333334,
+          "minimum": 232819.0,
+          "maximum": 239188.33333333334
+        },
+        "rtt_p99_us": {
+          "median": 5.463,
+          "minimum": 5.391,
+          "maximum": 6.063
+        }
+      },
+      "owned-baseline": {
+        "requests_per_second": {
+          "median": 232654.33333333334,
+          "minimum": 230995.33333333334,
+          "maximum": 234640.66666666666
+        },
+        "rtt_p99_us": {
+          "median": 5.911,
+          "minimum": 5.723,
+          "maximum": 5.923
+        }
+      },
+      "owned-lazy": {
+        "requests_per_second": {
+          "median": 232585.66666666666,
+          "minimum": 232422.33333333334,
+          "maximum": 234438.33333333334
+        },
+        "rtt_p99_us": {
+          "median": 5.651,
+          "minimum": 5.523,
+          "maximum": 5.743
+        }
+      },
+      "tokio": {
+        "requests_per_second": {
+          "median": 237317.33333333334,
+          "minimum": 236689.0,
+          "maximum": 238371.66666666666
+        },
+        "rtt_p99_us": {
+          "median": 5.883,
+          "minimum": 5.391,
+          "maximum": 5.943
+        }
+      },
+      "owned-change-percent": -0.02951445850282175,
+      "borrowed-change-percent": -0.5918926123804513
+    },
+    "4/32/64": {
+      "borrowed-baseline": {
+        "requests_per_second": {
+          "median": 1747779.3333333333,
+          "minimum": 1714346.0,
+          "maximum": 1752109.6666666667
+        },
+        "rtt_p99_us": {
+          "median": 55.071,
+          "minimum": 54.431,
+          "maximum": 55.199
+        }
+      },
+      "borrowed-lazy": {
+        "requests_per_second": {
+          "median": 1746612.0,
+          "minimum": 1720122.3333333333,
+          "maximum": 1765589.6666666667
+        },
+        "rtt_p99_us": {
+          "median": 54.463,
+          "minimum": 54.367,
+          "maximum": 54.687
+        }
+      },
+      "owned-baseline": {
+        "requests_per_second": {
+          "median": 1697715.6666666667,
+          "minimum": 1696430.6666666667,
+          "maximum": 1724846.0
+        },
+        "rtt_p99_us": {
+          "median": 56.895,
+          "minimum": 56.895,
+          "maximum": 56.991
+        }
+      },
+      "owned-lazy": {
+        "requests_per_second": {
+          "median": 1696485.6666666667,
+          "minimum": 1678297.6666666667,
+          "maximum": 1704344.6666666667
+        },
+        "rtt_p99_us": {
+          "median": 57.343,
+          "minimum": 57.023,
+          "maximum": 57.375
+        }
+      },
+      "tokio": {
+        "requests_per_second": {
+          "median": 1748362.0,
+          "minimum": 1746626.6666666667,
+          "maximum": 1761728.6666666667
+        },
+        "rtt_p99_us": {
+          "median": 51.679,
+          "minimum": 51.519,
+          "maximum": 51.711
+        }
+      },
+      "owned-change-percent": -0.07245029448393892,
+      "borrowed-change-percent": -0.06678951461835947
+    },
+    "4/32/4096": {
+      "borrowed-baseline": {
+        "requests_per_second": {
+          "median": 1611867.0,
+          "minimum": 1591734.0,
+          "maximum": 1617217.3333333333
+        },
+        "rtt_p99_us": {
+          "median": 63.007,
+          "minimum": 62.655,
+          "maximum": 63.679
+        }
+      },
+      "borrowed-lazy": {
+        "requests_per_second": {
+          "median": 1616219.3333333333,
+          "minimum": 1586979.3333333333,
+          "maximum": 1620828.0
+        },
+        "rtt_p99_us": {
+          "median": 62.911,
+          "minimum": 62.431,
+          "maximum": 63.935
+        }
+      },
+      "owned-baseline": {
+        "requests_per_second": {
+          "median": 1596947.3333333333,
+          "minimum": 1561628.0,
+          "maximum": 1597156.0
+        },
+        "rtt_p99_us": {
+          "median": 65.343,
+          "minimum": 64.735,
+          "maximum": 65.503
+        }
+      },
+      "owned-lazy": {
+        "requests_per_second": {
+          "median": 1590640.0,
+          "minimum": 1569156.6666666667,
+          "maximum": 1601166.3333333333
+        },
+        "rtt_p99_us": {
+          "median": 65.311,
+          "minimum": 65.023,
+          "maximum": 65.535
+        }
+      },
+      "tokio": {
+        "requests_per_second": {
+          "median": 1617549.3333333333,
+          "minimum": 1610595.0,
+          "maximum": 1619726.6666666667
+        },
+        "rtt_p99_us": {
+          "median": 59.295,
+          "minimum": 59.167,
+          "maximum": 59.807
+        }
+      },
+      "owned-change-percent": -0.3949618877015726,
+      "borrowed-change-percent": 0.270018142522499
+    }
+  }
+}

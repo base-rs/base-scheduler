@@ -418,14 +418,90 @@ fn submissions_from_another_native_worker_use_the_selected_scheduler() {
 
 #[test]
 fn intermediate_runnable_retirement_does_not_wake_drain_waiters() {
-    let queue = std::array::from_fn(|_| crossbeam_deque::Worker::new_fifo());
-    let shared = Shared::new(std::slice::from_ref(&queue), 8);
-    shared.outstanding.store(2, Ordering::Release);
-    let mut listener = Box::pin(shared.changed.listen());
-    shared.retire_runnable();
-    assert!(block_on(futures_lite::future::poll_once(&mut listener)).is_none());
-    shared.retire_runnable();
-    assert!(block_on(futures_lite::future::poll_once(&mut listener)).is_some());
+    use std::task::{Wake, Waker};
+
+    #[derive(Default)]
+    struct WakeCount(AtomicUsize);
+    impl Wake for WakeCount {
+        fn wake(self: Arc<Self>) {
+            self.0.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    let (service, _queues) = queued_service(1);
+    let tasks = (0..2)
+        .map(|_| service.spawn(std::future::pending::<()>()).unwrap())
+        .collect::<Vec<_>>();
+    let wake = Arc::new(WakeCount::default());
+    let waker = Waker::from(Arc::clone(&wake));
+    let mut context = Context::from_waker(&waker);
+    let mut waiting = std::pin::pin!(service.wait(false));
+    assert!(waiting.as_mut().poll(&mut context).is_pending());
+
+    for remaining in [1, 0] {
+        service.shared.workers[0]
+            .incoming
+            .steal()
+            .success()
+            .unwrap()
+            .run();
+        service.shared.retire_runnable();
+        assert_eq!(wake.0.load(Ordering::Relaxed), usize::from(remaining == 0));
+    }
+    assert!(waiting.as_mut().poll(&mut context).is_ready());
+    drop(tasks);
+    for _ in 0..2 {
+        service.shared.workers[0]
+            .incoming
+            .steal()
+            .success()
+            .unwrap()
+            .run();
+        service.shared.retire_runnable();
+    }
+    block_on(service.drain());
+}
+
+#[test]
+fn quiescence_before_listening_and_concurrent_abandoned_waiters_preserve_progress() {
+    for run_first in [false, true] {
+        let (service, _queues) = queued_service(1);
+        let task = service.spawn(std::future::pending::<()>()).unwrap();
+        let run_one = || {
+            service.shared.workers[0]
+                .incoming
+                .steal()
+                .success()
+                .unwrap()
+                .run();
+            service.shared.retire_runnable();
+        };
+        if run_first {
+            run_one();
+        }
+        let mut first = Box::pin(service.wait(false));
+        let mut second = Box::pin(service.wait(false));
+        assert_eq!(
+            block_on(futures_lite::future::poll_once(&mut first)).is_some(),
+            run_first
+        );
+        assert_eq!(
+            block_on(futures_lite::future::poll_once(&mut second)).is_some(),
+            run_first
+        );
+        drop(first);
+        if !run_first {
+            run_one();
+            assert!(block_on(futures_lite::future::poll_once(&mut second)).is_some());
+        }
+        assert!(!service.shared.has_runnables());
+        drop(second);
+        drop(task);
+        run_one();
+        service.close();
+        assert!(service.shared.finished());
+        block_on(service.drain());
+    }
 }
 
 mod pinned_tasks {

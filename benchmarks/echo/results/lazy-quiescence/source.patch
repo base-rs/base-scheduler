@@ -1,0 +1,162 @@
+diff --git a/crates/native/src/task_service.rs b/crates/native/src/task_service.rs
+index 222470b..41cbb26 100644
+--- a/crates/native/src/task_service.rs
++++ b/crates/native/src/task_service.rs
+@@ -23,6 +23,10 @@ pub(crate) struct TaskState {
+     pub(crate) worker: AtomicUsize,
+ }
+ pub(crate) type Runnable = async_task::Runnable<TaskState>;
++
++// Arming shares the runnable counter's modification order, so a waiter either sees quiescence or the last runnable sees this bit and notifies it. Keep the bit armed thereafter; drains are cold, and this avoids deregistration races between concurrent or abandoned waiters.
++const NOTIFY_IDLE: usize = 1 << (usize::BITS - 1);
++
+ pub(crate) struct Shared {
+     // Serialize registration with closure and distribute new tasks using a round-robin worker cursor. Task ownership itself needs only a count.
+     admission: Mutex<usize>,
+@@ -93,7 +97,7 @@ impl Shared {
+     }
+ 
+     pub(crate) fn has_runnables(&self) -> bool {
+-        self.outstanding.load(Ordering::Acquire) != 0
++        self.outstanding.load(Ordering::Acquire) & !NOTIFY_IDLE != 0
+     }
+ 
+     pub(crate) fn is_closed(&self) -> bool {
+@@ -120,7 +124,7 @@ impl Shared {
+     pub(crate) fn finished(&self) -> bool {
+         self.closed.load(Ordering::Acquire)
+             && self.remaining.load(Ordering::Acquire) == 0
+-            && self.outstanding.load(Ordering::Acquire) == 0
++            && !self.has_runnables()
+     }
+     pub(crate) fn wake_all(&self) {
+         for worker in &self.workers {
+@@ -144,7 +148,7 @@ impl Shared {
+         }
+     }
+     pub(crate) fn retire_runnable(&self) {
+-        if self.outstanding.fetch_sub(1, Ordering::AcqRel) == 1 {
++        if self.outstanding.fetch_sub(1, Ordering::AcqRel) == (NOTIFY_IDLE | 1) {
+             // Draining waits for quiescence; intermediate retirements cannot satisfy that condition.
+             self.changed.notify(usize::MAX);
+         }
+@@ -238,12 +242,15 @@ impl TaskService {
+     pub(crate) async fn wait(&self, all: bool) {
+         loop {
+             event_listener::listener!(self.shared.changed => listener);
++            self.shared
++                .outstanding
++                .fetch_or(NOTIFY_IDLE, Ordering::AcqRel);
+             // Observe registration retirement first. After close, no new registrations can appear; its release also precedes the final runnable retirement. Reading in reverse order could combine pre-publication quiescence with post-completion registration state.
+             if (!all
+                 || (self.shared.remaining.load(Ordering::Acquire) == 0
+                     && (!self.shared.is_closed()
+                         || self.shared.workers_remaining.load(Ordering::Acquire) == 0)))
+-                && self.shared.outstanding.load(Ordering::Acquire) == 0
++                && !self.shared.has_runnables()
+             {
+                 return;
+             }
+diff --git a/crates/native/src/task_service/tests.rs b/crates/native/src/task_service/tests.rs
+index 733b06f..472f128 100644
+--- a/crates/native/src/task_service/tests.rs
++++ b/crates/native/src/task_service/tests.rs
+@@ -418,14 +418,90 @@ fn submissions_from_another_native_worker_use_the_selected_scheduler() {
+ 
+ #[test]
+ fn intermediate_runnable_retirement_does_not_wake_drain_waiters() {
+-    let queue = std::array::from_fn(|_| crossbeam_deque::Worker::new_fifo());
+-    let shared = Shared::new(std::slice::from_ref(&queue), 8);
+-    shared.outstanding.store(2, Ordering::Release);
+-    let mut listener = Box::pin(shared.changed.listen());
+-    shared.retire_runnable();
+-    assert!(block_on(futures_lite::future::poll_once(&mut listener)).is_none());
+-    shared.retire_runnable();
+-    assert!(block_on(futures_lite::future::poll_once(&mut listener)).is_some());
++    use std::task::{Wake, Waker};
++
++    #[derive(Default)]
++    struct WakeCount(AtomicUsize);
++    impl Wake for WakeCount {
++        fn wake(self: Arc<Self>) {
++            self.0.fetch_add(1, Ordering::Relaxed);
++        }
++    }
++
++    let (service, _queues) = queued_service(1);
++    let tasks = (0..2)
++        .map(|_| service.spawn(std::future::pending::<()>()).unwrap())
++        .collect::<Vec<_>>();
++    let wake = Arc::new(WakeCount::default());
++    let waker = Waker::from(Arc::clone(&wake));
++    let mut context = Context::from_waker(&waker);
++    let mut waiting = std::pin::pin!(service.wait(false));
++    assert!(waiting.as_mut().poll(&mut context).is_pending());
++
++    for remaining in [1, 0] {
++        service.shared.workers[0]
++            .incoming
++            .steal()
++            .success()
++            .unwrap()
++            .run();
++        service.shared.retire_runnable();
++        assert_eq!(wake.0.load(Ordering::Relaxed), usize::from(remaining == 0));
++    }
++    assert!(waiting.as_mut().poll(&mut context).is_ready());
++    drop(tasks);
++    for _ in 0..2 {
++        service.shared.workers[0]
++            .incoming
++            .steal()
++            .success()
++            .unwrap()
++            .run();
++        service.shared.retire_runnable();
++    }
++    block_on(service.drain());
++}
++
++#[test]
++fn quiescence_before_listening_and_concurrent_abandoned_waiters_preserve_progress() {
++    for run_first in [false, true] {
++        let (service, _queues) = queued_service(1);
++        let task = service.spawn(std::future::pending::<()>()).unwrap();
++        let run_one = || {
++            service.shared.workers[0]
++                .incoming
++                .steal()
++                .success()
++                .unwrap()
++                .run();
++            service.shared.retire_runnable();
++        };
++        if run_first {
++            run_one();
++        }
++        let mut first = Box::pin(service.wait(false));
++        let mut second = Box::pin(service.wait(false));
++        assert_eq!(
++            block_on(futures_lite::future::poll_once(&mut first)).is_some(),
++            run_first
++        );
++        assert_eq!(
++            block_on(futures_lite::future::poll_once(&mut second)).is_some(),
++            run_first
++        );
++        drop(first);
++        if !run_first {
++            run_one();
++            assert!(block_on(futures_lite::future::poll_once(&mut second)).is_some());
++        }
++        assert!(!service.shared.has_runnables());
++        drop(second);
++        drop(task);
++        run_one();
++        service.close();
++        assert!(service.shared.finished());
++        block_on(service.drain());
++    }
+ }
+ 
+ mod pinned_tasks {
