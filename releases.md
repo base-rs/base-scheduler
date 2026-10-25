@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add `Clock::timeout` with operation-first polling, distinct expiry and clock errors, and no timer registration for immediately ready operations.
+
 - Add cancellable child process waits, Unix group selection and state-change flags, optional io\_uring `WAITID`, native process notifications, and bounded-pool fallbacks.
 
 - Remove experimental worker-provided receive pools and implicit receive-ahead from bound socket readers. Preserve reusable shared buffers and explicit read/write overlap through independent handles and owned stream submission; retain the standalone multishot benchmark API.

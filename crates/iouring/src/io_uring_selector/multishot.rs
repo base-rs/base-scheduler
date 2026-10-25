@@ -130,6 +130,8 @@ impl<B: IoBuf> RecvMsgMultishot<B> {
             if let Some(result) = self.state.next() {
                 return result;
             }
+            #[cfg(test)]
+            tests::before_receive_listen();
             let was_cancelled = {
                 event_listener::listener!(self.state.changed => listener);
                 if let Some(result) = self.state.next() {
