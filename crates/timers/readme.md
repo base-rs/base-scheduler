@@ -4,7 +4,7 @@ Runtime-independent monotonic timer queues with batched expiry and constant-time
 
 ## Usage
 
-The workspace is not published yet. Add this package from Git with `cargo add core-scheduler-timers --git https://github.com/core-rs/core-scheduler`.
+Add this package with `cargo add core-scheduler-timers`.
 
 ```rust
 use core_scheduler_timers::Timers;
@@ -33,7 +33,7 @@ This package releases with the workspace. Follow the [workspace release process]
 
 ## Releases
 
-See the shared [release notes](../../releases.md) for changes awaiting the first release.
+See the shared [release notes](../../releases.md).
 
 ## See Also
 

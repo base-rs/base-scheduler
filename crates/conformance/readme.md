@@ -4,7 +4,7 @@ Reusable, capability-specific tests for implementations of `core-scheduler`. Add
 
 ## Usage
 
-The workspace is not published yet. Add this development dependency from Git with `cargo add --dev core-scheduler-conformance --git https://github.com/core-rs/core-scheduler`.
+Add this development dependency with `cargo add --dev core-scheduler-conformance`.
 
 ### Generated suites
 
@@ -99,7 +99,7 @@ This package releases with the workspace. Follow the [workspace release process]
 
 ## Releases
 
-See the shared [release notes](../../releases.md) for changes awaiting the first release.
+See the shared [release notes](../../releases.md).
 
 ## See Also
 

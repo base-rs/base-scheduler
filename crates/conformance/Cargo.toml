@@ -1,6 +1,6 @@
 [package]
 name = "core-scheduler-conformance"
-version = "0.0.0"
+version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
 license = "MIT"
@@ -9,7 +9,7 @@ description = "Reusable capability conformance tests for core-scheduler"
 readme = "readme.md"
 
 [dependencies]
-core-scheduler = { path = "../..", version = "=0.0.0" }
+core-scheduler = { path = "../..", version = "0.1.0" }
 futures-lite = "2.6.1"
 futures-channel = "0.3.31"
 libc = "0.2"

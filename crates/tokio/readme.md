@@ -4,7 +4,7 @@
 
 ## Usage
 
-The workspace is not published yet. Add this package from Git with `cargo add core-scheduler core-scheduler-tokio --git https://github.com/core-rs/core-scheduler`. Add Tokio to the application with `cargo add tokio --features rt,net,time`.
+Add this package with `cargo add core-scheduler core-scheduler-tokio`. Add Tokio to the application with `cargo add tokio --features rt,net,time`.
 
 ```rust
 use core_scheduler::{Cancellation, FileClose, FileOpen, FileOptions, FileReader, FileReading};
@@ -62,7 +62,7 @@ This package releases with the workspace. Follow the [workspace release process]
 
 ## Releases
 
-See the shared [release notes](../../releases.md) for changes awaiting the first release.
+See the shared [release notes](../../releases.md).
 
 ## See Also
 
