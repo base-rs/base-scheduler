@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Arm Native runnable-quiescence notifications when first requested, preserving drain and shutdown wakeups while removing unused event work from ordinary dispatch.
+
 - Combine idle Native io\_uring receive preparation, submission, and waiting in one driver turn, preserving owned-buffer retirement and bounded driver progress between runnable batches.
 
 - Store Native task futures in the task allocation where their size permits, removing a second allocation and pointer indirection while preserving pinned addresses, abandonment, and panic containment.
