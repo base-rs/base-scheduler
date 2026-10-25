@@ -26,6 +26,7 @@ enum Fault {
     RelativeCancellation,
     PendingSuccess,
     CancellationSelfWake,
+    ExpiryError,
 }
 struct State {
     now: Instant,
@@ -92,6 +93,11 @@ impl Clock for Fixture {
             }
             let mut state = self.state.lock().unwrap();
             if state.now >= deadline {
+                if self.fault == Fault::ExpiryError {
+                    return Poll::Ready(
+                        Err(std::io::Error::other("clock failed at expiry").into()),
+                    );
+                }
                 return Poll::Ready(Ok(()));
             }
             state.timers.insert(id, (deadline, context.waker().clone()));
@@ -178,6 +184,7 @@ fn rejects_clock_contract_violations() {
         (Fault::RelativeCancellation, 0),
         (Fault::PendingSuccess, 5),
         (Fault::CancellationSelfWake, 5),
+        (Fault::ExpiryError, 6),
     ] {
         support::run(move || {
             let fixture = Fixture::new(fault);
@@ -189,7 +196,8 @@ fn rejects_clock_contract_violations() {
                         2 => clock::registration(&fixture).await,
                         3 => clock::relative(&fixture).await,
                         4 => clock::expiry_wins(&fixture).await,
-                        _ => clock::cancellation(&fixture).await,
+                        5 => clock::cancellation(&fixture).await,
+                        _ => clock::timeout(&fixture).await,
                     }
                 })
             }));
