@@ -1,0 +1,698 @@
+{
+  "base": "4c1db9d6569a284aaf696225d2f48235612927a3",
+  "candidate": "0e05e3f2c8edf091b732c9a5b6a2d27608db11f3",
+  "wide": {
+    "samples": 120,
+    "repeats": 3,
+    "cases": [
+      {
+        "workers": 1,
+        "connections": 1,
+        "bytes": 64,
+        "variants": {
+          "owned-baseline": {
+            "requests_per_second": {
+              "median": 240882.0,
+              "min": 233617.33333333334,
+              "max": 249061.0
+            },
+            "rtt_p99_us": {
+              "median": 5.711,
+              "min": 5.711,
+              "max": 5.731
+            }
+          },
+          "owned-candidate": {
+            "requests_per_second": {
+              "median": 251119.33333333334,
+              "min": 250996.33333333334,
+              "max": 252528.0
+            },
+            "rtt_p99_us": {
+              "median": 5.703,
+              "min": 5.691,
+              "max": 5.711
+            }
+          },
+          "borrowed-baseline": {
+            "requests_per_second": {
+              "median": 269899.0,
+              "min": 269150.6666666667,
+              "max": 270439.3333333333
+            },
+            "rtt_p99_us": {
+              "median": 4.351,
+              "min": 4.323,
+              "max": 4.551
+            }
+          },
+          "borrowed-candidate": {
+            "requests_per_second": {
+              "median": 272529.3333333333,
+              "min": 269941.0,
+              "max": 275066.3333333333
+            },
+            "rtt_p99_us": {
+              "median": 4.291,
+              "min": 4.263,
+              "max": 4.303
+            }
+          },
+          "tokio": {
+            "requests_per_second": {
+              "median": 273342.0,
+              "min": 271670.6666666667,
+              "max": 276517.6666666667
+            },
+            "rtt_p99_us": {
+              "median": 4.303,
+              "min": 4.263,
+              "max": 4.323
+            }
+          }
+        },
+        "comparisons": {
+          "owned": {
+            "requests_per_second_change_percent": 4.249937036944784,
+            "rtt_p99_us_change_percent": -0.14008054631412525,
+            "candidate_vs_tokio_percent": -8.12998612239124
+          },
+          "borrowed": {
+            "requests_per_second_change_percent": 0.9745620892753548,
+            "rtt_p99_us_change_percent": -1.3789933348655414,
+            "candidate_vs_tokio_percent": -0.29730764634292584
+          }
+        }
+      },
+      {
+        "workers": 1,
+        "connections": 1,
+        "bytes": 4096,
+        "variants": {
+          "owned-baseline": {
+            "requests_per_second": {
+              "median": 232077.33333333334,
+              "min": 231374.0,
+              "max": 232543.66666666666
+            },
+            "rtt_p99_us": {
+              "median": 5.663,
+              "min": 5.423,
+              "max": 5.851
+            }
+          },
+          "owned-candidate": {
+            "requests_per_second": {
+              "median": 232752.33333333334,
+              "min": 231426.66666666666,
+              "max": 234338.0
+            },
+            "rtt_p99_us": {
+              "median": 5.403,
+              "min": 5.391,
+              "max": 5.431
+            }
+          },
+          "borrowed-baseline": {
+            "requests_per_second": {
+              "median": 240771.66666666666,
+              "min": 237318.33333333334,
+              "max": 241122.0
+            },
+            "rtt_p99_us": {
+              "median": 5.323,
+              "min": 5.291,
+              "max": 5.851
+            }
+          },
+          "borrowed-candidate": {
+            "requests_per_second": {
+              "median": 239091.0,
+              "min": 237889.66666666666,
+              "max": 242672.33333333334
+            },
+            "rtt_p99_us": {
+              "median": 5.303,
+              "min": 5.303,
+              "max": 5.403
+            }
+          },
+          "tokio": {
+            "requests_per_second": {
+              "median": 242381.66666666666,
+              "min": 236736.33333333334,
+              "max": 247213.33333333334
+            },
+            "rtt_p99_us": {
+              "median": 5.323,
+              "min": 5.151,
+              "max": 5.331
+            }
+          }
+        },
+        "comparisons": {
+          "owned": {
+            "requests_per_second_change_percent": 0.2908513254202605,
+            "rtt_p99_us_change_percent": -4.591206074518817,
+            "candidate_vs_tokio_percent": -3.972797722600019
+          },
+          "borrowed": {
+            "requests_per_second_change_percent": -0.6980334064777827,
+            "rtt_p99_us_change_percent": -0.37572797294759264,
+            "candidate_vs_tokio_percent": -1.3576384352501858
+          }
+        }
+      },
+      {
+        "workers": 1,
+        "connections": 32,
+        "bytes": 64,
+        "variants": {
+          "owned-baseline": {
+            "requests_per_second": {
+              "median": 657660.6666666666,
+              "min": 653844.3333333334,
+              "max": 663406.0
+            },
+            "rtt_p99_us": {
+              "median": 52.863,
+              "min": 52.511,
+              "max": 53.055
+            }
+          },
+          "owned-candidate": {
+            "requests_per_second": {
+              "median": 650627.6666666666,
+              "min": 646529.6666666666,
+              "max": 652829.0
+            },
+            "rtt_p99_us": {
+              "median": 53.279,
+              "min": 53.279,
+              "max": 53.471
+            }
+          },
+          "borrowed-baseline": {
+            "requests_per_second": {
+              "median": 629256.3333333334,
+              "min": 629251.0,
+              "max": 638384.0
+            },
+            "rtt_p99_us": {
+              "median": 55.359,
+              "min": 54.687,
+              "max": 55.455
+            }
+          },
+          "borrowed-candidate": {
+            "requests_per_second": {
+              "median": 632891.3333333334,
+              "min": 629914.0,
+              "max": 634008.3333333334
+            },
+            "rtt_p99_us": {
+              "median": 55.135,
+              "min": 54.879,
+              "max": 55.391
+            }
+          },
+          "tokio": {
+            "requests_per_second": {
+              "median": 717081.6666666666,
+              "min": 710070.3333333334,
+              "max": 718600.6666666666
+            },
+            "rtt_p99_us": {
+              "median": 52.383,
+              "min": 52.255,
+              "max": 52.895
+            }
+          }
+        },
+        "comparisons": {
+          "owned": {
+            "requests_per_second_change_percent": -1.0693964770079,
+            "rtt_p99_us_change_percent": 0.7869398255869076,
+            "candidate_vs_tokio_percent": -9.26728475836086
+          },
+          "borrowed": {
+            "requests_per_second_change_percent": 0.5776660173993697,
+            "rtt_p99_us_change_percent": -0.40463158655322795,
+            "candidate_vs_tokio_percent": -11.740689693642503
+          }
+        }
+      },
+      {
+        "workers": 1,
+        "connections": 32,
+        "bytes": 4096,
+        "variants": {
+          "owned-baseline": {
+            "requests_per_second": {
+              "median": 590879.0,
+              "min": 582469.0,
+              "max": 594017.6666666666
+            },
+            "rtt_p99_us": {
+              "median": 58.623,
+              "min": 58.335,
+              "max": 60.799
+            }
+          },
+          "owned-candidate": {
+            "requests_per_second": {
+              "median": 586225.3333333334,
+              "min": 575940.6666666666,
+              "max": 588349.0
+            },
+            "rtt_p99_us": {
+              "median": 60.031,
+              "min": 59.039,
+              "max": 60.383
+            }
+          },
+          "borrowed-baseline": {
+            "requests_per_second": {
+              "median": 568693.3333333334,
+              "min": 564200.3333333334,
+              "max": 580515.3333333334
+            },
+            "rtt_p99_us": {
+              "median": 61.311,
+              "min": 59.935,
+              "max": 61.695
+            }
+          },
+          "borrowed-candidate": {
+            "requests_per_second": {
+              "median": 573644.6666666666,
+              "min": 567143.0,
+              "max": 576027.0
+            },
+            "rtt_p99_us": {
+              "median": 60.799,
+              "min": 60.511,
+              "max": 61.407
+            }
+          },
+          "tokio": {
+            "requests_per_second": {
+              "median": 628108.3333333334,
+              "min": 625105.3333333334,
+              "max": 638137.0
+            },
+            "rtt_p99_us": {
+              "median": 59.359,
+              "min": 58.623,
+              "max": 59.711
+            }
+          }
+        },
+        "comparisons": {
+          "owned": {
+            "requests_per_second_change_percent": -0.7875836959287175,
+            "rtt_p99_us_change_percent": 2.401787694249702,
+            "candidate_vs_tokio_percent": -6.668117230307935
+          },
+          "borrowed": {
+            "requests_per_second_change_percent": 0.8706508487292375,
+            "rtt_p99_us_change_percent": -0.8350866891748687,
+            "candidate_vs_tokio_percent": -8.671062582091738
+          }
+        }
+      },
+      {
+        "workers": 4,
+        "connections": 1,
+        "bytes": 64,
+        "variants": {
+          "owned-baseline": {
+            "requests_per_second": {
+              "median": 239695.66666666666,
+              "min": 238936.0,
+              "max": 249625.33333333334
+            },
+            "rtt_p99_us": {
+              "median": 6.091,
+              "min": 5.983,
+              "max": 6.123
+            }
+          },
+          "owned-candidate": {
+            "requests_per_second": {
+              "median": 256240.0,
+              "min": 251018.33333333334,
+              "max": 257195.66666666666
+            },
+            "rtt_p99_us": {
+              "median": 5.751,
+              "min": 5.743,
+              "max": 5.751
+            }
+          },
+          "borrowed-baseline": {
+            "requests_per_second": {
+              "median": 266734.6666666667,
+              "min": 266697.0,
+              "max": 270652.3333333333
+            },
+            "rtt_p99_us": {
+              "median": 4.711,
+              "min": 4.591,
+              "max": 4.743
+            }
+          },
+          "borrowed-candidate": {
+            "requests_per_second": {
+              "median": 269251.0,
+              "min": 268872.0,
+              "max": 270529.3333333333
+            },
+            "rtt_p99_us": {
+              "median": 4.711,
+              "min": 4.371,
+              "max": 4.923
+            }
+          },
+          "tokio": {
+            "requests_per_second": {
+              "median": 275029.0,
+              "min": 273425.3333333333,
+              "max": 276068.6666666667
+            },
+            "rtt_p99_us": {
+              "median": 4.671,
+              "min": 4.363,
+              "max": 4.703
+            }
+          }
+        },
+        "comparisons": {
+          "owned": {
+            "requests_per_second_change_percent": 6.90222462650556,
+            "rtt_p99_us_change_percent": -5.5820062387128555,
+            "candidate_vs_tokio_percent": -6.831643208534377
+          },
+          "borrowed": {
+            "requests_per_second_change_percent": 0.9433844369685751,
+            "rtt_p99_us_change_percent": 0.0,
+            "candidate_vs_tokio_percent": -2.100869362867186
+          }
+        }
+      },
+      {
+        "workers": 4,
+        "connections": 1,
+        "bytes": 4096,
+        "variants": {
+          "owned-baseline": {
+            "requests_per_second": {
+              "median": 233751.66666666666,
+              "min": 232725.0,
+              "max": 234498.33333333334
+            },
+            "rtt_p99_us": {
+              "median": 6.051,
+              "min": 5.903,
+              "max": 6.111
+            }
+          },
+          "owned-candidate": {
+            "requests_per_second": {
+              "median": 234569.66666666666,
+              "min": 230576.66666666666,
+              "max": 237993.66666666666
+            },
+            "rtt_p99_us": {
+              "median": 6.063,
+              "min": 5.423,
+              "max": 6.063
+            }
+          },
+          "borrowed-baseline": {
+            "requests_per_second": {
+              "median": 236141.33333333334,
+              "min": 235494.66666666666,
+              "max": 237373.0
+            },
+            "rtt_p99_us": {
+              "median": 5.451,
+              "min": 5.391,
+              "max": 5.823
+            }
+          },
+          "borrowed-candidate": {
+            "requests_per_second": {
+              "median": 237224.0,
+              "min": 237158.0,
+              "max": 241269.0
+            },
+            "rtt_p99_us": {
+              "median": 5.563,
+              "min": 5.351,
+              "max": 5.571
+            }
+          },
+          "tokio": {
+            "requests_per_second": {
+              "median": 241046.66666666666,
+              "min": 239463.66666666666,
+              "max": 241058.0
+            },
+            "rtt_p99_us": {
+              "median": 5.383,
+              "min": 5.323,
+              "max": 5.863
+            }
+          }
+        },
+        "comparisons": {
+          "owned": {
+            "requests_per_second_change_percent": 0.349944028919591,
+            "rtt_p99_us_change_percent": 0.1983143282102029,
+            "candidate_vs_tokio_percent": -2.6870315568216396
+          },
+          "borrowed": {
+            "requests_per_second_change_percent": 0.4584824907117646,
+            "rtt_p99_us_change_percent": 2.0546688680975977,
+            "candidate_vs_tokio_percent": -1.585861658876564
+          }
+        }
+      },
+      {
+        "workers": 4,
+        "connections": 32,
+        "bytes": 64,
+        "variants": {
+          "owned-baseline": {
+            "requests_per_second": {
+              "median": 1737405.3333333333,
+              "min": 1699616.0,
+              "max": 1750226.0
+            },
+            "rtt_p99_us": {
+              "median": 53.759,
+              "min": 53.311,
+              "max": 54.431
+            }
+          },
+          "owned-candidate": {
+            "requests_per_second": {
+              "median": 1727195.3333333333,
+              "min": 1723082.0,
+              "max": 1752757.3333333333
+            },
+            "rtt_p99_us": {
+              "median": 55.327,
+              "min": 55.263,
+              "max": 55.967
+            }
+          },
+          "borrowed-baseline": {
+            "requests_per_second": {
+              "median": 1757210.6666666667,
+              "min": 1752642.3333333333,
+              "max": 1758826.3333333333
+            },
+            "rtt_p99_us": {
+              "median": 52.511,
+              "min": 52.447,
+              "max": 53.023
+            }
+          },
+          "borrowed-candidate": {
+            "requests_per_second": {
+              "median": 1752178.3333333333,
+              "min": 1742972.0,
+              "max": 1787636.3333333333
+            },
+            "rtt_p99_us": {
+              "median": 54.399,
+              "min": 54.303,
+              "max": 54.527
+            }
+          },
+          "tokio": {
+            "requests_per_second": {
+              "median": 1755353.6666666667,
+              "min": 1749530.3333333333,
+              "max": 1780063.0
+            },
+            "rtt_p99_us": {
+              "median": 51.391,
+              "min": 51.007,
+              "max": 51.775
+            }
+          }
+        },
+        "comparisons": {
+          "owned": {
+            "requests_per_second_change_percent": -0.587657917476947,
+            "rtt_p99_us_change_percent": 2.916720921148075,
+            "candidate_vs_tokio_percent": -1.6041401723223547
+          },
+          "borrowed": {
+            "requests_per_second_change_percent": -0.2863819022268732,
+            "rtt_p99_us_change_percent": 3.5954371465026336,
+            "candidate_vs_tokio_percent": -0.18089422055689308
+          }
+        }
+      },
+      {
+        "workers": 4,
+        "connections": 32,
+        "bytes": 4096,
+        "variants": {
+          "owned-baseline": {
+            "requests_per_second": {
+              "median": 1605283.3333333333,
+              "min": 1604183.6666666667,
+              "max": 1623598.6666666667
+            },
+            "rtt_p99_us": {
+              "median": 62.623,
+              "min": 62.143,
+              "max": 63.167
+            }
+          },
+          "owned-candidate": {
+            "requests_per_second": {
+              "median": 1605562.6666666667,
+              "min": 1586244.6666666667,
+              "max": 1607104.0
+            },
+            "rtt_p99_us": {
+              "median": 65.215,
+              "min": 65.087,
+              "max": 65.407
+            }
+          },
+          "borrowed-baseline": {
+            "requests_per_second": {
+              "median": 1602029.6666666667,
+              "min": 1590321.6666666667,
+              "max": 1634473.3333333333
+            },
+            "rtt_p99_us": {
+              "median": 62.271,
+              "min": 61.215,
+              "max": 62.271
+            }
+          },
+          "borrowed-candidate": {
+            "requests_per_second": {
+              "median": 1622767.0,
+              "min": 1604785.3333333333,
+              "max": 1626585.0
+            },
+            "rtt_p99_us": {
+              "median": 63.135,
+              "min": 62.911,
+              "max": 63.583
+            }
+          },
+          "tokio": {
+            "requests_per_second": {
+              "median": 1636990.0,
+              "min": 1616738.3333333333,
+              "max": 1647893.6666666667
+            },
+            "rtt_p99_us": {
+              "median": 59.231,
+              "min": 58.527,
+              "max": 59.391
+            }
+          }
+        },
+        "comparisons": {
+          "owned": {
+            "requests_per_second_change_percent": 0.01740087419668246,
+            "rtt_p99_us_change_percent": 4.139054341056814,
+            "candidate_vs_tokio_percent": -1.9198243931443204
+          },
+          "borrowed": {
+            "requests_per_second_change_percent": 1.2944412806337846,
+            "rtt_p99_us_change_percent": 1.3874837404249218,
+            "candidate_vs_tokio_percent": -0.8688507565715153
+          }
+        }
+      }
+    ]
+  },
+  "serial_confirmation": {
+    "samples": 21,
+    "repeats": 7,
+    "cases": [
+      {
+        "workers": 1,
+        "connections": 1,
+        "bytes": 64,
+        "variants": {
+          "owned-baseline": {
+            "requests_per_second": {
+              "median": 248078.33333333334,
+              "min": 242719.66666666666,
+              "max": 250820.0
+            },
+            "rtt_p99_us": {
+              "median": 5.703,
+              "min": 5.651,
+              "max": 5.811
+            }
+          },
+          "owned-candidate": {
+            "requests_per_second": {
+              "median": 255601.0,
+              "min": 248466.0,
+              "max": 261487.66666666666
+            },
+            "rtt_p99_us": {
+              "median": 5.683,
+              "min": 5.543,
+              "max": 5.731
+            }
+          },
+          "tokio": {
+            "requests_per_second": {
+              "median": 274408.0,
+              "min": 272386.6666666667,
+              "max": 276674.3333333333
+            },
+            "rtt_p99_us": {
+              "median": 4.303,
+              "min": 4.271,
+              "max": 4.343
+            }
+          }
+        },
+        "comparisons": {
+          "owned": {
+            "requests_per_second_change_percent": 3.0323755265473817,
+            "rtt_p99_us_change_percent": -0.35069261792040063,
+            "candidate_vs_tokio_percent": -6.853663158508494
+          }
+        }
+      }
+    ]
+  }
+}
