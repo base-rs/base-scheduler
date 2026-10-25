@@ -81,7 +81,8 @@ mod worker_conformance {
         relative,
         cancellation,
         expiry_wins,
-        overflow
+        overflow,
+        timeout
     );
 }
 

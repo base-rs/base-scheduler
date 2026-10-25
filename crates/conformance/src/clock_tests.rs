@@ -29,6 +29,9 @@ macro_rules! clock_tests {
             overflow_registers_no_timer => |fixture| {
                 $crate::clock::overflow(fixture).await;
             },
+            timeout_results_expiry_and_cleanup => |fixture| {
+                $crate::clock::timeout(fixture).await;
+            },
         }
     };
 }

@@ -188,10 +188,13 @@ Destination arguments apply to packet writers only. Stream writes await earlier 
 | [`Clock::now`](https://github.com/core-rs/core-scheduler/blob/main/src/clock.rs) | `() → Instant` synchronously | Monotonic time within this scheduler's clock domain; use it in generic code instead of the system clock. |
 | `sleep_until` | `(deadline: Instant, C) → OperationResult<()>` | Wait for an absolute deadline. Pre-cancellation wins even if elapsed; once waiting, observed expiry wins a simultaneous cancellation. No yield is promised for an elapsed deadline. |
 | `sleep` | `(duration: Duration, C) → OperationResult<()>` | Relative deadline starts at first poll. Unrepresentable deadlines return `InvalidInput`. |
+| `timeout` | `(duration: Duration, operation: F) → Result<F::Output, TimeoutError>` | Default helper for a `Send` future. Polls the operation first; only a pending operation starts the timer. Completion wins ties. Expiry or clock failure drops the operation, preserving its own errors separately from timeout errors. |
 | [`Timers::timer`](https://github.com/core-rs/core-scheduler/blob/main/src/timers.rs) | `() → Timer` synchronously | Infallible construction of scheduler-compatible reusable state, without registering a deadline or selecting a worker. |
 | `timer_wait_until` | `(&mut Timer, deadline: Instant, C) → OperationResult<()>` | Reuse timer state with one waiter. Incompatible scheduler pairing is rejected. Cancellation after admission disarms; pre-cancellation leaves state unchanged. |
 
 Dropping an ordinary clock wait releases its registration. Reusable timer waits deliberately retain state for later reuse, potentially retaining capacity and an old waker. Dropping the timer retires it; forgetting it can leak capacity. Reusable timers remain experimental. Deadlines from independently advancing clock domains are not interchangeable.
+
+`Clock::timeout` returns the operation's output inside `Ok`, `TimeoutError::Elapsed` on expiry, or `TimeoutError::Clock` when sleep fails, including deadline overflow. Immediate completion needs no clock read or timer registration. The helper drops the losing future before returning and drops both futures if abandoned. It does not request cancellation or wait for independently retiring work; a timed-out owned I/O operation may still complete in its backend. No synchronous poll is preempted.
 
 ## Buffer pools and received storage
 

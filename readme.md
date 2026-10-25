@@ -65,7 +65,7 @@ File and socket lifecycle operations remain explicit scheduler capabilities: ope
 
 | Capability | Contract |
 | --- | --- |
-| `Clock` | Monotonic observations and cancellable relative or absolute waits. |
+| `Clock` | Monotonic observations, cancellable relative or absolute waits, and operation timeouts. |
 | `Spawn` | Task dispatch with implementation-associated, owning completion handles. |
 | `Blocking` | Bounded admission of owned synchronous work. |
 | `ProcessWait` | Individual child and Unix process-group status waits with cooperative cancellation. |

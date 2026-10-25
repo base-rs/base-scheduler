@@ -99,6 +99,7 @@ mod spawn_error;
 mod sync_mode;
 mod task_error;
 mod tcp_no_delay;
+mod timeout_error;
 mod timers;
 
 pub use address_hints::AddressHints;
@@ -194,6 +195,7 @@ pub use spawn_error::SpawnError;
 pub use sync_mode::SyncMode;
 pub use task_error::TaskError;
 pub use tcp_no_delay::TcpNoDelay;
+pub use timeout_error::TimeoutError;
 pub use timers::Timers;
 
 /// An IP endpoint, compatible with standard-library socket addresses.

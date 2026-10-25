@@ -4,7 +4,7 @@
 //! Controlled monotonic-clock assertions; no wall-clock timing assumptions.
 
 use crate::{ClockFixture, probe::WakeProbe};
-use core_scheduler::{Cancellation, Clock, OperationError};
+use core_scheduler::{Cancellation, Clock, OperationError, TimeoutError};
 use futures_lite::future::poll_once;
 use std::{
     future::Future,
@@ -157,5 +157,45 @@ pub async fn overflow<F: ClockFixture>(fixture: &F) {
     assert!(
         matches!(error, OperationError::Io(error) if error.kind() == std::io::ErrorKind::InvalidInput)
     );
+    assert_eq!(fixture.registrations(), 0);
+}
+
+/// Timeouts preserve operation results, use the supplied clock, and retire both waits.
+pub async fn timeout<F: ClockFixture>(fixture: &F) {
+    let scheduler = fixture.scheduler();
+    assert_eq!(
+        scheduler
+            .timeout(Duration::MAX, std::future::ready(Err::<(), _>("closed")))
+            .await
+            .unwrap(),
+        Err("closed")
+    );
+    assert_eq!(fixture.registrations(), 0);
+
+    let mut wait = Box::pin(scheduler.timeout(STEP, std::future::pending::<()>()));
+    // Time spent between construction and first poll does not shorten the wait.
+    fixture.advance(STEP * 2);
+    assert!(poll_once(&mut wait).await.is_none());
+    assert_eq!(fixture.registrations(), 1);
+    fixture.advance(STEP / 2);
+    assert!(poll_once(&mut wait).await.is_none());
+    fixture.advance(STEP / 2);
+    assert!(matches!(wait.as_mut().await, Err(TimeoutError::Elapsed)));
+    assert_eq!(fixture.registrations(), 0);
+
+    let finish = Cancellation::new();
+    let mut wait = Box::pin(scheduler.timeout(STEP, finish.cancelled()));
+    assert!(poll_once(&mut wait).await.is_none());
+    assert_eq!(fixture.registrations(), 1);
+    // Both become ready before the next poll: operation completion wins.
+    finish.cancel();
+    fixture.advance(STEP);
+    wait.as_mut().await.unwrap();
+    assert_eq!(fixture.registrations(), 0);
+
+    let mut wait = Box::pin(scheduler.timeout(STEP, std::future::pending::<()>()));
+    assert!(poll_once(&mut wait).await.is_none());
+    assert_eq!(fixture.registrations(), 1);
+    drop(wait);
     assert_eq!(fixture.registrations(), 0);
 }
