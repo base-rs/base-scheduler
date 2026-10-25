@@ -347,12 +347,12 @@ impl Drop for Controller {
     }
 }
 
-struct CancelOnDrop {
-    controller: Arc<Controller>,
+struct CancelOnDrop<C: std::ops::Deref<Target = Controller> = Arc<Controller>> {
+    controller: C,
     identifier: u64,
     armed: bool,
 }
-impl CancelOnDrop {
+impl<C: std::ops::Deref<Target = Controller>> CancelOnDrop<C> {
     fn request(&mut self) {
         if self.armed {
             let _ = self.controller.send(Command::Cancel(self.identifier));
@@ -360,7 +360,7 @@ impl CancelOnDrop {
         }
     }
 }
-impl Drop for CancelOnDrop {
+impl<C: std::ops::Deref<Target = Controller>> Drop for CancelOnDrop<C> {
     fn drop(&mut self) {
         self.request();
     }

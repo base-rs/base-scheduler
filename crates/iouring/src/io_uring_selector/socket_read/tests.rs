@@ -71,6 +71,78 @@ fn repeated_owned_reads_reuse_request_and_completion_storage_without_allocations
 }
 
 #[test]
+fn cached_reads_release_replaced_sockets_and_the_final_socket_on_drop() {
+    let (selector, driver) = IoUringSelector::new(Default::default()).unwrap();
+    let mut worker = driver.enter();
+    let wake = worker.waker();
+    let mut context = Context::from_waker(&wake);
+    let never = Cancellation::never();
+    let mut state = State::default();
+    let mut previous = None;
+    for byte in [1, 2] {
+        let (native, mut peer) = sockets(&selector);
+        let socket = native.retain_socket();
+        let weak = Arc::downgrade(&socket);
+        drop(native);
+        peer.write_all(&[byte]).unwrap();
+        let (result, buffer) = drive(
+            &mut worker,
+            &mut context,
+            pin!(state.read(&selector, &socket, vec![0; 16], &never)),
+        );
+        assert_eq!(result.unwrap(), 1);
+        assert_eq!(buffer[0], byte);
+        drop(socket);
+        assert!(weak.upgrade().is_some());
+        if let Some(previous) = previous {
+            assert!(std::sync::Weak::upgrade(&previous).is_none());
+        }
+        previous = Some(weak);
+    }
+    drop(state);
+    assert!(previous.unwrap().upgrade().is_none());
+}
+
+#[test]
+fn abandoned_cached_reads_retain_the_socket_until_request_retirement() {
+    let (selector, driver) = IoUringSelector::new(Default::default()).unwrap();
+    let (native, mut peer) = sockets(&selector);
+    let socket = native.retain_socket();
+    let weak = Arc::downgrade(&socket);
+    drop(native);
+    let mut worker = driver.enter();
+    let wake = worker.waker();
+    let mut context = Context::from_waker(&wake);
+    let never = Cancellation::never();
+    let mut state = State::default();
+    peer.write_all(b"x").unwrap();
+    let (result, buffer) = drive(
+        &mut worker,
+        &mut context,
+        pin!(state.read(&selector, &socket, vec![0; 16], &never)),
+    );
+    assert_eq!(result.unwrap(), 1);
+    {
+        let mut reading = pin!(state.read(&selector, &socket, buffer, &never));
+        assert!(reading.as_mut().poll(&mut context).is_pending());
+    }
+    drop(state);
+    drop(socket);
+    assert!(weak.upgrade().is_some());
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while selector.controllers[0]
+        .capacity
+        .state
+        .load(Ordering::Acquire)
+        != 0
+    {
+        assert!(Instant::now() < deadline);
+        worker.turn(Some(Duration::ZERO)).unwrap();
+    }
+    assert!(weak.upgrade().is_none());
+}
+
+#[test]
 fn prepared_receives_do_not_invoke_buffer_callbacks_on_the_ring_owner() {
     struct ObservedBuffer {
         bytes: Box<[u8]>,

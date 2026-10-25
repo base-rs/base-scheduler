@@ -17,6 +17,8 @@ use std::{
 #[derive(Default)]
 pub(crate) struct OperationState {
     activity: Option<Arc<Activity>>,
+    // Normal collection returns this reference to the same exclusive lane; abandonment retains it in the guard through retirement.
+    cached_retirement: Option<Arc<Activity>>,
 }
 
 struct Activity {
@@ -30,7 +32,7 @@ pub(crate) struct OperationGuard<T> {
     value: Option<T>,
     _retirement: Retirement,
 }
-struct Retirement(Arc<Activity>);
+struct Retirement(Option<Arc<Activity>>);
 struct RetirementWait<'a>(&'a AtomicWaker);
 impl Drop for RetirementWait<'_> {
     fn drop(&mut self) {
@@ -39,8 +41,10 @@ impl Drop for RetirementWait<'_> {
 }
 impl Drop for Retirement {
     fn drop(&mut self) {
-        self.0.running.store(false, Ordering::Release);
-        self.0.retired.wake();
+        if let Some(activity) = self.0.take() {
+            activity.running.store(false, Ordering::Release);
+            activity.retired.wake();
+        }
     }
 }
 impl<T> OperationGuard<T> {
@@ -108,13 +112,29 @@ impl OperationState {
                 retired: AtomicWaker::new(),
             })
         });
-        if activity.running.swap(true, Ordering::AcqRel) {
+        if activity.running.load(Ordering::Acquire) {
             return Err((io::Error::from(io::ErrorKind::WouldBlock).into(), value));
         }
+        // Only this exclusively borrowed lane can start an operation; concurrent retirement can only clear the flag.
+        activity.running.store(true, Ordering::Relaxed);
         Ok(OperationGuard {
             value: Some(value),
-            _retirement: Retirement(Arc::clone(activity)),
+            _retirement: Retirement(Some(
+                self.cached_retirement
+                    .take()
+                    .unwrap_or_else(|| Arc::clone(activity)),
+            )),
         })
+    }
+
+    // Result collection holds the lane exclusively, so no close can be waiting on this operation. Abandonment still retires through the guard's drop path and wakes close.
+    pub(crate) fn complete<T>(&mut self, mut guard: OperationGuard<T>) -> T {
+        let activity = guard._retirement.0.take().unwrap();
+        debug_assert!(Arc::ptr_eq(self.activity.as_ref().unwrap(), &activity));
+        let value = guard.value.take().unwrap();
+        activity.running.store(false, Ordering::Release);
+        self.cached_retirement = Some(activity);
+        value
     }
     pub(crate) async fn close(&mut self) {
         if let Some(activity) = &self.activity {

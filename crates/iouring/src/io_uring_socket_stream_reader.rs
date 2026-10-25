@@ -315,7 +315,7 @@ impl SocketStreamReader for IoUringSocketStreamReader<'_> {
         if matches!(result, Ok(0)) {
             self.eof = true;
         }
-        (result, buffer.into_inner())
+        (result, self.operations.complete(buffer))
     }
     async fn close(&mut self) -> io::Result<()> {
         self.closed = true;

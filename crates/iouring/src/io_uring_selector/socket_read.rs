@@ -70,7 +70,7 @@ impl Drop for Shared {
 }
 
 struct CompletionWait<'a> {
-    cancel: CancelOnDrop,
+    cancel: CancelOnDrop<&'a Controller>,
     shared: Option<&'a Shared>,
 }
 impl Drop for CompletionWait<'_> {
@@ -119,7 +119,6 @@ impl<B: IoBufMut> PendingRequest for ReadRequest<B> {
     }
     fn finish(mut self: Box<Self>, result: io::Result<usize>) {
         let shared = self.reply.take().unwrap();
-        drop(self.socket.take());
         drop(self.permit.take());
         shared.publish(Completion::Request(result, self));
     }
@@ -152,8 +151,8 @@ impl State {
     async fn attempt<B: IoBufMut>(
         &mut self,
         selector: &IoUringSelector,
-        controller: Arc<Controller>,
-        socket: RegisteredSocket,
+        controller: &Controller,
+        socket: &RegisteredSocket,
         buffer: B,
         cancellation: &Cancellation,
     ) -> RawBufferResult<B> {
@@ -190,7 +189,13 @@ impl State {
             });
         request.identifier = identifier;
         request.permit = Some(permit);
-        request.socket = Some(socket);
+        if !request
+            .socket
+            .as_ref()
+            .is_some_and(|held| Arc::ptr_eq(held, socket))
+        {
+            request.socket = Some(Arc::clone(socket));
+        }
         request.buffer = Some(buffer);
         // Derive the pointer after placing its owner in the request. Moving a Box-backed owner afterward can invalidate the pointer's provenance even if its address stays stable.
         let buffer = request.buffer.as_mut().unwrap();
@@ -251,30 +256,24 @@ impl State {
     pub(crate) async fn read<B: IoBufMut>(
         &mut self,
         selector: &IoUringSelector,
-        socket: &impl SocketSource,
+        socket: &RegisteredSocket,
         mut buffer: B,
         cancellation: &Cancellation,
     ) -> BufferResult<B> {
-        let controller = selector.route();
+        let controller = selector.route_ref();
         loop {
             if let Err(error) = cancellation.check() {
                 return (Err(error.into()), buffer);
             }
             let (result, returned) = self
-                .attempt(
-                    selector,
-                    Arc::clone(&controller),
-                    socket.retain_socket(),
-                    buffer,
-                    cancellation,
-                )
+                .attempt(selector, controller, socket, buffer, cancellation)
                 .await;
             buffer = returned;
             match result {
                 Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
                     let (result, returned) = selector
                         .wait_ready_owned(
-                            Arc::clone(&controller),
+                            Arc::clone(controller),
                             socket,
                             buffer,
                             crate::Interest::Readable,
