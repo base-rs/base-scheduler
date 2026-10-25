@@ -1,0 +1,159 @@
+diff --git a/crates/iouring/src/io_uring_selector/socket_read.rs b/crates/iouring/src/io_uring_selector/socket_read.rs
+index 97c80cd..0a27218 100644
+--- a/crates/iouring/src/io_uring_selector/socket_read.rs
++++ b/crates/iouring/src/io_uring_selector/socket_read.rs
+@@ -2,7 +2,7 @@
+ // Copyright, 2026, by Samuel Williams.
+ 
+ use super::*;
+-use std::{any::Any, sync::Mutex};
++use std::{any::Any, cell::UnsafeCell, sync::atomic::AtomicU8};
+ 
+ pub(crate) struct State {
+     shared: Arc<Shared>,
+@@ -13,11 +13,8 @@ impl Default for State {
+     fn default() -> Self {
+         Self {
+             shared: Arc::new(Shared {
+-                slot: Mutex::new(Slot {
+-                    result: None,
+-                    collecting: false,
+-                }),
+-                ready: AtomicBool::new(false),
++                result: UnsafeCell::new(None),
++                phase: AtomicU8::new(IDLE),
+                 waker: atomic_waker::AtomicWaker::new(),
+             }),
+             cached: None,
+@@ -30,42 +27,42 @@ enum Completion {
+     Rejected(Box<dyn Any + Send>),
+     Failed,
+ }
+-struct Slot {
+-    result: Option<Completion>,
+-    collecting: bool,
+-}
++const IDLE: u8 = 0;
++const WAITING: u8 = 1;
++const READY: u8 = 2;
++const ABANDONED: u8 = 3;
++
+ struct Shared {
+-    slot: Mutex<Slot>,
+-    ready: AtomicBool,
++    result: UnsafeCell<Option<Completion>>,
++    phase: AtomicU8,
+     waker: atomic_waker::AtomicWaker,
+ }
++// SAFETY: Each admission exposes exactly one producer. That producer writes the slot before publishing READY. Only the single waiter observing READY may collect it. If the waiter abandons WAITING instead, the producer alone discards its result. IDLE is published only after the slot is emptied, and the exclusively borrowed State admits no overlapping generations.
++unsafe impl Sync for Shared {}
+ impl Shared {
+     fn publish(&self, result: Completion) {
+-        let abandoned = {
+-            let mut slot = self.slot.lock().unwrap();
+-            let abandoned = if slot.collecting {
+-                slot.result = Some(result);
+-                None
+-            } else {
+-                Some(result)
+-            };
+-            // Dropping a returned owner can retire its lane and permit immediate reuse. Publish readiness before releasing that owner or allowing collection to take it.
+-            self.ready.store(true, Ordering::Release);
+-            abandoned
+-        };
+-        self.waker.wake();
+-        discard(abandoned);
++        // SAFETY: The accepted request uniquely owns publication until its release transition to READY. The waiter cannot access the slot while WAITING or ABANDONED.
++        unsafe { *self.result.get() = Some(result) };
++        if self.phase.swap(READY, Ordering::AcqRel) == ABANDONED {
++            // SAFETY: Abandonment transferred exclusive result cleanup to this producer. Leave the slot empty before permitting reuse or retiring its buffer's operation lane.
++            let abandoned = unsafe { (*self.result.get()).take() };
++            self.phase.store(IDLE, Ordering::Release);
++            self.waker.wake();
++            discard(abandoned);
++        } else {
++            self.waker.wake();
++        }
++    }
++    fn collect(&self) -> Completion {
++        // SAFETY: The unique waiter observed READY with acquire ordering. Publication no longer accesses the slot, and no admission can reuse it before this waiter publishes IDLE.
++        let result = unsafe { (*self.result.get()).take().unwrap() };
++        self.phase.store(IDLE, Ordering::Release);
++        result
+     }
+ }
+ impl Drop for Shared {
+     fn drop(&mut self) {
+-        discard(
+-            self.slot
+-                .get_mut()
+-                .unwrap_or_else(std::sync::PoisonError::into_inner)
+-                .result
+-                .take(),
+-        );
++        discard(self.result.get_mut().take());
+     }
+ }
+ 
+@@ -78,10 +75,10 @@ impl Drop for CompletionWait<'_> {
+         let Some(shared) = self.shared.take() else {
+             return;
+         };
+-        let abandoned = {
+-            let mut slot = shared.slot.lock().unwrap();
+-            slot.collecting = false;
+-            slot.result.take()
++        let abandoned = if shared.phase.swap(ABANDONED, Ordering::AcqRel) == READY {
++            Some(shared.collect())
++        } else {
++            None
+         };
+         shared.waker.take();
+         discard(abandoned);
+@@ -159,6 +156,9 @@ impl State {
+         if let Err(error) = selector.check_open() {
+             return (Err(error), buffer);
+         }
++        if self.shared.phase.load(Ordering::Acquire) != IDLE {
++            return (Err(io::ErrorKind::WouldBlock.into()), buffer);
++        }
+         let permit = match controller.capacity.try_acquire(cancellation) {
+             Ok(Some(permit)) => permit,
+             Ok(None) => match controller.capacity.acquire(cancellation).await {
+@@ -203,8 +203,7 @@ impl State {
+         request.pointer = buffer.as_mut().as_mut_ptr();
+         request.reply.set(Some(Arc::clone(&self.shared)));
+         request.cancelling.set(false);
+-        self.shared.ready.store(false, Ordering::Relaxed);
+-        self.shared.slot.lock().unwrap().collecting = true;
++        self.shared.phase.store(WAITING, Ordering::Release);
+         let mut completion = CompletionWait {
+             cancel: CancelOnDrop {
+                 controller,
+@@ -216,11 +215,11 @@ impl State {
+         completion.cancel.controller.submit(request);
+         let mut cancelled = pin!(cancellation.cancelled());
+         poll_fn(|context| {
+-            if self.shared.ready.load(Ordering::Acquire) {
++            if self.shared.phase.load(Ordering::Acquire) == READY {
+                 return Poll::Ready(());
+             }
+             self.shared.waker.register(context.waker());
+-            if self.shared.ready.load(Ordering::Acquire) {
++            if self.shared.phase.load(Ordering::Acquire) == READY {
+                 self.shared.waker.take();
+                 return Poll::Ready(());
+             }
+@@ -231,11 +230,7 @@ impl State {
+         })
+         .await;
+         completion.cancel.armed = false;
+-        let result = {
+-            let mut slot = self.shared.slot.lock().unwrap();
+-            slot.collecting = false;
+-            slot.result.take().unwrap()
+-        };
++        let result = self.shared.collect();
+         completion.shared = None;
+         drop(completion);
+         match result {

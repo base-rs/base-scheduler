@@ -1,0 +1,2030 @@
+{
+  "tokio-no-short": {
+    "samples": 30,
+    "cases": [
+      {
+        "case": [
+          1,
+          1,
+          64
+        ],
+        "variants": {
+          "adapter": {
+            "median": 271361.0,
+            "minimum": 268706.6666666667,
+            "maximum": 274361.0,
+            "median_sample_p99_us": 4.711
+          },
+          "tokio": {
+            "median": 275119.3333333333,
+            "minimum": 273157.6666666667,
+            "maximum": 279108.0,
+            "median_sample_p99_us": 4.263
+          },
+          "tokio-no-short": {
+            "median": 274093.3333333333,
+            "minimum": 273755.0,
+            "maximum": 275011.3333333333,
+            "median_sample_p99_us": 4.671
+          }
+        }
+      },
+      {
+        "case": [
+          1,
+          32,
+          64
+        ],
+        "variants": {
+          "adapter": {
+            "median": 652903.6666666666,
+            "minimum": 638875.3333333334,
+            "maximum": 653987.3333333334,
+            "median_sample_p99_us": 56.767
+          },
+          "tokio": {
+            "median": 698419.3333333334,
+            "minimum": 696795.3333333334,
+            "maximum": 704947.6666666666,
+            "median_sample_p99_us": 53.567
+          },
+          "tokio-no-short": {
+            "median": 666024.0,
+            "minimum": 662591.0,
+            "maximum": 671350.3333333334,
+            "median_sample_p99_us": 55.903
+          }
+        }
+      }
+    ]
+  },
+  "permit": {
+    "samples": 45,
+    "cases": [
+      {
+        "case": [
+          1,
+          1,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 262880.0,
+            "minimum": 256343.66666666666,
+            "maximum": 269719.0,
+            "median_sample_p99_us": 5.511
+          },
+          "candidate": {
+            "median": 268800.6666666667,
+            "minimum": 261686.66666666666,
+            "maximum": 270107.3333333333,
+            "median_sample_p99_us": 4.971,
+            "change_percent": 2.2522316899979744
+          },
+          "tokio": {
+            "median": 273383.6666666667,
+            "minimum": 270522.6666666667,
+            "maximum": 274095.6666666667,
+            "median_sample_p99_us": 4.411
+          }
+        }
+      },
+      {
+        "case": [
+          1,
+          32,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 659093.6666666666,
+            "minimum": 654173.3333333334,
+            "maximum": 667092.0,
+            "median_sample_p99_us": 52.575
+          },
+          "candidate": {
+            "median": 661839.0,
+            "minimum": 655740.6666666666,
+            "maximum": 669423.3333333334,
+            "median_sample_p99_us": 52.351,
+            "change_percent": 0.4165315906034639
+          },
+          "tokio": {
+            "median": 699592.3333333334,
+            "minimum": 697884.3333333334,
+            "maximum": 707484.3333333334,
+            "median_sample_p99_us": 53.471
+          }
+        }
+      },
+      {
+        "case": [
+          4,
+          32,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 1728708.0,
+            "minimum": 1708557.6666666667,
+            "maximum": 1742851.6666666667,
+            "median_sample_p99_us": 56.607
+          },
+          "candidate": {
+            "median": 1716949.0,
+            "minimum": 1697025.3333333333,
+            "maximum": 1746744.6666666667,
+            "median_sample_p99_us": 56.959,
+            "change_percent": -0.6802189843513218
+          },
+          "tokio": {
+            "median": 1731657.6666666667,
+            "minimum": 1727959.0,
+            "maximum": 1734567.0,
+            "median_sample_p99_us": 52.127
+          }
+        }
+      }
+    ]
+  },
+  "slot": {
+    "samples": 45,
+    "cases": [
+      {
+        "case": [
+          1,
+          1,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 267832.0,
+            "minimum": 262501.3333333333,
+            "maximum": 271294.6666666667,
+            "median_sample_p99_us": 5.523
+          },
+          "candidate": {
+            "median": 269266.6666666667,
+            "minimum": 266037.0,
+            "maximum": 270248.3333333333,
+            "median_sample_p99_us": 5.011,
+            "change_percent": 0.535659169429592
+          },
+          "tokio": {
+            "median": 274022.3333333333,
+            "minimum": 271636.6666666667,
+            "maximum": 275111.0,
+            "median_sample_p99_us": 4.311
+          }
+        }
+      },
+      {
+        "case": [
+          1,
+          32,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 666368.3333333334,
+            "minimum": 657516.6666666666,
+            "maximum": 672225.3333333334,
+            "median_sample_p99_us": 52.159
+          },
+          "candidate": {
+            "median": 669046.3333333334,
+            "minimum": 666415.0,
+            "maximum": 675789.0,
+            "median_sample_p99_us": 51.967,
+            "change_percent": 0.40187984122894704
+          },
+          "tokio": {
+            "median": 712592.6666666666,
+            "minimum": 705958.3333333334,
+            "maximum": 724409.3333333334,
+            "median_sample_p99_us": 52.735
+          }
+        }
+      },
+      {
+        "case": [
+          4,
+          32,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 1727837.6666666667,
+            "minimum": 1690053.0,
+            "maximum": 1735806.6666666667,
+            "median_sample_p99_us": 56.831
+          },
+          "candidate": {
+            "median": 1722065.6666666667,
+            "minimum": 1692919.3333333333,
+            "maximum": 1731273.6666666667,
+            "median_sample_p99_us": 56.735,
+            "change_percent": -0.33405916026447713
+          },
+          "tokio": {
+            "median": 1747795.6666666667,
+            "minimum": 1738027.0,
+            "maximum": 1763511.0,
+            "median_sample_p99_us": 51.615
+          }
+        }
+      }
+    ]
+  },
+  "tcp-inq": {
+    "samples": 75,
+    "cases": [
+      {
+        "case": [
+          1,
+          1,
+          64
+        ],
+        "variants": {
+          "baseline-borrowed": {
+            "median": 269563.0,
+            "minimum": 268613.0,
+            "maximum": 271874.3333333333,
+            "median_sample_p99_us": 4.711
+          },
+          "baseline-owned": {
+            "median": 269685.6666666667,
+            "minimum": 267721.0,
+            "maximum": 272251.3333333333,
+            "median_sample_p99_us": 4.731
+          },
+          "candidate-borrowed": {
+            "median": 266967.0,
+            "minimum": 265880.0,
+            "maximum": 272159.3333333333,
+            "median_sample_p99_us": 4.463
+          },
+          "candidate-owned": {
+            "median": 266164.3333333333,
+            "minimum": 263826.3333333333,
+            "maximum": 270308.0,
+            "median_sample_p99_us": 4.471
+          },
+          "tokio": {
+            "median": 273279.3333333333,
+            "minimum": 268413.0,
+            "maximum": 275225.0,
+            "median_sample_p99_us": 4.391
+          }
+        }
+      },
+      {
+        "case": [
+          1,
+          32,
+          64
+        ],
+        "variants": {
+          "baseline-borrowed": {
+            "median": 645549.6666666666,
+            "minimum": 642337.3333333334,
+            "maximum": 653361.3333333334,
+            "median_sample_p99_us": 57.375
+          },
+          "baseline-owned": {
+            "median": 643617.3333333334,
+            "minimum": 639527.6666666666,
+            "maximum": 648462.6666666666,
+            "median_sample_p99_us": 57.567
+          },
+          "candidate-borrowed": {
+            "median": 668048.0,
+            "minimum": 665640.0,
+            "maximum": 680023.3333333334,
+            "median_sample_p99_us": 55.743
+          },
+          "candidate-owned": {
+            "median": 660499.0,
+            "minimum": 655385.3333333334,
+            "maximum": 666447.6666666666,
+            "median_sample_p99_us": 56.287
+          },
+          "tokio": {
+            "median": 706951.0,
+            "minimum": 697210.3333333334,
+            "maximum": 710601.3333333334,
+            "median_sample_p99_us": 53.151
+          }
+        }
+      },
+      {
+        "case": [
+          4,
+          32,
+          64
+        ],
+        "variants": {
+          "baseline-borrowed": {
+            "median": 1702366.0,
+            "minimum": 1688593.6666666667,
+            "maximum": 1720145.0,
+            "median_sample_p99_us": 51.999
+          },
+          "baseline-owned": {
+            "median": 1700936.0,
+            "minimum": 1694401.3333333333,
+            "maximum": 1710337.0,
+            "median_sample_p99_us": 51.903
+          },
+          "candidate-borrowed": {
+            "median": 1718623.0,
+            "minimum": 1706404.6666666667,
+            "maximum": 1731320.3333333333,
+            "median_sample_p99_us": 52.031
+          },
+          "candidate-owned": {
+            "median": 1704871.6666666667,
+            "minimum": 1700891.0,
+            "maximum": 1732135.0,
+            "median_sample_p99_us": 52.095
+          },
+          "tokio": {
+            "median": 1751125.6666666667,
+            "minimum": 1732402.3333333333,
+            "maximum": 1754290.6666666667,
+            "median_sample_p99_us": 51.967
+          }
+        }
+      }
+    ]
+  },
+  "probe": {
+    "samples": 45,
+    "cases": [
+      {
+        "case": [
+          1,
+          1,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 268817.3333333333,
+            "minimum": 239521.33333333334,
+            "maximum": 271279.6666666667,
+            "median_sample_p99_us": 5.163
+          },
+          "candidate": {
+            "median": 241292.66666666666,
+            "minimum": 232008.0,
+            "maximum": 247768.33333333334,
+            "median_sample_p99_us": 5.883,
+            "change_percent": -10.239171085197874
+          },
+          "tokio": {
+            "median": 272715.3333333333,
+            "minimum": 270493.3333333333,
+            "maximum": 274631.6666666667,
+            "median_sample_p99_us": 4.363
+          }
+        }
+      },
+      {
+        "case": [
+          1,
+          32,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 664223.3333333334,
+            "minimum": 656683.6666666666,
+            "maximum": 669341.3333333334,
+            "median_sample_p99_us": 52.287
+          },
+          "candidate": {
+            "median": 632973.6666666666,
+            "minimum": 629124.3333333334,
+            "maximum": 638310.6666666666,
+            "median_sample_p99_us": 54.783,
+            "change_percent": -4.704692698740898
+          },
+          "tokio": {
+            "median": 707679.3333333334,
+            "minimum": 699629.3333333334,
+            "maximum": 714822.6666666666,
+            "median_sample_p99_us": 52.927
+          }
+        }
+      },
+      {
+        "case": [
+          4,
+          32,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 1731177.0,
+            "minimum": 1677636.0,
+            "maximum": 1735666.3333333333,
+            "median_sample_p99_us": 57.183
+          },
+          "candidate": {
+            "median": 1726484.6666666667,
+            "minimum": 1702963.3333333333,
+            "maximum": 1734594.3333333333,
+            "median_sample_p99_us": 57.311,
+            "change_percent": -0.27104873351097014
+          },
+          "tokio": {
+            "median": 1732915.6666666667,
+            "minimum": 1722650.6666666667,
+            "maximum": 1759817.0,
+            "median_sample_p99_us": 51.807
+          }
+        }
+      }
+    ]
+  },
+  "counter": {
+    "samples": 30,
+    "cases": [
+      {
+        "case": [
+          1,
+          1,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 267644.3333333333,
+            "minimum": 251307.0,
+            "maximum": 270093.3333333333,
+            "median_sample_p99_us": 5.491
+          },
+          "candidate": {
+            "median": 268920.6666666667,
+            "minimum": 267715.0,
+            "maximum": 269368.0,
+            "median_sample_p99_us": 4.943,
+            "change_percent": 0.47687665097837506
+          },
+          "tokio": {
+            "median": 273080.0,
+            "minimum": 271419.0,
+            "maximum": 275447.0,
+            "median_sample_p99_us": 4.363
+          }
+        }
+      },
+      {
+        "case": [
+          1,
+          32,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 666111.0,
+            "minimum": 659884.0,
+            "maximum": 670892.0,
+            "median_sample_p99_us": 52.223
+          },
+          "candidate": {
+            "median": 663528.6666666666,
+            "minimum": 660572.6666666666,
+            "maximum": 672720.0,
+            "median_sample_p99_us": 52.511,
+            "change_percent": -0.38767312555014755
+          },
+          "tokio": {
+            "median": 712485.3333333334,
+            "minimum": 702694.3333333334,
+            "maximum": 715974.3333333334,
+            "median_sample_p99_us": 52.735
+          }
+        }
+      }
+    ]
+  },
+  "retire": {
+    "samples": 45,
+    "cases": [
+      {
+        "case": [
+          1,
+          1,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 269501.0,
+            "minimum": 267626.0,
+            "maximum": 271606.6666666667,
+            "median_sample_p99_us": 4.923
+          },
+          "candidate": {
+            "median": 269015.6666666667,
+            "minimum": 256374.66666666666,
+            "maximum": 270182.0,
+            "median_sample_p99_us": 4.891,
+            "change_percent": -0.18008591186426948
+          },
+          "tokio": {
+            "median": 271558.6666666667,
+            "minimum": 269737.0,
+            "maximum": 275983.6666666667,
+            "median_sample_p99_us": 4.291
+          }
+        }
+      },
+      {
+        "case": [
+          1,
+          32,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 661657.3333333334,
+            "minimum": 586765.6666666666,
+            "maximum": 665311.6666666666,
+            "median_sample_p99_us": 52.479
+          },
+          "candidate": {
+            "median": 663165.3333333334,
+            "minimum": 659572.0,
+            "maximum": 665495.0,
+            "median_sample_p99_us": 52.319,
+            "change_percent": 0.22791253478637863
+          },
+          "tokio": {
+            "median": 705619.3333333334,
+            "minimum": 696690.6666666666,
+            "maximum": 711268.0,
+            "median_sample_p99_us": 53.151
+          }
+        }
+      },
+      {
+        "case": [
+          4,
+          32,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 1711657.3333333333,
+            "minimum": 1692036.0,
+            "maximum": 1716637.3333333333,
+            "median_sample_p99_us": 56.671
+          },
+          "candidate": {
+            "median": 1723513.3333333333,
+            "minimum": 1700659.6666666667,
+            "maximum": 1752859.6666666667,
+            "median_sample_p99_us": 56.799,
+            "change_percent": 0.6926620047782217
+          },
+          "tokio": {
+            "median": 1737458.3333333333,
+            "minimum": 1707001.6666666667,
+            "maximum": 1744574.3333333333,
+            "median_sample_p99_us": 51.807
+          }
+        }
+      }
+    ]
+  },
+  "dispatch": {
+    "samples": 45,
+    "cases": [
+      {
+        "case": [
+          1,
+          1,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 259840.66666666666,
+            "minimum": 254467.33333333334,
+            "maximum": 270715.3333333333,
+            "median_sample_p99_us": 5.603
+          },
+          "candidate": {
+            "median": 263241.6666666667,
+            "minimum": 240415.66666666666,
+            "maximum": 270334.3333333333,
+            "median_sample_p99_us": 5.571,
+            "change_percent": 1.3088790309959242
+          },
+          "tokio": {
+            "median": 276405.6666666667,
+            "minimum": 273177.0,
+            "maximum": 278364.6666666667,
+            "median_sample_p99_us": 4.271
+          }
+        }
+      },
+      {
+        "case": [
+          1,
+          32,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 665382.6666666666,
+            "minimum": 662189.6666666666,
+            "maximum": 671514.0,
+            "median_sample_p99_us": 52.255
+          },
+          "candidate": {
+            "median": 663918.0,
+            "minimum": 655160.3333333334,
+            "maximum": 667634.6666666666,
+            "median_sample_p99_us": 52.351,
+            "change_percent": -0.2201239587445336
+          },
+          "tokio": {
+            "median": 709772.6666666666,
+            "minimum": 700101.0,
+            "maximum": 720744.3333333334,
+            "median_sample_p99_us": 52.863
+          }
+        }
+      },
+      {
+        "case": [
+          4,
+          32,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 1709004.0,
+            "minimum": 1670287.3333333333,
+            "maximum": 1738984.6666666667,
+            "median_sample_p99_us": 57.151
+          },
+          "candidate": {
+            "median": 1713566.0,
+            "minimum": 1693685.0,
+            "maximum": 1719935.6666666667,
+            "median_sample_p99_us": 56.799,
+            "change_percent": 0.26693910605242177
+          },
+          "tokio": {
+            "median": 1750044.6666666667,
+            "minimum": 1717403.0,
+            "maximum": 1757814.6666666667,
+            "median_sample_p99_us": 51.775
+          }
+        }
+      }
+    ]
+  },
+  "dispatch-v2": {
+    "samples": 45,
+    "cases": [
+      {
+        "case": [
+          1,
+          1,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 265766.6666666667,
+            "minimum": 258077.33333333334,
+            "maximum": 268780.3333333333,
+            "median_sample_p99_us": 5.531
+          },
+          "candidate": {
+            "median": 269186.0,
+            "minimum": 262374.3333333333,
+            "maximum": 270949.0,
+            "median_sample_p99_us": 4.963,
+            "change_percent": 1.286592248839824
+          },
+          "tokio": {
+            "median": 272235.0,
+            "minimum": 271527.0,
+            "maximum": 274332.3333333333,
+            "median_sample_p99_us": 4.311
+          }
+        }
+      },
+      {
+        "case": [
+          1,
+          32,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 665307.0,
+            "minimum": 660621.3333333334,
+            "maximum": 674222.0,
+            "median_sample_p99_us": 52.287
+          },
+          "candidate": {
+            "median": 665786.0,
+            "minimum": 657817.0,
+            "maximum": 669461.6666666666,
+            "median_sample_p99_us": 52.319,
+            "change_percent": 0.07199683755019226
+          },
+          "tokio": {
+            "median": 703310.6666666666,
+            "minimum": 702559.0,
+            "maximum": 719959.3333333334,
+            "median_sample_p99_us": 53.247
+          }
+        }
+      },
+      {
+        "case": [
+          4,
+          32,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 1715691.3333333333,
+            "minimum": 1709571.6666666667,
+            "maximum": 1735259.6666666667,
+            "median_sample_p99_us": 56.927
+          },
+          "candidate": {
+            "median": 1718554.0,
+            "minimum": 1716277.3333333333,
+            "maximum": 1735443.3333333333,
+            "median_sample_p99_us": 56.383,
+            "change_percent": 0.1668520794533057
+          },
+          "tokio": {
+            "median": 1752380.0,
+            "minimum": 1751480.6666666667,
+            "maximum": 1760548.6666666667,
+            "median_sample_p99_us": 51.583
+          }
+        }
+      }
+    ]
+  },
+  "flatten": {
+    "samples": 45,
+    "cases": [
+      {
+        "case": [
+          1,
+          1,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 265242.0,
+            "minimum": 260013.33333333334,
+            "maximum": 268780.0,
+            "median_sample_p99_us": 5.111
+          },
+          "candidate": {
+            "median": 270893.6666666667,
+            "minimum": 267618.3333333333,
+            "maximum": 271976.3333333333,
+            "median_sample_p99_us": 4.943,
+            "change_percent": 2.130758577701375
+          },
+          "tokio": {
+            "median": 275014.3333333333,
+            "minimum": 272614.3333333333,
+            "maximum": 278603.6666666667,
+            "median_sample_p99_us": 4.311
+          }
+        }
+      },
+      {
+        "case": [
+          1,
+          32,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 663654.3333333334,
+            "minimum": 659057.0,
+            "maximum": 668532.6666666666,
+            "median_sample_p99_us": 52.383
+          },
+          "candidate": {
+            "median": 664206.3333333334,
+            "minimum": 661366.0,
+            "maximum": 670512.0,
+            "median_sample_p99_us": 52.415,
+            "change_percent": 0.08317582998780271
+          },
+          "tokio": {
+            "median": 703011.0,
+            "minimum": 700021.0,
+            "maximum": 709710.3333333334,
+            "median_sample_p99_us": 53.343
+          }
+        }
+      },
+      {
+        "case": [
+          4,
+          32,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 1707073.0,
+            "minimum": 1704150.3333333333,
+            "maximum": 1736593.0,
+            "median_sample_p99_us": 56.703
+          },
+          "candidate": {
+            "median": 1733504.6666666667,
+            "minimum": 1692161.6666666667,
+            "maximum": 1739481.0,
+            "median_sample_p99_us": 56.031,
+            "change_percent": 1.5483618255731635
+          },
+          "tokio": {
+            "median": 1747698.0,
+            "minimum": 1738639.3333333333,
+            "maximum": 1772496.0,
+            "median_sample_p99_us": 51.679
+          }
+        }
+      }
+    ]
+  },
+  "split": {
+    "samples": 60,
+    "cases": [
+      {
+        "case": [
+          1,
+          1,
+          64
+        ],
+        "variants": {
+          "integrated-native": {
+            "median": 267341.3333333333,
+            "minimum": 259270.66666666666,
+            "maximum": 270097.0,
+            "median_sample_p99_us": 4.911
+          },
+          "raw-tokio": {
+            "median": 273624.0,
+            "minimum": 271106.6666666667,
+            "maximum": 275416.0,
+            "median_sample_p99_us": 4.291
+          },
+          "split-native": {
+            "median": 191691.33333333334,
+            "minimum": 183293.0,
+            "maximum": 195675.66666666666,
+            "median_sample_p99_us": 7.243
+          },
+          "split-tokio": {
+            "median": 172751.33333333334,
+            "minimum": 166553.0,
+            "maximum": 181887.33333333334,
+            "median_sample_p99_us": 7.991
+          }
+        }
+      },
+      {
+        "case": [
+          1,
+          32,
+          64
+        ],
+        "variants": {
+          "integrated-native": {
+            "median": 668823.6666666666,
+            "minimum": 663297.6666666666,
+            "maximum": 674738.3333333334,
+            "median_sample_p99_us": 51.935
+          },
+          "raw-tokio": {
+            "median": 707025.0,
+            "minimum": 701405.6666666666,
+            "maximum": 710521.3333333334,
+            "median_sample_p99_us": 53.087
+          },
+          "split-native": {
+            "median": 456054.6666666667,
+            "minimum": 454337.0,
+            "maximum": 457390.0,
+            "median_sample_p99_us": 88.639
+          },
+          "split-tokio": {
+            "median": 451118.0,
+            "minimum": 447872.6666666667,
+            "maximum": 456666.0,
+            "median_sample_p99_us": 90.495
+          }
+        }
+      },
+      {
+        "case": [
+          4,
+          32,
+          64
+        ],
+        "variants": {
+          "integrated-native": {
+            "median": 1716623.3333333333,
+            "minimum": 1687089.0,
+            "maximum": 1720781.6666666667,
+            "median_sample_p99_us": 57.119
+          },
+          "raw-tokio": {
+            "median": 1762248.6666666667,
+            "minimum": 1724550.6666666667,
+            "maximum": 1770128.3333333333,
+            "median_sample_p99_us": 51.711
+          },
+          "split-native": {
+            "median": 1432800.3333333333,
+            "minimum": 1413784.3333333333,
+            "maximum": 1490903.3333333333,
+            "median_sample_p99_us": 58.751
+          },
+          "split-tokio": {
+            "median": 1053581.0,
+            "minimum": 1025359.0,
+            "maximum": 1063152.3333333333,
+            "median_sample_p99_us": 58.655
+          }
+        }
+      }
+    ]
+  },
+  "fresh-state": {
+    "samples": 45,
+    "cases": [
+      {
+        "case": [
+          1,
+          1,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 267909.0,
+            "minimum": 258969.66666666666,
+            "maximum": 270305.6666666667,
+            "median_sample_p99_us": 5.063
+          },
+          "candidate": {
+            "median": 261892.33333333334,
+            "minimum": 247323.66666666666,
+            "maximum": 268359.6666666667,
+            "median_sample_p99_us": 5.551,
+            "change_percent": -2.2457874377742604
+          },
+          "tokio": {
+            "median": 273035.3333333333,
+            "minimum": 271563.3333333333,
+            "maximum": 275354.6666666667,
+            "median_sample_p99_us": 4.291
+          }
+        }
+      },
+      {
+        "case": [
+          1,
+          32,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 673016.6666666666,
+            "minimum": 659725.0,
+            "maximum": 674160.6666666666,
+            "median_sample_p99_us": 51.839
+          },
+          "candidate": {
+            "median": 664202.6666666666,
+            "minimum": 655103.6666666666,
+            "maximum": 669409.0,
+            "median_sample_p99_us": 52.223,
+            "change_percent": -1.3096258141205075
+          },
+          "tokio": {
+            "median": 708096.3333333334,
+            "minimum": 700931.0,
+            "maximum": 716140.0,
+            "median_sample_p99_us": 52.991
+          }
+        }
+      },
+      {
+        "case": [
+          4,
+          32,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 1735748.0,
+            "minimum": 1700275.6666666667,
+            "maximum": 1763018.6666666667,
+            "median_sample_p99_us": 56.447
+          },
+          "candidate": {
+            "median": 1702084.0,
+            "minimum": 1694389.0,
+            "maximum": 1737875.6666666667,
+            "median_sample_p99_us": 56.351,
+            "change_percent": -1.9394520402731263
+          },
+          "tokio": {
+            "median": 1743227.6666666667,
+            "minimum": 1729122.0,
+            "maximum": 1751132.6666666667,
+            "median_sample_p99_us": 51.871
+          }
+        }
+      }
+    ]
+  },
+  "admission": {
+    "samples": 45,
+    "cases": [
+      {
+        "case": [
+          1,
+          1,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 266779.0,
+            "minimum": 263788.0,
+            "maximum": 271125.0,
+            "median_sample_p99_us": 5.371
+          },
+          "candidate": {
+            "median": 268447.3333333333,
+            "minimum": 264052.3333333333,
+            "maximum": 272897.0,
+            "median_sample_p99_us": 4.863,
+            "change_percent": 0.6253615664401302
+          },
+          "tokio": {
+            "median": 273863.0,
+            "minimum": 272677.0,
+            "maximum": 278044.3333333333,
+            "median_sample_p99_us": 4.363
+          }
+        }
+      },
+      {
+        "case": [
+          1,
+          32,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 660340.0,
+            "minimum": 655819.3333333334,
+            "maximum": 677899.6666666666,
+            "median_sample_p99_us": 52.351
+          },
+          "candidate": {
+            "median": 665822.0,
+            "minimum": 665522.3333333334,
+            "maximum": 680955.3333333334,
+            "median_sample_p99_us": 51.935,
+            "change_percent": 0.8301783929490769
+          },
+          "tokio": {
+            "median": 704050.3333333334,
+            "minimum": 694645.0,
+            "maximum": 716129.0,
+            "median_sample_p99_us": 53.247
+          }
+        }
+      },
+      {
+        "case": [
+          4,
+          32,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 1712471.6666666667,
+            "minimum": 1678168.6666666667,
+            "maximum": 1731834.0,
+            "median_sample_p99_us": 56.895
+          },
+          "candidate": {
+            "median": 1699002.6666666667,
+            "minimum": 1686652.3333333333,
+            "maximum": 1735726.0,
+            "median_sample_p99_us": 57.151,
+            "change_percent": -0.7865239619536335
+          },
+          "tokio": {
+            "median": 1734412.3333333333,
+            "minimum": 1730960.3333333333,
+            "maximum": 1737901.3333333333,
+            "median_sample_p99_us": 51.839
+          }
+        }
+      }
+    ]
+  },
+  "no-slp": {
+    "samples": 60,
+    "cases": [
+      {
+        "case": [
+          1,
+          1,
+          64
+        ],
+        "variants": {
+          "native": {
+            "median": 263831.0,
+            "minimum": 254586.0,
+            "maximum": 269692.6666666667,
+            "median_sample_p99_us": 5.063
+          },
+          "native-no-slp": {
+            "median": 270286.3333333333,
+            "minimum": 263922.6666666667,
+            "maximum": 272991.3333333333,
+            "median_sample_p99_us": 4.923
+          },
+          "tokio": {
+            "median": 274334.0,
+            "minimum": 272364.0,
+            "maximum": 276423.6666666667,
+            "median_sample_p99_us": 4.291
+          },
+          "tokio-no-slp": {
+            "median": 271436.3333333333,
+            "minimum": 270118.0,
+            "maximum": 273086.0,
+            "median_sample_p99_us": 4.343
+          }
+        }
+      },
+      {
+        "case": [
+          1,
+          32,
+          64
+        ],
+        "variants": {
+          "native": {
+            "median": 668199.3333333334,
+            "minimum": 656694.3333333334,
+            "maximum": 677392.3333333334,
+            "median_sample_p99_us": 52.031
+          },
+          "native-no-slp": {
+            "median": 659320.3333333334,
+            "minimum": 657023.3333333334,
+            "maximum": 661098.0,
+            "median_sample_p99_us": 52.575
+          },
+          "tokio": {
+            "median": 700013.0,
+            "minimum": 699025.0,
+            "maximum": 706714.0,
+            "median_sample_p99_us": 53.503
+          },
+          "tokio-no-slp": {
+            "median": 706106.6666666666,
+            "minimum": 701955.6666666666,
+            "maximum": 721301.6666666666,
+            "median_sample_p99_us": 53.119
+          }
+        }
+      },
+      {
+        "case": [
+          4,
+          32,
+          64
+        ],
+        "variants": {
+          "native": {
+            "median": 1723566.6666666667,
+            "minimum": 1702910.6666666667,
+            "maximum": 1735494.3333333333,
+            "median_sample_p99_us": 56.351
+          },
+          "native-no-slp": {
+            "median": 1716451.0,
+            "minimum": 1705713.0,
+            "maximum": 1728743.6666666667,
+            "median_sample_p99_us": 56.415
+          },
+          "tokio": {
+            "median": 1742761.6666666667,
+            "minimum": 1732999.3333333333,
+            "maximum": 1759897.3333333333,
+            "median_sample_p99_us": 51.903
+          },
+          "tokio-no-slp": {
+            "median": 1745709.3333333333,
+            "minimum": 1735991.0,
+            "maximum": 1749320.0,
+            "median_sample_p99_us": 51.743
+          }
+        }
+      }
+    ]
+  },
+  "batch": {
+    "samples": 20,
+    "cases": [
+      {
+        "case": [
+          1,
+          32,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 661003.6666666666,
+            "minimum": 660476.0,
+            "maximum": 668861.0,
+            "median_sample_p99_us": 52.479
+          },
+          "batch-16": {
+            "median": 660472.3333333334,
+            "minimum": 660247.3333333334,
+            "maximum": 665140.6666666666,
+            "median_sample_p99_us": 56.351,
+            "change_percent": -0.08038281179477691
+          },
+          "batch-4": {
+            "median": 608062.6666666666,
+            "minimum": 607986.0,
+            "maximum": 611733.3333333334,
+            "median_sample_p99_us": 57.087,
+            "change_percent": -8.009184013603555
+          },
+          "tokio": {
+            "median": 704434.0,
+            "minimum": 696243.0,
+            "maximum": 715577.0,
+            "median_sample_p99_us": 53.215
+          }
+        }
+      }
+    ]
+  },
+  "boxed": {
+    "samples": 60,
+    "cases": [
+      {
+        "case": [
+          1,
+          1,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 264836.0,
+            "minimum": 236985.33333333334,
+            "maximum": 270755.6666666667,
+            "median_sample_p99_us": 5.363
+          },
+          "boxed-ahead": {
+            "median": 267343.6666666667,
+            "minimum": 255441.0,
+            "maximum": 270057.3333333333,
+            "median_sample_p99_us": 5.123,
+            "change_percent": 0.9468752989271412
+          },
+          "boxed-cold-paths": {
+            "median": 260697.66666666666,
+            "minimum": 255090.33333333334,
+            "maximum": 264298.3333333333,
+            "median_sample_p99_us": 5.563,
+            "change_percent": -1.562602264546109
+          },
+          "tokio": {
+            "median": 273373.0,
+            "minimum": 271195.0,
+            "maximum": 276372.0,
+            "median_sample_p99_us": 4.351
+          }
+        }
+      },
+      {
+        "case": [
+          1,
+          32,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 673067.0,
+            "minimum": 661201.6666666666,
+            "maximum": 678480.6666666666,
+            "median_sample_p99_us": 51.743
+          },
+          "boxed-ahead": {
+            "median": 658231.3333333334,
+            "minimum": 653840.0,
+            "maximum": 670407.6666666666,
+            "median_sample_p99_us": 52.703,
+            "change_percent": -2.2041886865151072
+          },
+          "boxed-cold-paths": {
+            "median": 656465.3333333334,
+            "minimum": 650303.0,
+            "maximum": 668038.6666666666,
+            "median_sample_p99_us": 52.831,
+            "change_percent": -2.466569697618015
+          },
+          "tokio": {
+            "median": 701040.6666666666,
+            "minimum": 697116.6666666666,
+            "maximum": 715416.0,
+            "median_sample_p99_us": 53.407
+          }
+        }
+      },
+      {
+        "case": [
+          4,
+          32,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 1706766.6666666667,
+            "minimum": 1684235.6666666667,
+            "maximum": 1725262.6666666667,
+            "median_sample_p99_us": 56.799
+          },
+          "boxed-ahead": {
+            "median": 1709651.6666666667,
+            "minimum": 1690313.0,
+            "maximum": 1741958.3333333333,
+            "median_sample_p99_us": 57.183,
+            "change_percent": 0.1690330644688709
+          },
+          "boxed-cold-paths": {
+            "median": 1726488.3333333333,
+            "minimum": 1700135.6666666667,
+            "maximum": 1752865.3333333333,
+            "median_sample_p99_us": 56.703,
+            "change_percent": 1.155498701247959
+          },
+          "tokio": {
+            "median": 1740502.6666666667,
+            "minimum": 1718451.3333333333,
+            "maximum": 1763638.0,
+            "median_sample_p99_us": 51.839
+          }
+        }
+      }
+    ]
+  },
+  "lazy-write": {
+    "samples": 45,
+    "cases": [
+      {
+        "case": [
+          1,
+          1,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 269164.3333333333,
+            "minimum": 251992.0,
+            "maximum": 272882.3333333333,
+            "median_sample_p99_us": 4.963
+          },
+          "candidate": {
+            "median": 267622.0,
+            "minimum": 245875.66666666666,
+            "maximum": 269228.6666666667,
+            "median_sample_p99_us": 5.083,
+            "change_percent": -0.5730080632277867
+          },
+          "tokio": {
+            "median": 274663.6666666667,
+            "minimum": 273570.0,
+            "maximum": 275699.6666666667,
+            "median_sample_p99_us": 4.311
+          }
+        }
+      },
+      {
+        "case": [
+          1,
+          32,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 671514.6666666666,
+            "minimum": 666334.6666666666,
+            "maximum": 678850.3333333334,
+            "median_sample_p99_us": 51.743
+          },
+          "candidate": {
+            "median": 661462.0,
+            "minimum": 658738.3333333334,
+            "maximum": 672749.6666666666,
+            "median_sample_p99_us": 52.383,
+            "change_percent": -1.4970137162553798
+          },
+          "tokio": {
+            "median": 704820.6666666666,
+            "minimum": 701940.6666666666,
+            "maximum": 710005.0,
+            "median_sample_p99_us": 53.343
+          }
+        }
+      },
+      {
+        "case": [
+          4,
+          32,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 1699478.0,
+            "minimum": 1681476.0,
+            "maximum": 1712188.0,
+            "median_sample_p99_us": 57.023
+          },
+          "candidate": {
+            "median": 1704260.6666666667,
+            "minimum": 1692889.0,
+            "maximum": 1706686.6666666667,
+            "median_sample_p99_us": 57.119,
+            "change_percent": 0.28141974574937834
+          },
+          "tokio": {
+            "median": 1740999.3333333333,
+            "minimum": 1728115.3333333333,
+            "maximum": 1758781.0,
+            "median_sample_p99_us": 52.095
+          }
+        }
+      }
+    ]
+  },
+  "inline-lane": {
+    "samples": 45,
+    "cases": [
+      {
+        "case": [
+          1,
+          1,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 267055.0,
+            "minimum": 263428.6666666667,
+            "maximum": 269820.6666666667,
+            "median_sample_p99_us": 5.011
+          },
+          "candidate": {
+            "median": 267845.3333333333,
+            "minimum": 267278.6666666667,
+            "maximum": 269321.6666666667,
+            "median_sample_p99_us": 4.963,
+            "change_percent": 0.29594403150412507
+          },
+          "tokio": {
+            "median": 276013.0,
+            "minimum": 272852.0,
+            "maximum": 278374.3333333333,
+            "median_sample_p99_us": 4.303
+          }
+        }
+      },
+      {
+        "case": [
+          1,
+          32,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 671231.3333333334,
+            "minimum": 657497.0,
+            "maximum": 676212.0,
+            "median_sample_p99_us": 51.903
+          },
+          "candidate": {
+            "median": 661215.3333333334,
+            "minimum": 657862.0,
+            "maximum": 680357.0,
+            "median_sample_p99_us": 52.447,
+            "change_percent": -1.492183022842597
+          },
+          "tokio": {
+            "median": 704944.6666666666,
+            "minimum": 695275.6666666666,
+            "maximum": 715733.3333333334,
+            "median_sample_p99_us": 53.119
+          }
+        }
+      },
+      {
+        "case": [
+          4,
+          32,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 1703798.0,
+            "minimum": 1690962.0,
+            "maximum": 1715934.0,
+            "median_sample_p99_us": 56.927
+          },
+          "candidate": {
+            "median": 1712461.0,
+            "minimum": 1702705.6666666667,
+            "maximum": 1723500.6666666667,
+            "median_sample_p99_us": 56.767,
+            "change_percent": 0.5084522930535185
+          },
+          "tokio": {
+            "median": 1732320.6666666667,
+            "minimum": 1713564.3333333333,
+            "maximum": 1752866.3333333333,
+            "median_sample_p99_us": 51.935
+          }
+        }
+      }
+    ]
+  },
+  "waker-slot": {
+    "samples": 45,
+    "cases": [
+      {
+        "case": [
+          1,
+          1,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 268933.3333333333,
+            "minimum": 259760.0,
+            "maximum": 270894.6666666667,
+            "median_sample_p99_us": 4.891
+          },
+          "candidate": {
+            "median": 266481.0,
+            "minimum": 257514.33333333334,
+            "maximum": 269217.0,
+            "median_sample_p99_us": 5.451,
+            "change_percent": -0.9118740704015749
+          },
+          "tokio": {
+            "median": 274064.6666666667,
+            "minimum": 272501.0,
+            "maximum": 275437.3333333333,
+            "median_sample_p99_us": 4.351
+          }
+        }
+      },
+      {
+        "case": [
+          1,
+          32,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 672548.0,
+            "minimum": 665623.6666666666,
+            "maximum": 681780.3333333334,
+            "median_sample_p99_us": 51.743
+          },
+          "candidate": {
+            "median": 659318.0,
+            "minimum": 658631.3333333334,
+            "maximum": 665338.0,
+            "median_sample_p99_us": 52.511,
+            "change_percent": -1.9671458394047714
+          },
+          "tokio": {
+            "median": 707658.3333333334,
+            "minimum": 702407.3333333334,
+            "maximum": 711071.6666666666,
+            "median_sample_p99_us": 52.991
+          }
+        }
+      },
+      {
+        "case": [
+          4,
+          32,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 1700229.6666666667,
+            "minimum": 1692251.3333333333,
+            "maximum": 1717709.0,
+            "median_sample_p99_us": 57.087
+          },
+          "candidate": {
+            "median": 1718712.3333333333,
+            "minimum": 1683217.0,
+            "maximum": 1737938.6666666667,
+            "median_sample_p99_us": 57.119,
+            "change_percent": 1.0870688254077
+          },
+          "tokio": {
+            "median": 1736350.6666666667,
+            "minimum": 1721098.6666666667,
+            "maximum": 1742854.0,
+            "median_sample_p99_us": 52.031
+          }
+        }
+      }
+    ]
+  },
+  "fused-release": {
+    "samples": 45,
+    "cases": [
+      {
+        "case": [
+          1,
+          1,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 260346.0,
+            "minimum": 245763.0,
+            "maximum": 267031.3333333333,
+            "median_sample_p99_us": 5.531
+          },
+          "candidate": {
+            "median": 269601.0,
+            "minimum": 256511.0,
+            "maximum": 270545.6666666667,
+            "median_sample_p99_us": 4.911,
+            "change_percent": 3.5548846534995793
+          },
+          "tokio": {
+            "median": 274269.0,
+            "minimum": 269201.0,
+            "maximum": 280527.3333333333,
+            "median_sample_p99_us": 4.311
+          }
+        }
+      },
+      {
+        "case": [
+          1,
+          32,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 662383.3333333334,
+            "minimum": 651394.3333333334,
+            "maximum": 672507.3333333334,
+            "median_sample_p99_us": 52.447
+          },
+          "candidate": {
+            "median": 666816.0,
+            "minimum": 659306.0,
+            "maximum": 672742.6666666666,
+            "median_sample_p99_us": 52.319,
+            "change_percent": 0.6691996074780437
+          },
+          "tokio": {
+            "median": 704577.0,
+            "minimum": 697964.6666666666,
+            "maximum": 706476.3333333334,
+            "median_sample_p99_us": 53.183
+          }
+        }
+      },
+      {
+        "case": [
+          4,
+          32,
+          64
+        ],
+        "variants": {
+          "baseline": {
+            "median": 1712517.3333333333,
+            "minimum": 1695996.6666666667,
+            "maximum": 1722797.6666666667,
+            "median_sample_p99_us": 56.959
+          },
+          "candidate": {
+            "median": 1710695.6666666667,
+            "minimum": 1688148.3333333333,
+            "maximum": 1751664.0,
+            "median_sample_p99_us": 57.247,
+            "change_percent": -0.10637361918671706
+          },
+          "tokio": {
+            "median": 1745989.0,
+            "minimum": 1726857.6666666667,
+            "maximum": 1753625.3333333333,
+            "median_sample_p99_us": 51.743
+          }
+        }
+      }
+    ]
+  },
+  "task-poll": {
+    "samples": 40,
+    "cases": {
+      "native/32/borrowed": {
+        "median_polls_per_second": 24319605.886973068,
+        "nanoseconds_per_poll": 41.1190874
+      },
+      "tokio/1/borrowed": {
+        "median_polls_per_second": 23842140.766364224,
+        "nanoseconds_per_poll": 41.9425424
+      },
+      "native/1/borrowed": {
+        "median_polls_per_second": 20979663.514226064,
+        "nanoseconds_per_poll": 47.66520679999999
+      },
+      "tokio/32/owned": {
+        "median_polls_per_second": 21636319.816915195,
+        "nanoseconds_per_poll": 46.21858099999999
+      },
+      "tokio/1/owned": {
+        "median_polls_per_second": 21588738.9614295,
+        "nanoseconds_per_poll": 46.3204452
+      },
+      "native/1/owned": {
+        "median_polls_per_second": 17940848.512932763,
+        "nanoseconds_per_poll": 55.7387238
+      },
+      "native/32/owned": {
+        "median_polls_per_second": 20460654.447945762,
+        "nanoseconds_per_poll": 48.874292
+      },
+      "tokio/32/borrowed": {
+        "median_polls_per_second": 23861024.991369467,
+        "nanoseconds_per_poll": 41.909348
+      }
+    }
+  },
+  "concurrency": {
+    "samples": 24,
+    "cases": [
+      {
+        "case": [
+          1,
+          1,
+          64
+        ],
+        "variants": {
+          "native": {
+            "median": 266715.6666666667,
+            "minimum": 266348.3333333333,
+            "maximum": 270621.0,
+            "median_sample_p99_us": 5.083
+          },
+          "tokio": {
+            "median": 274467.6666666667,
+            "minimum": 271823.6666666667,
+            "maximum": 278388.3333333333,
+            "median_sample_p99_us": 4.323
+          }
+        }
+      },
+      {
+        "case": [
+          1,
+          8,
+          64
+        ],
+        "variants": {
+          "native": {
+            "median": 619650.6666666666,
+            "minimum": 617596.0,
+            "maximum": 624508.6666666666,
+            "median_sample_p99_us": 16.007
+          },
+          "tokio": {
+            "median": 694450.3333333334,
+            "minimum": 691355.0,
+            "maximum": 700412.6666666666,
+            "median_sample_p99_us": 16.447
+          }
+        }
+      },
+      {
+        "case": [
+          1,
+          32,
+          64
+        ],
+        "variants": {
+          "native": {
+            "median": 661815.3333333334,
+            "minimum": 658953.3333333334,
+            "maximum": 666873.0,
+            "median_sample_p99_us": 52.543
+          },
+          "tokio": {
+            "median": 701577.0,
+            "minimum": 701153.0,
+            "maximum": 718071.0,
+            "median_sample_p99_us": 53.439
+          }
+        }
+      },
+      {
+        "case": [
+          1,
+          128,
+          64
+        ],
+        "variants": {
+          "native": {
+            "median": 658161.6666666666,
+            "minimum": 652625.3333333334,
+            "maximum": 660031.3333333334,
+            "median_sample_p99_us": 203.263
+          },
+          "tokio": {
+            "median": 703365.6666666666,
+            "minimum": 700529.0,
+            "maximum": 706941.6666666666,
+            "median_sample_p99_us": 196.863
+          }
+        }
+      }
+    ]
+  },
+  "concurrency-cache": {
+    "samples": 16,
+    "cases": [
+      {
+        "case": [
+          1,
+          1,
+          64
+        ],
+        "variants": {
+          "native": {
+            "median": 154377.6666666667,
+            "minimum": 153700.0,
+            "maximum": 155055.33333333334,
+            "median_sample_p99_us": 12.143,
+            "per_request": {
+              "cycles:u": 2155.1171135433588,
+              "instructions:u": 3532.1594960838947,
+              "L1-dcache-loads:u": 2014.1159941142287,
+              "L1-dcache-load-misses:u": 69.53463200815746,
+              "L1-icache-load-misses:u": 42.70711475590668
+            }
+          },
+          "tokio": {
+            "median": 165097.1666666667,
+            "minimum": 160657.0,
+            "maximum": 169537.33333333334,
+            "median_sample_p99_us": 7.461,
+            "per_request": {
+              "cycles:u": 2495.51992049689,
+              "instructions:u": 3039.9010523377583,
+              "L1-dcache-loads:u": 1656.5164737898594,
+              "L1-dcache-load-misses:u": 20.4210446617814,
+              "L1-icache-load-misses:u": 47.06545059673229
+            }
+          }
+        }
+      },
+      {
+        "case": [
+          1,
+          8,
+          64
+        ],
+        "variants": {
+          "native": {
+            "median": 622117.3333333333,
+            "minimum": 620392.0,
+            "maximum": 623842.6666666666,
+            "median_sample_p99_us": 16.043,
+            "per_request": {
+              "cycles:u": 1366.9402375762197,
+              "instructions:u": 2683.4916919987927,
+              "L1-dcache-loads:u": 1429.2258952273573,
+              "L1-dcache-load-misses:u": 51.0898442241394,
+              "L1-icache-load-misses:u": 26.337847187268263
+            }
+          },
+          "tokio": {
+            "median": 689043.8333333333,
+            "minimum": 686737.6666666666,
+            "maximum": 691350.0,
+            "median_sample_p99_us": 16.527,
+            "per_request": {
+              "cycles:u": 932.941915891081,
+              "instructions:u": 1755.593495217774,
+              "L1-dcache-loads:u": 931.4307654708805,
+              "L1-dcache-load-misses:u": 8.508696017670793,
+              "L1-icache-load-misses:u": 20.58998684900111
+            }
+          }
+        }
+      },
+      {
+        "case": [
+          1,
+          32,
+          64
+        ],
+        "variants": {
+          "native": {
+            "median": 668831.1666666667,
+            "minimum": 666350.0,
+            "maximum": 671312.3333333334,
+            "median_sample_p99_us": 52.303,
+            "per_request": {
+              "cycles:u": 1291.8478789942653,
+              "instructions:u": 2487.457144843513,
+              "L1-dcache-loads:u": 1329.391688223226,
+              "L1-dcache-load-misses:u": 50.724945166105584,
+              "L1-icache-load-misses:u": 21.095301523888992
+            }
+          },
+          "tokio": {
+            "median": 705710.1666666666,
+            "minimum": 704838.6666666666,
+            "maximum": 706581.6666666666,
+            "median_sample_p99_us": 53.215,
+            "per_request": {
+              "cycles:u": 663.7876783689726,
+              "instructions:u": 1441.2587418825838,
+              "L1-dcache-loads:u": 765.5273309067234,
+              "L1-dcache-load-misses:u": 10.443462658122613,
+              "L1-icache-load-misses:u": 15.25783918577124
+            }
+          }
+        }
+      },
+      {
+        "case": [
+          1,
+          128,
+          64
+        ],
+        "variants": {
+          "native": {
+            "median": 661207.1666666667,
+            "minimum": 660969.0,
+            "maximum": 661445.3333333334,
+            "median_sample_p99_us": 203.583,
+            "per_request": {
+              "cycles:u": 1296.9895317382209,
+              "instructions:u": 2461.758853522293,
+              "L1-dcache-loads:u": 1314.2587186723986,
+              "L1-dcache-load-misses:u": 49.48067611781158,
+              "L1-icache-load-misses:u": 17.346348023507602
+            }
+          },
+          "tokio": {
+            "median": 705345.8333333334,
+            "minimum": 702132.3333333334,
+            "maximum": 708559.3333333334,
+            "median_sample_p99_us": 197.247,
+            "per_request": {
+              "cycles:u": 633.9417258650997,
+              "instructions:u": 1394.642721834221,
+              "L1-dcache-loads:u": 741.1634351157531,
+              "L1-dcache-load-misses:u": 10.64286892473149,
+              "L1-icache-load-misses:u": 14.449194250949894
+            }
+          }
+        }
+      }
+    ]
+  }
+}

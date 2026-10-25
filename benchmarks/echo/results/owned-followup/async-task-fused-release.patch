@@ -1,0 +1,27 @@
+--- async-task-4.7.1/src/raw.rs
++++ async-task-4.7.1/src/raw.rs
+@@ -616,8 +616,11 @@
+                 loop {
+                     // If the task was closed while running, we'll need to unschedule in case it
+                     // was woken up and then destroy it.
++                    let release = state & (CLOSED | SCHEDULED) == 0;
+                     let new = if state & CLOSED != 0 {
+                         state & !RUNNING & !SCHEDULED
++                    } else if release {
++                        (state & !RUNNING) - REFERENCE
+                     } else {
+                         state & !RUNNING
+                     };
+@@ -660,8 +663,10 @@
+                                 Self::schedule(ptr, ScheduleInfo::new(true));
+                                 return true;
+                             } else {
+-                                // Drop the task reference.
+-                                Self::drop_ref(ptr);
++                                // The idle transition already released this runnable's reference.
++                                if new & !(REFERENCE - 1) == 0 && new & TASK == 0 {
++                                    Self::destroy(ptr);
++                                }
+                             }
+                             break;
+                         }

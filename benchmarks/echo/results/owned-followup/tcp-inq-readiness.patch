@@ -1,0 +1,290 @@
+diff --git a/crates/tokio/src/socket_io.rs b/crates/tokio/src/socket_io.rs
+index 19bc7f7..f1e81e5 100644
+--- a/crates/tokio/src/socket_io.rs
++++ b/crates/tokio/src/socket_io.rs
+@@ -336,12 +336,32 @@ unsafe fn recv_vectors(
+                 header.msg_iovlen = count as _;
+                 header.msg_name = address.cast();
+                 header.msg_namelen = *length;
++                #[cfg(target_os = "linux")]
++                let mut control = [0usize; 8];
++                #[cfg(target_os = "linux")]
++                {
++                    header.msg_control = control.as_mut_ptr().cast();
++                    header.msg_controllen = std::mem::size_of_val(&control);
++                }
+                 let bytes = result_count(libc::recvmsg(socket.as_raw_fd(), &mut header, flags))?;
+                 *length = header.msg_namelen;
++                let mut control_truncated = header.msg_flags & libc::MSG_CTRUNC != 0;
++                #[cfg(target_os = "linux")]
++                {
++                    let mut message = libc::CMSG_FIRSTHDR(&header);
++                    while !message.is_null() {
++                        if (*message).cmsg_level != libc::IPPROTO_TCP
++                            || (*message).cmsg_type != libc::TCP_CM_INQ
++                        {
++                            control_truncated = true;
++                        }
++                        message = libc::CMSG_NXTHDR(&header, message);
++                    }
++                }
+                 Ok((
+                     bytes,
+                     header.msg_flags & libc::MSG_TRUNC != 0,
+-                    header.msg_flags & libc::MSG_CTRUNC != 0,
++                    control_truncated,
+                 ))
+             }
+             #[cfg(windows)]
+@@ -411,6 +431,51 @@ pub(crate) fn recv_poll(
+     socket.recv_with_flags(bytes, flags)
+ }
+ 
++// Diagnostic prototype: consumes the kernel's queue-length hint instead of inferring drainage from a short read.
++pub(crate) fn recv_inq(
++    socket: &Socket,
++    bytes: &mut [u8],
++    flags: SocketRecvFlags,
++) -> io::Result<(usize, bool)> {
++    #[cfg(target_os = "linux")]
++    unsafe {
++        let mut vector = libc::iovec {
++            iov_base: bytes.as_mut_ptr().cast(),
++            iov_len: bytes.len(),
++        };
++        let mut control = [0usize; 8];
++        let mut message: libc::msghdr = std::mem::zeroed();
++        message.msg_iov = &mut vector;
++        message.msg_iovlen = 1;
++        message.msg_control = control.as_mut_ptr().cast();
++        message.msg_controllen = std::mem::size_of_val(&control);
++        let count = libc::recvmsg(
++            socket.as_raw_fd(),
++            &mut message,
++            POLL_FLAGS | recv_flags(flags),
++        );
++        if count < 0 {
++            return Err(io::Error::last_os_error());
++        }
++        let mut drained = false;
++        if count > 0 && !flags.peek && message.msg_flags & libc::MSG_CTRUNC == 0 {
++            let mut header = libc::CMSG_FIRSTHDR(&message);
++            while !header.is_null() {
++                if (*header).cmsg_level == libc::IPPROTO_TCP
++                    && (*header).cmsg_type == libc::TCP_CM_INQ
++                    && (*header).cmsg_len >= libc::CMSG_LEN(4) as usize
++                {
++                    drained = std::ptr::read_unaligned(libc::CMSG_DATA(header).cast::<i32>()) == 0;
++                }
++                header = libc::CMSG_NXTHDR(&message, header);
++            }
++        }
++        Ok((count as usize, drained))
++    }
++    #[cfg(not(target_os = "linux"))]
++    recv_poll(socket, bytes, flags).map(|count| (count, false))
++}
++
+ pub(crate) fn send_poll(
+     socket: &Socket,
+     bytes: &[u8],
+diff --git a/crates/tokio/src/socket_operations.rs b/crates/tokio/src/socket_operations.rs
+index d7fedf8..9a084e7 100644
+--- a/crates/tokio/src/socket_operations.rs
++++ b/crates/tokio/src/socket_operations.rs
+@@ -195,16 +195,19 @@ impl TokioScheduler {
+         mut buffer: B,
+         cancellation: &Cancellation,
+     ) -> BufferResult<B> {
+-        let length = buffer.as_mut().len();
+-        self.socket_operation_with(
+-            socket,
+-            buffer,
+-            cancellation,
+-            Interest::Readable,
+-            |socket, buffer| socket_io::recv(socket, buffer.as_mut()),
+-            length > 0,
+-        )
+-        .await
++        let read_nonempty = !buffer.as_mut().is_empty();
++        let result = self
++            .socket_result(socket, cancellation, || {
++                socket.io_with_hint(
++                    Interest::Readable,
++                    |socket| {
++                        socket_io::recv_inq(socket, buffer.as_mut(), SocketRecvFlags::default())
++                    },
++                    read_nonempty,
++                )
++            })
++            .await;
++        (result, buffer)
+     }
+ }
+ 
+@@ -234,17 +237,15 @@ impl TokioScheduler {
+         flags: SocketRecvFlags,
+         cancellation: &Cancellation,
+     ) -> OperationResult<usize> {
+-        let length = buffer.len();
+-        self.socket_operation_with(
+-            socket,
+-            buffer,
+-            cancellation,
+-            Interest::Readable,
+-            |socket, buffer| socket_io::recv_poll(socket, buffer, flags),
+-            length > 0,
+-        )
++        let read_nonempty = !buffer.is_empty();
++        self.socket_result(socket, cancellation, || {
++            socket.io_with_hint(
++                Interest::Readable,
++                |socket| socket_io::recv_inq(socket, buffer, flags),
++                read_nonempty,
++            )
++        })
+         .await
+-        .0
+     }
+ }
+ 
+diff --git a/crates/tokio/src/tokio_socket.rs b/crates/tokio/src/tokio_socket.rs
+index 7ebdcef..3118000 100644
+--- a/crates/tokio/src/tokio_socket.rs
++++ b/crates/tokio/src/tokio_socket.rs
+@@ -25,6 +25,21 @@ impl RegisteredSocket {
+         let stream = socket
+             .r#type()
+             .is_ok_and(|kind| kind == socket2::Type::STREAM);
++        #[cfg(target_os = "linux")]
++        if stream {
++            use std::os::fd::AsRawFd;
++            let enabled = 1i32;
++            // Experimental advisory hint; absent or unsupported hints retain the normal WouldBlock path.
++            unsafe {
++                libc::setsockopt(
++                    socket.as_raw_fd(),
++                    libc::IPPROTO_TCP,
++                    libc::TCP_INQ,
++                    (&enabled as *const i32).cast(),
++                    4,
++                )
++            };
++        }
+         Self {
+             socket: Arc::new(socket),
+             stream,
+@@ -164,6 +179,23 @@ impl TokioSocket {
+     ) -> io::Result<Output>
+     where
+         Operation: FnMut(&socket2::Socket) -> io::Result<Output> + Send,
++    {
++        self.io_with_hint(
++            interest,
++            |socket| operation(socket).map(|value| (value, false)),
++            read_nonempty,
++        )
++        .await
++    }
++
++    pub(super) async fn io_with_hint<Output, Operation>(
++        &self,
++        interest: Interest,
++        mut operation: Operation,
++        read_nonempty: bool,
++    ) -> io::Result<Output>
++    where
++        Operation: FnMut(&socket2::Socket) -> io::Result<(Output, bool)> + Send,
+     {
+         #[cfg(unix)]
+         let known_connected = read_nonempty && self.inner.connected_stream.load(Ordering::Relaxed);
+@@ -180,7 +212,7 @@ impl TokioSocket {
+                 self.inner.connected_stream.store(true, Ordering::Relaxed);
+             }
+             if !matches!(&result, Err(error) if error.kind() == io::ErrorKind::WouldBlock) {
+-                return result;
++                return result.map(|(value, _)| value);
+             }
+         }
+         #[cfg(unix)]
+@@ -193,11 +225,19 @@ impl TokioSocket {
+             let _ = read_nonempty;
+             let result = operation(self.get_ref());
+             if !matches!(&result, Err(error) if error.kind() == io::ErrorKind::WouldBlock) {
+-                return result;
++                return result.map(|(value, _)| value);
+             }
+             match interest {
+-                Interest::Readable => self.inner.read_with(|socket| operation(socket)).await,
+-                Interest::Writable => self.inner.write_with(|socket| operation(socket)).await,
++                Interest::Readable => self
++                    .inner
++                    .read_with(|socket| operation(socket))
++                    .await
++                    .map(|(value, _)| value),
++                Interest::Writable => self
++                    .inner
++                    .write_with(|socket| operation(socket))
++                    .await
++                    .map(|(value, _)| value),
+             }
+         }
+     }
+@@ -206,7 +246,7 @@ impl TokioSocket {
+         #[cfg(unix)]
+         if self.inner.registration.get().is_some() {
+             // A registered socket already has advisory readiness state. Waiting on it needs no extra poll(2) probe before or after Tokio wakes us.
+-            return self.ready_io(interest, |_| Ok(()), false).await;
++            return self.ready_io(interest, |_| Ok(((), false)), false).await;
+         }
+         // Preserve syscall-first handling of unregistered sockets, including unconnected streams whose hangup must not become permanently cached readiness.
+         self.io_with(
+@@ -225,7 +265,7 @@ impl TokioSocket {
+         mark_connected: bool,
+     ) -> io::Result<Output>
+     where
+-        Operation: FnMut(&socket2::Socket) -> io::Result<Output> + Send,
++        Operation: FnMut(&socket2::Socket) -> io::Result<(Output, bool)> + Send,
+     {
+         // Linux can report EPOLLHUP for an unconnected TCP socket; Tokio retains closed readiness permanently, which would spin after the socket later connects and a syscall returns WouldBlock. Register only after a syscall needs to wait, then reuse the registration on subsequent waits.
+         let registration = match self.inner.registration.get() {
+@@ -252,7 +292,10 @@ impl TokioSocket {
+                     if mark_connected && result.is_ok() {
+                         self.inner.connected_stream.store(true, Ordering::Relaxed);
+                     }
+-                    return result;
++                    if matches!(&result, Ok((_, true))) {
++                        ready.clear_ready_matching(tokio::io::Ready::READABLE);
++                    }
++                    return result.map(|(value, _)| value);
+                 }
+             }
+         }
+@@ -268,7 +311,10 @@ impl TokioSocket {
+                     if mark_connected && result.is_ok() {
+                         self.inner.connected_stream.store(true, Ordering::Relaxed);
+                     }
+-                    return std::task::Poll::Ready(result);
++                    if matches!(&result, Ok((_, true))) {
++                        ready.clear_ready_matching(tokio::io::Ready::READABLE);
++                    }
++                    return std::task::Poll::Ready(result.map(|(value, _)| value));
+                 }
+             }
+         })
+diff --git a/crates/tokio/src/tokio_socket/tests.rs b/crates/tokio/src/tokio_socket/tests.rs
+index 1cd9fdd..e1fdaec 100644
+--- a/crates/tokio/src/tokio_socket/tests.rs
++++ b/crates/tokio/src/tokio_socket/tests.rs
+@@ -422,8 +422,9 @@ fn established_stream_reads_only_retry_stale_readiness_once() {
+                     assert!(poll_once(&mut next).await.is_none());
+                     drop(next);
+                     assert_eq!(
+-                        attempts, 1,
+-                        "the next read should clear stale readiness without an extra speculative syscall"
++                        attempts,
++                        if cfg!(target_os = "linux") { 0 } else { 1 },
++                        "the queue-length hint clears already-drained readiness before the next read"
+                     );
+                     peer.write_all(b"y").unwrap();
+                     assert_eq!(

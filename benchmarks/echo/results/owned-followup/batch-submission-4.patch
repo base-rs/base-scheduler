@@ -1,0 +1,50 @@
+diff --git a/crates/native/src/worker.rs b/crates/native/src/worker.rs
+index 8a2b3ff..ec0c55a 100644
+--- a/crates/native/src/worker.rs
++++ b/crates/native/src/worker.rs
+@@ -318,14 +318,19 @@ fn run_loop(
+         if needs_turn {
+             drive(&mut driver, Some(Duration::ZERO));
+         }
+-        run_ready_batch(&shared, runnable);
++        run_ready_batch(&shared, runnable, &mut driver);
+         needs_turn = true;
+     }
+     CURRENT_WORKER.with(|current| current.take());
+ }
+ 
+ #[inline(always)]
+-fn run_ready_batch(shared: &Shared, first: Runnable) {
++fn run_ready_batch(
++    shared: &Shared,
++    first: Runnable,
++    driver: &mut Option<&mut dyn core_scheduler_selector::SelectorWorker>,
++) {
++    const SUBMISSION_INTERVAL: usize = 4;
+     // Freeze the batch. Wakes during task polling go into the now-empty next queue.
+     let (identifier, has_more) = CURRENT_WORKER.with(|current| {
+         let mut current = current.borrow_mut();
+@@ -337,6 +342,7 @@ fn run_ready_batch(shared: &Shared, first: Runnable) {
+         shared.wake_idle(usize::MAX);
+     }
+     let mut runnable = Some(first);
++    let mut until_turn = SUBMISSION_INTERVAL;
+     while let Some(task) = runnable {
+         task.metadata().worker.store(identifier, Ordering::Relaxed);
+         // Contain task-machinery panics as well as the guarded future's panics.
+@@ -352,6 +358,15 @@ fn run_ready_batch(shared: &Shared, first: Runnable) {
+                 .current
+                 .pop()
+         });
++        until_turn -= 1;
++        if until_turn == 0 {
++            until_turn = SUBMISSION_INTERVAL;
++            if runnable.is_some() && driver.is_some() {
++                // Diagnostic: the first turn may stage a batch; the second submits it before the current task batch finishes.
++                drive(driver, Some(Duration::ZERO));
++                drive(driver, Some(Duration::ZERO));
++            }
++        }
+     }
+ }
+ 

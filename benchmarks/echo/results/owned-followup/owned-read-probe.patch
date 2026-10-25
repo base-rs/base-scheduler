@@ -1,0 +1,21 @@
+diff --git a/crates/iouring/src/io_uring_selector/socket_read.rs b/crates/iouring/src/io_uring_selector/socket_read.rs
+index 97c80cd..b424fc2 100644
+--- a/crates/iouring/src/io_uring_selector/socket_read.rs
++++ b/crates/iouring/src/io_uring_selector/socket_read.rs
+@@ -265,6 +265,16 @@ impl State {
+             if let Err(error) = cancellation.check() {
+                 return (Err(error.into()), buffer);
+             }
++            if let Err(error) = selector.check_open() {
++                return (Err(error.into()), buffer);
++            }
++            match syscall("owned-recv-probe", || {
++                crate::retained_socket::recv(socket, buffer.as_mut(), SocketRecvFlags::default())
++            }) {
++                Err(error) if error.kind() == io::ErrorKind::WouldBlock => {}
++                Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
++                result => return (operation_result(result, cancellation), buffer),
++            }
+             let (result, returned) = self
+                 .attempt(selector, controller, socket, buffer, cancellation)
+                 .await;

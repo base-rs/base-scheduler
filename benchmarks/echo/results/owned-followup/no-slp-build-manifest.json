@@ -1,0 +1,15 @@
+{
+  "base": "83433057fc469e076dcd7e7f42a61b8147a91ced",
+  "binary_sha256": "c036748a21f9062830f1170b9d93345610e786b9e176acff35dee74e5b0c250a",
+  "environment": {
+    "CARGO_TARGET_DIR": "/home/samuel/.cache/core-scheduler-owned-dispatch/no-slp-target",
+    "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_PROFILE_RELEASE_LTO": "false",
+    "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "16",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_ENCODED_RUSTFLAGS": "-C\u001fno-vectorize-slp",
+    "RUSTFLAGS": "-C no-vectorize-slp",
+    "RUST_TEST_THREADS": "1"
+  }
+}

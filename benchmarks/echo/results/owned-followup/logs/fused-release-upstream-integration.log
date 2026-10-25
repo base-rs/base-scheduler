@@ -1,0 +1,115 @@
+   Compiling async-task v4.7.1 (/home/samuel/.cache/core-scheduler-owned-dispatch/async-task-fused-release)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.45s
+     Running unittests src/lib.rs (/home/samuel/.cache/core-scheduler-owned-echo-diagnosis/target/debug/deps/async_task-ec6a9fa91f749001)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/basic.rs (/home/samuel/.cache/core-scheduler-owned-echo-diagnosis/target/debug/deps/basic-5e63a10e77f09ba4)
+
+running 12 tests
+test cancel_and_run ... ok
+test cancel_join ... ok
+test detach_and_drop ... ok
+test detach_and_run ... ok
+test drop_and_detach ... ok
+test drop_inside_schedule ... ok
+test raw ... ok
+test run_and_cancel ... ok
+test run_and_detach ... ok
+test schedule ... ok
+test schedule_counter ... ok
+test waker ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/cancel.rs (/home/samuel/.cache/core-scheduler-owned-echo-diagnosis/target/debug/deps/cancel-e6965f687f572b2a)
+
+running 3 tests
+test cancel_and_run ... ok
+test cancel_during_run ... ok
+test run_and_cancel ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.60s
+
+     Running tests/join.rs (/home/samuel/.cache/core-scheduler-owned-echo-diagnosis/target/debug/deps/join-57a89c35b134bd25)
+
+running 10 tests
+test await_output ... ok
+test detach_and_run ... ok
+test drop_and_join ... ok
+test join_and_cancel ... ok
+test join_and_run ... ok
+test join_twice ... ok
+test run_and_join ... ok
+test try_join_and_cancel_and_run ... ok
+test try_join_and_run_and_cancel ... ok
+test try_join_and_run_and_join ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.40s
+
+     Running tests/metadata.rs (/home/samuel/.cache/core-scheduler-owned-echo-diagnosis/target/debug/deps/metadata-e2aaeb5c349566cd)
+
+running 1 test
+test metadata_use_case ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/panic.rs (/home/samuel/.cache/core-scheduler-owned-echo-diagnosis/target/debug/deps/panic-a5138928d9dcf9d9)
+
+running 6 tests
+test cancel_during_run ... ok
+test detach_during_run ... ok
+test join_during_run ... ok
+test run_and_join ... ok
+test try_join_and_run_and_join ... ok
+test try_join_during_run ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.60s
+
+     Running tests/ready.rs (/home/samuel/.cache/core-scheduler-owned-echo-diagnosis/target/debug/deps/ready-0183307588443481)
+
+running 4 tests
+test cancel_during_run ... ok
+test detach_during_run ... ok
+test join_during_run ... ok
+test try_join_during_run ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.00s
+
+     Running tests/waker_panic.rs (/home/samuel/.cache/core-scheduler-owned-echo-diagnosis/target/debug/deps/waker_panic-274dda2f6ef20a38)
+
+running 5 tests
+test cancel_and_wake_during_run ... ok
+test cancel_during_run ... ok
+test panic_and_poll ... ok
+test wake_and_cancel_during_run ... ok
+test wake_during_run ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.80s
+
+     Running tests/waker_pending.rs (/home/samuel/.cache/core-scheduler-owned-echo-diagnosis/target/debug/deps/waker_pending-ae6dc4586052d4ab)
+
+running 7 tests
+test cancel_and_wake_during_run ... ok
+test cancel_during_run ... ok
+test cancel_last_task ... ok
+test drop_last_task ... ok
+test drop_last_waker ... ok
+test wake_and_cancel_during_run ... ok
+test wake_during_run ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.20s
+
+     Running tests/waker_ready.rs (/home/samuel/.cache/core-scheduler-owned-echo-diagnosis/target/debug/deps/waker_ready-5fb4fe6ee3d74007)
+
+running 5 tests
+test clone ... ok
+test wake ... ok
+test wake_by_ref ... ok
+test wake_completed ... ok
+test wake_dropped ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.80s
+
