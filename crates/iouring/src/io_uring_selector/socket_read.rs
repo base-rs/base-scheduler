@@ -93,23 +93,29 @@ struct ReadRequest<B: IoBufMut> {
     permit: Option<Permit>,
     socket: Option<RegisteredSocket>,
     buffer: Option<B>,
+    pointer: *mut u8,
+    length: u32,
     reply: Cell<Option<Arc<Shared>>>,
     cancelling: Cell<bool>,
 }
+// SAFETY: The buffer is placed in the request allocation before capturing its pointer and remains there through terminal completion. IoBufMut guarantees exclusive access to stable storage and permits sending its owner between threads. Moving the boxed request does not move the buffer; the cached pointer is never used while its buffer is absent.
+unsafe impl<B: IoBufMut> Send for ReadRequest<B> {}
 impl<B: IoBufMut> PendingRequest for ReadRequest<B> {
     fn identifier(&self) -> u64 {
         self.identifier
     }
     fn entry(&mut self) -> squeue::Entry {
-        let buffer = self.buffer.as_mut().unwrap();
-        let length = buffer.as_ref().len().min(i32::MAX as usize) as u32;
         opcode::Recv::new(
             types::Fd(self.socket.as_ref().unwrap().get_ref().as_raw_fd()),
-            buffer.as_mut().as_mut_ptr(),
-            length,
+            self.pointer,
+            self.length,
         )
         .build()
         .user_data(self.identifier)
+    }
+    // All user buffer callbacks run before the command is submitted, while its caller is still polling. Ring preparation cannot wake a task.
+    fn entry_may_wake(&self) -> bool {
+        false
     }
     fn finish(mut self: Box<Self>, result: io::Result<usize>) {
         let shared = self.reply.take().unwrap();
@@ -176,6 +182,8 @@ impl State {
                     permit: None,
                     socket: None,
                     buffer: None,
+                    pointer: std::ptr::null_mut(),
+                    length: 0,
                     reply: Cell::new(None),
                     cancelling: Cell::new(false),
                 })
@@ -184,6 +192,10 @@ impl State {
         request.permit = Some(permit);
         request.socket = Some(socket);
         request.buffer = Some(buffer);
+        // Derive the pointer after placing its owner in the request. Moving a Box-backed owner afterward can invalidate the pointer's provenance even if its address stays stable.
+        let buffer = request.buffer.as_mut().unwrap();
+        request.length = buffer.as_ref().len().min(i32::MAX as usize) as u32;
+        request.pointer = buffer.as_mut().as_mut_ptr();
         request.reply.set(Some(Arc::clone(&self.shared)));
         request.cancelling.set(false);
         self.shared.ready.store(false, Ordering::Relaxed);

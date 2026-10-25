@@ -230,6 +230,33 @@ fn remote_task_wakes_still_interrupt_an_idle_single_worker() {
 }
 
 #[test]
+fn io_only_batches_collect_completions_without_a_zero_timeout_probe() {
+    crate::test_support::run(|| {
+        let state = Arc::new(State::default());
+        state.only_idle_completions.store(true, Ordering::SeqCst);
+        let scheduler = construct(&[Arc::clone(&state)]);
+        let observed = Arc::clone(&state);
+        let task = scheduler
+            .spawn(async move {
+                for _ in 0..32 {
+                    let before = observed.turns.load(Ordering::SeqCst);
+                    observed.operation().await.unwrap();
+                    assert_eq!(
+                        observed.turns.load(Ordering::SeqCst) - before,
+                        1,
+                        "an empty ready queue should use one idle turn without a preceding zero-timeout probe"
+                    );
+                    assert!(!observed.inside_turn.load(Ordering::SeqCst));
+                }
+            })
+            .unwrap();
+        block_on(task).unwrap();
+        block_on(scheduler.shutdown());
+        wait(|| state.retired.load(Ordering::SeqCst));
+    });
+}
+
+#[test]
 fn completion_batch_is_published_before_any_local_task_resumes() {
     crate::test_support::run(|| {
         let state = Arc::new(State::default());
