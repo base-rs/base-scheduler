@@ -20,6 +20,13 @@ macro_rules! process_wait_tests {
                 $crate::process_wait::exit(scheduler).await;
             });
         }
+        #[cfg(windows)]
+        #[test]
+        fn invalid_or_unsupported_waits() {
+            $run(async |scheduler| {
+                $crate::process_wait::validation(scheduler).await;
+            });
+        }
         #[test]
         fn lazy_and_pre_cancelled() {
             $run(async |scheduler| {

@@ -111,6 +111,46 @@ where
     }
 }
 
+/// Windows rejects invalid process IDs and stopped/continued status requests before waiting.
+#[cfg(windows)]
+pub async fn validation<S: ProcessWait>(scheduler: &S)
+where
+    S::ProcessId: TryFrom<u32>,
+    <S::ProcessId as TryFrom<u32>>::Error: Debug,
+{
+    let error = scheduler
+        .process_wait(
+            0.try_into().unwrap(),
+            ProcessWaitFlags::default(),
+            &Cancellation::never(),
+        )
+        .await
+        .unwrap_err();
+    assert!(error.raw_os_error().is_some());
+    for flags in [
+        ProcessWaitFlags {
+            nohang: true,
+            untraced: true,
+            ..Default::default()
+        },
+        ProcessWaitFlags {
+            nohang: true,
+            continued: true,
+            ..Default::default()
+        },
+    ] {
+        let error = scheduler
+            .process_wait(
+                std::process::id().try_into().unwrap(),
+                flags,
+                &Cancellation::never(),
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(error.kind(), std::io::ErrorKind::Unsupported);
+    }
+}
+
 /// Nonblocking waits, lazy construction, and pre-cancellation do not reap a running child.
 pub async fn lazy<S: ProcessWait>(scheduler: &S)
 where
