@@ -23,6 +23,10 @@ pub(crate) struct TaskState {
     pub(crate) worker: AtomicUsize,
 }
 pub(crate) type Runnable = async_task::Runnable<TaskState>;
+
+// Arming shares the runnable counter's modification order, so a waiter either sees quiescence or the last runnable sees this bit and notifies it. Keep the bit armed thereafter; drains are cold, and this avoids deregistration races between concurrent or abandoned waiters.
+const NOTIFY_IDLE: usize = 1 << (usize::BITS - 1);
+
 pub(crate) struct Shared {
     // Serialize registration with closure and distribute new tasks using a round-robin worker cursor. Task ownership itself needs only a count.
     admission: Mutex<usize>,
@@ -93,7 +97,7 @@ impl Shared {
     }
 
     pub(crate) fn has_runnables(&self) -> bool {
-        self.outstanding.load(Ordering::Acquire) != 0
+        self.outstanding.load(Ordering::Acquire) & !NOTIFY_IDLE != 0
     }
 
     pub(crate) fn is_closed(&self) -> bool {
@@ -120,7 +124,7 @@ impl Shared {
     pub(crate) fn finished(&self) -> bool {
         self.closed.load(Ordering::Acquire)
             && self.remaining.load(Ordering::Acquire) == 0
-            && self.outstanding.load(Ordering::Acquire) == 0
+            && !self.has_runnables()
     }
     pub(crate) fn wake_all(&self) {
         for worker in &self.workers {
@@ -144,7 +148,7 @@ impl Shared {
         }
     }
     pub(crate) fn retire_runnable(&self) {
-        if self.outstanding.fetch_sub(1, Ordering::AcqRel) == 1 {
+        if self.outstanding.fetch_sub(1, Ordering::AcqRel) == (NOTIFY_IDLE | 1) {
             // Draining waits for quiescence; intermediate retirements cannot satisfy that condition.
             self.changed.notify(usize::MAX);
         }
@@ -238,12 +242,15 @@ impl TaskService {
     pub(crate) async fn wait(&self, all: bool) {
         loop {
             event_listener::listener!(self.shared.changed => listener);
+            self.shared
+                .outstanding
+                .fetch_or(NOTIFY_IDLE, Ordering::AcqRel);
             // Observe registration retirement first. After close, no new registrations can appear; its release also precedes the final runnable retirement. Reading in reverse order could combine pre-publication quiescence with post-completion registration state.
             if (!all
                 || (self.shared.remaining.load(Ordering::Acquire) == 0
                     && (!self.shared.is_closed()
                         || self.shared.workers_remaining.load(Ordering::Acquire) == 0)))
-                && self.shared.outstanding.load(Ordering::Acquire) == 0
+                && !self.shared.has_runnables()
             {
                 return;
             }
