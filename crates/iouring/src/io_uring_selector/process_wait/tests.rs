@@ -144,6 +144,31 @@ fn capacity_cancellation_closure_and_identifier_exhaustion_prevent_submission() 
 }
 
 #[test]
+fn detaching_a_wait_result_disconnects_its_receiver_exactly_once() {
+    let (selector, driver) = IoUringSelector::new(Default::default()).unwrap();
+    let controller = &selector.controllers[0];
+    let permit = block_on(controller.capacity.acquire(&Cancellation::never())).unwrap();
+    let (reply, result) = oneshot::channel();
+    let request = WaitRequest {
+        identifier: controller.next_identifier().unwrap(),
+        _permit: permit,
+        process: i32::MAX,
+        flags: ProcessWaitFlags::default(),
+        // SAFETY: Zero initializes valid scalar and union storage; this request is never submitted to the kernel.
+        info: UnsafeCell::new(unsafe { std::mem::zeroed() }),
+        reply: Cell::new(Some(reply)),
+        cancelling: Cell::new(false),
+    };
+    // Detaching the sender is independent of kernel completion: a stopped driver can disconnect the waiter while retaining the request's output storage.
+    drop(request.take_reply().unwrap());
+    assert!(request.take_reply().is_none());
+    assert!(block_on(result).is_err());
+    drop(request);
+    drop(driver);
+    block_on(selector.shutdown());
+}
+
+#[test]
 fn unsubmitted_driver_drop_reports_an_error_and_unknown_kernel_access_is_retained() {
     for submitted in [false, true] {
         let (selector, mut driver) = IoUringSelector::new(Default::default()).unwrap();

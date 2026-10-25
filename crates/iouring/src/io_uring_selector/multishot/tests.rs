@@ -7,6 +7,17 @@ use futures_lite::future::{block_on, poll_once};
 
 use core_scheduler_selector::{SelectorDriver, SelectorWorker};
 
+thread_local! {
+    static BEFORE_RECEIVE_LISTEN: std::cell::RefCell<Option<Box<dyn FnOnce()>>> = const { std::cell::RefCell::new(None) };
+}
+
+pub(super) fn before_receive_listen() {
+    let hook = BEFORE_RECEIVE_LISTEN.with(|hook| hook.borrow_mut().take());
+    if let Some(hook) = hook {
+        hook();
+    }
+}
+
 fn driven<F: Future>(worker: &mut crate::IoUringWorker, future: F) -> F::Output {
     let mut future = pin!(future);
     let deadline = std::time::Instant::now() + Duration::from_secs(3);
@@ -829,6 +840,43 @@ fn retained_leases_can_be_released_after_worker_thread_locals_are_destroyed() {
         .join()
         .unwrap();
     }
+}
+
+#[test]
+fn completion_between_queue_probe_and_listener_registration_is_not_lost() {
+    let (selector, driver) = pair(2);
+    let (sender, socket) = block_on(core_scheduler_conformance::socket::stream_pair(
+        &selector,
+        SocketDomain::Ipv4,
+    ));
+    let mut receiving = receiver(&selector, &socket, 2, 16);
+    let driver = std::rc::Rc::new(std::cell::RefCell::new(driver));
+    let publish = std::rc::Rc::clone(&driver);
+    let state = Arc::clone(&receiving.state);
+    sender
+        .try_send(b"message", SocketSendFlags::default())
+        .unwrap();
+    BEFORE_RECEIVE_LISTEN.with(|hook| {
+        *hook.borrow_mut() = Some(Box::new(move || {
+            // No driver has processed this receive yet. Publish the real CQE after the first empty probe and before the listener exists.
+            let deadline = std::time::Instant::now() + Duration::from_secs(3);
+            while state.received.lock().unwrap().messages.is_empty() {
+                publish
+                    .borrow_mut()
+                    .turn(Some(Duration::from_millis(1)))
+                    .unwrap();
+                assert!(std::time::Instant::now() < deadline);
+            }
+        }));
+    });
+    let message = block_on(receiving.recv(&Cancellation::never()))
+        .unwrap()
+        .unwrap();
+    assert_eq!(message.payload(), b"message");
+    assert!(BEFORE_RECEIVE_LISTEN.with(|hook| hook.borrow().is_none()));
+    drop(message);
+    drive(&mut driver.borrow_mut(), receiving.close()).unwrap();
+    drain(&selector, &mut driver.borrow_mut());
 }
 
 #[test]
