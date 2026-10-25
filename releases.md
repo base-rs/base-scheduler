@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Remove experimental worker-provided receive pools and implicit receive-ahead from bound socket readers. Preserve reusable shared buffers and explicit read/write overlap through independent handles and owned stream submission; retain the standalone multishot benchmark API.
+
 - Reduce repeated Native owned-read reference counting, operation-lane admission, and single-worker wake overhead while preserving cancellation, abandoned-operation retirement, and migration.
 
 - Arm Native runnable-quiescence notifications when first requested, preserving drain and shutdown wakeups while removing unused event work from ordinary dispatch.
@@ -40,7 +42,7 @@
 
 - Reuse persistent slab ownership claims across heap buffer checkout, freezing, and return. Notify only while capacity waiters are registered, preserving the public buffer interface, stable storage, and cross-thread teardown safety.
 
-- Prototype backend-selected buffer pools with writable completed leases and retained immutable views. Ordinary shared pools use portable monitor receives; the concrete io\_uring `buffer_pool_per_worker` experiment allocates every worker's contiguous slab and provided-ring metadata up front. Keep worker policy out of the portable capability and make the backend's receiver strategy opaque. Use one selector-wide group ID across rings, return leases to their home slab, and remove cross-worker reclamation. Worker receive-ahead requires Linux 6.0 or later; its locality and throughput remain experimental.
+- Add backend-selected buffer pools with writable completed leases and retained immutable views. Shared pools preserve an exact total budget and use demand-driven receives; allocation and registration remain backend details.
 
 - Replace the shared receive-buffer pool's free-list mutex with atomic availability words, and wake a distinct capacity waiter for every returned slot. Avoid listener registration for queued io\_uring multishot messages and redundant ownership increments on local buffer returns; allow retained leases to be released safely during thread-local teardown. Correct buffer benchmarks to execute Native and Tokio I/O on their task workers and add burst and pool-contention measurements.
 

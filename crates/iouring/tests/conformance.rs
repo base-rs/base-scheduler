@@ -155,6 +155,7 @@ macro_rules! ordered_writer_tests {
             case!(ordering);
             case!(bound_io);
             case!(independent_progress);
+            case!(overlapped_read_write);
             case!(abandoned_admission);
             #[test]
             fn close_pending() {

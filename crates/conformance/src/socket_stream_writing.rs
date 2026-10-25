@@ -96,6 +96,67 @@ where
     }
 }
 
+/// A pending accepted response progresses while its independent reader receives the next request. Two shared slots bound the input/output pipeline without implicit receive-ahead.
+pub async fn overlapped_read_write<S>(scheduler: &S, sender: &S::Socket, receiver: &S::Socket)
+where
+    S: SocketStreamWriting + SocketTestScheduler + Sync,
+    S::Socket: 'static,
+{
+    let never = Cancellation::never();
+    let pool = scheduler
+        .buffer_pool(BufferPoolOptions::new(2, 8 * 1024 * 1024))
+        .unwrap();
+    let mut reader = scheduler
+        .socket_stream_reader_with_pool(receiver, pool.clone())
+        .unwrap();
+    let mut writer = scheduler.socket_stream_writer(receiver).unwrap();
+    let mut peer_reader = scheduler.socket_stream_reader(sender).unwrap();
+    let mut peer_writer = scheduler.socket_stream_writer(sender).unwrap();
+
+    peer_writer.write(b"a", &never).await.unwrap();
+    let first = reader.read(&never).await.unwrap().unwrap();
+    assert_eq!(first.as_ref(), b"a");
+    drop(first);
+
+    let mut response = pool.acquire(&never).await.unwrap();
+    response.as_mut().fill(0x5a);
+    writer
+        .submit(response, &never)
+        .await
+        .map_err(|(error, _)| error)
+        .unwrap();
+    // The peer has not drained the large response. Abandoning this flush wait leaves the accepted write running.
+    let mut flush = Box::pin(writer.flush(&never));
+    assert!(poll_once(flush.as_mut()).await.is_none());
+    drop(flush);
+
+    peer_writer.write(b"b", &never).await.unwrap();
+    let next = reader.read(&never).await.unwrap().unwrap();
+    assert_eq!(next.as_ref(), b"b");
+    assert!(pool.try_acquire().is_none());
+    drop(next);
+
+    // Only the peer is polled while the response drains; no writer method is needed to advance or release its owner.
+    let mut bytes = vec![0; 64 * 1024];
+    let mut remaining = pool.buffer_size();
+    while remaining > 0 {
+        let count = peer_reader.read_into(&mut bytes, &never).await.unwrap();
+        assert!(count > 0 && count <= remaining);
+        assert!(bytes[..count].iter().all(|byte| *byte == 0x5a));
+        remaining -= count;
+    }
+    let first = pool.acquire(&never).await.unwrap();
+    let second = pool.acquire(&never).await.unwrap();
+    assert!(pool.try_acquire().is_none());
+    drop((first, second));
+
+    writer.flush(&never).await.unwrap();
+    reader.close().await.unwrap();
+    writer.close().await.unwrap();
+    peer_reader.close().await.unwrap();
+    peer_writer.close().await.unwrap();
+}
+
 /// Abandoning a later admission wait leaves the first accepted write intact.
 pub async fn abandoned_admission<S>(scheduler: &S, sender: &S::Socket, receiver: &S::Socket)
 where

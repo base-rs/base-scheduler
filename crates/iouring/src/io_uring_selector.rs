@@ -157,12 +157,6 @@ pub(crate) trait PendingRequest: Send {
     fn prepare(&mut self, _ring: &io_uring::Submitter<'_>) -> io::Result<()> {
         Ok(())
     }
-    fn ready(&mut self, ring: &io_uring::Submitter<'_>) -> io::Result<bool> {
-        self.prepare(ring).map(|()| true)
-    }
-    fn buffer_pool(&self) -> Option<&Arc<provided_buffers::WorkerBuffers>> {
-        None
-    }
     fn entry(&mut self) -> squeue::Entry;
     fn submission_notification(
         &mut self,
@@ -238,7 +232,6 @@ pub(crate) enum Command {
     MonitorCancel(u64, u64),
     FileRelease(registered_file::Release),
     Recycle(Arc<multishot::pool::Pool>, u16),
-    PoolReady(Arc<provided_buffers::WorkerBuffers>),
     Rearm(u64),
     Cancel(u64),
     CancelAfterSubmission(u64),
@@ -272,10 +265,8 @@ pub(crate) struct Controller {
 
 impl Controller {
     pub(crate) fn send(&self, command: Command) -> Result<(), mpsc::SendError<Command>> {
-        if matches!(
-            &command,
-            Command::Submit(_) | Command::MonitorSubmit(_) | Command::PoolReady(_)
-        ) && self.closed.load(Ordering::Acquire)
+        if matches!(&command, Command::Submit(_) | Command::MonitorSubmit(_))
+            && self.closed.load(Ordering::Acquire)
         {
             return Err(mpsc::SendError(command));
         }
@@ -757,8 +748,6 @@ pub(crate) struct Reactor {
     dormant: HashMap<u64, Box<dyn PendingRequest>>,
     monitors: monitor::Monitors,
     pending_monitors: VecDeque<monitor::Submission>,
-    buffer_pools: Vec<Option<Arc<provided_buffers::WorkerBuffers>>>,
-    pool_ready: Vec<u64>,
     in_flight: InFlight,
     cancellations: VecDeque<u64>,
     closing: bool,
@@ -779,8 +768,6 @@ impl Reactor {
             ring,
             monitors,
             pending_monitors,
-            buffer_pools: Vec::new(),
-            pool_ready: Vec::new(),
             started: false,
             notification,
             incoming,
@@ -1017,17 +1004,6 @@ impl Reactor {
                         self.pending.push_back(request);
                     }
                 }
-                Command::PoolReady(pool) => {
-                    let index = pool.group() as usize;
-                    if self.buffer_pools.len() <= index {
-                        self.buffer_pools.resize_with(index + 1, || None);
-                    }
-                    assert!(
-                        self.buffer_pools[index].is_none(),
-                        "a live pool owns its group ID across all rings"
-                    );
-                    self.buffer_pools[index] = Some(pool);
-                }
                 Command::Rearm(identifier) => {
                     if let Some(request) = self.dormant.remove(&identifier) {
                         self.pending.push_back(request);
@@ -1060,31 +1036,6 @@ impl Reactor {
 
         progressed |= self.collect_completions()?;
 
-        // Initialize and refill on the ring owner. Each indexed entry owns only this worker's storage; completed payloads may be retained on any thread.
-        for slot in &mut self.buffer_pools {
-            let Some(pool) = slot else { continue };
-            if pool.service(&self.ring.submitter())? && !self.dormant.is_empty() {
-                for (identifier, request) in &self.dormant {
-                    if request
-                        .buffer_pool()
-                        .is_some_and(|known| Arc::ptr_eq(known, pool))
-                    {
-                        self.pool_ready.push(*identifier);
-                    }
-                }
-            }
-            if pool.empty() {
-                *slot = None;
-            }
-        }
-        for identifier in self.pool_ready.drain(..) {
-            self.pending.push_back(
-                self.dormant
-                    .remove(&identifier)
-                    .expect("a ready pool retains its dormant request"),
-            );
-        }
-
         let defer_submission;
         {
             let (submitter, mut submissions, _) = self.ring.split();
@@ -1104,12 +1055,8 @@ impl Reactor {
                 let Some(mut request) = self.pending.pop_front() else {
                     break;
                 };
-                match request.ready(&submitter) {
-                    Ok(true) => {}
-                    Ok(false) => {
-                        self.dormant.insert(request.identifier(), request);
-                        continue;
-                    }
+                match request.prepare(&submitter) {
+                    Ok(()) => {}
                     Err(error) => {
                         request.retire(&submitter, Err(error));
                         progressed = true;
@@ -1248,10 +1195,6 @@ impl Reactor {
 impl Drop for Reactor {
     fn drop(&mut self) {
         self.retire_pending(io::ErrorKind::BrokenPipe);
-        for pool in self.buffer_pools.iter().flatten() {
-            // Only proven-idle registrations can be released. Unknown in-flight payloads remain retained on driver failure.
-            let _ = pool.shutdown(&self.ring.submitter());
-        }
         // Pop without retaining a queue borrow: returning a buffer or waking its owner can reenter local routing.
         while let Some(command) = crate::io_uring_worker::pop(&self.controller) {
             discard(command);
@@ -1284,10 +1227,6 @@ pub(crate) mod socket_read;
 mod tests;
 
 pub(crate) mod file_monitor;
-
-mod socket_receiving;
-
-pub(crate) mod provided_buffers;
 
 pub(crate) mod stream_writer;
 mod submission_notifications;

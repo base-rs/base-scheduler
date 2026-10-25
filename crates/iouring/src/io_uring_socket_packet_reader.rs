@@ -24,7 +24,6 @@ pub(crate) struct IoUringSocketPacketReader<'a> {
     operations: crate::operation_state::OperationState,
     monitor: MonitorStorage,
     pool: Option<IoUringBufferPool>,
-    ahead: crate::receive_ahead::ReceiveAhead,
     closing: bool,
 }
 
@@ -42,7 +41,6 @@ impl<'a> IoUringSocketPacketReader<'a> {
             operations: Default::default(),
             monitor: scheduler.socket_monitor(socket, Interest::Readable),
             pool: None,
-            ahead: Default::default(),
             closing: false,
         })
     }
@@ -71,22 +69,6 @@ impl SocketPacketReader for IoUringSocketPacketReader<'_> {
                 self.scheduler
                     .buffer_pool(BufferPoolOptions::new(2, 64 * 1024))?,
             );
-        }
-        if self
-            .pool
-            .as_ref()
-            .is_some_and(IoUringBufferPool::is_provided)
-        {
-            let message = self
-                .ahead
-                .read(
-                    self.scheduler,
-                    self.monitor.socket(),
-                    self.pool.as_ref().unwrap(),
-                    cancellation,
-                )
-                .await?;
-            return Ok(message);
         }
         let pool = self.pool.as_ref().unwrap();
         loop {
@@ -124,16 +106,6 @@ impl SocketPacketReader for IoUringSocketPacketReader<'_> {
         buffer: &mut [u8],
         cancellation: &Cancellation,
     ) -> OperationResult<SocketRecvResult> {
-        if self.ahead.active() {
-            return self
-                .read_vectored_with_flags(
-                    &mut [IoSliceMut::new(buffer)],
-                    SocketRecvFlags::default(),
-                    cancellation,
-                )
-                .await;
-        }
-
         self.read_vectored(&mut [IoSliceMut::new(buffer)], cancellation)
             .await
     }
@@ -143,12 +115,6 @@ impl SocketPacketReader for IoUringSocketPacketReader<'_> {
         buffers: &mut [IoSliceMut<'_>],
         cancellation: &Cancellation,
     ) -> OperationResult<SocketRecvResult> {
-        if self.ahead.active() {
-            return self
-                .read_vectored_with_flags(buffers, SocketRecvFlags::default(), cancellation)
-                .await;
-        }
-
         cancellation.check()?;
         if self.closing {
             return Err(io::Error::from(io::ErrorKind::BrokenPipe).into());
@@ -170,16 +136,6 @@ impl SocketPacketReader for IoUringSocketPacketReader<'_> {
         flags: SocketRecvFlags,
         cancellation: &Cancellation,
     ) -> OperationResult<core_scheduler::SocketRecvResult> {
-        if self.ahead.active() {
-            if self.closing {
-                return Err(io::Error::from(io::ErrorKind::BrokenPipe).into());
-            }
-            return self
-                .ahead
-                .read_vectored(buffers, flags, false, cancellation)
-                .await;
-        }
-
         cancellation.check()?;
         if self.closing {
             return Err(io::Error::from(io::ErrorKind::BrokenPipe).into());
@@ -195,19 +151,6 @@ impl SocketPacketReader for IoUringSocketPacketReader<'_> {
         flags: SocketRecvFlags,
         cancellation: &Cancellation,
     ) -> (OperationResult<core_scheduler::SocketRecvResult>, Buffers) {
-        if self.ahead.active() {
-            if self.closing {
-                return (
-                    Err(io::Error::from(io::ErrorKind::BrokenPipe).into()),
-                    buffers,
-                );
-            }
-            return self
-                .ahead
-                .read_owned(buffers, flags, false, cancellation)
-                .await;
-        }
-
         if self.closing {
             return (
                 Err(io::Error::from(io::ErrorKind::BrokenPipe).into()),
@@ -230,10 +173,6 @@ impl SocketPacketReader for IoUringSocketPacketReader<'_> {
     async fn close(&mut self) -> io::Result<()> {
         self.closing = true;
         self.operations.close().await;
-        let ahead = self.ahead.close().await;
-        self.scheduler
-            .socket_monitor_close(&mut self.monitor)
-            .await
-            .and(ahead)
+        self.scheduler.socket_monitor_close(&mut self.monitor).await
     }
 }

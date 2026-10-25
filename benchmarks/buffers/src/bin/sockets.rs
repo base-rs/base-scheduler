@@ -434,21 +434,7 @@ fn execute(args: &[String]) -> serde_json::Value {
         "unknown traffic pattern"
     );
     let pool_layout = args.get(10).map(String::as_str).unwrap_or("total");
-    assert!(
-        [
-            "total",
-            #[cfg(target_os = "linux")]
-            "worker-equal",
-            #[cfg(target_os = "linux")]
-            "worker-scaled"
-        ]
-        .contains(&pool_layout),
-        "unknown pool layout"
-    );
-    assert!(
-        backend == "iouring" || pool_layout == "total",
-        "worker pool layouts require the io_uring backend"
-    );
+    assert_eq!(pool_layout, "total", "unknown pool layout");
     let workload = Workload {
         mode: mode.to_owned(),
         pool_layout: pool_layout.to_owned(),
@@ -520,25 +506,7 @@ fn execute(args: &[String]) -> serde_json::Value {
                 )
                 .unwrap(),
             );
-            // Backend policy comparisons stay in this benchmark; the generic receive loop accepts any scheduler-created pool.
-            let pool = match pool_layout {
-                "total" => scheduler.buffer_pool(options),
-                "worker-equal" => {
-                    assert!(
-                        options.buffers % workers == 0,
-                        "equal budgets require a whole number of buffers per worker"
-                    );
-                    scheduler
-                        .selector()
-                        .buffer_pool_per_worker(BufferPoolOptions {
-                            buffers: options.buffers / workers,
-                            ..options
-                        })
-                }
-                "worker-scaled" => scheduler.selector().buffer_pool_per_worker(options),
-                _ => unreachable!("The pool layout was validated before execution"),
-            }
-            .unwrap();
+            let pool = scheduler.buffer_pool(options).unwrap();
             let result = scheduler.block_on(run_group(Arc::clone(&scheduler), workload, pool));
             scheduler.block_on(scheduler.shutdown());
             result
@@ -624,78 +592,12 @@ mod tests {
         }
     }
 
-    #[cfg(target_os = "linux")]
-    #[test]
-    fn worker_pools_preserve_data_with_equal_and_scaled_budgets() {
-        for layout in ["worker-equal", "worker-scaled"] {
-            for mode in ["pool", "shared"] {
-                for transport in ["tcp", "udp"] {
-                    let args = [
-                        "sockets", "iouring", mode, "64", "2", "2", transport, "4", "receive", "4",
-                        layout,
-                    ]
-                    .map(str::to_owned);
-                    let result = execute(&args);
-                    assert_eq!(
-                        result["pool_capacity"],
-                        if layout == "worker-equal" { 32 } else { 64 }
-                    );
-                    assert_eq!(result["pool_layout"], layout);
-                }
-            }
-        }
-    }
-
-    #[test]
-    #[cfg(target_os = "linux")]
-    #[should_panic(expected = "worker pool layouts require the io_uring backend")]
-    fn worker_pool_experiments_do_not_become_portable_requirements() {
-        execute(
-            &[
-                "sockets",
-                "native",
-                "pool",
-                "64",
-                "2",
-                "1",
-                "tcp",
-                "1",
-                "echo",
-                "1",
-                "worker-equal",
-            ]
-            .map(str::to_owned),
-        );
-    }
-
     #[test]
     #[should_panic(expected = "unknown pool layout")]
     fn rejects_unknown_pool_layout() {
         execute(
             &[
                 "sockets", "native", "pool", "64", "2", "1", "tcp", "1", "echo", "1", "unknown",
-            ]
-            .map(str::to_owned),
-        );
-    }
-
-    #[cfg(target_os = "linux")]
-    #[test]
-    #[should_panic(expected = "equal budgets require")]
-    fn rejects_unequal_worker_budgets() {
-        execute(
-            &[
-                "sockets",
-                "iouring",
-                "pool",
-                "64",
-                "2",
-                "3",
-                "tcp",
-                "1",
-                "echo",
-                "1",
-                "worker-equal",
             ]
             .map(str::to_owned),
         );

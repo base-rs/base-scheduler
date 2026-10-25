@@ -1,5 +1,7 @@
 # Eager worker-owned receive pools
 
+This is a historical experiment. Worker-provided pool construction and its receive-ahead integration have been removed from ordinary readers. Reproduce the comparisons at the recorded source revisions; current applications overlap reads and writes explicitly.
+
 The measurements below describe the implementation at their recorded source revisions. The current portable `BufferPooling` interface exposes only `buffer_pool(options)`; the per-worker comparison is now a concrete `IoUringSelector::buffer_pool_per_worker(options)` experiment accessed through the Native scheduler's selector. Moving that control does not change the measured receive algorithms.
 
 Worker-owned storage removes cross-worker buffer reclamation and makes receive capacity predictable per worker. Ordinary shared pools retain the simpler syscall-first monitor receive path. Across the longer equal-budget run, worker pools improve the multiworker aggregate by 11.4% over the previous shared provided-ring implementation, but remain 6.7% behind monitor receives and 14.6% behind the Tokio adapter. Keep receive-ahead explicit; local storage alone does not make it the universally faster default.

@@ -1,5 +1,7 @@
 # Portable buffer policy
 
+This is a historical experiment. Worker-provided pool construction and its receive-ahead integration have been removed from ordinary readers. Reproduce the comparisons at the recorded source revisions; current applications overlap reads and writes explicitly.
+
 The portable interface now has one `BufferPooling::buffer_pool(options)` factory and an opaque backend receiver. Applications choose their payload budget, size, and alignment; the backend chooses allocation, reuse, registration, and receive strategy. Ordinary pools keep an exact shared total capacity independent of worker count. The locality experiment remains available only through the concrete `IoUringSelector::buffer_pool_per_worker(options)` method, accessed from Native through `scheduler.selector()`.
 
 This refactor preserves the existing monitor and provided-buffer receive algorithms. It adds no payload allocation or per-message policy lookup. The [worker-owned report](worker-owned.md) records the earlier implementation and strategy comparisons; this check isolates the interface refactor rather than comparing those strategies again.
