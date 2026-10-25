@@ -1703,5 +1703,239 @@
         "nanoseconds_per_poll": 41.909348
       }
     }
+  },
+  "concurrency": {
+    "samples": 24,
+    "cases": [
+      {
+        "case": [
+          1,
+          1,
+          64
+        ],
+        "variants": {
+          "native": {
+            "median": 266715.6666666667,
+            "minimum": 266348.3333333333,
+            "maximum": 270621.0,
+            "median_sample_p99_us": 5.083
+          },
+          "tokio": {
+            "median": 274467.6666666667,
+            "minimum": 271823.6666666667,
+            "maximum": 278388.3333333333,
+            "median_sample_p99_us": 4.323
+          }
+        }
+      },
+      {
+        "case": [
+          1,
+          8,
+          64
+        ],
+        "variants": {
+          "native": {
+            "median": 619650.6666666666,
+            "minimum": 617596.0,
+            "maximum": 624508.6666666666,
+            "median_sample_p99_us": 16.007
+          },
+          "tokio": {
+            "median": 694450.3333333334,
+            "minimum": 691355.0,
+            "maximum": 700412.6666666666,
+            "median_sample_p99_us": 16.447
+          }
+        }
+      },
+      {
+        "case": [
+          1,
+          32,
+          64
+        ],
+        "variants": {
+          "native": {
+            "median": 661815.3333333334,
+            "minimum": 658953.3333333334,
+            "maximum": 666873.0,
+            "median_sample_p99_us": 52.543
+          },
+          "tokio": {
+            "median": 701577.0,
+            "minimum": 701153.0,
+            "maximum": 718071.0,
+            "median_sample_p99_us": 53.439
+          }
+        }
+      },
+      {
+        "case": [
+          1,
+          128,
+          64
+        ],
+        "variants": {
+          "native": {
+            "median": 658161.6666666666,
+            "minimum": 652625.3333333334,
+            "maximum": 660031.3333333334,
+            "median_sample_p99_us": 203.263
+          },
+          "tokio": {
+            "median": 703365.6666666666,
+            "minimum": 700529.0,
+            "maximum": 706941.6666666666,
+            "median_sample_p99_us": 196.863
+          }
+        }
+      }
+    ]
+  },
+  "concurrency-cache": {
+    "samples": 16,
+    "cases": [
+      {
+        "case": [
+          1,
+          1,
+          64
+        ],
+        "variants": {
+          "native": {
+            "median": 154377.6666666667,
+            "minimum": 153700.0,
+            "maximum": 155055.33333333334,
+            "median_sample_p99_us": 12.143,
+            "per_request": {
+              "cycles:u": 2155.1171135433588,
+              "instructions:u": 3532.1594960838947,
+              "L1-dcache-loads:u": 2014.1159941142287,
+              "L1-dcache-load-misses:u": 69.53463200815746,
+              "L1-icache-load-misses:u": 42.70711475590668
+            }
+          },
+          "tokio": {
+            "median": 165097.1666666667,
+            "minimum": 160657.0,
+            "maximum": 169537.33333333334,
+            "median_sample_p99_us": 7.461,
+            "per_request": {
+              "cycles:u": 2495.51992049689,
+              "instructions:u": 3039.9010523377583,
+              "L1-dcache-loads:u": 1656.5164737898594,
+              "L1-dcache-load-misses:u": 20.4210446617814,
+              "L1-icache-load-misses:u": 47.06545059673229
+            }
+          }
+        }
+      },
+      {
+        "case": [
+          1,
+          8,
+          64
+        ],
+        "variants": {
+          "native": {
+            "median": 622117.3333333333,
+            "minimum": 620392.0,
+            "maximum": 623842.6666666666,
+            "median_sample_p99_us": 16.043,
+            "per_request": {
+              "cycles:u": 1366.9402375762197,
+              "instructions:u": 2683.4916919987927,
+              "L1-dcache-loads:u": 1429.2258952273573,
+              "L1-dcache-load-misses:u": 51.0898442241394,
+              "L1-icache-load-misses:u": 26.337847187268263
+            }
+          },
+          "tokio": {
+            "median": 689043.8333333333,
+            "minimum": 686737.6666666666,
+            "maximum": 691350.0,
+            "median_sample_p99_us": 16.527,
+            "per_request": {
+              "cycles:u": 932.941915891081,
+              "instructions:u": 1755.593495217774,
+              "L1-dcache-loads:u": 931.4307654708805,
+              "L1-dcache-load-misses:u": 8.508696017670793,
+              "L1-icache-load-misses:u": 20.58998684900111
+            }
+          }
+        }
+      },
+      {
+        "case": [
+          1,
+          32,
+          64
+        ],
+        "variants": {
+          "native": {
+            "median": 668831.1666666667,
+            "minimum": 666350.0,
+            "maximum": 671312.3333333334,
+            "median_sample_p99_us": 52.303,
+            "per_request": {
+              "cycles:u": 1291.8478789942653,
+              "instructions:u": 2487.457144843513,
+              "L1-dcache-loads:u": 1329.391688223226,
+              "L1-dcache-load-misses:u": 50.724945166105584,
+              "L1-icache-load-misses:u": 21.095301523888992
+            }
+          },
+          "tokio": {
+            "median": 705710.1666666666,
+            "minimum": 704838.6666666666,
+            "maximum": 706581.6666666666,
+            "median_sample_p99_us": 53.215,
+            "per_request": {
+              "cycles:u": 663.7876783689726,
+              "instructions:u": 1441.2587418825838,
+              "L1-dcache-loads:u": 765.5273309067234,
+              "L1-dcache-load-misses:u": 10.443462658122613,
+              "L1-icache-load-misses:u": 15.25783918577124
+            }
+          }
+        }
+      },
+      {
+        "case": [
+          1,
+          128,
+          64
+        ],
+        "variants": {
+          "native": {
+            "median": 661207.1666666667,
+            "minimum": 660969.0,
+            "maximum": 661445.3333333334,
+            "median_sample_p99_us": 203.583,
+            "per_request": {
+              "cycles:u": 1296.9895317382209,
+              "instructions:u": 2461.758853522293,
+              "L1-dcache-loads:u": 1314.2587186723986,
+              "L1-dcache-load-misses:u": 49.48067611781158,
+              "L1-icache-load-misses:u": 17.346348023507602
+            }
+          },
+          "tokio": {
+            "median": 705345.8333333334,
+            "minimum": 702132.3333333334,
+            "maximum": 708559.3333333334,
+            "median_sample_p99_us": 197.247,
+            "per_request": {
+              "cycles:u": 633.9417258650997,
+              "instructions:u": 1394.642721834221,
+              "L1-dcache-loads:u": 741.1634351157531,
+              "L1-dcache-load-misses:u": 10.64286892473149,
+              "L1-icache-load-misses:u": 14.449194250949894
+            }
+          }
+        }
+      }
+    ]
   }
 }

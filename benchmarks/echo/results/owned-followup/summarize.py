@@ -1,5 +1,6 @@
 """Validate the follow-up matrices and summarize every retained capacity sample."""
 
+import csv
 import hashlib
 import itertools
 import json
@@ -37,8 +38,8 @@ def read(name):
     return json.loads((ROOT / name).read_text())
 
 
-def summarize(name, candidates):
-    report = read(name + "-screen.json")
+def summarize(name, candidates, *, repeats=5, counter_mode=None):
+    report = read(name + ("-cache.json" if counter_mode else "-screen.json"))
     binaries = {BINARY}
     for manifest_name, patch_name, candidate in candidates:
         manifest = read(manifest_name + "-build-manifest.json")
@@ -51,12 +52,16 @@ def summarize(name, candidates):
         assert report["variants"][candidate]["sha256"] == manifest["binary_sha256"]
         binaries.add(manifest["binary_sha256"])
     assert report["client_sha256"] == CLIENT
-    assert report["counter_mode"] is None
+    assert report["counter_mode"] == counter_mode
+    warmup = 0 if counter_mode else 1
     variants = report["variants"]
     assert all(variant["sha256"] in binaries for variant in variants.values())
     assert report["settings"]["seconds"] == 3
-    assert report["settings"]["warmup"] == 1
-    assert report["repeats"] == 5
+    assert report["settings"]["warmup"] == warmup
+    assert report["repeats"] == repeats
+    if name == "concurrency":
+        assert report["cases"] == [[1, count, 64] for count in [1, 8, 32, 128]]
+        assert set(report["variants"]) == {"native", "tokio"}
     expected = set(itertools.product(map(tuple, report["cases"]), variants, range(report["repeats"])))
     observed = set()
     groups = {}
@@ -68,9 +73,21 @@ def summarize(name, candidates):
         assert sample["server_cpus"] == list(range(sample["workers"]))
         assert sample["client_cpus"] == [4, 5, 6, 7]
         assert sample["client_workers"] == 4
-        assert sample["seconds"] == 3 and sample["warmup_seconds"] == 1
+        assert sample["seconds"] == 3 and sample["warmup_seconds"] == warmup
         assert sample["backend"] == variants[sample["variant"]]["backend"]
         assert sample["requests_per_second"] == sample["requests"] / sample["seconds"]
+        if counter_mode:
+            assert set(sample["counters"]) == set(report["events"])
+            for event, count in sample["counters"].items():
+                assert count > 0
+                assert sample["per_request"][event] == count / sample["requests"]
+            filename = f"concurrency-cache-{sample['variant']}-w{sample['workers']}-c{sample['connections']}-b{sample['bytes']}-r{sample['repeat']}.csv"
+            rows = list(csv.reader((ROOT / "cache-counters" / filename).read_text().splitlines()))
+            raw = {row[2]: row for row in rows if len(row) >= 5 and row[2] in report["events"]}
+            assert set(raw) == set(report["events"])
+            for event, count in sample["counters"].items():
+                assert float(raw[event][0]) == count
+                assert float(raw[event][4]) == 100.0
         groups.setdefault(case, {}).setdefault(sample["variant"], []).append(sample)
     assert observed == expected
     cases = []
@@ -84,6 +101,11 @@ def summarize(name, candidates):
                 "maximum": max(rates),
                 "median_sample_p99_us": statistics.median(sample["rtt_p99_us"] for sample in samples),
             }
+            if counter_mode:
+                summary[variant]["per_request"] = {
+                    event: statistics.median(sample["per_request"][event] for sample in samples)
+                    for event in report["events"]
+                }
         if "baseline" in summary:
             for _, _, candidate in candidates:
                 summary[candidate]["change_percent"] = 100 * (summary[candidate]["median"] / summary["baseline"]["median"] - 1)
@@ -123,9 +145,11 @@ def main():
     rebuild = read("clean-rebuild-build-manifest.json")
     assert rebuild["base"] == BASE and rebuild["binary_sha256"] == BINARY
     summary["task-poll"] = task_polls()
+    summary["concurrency"] = summarize("concurrency", [], repeats=3)
+    summary["concurrency-cache"] = summarize("concurrency", [], repeats=2, counter_mode="cache")
     (ROOT / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
-    capacity_samples = sum(report["samples"] for name, report in summary.items() if name != "task-poll")
-    print(f"Validated {capacity_samples} capacity samples and 40 task-only samples across {len(summary)} experiments.")
+    capacity_samples = sum(report["samples"] for name, report in summary.items() if name not in {"task-poll", "concurrency-cache"})
+    print(f"Validated {capacity_samples} capacity samples, 16 cache-counter samples, and 40 task-only samples across {len(summary)} experiments.")
 
 
 if __name__ == "__main__":

@@ -90,6 +90,23 @@ The [instruction-level annotation](native-echo-annotate.txt) contains samples ar
 
 Keep performance changes focused on eliminating work and redundant state. A more complex completion slot, special allocator, or custom task implementation needs a clear causal measurement and a repeatable gain under the same ownership, cancellation, and shutdown contracts. This archive records rejected experiments to avoid repeating them; it does not select a new runtime change.
 
+## Connection count and cache counters
+
+A separate three-repeat single-worker sweep uses the unchanged frozen executable for Native and Tokio:
+
+| Connections | Native echoes/s | Tokio echoes/s | Native vs Tokio |
+| --- | ---: | ---: | ---: |
+| 1 | 266,716 | 274,468 | −2.82% |
+| 8 | 619,651 | 694,450 | −10.77% |
+| 32 | 661,815 | 701,577 | −5.67% |
+| 128 | 658,162 | 703,366 | −6.43% |
+
+The gap is larger at eight connections than at 32. These data do not support a simple explanation in which Native's larger per-task working set causes a growing throughput deficit as connections increase.
+
+Two separate cache-counter repeats per configuration record userspace events. At 32 connections, Native reports about 1,292 userspace cycles, 2,487 instructions, and 50.7 L1 data-load misses per echo; Tokio reports about 664 cycles, 1,441 instructions, and 10.4 misses. Native's data-load misses are roughly 51.1 at eight connections and 49.5 at 128, rather than increasing with task count. The instruction difference and additional data traffic support examining the whole I/O handoff, but these aggregate counters cannot identify the objects or code responsible. They do not prove that task-future size or any particular copy causes the gap.
+
+Cache-counter runs have no warmup and include process startup and shutdown. Their timing is diagnostic: the single-connection instrumented rates differ markedly from capacity rates. Do not compare those rates as an optimization result. The raw CSVs retain the event-running percentages, and the JSON records counts normalized by validated echoes. See [the capacity sweep](concurrency-screen.json) and [cache counters](concurrency-cache.json).
+
 ## Method and reproduction
 
 Aiko runs Linux 7.2.8 on a Ryzen 9950X3D, with Rust 1.99.0 and LLVM 23.1.1. Builds use optimization level 3, debug information level 1, 16 codegen units, no LTO, no incremental compilation, and empty Rust flags. The manifests preserve exact binary and patch hashes. A clean unpatched rebuild reproduces the original `lean-final` executable byte for byte; the harness rejects a redundant timing comparison of those identical executables. See [the clean rebuild manifest](clean-rebuild-build-manifest.json). Capacity samples use one second of warmup and three measured seconds, deterministic shuffled order, persistent IPv4 TCP connections, `TCP_NODELAY`, reused 64 KiB server buffers, and one outstanding validated echo per connection.
