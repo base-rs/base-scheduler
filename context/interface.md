@@ -231,4 +231,4 @@ Drivers publish results and wake tasks; they never poll application futures from
 
 Constructors, `block_on`, worker counts, `selector()`, concrete admission `close`, and runtime `shutdown` belong to the chosen backend, not a universal scheduler trait. Tokio's adapter borrows an application-owned runtime which must remain alive and driven. Native owns its executor and composes selectors. Direct supplies a reference implementation. An application must keep execution services running while awaiting graceful cleanup.
 
-Concrete io\_uring multishot and worker-provided-pool controls remain backend experiments. They are not required by the bound reader/writer contract and are not application defaults.
+The concrete io\_uring multishot receiver remains a standalone backend experiment. It is not required by the bound reader/writer contract and is not an application default.

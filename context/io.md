@@ -32,6 +32,8 @@ A stream writer's `write` and `write_vectored` make one possibly partial transfe
 
 Use `submit(owner, cancellation)` when retaining owned output lets the application prepare or receive the next chunk while the accepted write progresses. Submission finishes its predecessor before accepting the new owner. Rejection returns the new owner unchanged. Accepted partial-write retries progress independently of further writer calls, and completed owners are released without requiring `flush` to collect them. `flush(cancellation)` awaits acceptance of every submitted byte by the socket; it does not establish peer acknowledgement. Its cancellation ends only that flush wait.
 
+Overlap input and output explicitly. The first read produces a chunk; submit its owned response, then await the next read while that output progresses. The next submission waits for the preceding output before accepting another owner. Two pool slots accommodate one read and one write; retained parser views require additional capacity. Ordinary readers receive on demand and keep no hidden receive-ahead queue. For packet operations, poll independent reads and writes together when overlap is useful.
+
 For packets, each write preserves one message boundary and accepts an optional destination address; `None` uses a connected peer. `write_owned` returns the owner alongside the completed result. Retain the complete received message when handing it to a task that also needs its source metadata.
 
 ## Keep file position explicit

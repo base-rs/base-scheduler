@@ -1,7 +1,6 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::{IoBufSequence, IoBufSequenceMut};
 use std::ptr::NonNull;
 
 // A real initialized range just beyond the native message limit. Anonymous pages are demand-zero; validation rejects this range without committing payload pages.
@@ -42,35 +41,5 @@ impl Drop for LargeMapping {
         // SAFETY: This is the original mapping and length; all borrowed slices have expired before its owner can be dropped.
         let result = unsafe { libc::munmap(self.pointer.as_ptr().cast(), Self::LENGTH) };
         assert_eq!(result, 0);
-    }
-}
-
-// A valid owned sequence can describe arbitrarily many empty ranges without allocating an I/O-vector array. Count validation must reject it before enumerating those ranges.
-pub(crate) struct EmptyRanges {
-    bytes: Box<[u8]>,
-}
-impl EmptyRanges {
-    pub(crate) const COUNT: usize = i32::MAX as usize + 1;
-    pub(crate) fn new() -> Self {
-        Self {
-            bytes: Box::default(),
-        }
-    }
-}
-// SAFETY: Count and order never change. Each empty range uses the same stable boxed-slice address and contains no initialized bytes that could move or overlap another range.
-unsafe impl IoBufSequence for EmptyRanges {
-    fn buffer_count(&self) -> usize {
-        Self::COUNT
-    }
-    fn buffer(&self, index: usize) -> &[u8] {
-        assert!(index < Self::COUNT);
-        &self.bytes
-    }
-}
-// SAFETY: Empty writable ranges contain no bytes and cannot overlap; exclusive access retains the stable box until operation retirement.
-unsafe impl IoBufSequenceMut for EmptyRanges {
-    fn buffer_mut(&mut self, index: usize) -> &mut [u8] {
-        assert!(index < Self::COUNT);
-        &mut self.bytes
     }
 }

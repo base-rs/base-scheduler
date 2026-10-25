@@ -29,7 +29,7 @@ fn drive<F: Future>(driver: &mut IoUringDriver, future: F) -> F::Output {
 }
 
 #[test]
-fn provided_stream_reads_can_switch_to_borrowing_without_losing_queued_suffixes() {
+fn stream_reads_can_switch_between_owned_and_borrowed_storage() {
     let (scheduler, mut driver) = IoUringSelector::new(Default::default()).unwrap();
     let (sender, receiver) = block_on(core_scheduler_conformance::socket::stream_pair(
         &scheduler,
@@ -37,7 +37,7 @@ fn provided_stream_reads_can_switch_to_borrowing_without_losing_queued_suffixes(
     ));
     let never = Cancellation::never();
     let pool = scheduler
-        .buffer_pool_per_worker(BufferPoolOptions::new(4, 128))
+        .buffer_pool(BufferPoolOptions::new(4, 128))
         .unwrap();
     let mut reader = scheduler
         .socket_stream_reader_with_pool(&receiver, pool)
@@ -108,7 +108,7 @@ fn provided_stream_reads_can_switch_to_borrowing_without_losing_queued_suffixes(
 }
 
 #[test]
-fn provided_packet_reads_keep_peek_addresses_truncation_and_empty_datagrams() {
+fn packet_reads_keep_peek_addresses_truncation_and_empty_datagrams() {
     let (scheduler, mut driver) = IoUringSelector::new(Default::default()).unwrap();
     let never = Cancellation::never();
     let receiver =
@@ -119,7 +119,7 @@ fn provided_packet_reads_keep_peek_addresses_truncation_and_empty_datagrams() {
     let sender = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
     let peer = sender.local_addr().unwrap();
     let pool = scheduler
-        .buffer_pool_per_worker(BufferPoolOptions::new(4, 128))
+        .buffer_pool(BufferPoolOptions::new(4, 128))
         .unwrap();
     let mut reader = scheduler
         .socket_packet_reader_with_pool(&receiver, pool)

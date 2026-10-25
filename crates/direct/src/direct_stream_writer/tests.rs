@@ -23,6 +23,7 @@ macro_rules! conformance {
 conformance!(
     ordering,
     independent_progress,
+    overlapped_read_write,
     abandoned_admission,
     bound_io
 );

@@ -613,3 +613,8 @@ fn owned_stream_writes_wait_for_earlier_accepted_output() {
         reader.close().await.unwrap();
     });
 }
+
+#[test]
+fn accepted_output_overlaps_the_next_read() {
+    stream_case(socket_stream_writing::overlapped_read_write);
+}

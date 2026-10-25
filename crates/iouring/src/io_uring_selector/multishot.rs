@@ -117,10 +117,9 @@ impl<B: IoBuf> State<B> {
 pub struct RecvMsgMultishot<B: IoBuf = RecvMsgBuffer> {
     pub(super) state: Arc<State<B>>,
     pub(super) cancel: CancelOnDrop,
-    pub(super) cancel_on_wait: bool,
 }
 impl<B: IoBuf> RecvMsgMultishot<B> {
-    /// Receive the next message; `None` is terminal stream EOF. Empty datagrams are messages. Successful queued progress wins concurrent cancellation. Cancellation with no queued message closes and drains an explicit multishot receiver; shared pooled receivers cancel only the wait.
+    /// Receive the next message; `None` is terminal stream EOF. Empty datagrams are messages. Successful queued progress wins concurrent cancellation. Cancellation with no queued message closes and drains the receiver.
     async fn receive(
         &mut self,
         cancellation: &Cancellation,
@@ -147,9 +146,7 @@ impl<B: IoBuf> RecvMsgMultishot<B> {
                 .await
             };
             if was_cancelled {
-                if self.cancel_on_wait {
-                    self.retire().await?;
-                }
+                self.retire().await?;
                 return Err(Cancelled.into());
             }
         }
@@ -263,7 +260,6 @@ impl IoUringSelector {
         };
         controller.submit(Box::new(request));
         Ok(RecvMsgMultishot {
-            cancel_on_wait: true,
             state,
             cancel: CancelOnDrop {
                 controller,

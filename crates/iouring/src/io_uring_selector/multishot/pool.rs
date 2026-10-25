@@ -212,9 +212,6 @@ mod tests {
         assert!(
             matches!(Pool::new(controller, RecvMsgMultishotOptions { buffers: 1, buffer_size: 8 }, 0), Err(error) if error.kind() == io::ErrorKind::WouldBlock)
         );
-        assert!(
-            matches!(selector.buffer_pool_per_worker(BufferPoolOptions::new(1, 8)), Err(error) if error.kind() == io::ErrorKind::WouldBlock)
-        );
         let released = groups.swap_remove(7);
         drop(released);
         let replacement = Group::new(controller).unwrap();

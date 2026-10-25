@@ -55,12 +55,6 @@ impl<B: IoBuf> IoUringRecvMessage<B> {
     }
 }
 
-impl IoUringRecvMessage<crate::IoUringBuffer> {
-    pub(crate) fn advance_payload(&mut self, bytes: usize) {
-        self.payload.advance(bytes);
-    }
-}
-
 impl<B: MessageStorage> SocketRecvMessage for IoUringRecvMessage<B> {
     type Payload = B;
 

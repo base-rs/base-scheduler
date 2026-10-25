@@ -428,12 +428,12 @@ fn cancelled_successors_preserve_their_owners_and_leave_cleanup_available() {
 }
 
 #[test]
-fn provided_stream_storage_supports_owned_peeks_cancellation_and_every_eof_form() {
+fn stream_storage_supports_owned_peeks_cancellation_and_every_eof_form() {
     run(async |scheduler| {
         let (sender, receiver) = stream_pair(scheduler).await;
         let never = Cancellation::never();
         let pool = scheduler
-            .buffer_pool_per_worker(BufferPoolOptions::new(4, 64))
+            .buffer_pool(BufferPoolOptions::new(4, 64))
             .unwrap();
         let mut reader = scheduler
             .socket_stream_reader_with_pool(&receiver, pool)
@@ -527,13 +527,13 @@ fn provided_stream_storage_supports_owned_peeks_cancellation_and_every_eof_form(
 }
 
 #[test]
-fn provided_packet_borrowing_preserves_peek_and_cancellation_before_closed_rejection() {
+fn packet_borrowing_preserves_peek_and_cancellation_before_closed_rejection() {
     run(async |scheduler| {
         let (sender, receiver) = packet_pair(scheduler).await;
         let never = Cancellation::never();
         let address = scheduler.socket_local_address(&receiver).unwrap();
         let pool = scheduler
-            .buffer_pool_per_worker(BufferPoolOptions::new(4, 64))
+            .buffer_pool(BufferPoolOptions::new(4, 64))
             .unwrap();
         let mut reader = scheduler
             .socket_packet_reader_with_pool(&receiver, pool)
@@ -843,11 +843,11 @@ fn stream_read_errors_and_cancellation_release_pool_capacity() {
 }
 
 #[test]
-fn provided_stream_read_cancellation_and_closed_admission_retire_receiver_state() {
+fn stream_read_cancellation_and_closed_admission_preserve_cleanup() {
     run(async |scheduler| {
         let (sender, receiver) = stream_pair(scheduler).await;
         let pool = scheduler
-            .buffer_pool_per_worker(BufferPoolOptions::new(4, 64))
+            .buffer_pool(BufferPoolOptions::new(4, 64))
             .unwrap();
         let mut reader = scheduler
             .socket_stream_reader_with_pool(&receiver, pool)
@@ -867,7 +867,7 @@ fn provided_stream_read_cancellation_and_closed_admission_retire_receiver_state(
     run(async |scheduler| {
         let (sender, receiver) = stream_pair(scheduler).await;
         let pool = scheduler
-            .buffer_pool_per_worker(BufferPoolOptions::new(4, 64))
+            .buffer_pool(BufferPoolOptions::new(4, 64))
             .unwrap();
         let mut reader = scheduler
             .socket_stream_reader_with_pool(&receiver, pool)
@@ -880,7 +880,7 @@ fn provided_stream_read_cancellation_and_closed_admission_retire_receiver_state(
 }
 
 #[test]
-fn provided_stream_socket_failures_preserve_borrowed_and_owned_storage() {
+fn stream_socket_failures_preserve_borrowed_and_owned_storage() {
     for owned in [false, true] {
         run(async |scheduler| {
             let never = Cancellation::never();
@@ -889,19 +889,12 @@ fn provided_stream_socket_failures_preserve_borrowed_and_owned_storage() {
                 .await
                 .unwrap();
             let pool = scheduler
-                .buffer_pool_per_worker(BufferPoolOptions::new(4, 64))
+                .buffer_pool(BufferPoolOptions::new(4, 64))
                 .unwrap();
             let mut reader = scheduler
                 .socket_stream_reader_with_pool(&socket, pool)
                 .unwrap();
-            // Cancelling only this wait leaves the provided receiver admitted. The following read observes the real ENOTCONN completion, with its own caller storage untouched.
-            let cancellation = Cancellation::new();
-            {
-                let mut first = Box::pin(reader.read(&cancellation));
-                assert!(poll_once(first.as_mut()).await.is_none());
-                cancellation.cancel();
-                assert!(first.await.is_err());
-            }
+            // An unconnected stream rejects the transfer without touching caller storage.
             if owned {
                 let (result, parts) = reader
                     .read_owned_vectored(vec![vec![0x5a; 4]], SocketRecvFlags::default(), &never)

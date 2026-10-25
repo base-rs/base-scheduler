@@ -47,14 +47,15 @@ fn run(future: impl std::future::Future<Output = ()>) {
 }
 
 #[test]
-fn worker_pools_preserve_independent_capacity_and_retained_payloads() {
+fn shared_pool_preserves_capacity_and_retained_payloads_across_workers() {
     let fixture = Fixture::new(4);
     let scheduler = &*fixture.selector;
     run(async {
         let never = Cancellation::never();
         let pool = scheduler
-            .buffer_pool_per_worker(BufferPoolOptions::new(2, 64))
+            .buffer_pool(BufferPoolOptions::new(2, 64))
             .unwrap();
+        assert_eq!(pool.capacity(), 2);
         let sender = UdpSocket::bind("127.0.0.1:0").unwrap();
         let mut sockets = Vec::new();
         let mut receivers = Vec::new();
@@ -100,7 +101,7 @@ fn worker_pools_preserve_independent_capacity_and_retained_payloads() {
             assert_eq!(retained.as_ref().as_ptr() as usize, address);
             assert_eq!(retained.as_ref(), b"retained");
         }
-        // The view can leave its original ring and worker, including through the final release.
+        // A retained view can move to another thread, including through its final release.
         std::thread::spawn(move || assert_eq!(retained.as_ref(), b"retained"))
             .join()
             .unwrap();
@@ -126,7 +127,7 @@ fn shared_receive_preserves_alignment_empty_datagrams_and_wait_cancellation() {
     run(async {
         let never = Cancellation::never();
         let pool = scheduler
-            .buffer_pool_per_worker(BufferPoolOptions {
+            .buffer_pool(BufferPoolOptions {
                 alignment: 4096,
                 ..BufferPoolOptions::new(1, 3)
             })

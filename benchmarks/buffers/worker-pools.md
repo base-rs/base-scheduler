@@ -1,5 +1,7 @@
 # Shared payloads and worker-local provided-buffer rings
 
+This is a historical experiment. Worker-provided pool construction and its receive-ahead integration have been removed from ordinary readers. Reproduce the comparisons at the recorded source revisions; current applications overlap reads and writes explicitly.
+
 This is a historical shared-budget prototype. The [worker-owned pool experiment](worker-owned.md) replaces cross-worker reclamation with eagerly provisioned local storage.
 
 One logical pool supplies exactly its requested payload capacity across connections and workers. The io_uring backend now implements that contract with a provided-buffer ring per participating worker. Payload storage is shared; ring metadata is local. This is a working prototype, not evidence that provided buffers universally outperform syscall-first receives.

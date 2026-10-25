@@ -50,8 +50,6 @@ mod io_uring_file_writer;
 pub use io_uring_file_reader::IoUringFileReader;
 pub use io_uring_file_writer::IoUringFileWriter;
 
-mod receive_ahead;
-
 mod interest;
 mod socket_message;
 use interest::Interest;

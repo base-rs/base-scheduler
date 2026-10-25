@@ -22,7 +22,6 @@ pub(crate) struct IoUringSocketStreamReader<'a> {
     owned: Option<crate::io_uring_selector::socket_read::State>,
     monitor: MonitorStorage,
     pool: Option<IoUringBufferPool>,
-    ahead: crate::receive_ahead::ReceiveAhead,
     eof: bool,
     closed: bool,
 }
@@ -42,7 +41,6 @@ impl<'a> IoUringSocketStreamReader<'a> {
             owned: None,
             monitor: scheduler.socket_monitor(socket, Interest::Readable),
             pool: None,
-            ahead: Default::default(),
             eof: false,
             closed: false,
         })
@@ -78,25 +76,6 @@ impl SocketStreamReader for IoUringSocketStreamReader<'_> {
                 self.scheduler
                     .buffer_pool(BufferPoolOptions::new(2, 64 * 1024))?,
             );
-        }
-        if self
-            .pool
-            .as_ref()
-            .is_some_and(IoUringBufferPool::is_provided)
-        {
-            let message = self
-                .ahead
-                .read(
-                    self.scheduler,
-                    self.monitor.socket(),
-                    self.pool.as_ref().unwrap(),
-                    cancellation,
-                )
-                .await?;
-            if message.is_none() {
-                self.eof = true;
-            }
-            return Ok(message.map(core_scheduler::SocketRecvMessage::into_payload));
         }
         let pool = self
             .pool
@@ -136,17 +115,6 @@ impl SocketStreamReader for IoUringSocketStreamReader<'_> {
         buffer: &mut [u8],
         cancellation: &Cancellation,
     ) -> OperationResult<usize> {
-        if self.ahead.active() {
-            return self
-                .read_vectored_with_flags(
-                    &mut [IoSliceMut::new(buffer)],
-                    SocketRecvFlags::default(),
-                    cancellation,
-                )
-                .await
-                .map(|result| result.bytes);
-        }
-
         self.check_open()?;
         self.operations.check_idle()?;
         if self.eof || buffer.is_empty() {
@@ -173,13 +141,6 @@ impl SocketStreamReader for IoUringSocketStreamReader<'_> {
         buffers: &mut [IoSliceMut<'_>],
         cancellation: &Cancellation,
     ) -> OperationResult<usize> {
-        if self.ahead.active() {
-            return self
-                .read_vectored_with_flags(buffers, SocketRecvFlags::default(), cancellation)
-                .await
-                .map(|result| result.bytes);
-        }
-
         self.check_open()?;
         self.operations.check_idle()?;
         if self.eof || buffers.iter().all(|buffer| buffer.is_empty()) {
@@ -207,24 +168,6 @@ impl SocketStreamReader for IoUringSocketStreamReader<'_> {
         flags: SocketRecvFlags,
         cancellation: &Cancellation,
     ) -> OperationResult<core_scheduler::SocketRecvResult> {
-        if self.ahead.active() {
-            self.check_open()?;
-            // Receive-ahead acquires this lane only after raw operations retire; all later owned reads stay with that receiver.
-            if self.eof || buffers.iter().all(|buffer| buffer.is_empty()) {
-                cancellation.check()?;
-                return Ok(core_scheduler::SocketRecvResult {
-                    bytes: 0,
-                    address: None,
-                    truncated: false,
-                    control_truncated: false,
-                });
-            }
-            return self
-                .ahead
-                .read_vectored(buffers, flags, true, cancellation)
-                .await;
-        }
-
         self.check_open()?;
         self.operations.check_idle()?;
         if self.eof || buffers.iter().all(|buffer| buffer.is_empty()) {
@@ -246,16 +189,6 @@ impl SocketStreamReader for IoUringSocketStreamReader<'_> {
         flags: SocketRecvFlags,
         cancellation: &Cancellation,
     ) -> (OperationResult<core_scheduler::SocketRecvResult>, Buffers) {
-        if self.ahead.active() {
-            if let Err(error) = self.check_open() {
-                return (Err(error), buffers);
-            }
-            return self
-                .ahead
-                .read_owned(buffers, flags, true, cancellation)
-                .await;
-        }
-
         if let Err(error) = self.check_open() {
             return (Err(error), buffers);
         }
@@ -288,12 +221,6 @@ impl SocketStreamReader for IoUringSocketStreamReader<'_> {
         buffer: B,
         cancellation: &Cancellation,
     ) -> core_scheduler::BufferResult<B> {
-        if self.ahead.active() {
-            let mut buffer = buffer;
-            let result = self.read_into(buffer.as_mut(), cancellation).await;
-            return (result, buffer);
-        }
-
         if let Err(error) = self.check_open() {
             return (Err(error), buffer);
         }
@@ -320,10 +247,6 @@ impl SocketStreamReader for IoUringSocketStreamReader<'_> {
     async fn close(&mut self) -> io::Result<()> {
         self.closed = true;
         self.operations.close().await;
-        let ahead = self.ahead.close().await;
-        self.scheduler
-            .socket_monitor_close(&mut self.monitor)
-            .await
-            .and(ahead)
+        self.scheduler.socket_monitor_close(&mut self.monitor).await
     }
 }
