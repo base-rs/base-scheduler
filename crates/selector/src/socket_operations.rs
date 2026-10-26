@@ -93,6 +93,12 @@ impl ReadinessSelector {
         };
         cancellation.check()?;
         self.check_open()?;
+        #[cfg(unix)]
+        if cancellation.is_never() && self.readiness.is_some() {
+            // Worker direction waits already wake and report driver closure.
+            // Neither cancellation listener can contribute on this path.
+            return operation.await.map_err(Into::into);
+        }
         let mut operation = pin!(operation);
         let mut cancelled = pin!(cancellation.cancelled());
         let mut closed = pin!(self.closed.cancelled());
@@ -103,6 +109,13 @@ impl ReadinessSelector {
             }
             if cancelled.as_mut().poll(context).is_ready() {
                 return Poll::Ready(Err(Cancelled.into()));
+            }
+            // Worker-owned readiness wakes every direction when the group
+            // closes, and its wait checks this same closure signal. Register a
+            // separate shutdown listener only for independently driven I/O.
+            #[cfg(unix)]
+            if self.readiness.is_some() {
+                return Poll::Pending;
             }
             if closed.as_mut().poll(context).is_ready() {
                 return Poll::Ready(Err(io::Error::new(

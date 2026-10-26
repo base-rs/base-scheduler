@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Drive Native socket readiness on executor workers, with lazy per-socket registration, independent concurrent waiters, and cached stream-read readiness.
+- Reduce worker-readiness notification overhead while preserving independent waiters, cancellation, and shutdown wakeups.
 
 ## v0.1.0
 
