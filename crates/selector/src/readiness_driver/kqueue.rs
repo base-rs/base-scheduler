@@ -25,6 +25,8 @@ pub(super) struct Poller {
     queue: OwnedFd,
     #[cfg(test)]
     pub(super) failure: std::sync::atomic::AtomicI32,
+    #[cfg(test)]
+    pub(super) partial_add_error: std::sync::atomic::AtomicI32,
 }
 impl Poller {
     pub(super) fn new() -> io::Result<Self> {
@@ -49,6 +51,8 @@ impl Poller {
             queue,
             #[cfg(test)]
             failure: std::sync::atomic::AtomicI32::new(INITIAL_FAILURE.with(std::cell::Cell::take)),
+            #[cfg(test)]
+            partial_add_error: std::sync::atomic::AtomicI32::new(0),
         };
         poller.changes(&[event(
             INTERRUPT,
@@ -98,6 +102,21 @@ impl Poller {
         debug_assert_eq!(mode, PollMode::Edge);
         let fd = socket.as_raw_fd() as usize;
         let flags = libc::EV_ADD | libc::EV_CLEAR;
+        #[cfg(test)]
+        {
+            let error = self
+                .partial_add_error
+                .swap(0, std::sync::atomic::Ordering::Relaxed);
+            if error != 0 {
+                // Deterministically model one installed filter followed by an
+                // add error and failed rollback, using a real readable source.
+                self.changes(&[event(fd, libc::EVFILT_READ, flags, 0, interest.key)])?;
+                self.failure
+                    .store(error, std::sync::atomic::Ordering::Relaxed);
+                let _ = self.delete(socket);
+                return Err(io::Error::from_raw_os_error(error));
+            }
+        }
         let result = self.changes(&[
             event(fd, libc::EVFILT_READ, flags, 0, interest.key),
             event(fd, libc::EVFILT_WRITE, flags, 0, interest.key),
@@ -125,16 +144,12 @@ impl Poller {
         }
         let mut receipts = [MaybeUninit::<libc::kevent>::uninit(); 2];
         let count = self.submit(&input[..changes.len()], &mut receipts)?;
-        for receipt in &receipts[..count] {
+        // EV_RECEIPT returns one receipt per change with sufficient output
+        // space. Never authorize pointer retirement from an incomplete prefix.
+        assert_eq!(count, changes.len(), "incomplete kqueue change receipts");
+        for (receipt, change) in receipts[..count].iter().zip(changes) {
             // SAFETY: The returned prefix was initialized by kevent.
-            let receipt = unsafe { receipt.assume_init_ref() };
-            if receipt.flags & libc::EV_ERROR != 0 && receipt.data != 0 {
-                // Removing an absent filter is harmless. A closed write side
-                // still needs readable EOF delivery (the usual kqueue EPIPE).
-                if receipt.data != libc::ENOENT as isize && receipt.data != libc::EPIPE as isize {
-                    return Err(io::Error::from_raw_os_error(receipt.data as i32));
-                }
-            }
+            check_receipt(unsafe { receipt.assume_init_ref() }, change)?;
         }
         Ok(())
     }
@@ -183,7 +198,8 @@ impl Poller {
             tv_nsec: duration.subsec_nanos() as libc::c_long,
         });
         // SAFETY: kevent writes only into this exclusively borrowed result
-        // array, synchronously. No userspace pointers survive the call.
+        // array, synchronously. No borrowed output storage access survives the call;
+        // opaque registration tokens follow the owning driver's lifetime rules.
         let count = unsafe {
             self.kevent(
                 self.queue.as_raw_fd(),
@@ -216,6 +232,19 @@ impl Poller {
         Ok(events.ready.len())
     }
 }
+fn check_receipt(receipt: &libc::kevent, change: &libc::kevent) -> io::Result<()> {
+    if receipt.flags & libc::EV_ERROR != 0 && receipt.data != 0 {
+        // Absence establishes deletion. EPIPE is accepted only for adding a
+        // closed write side; it cannot prove an old pointer was deregistered.
+        let absent = receipt.data == libc::ENOENT as isize;
+        let closed_add = receipt.data == libc::EPIPE as isize && change.flags & libc::EV_ADD != 0;
+        if !absent && !closed_add {
+            return Err(io::Error::from_raw_os_error(receipt.data as i32));
+        }
+    }
+    Ok(())
+}
+
 const ZERO: libc::timespec = libc::timespec {
     tv_sec: 0,
     tv_nsec: 0,
@@ -241,7 +270,8 @@ pub(super) struct ReadyEvent {
     pub(super) available: usize,
     pub(super) read_closed: bool,
 }
-// SAFETY: udata contains opaque numeric keys, never pointers to Rust storage.
+// SAFETY: udata contains opaque address tokens. This array only transports
+// them; the owning readiness driver controls all dereference and retirement.
 // The raw result array has one owner and is accessed only by a synchronous wait.
 unsafe impl Send for Events {}
 impl Events {

@@ -87,7 +87,17 @@ fn concurrent_registration_of_the_same_socket_reuses_one_live_record() {
         1
     );
     drop(socket);
-    assert!(first.owner.table.lock().unwrap().registrations.is_empty());
+    assert!(
+        first
+            .owner
+            .upgrade()
+            .unwrap()
+            .table
+            .lock()
+            .unwrap()
+            .registrations
+            .is_empty()
+    );
 }
 
 #[test]
@@ -418,7 +428,8 @@ fn failed_driver_creation_and_registration_return_the_os_error() {
         block_on(read(&selector, &socket)).0.unwrap_err().kind(),
         io::ErrorKind::OutOfMemory
     );
-    // A failed registration retains no key/record and permits a later attempt.
+    // Failed admission retains no socket entry and permits a later attempt.
+    // Its possibly exposed pointer stays quarantined in the controller.
     assert!(socket.registrations.entries.lock().unwrap().is_empty());
 }
 
@@ -481,23 +492,16 @@ fn simultaneous_listeners_have_distinct_wakers_and_drop_unregisters_only_one() {
 }
 
 #[test]
-fn events_after_table_retirement_do_not_notify_the_old_registration() {
+fn inactive_events_do_not_notify_the_old_registration() {
     let (selector, mut workers) = setup(1);
     let Some(group) = &selector.readiness else {
         return;
     };
     let socket = packet();
     let registration = socket.registrations.get(group, socket.get_ref()).unwrap();
-    // Deregistration removes routing before deleting the kernel filter. Model
-    // that supported window deterministically while the worker collects an edge.
-    let retired = registration
-        .owner
-        .table
-        .lock()
-        .unwrap()
-        .registrations
-        .remove(&registration.key);
-    assert!(retired.is_some());
+    // A retiring source is marked inactive before kernel deletion. Its
+    // pointer remains controller-owned while a collected event is ignored.
+    registration.inactive.store(true, Ordering::Release);
     let sender = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
     sender
         .send_to(b"retired", socket.local_addr().unwrap())
@@ -510,7 +514,7 @@ fn events_after_table_retirement_do_not_notify_the_old_registration() {
 }
 
 #[test]
-fn publication_allows_remote_exclusive_close_during_a_live_routing_snapshot() {
+fn publication_allows_remote_exclusive_close_during_a_live_batch() {
     struct CloseOnWake {
         selector: Arc<ReadinessSelector>,
         socket: Mutex<Option<NativeSocket>>,
@@ -524,7 +528,7 @@ fn publication_allows_remote_exclusive_close_during_a_live_routing_snapshot() {
                 tx.send(block_on(selector.socket_close(socket))).unwrap();
             });
             rx.recv_timeout(Duration::from_secs(3))
-                .expect("routing snapshot blocked exclusive close")
+                .expect("event publication blocked exclusive close")
                 .unwrap();
             closing.join().unwrap();
         }
@@ -569,6 +573,8 @@ fn publication_allows_remote_exclusive_close_during_a_live_routing_snapshot() {
     assert!(
         registration
             .owner
+            .upgrade()
+            .unwrap()
             .table
             .lock()
             .unwrap()
@@ -584,6 +590,360 @@ fn publication_allows_remote_exclusive_close_during_a_live_routing_snapshot() {
     registration.direction(Interest::Readable).publish();
     assert_eq!(fresh.direction(Interest::Readable).snapshot(), 0);
     block_on(selector.socket_close(replacement)).unwrap();
+}
+
+#[test]
+fn collected_pointers_survive_remote_retirement_and_reclaim_at_the_next_boundary() {
+    for close in [false, true] {
+        let (selector, mut workers) = setup(1);
+        let Some(group) = &selector.readiness else {
+            return;
+        };
+        let socket = packet();
+        let address = socket.local_addr().unwrap();
+        let registration = socket.registrations.get(group, socket.get_ref()).unwrap();
+        let weak = Arc::downgrade(&registration);
+        let token = registration.token();
+        let sender = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
+        sender.send_to(b"old", address).unwrap();
+        let inner = workers[0].driver.inner.as_mut().unwrap();
+        inner.events.clear();
+        inner
+            .controller
+            .poller
+            .wait(&mut inner.events, Some(Duration::from_secs(1)))
+            .unwrap();
+        assert!(inner.events.iter().any(|event| {
+            #[cfg(target_os = "macos")]
+            let event = event.readiness;
+            event.key == token
+        }));
+        drop(registration);
+        // The last socket owner closes remotely while this batch is retained.
+        std::thread::spawn(move || drop(socket)).join().unwrap();
+        assert!(weak.upgrade().is_some());
+        if close {
+            selector.close();
+        }
+        // This dereferences the collected token after every external record
+        // owner has gone. Inactive records must stay alive and be skipped.
+        inner.dispatch();
+        assert_eq!(weak.upgrade().unwrap().readable.snapshot(), 0);
+        workers[0].turn(Some(Duration::ZERO)).unwrap();
+        assert!(weak.upgrade().is_none());
+    }
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn failed_deletion_and_partial_add_are_quarantined_until_the_driver_stops() {
+    for failure in 0..3 {
+        let failed_add = failure != 0;
+        let (selector, mut workers) = setup(1);
+        let group = selector.readiness.as_ref().unwrap();
+        let owner = &group.controllers[0];
+        let socket = packet();
+        let address = socket.local_addr().unwrap();
+        if failed_add {
+            owner
+                .poller
+                .partial_add_error
+                .store(libc::ENOMEM, Ordering::Relaxed);
+            if failure == 2 {
+                owner.poller.failure.store(libc::ENOMEM, Ordering::Relaxed);
+            }
+            assert!(socket.registrations.get(group, socket.get_ref()).is_err());
+            assert!(socket.registrations.entries.lock().unwrap().is_empty());
+        } else {
+            drop(socket.registrations.get(group, socket.get_ref()).unwrap());
+        }
+        let weak = Arc::downgrade(
+            owner
+                .table
+                .lock()
+                .unwrap()
+                .registrations
+                .values()
+                .next()
+                .unwrap(),
+        );
+        if failure == 1 {
+            // The real read filter survived failed rollback and returns the
+            // quarantined pointer. It is safe to inspect and ignored.
+            let sender = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
+            sender.send_to(b"orphan", address).unwrap();
+            workers[0].turn(Some(Duration::from_secs(1))).unwrap();
+            assert_eq!(weak.upgrade().unwrap().readable.snapshot(), 0);
+        } else if !failed_add {
+            owner.poller.failure.store(libc::ENOMEM, Ordering::Relaxed);
+        }
+        drop(socket);
+        workers[0].turn(Some(Duration::ZERO)).unwrap();
+        assert!(weak.upgrade().is_some());
+        drop(workers);
+        assert!(weak.upgrade().is_none());
+    }
+}
+
+#[test]
+fn retired_records_release_on_next_turn_or_driver_drop() {
+    for turn in [false, true] {
+        let (selector, mut workers) = setup(1);
+        let Some(group) = &selector.readiness else {
+            return;
+        };
+        let mut weak = Vec::new();
+        for _ in 0..16 {
+            let socket = packet();
+            let registration = socket.registrations.get(group, socket.get_ref()).unwrap();
+            weak.push(Arc::downgrade(&registration));
+            drop(registration);
+            drop(socket);
+        }
+        assert!(weak.iter().all(|record| record.upgrade().is_some()));
+        if turn {
+            workers[0].turn(Some(Duration::from_secs(1))).unwrap();
+        } else {
+            drop(workers);
+        }
+        assert!(weak.iter().all(|record| record.upgrade().is_none()));
+    }
+}
+
+#[test]
+fn a_socket_can_outlive_its_driver_group_without_retaining_the_poller() {
+    let socket = packet();
+    let owner = {
+        let (selector, workers) = setup(1);
+        let Some(group) = &selector.readiness else {
+            return;
+        };
+        let registration = socket.registrations.get(group, socket.get_ref()).unwrap();
+        let owner = registration.owner.clone();
+        drop(registration);
+        drop(workers);
+        drop(selector);
+        owner
+    };
+    assert!(owner.upgrade().is_none());
+    drop(socket);
+}
+
+#[test]
+fn closing_one_worker_preserves_another_workers_collected_batch() {
+    let (selector, mut workers) = setup(2);
+    let Some(group) = &selector.readiness else {
+        return;
+    };
+    // Both workers were entered here, so the last entry routes this source.
+    let socket = packet();
+    let registration = socket.registrations.get(group, socket.get_ref()).unwrap();
+    let weak = Arc::downgrade(&registration);
+    let sender = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
+    sender
+        .send_to(b"closing", socket.local_addr().unwrap())
+        .unwrap();
+    let inner = workers[1].driver.inner.as_mut().unwrap();
+    inner
+        .controller
+        .poller
+        .wait(&mut inner.events, Some(Duration::from_secs(1)))
+        .unwrap();
+    assert!(inner.events.iter().next().is_some());
+    drop(registration);
+    drop(socket);
+    workers.remove(0); // Closes the whole group and reclaims only its own table.
+    assert!(weak.upgrade().is_some());
+    workers[0].driver.inner.as_ref().unwrap().dispatch();
+    drop(workers);
+    assert!(weak.upgrade().is_none());
+}
+
+#[test]
+fn retirement_interrupts_a_driver_already_waiting_without_socket_events() {
+    let (selector, mut drivers) =
+        ReadinessSelector::with_workers(SelectorOptions::default(), 1).unwrap();
+    let Some(group) = &selector.readiness else {
+        return;
+    };
+    let sockets = (0..16)
+        .map(|_| {
+            let socket = packet();
+            drop(socket.registrations.get(group, socket.get_ref()).unwrap());
+            socket
+        })
+        .collect::<Vec<_>>();
+    let driver = drivers.pop().unwrap();
+    let (ready, started) = std::sync::mpsc::channel();
+    let (done, finished) = std::sync::mpsc::channel();
+    let worker = std::thread::spawn(move || {
+        let mut worker = driver.enter();
+        // Drain initial writable edges before testing the idle interrupt.
+        worker.turn(Some(Duration::ZERO)).unwrap();
+        ready.send(()).unwrap();
+        worker.turn(Some(Duration::from_secs(3))).unwrap();
+        done.send(()).unwrap();
+    });
+    started.recv_timeout(Duration::from_secs(3)).unwrap();
+    drop(sockets);
+    finished
+        .recv_timeout(Duration::from_secs(1))
+        .expect("retirement did not interrupt the driver");
+    worker.join().unwrap();
+}
+
+#[test]
+fn the_first_callback_can_remotely_replace_sources_in_the_rest_of_the_batch() {
+    struct ReplaceOnWake {
+        selector: Arc<ReadinessSelector>,
+        sockets: Mutex<Vec<NativeSocket>>,
+        replacements: Mutex<Vec<NativeSocket>>,
+        close: bool,
+    }
+    impl Wake for ReplaceOnWake {
+        fn wake(self: Arc<Self>) {
+            let sockets = std::mem::take(&mut *self.sockets.lock().unwrap());
+            if sockets.is_empty() {
+                return;
+            }
+            let selector = Arc::clone(&self.selector);
+            let (tx, rx) = std::sync::mpsc::channel();
+            let remote = std::thread::spawn(move || {
+                for socket in sockets {
+                    block_on(selector.socket_close(socket)).unwrap();
+                }
+                let group = selector.readiness.as_ref().unwrap();
+                let replacements = (0..2)
+                    .map(|_| {
+                        let socket = packet();
+                        drop(socket.registrations.get(group, socket.get_ref()).unwrap());
+                        socket
+                    })
+                    .collect::<Vec<_>>();
+                tx.send(replacements).unwrap();
+            });
+            *self.replacements.lock().unwrap() = rx
+                .recv_timeout(Duration::from_secs(3))
+                .expect("callback held the routing lock or native owner");
+            remote.join().unwrap();
+            if self.close {
+                self.selector.close();
+            }
+        }
+    }
+    for close in [false, true] {
+        let (selector, mut workers) = setup(1);
+        let selector = Arc::new(selector);
+        let Some(group) = &selector.readiness else {
+            return;
+        };
+        let sockets = (0..2).map(|_| packet()).collect::<Vec<_>>();
+        let addresses = sockets
+            .iter()
+            .map(|socket| socket.local_addr().unwrap())
+            .collect::<Vec<_>>();
+        let registrations = sockets
+            .iter()
+            .map(|socket| socket.registrations.get(group, socket.get_ref()).unwrap())
+            .collect::<Vec<_>>();
+        workers[0].turn(Some(Duration::ZERO)).unwrap();
+        let wake = Arc::new(ReplaceOnWake {
+            selector: Arc::clone(&selector),
+            sockets: Mutex::new(sockets),
+            replacements: Mutex::new(Vec::new()),
+            close,
+        });
+        let waker = Waker::from(Arc::clone(&wake));
+        let mut waiting = registrations
+            .iter()
+            .map(|record| Box::pin(record.readable.wait(group)))
+            .collect::<Vec<_>>();
+        for wait in &mut waiting {
+            assert!(
+                wait.as_mut()
+                    .poll(&mut std::task::Context::from_waker(&waker))
+                    .is_pending()
+            );
+        }
+        let sender = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
+        for address in addresses {
+            sender.send_to(b"batch", address).unwrap();
+        }
+        let inner = workers[0].driver.inner.as_mut().unwrap();
+        inner.events.clear();
+        let deadline = std::time::Instant::now() + Duration::from_secs(3);
+        loop {
+            // A single OS wait need not return the entire ready set. Append
+            // until both sources are in the batch, without dispatching either.
+            inner
+                .controller
+                .poller
+                .wait(&mut inner.events, Some(Duration::from_millis(10)))
+                .unwrap();
+            let readable = inner
+                .events
+                .iter()
+                .filter_map(|event| {
+                    #[cfg(target_os = "macos")]
+                    let event = event.readiness;
+                    event.readable.then_some(event.key)
+                })
+                .collect::<std::collections::HashSet<_>>();
+            if readable.len() == 2 {
+                break;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "both sources were not collected"
+            );
+        }
+        inner.dispatch();
+        assert_eq!(
+            registrations
+                .iter()
+                .filter(|record| record.readable.snapshot() != 0)
+                .count(),
+            1
+        );
+        for replacement in wake.replacements.lock().unwrap().iter() {
+            let record = replacement.registrations.existing(group).unwrap();
+            assert_eq!(record.readable.snapshot(), 0);
+            assert!(
+                registrations
+                    .iter()
+                    .all(|old| old.token() != record.token())
+            );
+        }
+        drop(waiting);
+        drop(std::mem::take(&mut *wake.replacements.lock().unwrap()));
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+#[test]
+fn failed_epoll_deletion_quarantines_the_inactive_record_until_stop() {
+    let (selector, mut workers) = setup(1);
+    let socket = packet();
+    let group = selector.readiness.as_ref().unwrap();
+    let registration = socket.registrations.get(group, socket.get_ref()).unwrap();
+    let owner = registration.owner.upgrade().unwrap();
+    let weak = Arc::downgrade(&registration);
+    owner.poller.failure.store(libc::ENOMEM, Ordering::Relaxed);
+    drop(socket);
+    assert!(registration.inactive.load(Ordering::Acquire));
+    assert!(
+        owner
+            .table
+            .lock()
+            .unwrap()
+            .registrations
+            .contains_key(&registration.key)
+    );
+    drop(registration);
+    workers[0].turn(Some(Duration::ZERO)).unwrap();
+    assert!(weak.upgrade().is_some());
+    drop(workers);
+    assert!(weak.upgrade().is_none());
 }
 
 #[test]
