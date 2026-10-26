@@ -33,9 +33,7 @@ impl<'a> ReadinessSocketPacketReader<'a> {
         }
         Ok(Self {
             scheduler,
-            socket: NativeSocket {
-                inner: std::sync::Arc::clone(&socket.inner),
-            },
+            socket: socket.retain(),
             pool: None,
             closing: false,
         })

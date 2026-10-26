@@ -1,11 +1,15 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use crate::{NativeSocket, ReadinessSelector, socket_io};
+#[cfg(unix)]
+use crate::readiness_driver::Registration;
+use crate::{Interest, NativeSocket, ReadinessSelector, socket_io};
 use base_scheduler::{
     BufferPool, Cancellation, IoBuf, OperationError, OperationResult, SocketSendFlags,
     SocketStreamWriter, SocketStreamWriting,
 };
+#[cfg(unix)]
+use std::sync::Arc;
 use std::{
     future::{Future, poll_fn},
     io::{self, IoSlice},
@@ -20,6 +24,8 @@ type Completion = Pin<Box<dyn Future<Output = OperationResult<()>> + Send>>;
 pub(crate) struct ReadinessSocketStreamWriter<'scheduler, B> {
     scheduler: &'scheduler ReadinessSelector,
     socket: NativeSocket,
+    #[cfg(unix)]
+    registration: Option<Arc<Registration>>,
     pending: Option<Completion>,
     stopping: Cancellation,
     error: Option<OperationError>,
@@ -39,6 +45,8 @@ impl<'scheduler, B> ReadinessSocketStreamWriter<'scheduler, B> {
         Ok(Self {
             scheduler,
             socket: socket.retain(),
+            #[cfg(unix)]
+            registration: None,
             pending: None,
             stopping: Cancellation::new(),
             error: None,
@@ -83,6 +91,59 @@ impl<'scheduler, B> ReadinessSocketStreamWriter<'scheduler, B> {
         }
         self.result()
     }
+
+    #[cfg(unix)]
+    async fn write_with(
+        &mut self,
+        cancellation: &Cancellation,
+        mut send: impl FnMut(&socket2::Socket) -> io::Result<usize> + Send,
+    ) -> OperationResult<usize> {
+        let scheduler = self.scheduler;
+        let operation = pin!(async {
+            let Some(group) = &self.scheduler.readiness else {
+                return self.socket.io(Interest::Writable, send).await;
+            };
+            if self.registration.is_none() {
+                // Ready writes need neither a registration nor a table lookup.
+                let result = send(self.socket.get_ref());
+                if !matches!(&result, Err(error) if error.kind() == io::ErrorKind::WouldBlock) {
+                    return result;
+                }
+                self.registration = Some(
+                    self.socket
+                        .registrations
+                        .get(group, self.socket.get_ref())?,
+                );
+            }
+            let direction = self
+                .registration
+                .as_ref()
+                .unwrap()
+                .direction(Interest::Writable);
+            loop {
+                // Retry across lazy registration, and never clear a newer edge.
+                let observed = direction.snapshot();
+                match send(self.socket.get_ref()) {
+                    Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                        direction.clear(observed);
+                        direction.wait(group).await?;
+                    }
+                    result => return result,
+                }
+            }
+        });
+        scheduler.cancellable(cancellation, operation).await
+    }
+    #[cfg(not(unix))]
+    async fn write_with(
+        &mut self,
+        cancellation: &Cancellation,
+        send: impl FnMut(&socket2::Socket) -> io::Result<usize> + Send,
+    ) -> OperationResult<usize> {
+        self.scheduler
+            .cancellable(cancellation, self.socket.io(Interest::Writable, send))
+            .await
+    }
 }
 impl SocketStreamWriting for ReadinessSelector {
     fn socket_stream_writer<'scheduler>(
@@ -110,14 +171,10 @@ impl<B: IoBuf> SocketStreamWriter for ReadinessSocketStreamWriter<'_, B> {
         if self.pending.is_some() {
             self.wait(cancellation).await?;
         }
-        self.scheduler
-            .socket_send_poll(
-                &self.socket,
-                buffer,
-                SocketSendFlags::default(),
-                cancellation,
-            )
-            .await
+        self.write_with(cancellation, |socket| {
+            socket_io::send_poll(socket, buffer, SocketSendFlags::default())
+        })
+        .await
     }
     async fn write_vectored(
         &mut self,
@@ -137,9 +194,10 @@ impl<B: IoBuf> SocketStreamWriter for ReadinessSocketStreamWriter<'_, B> {
         if self.pending.is_some() {
             self.wait(cancellation).await?;
         }
-        self.scheduler
-            .socket_sendmsg_poll(&self.socket, buffers, None, flags, cancellation)
-            .await
+        self.write_with(cancellation, |socket| {
+            socket_io::sendmsg_poll(socket, buffers, None, flags)
+        })
+        .await
     }
     async fn write_owned_vectored<Buffers: base_scheduler::IoBufSequence>(
         &mut self,
@@ -302,6 +360,10 @@ impl<B> Drop for ReadinessSocketStreamWriter<'_, B> {
         self.stopping.cancel();
     }
 }
+
+#[cfg(all(test, unix))]
+#[path = "readiness_socket_stream_writer/tests.rs"]
+mod readiness_tests;
 
 #[cfg(test)]
 mod tests {

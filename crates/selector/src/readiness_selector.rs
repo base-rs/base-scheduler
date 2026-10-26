@@ -17,13 +17,15 @@ use std::{
     path::Path,
 };
 
-/// Native I/O capabilities independent of task execution. Sockets use `async-io` readiness; files, resolution, and blocking work use bounded worker pools.
+/// Native I/O capabilities independent of task execution. Sockets use worker-owned or independently driven readiness; files, resolution, and blocking work use bounded worker pools.
 ///
-/// Compatible instances accept the same file and socket types. The readiness reactor progresses independently of the executor polling operation futures.
+/// Compatible instances accept the same file and socket types. `new` and `with_options` provide independent reactor progress; `with_workers` supplies caller-owned drivers.
 pub struct ReadinessSelector {
     pub(crate) work: BlockingPool,
     pub(crate) cleanup: BlockingPool,
     pub(crate) closed: Cancellation,
+    #[cfg(unix)]
+    pub(crate) readiness: Option<std::sync::Arc<crate::readiness_driver::DriverGroup>>,
     #[cfg(test)]
     pub(crate) option_probe: std::sync::Arc<crate::socket_options::Probe>,
     #[cfg(test)]
@@ -69,6 +71,8 @@ impl ReadinessSelector {
             #[cfg(unix)]
             signals: crate::signal_service::SignalService::new(),
             closed: Cancellation::new(),
+            #[cfg(unix)]
+            readiness: None,
             work: BlockingPool::new(options),
             cleanup: BlockingPool::new(SelectorOptions {
                 threads: 1,
@@ -85,6 +89,10 @@ impl ReadinessSelector {
         self.cleanup.close();
         self.closed.cancel();
         #[cfg(unix)]
+        if let Some(group) = &self.readiness {
+            group.close();
+        }
+        #[cfg(unix)]
         self.signals.close();
     }
 
@@ -97,6 +105,36 @@ impl ReadinessSelector {
         self.cleanup.drain().await;
         #[cfg(unix)]
         self.signals.drain().await;
+    }
+
+    /// Compose readiness with one caller-driven poller per task worker.
+    ///
+    /// The returned drivers must keep progressing through shutdown. Operations
+    /// on this selector use its current entered worker, or an external route;
+    /// pending operations keep that owner across task migration. Platforms
+    /// without edge polling retain independent `async-io` progress instead.
+    pub fn with_workers(
+        options: SelectorOptions,
+        workers: usize,
+    ) -> io::Result<(Self, Vec<crate::ReadinessDriver>)> {
+        if workers == 0 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "worker count must be nonzero",
+            ));
+        }
+        let selector = Self::with_options(options)?;
+        #[cfg(unix)]
+        let (selector, drivers) = {
+            let mut selector = selector;
+            let (group, drivers) =
+                crate::readiness_driver::create(workers, selector.closed.clone())?;
+            selector.readiness = group;
+            (selector, drivers)
+        };
+        #[cfg(not(unix))]
+        let drivers = crate::readiness_driver::create(workers);
+        Ok((selector, drivers))
     }
 
     pub(crate) async fn buffer_operation<B: IoBuf>(

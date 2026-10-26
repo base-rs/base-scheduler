@@ -2,11 +2,16 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::Interest;
+#[cfg(unix)]
+use crate::readiness_driver::Registration;
+use crate::socket_io;
 use crate::{NativeSocket, ReadinessSelector};
 use base_scheduler::{
     BufferPool, BufferPoolOptions, BufferPooling, Cancellation, OperationResult, SocketRecvFlags,
     SocketStreamReader,
 };
+#[cfg(unix)]
+use std::sync::Arc;
 use std::{
     future::{Future, poll_fn},
     io::{self, IoSliceMut},
@@ -18,6 +23,10 @@ use std::{
 pub(crate) struct ReadinessSocketStreamReader<'a> {
     scheduler: &'a ReadinessSelector,
     socket: NativeSocket,
+    #[cfg(unix)]
+    registration: Option<Arc<Registration>>,
+    #[cfg(unix)]
+    established: bool,
     pool: Option<base_scheduler::HeapBufferPool>,
     eof: bool,
     closed: bool,
@@ -34,9 +43,11 @@ impl<'a> ReadinessSocketStreamReader<'a> {
         }
         Ok(Self {
             scheduler,
-            socket: NativeSocket {
-                inner: std::sync::Arc::clone(&socket.inner),
-            },
+            socket: socket.retain(),
+            #[cfg(unix)]
+            registration: None,
+            #[cfg(unix)]
+            established: false,
             pool: None,
             eof: false,
             closed: false,
@@ -58,6 +69,81 @@ impl<'a> ReadinessSocketStreamReader<'a> {
         } else {
             Ok(())
         }
+    }
+
+    // Scalar consuming stream reads may use readiness before their syscall.
+    // Message receives retain their separate syscall-first contract.
+    #[cfg(unix)]
+    async fn read_with(
+        &mut self,
+        capacity: usize,
+        cancellation: &Cancellation,
+        mut receive: impl FnMut(&socket2::Socket) -> io::Result<usize> + Send,
+    ) -> OperationResult<usize> {
+        let result = {
+            let scheduler = self.scheduler;
+            let operation = pin!(async {
+                let Some(group) = &self.scheduler.readiness else {
+                    return self.socket.io(Interest::Readable, receive).await;
+                };
+                let mut probe = !self.established;
+                if self.registration.is_none() {
+                    // Preserve immediate errors and retry across registration.
+                    let result = receive(self.socket.get_ref());
+                    if !matches!(&result, Err(error) if error.kind() == io::ErrorKind::WouldBlock) {
+                        return result;
+                    }
+                    self.registration = Some(
+                        self.socket
+                            .registrations
+                            .get(group, self.socket.get_ref())?,
+                    );
+                    probe = true;
+                }
+                let direction = self
+                    .registration
+                    .as_ref()
+                    .expect("a waiting stream retains its registration")
+                    .direction(Interest::Readable);
+                loop {
+                    let observed = direction.snapshot();
+                    if !probe && observed & 1 == 0 {
+                        direction.wait(group).await?;
+                        continue;
+                    }
+                    probe = false;
+                    match receive(self.socket.get_ref()) {
+                        Ok(count) => {
+                            // A short read must consume the event's reported
+                            // bytes before clearing. An urgent-data boundary can
+                            // leave bytes queued even after a short receive.
+                            direction.clear_after_read(observed, count, capacity);
+                            return Ok(count);
+                        }
+                        Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                            direction.clear(observed);
+                        }
+                        Err(error) => return Err(error),
+                    }
+                }
+            });
+            scheduler.cancellable(cancellation, operation).await
+        };
+        if matches!(result, Ok(count) if count != 0) {
+            self.established = true;
+        }
+        result
+    }
+    #[cfg(not(unix))]
+    async fn read_with(
+        &mut self,
+        _capacity: usize,
+        cancellation: &Cancellation,
+        receive: impl FnMut(&socket2::Socket) -> io::Result<usize> + Send,
+    ) -> OperationResult<usize> {
+        self.scheduler
+            .cancellable(cancellation, self.socket.io(Interest::Readable, receive))
+            .await
     }
 }
 
@@ -119,13 +205,9 @@ impl SocketStreamReader for ReadinessSocketStreamReader<'_> {
             return Ok(0);
         }
         let count = self
-            .scheduler
-            .socket_recv_poll(
-                &self.socket,
-                buffer,
-                SocketRecvFlags::default(),
-                cancellation,
-            )
+            .read_with(buffer.len(), cancellation, |socket| {
+                socket_io::recv_poll(socket, buffer, SocketRecvFlags::default())
+            })
             .await?;
         if count == 0 {
             self.eof = true;
@@ -232,3 +314,6 @@ impl SocketStreamReader for ReadinessSocketStreamReader<'_> {
         Ok(())
     }
 }
+
+#[cfg(all(test, unix))]
+mod tests;

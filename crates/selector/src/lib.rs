@@ -41,6 +41,10 @@ pub use system_address_info::SystemAddressInfo;
 pub use system_addresses::SystemAddresses;
 pub use system_file_metadata::SystemFileMetadata;
 
+#[cfg_attr(not(unix), path = "readiness_driver/fallback.rs")]
+mod readiness_driver;
+pub use readiness_driver::{ReadinessDriver, ReadinessWorker};
+
 mod readiness_selector;
 mod selector;
 mod selector_options;

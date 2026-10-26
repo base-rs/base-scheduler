@@ -409,10 +409,6 @@ fn borrowed_operations_reject_closed_schedulers_and_preserve_storage_on_errors()
     let mut target = [0x5a; 4];
     // An unconnected datagram send must report the immediate native error.
     assert!(matches!(
-        block_on(scheduler.socket_send_poll(&socket, b"x", SocketSendFlags::default(), &never)),
-        Err(OperationError::Io(_))
-    ));
-    assert!(matches!(
         block_on(scheduler.socket_sendmsg_poll(
             &socket,
             &[IoSlice::new(b"x")],
@@ -457,12 +453,6 @@ fn borrowed_operations_reject_closed_schedulers_and_preserve_storage_on_errors()
         io::ErrorKind::BrokenPipe
     );
     assert_eq!(
-        block_on(scheduler.socket_send_poll(&socket, b"x", SocketSendFlags::default(), &never))
-            .unwrap_err()
-            .kind(),
-        io::ErrorKind::BrokenPipe
-    );
-    assert_eq!(
         block_on(scheduler.socket_sendmsg_poll(
             &socket,
             &[IoSlice::new(b"x")],
@@ -494,6 +484,7 @@ fn borrowed_sends_preserve_short_counts_and_cancel_when_the_send_queue_is_full()
         server_socket.set_recv_buffer_size(4096).unwrap();
         let payload = vec![7; 4 * 1024 * 1024];
         let never = Cancellation::never();
+        let mut writer = scheduler.socket_stream_writer(&client).unwrap();
         let count = if message {
             block_on(scheduler.socket_sendmsg_poll(
                 &client,
@@ -504,13 +495,7 @@ fn borrowed_sends_preserve_short_counts_and_cancel_when_the_send_queue_is_full()
             ))
             .unwrap()
         } else {
-            block_on(scheduler.socket_send_poll(
-                &client,
-                &payload,
-                SocketSendFlags::default(),
-                &never,
-            ))
-            .unwrap()
+            block_on(writer.write(&payload, &never)).unwrap()
         };
         assert!(
             count > 0 && count < payload.len(),
@@ -539,15 +524,7 @@ fn borrowed_sends_preserve_short_counts_and_cancel_when_the_send_queue_is_full()
                         &token,
                     )
                 } else {
-                    cancel_pending_send(
-                        scheduler.socket_send_poll(
-                            &client,
-                            &payload,
-                            SocketSendFlags::default(),
-                            &token,
-                        ),
-                        &token,
-                    )
+                    cancel_pending_send(writer.write(&payload, &token), &token)
                 };
                 if cancelled {
                     break;
@@ -557,6 +534,8 @@ fn borrowed_sends_preserve_short_counts_and_cancel_when_the_send_queue_is_full()
             assert!(result.unwrap() > 0);
         }
         assert!(payload.iter().all(|byte| *byte == 7));
+        block_on(writer.close()).unwrap();
+        drop(writer);
         block_on(scheduler.shutdown());
     }
 }
@@ -604,4 +583,81 @@ fn directional_handle_factories_validate_transport_and_closed_admission() {
         io::ErrorKind::BrokenPipe
     );
     block_on(scheduler.shutdown());
+}
+
+#[cfg(unix)]
+#[test]
+fn registered_would_block_attempts_once_before_waiting() {
+    let (selector, drivers) =
+        ReadinessSelector::with_workers(crate::SelectorOptions::default(), 1).unwrap();
+    let worker = crate::SelectorDriver::enter(drivers.into_iter().next().unwrap());
+    let socket = socket();
+    let Some(group) = selector.readiness.as_ref() else {
+        return;
+    };
+    socket.registrations.get(group, socket.get_ref()).unwrap();
+    let calls = std::sync::atomic::AtomicUsize::new(0);
+    let mut operation = Box::pin(selector.socket_io(&socket, Interest::Readable, |_| {
+        calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        Err::<(), _>(io::Error::from(io::ErrorKind::WouldBlock))
+    }));
+    assert!(block_on(poll_once(&mut operation)).is_none());
+    assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 1);
+    drop(operation);
+    drop(worker);
+    block_on(selector.shutdown());
+}
+
+#[cfg(unix)]
+#[test]
+fn readiness_published_during_a_registered_syscall_is_not_cleared() {
+    use crate::{SelectorDriver, SelectorWorker};
+    let (selector, drivers) =
+        ReadinessSelector::with_workers(crate::SelectorOptions::default(), 1).unwrap();
+    let socket =
+        NativeSocket::new(std::net::UdpSocket::bind("127.0.0.1:0").unwrap().into()).unwrap();
+    let sender = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
+    let address = socket.local_addr().unwrap();
+    let Some(group) = selector.readiness.as_ref() else {
+        return;
+    };
+    let registration = socket.registrations.get(group, socket.get_ref()).unwrap();
+    let (turn, turns) = mpsc::channel();
+    let (done, completed) = mpsc::channel();
+    let (stop, stopping) = mpsc::channel();
+    let driver = drivers.into_iter().next().unwrap();
+    let driving = std::thread::spawn(move || {
+        let mut worker = driver.enter();
+        turns.recv_timeout(TIMEOUT).unwrap();
+        // The first batch can contain only the socket's initial writable
+        // edge. Synchronize on the readable edge this test actually needs.
+        let deadline = std::time::Instant::now() + TIMEOUT;
+        while registration.direction(Interest::Readable).snapshot() & 1 == 0 {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "readable edge was not delivered"
+            );
+            worker.turn(Some(Duration::from_millis(100))).unwrap();
+        }
+        done.send(()).unwrap();
+        stopping.recv_timeout(TIMEOUT).unwrap();
+    });
+    let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let called = calls.clone();
+    let mut operation = Box::pin(selector.socket_io(&socket, Interest::Readable, move |_| {
+        if called.fetch_add(1, std::sync::atomic::Ordering::SeqCst) == 0 {
+            sender.send_to(b"x", address).unwrap();
+            turn.send(()).unwrap();
+            completed.recv_timeout(TIMEOUT).unwrap();
+            Err(io::Error::from(io::ErrorKind::WouldBlock))
+        } else {
+            Ok(7)
+        }
+    }));
+    assert_eq!(block_on(poll_once(&mut operation)).unwrap().unwrap(), 7);
+    drop(operation);
+    assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 2);
+    stop.send(()).unwrap();
+    driving.join().unwrap();
+    block_on(selector.shutdown());
 }

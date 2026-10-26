@@ -629,3 +629,12 @@ mod pinned_tasks {
         }
     }
 }
+
+#[test]
+fn independently_driven_selectors_also_report_worker_startup_failures() {
+    for fail_after in [0, 1] {
+        thread::FAIL_AFTER.set(Some(fail_after));
+        assert!(TaskService::new(2, 8).is_err());
+        thread::FAIL_AFTER.set(None);
+    }
+}

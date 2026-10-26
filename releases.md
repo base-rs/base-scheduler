@@ -1,5 +1,9 @@
 # Releases
 
+## Unreleased
+
+- Drive Native socket readiness on executor workers, with lazy per-socket registration, independent concurrent waiters, and cached stream-read readiness.
+
 ## v0.1.0
 
 - Publish as `base-scheduler` in the `base-rs` organization, with package versions starting at 0.1.0.
