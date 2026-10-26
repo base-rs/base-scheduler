@@ -143,6 +143,86 @@ fn pending_writes_observe_cancellation_and_scheduler_closure() {
 }
 
 #[test]
+fn ready_results_win_cancellation_and_closure_after_admission() {
+    for close in [false, true] {
+        let (selector, _worker, socket, _peer) = setup();
+        let mut writer = ReadinessSocketStreamWriter::<Vec<u8>>::new(&selector, &socket).unwrap();
+        let cancellation = Cancellation::new();
+        assert_eq!(
+            block_on(writer.write_with(&cancellation, |_| {
+                if close {
+                    selector.close();
+                } else {
+                    cancellation.cancel();
+                }
+                Ok(3)
+            }))
+            .unwrap(),
+            3
+        );
+        assert!(writer.registration.is_none());
+    }
+}
+
+#[test]
+fn ready_write_admission_is_lazy_and_prevents_syscalls_after_cancel_or_close() {
+    let (selector, _worker, socket, _peer) = setup();
+    let mut writer = ReadinessSocketStreamWriter::<Vec<u8>>::new(&selector, &socket).unwrap();
+    let cancellation = Cancellation::new();
+    let attempts = std::sync::atomic::AtomicUsize::new(0);
+    let send = |_: &socket2::Socket| {
+        attempts.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        Ok(1)
+    };
+    let unpolled = writer.write_with(&cancellation, send);
+    drop(unpolled);
+    assert_eq!(attempts.load(std::sync::atomic::Ordering::Relaxed), 0);
+    cancellation.cancel();
+    assert!(matches!(
+        block_on(writer.write_with(&cancellation, send)),
+        Err(OperationError::Cancelled(_))
+    ));
+    selector.close();
+    assert_eq!(
+        block_on(writer.write_with(&Cancellation::never(), send))
+            .unwrap_err()
+            .kind(),
+        io::ErrorKind::BrokenPipe
+    );
+    assert_eq!(attempts.load(std::sync::atomic::Ordering::Relaxed), 0);
+}
+
+#[test]
+fn a_blocked_registered_write_waits_without_a_same_generation_probe() {
+    let (selector, _worker, socket, _peer) = setup();
+    let mut writer = ReadinessSocketStreamWriter::<Vec<u8>>::new(&selector, &socket).unwrap();
+    let never = Cancellation::never();
+    let mut attempts = 0;
+    block_on(writer.write_with(&never, |_| {
+        attempts += 1;
+        if attempts == 1 {
+            Err(io::ErrorKind::WouldBlock.into())
+        } else {
+            Ok(1)
+        }
+    }))
+    .unwrap();
+    let registration = writer.registration.as_ref().unwrap().clone();
+    let direction = registration.direction(Interest::Writable);
+    direction.publish();
+    let attempts = std::sync::atomic::AtomicUsize::new(0);
+    let mut writing = Box::pin(writer.write_with(&never, |_| {
+        attempts.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        Err(io::ErrorKind::WouldBlock.into())
+    }));
+    assert!(block_on(poll_once(writing.as_mut())).is_none());
+    assert_eq!(attempts.load(std::sync::atomic::Ordering::Relaxed), 1);
+    direction.publish();
+    assert!(block_on(poll_once(writing.as_mut())).is_none());
+    assert_eq!(attempts.load(std::sync::atomic::Ordering::Relaxed), 2);
+}
+
+#[test]
 fn worker_driven_writes_resume_after_real_tcp_backpressure() {
     use crate::SelectorWorker;
     use std::time::{Duration, Instant};
@@ -201,4 +281,35 @@ fn worker_driven_writes_resume_after_real_tcp_backpressure() {
         worker.turn(Some(Duration::from_millis(10))).unwrap();
     }
     receiving.join().unwrap();
+}
+
+#[test]
+fn blocked_writes_report_failed_registration_and_closure_during_the_first_wait() {
+    for fail_registration in [false, true] {
+        let (selector, _worker, socket, _peer) = setup();
+        let mut writer = ReadinessSocketStreamWriter::<Vec<u8>>::new(&selector, &socket).unwrap();
+        let never = Cancellation::never();
+        if fail_registration {
+            selector
+                .readiness
+                .as_ref()
+                .unwrap()
+                .fail_next_registration(libc::ENOMEM);
+        }
+        let mut writing =
+            pin!(writer.write_with(&never, |_| Err(io::ErrorKind::WouldBlock.into())));
+        if fail_registration {
+            assert_eq!(
+                block_on(writing).unwrap_err().kind(),
+                io::ErrorKind::OutOfMemory
+            );
+        } else {
+            assert!(block_on(poll_once(writing.as_mut())).is_none());
+            selector.close();
+            assert_eq!(
+                block_on(writing).unwrap_err().kind(),
+                io::ErrorKind::BrokenPipe
+            );
+        }
+    }
 }

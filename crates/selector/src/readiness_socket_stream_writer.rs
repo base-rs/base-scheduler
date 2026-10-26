@@ -99,16 +99,30 @@ impl<'scheduler, B> ReadinessSocketStreamWriter<'scheduler, B> {
         mut send: impl FnMut(&socket2::Socket) -> io::Result<usize> + Send,
     ) -> OperationResult<usize> {
         let scheduler = self.scheduler;
+        let mut wait_before_retry = false;
+        if scheduler.readiness.is_some() {
+            cancellation.check()?;
+            scheduler.check_open()?;
+            let direction = self
+                .registration
+                .as_ref()
+                .map(|registration| registration.direction(Interest::Writable));
+            let observed = direction.map(|direction| direction.snapshot());
+            match send(self.socket.get_ref()) {
+                Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                    if let Some(direction) = direction {
+                        direction.clear(observed.unwrap());
+                        wait_before_retry = true;
+                    }
+                }
+                result => return result.map_err(Into::into),
+            }
+        }
         let operation = pin!(async {
             let Some(group) = &self.scheduler.readiness else {
                 return self.socket.io(Interest::Writable, send).await;
             };
             if self.registration.is_none() {
-                // Ready writes need neither a registration nor a table lookup.
-                let result = send(self.socket.get_ref());
-                if !matches!(&result, Err(error) if error.kind() == io::ErrorKind::WouldBlock) {
-                    return result;
-                }
                 self.registration = Some(
                     self.socket
                         .registrations
@@ -120,6 +134,9 @@ impl<'scheduler, B> ReadinessSocketStreamWriter<'scheduler, B> {
                 .as_ref()
                 .unwrap()
                 .direction(Interest::Writable);
+            if wait_before_retry {
+                direction.wait(group).await?;
+            }
             loop {
                 // Retry across lazy registration, and never clear a newer edge.
                 let observed = direction.snapshot();

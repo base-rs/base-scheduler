@@ -4,6 +4,7 @@
 
 - Drive Native socket readiness on executor workers, with lazy per-socket registration, independent concurrent waiters, and cached stream-read readiness.
 - Reduce worker-readiness notification overhead while preserving independent waiters, cancellation, and shutdown wakeups.
+- Return successful borrowed stream writes before constructing wait futures; retain lazy registration and ordered owned output.
 
 ## v0.1.0
 

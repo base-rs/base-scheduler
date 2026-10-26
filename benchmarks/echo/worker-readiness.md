@@ -11,3 +11,7 @@ The initial change moves readiness delivery from the independent reactor onto ex
 ## Fused notifier
 
 The notifier confirmation reduces median raw user CPU from 0.37438 to 0.33881 microseconds/request (9.5%) and full HTTP from 0.86195 to 0.81298 (5.7%). Median throughput is 133,733 to 134,884 requests/second raw and 129,130 to 129,877 HTTP. All samples report zero errors. This cohort includes the `Cancellation::never()` path and removal of redundant closure listeners; it does not isolate those pieces individually. See [notifier summaries](results/worker-readiness/notifier/summary.json) and [samples](results/worker-readiness/notifier/samples.jsonl).
+
+## Successful borrowed writes
+
+The short ready-write screen changes raw user CPU from approximately 0.32277 to 0.31239 microseconds/request (3.2%). This is historical screening evidence, not an isolated confirmation of this extracted change: the comparison binary is from the copy-on-write routing experiment, while this PR retains numeric weak-table routing. Do not attribute the full difference to early write return. The retained implementation does not introduce copy-on-write routing. See [screen summaries](results/worker-readiness/ready-write-screen/summary.json) and [samples](results/worker-readiness/ready-write-screen/samples.jsonl).
