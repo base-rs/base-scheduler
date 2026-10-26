@@ -45,6 +45,10 @@ pub(crate) struct DriverGroup {
     next: AtomicUsize,
 }
 impl DriverGroup {
+    #[cfg(test)]
+    pub(crate) fn fail_next_registration(self: &Arc<Self>, error: i32) {
+        self.route().poller.failure.store(error, Ordering::Relaxed);
+    }
     pub(crate) fn close(&self) {
         self.closed.cancel();
         for controller in &self.controllers {
