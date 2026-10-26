@@ -50,6 +50,7 @@ impl Poller {
         unsafe { self.inner.add_with_mode(socket, event, mode) }
     }
     pub(super) fn delete(&self, socket: &socket2::Socket) -> io::Result<()> {
+        self.check()?;
         self.inner.delete(socket)
     }
     pub(super) fn notify(&self) -> io::Result<()> {

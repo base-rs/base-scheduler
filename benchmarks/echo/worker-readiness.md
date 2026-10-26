@@ -15,3 +15,7 @@ The notifier confirmation reduces median raw user CPU from 0.37438 to 0.33881 mi
 ## Successful borrowed writes
 
 The short ready-write screen changes raw user CPU from approximately 0.32277 to 0.31239 microseconds/request (3.2%). This is historical screening evidence, not an isolated confirmation of this extracted change: the comparison binary is from the copy-on-write routing experiment, while this PR retains numeric weak-table routing. Do not attribute the full difference to early write return. The retained implementation does not introduce copy-on-write routing. See [screen summaries](results/worker-readiness/ready-write-screen/summary.json) and [samples](results/worker-readiness/ready-write-screen/samples.jsonl).
+
+## Direct registration pointers
+
+Against an otherwise equivalent ready-write binary, the pointer screen reduces median raw user CPU by about 8.1%, improving all five paired rounds. Safety changes include strong driver ownership before kernel addition, inactive marking before synchronous deletion, deferred retirement after batch clearing, and failed-add/delete quarantine. Median raw throughput is 133,415 to 132,411 requests/second; this screen establishes no throughput gain. The final extraction includes additional failure and lifetime tests after measurement. See [pointer summaries](results/worker-readiness/pointer-screen/summary.json) and [samples](results/worker-readiness/pointer-screen/samples.jsonl).

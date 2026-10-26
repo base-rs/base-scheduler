@@ -27,7 +27,7 @@ use std::{
     rc::Rc,
     sync::{
         Arc, Mutex, Weak,
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     task::{Poll, Wake, Waker},
     time::Duration,
@@ -45,15 +45,15 @@ pub(crate) struct DriverGroup {
     next: AtomicUsize,
 }
 impl DriverGroup {
-    #[cfg(test)]
-    pub(crate) fn fail_next_registration(self: &Arc<Self>, error: i32) {
-        self.route().poller.failure.store(error, Ordering::Relaxed);
-    }
     pub(crate) fn close(&self) {
         self.closed.cancel();
         for controller in &self.controllers {
             controller.close();
         }
+    }
+    #[cfg(test)]
+    pub(crate) fn fail_next_registration(self: &Arc<Self>, error: i32) {
+        self.route().poller.failure.store(error, Ordering::Relaxed);
     }
     fn route(self: &Arc<Self>) -> Arc<Controller> {
         let local = ROUTES.with(|routes| {
@@ -76,29 +76,53 @@ impl DriverGroup {
 struct Table {
     closed: bool,
     next: usize,
-    registrations: HashMap<usize, Weak<Registration>>,
+    registrations: HashMap<usize, Arc<Registration>>,
+    retired: Vec<Arc<Registration>>,
 }
 struct Controller {
     poller: Poller,
     table: Mutex<Table>,
+    needs_release: AtomicBool,
 }
 impl Controller {
     fn close(&self) {
         let registrations = {
             let mut table = self.table.lock().unwrap();
             table.closed = true;
-            table
-                .registrations
-                .drain()
-                .filter_map(|(_, value)| value.upgrade())
-                .collect::<Vec<_>>()
+            table.registrations.values().cloned().collect::<Vec<_>>()
         };
-        // Never invoke task wakers under the routing/table lock.
+        // Closure wakes waits but cannot free pointers in a collected batch.
         for registration in registrations {
             registration.readable.changed.notify();
             registration.writable.changed.notify();
         }
         let _ = self.poller.notify();
+    }
+
+    fn release(&self) {
+        if !self.needs_release.load(Ordering::Acquire) {
+            return;
+        }
+        let retired = {
+            let mut table = self.table.lock().unwrap();
+            self.needs_release.store(false, Ordering::Release);
+            std::mem::take(&mut table.retired)
+        };
+        // Registration/waker destruction must be outside the table lock.
+        drop(retired);
+    }
+
+    fn stop(&self) {
+        let (registrations, retired) = {
+            let mut table = self.table.lock().unwrap();
+            table.closed = true;
+            (
+                std::mem::take(&mut table.registrations),
+                std::mem::take(&mut table.retired),
+            )
+        };
+        // Only the sole driver calls this, after its final dispatch has ended.
+        drop((registrations, retired));
     }
 }
 impl Wake for Controller {
@@ -198,12 +222,25 @@ fn closed() -> io::Error {
 }
 
 pub(crate) struct Registration {
-    owner: Arc<Controller>,
+    owner: Weak<Controller>,
     key: usize,
+    inactive: AtomicBool,
     readable: Direction,
     writable: Direction,
 }
 impl Registration {
+    fn token(&self) -> usize {
+        // Direct tokens require audited synchronous filter deletion. Other
+        // polling backends retain safe numeric-key routing.
+        #[cfg(any(target_os = "macos", target_os = "linux", target_os = "android"))]
+        {
+            (self as *const Self).expose_provenance()
+        }
+        #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "android")))]
+        {
+            self.key
+        }
+    }
     pub(crate) fn direction(&self, interest: Interest) -> &Direction {
         match interest {
             Interest::Readable => &self.readable,
@@ -271,44 +308,61 @@ impl SocketRegistrations {
             return Err(closed());
         }
         let key = table.next;
-        // Never reuse an event key: a collected batch can outlive deregistration.
+        // Stable diagnostic identities are separate from reusable pointer tokens.
         table.next = key
             .checked_add(1)
             .filter(|next| *next != usize::MAX)
             .ok_or_else(|| io::Error::other("readiness event keys exhausted"))?;
-        // SAFETY: NativeSocket retains this source through SocketRegistrations
-        // destruction, which deletes every registration before its native owner.
-        unsafe {
-            owner
-                .poller
-                .add_with_mode(socket, Event::all(key), PollMode::Edge)?;
-        }
         let registration = Arc::new(Registration {
-            owner: Arc::clone(&owner),
+            owner: Arc::downgrade(&owner),
             key,
+            inactive: AtomicBool::new(false),
             readable: Direction::new(),
             writable: Direction::new(),
         });
-        table
-            .registrations
-            .insert(key, Arc::downgrade(&registration));
+        // Publish ownership before the kernel can return this pointer. Failed
+        // adds can have installed one filter, even when rollback also fails.
+        table.registrations.insert(key, Arc::clone(&registration));
+        let token = registration.token();
+        // SAFETY: The controller retains this record until successful deletion
+        // followed by a driver batch boundary, or until the driver stops.
+        if let Err(error) = unsafe {
+            owner
+                .poller
+                .add_with_mode(socket, Event::all(token), PollMode::Edge)
+        } {
+            registration.inactive.store(true, Ordering::Release);
+            return Err(error);
+        }
         drop(table);
         entries.push((Arc::downgrade(group), Arc::clone(&registration)));
         Ok(registration)
     }
 }
 fn deregister(registration: &Registration, socket: &socket2::Socket) {
-    // Remove the key before deletion; a queued event can only reach its old
-    // record and cannot become a notification for a recycled descriptor.
-    registration
-        .owner
-        .table
-        .lock()
-        .unwrap()
-        .registrations
-        .remove(&registration.key);
-    let _ = registration.owner.poller.delete(socket);
+    registration.inactive.store(true, Ordering::Release);
+    let Some(owner) = registration.owner.upgrade() else {
+        // Its driver and poller have already been destroyed.
+        return;
+    };
+    // Never release a pointer which can still be returned by the OS. A failed
+    // delete leaves its inactive record quarantined until the driver stops.
+    if owner.poller.delete(socket).is_err() {
+        return;
+    }
+    let notify = {
+        let mut table = owner.table.lock().unwrap();
+        if let Some(record) = table.registrations.remove(&registration.key) {
+            table.retired.push(record);
+            owner.needs_release.store(true, Ordering::Release);
+        }
+        table.retired.len() == 16
+    };
+    if notify {
+        let _ = owner.poller.notify();
+    }
 }
+
 impl Drop for SocketRegistrations {
     fn drop(&mut self) {
         let socket = self
@@ -325,6 +379,52 @@ struct DriverState {
     group: Arc<DriverGroup>,
     controller: Arc<Controller>,
     events: Events,
+}
+
+impl DriverState {
+    fn dispatch(&self) {
+        for event in self.events.iter() {
+            #[cfg(target_os = "macos")]
+            let (event, available, read_closed) =
+                (event.readiness, event.available, event.read_closed);
+            // SAFETY: Only add_with_mode installs these tokens. Active records
+            // are controller-owned; successful deletion retires them only at
+            // the next batch boundary. Failed adds/deletes remain quarantined.
+            // Reentrant closure/retirement never releases a live batch's state.
+            #[cfg(any(target_os = "macos", target_os = "linux", target_os = "android"))]
+            let registration =
+                unsafe { &*std::ptr::with_exposed_provenance::<Registration>(event.key) };
+            #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "android")))]
+            let registration = {
+                let record = self
+                    .controller
+                    .table
+                    .lock()
+                    .unwrap()
+                    .registrations
+                    .get(&event.key)
+                    .cloned();
+                let Some(record) = record else {
+                    continue;
+                };
+                record
+            };
+            if registration.inactive.load(Ordering::Acquire) {
+                continue;
+            }
+            if event.readable {
+                #[cfg(target_os = "macos")]
+                registration
+                    .readable
+                    .publish_readable(available, read_closed);
+                #[cfg(not(target_os = "macos"))]
+                registration.readable.publish();
+            }
+            if event.writable {
+                registration.writable.publish();
+            }
+        }
+    }
 }
 
 /// A movable readiness driver for one executor worker.
@@ -367,7 +467,9 @@ fn create_with(
                 closed: false,
                 next: 0,
                 registrations: HashMap::new(),
+                retired: Vec::new(),
             }),
+            needs_release: AtomicBool::new(false),
         }));
     }
     let group = Arc::new(DriverGroup {
@@ -434,10 +536,13 @@ impl SelectorWorker for ReadinessWorker {
         let Some(inner) = &mut self.driver.inner else {
             return Ok(true);
         };
+        // Forget the previous batch before reclaiming successfully deleted
+        // registrations. Concurrent retirements stay owned until a later turn.
+        inner.events.clear();
+        inner.controller.release();
         if inner.group.closed.is_cancelled() {
             return Ok(true);
         }
-        inner.events.clear();
         if let Err(error) = inner.controller.poller.wait(&mut inner.events, timeout) {
             if error.kind() == io::ErrorKind::Interrupted {
                 return Ok(false);
@@ -445,32 +550,7 @@ impl SelectorWorker for ReadinessWorker {
             inner.group.close();
             return Err(error);
         }
-        for event in inner.events.iter() {
-            #[cfg(target_os = "macos")]
-            let (event, available, read_closed) =
-                (event.readiness, event.available, event.read_closed);
-            let registration = inner
-                .controller
-                .table
-                .lock()
-                .unwrap()
-                .registrations
-                .get(&event.key)
-                .and_then(Weak::upgrade);
-            if let Some(registration) = registration {
-                if event.readable {
-                    #[cfg(target_os = "macos")]
-                    registration
-                        .readable
-                        .publish_readable(available, read_closed);
-                    #[cfg(not(target_os = "macos"))]
-                    registration.readable.publish();
-                }
-                if event.writable {
-                    registration.writable.publish();
-                }
-            }
-        }
+        inner.dispatch();
         Ok(inner.group.closed.is_cancelled())
     }
 }
@@ -487,8 +567,10 @@ impl Drop for ReadinessWorker {
 }
 impl Drop for ReadinessDriver {
     fn drop(&mut self) {
-        if let Some(inner) = &self.inner {
+        if let Some(inner) = &mut self.inner {
             inner.group.close();
+            inner.events.clear();
+            inner.controller.stop();
         }
     }
 }

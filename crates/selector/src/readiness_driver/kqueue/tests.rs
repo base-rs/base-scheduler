@@ -75,3 +75,22 @@ fn waits_and_interrupts_report_os_errors_without_losing_ownership() {
         0
     );
 }
+
+#[test]
+fn receipt_errors_distinguish_closed_additions_from_failed_deletions() {
+    for flags in [libc::EV_ADD, libc::EV_DELETE] {
+        let change = event(1, libc::EVFILT_WRITE, flags, 0, 1);
+        for error in [0, libc::ENOENT, libc::EPIPE, libc::ENOMEM] {
+            let mut receipt = event(1, libc::EVFILT_WRITE, libc::EV_ERROR, 0, 1);
+            receipt.data = error as isize;
+            let result = check_receipt(&receipt, &change);
+            let accepted = error == 0
+                || error == libc::ENOENT
+                || (error == libc::EPIPE && flags == libc::EV_ADD);
+            assert_eq!(result.is_ok(), accepted);
+            if !accepted {
+                assert_eq!(result.unwrap_err().raw_os_error(), Some(error));
+            }
+        }
+    }
+}
