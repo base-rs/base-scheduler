@@ -192,20 +192,24 @@ impl Poller {
             }
         }
     }
+    /// Append native events, returning this wait's count including interrupts.
     pub(super) fn wait(&self, events: &mut Events, timeout: Option<Duration>) -> io::Result<usize> {
         let timeout = timeout.map(|duration| libc::timespec {
             tv_sec: duration.as_secs().min(libc::time_t::MAX as u64) as libc::time_t,
             tv_nsec: duration.subsec_nanos() as libc::c_long,
         });
+        events.raw.reserve(BATCH);
+        let length = events.raw.len();
         // SAFETY: kevent writes only into this exclusively borrowed result
-        // array, synchronously. No borrowed output storage access survives the call;
-        // opaque registration tokens follow the owning driver's lifetime rules.
+        // vector's spare capacity, synchronously. No borrowed output-storage
+        // access survives the call; opaque registration tokens follow the
+        // owning driver's lifetime rules.
         let count = unsafe {
             self.kevent(
                 self.queue.as_raw_fd(),
                 ptr::null(),
                 0,
-                events.raw.as_mut_ptr().cast(),
+                events.raw.as_mut_ptr().add(length),
                 BATCH as i32,
                 timeout.as_ref().map_or(ptr::null(), |value| value),
             )
@@ -213,23 +217,10 @@ impl Poller {
         if count < 0 {
             return Err(io::Error::last_os_error());
         }
-        for raw in &events.raw[..count as usize] {
-            // SAFETY: kevent initialized this returned prefix.
-            let raw = unsafe { raw.assume_init_ref() };
-            if raw.filter == libc::EVFILT_USER {
-                continue;
-            }
-            let error = raw.flags & libc::EV_ERROR != 0;
-            let mut ready = Event::none(raw.udata as usize);
-            ready.readable = raw.filter == libc::EVFILT_READ || error;
-            ready.writable = raw.filter == libc::EVFILT_WRITE || error;
-            events.ready.push(ReadyEvent {
-                readiness: ready,
-                available: raw.data.max(0) as usize,
-                read_closed: raw.filter == libc::EVFILT_READ && raw.flags & libc::EV_EOF != 0,
-            });
-        }
-        Ok(events.ready.len())
+        // SAFETY: kevent initialized exactly this many entries in the reserved
+        // tail. On failure the initialized prefix and its length stay unchanged.
+        unsafe { events.raw.set_len(length + count as usize) };
+        Ok(count as usize)
     }
 }
 fn check_receipt(receipt: &libc::kevent, change: &libc::kevent) -> io::Result<()> {
@@ -261,8 +252,7 @@ fn event(ident: usize, filter: i16, flags: u16, fflags: u32, key: usize) -> libc
 }
 
 pub(super) struct Events {
-    raw: Box<[MaybeUninit<libc::kevent>; BATCH]>,
-    ready: Vec<ReadyEvent>,
+    raw: Vec<libc::kevent>,
 }
 #[derive(Clone, Copy)]
 pub(super) struct ReadyEvent {
@@ -270,22 +260,34 @@ pub(super) struct ReadyEvent {
     pub(super) available: usize,
     pub(super) read_closed: bool,
 }
-// SAFETY: udata contains opaque address tokens. This array only transports
+// SAFETY: udata contains opaque address tokens. This vector only transports
 // them; the owning readiness driver controls all dereference and retirement.
-// The raw result array has one owner and is accessed only by a synchronous wait.
+// The raw result vector has one owner and is written only by a synchronous wait.
 unsafe impl Send for Events {}
 impl Events {
     pub(super) fn new() -> Self {
         Self {
-            raw: Box::new([MaybeUninit::uninit(); BATCH]),
-            ready: Vec::with_capacity(BATCH),
+            raw: Vec::with_capacity(BATCH),
         }
     }
     pub(super) fn clear(&mut self) {
-        self.ready.clear();
+        self.raw.clear();
     }
     pub(super) fn iter(&self) -> impl Iterator<Item = ReadyEvent> + '_ {
-        self.ready.iter().copied()
+        self.raw.iter().filter_map(|raw| {
+            if raw.filter == libc::EVFILT_USER {
+                return None;
+            }
+            let error = raw.flags & libc::EV_ERROR != 0;
+            let mut readiness = Event::none(raw.udata as usize);
+            readiness.readable = raw.filter == libc::EVFILT_READ || error;
+            readiness.writable = raw.filter == libc::EVFILT_WRITE || error;
+            Some(ReadyEvent {
+                readiness,
+                available: raw.data.max(0) as usize,
+                read_closed: raw.filter == libc::EVFILT_READ && raw.flags & libc::EV_EOF != 0,
+            })
+        })
     }
 }
 

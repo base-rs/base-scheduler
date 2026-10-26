@@ -6,6 +6,7 @@
 - Reduce worker-readiness notification overhead while preserving independent waiters, cancellation, and shutdown wakeups.
 - Return successful borrowed stream writes before constructing wait futures; retain lazy registration and ordered owned output.
 - Dispatch macOS and Linux/Android readiness events through stable registration pointers, with deferred retirement and failed-registration quarantine.
+- Decode macOS kqueue events directly from one reusable native-event vector, removing normalized event staging.
 
 ## v0.1.0
 
