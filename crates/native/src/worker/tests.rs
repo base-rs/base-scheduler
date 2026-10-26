@@ -498,3 +498,8 @@ fn idle_wake_prefers_the_requested_sleeping_worker() {
     assert!(!shared.workers[1].sleeping.load(Ordering::SeqCst));
     shared.wake_all();
 }
+
+#[test]
+fn a_nonblocking_turn_without_a_driver_does_not_park() {
+    super::drive(&mut None, Some(std::time::Duration::ZERO));
+}

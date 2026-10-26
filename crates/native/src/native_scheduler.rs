@@ -22,12 +22,16 @@ impl NativeScheduler {
 
     /// Configure task workers, timer capacity, and the default selector's blocking services.
     pub fn with_options(options: NativeOptions) -> io::Result<Self> {
-        let selector = ReadinessSelector::with_options(SelectorOptions {
-            threads: options.threads,
-            capacity: options.capacity,
-        })?;
-        Self::with_selector(
+        let (selector, drivers) = ReadinessSelector::with_workers(
+            SelectorOptions {
+                threads: options.threads,
+                capacity: options.capacity,
+            },
+            options.workers,
+        )?;
+        Self::with_drivers(
             selector,
+            drivers,
             NativeExecutorOptions {
                 workers: options.workers,
                 timer_capacity: options.timer_capacity,

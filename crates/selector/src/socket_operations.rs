@@ -27,14 +27,61 @@ impl ReadinessSelector {
             self.check_open()?;
             self.cancellable(
                 cancellation,
-                socket.io(interest, |socket| operation(socket, &mut input)),
+                self.socket_io(socket, interest, |socket| operation(socket, &mut input)),
             )
             .await
         }
         .await;
         (result, input)
     }
-    async fn cancellable<T>(
+    #[cfg(unix)]
+    async fn socket_io<T>(
+        &self,
+        socket: &NativeSocket,
+        interest: Interest,
+        mut operation: impl FnMut(&Socket) -> io::Result<T> + Send,
+    ) -> io::Result<T> {
+        if let Some(group) = &self.readiness {
+            let registration = if let Some(registration) = socket.registrations.existing(group) {
+                // Snapshot an existing edge generation before the syscall. A
+                // WouldBlock then clears only the observation that preceded it,
+                // without an immediate redundant retry on an already registered socket.
+                registration
+            } else {
+                // Unregistered sockets still attempt ready progress before
+                // registration. Retry after registration to cover that boundary.
+                let result = operation(socket.get_ref());
+                if !matches!(&result, Err(error) if error.kind() == io::ErrorKind::WouldBlock) {
+                    return result;
+                }
+                socket.registrations.get(group, socket.get_ref())?
+            };
+            let direction = registration.direction(interest);
+            loop {
+                let tick = direction.snapshot();
+                let result = operation(socket.get_ref());
+                if !matches!(&result, Err(error) if error.kind() == io::ErrorKind::WouldBlock) {
+                    return result;
+                }
+                direction.clear(tick);
+                direction.wait(group).await?;
+            }
+        } else {
+            socket.io(interest, operation).await
+        }
+    }
+
+    #[cfg(not(unix))]
+    async fn socket_io<T>(
+        &self,
+        socket: &NativeSocket,
+        interest: Interest,
+        operation: impl FnMut(&Socket) -> io::Result<T> + Send,
+    ) -> io::Result<T> {
+        socket.io(interest, operation).await
+    }
+
+    pub(crate) async fn cancellable<T>(
         &self,
         cancellation: &Cancellation,
         operation: impl std::future::Future<Output = io::Result<T>> + Send,
@@ -225,26 +272,6 @@ impl ReadinessSelector {
             cancellation,
             Interest::Readable,
             |socket, buffer| socket_io::recv_poll(socket, buffer, flags),
-        )
-        .await
-        .0
-    }
-}
-
-impl ReadinessSelector {
-    pub(crate) async fn socket_send_poll(
-        &self,
-        socket: &NativeSocket,
-        buffer: &[u8],
-        flags: SocketSendFlags,
-        cancellation: &Cancellation,
-    ) -> OperationResult<usize> {
-        self.socket_operation(
-            socket,
-            buffer,
-            cancellation,
-            Interest::Writable,
-            |socket, buffer| socket_io::send_poll(socket, buffer, flags),
         )
         .await
         .0

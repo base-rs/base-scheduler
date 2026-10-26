@@ -26,9 +26,7 @@ impl<'a> ReadinessSocketPacketWriter<'a> {
         }
         Ok(Self {
             scheduler,
-            socket: NativeSocket {
-                inner: std::sync::Arc::clone(&socket.inner),
-            },
+            socket: socket.retain(),
             closing: false,
         })
     }

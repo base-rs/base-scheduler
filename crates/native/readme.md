@@ -2,7 +2,7 @@
 
 A work-stealing executor composed with native I/O selectors for Base's explicit scheduler capabilities. Applications select this implementation; libraries depend only on `base-scheduler`.
 
-Tasks run on worker-local queues with remote inboxes and work stealing. The default `ReadinessSelector` supplies I/O independently of those workers. Nonblocking sockets use `async-io` readiness. Files, address resolution, and blocking closures use a separate bounded pool; accepted cleanup has an independent pool. Monotonic sleeps use reserved timer storage from `base-scheduler-timers`.
+Tasks run on worker-local queues with remote inboxes and work stealing. The default `ReadinessSelector` supplies one socket readiness driver per task worker. On macOS, workers own kqueues directly; other edge-capable platforms use `polling`, with independent `async-io` progress retained where edge polling is unavailable. Files, address resolution, and blocking closures use a separate bounded pool; accepted cleanup has an independent pool. Monotonic sleeps use reserved timer storage from `base-scheduler-timers`.
 
 ## Usage
 

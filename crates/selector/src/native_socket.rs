@@ -11,6 +11,9 @@ type RegisteredSocket = async_io::Async<socket2::Socket>;
 /// Usable by any native scheduler instance. Readiness operations retain their buffers in the waiting future without leaving payload pointers in the reactor. Completion backends retain the socket and buffers independently until their operations retire. Finish outstanding operations before exclusive close. Imported TCP resources must remain nonblocking through external aliases.
 #[derive(Debug)]
 pub struct NativeSocket {
+    // Drop registrations before the final native owner. They hold only a weak native reference.
+    #[cfg(unix)]
+    pub(crate) registrations: Arc<crate::readiness_driver::SocketRegistrations>,
     pub(crate) inner: Arc<RegisteredSocket>,
 }
 impl NativeSocket {
@@ -29,16 +32,23 @@ impl NativeSocket {
         socket: socket2::Socket,
         register: impl FnOnce(socket2::Socket) -> io::Result<RegisteredSocket>,
     ) -> io::Result<Self> {
+        let inner = Arc::new(register(socket)?);
         Ok(Self {
-            inner: Arc::new(register(socket)?),
+            #[cfg(unix)]
+            registrations: Arc::new(crate::readiness_driver::SocketRegistrations::new(&inner)),
+            inner,
         })
     }
     pub(crate) fn retain(&self) -> Self {
         Self {
+            #[cfg(unix)]
+            registrations: Arc::clone(&self.registrations),
             inner: Arc::clone(&self.inner),
         }
     }
     pub(crate) fn into_close(self) -> impl FnOnce() -> io::Result<()> + Send + 'static {
+        #[cfg(unix)]
+        drop(self.registrations);
         let inner = Arc::try_unwrap(self.inner)
             .expect("cannot close a socket with outstanding operations; await them first");
         move || inner.into_inner().and_then(crate::socket_io::close)
