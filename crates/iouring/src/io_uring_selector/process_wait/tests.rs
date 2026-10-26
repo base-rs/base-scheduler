@@ -144,7 +144,7 @@ fn capacity_cancellation_closure_and_identifier_exhaustion_prevent_submission() 
 }
 
 #[test]
-fn detaching_a_wait_result_disconnects_its_receiver_exactly_once() {
+fn cancellation_retains_a_wait_reply_until_it_is_detached_exactly_once() {
     let (selector, driver) = IoUringSelector::new(Default::default()).unwrap();
     let controller = &selector.controllers[0];
     let permit = block_on(controller.capacity.acquire(&Cancellation::never())).unwrap();
@@ -159,6 +159,9 @@ fn detaching_a_wait_result_disconnects_its_receiver_exactly_once() {
         reply: Cell::new(Some(reply)),
         cancelling: Cell::new(false),
     };
+    assert!(request.begin_cancellation());
+    assert!(!request.begin_cancellation());
+    assert!(matches!(result.try_recv(), Ok(None)));
     // Detaching the sender is independent of kernel completion: a stopped driver can disconnect the waiter while retaining the request's output storage.
     drop(request.take_reply().unwrap());
     assert!(request.take_reply().is_none());

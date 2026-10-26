@@ -2,6 +2,9 @@
 
 ## v0.1.0
 
+- Publish as `base-scheduler` in the `base-rs` organization, with package versions starting at 0.1.0.
+- Rename the companion scheduler packages and Rust crate paths to the `base-scheduler` family.
+
 Initial release of the runtime-independent scheduler interface and its seven companion crates. The workspace requires Rust 1.85 or later.
 
 - Define separate capabilities for clocks, task spawning, bounded blocking work, address resolution, signals, process waits, and file/socket lifecycle operations. Protocol libraries depend on the capabilities they use; applications choose a backend.

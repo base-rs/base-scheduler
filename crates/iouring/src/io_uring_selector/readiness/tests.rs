@@ -7,7 +7,7 @@ use crate::Interest;
 use futures_lite::future::{block_on, poll_once};
 
 fn streams(selector: &IoUringSelector) -> (NativeSocket, NativeSocket) {
-    block_on(core_scheduler_conformance::socket::stream_pair(
+    block_on(base_scheduler_conformance::socket::stream_pair(
         selector,
         SocketDomain::Ipv4,
     ))

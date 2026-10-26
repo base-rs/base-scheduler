@@ -4,7 +4,7 @@
 use crate::{
     NativeFile, ReadinessSelector, blocking_pool::admission_error, readiness_selector::wait_close,
 };
-use core_scheduler::{
+use base_scheduler::{
     AdviceMode, AllocationMode, Cancellation, FileAdvice, FileAllocate, OperationResult,
 };
 use std::{io, os::fd::AsRawFd};
@@ -108,7 +108,7 @@ impl ReadinessSelector {
         length: u64,
         advice: AdviceMode,
     ) -> io::Result<
-        futures_channel::oneshot::Receiver<Result<io::Result<()>, core_scheduler::TaskError>>,
+        futures_channel::oneshot::Receiver<Result<io::Result<()>, base_scheduler::TaskError>>,
     > {
         range(offset, length)?;
         let file = file.retain();

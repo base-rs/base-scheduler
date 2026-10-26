@@ -4,7 +4,7 @@
 #![allow(clippy::unnecessary_cast)]
 
 use crate::{SystemAddresses, TokioScheduler};
-use core_scheduler::{
+use base_scheduler::{
     AddressHints, AddressResolution, AddressService, Cancellation, OperationResult, SocketDomain,
     SocketProtocol, SocketType,
 };

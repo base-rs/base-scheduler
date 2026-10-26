@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 //! Independent directional resources retain registration privately across repeated operations.
-use core_scheduler::*;
+use base_scheduler::*;
 use futures_lite::future::{poll_once, zip};
 
 pub async fn stream<S>(scheduler: &S, sender: &S::Socket, receiver: &S::Socket)

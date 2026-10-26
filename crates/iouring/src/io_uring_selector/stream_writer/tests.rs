@@ -44,7 +44,7 @@ fn buffer(length: usize, byte: u8, drops: &Arc<AtomicUsize>) -> Buffer {
 }
 
 fn stream(selector: &IoUringSelector) -> (NativeSocket, NativeSocket) {
-    block_on(core_scheduler_conformance::socket::stream_pair(
+    block_on(base_scheduler_conformance::socket::stream_pair(
         selector,
         SocketDomain::Ipv4,
     ))

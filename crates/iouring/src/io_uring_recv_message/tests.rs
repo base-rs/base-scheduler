@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use super::*;
-use core_scheduler::HeapBufferPool;
+use base_scheduler::HeapBufferPool;
 
 #[test]
 fn native_addresses_decode_unaligned_ipv4_and_ipv6_metadata_without_exposing_it_as_payload() {
@@ -36,7 +36,7 @@ fn native_addresses_decode_unaligned_ipv4_and_ipv6_metadata_without_exposing_it_
         let payload = message.into_payload();
         assert_eq!(payload.as_ref(), b"Xata");
         assert_eq!(payload.as_ref().as_ptr(), pointer);
-        let frozen = core_scheduler::ReceiveBuffer::freeze(payload);
+        let frozen = base_scheduler::ReceiveBuffer::freeze(payload);
         drop(pool);
         assert_eq!(frozen.as_ref(), b"Xata");
     }
@@ -59,7 +59,7 @@ fn portable_metadata_and_empty_payloads_use_the_same_message_contract() {
         let buffer = pool.try_acquire().unwrap();
         let payload = crate::IoUringBuffer::new(buffer, 0, 0);
         let message = IoUringRecvMessage::portable(OwnedSocketRecvMessage::new(
-            core_scheduler::SocketRecvResult {
+            base_scheduler::SocketRecvResult {
                 bytes: 0,
                 address,
                 truncated: false,

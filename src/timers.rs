@@ -9,7 +9,7 @@ use std::{future::Future, time::Instant};
 /// Construct resources through `timer` to establish their scheduler compatibility before waiting. Waiting always receives its scheduler and cancellation explicitly; incompatible scheduler/resource pairings are rejected with `io::ErrorKind::InvalidInput`. Only one waiter can borrow the resource. Dropping a wait retains its registration, which may cause a later wake of the previous task. Dropping the resource retires it; forgetting it may leak registration capacity but cannot retain borrowed application memory. Cancellation observed after admission disarms its registration; pre-cancellation leaves existing state unchanged. Deadline replacement happens on first poll, including an earlier replacement.
 ///
 /// ```
-/// use core_scheduler::{Cancellation, OperationResult, Timers};
+/// use base_scheduler::{Cancellation, OperationResult, Timers};
 /// use std::time::Duration;
 ///
 /// async fn delay<S: Timers>(scheduler: &S, cancellation: &Cancellation) -> OperationResult<()> {

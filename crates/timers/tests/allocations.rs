@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler_timers::Timers;
+use base_scheduler_timers::Timers;
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::Cell;
 use std::task::Waker;
@@ -145,7 +145,7 @@ fn reserved_timer_lifecycles_and_reuse_allocate_nothing() {
 #[cfg(feature = "driver")]
 #[test]
 fn bounded_driver_lifecycles_allocate_nothing() {
-    use core_scheduler_timers::driver::TimerDriver;
+    use base_scheduler_timers::driver::TimerDriver;
     let now = Instant::now();
     let mut driver = TimerDriver::new();
     let mut producer = driver.producer(512);
@@ -207,7 +207,7 @@ fn bounded_driver_lifecycles_allocate_nothing() {
 #[cfg(feature = "local")]
 #[test]
 fn local_queue_reuses_slots_and_compacts_without_allocating() {
-    use core_scheduler_timers::local::TimerQueue;
+    use base_scheduler_timers::local::TimerQueue;
     let now = Instant::now();
     let mut queue = TimerQueue::with_capacity(512);
     let mut keys = Vec::with_capacity(queue.capacity());
@@ -244,7 +244,7 @@ fn local_queue_reuses_slots_and_compacts_without_allocating() {
 #[cfg(feature = "sharded")]
 #[test]
 fn sharded_registration_assistance_and_reuse_allocate_nothing() {
-    use core_scheduler_timers::sharded::{TimerWaiter, WorkerTimers};
+    use base_scheduler_timers::sharded::{TimerWaiter, WorkerTimers};
     let mut owner = WorkerTimers::with_capacity(512);
     let peer = owner.assistance();
     let waiter = TimerWaiter::new(std::slice::from_ref(&peer));
@@ -300,7 +300,7 @@ fn sharded_registration_assistance_and_reuse_allocate_nothing() {
 #[cfg(feature = "sharded")]
 #[test]
 fn lazy_sleep_lifecycles_allocate_nothing() {
-    use core_scheduler_timers::sharded::{SleepWake, WorkerTimers};
+    use base_scheduler_timers::sharded::{SleepWake, WorkerTimers};
     use std::future::Future;
     use std::pin::Pin;
     use std::task::Context;

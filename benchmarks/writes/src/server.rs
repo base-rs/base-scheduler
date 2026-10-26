@@ -2,11 +2,11 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::{Result, Workload, prepare};
-use core_scheduler::{
+use base_scheduler::{
     BufferLease, Cancellation, HeapBufferPool, SocketRegistration, SocketStreamReader,
     SocketStreamReading, SocketStreamWriter, SocketStreamWriting, Spawn,
 };
-use core_scheduler_tokio::TokioScheduler;
+use base_scheduler_tokio::TokioScheduler;
 use std::{
     future::Future,
     io::{self, Write},
@@ -266,7 +266,7 @@ fn serve(backend: &str, workers: usize, workload: Workload, sockets: Vec<TcpStre
         }
         #[cfg(target_os = "linux")]
         "native-monitor" | "native-monitor-alternating" => {
-            use core_scheduler_native::{NativeOptions, NativeScheduler};
+            use base_scheduler_native::{NativeOptions, NativeScheduler};
             let scheduler = Arc::new(crate::setup("native runtime", || {
                 NativeScheduler::with_options(NativeOptions {
                     workers,
@@ -293,8 +293,8 @@ fn serve(backend: &str, workers: usize, workload: Workload, sockets: Vec<TcpStre
         }
         #[cfg(target_os = "linux")]
         "iouring-monitor" | "iouring-monitor-alternating" | "iouring-writer" => {
-            use core_scheduler_iouring::{IoUringOptions, IoUringSelector};
-            use core_scheduler_native::{NativeExecutorOptions, NativeScheduler};
+            use base_scheduler_iouring::{IoUringOptions, IoUringSelector};
+            use base_scheduler_native::{NativeExecutorOptions, NativeScheduler};
             let (selector, drivers) = crate::setup("io_uring selector", || {
                 IoUringSelector::with_workers(
                     IoUringOptions {

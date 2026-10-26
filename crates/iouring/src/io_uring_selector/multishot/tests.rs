@@ -5,7 +5,7 @@ use super::super::tests::{drain, drive, pair};
 use super::*;
 use futures_lite::future::{block_on, poll_once};
 
-use core_scheduler_selector::{SelectorDriver, SelectorWorker};
+use base_scheduler_selector::{SelectorDriver, SelectorWorker};
 
 thread_local! {
     static BEFORE_RECEIVE_LISTEN: std::cell::RefCell<Option<Box<dyn FnOnce()>>> = const { std::cell::RefCell::new(None) };
@@ -51,7 +51,7 @@ fn receiver(
 #[test]
 fn persistent_stream_reuses_one_submission_and_keeps_leases_alive_after_shutdown() {
     let (selector, mut driver) = pair(2);
-    let (sender, socket) = block_on(core_scheduler_conformance::socket::stream_pair(
+    let (sender, socket) = block_on(base_scheduler_conformance::socket::stream_pair(
         &selector,
         SocketDomain::Ipv4,
     ));
@@ -140,7 +140,7 @@ fn empty_datagrams_truncation_and_exhaustion_preserve_message_boundaries() {
 #[test]
 fn shutdown_during_buffer_exhaustion_retires_without_a_transport_error() {
     let (selector, mut driver) = pair(2);
-    let (sender, socket) = block_on(core_scheduler_conformance::socket::stream_pair(
+    let (sender, socket) = block_on(base_scheduler_conformance::socket::stream_pair(
         &selector,
         SocketDomain::Ipv4,
     ));
@@ -175,7 +175,7 @@ fn shutdown_during_buffer_exhaustion_retires_without_a_transport_error() {
 fn cancellation_and_abandonment_retire_before_exclusive_socket_close() {
     for abandon in [false, true] {
         let (selector, mut driver) = pair(1);
-        let (_sender, socket) = block_on(core_scheduler_conformance::socket::stream_pair(
+        let (_sender, socket) = block_on(base_scheduler_conformance::socket::stream_pair(
             &selector,
             SocketDomain::Ipv4,
         ));
@@ -211,7 +211,7 @@ fn cancellation_and_abandonment_retire_before_exclusive_socket_close() {
 #[test]
 fn construction_is_lazy_and_rejects_invalid_options_peeking_cancellation_and_closure() {
     let (selector, mut driver) = pair(1);
-    let (_sender, socket) = block_on(core_scheduler_conformance::socket::stream_pair(
+    let (_sender, socket) = block_on(base_scheduler_conformance::socket::stream_pair(
         &selector,
         SocketDomain::Ipv4,
     ));
@@ -270,7 +270,7 @@ fn construction_is_lazy_and_rejects_invalid_options_peeking_cancellation_and_clo
 #[test]
 fn eof_follows_data_and_leases_support_owned_writes() {
     let (selector, mut driver) = pair(2);
-    let (sender, socket) = block_on(core_scheduler_conformance::socket::stream_pair(
+    let (sender, socket) = block_on(base_scheduler_conformance::socket::stream_pair(
         &selector,
         SocketDomain::Ipv4,
     ));
@@ -318,7 +318,7 @@ fn eof_follows_data_and_leases_support_owned_writes() {
 #[test]
 fn remote_return_rearms_the_original_pool_and_forgotten_receivers_drain_on_shutdown() {
     let (selector, mut driver) = pair(1);
-    let (sender, socket) = block_on(core_scheduler_conformance::socket::stream_pair(
+    let (sender, socket) = block_on(base_scheduler_conformance::socket::stream_pair(
         &selector,
         SocketDomain::Ipv4,
     ));
@@ -347,12 +347,12 @@ fn remote_return_rearms_the_original_pool_and_forgotten_receivers_drain_on_shutd
 fn unpublished_receivers_are_notified_when_the_driver_is_dropped() {
     for local in [false, true] {
         let (selector, driver) = pair(1);
-        let (_sender, socket) = block_on(core_scheduler_conformance::socket::stream_pair(
+        let (_sender, socket) = block_on(base_scheduler_conformance::socket::stream_pair(
             &selector,
             SocketDomain::Ipv4,
         ));
         let owner: Box<dyn std::any::Any> = if local {
-            Box::new(core_scheduler_selector::SelectorDriver::enter(driver))
+            Box::new(base_scheduler_selector::SelectorDriver::enter(driver))
         } else {
             Box::new(driver)
         };
@@ -368,7 +368,7 @@ fn pool_errors_and_driver_failure_notify_the_receiver() {
     use super::super::tests::Failures;
     for failure in ["register-buffer-ring", "unregister-buffer-ring", "wait"] {
         let (selector, mut driver) = pair(1);
-        let (_sender, socket) = block_on(core_scheduler_conformance::socket::stream_pair(
+        let (_sender, socket) = block_on(base_scheduler_conformance::socket::stream_pair(
             &selector,
             SocketDomain::Ipv4,
         ));
@@ -406,7 +406,7 @@ fn pool_errors_and_driver_failure_notify_the_receiver() {
 fn dormant_close_and_shutdown_leave_held_leases_valid() {
     for shutdown in [false, true] {
         let (selector, mut driver) = pair(1);
-        let (sender, socket) = block_on(core_scheduler_conformance::socket::stream_pair(
+        let (sender, socket) = block_on(base_scheduler_conformance::socket::stream_pair(
             &selector,
             SocketDomain::Ipv4,
         ));
@@ -445,7 +445,7 @@ fn dormant_close_and_shutdown_leave_held_leases_valid() {
 fn selected_error_and_eof_buffers_are_returned_without_reading_a_header() {
     for result in [-libc::ECONNRESET, 0] {
         let (selector, mut driver) = pair(1);
-        let (_sender, socket) = block_on(core_scheduler_conformance::socket::stream_pair(
+        let (_sender, socket) = block_on(base_scheduler_conformance::socket::stream_pair(
             &selector,
             SocketDomain::Ipv4,
         ));
@@ -482,10 +482,10 @@ fn selected_error_and_eof_buffers_are_returned_without_reading_a_header() {
 
 #[test]
 fn local_returns_publish_directly_and_only_exhaustion_queues_a_rearm() {
-    use core_scheduler_selector::{SelectorDriver, SelectorWorker};
+    use base_scheduler_selector::{SelectorDriver, SelectorWorker};
     for exhaust in [false, true] {
         let (selector, driver) = pair(1);
-        let (sender, socket) = block_on(core_scheduler_conformance::socket::stream_pair(
+        let (sender, socket) = block_on(base_scheduler_conformance::socket::stream_pair(
             &selector,
             SocketDomain::Ipv4,
         ));
@@ -546,7 +546,7 @@ fn local_returns_publish_directly_and_only_exhaustion_queues_a_rearm() {
 #[test]
 fn precancelled_receive_preserves_a_live_stream_and_admission_cancels_without_submission() {
     let (selector, mut driver) = pair(1);
-    let (sender, socket) = block_on(core_scheduler_conformance::socket::stream_pair(
+    let (sender, socket) = block_on(base_scheduler_conformance::socket::stream_pair(
         &selector,
         SocketDomain::Ipv4,
     ));
@@ -587,7 +587,7 @@ fn construction_failures_release_admission_and_close_races_notify_the_receiver()
     use super::super::tests::{BEFORE_SYSCALL, Failures};
     for failure in ["allocate-buffer-ring", "socket-type", "identifier", "close"] {
         let (selector, mut driver) = pair(1);
-        let (_sender, socket) = block_on(core_scheduler_conformance::socket::stream_pair(
+        let (_sender, socket) = block_on(base_scheduler_conformance::socket::stream_pair(
             &selector,
             SocketDomain::Ipv4,
         ));
@@ -634,7 +634,7 @@ fn construction_failures_release_admission_and_close_races_notify_the_receiver()
 #[test]
 fn cancellation_reports_retirement_failure() {
     let (selector, mut driver) = pair(1);
-    let (_sender, socket) = block_on(core_scheduler_conformance::socket::stream_pair(
+    let (_sender, socket) = block_on(base_scheduler_conformance::socket::stream_pair(
         &selector,
         SocketDomain::Ipv4,
     ));
@@ -658,7 +658,7 @@ fn cancellation_reports_retirement_failure() {
 #[test]
 fn terminal_decoding_preserves_payload_before_rearm_and_accepts_eof_without_a_buffer() {
     let (selector, mut driver) = pair(1);
-    let (_sender, socket) = block_on(core_scheduler_conformance::socket::stream_pair(
+    let (_sender, socket) = block_on(base_scheduler_conformance::socket::stream_pair(
         &selector,
         SocketDomain::Ipv4,
     ));
@@ -714,7 +714,7 @@ fn terminal_decoding_preserves_payload_before_rearm_and_accepts_eof_without_a_bu
 fn dropping_pending_dormant_and_prepared_requests_notifies_receivers() {
     for stage in ["pending", "dormant", "prepared"] {
         let (selector, mut driver) = pair(1);
-        let (sender, socket) = block_on(core_scheduler_conformance::socket::stream_pair(
+        let (sender, socket) = block_on(base_scheduler_conformance::socket::stream_pair(
             &selector,
             SocketDomain::Ipv4,
         ));
@@ -760,7 +760,7 @@ fn dropping_pending_dormant_and_prepared_requests_notifies_receivers() {
 #[test]
 fn a_returned_buffer_before_terminal_collection_allows_immediate_resubmission() {
     let (selector, mut driver) = pair(1);
-    let (sender, socket) = block_on(core_scheduler_conformance::socket::stream_pair(
+    let (sender, socket) = block_on(base_scheduler_conformance::socket::stream_pair(
         &selector,
         SocketDomain::Ipv4,
     ));
@@ -808,7 +808,7 @@ fn retained_leases_can_be_released_after_worker_thread_locals_are_destroyed() {
             // Initialize the lease holder first, so ROUTES is destroyed before the retained lease at thread exit.
             HELD.with(|held| assert!(held.borrow().is_none()));
             let (selector, driver) = pair(2);
-            let (sender, socket) = block_on(core_scheduler_conformance::socket::stream_pair(
+            let (sender, socket) = block_on(base_scheduler_conformance::socket::stream_pair(
                 &selector,
                 SocketDomain::Ipv4,
             ));
@@ -845,7 +845,7 @@ fn retained_leases_can_be_released_after_worker_thread_locals_are_destroyed() {
 #[test]
 fn completion_between_queue_probe_and_listener_registration_is_not_lost() {
     let (selector, driver) = pair(2);
-    let (sender, socket) = block_on(core_scheduler_conformance::socket::stream_pair(
+    let (sender, socket) = block_on(base_scheduler_conformance::socket::stream_pair(
         &selector,
         SocketDomain::Ipv4,
     ));
@@ -884,7 +884,7 @@ fn completion_between_queue_probe_and_listener_registration_is_not_lost() {
 fn concurrent_completion_publication_preserves_receive_wakeups() {
     let (selector, driver) = pair(2);
     let driver = std::thread::spawn(move || driver.run().unwrap());
-    let (sender, socket) = block_on(core_scheduler_conformance::socket::stream_pair(
+    let (sender, socket) = block_on(base_scheduler_conformance::socket::stream_pair(
         &selector,
         SocketDomain::Ipv4,
     ));

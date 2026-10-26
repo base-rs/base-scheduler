@@ -1,8 +1,8 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::{Cancellation, FileSeek};
-use core_scheduler::{FileReader, FileReading, FileWriter, FileWriting};
+use base_scheduler::{Cancellation, FileSeek};
+use base_scheduler::{FileReader, FileReading, FileWriter, FileWriting};
 use std::{
     future::{Future, poll_fn},
     io::SeekFrom,
@@ -125,8 +125,8 @@ impl AsMut<[u8]> for GatedBuffer {
     }
 }
 // SAFETY: The Vec owns stable initialized storage, with exclusive access through the transferred owner. Gating never changes its allocation or range.
-unsafe impl core_scheduler::IoBuf for GatedBuffer {}
-unsafe impl core_scheduler::IoBufMut for GatedBuffer {}
+unsafe impl base_scheduler::IoBuf for GatedBuffer {}
+unsafe impl base_scheduler::IoBufMut for GatedBuffer {}
 
 pub async fn pending_retirement<S: FileReading + FileWriting>(scheduler: &S, file: &S::File) {
     let never = Cancellation::never();

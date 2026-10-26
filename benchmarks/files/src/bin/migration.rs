@@ -3,14 +3,14 @@
 
 #[cfg(target_os = "linux")]
 mod linux {
-    use core_scheduler::{
+    use base_scheduler::{
         BufferResult, Cancellation, FileClose, FileOpen, FileOptions, FileReader, FileReading,
         FileWriter, FileWriting,
     };
-    use core_scheduler_iouring::{
+    use base_scheduler_iouring::{
         IoUringFileReader, IoUringFileWriter, IoUringOptions, IoUringSelector,
     };
-    use core_scheduler_selector::{SelectorDriver, SelectorWorker};
+    use base_scheduler_selector::{SelectorDriver, SelectorWorker};
     use futures_lite::future::block_on;
     use std::{
         future::Future,

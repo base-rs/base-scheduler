@@ -21,10 +21,10 @@ Use one handle per sequential execution, with independent readers and writers fo
 
 | Factory capability | Constructor | Resource trait |
 | --- | --- | --- |
-| [`SocketStreamReading`](https://github.com/core-rs/core-scheduler/blob/main/src/socket_stream_reading.rs) | `socket_stream_reader(K)` | `SocketStreamReader` |
-| [`SocketStreamWriting`](https://github.com/core-rs/core-scheduler/blob/main/src/socket_stream_writing.rs) | `socket_stream_writer(K)` | `SocketStreamWriter<Buffer = Pool::Buffer>` |
-| [`SocketPacketReading`](https://github.com/core-rs/core-scheduler/blob/main/src/socket_packet_reading.rs) | `socket_packet_reader(K)` | `SocketPacketReader` |
-| [`SocketPacketWriting`](https://github.com/core-rs/core-scheduler/blob/main/src/socket_packet_writing.rs) | `socket_packet_writer(K)` | `SocketPacketWriter` |
+| [`SocketStreamReading`](https://github.com/base-rs/base-scheduler/blob/main/src/socket_stream_reading.rs) | `socket_stream_reader(K)` | `SocketStreamReader` |
+| [`SocketStreamWriting`](https://github.com/base-rs/base-scheduler/blob/main/src/socket_stream_writing.rs) | `socket_stream_writer(K)` | `SocketStreamWriter<Buffer = Pool::Buffer>` |
+| [`SocketPacketReading`](https://github.com/base-rs/base-scheduler/blob/main/src/socket_packet_reading.rs) | `socket_packet_reader(K)` | `SocketPacketReader` |
+| [`SocketPacketWriting`](https://github.com/base-rs/base-scheduler/blob/main/src/socket_packet_writing.rs) | `socket_packet_writer(K)` | `SocketPacketWriter` |
 
 The default stream writer accepts the same pooled owner type returned by the default stream reader, with no type annotation needed for borrowed-only output. `socket_stream_writer_with_buffer::<B>(K)` selects another stable owner type. Reader factories allocate no payload pool; the first owned read initializes default storage lazily. `socket_stream_reader_with_pool(K, pool)` and `socket_packet_reader_with_pool(K, pool)` select an application-owned shared budget at construction. Factories return implementation-selected handles through the reader/writer contracts; backends choose their composition without changing application operations.
 
@@ -32,7 +32,7 @@ The Direct and Tokio backends provide all four socket handles. Native forwards i
 
 ### Stream input
 
-[`SocketStreamReader`](https://github.com/core-rs/core-scheduler/blob/main/src/socket_stream_reader.rs) associates `Buffer: ReceiveBuffer`.
+[`SocketStreamReader`](https://github.com/base-rs/base-scheduler/blob/main/src/socket_stream_reader.rs) associates `Buffer: ReceiveBuffer`.
 
 | Method | Arguments → awaited result | Semantics |
 | --- | --- | --- |
@@ -45,7 +45,7 @@ Ordinary errors and cancellation end the current wait without closing the reader
 
 ### Stream output
 
-[`SocketStreamWriter`](https://github.com/core-rs/core-scheduler/blob/main/src/socket_stream_writer.rs) associates `Buffer: IoBuf`.
+[`SocketStreamWriter`](https://github.com/base-rs/base-scheduler/blob/main/src/socket_stream_writer.rs) associates `Buffer: IoBuf`.
 
 | Method | Arguments → awaited result | Semantics |
 | --- | --- | --- |
@@ -59,7 +59,7 @@ The submission token continues to govern accepted output until its send result. 
 
 ### Packet input and output
 
-[`SocketPacketReader`](https://github.com/core-rs/core-scheduler/blob/main/src/socket_packet_reader.rs) associates an owned `Message: SocketRecvMessageMut`. Each successful read represents one packet.
+[`SocketPacketReader`](https://github.com/base-rs/base-scheduler/blob/main/src/socket_packet_reader.rs) associates an owned `Message: SocketRecvMessageMut`. Each successful read represents one packet.
 
 | Method | Arguments → awaited result | Semantics |
 | --- | --- | --- |
@@ -68,7 +68,7 @@ The submission token continues to govern accepted output until its send result. 
 | `read_vectored` | `(&mut [IoSliceMut], C) → OperationResult<SocketRecvResult>` | Receive one packet across borrowed ranges; preserve the same message metadata. |
 | `close` | `() → io::Result<()>` | Stop input and await registration retirement, preserving already returned messages. |
 
-[`SocketPacketWriter`](https://github.com/core-rs/core-scheduler/blob/main/src/socket_packet_writer.rs) sends one packet per operation. `address: Option<SocketAddress>` selects a destination; `None` uses the connected peer.
+[`SocketPacketWriter`](https://github.com/base-rs/base-scheduler/blob/main/src/socket_packet_writer.rs) sends one packet per operation. `address: Option<SocketAddress>` selects a destination; `None` uses the connected peer.
 
 | Method | Arguments → awaited result | Semantics |
 | --- | --- | --- |
@@ -81,7 +81,7 @@ The submission token continues to govern accepted output until its send result. 
 
 ## Bound file I/O
 
-[`FileReading::file_reader`](https://github.com/core-rs/core-scheduler/blob/main/src/file_reading.rs) and [`FileWriting::file_writer`](https://github.com/core-rs/core-scheduler/blob/main/src/file_writing.rs) synchronously construct scheduler-bound handles from `F`. Reuse each handle for one sequential operation stream. Independent handles may operate on the same file concurrently.
+[`FileReading::file_reader`](https://github.com/base-rs/base-scheduler/blob/main/src/file_reading.rs) and [`FileWriting::file_writer`](https://github.com/base-rs/base-scheduler/blob/main/src/file_writing.rs) synchronously construct scheduler-bound handles from `F`. Reuse each handle for one sequential operation stream. Independent handles may operate on the same file concurrently.
 
 | Resource/method | Arguments → awaited result | Semantics |
 | --- | --- | --- |
@@ -126,41 +126,41 @@ Destination arguments apply to packet writers only. Stream writes await earlier 
 
 | Capability/hook | Arguments → awaited result | Semantics |
 | --- | --- | --- |
-| [`FileOpen::file_open`](https://github.com/core-rs/core-scheduler/blob/main/src/file_open.rs) | `(&Path, FileOptions, C) → OperationResult<File>` | Options expose read, write, create, create-new, and truncate; append is omitted. |
-| [`FileSeek::file_seek`](https://github.com/core-rs/core-scheduler/blob/main/src/file_seek.rs) | `(F, SeekFrom, C) → OperationResult<u64>` | Set the shared cursor and return its new position. Serialize dependent cursor operations. |
-| [`FileStat::file_stat`](https://github.com/core-rs/core-scheduler/blob/main/src/file_stat.rs) | `(F, C) → OperationResult<Metadata>` | Associated owned metadata; an observation rather than a globally atomic snapshot. |
-| [`FileTruncate::file_truncate`](https://github.com/core-rs/core-scheduler/blob/main/src/file_truncate.rs) | `(F, length: u64, C) → OperationResult<()>` | Change logical size without changing the cursor. |
-| [`FileSync::file_sync`](https://github.com/core-rs/core-scheduler/blob/main/src/file_sync.rs) | `(F, SyncMode, C) → OperationResult<()>` | Synchronize data or data plus metadata. Await prior writes first. Does not flush application buffers or synchronize a parent directory. |
-| [`FileAllocate::file_allocate`](https://github.com/core-rs/core-scheduler/blob/main/src/file_allocate.rs) | `(F, offset: u64, length: u64, AllocationMode, C) → OperationResult<()>` | Reserve backing storage, optionally preserving logical size. Filesystem support and errors remain observable; not a durability barrier. |
-| [`FileAdvice::file_advise`](https://github.com/core-rs/core-scheduler/blob/main/src/file_advice.rs) | `(F, offset: u64, length: u64, AdviceMode) → io::Result<()>` | Uncancellable hint, awaited through OS completion. Zero length means through EOF. |
+| [`FileOpen::file_open`](https://github.com/base-rs/base-scheduler/blob/main/src/file_open.rs) | `(&Path, FileOptions, C) → OperationResult<File>` | Options expose read, write, create, create-new, and truncate; append is omitted. |
+| [`FileSeek::file_seek`](https://github.com/base-rs/base-scheduler/blob/main/src/file_seek.rs) | `(F, SeekFrom, C) → OperationResult<u64>` | Set the shared cursor and return its new position. Serialize dependent cursor operations. |
+| [`FileStat::file_stat`](https://github.com/base-rs/base-scheduler/blob/main/src/file_stat.rs) | `(F, C) → OperationResult<Metadata>` | Associated owned metadata; an observation rather than a globally atomic snapshot. |
+| [`FileTruncate::file_truncate`](https://github.com/base-rs/base-scheduler/blob/main/src/file_truncate.rs) | `(F, length: u64, C) → OperationResult<()>` | Change logical size without changing the cursor. |
+| [`FileSync::file_sync`](https://github.com/base-rs/base-scheduler/blob/main/src/file_sync.rs) | `(F, SyncMode, C) → OperationResult<()>` | Synchronize data or data plus metadata. Await prior writes first. Does not flush application buffers or synchronize a parent directory. |
+| [`FileAllocate::file_allocate`](https://github.com/base-rs/base-scheduler/blob/main/src/file_allocate.rs) | `(F, offset: u64, length: u64, AllocationMode, C) → OperationResult<()>` | Reserve backing storage, optionally preserving logical size. Filesystem support and errors remain observable; not a durability barrier. |
+| [`FileAdvice::file_advise`](https://github.com/base-rs/base-scheduler/blob/main/src/file_advice.rs) | `(F, offset: u64, length: u64, AdviceMode) → io::Result<()>` | Uncancellable hint, awaited through OS completion. Zero length means through EOF. |
 | `file_advise_submit` | same arguments → `io::Result<()>` | Await admission only; execution errors are not returned. Accepted work survives abandonment. |
-| [`FileClose::file_close`](https://github.com/core-rs/core-scheduler/blob/main/src/file_close.rs) | `(File by value) → io::Result<()>` | Consume exclusive ownership and await admission plus OS close. Finish operations and close/drop bound readers and writers first. Not retried after close errors. |
+| [`FileClose::file_close`](https://github.com/base-rs/base-scheduler/blob/main/src/file_close.rs) | `(File by value) → io::Result<()>` | Consume exclusive ownership and await admission plus OS close. Finish operations and close/drop bound readers and writers first. Not retried after close errors. |
 | `file_close_submit` | `(File by value) → io::Result<()>` | Admission only; accepted cleanup is drained by graceful shutdown. |
 
-[`FileMetadata`](https://github.com/core-rs/core-scheduler/blob/main/src/file_metadata.rs) exposes synchronous `file_type() → Option<FileType>`, `size() → Option<u64>`, and `accessed()`, `modified()`, `created() → Option<SystemTime>`. Absence represents unavailable information. Backends can retain native metadata and compute accessors without eagerly copying every field.
+[`FileMetadata`](https://github.com/base-rs/base-scheduler/blob/main/src/file_metadata.rs) exposes synchronous `file_type() → Option<FileType>`, `size() → Option<u64>`, and `accessed()`, `modified()`, `created() → Option<SystemTime>`. Absence represents unavailable information. Backends can retain native metadata and compute accessors without eagerly copying every field.
 
 ## Socket creation, control, and resolution
 
 | Capability/hook | Arguments → result | Semantics |
 | --- | --- | --- |
-| [`SocketOpen::socket_open`](https://github.com/core-rs/core-scheduler/blob/main/src/socket_open.rs) | `(SocketDomain, SocketType, Option<SocketProtocol>, C) → OperationResult<Socket>` asynchronously | Open nonblocking, without explicit bind/listen/connect. `None` selects the OS default protocol. |
-| [`SocketBind::socket_bind`](https://github.com/core-rs/core-scheduler/blob/main/src/socket_bind.rs) | `(K, SocketAddress, C) → OperationResult<()>` asynchronously | Bind an existing socket. |
-| [`SocketListen::socket_listen`](https://github.com/core-rs/core-scheduler/blob/main/src/socket_listen.rs) | `(K, backlog: i32, C) → OperationResult<()>` asynchronously | Begin listening; OS backlog and implicit-bind rules remain observable. |
-| [`SocketConnect::socket_connect`](https://github.com/core-rs/core-scheduler/blob/main/src/socket_connect.rs) | `(K, SocketAddress, C) → OperationResult<()>` asynchronously | Connect; cancellation does not undo an attempted connection. |
-| [`SocketAccept::socket_accept`](https://github.com/core-rs/core-scheduler/blob/main/src/socket_accept.rs) | `(K, C) → OperationResult<(Socket, SocketAddress)>` asynchronously | Return a new socket and peer address. |
-| [`SocketLocalAddress::socket_local_address`](https://github.com/core-rs/core-scheduler/blob/main/src/socket_local_address.rs) / [`SocketPeerAddress::socket_peer_address`](https://github.com/core-rs/core-scheduler/blob/main/src/socket_peer_address.rs) | `(K) → io::Result<SocketAddress>` synchronously | Inspect local or connected peer endpoint. |
-| [`SocketShutdown::socket_shutdown`](https://github.com/core-rs/core-scheduler/blob/main/src/socket_shutdown.rs) | `(K, Shutdown) → io::Result<()>` asynchronously | Shutdown read, write, or both directions through completion; no cancellation token. |
+| [`SocketOpen::socket_open`](https://github.com/base-rs/base-scheduler/blob/main/src/socket_open.rs) | `(SocketDomain, SocketType, Option<SocketProtocol>, C) → OperationResult<Socket>` asynchronously | Open nonblocking, without explicit bind/listen/connect. `None` selects the OS default protocol. |
+| [`SocketBind::socket_bind`](https://github.com/base-rs/base-scheduler/blob/main/src/socket_bind.rs) | `(K, SocketAddress, C) → OperationResult<()>` asynchronously | Bind an existing socket. |
+| [`SocketListen::socket_listen`](https://github.com/base-rs/base-scheduler/blob/main/src/socket_listen.rs) | `(K, backlog: i32, C) → OperationResult<()>` asynchronously | Begin listening; OS backlog and implicit-bind rules remain observable. |
+| [`SocketConnect::socket_connect`](https://github.com/base-rs/base-scheduler/blob/main/src/socket_connect.rs) | `(K, SocketAddress, C) → OperationResult<()>` asynchronously | Connect; cancellation does not undo an attempted connection. |
+| [`SocketAccept::socket_accept`](https://github.com/base-rs/base-scheduler/blob/main/src/socket_accept.rs) | `(K, C) → OperationResult<(Socket, SocketAddress)>` asynchronously | Return a new socket and peer address. |
+| [`SocketLocalAddress::socket_local_address`](https://github.com/base-rs/base-scheduler/blob/main/src/socket_local_address.rs) / [`SocketPeerAddress::socket_peer_address`](https://github.com/base-rs/base-scheduler/blob/main/src/socket_peer_address.rs) | `(K) → io::Result<SocketAddress>` synchronously | Inspect local or connected peer endpoint. |
+| [`SocketShutdown::socket_shutdown`](https://github.com/base-rs/base-scheduler/blob/main/src/socket_shutdown.rs) | `(K, Shutdown) → io::Result<()>` asynchronously | Shutdown read, write, or both directions through completion; no cancellation token. |
 | `socket_shutdown_submit` | same arguments → `io::Result<()>` | Await admission only. |
-| [`SocketClose::socket_close`](https://github.com/core-rs/core-scheduler/blob/main/src/socket_close.rs) | `(Socket by value) → io::Result<()>` asynchronously | Close exclusive ownership through completion; no cancellation token. |
+| [`SocketClose::socket_close`](https://github.com/base-rs/base-scheduler/blob/main/src/socket_close.rs) | `(Socket by value) → io::Result<()>` asynchronously | Close exclusive ownership through completion; no cancellation token. |
 | `socket_close_submit` | `(Socket by value) → io::Result<()>` asynchronously | Await admission only. |
-| [`SocketRegistration::register_socket`](https://github.com/core-rs/core-scheduler/blob/main/src/socket_registration.rs) / `register_listener` | `(TcpStream)` / `(TcpListener) → io::Result<Socket>` synchronously | Transfer an existing standard-library resource into the backend. |
-| [`SocketGetOption<O>::socket_get_option`](https://github.com/core-rs/core-scheduler/blob/main/src/socket_get_option.rs) | `(K, option: O, C) → OperationResult<O::Value>` asynchronously | Query a typed option. |
-| [`SocketSetOption<O>::socket_set_option`](https://github.com/core-rs/core-scheduler/blob/main/src/socket_set_option.rs) | `(K, option: O, value: O::Value, C) → OperationResult<()>` asynchronously | Set a typed option. |
-| [`AddressResolution::address_resolve`](https://github.com/core-rs/core-scheduler/blob/main/src/address_resolution.rs) | `(name: Option<&str>, AddressService, AddressHints, C) → OperationResult<Addresses>` asynchronously | Owned associated resolution result; independent of connect policy. Preserve ordering, duplicates, socket type, protocol, and IPv6 scope. |
+| [`SocketRegistration::register_socket`](https://github.com/base-rs/base-scheduler/blob/main/src/socket_registration.rs) / `register_listener` | `(TcpStream)` / `(TcpListener) → io::Result<Socket>` synchronously | Transfer an existing standard-library resource into the backend. |
+| [`SocketGetOption<O>::socket_get_option`](https://github.com/base-rs/base-scheduler/blob/main/src/socket_get_option.rs) | `(K, option: O, C) → OperationResult<O::Value>` asynchronously | Query a typed option. |
+| [`SocketSetOption<O>::socket_set_option`](https://github.com/base-rs/base-scheduler/blob/main/src/socket_set_option.rs) | `(K, option: O, value: O::Value, C) → OperationResult<()>` asynchronously | Set a typed option. |
+| [`AddressResolution::address_resolve`](https://github.com/base-rs/base-scheduler/blob/main/src/address_resolution.rs) | `(name: Option<&str>, AddressService, AddressHints, C) → OperationResult<Addresses>` asynchronously | Owned associated resolution result; independent of connect policy. Preserve ordering, duplicates, socket type, protocol, and IPv6 scope. |
 
 `SocketAddress` is the standard-library IP `SocketAddr`; this is not a Unix-domain or arbitrary native-address interface. `SocketOption` associates a `Value: Send`; supplied boolean options are `TcpNoDelay`, `SocketReuseAddress`, and `SocketKeepalive`. Implementations may support additional typed options independently.
 
-`AddressService` selects a port or named service. Resolver errors are `AddressResolveError` carried inside `OperationError::Io`, preserving a portable category and native code when available. [`AddressInfoCollection::entries`](https://github.com/core-rs/core-scheduler/blob/main/src/address_info_collection.rs) returns borrowed `AddressInfoView` entries exposing `address`, `socket_type`, `protocol`, and explicit `to_address_info` materialization. The result owner can retain the original native address list.
+`AddressService` selects a port or named service. Resolver errors are `AddressResolveError` carried inside `OperationError::Io`, preserving a portable category and native code when available. [`AddressInfoCollection::entries`](https://github.com/base-rs/base-scheduler/blob/main/src/address_info_collection.rs) returns borrowed `AddressInfoView` entries exposing `address`, `socket_type`, `protocol`, and explicit `to_address_info` materialization. The result owner can retain the original native address list.
 
 ## Cancellation, tasks, blocking work, and signals
 
@@ -174,10 +174,10 @@ Destination arguments apply to packet writers only. Stream writes await earlier 
 | `is_never` | `() → bool` | Whether this signal can never be cancelled, allowing backends to omit cancellation registration. Children of `never` are independently cancellable. |
 | `cancelled` | `() → ()` asynchronously | Wait for notification; dropping the wait removes its listener only. |
 | `defer_cancel` | `(C, future, on_cancel: FnOnce()) → future output` | Invoke the synchronous callback once when cancellation is observed, then keep awaiting the protected future. Does not prevent the wrapper being dropped. |
-| [`Spawn::spawn`](https://github.com/core-rs/core-scheduler/blob/main/src/spawn.rs) | `(future) → Result<Handle<T>, SpawnError>` synchronously | Register `Send + 'static` work before making it runnable. Handle owns execution lifetime; dropping it requests destruction after an active poll returns. Await yields `Result<T, TaskError>`. Closed admission rejects the future without polling it. |
-| [`Blocking::spawn_blocking`](https://github.com/core-rs/core-scheduler/blob/main/src/blocking.rs) | `(FnOnce() → T, C) → Result<Handle<T>, BlockingError>` asynchronously | Await bounded admission, then return an owning completion handle. Queued plus running jobs count against capacity. Dropping a handle cannot interrupt a running closure. A worker checks cancellation before starting; running code can capture a token to cooperate. |
-| [`Signals::signal_subscribe`](https://github.com/core-rs/core-scheduler/blob/main/src/signals.rs) | `(&[Signal], target: Notify<Signal>) → io::Result<Subscription>` synchronously | Associated signal identifiers and owning subscription. Dropping the subscription stops new notifications; in-progress dispatch can finish. Notifications can coalesce. |
-| [`Notify::notify`](https://github.com/core-rs/core-scheduler/blob/main/src/notify.rs) | `(value) → ()` synchronously | Shared notification hook (`Notify<Value>: Send + Sync`); `Arc` targets, standard-library channel senders, and cancellation signals have implementations. Signal callbacks run outside raw signal handlers and scheduler locks. |
+| [`Spawn::spawn`](https://github.com/base-rs/base-scheduler/blob/main/src/spawn.rs) | `(future) → Result<Handle<T>, SpawnError>` synchronously | Register `Send + 'static` work before making it runnable. Handle owns execution lifetime; dropping it requests destruction after an active poll returns. Await yields `Result<T, TaskError>`. Closed admission rejects the future without polling it. |
+| [`Blocking::spawn_blocking`](https://github.com/base-rs/base-scheduler/blob/main/src/blocking.rs) | `(FnOnce() → T, C) → Result<Handle<T>, BlockingError>` asynchronously | Await bounded admission, then return an owning completion handle. Queued plus running jobs count against capacity. Dropping a handle cannot interrupt a running closure. A worker checks cancellation before starting; running code can capture a token to cooperate. |
+| [`Signals::signal_subscribe`](https://github.com/base-rs/base-scheduler/blob/main/src/signals.rs) | `(&[Signal], target: Notify<Signal>) → io::Result<Subscription>` synchronously | Associated signal identifiers and owning subscription. Dropping the subscription stops new notifications; in-progress dispatch can finish. Notifications can coalesce. |
+| [`Notify::notify`](https://github.com/base-rs/base-scheduler/blob/main/src/notify.rs) | `(value) → ()` synchronously | Shared notification hook (`Notify<Value>: Send + Sync`); `Arc` targets, standard-library channel senders, and cancellation signals have implementations. Signal callbacks run outside raw signal handlers and scheduler locks. |
 
 `TaskError` distinguishes cancellation from a retained panic payload. `SpawnError` reports closed admission or exhausted task identifiers. `BlockingError` distinguishes cancellation, closed admission, and worker-start I/O failure. Task ownership and cancellation signals are separate: background work needs an owner that remains alive, and the primitive interface supplies no implicit parent-child task group.
 
@@ -185,11 +185,11 @@ Destination arguments apply to packet writers only. Stream writes await earlier 
 
 | Capability/hook | Arguments → result | Semantics |
 | --- | --- | --- |
-| [`Clock::now`](https://github.com/core-rs/core-scheduler/blob/main/src/clock.rs) | `() → Instant` synchronously | Monotonic time within this scheduler's clock domain; use it in generic code instead of the system clock. |
+| [`Clock::now`](https://github.com/base-rs/base-scheduler/blob/main/src/clock.rs) | `() → Instant` synchronously | Monotonic time within this scheduler's clock domain; use it in generic code instead of the system clock. |
 | `sleep_until` | `(deadline: Instant, C) → OperationResult<()>` | Wait for an absolute deadline. Pre-cancellation wins even if elapsed; once waiting, observed expiry wins a simultaneous cancellation. No yield is promised for an elapsed deadline. |
 | `sleep` | `(duration: Duration, C) → OperationResult<()>` | Relative deadline starts at first poll. Unrepresentable deadlines return `InvalidInput`. |
 | `timeout` | `(duration: Duration, operation: F) → Result<F::Output, TimeoutError>` | Default helper for a `Send` future. Polls the operation first; only a pending operation starts the timer. Completion wins ties. Expiry or clock failure drops the operation, preserving its own errors separately from timeout errors. |
-| [`Timers::timer`](https://github.com/core-rs/core-scheduler/blob/main/src/timers.rs) | `() → Timer` synchronously | Infallible construction of scheduler-compatible reusable state, without registering a deadline or selecting a worker. |
+| [`Timers::timer`](https://github.com/base-rs/base-scheduler/blob/main/src/timers.rs) | `() → Timer` synchronously | Infallible construction of scheduler-compatible reusable state, without registering a deadline or selecting a worker. |
 | `timer_wait_until` | `(&mut Timer, deadline: Instant, C) → OperationResult<()>` | Reuse timer state with one waiter. Incompatible scheduler pairing is rejected. Cancellation after admission disarms; pre-cancellation leaves state unchanged. |
 
 Dropping an ordinary clock wait releases its registration. Reusable timer waits deliberately retain state for later reuse, potentially retaining capacity and an old waker. Dropping the timer retires it; forgetting it can leak capacity. Reusable timers remain experimental. Deadlines from independently advancing clock domains are not interchangeable.
@@ -198,9 +198,9 @@ Dropping an ordinary clock wait releases its registration. Reusable timer waits 
 
 ## Buffer pools and received storage
 
-[`BufferPooling::buffer_pool`](https://github.com/core-rs/core-scheduler/blob/main/src/buffer_pooling.rs) takes `BufferPoolOptions { buffers, buffer_size, alignment }` and synchronously returns `io::Result<Pool>`. `buffers` is an exact shared budget independent of worker count. Alignment is a nonzero power of two; native metadata and padding can require additional memory. Configure readers with this pool to share a bounded retention budget across connections.
+[`BufferPooling::buffer_pool`](https://github.com/base-rs/base-scheduler/blob/main/src/buffer_pooling.rs) takes `BufferPoolOptions { buffers, buffer_size, alignment }` and synchronously returns `io::Result<Pool>`. `buffers` is an exact shared budget independent of worker count. Alignment is a nonzero power of two; native metadata and padding can require additional memory. Configure readers with this pool to share a bounded retention budget across connections.
 
-[`BufferPool`](https://github.com/core-rs/core-scheduler/blob/main/src/buffer_pool.rs) is `Clone + Send + Sync + 'static` with `Buffer: ReceiveBuffer`. Its synchronous `capacity`, `buffer_size`, and `alignment` describe the whole pool, not free capacity. `try_acquire() → Option<Buffer>` never waits. `acquire(C) → Result<Buffer, Cancelled>` waits at exhaustion without silently growing. Clones share capacity; live application leases, frozen views, and published I/O all count against it.
+[`BufferPool`](https://github.com/base-rs/base-scheduler/blob/main/src/buffer_pool.rs) is `Clone + Send + Sync + 'static` with `Buffer: ReceiveBuffer`. Its synchronous `capacity`, `buffer_size`, and `alignment` describe the whole pool, not free capacity. `try_acquire() → Option<Buffer>` never waits. `acquire(C) → Result<Buffer, Cancelled>` waits at exhaustion without silently growing. Clones share capacity; live application leases, frozen views, and published I/O all count against it.
 
 | Buffer/message method | Arguments → result | Semantics |
 | --- | --- | --- |
@@ -219,14 +219,14 @@ Dropping an ordinary clock wait releases its registration. Reusable timer waits 
 
 Application protocols and adapters share the resource contracts above. There is no separate public dispatch, monitor, or receiver protocol. Concrete adapters keep reusable registration, request, and retirement state private; Native forwards public factories directly without adding an I/O wrapper. The conformance crate tests public resources. Backend unit tests cover ring migration, aliasing, and completion retirement.
 
-The selector lifecycle hooks below live in `core-scheduler-selector`, not the portable interface. They let the Native executor drive independently selected I/O machinery.
+The selector lifecycle hooks below live in `base-scheduler-selector`, not the portable interface. They let the Native executor drive independently selected I/O machinery.
 
 | Hook | Arguments → result | Semantics |
 | --- | --- | --- |
-| [`Selector::close`](https://github.com/core-rs/core-scheduler/blob/main/crates/selector/src/selector.rs) | `() → ()` synchronously | Stop admission and notify waiters; retain accepted cleanup and kernel-accessible storage. Repeatable. |
+| [`Selector::close`](https://github.com/base-rs/base-scheduler/blob/main/crates/selector/src/selector.rs) | `() → ()` synchronously | Stop admission and notify waiters; retain accepted cleanup and kernel-accessible storage. Repeatable. |
 | `Selector::shutdown` | `() → ()` asynchronously | Close admission and await all accepted work retiring, including abandoned futures. Keep drivers progressing while waiting. |
-| [`SelectorDriver::enter`](https://github.com/core-rs/core-scheduler/blob/main/crates/selector/src/selector_driver.rs) | `(driver by value) → Worker` synchronously | Consume a movable `Send + 'static` driver into its owning worker; thread-bound routing is restored on worker destruction. |
-| [`SelectorWorker::waker`](https://github.com/core-rs/core-scheduler/blob/main/crates/selector/src/selector_worker.rs) | `() → Waker` | Interrupt an event wait, including wake/sleep races; harmless after driver retirement. |
+| [`SelectorDriver::enter`](https://github.com/base-rs/base-scheduler/blob/main/crates/selector/src/selector_driver.rs) | `(driver by value) → Worker` synchronously | Consume a movable `Send + 'static` driver into its owning worker; thread-bound routing is restored on worker destruction. |
+| [`SelectorWorker::waker`](https://github.com/base-rs/base-scheduler/blob/main/crates/selector/src/selector_worker.rs) | `() → Waker` | Interrupt an event wait, including wake/sleep races; harmless after driver retirement. |
 | `SelectorWorker::close` | `(&mut worker) → ()` | Begin retirement without synchronously waiting. |
 | `SelectorWorker::turn` | `(&mut worker, Option<Duration>) → io::Result<bool>` | Publish a bounded completion batch and wait at most the timeout. Zero is nonblocking; `None` permits indefinite waiting. True means closed and drained. After waking tasks, return so the executor can poll them. |
 

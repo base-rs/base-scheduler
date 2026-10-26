@@ -3,7 +3,7 @@
 
 use super::*;
 use crate::test_support;
-use core_scheduler_conformance::ClockFixture;
+use base_scheduler_conformance::ClockFixture;
 use futures_lite::future::{block_on, poll_once};
 use std::sync::{
     Weak,
@@ -54,7 +54,7 @@ fn run(test: impl AsyncFnOnce(&DirectScheduler) + Send + 'static) {
     });
 }
 mod conformance {
-    core_scheduler_conformance::clock_tests!(run: super::run);
+    base_scheduler_conformance::clock_tests!(run: super::run);
 }
 
 #[test]
@@ -202,7 +202,7 @@ fn timer_waker_callbacks_run_outside_the_registry_lock() {
 
 #[test]
 fn reusable_timer_startup_and_identifier_exhaustion() {
-    use core_scheduler::Timers;
+    use base_scheduler::Timers;
     run(async |scheduler| {
         scheduler.timers.shared.state.lock().unwrap().paused = None;
         let mut timer = scheduler.timer();

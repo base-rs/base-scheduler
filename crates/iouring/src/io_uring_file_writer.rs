@@ -3,8 +3,8 @@
 
 use crate::IoUringSelector;
 use crate::io_uring_selector::file_monitor::IoUringFileRegistration;
-use core_scheduler::{BufferResult, Cancellation, FileWriter, FileWriting, IoBuf, OperationError};
-use core_scheduler_selector::NativeFile;
+use base_scheduler::{BufferResult, Cancellation, FileWriter, FileWriting, IoBuf, OperationError};
+use base_scheduler_selector::NativeFile;
 use std::{future::Future, io};
 
 /// One sequential file writer bound to its constructing selector.

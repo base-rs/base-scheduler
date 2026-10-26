@@ -50,7 +50,7 @@ Close and drop every reader and writer before exclusively closing its socket or 
 
 ## Keep examples and measurements aligned
 
-Use the [canonical I/O recipes](https://github.com/core-rs/core-scheduler/tree/main/examples) as starting points. Extend those workloads when changing a recommendation rather than creating an unrelated favorable microbenchmark.
+Use the [canonical I/O recipes](https://github.com/base-rs/base-scheduler/tree/main/examples) as starting points. Extend those workloads when changing a recommendation rather than creating an unrelated favorable microbenchmark.
 
 Use optimized builds, execute I/O on scheduler workers, validate received contents, and record setup, warmup, timing boundaries, payload sizes, pool budgets, worker counts, environment, and source revision. Compare equivalent ownership and parser behavior: immediate borrowed consumption and retaining frames solve different problems. Monitors, receivers, operation dispatch, and selector registration are backend implementation tools. Keep them out of ordinary protocol call sites, and measure multishot, registered buffers, and zero-copy mechanisms behind the same reader/writer interface.
 

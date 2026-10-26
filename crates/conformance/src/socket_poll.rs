@@ -5,7 +5,7 @@
 
 use crate::SocketTestScheduler;
 use crate::probe::WakeProbe;
-use core_scheduler::*;
+use base_scheduler::*;
 use futures_lite::future::poll_once;
 use std::{
     future::Future,

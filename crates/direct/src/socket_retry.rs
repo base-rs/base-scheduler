@@ -3,7 +3,7 @@
 
 //! A scheduler-local retry pulse, not a reactor. Waiting sockets occupy no worker or admission slot.
 
-use core_scheduler::{Cancellation, OperationResult};
+use base_scheduler::{Cancellation, OperationResult};
 use event_listener::Event;
 use std::future::{Future, poll_fn};
 use std::io;
@@ -76,7 +76,7 @@ impl SocketRetry {
                 }
                 let shared = Arc::clone(&self.shared);
                 thread::Builder::new()
-                    .name("core-direct-socket-retry".into())
+                    .name("base-direct-socket-retry".into())
                     .spawn(move || work(shared))
                     .map(drop)
             })
@@ -91,7 +91,7 @@ impl SocketRetry {
         let mut retry = pin!(retry);
         poll_fn(|context| {
             if cancelled.as_mut().poll(context).is_ready() {
-                return Poll::Ready(Err(core_scheduler::Cancelled.into()));
+                return Poll::Ready(Err(base_scheduler::Cancelled.into()));
             }
             retry.as_mut().poll(context).map(|()| Ok(()))
         })

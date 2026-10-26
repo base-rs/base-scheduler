@@ -3,8 +3,8 @@
 
 #![cfg(target_os = "linux")]
 
-use core_scheduler::*;
-use core_scheduler_iouring::{IoUringDriver, IoUringSelector};
+use base_scheduler::*;
+use base_scheduler_iouring::{IoUringDriver, IoUringSelector};
 use futures_lite::future::{block_on, poll_once};
 use std::{
     future::Future,
@@ -31,7 +31,7 @@ fn drive<F: Future>(driver: &mut IoUringDriver, future: F) -> F::Output {
 #[test]
 fn stream_reads_can_switch_between_owned_and_borrowed_storage() {
     let (scheduler, mut driver) = IoUringSelector::new(Default::default()).unwrap();
-    let (sender, receiver) = block_on(core_scheduler_conformance::socket::stream_pair(
+    let (sender, receiver) = block_on(base_scheduler_conformance::socket::stream_pair(
         &scheduler,
         SocketDomain::Ipv4,
     ));
@@ -178,7 +178,7 @@ fn packet_reads_keep_peek_addresses_truncation_and_empty_datagrams() {
 fn abandoned_owned_socket_transfers_reserve_the_lane_until_retirement() {
     let (scheduler, mut driver) = IoUringSelector::new(Default::default()).unwrap();
     let never = Cancellation::never();
-    let (sender, receiver) = block_on(core_scheduler_conformance::socket::stream_pair(
+    let (sender, receiver) = block_on(base_scheduler_conformance::socket::stream_pair(
         &scheduler,
         SocketDomain::Ipv4,
     ));

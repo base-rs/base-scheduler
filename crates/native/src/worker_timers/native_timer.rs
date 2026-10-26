@@ -4,7 +4,7 @@
 use super::{Command, Registration};
 use crate::worker_timers;
 use crate::{NativeScheduler, Selector, task_service::Shared, worker};
-use core_scheduler::{Cancellation, Clock, OperationResult, Timers};
+use base_scheduler::{Cancellation, Clock, OperationResult, Timers};
 use futures_channel::oneshot;
 use std::{
     future::{Future, poll_fn},
@@ -124,7 +124,7 @@ impl<S: Selector> Timers for NativeScheduler<S> {
                 return Poll::Ready(Ok(()));
             }
             if cancelled.as_mut().poll(context).is_ready() {
-                return Poll::Ready(Err(core_scheduler::Cancelled.into()));
+                return Poll::Ready(Err(base_scheduler::Cancelled.into()));
             }
             if shared.is_closed() {
                 return Poll::Ready(Err(worker_timers::closed().into()));

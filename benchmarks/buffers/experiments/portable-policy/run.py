@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Compare preserved release binaries before/after hiding buffer policies.
 
-Run on Aiko under flock /tmp/core-scheduler-perf.lock. Arguments: result
+Run on Aiko under flock /tmp/base-scheduler-perf.lock. Arguments: result
 directory, baseline executable, candidate executable. Output is exclusive so a
 rerun cannot silently append duplicate matched samples.
 """

@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::{BufferLease, BufferSlice, FrozenBuffer, HeapBufferPool};
+use base_scheduler::{BufferLease, BufferSlice, FrozenBuffer, HeapBufferPool};
 use io_uring::{IoUring, opcode, types};
 use std::{
     fs::File,

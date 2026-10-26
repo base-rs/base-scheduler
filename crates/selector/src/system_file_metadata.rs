@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::{FileMetadata, FileType};
+use base_scheduler::{FileMetadata, FileType};
 use std::{fs::Metadata, time::SystemTime};
 
 /// File status retained in the standard library's platform-specific representation. Native file operations return this type; common accessors convert only the requested field.

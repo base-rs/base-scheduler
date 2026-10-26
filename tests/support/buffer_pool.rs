@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::*;
+use base_scheduler::*;
 
 // A distinct pool and lease representation ensures generic consumers do not depend on the heap implementation's concrete owner types.
 #[derive(Clone)]

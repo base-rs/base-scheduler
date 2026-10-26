@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 //! Controlled public resources used to challenge the conformance assertions.
-use core_scheduler::*;
+use base_scheduler::*;
 use std::io::{self, IoSlice, IoSliceMut};
 
 pub trait SocketModel: SocketOperation<Socket: Clone + 'static> + Sync {

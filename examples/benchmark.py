@@ -25,10 +25,10 @@ def main():
     def command(*arguments):
         return subprocess.check_output(arguments, cwd=root, text=True).strip()
 
-    artifacts = command("cargo", "build", "--release", "--locked", "-p", "core-scheduler-examples", "--message-format=json")
+    artifacts = command("cargo", "build", "--release", "--locked", "-p", "base-scheduler-examples", "--message-format=json")
     binary = next(Path(artifact["executable"]) for line in artifacts.splitlines()
                   if (artifact := json.loads(line)).get("executable")
-                  and artifact["target"]["name"] == "core-scheduler-examples")
+                  and artifact["target"]["name"] == "base-scheduler-examples")
     metadata = {
         "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "platform": platform.platform(),

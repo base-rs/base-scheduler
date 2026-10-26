@@ -2,8 +2,8 @@
 // Copyright, 2026, by Samuel Williams.
 
 mod support;
-use core_scheduler::*;
-use core_scheduler_conformance::{AddressResolutionFixture, address_resolution};
+use base_scheduler::*;
+use base_scheduler_conformance::{AddressResolutionFixture, address_resolution};
 use futures_lite::future::block_on;
 use std::{
     io,
@@ -191,13 +191,13 @@ fn run_case(test: impl AsyncFnOnce(&Fixture) + Send + 'static) {
     support::run(move || block_on(test(&Fixture::new(Fault::None))));
 }
 mod generated {
-    core_scheduler_conformance::address_resolution_tests!(run: super::run_case);
+    base_scheduler_conformance::address_resolution_tests!(run: super::run_case);
 }
 mod ipv4 {
-    core_scheduler_conformance::address_resolution_ip_tests!(run: super::run_case, domain: core_scheduler::SocketDomain::Ipv4);
+    base_scheduler_conformance::address_resolution_ip_tests!(run: super::run_case, domain: base_scheduler::SocketDomain::Ipv4);
 }
 mod ipv6 {
-    core_scheduler_conformance::address_resolution_ip_tests!(run: super::run_case, domain: core_scheduler::SocketDomain::Ipv6);
+    base_scheduler_conformance::address_resolution_ip_tests!(run: super::run_case, domain: base_scheduler::SocketDomain::Ipv6);
 }
 #[test]
 fn empty_successful_results_are_allowed() {

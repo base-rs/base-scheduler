@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use super::*;
-use core_scheduler_selector::{SelectorDriver, SelectorWorker};
+use base_scheduler_selector::{SelectorDriver, SelectorWorker};
 use futures_lite::future::{block_on, poll_once};
 use std::{pin::Pin, task::Context, time::Instant};
 
@@ -948,7 +948,7 @@ fn dropping_a_cancelled_completion_releases_its_retired_owner_without_lane_reuse
     let (_directory, file) = super::super::tests::file(&selector);
     let mut lane = selector.file_monitor(&file).unwrap();
     let cancellation = Cancellation::new();
-    let pool = core_scheduler::HeapBufferPool::new(1, 6).unwrap();
+    let pool = base_scheduler::HeapBufferPool::new(1, 6).unwrap();
     let buffer = pool.try_acquire().unwrap();
     let mut completion = Box::pin(
         block_on(selector.file_monitor_read_at_submit(&mut lane, buffer, 0, &cancellation))

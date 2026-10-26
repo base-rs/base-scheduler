@@ -3,8 +3,8 @@
 
 use super::*;
 use crate::{DirectScheduler, test_support};
-use core_scheduler::{Cancellation, Spawn};
-use core_scheduler_conformance::SpawnFixture;
+use base_scheduler::{Cancellation, Spawn};
+use base_scheduler_conformance::SpawnFixture;
 use futures_lite::future::block_on;
 
 impl SpawnFixture for DirectScheduler {
@@ -34,10 +34,10 @@ fn run(test: impl AsyncFnOnce(&DirectScheduler) + Send + 'static) {
     });
 }
 mod conformance {
-    core_scheduler_conformance::spawn_tests!(run: super::run);
+    base_scheduler_conformance::spawn_tests!(run: super::run);
 }
 mod dispatch {
-    core_scheduler_conformance::spawn_dispatch_tests!(run: super::run);
+    base_scheduler_conformance::spawn_dispatch_tests!(run: super::run);
 }
 
 #[test]
@@ -65,7 +65,7 @@ fn startup_and_identifier_exhaustion_are_reported_without_polling_inputs() {
 fn tasks_progress_without_occupying_syscall_workers_and_survive_admission_close() {
     test_support::run(|| {
         block_on(async {
-            use core_scheduler::Blocking;
+            use base_scheduler::Blocking;
             let scheduler = test_support::scheduler();
             let token = Cancellation::new();
             let child = token.clone();

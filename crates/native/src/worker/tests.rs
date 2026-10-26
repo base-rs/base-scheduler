@@ -214,7 +214,7 @@ fn batch_search_admits_incoming_tasks_before_local_work() {
         scheduler: Arc::downgrade(&shared),
         ready,
         current,
-        timers: core_scheduler_timers::local::TimerQueue::with_capacity(8),
+        timers: base_scheduler_timers::local::TimerQueue::with_capacity(8),
     };
     let task = service.spawn(async {}).unwrap();
     search(&shared, &local, 1).success().unwrap().run();
@@ -252,7 +252,7 @@ fn nested_admission_distributes_tasks_instead_of_inheriting_the_worker() {
             scheduler: Arc::downgrade(&shared),
             ready,
             current,
-            timers: core_scheduler_timers::local::TimerQueue::with_capacity(8),
+            timers: base_scheduler_timers::local::TimerQueue::with_capacity(8),
         }));
     });
     let context = WorkerContext;
@@ -302,7 +302,7 @@ fn idle_worker_steals_remote_wakes_when_preferred_worker_is_busy() {
         scheduler: Arc::downgrade(&shared),
         ready,
         current,
-        timers: core_scheduler_timers::local::TimerQueue::with_capacity(8),
+        timers: base_scheduler_timers::local::TimerQueue::with_capacity(8),
     };
     let first = service.spawn(async {}).unwrap();
     shared.workers[0].incoming.steal().success().unwrap().run();
@@ -335,7 +335,7 @@ fn idle_worker_can_steal_both_ready_generations() {
         scheduler: Arc::downgrade(&shared),
         ready,
         current,
-        timers: core_scheduler_timers::local::TimerQueue::with_capacity(8),
+        timers: base_scheduler_timers::local::TimerQueue::with_capacity(8),
     };
     for queue in &queues[0] {
         let first = service.spawn(async {}).unwrap();
@@ -391,7 +391,7 @@ fn quiescent_publication(after_recheck: bool) {
         scheduler: Arc::downgrade(&shared),
         ready,
         current,
-        timers: core_scheduler_timers::local::TimerQueue::with_capacity(8),
+        timers: base_scheduler_timers::local::TimerQueue::with_capacity(8),
     };
     let published = Arc::new(AtomicBool::new(false));
     let (searching, searched) = mpsc::channel();

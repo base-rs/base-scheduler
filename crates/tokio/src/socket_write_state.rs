@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::{Cancellation, OperationError, OperationResult, TaskError};
+use base_scheduler::{Cancellation, OperationError, OperationResult, TaskError};
 use std::{
     future::{Future, poll_fn},
     io,
@@ -58,7 +58,7 @@ impl<H> SocketWriteState<H> {
     fn result(&self) -> OperationResult<()> {
         match &self.error {
             None => Ok(()),
-            Some(OperationError::Cancelled(_)) => Err(core_scheduler::Cancelled.into()),
+            Some(OperationError::Cancelled(_)) => Err(base_scheduler::Cancelled.into()),
             Some(OperationError::Io(error)) => Err(match error.raw_os_error() {
                 Some(code) => io::Error::from_raw_os_error(code),
                 None => io::Error::new(error.kind(), error.to_string()),
@@ -82,7 +82,7 @@ where
                 cancelled
                     .as_mut()
                     .poll(context)
-                    .map(|()| Err(core_scheduler::Cancelled))
+                    .map(|()| Err(base_scheduler::Cancelled))
             })
             .await?;
             self.pending = None;

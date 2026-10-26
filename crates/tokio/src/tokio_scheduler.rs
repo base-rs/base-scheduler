@@ -6,7 +6,7 @@ use crate::{
     blocking_pool::{BlockingPool, admission_error},
     file_io,
 };
-use core_scheduler::{
+use base_scheduler::{
     Blocking, BlockingError, BufferResult, Cancellation, FileClose, FileOpen, FileOperation,
     FileOptions, FileSeek, FileStat, FileSync, FileTruncate, IoBuf, OperationResult, Spawn,
     SpawnError, SyncMode, TaskError,

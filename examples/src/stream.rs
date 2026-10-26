@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::{Cancellation, OperationResult, SocketStreamReader, SocketStreamReading};
+use base_scheduler::{Cancellation, OperationResult, SocketStreamReader, SocketStreamReading};
 use std::io;
 
 /// Consume each borrowed chunk before reusing its storage. The callback cannot retain the borrow.

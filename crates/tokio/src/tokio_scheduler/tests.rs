@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use super::*;
-use core_scheduler::{FileReader, FileReading, IoBufMut};
+use base_scheduler::{FileReader, FileReading, IoBufMut};
 use futures_lite::future::{block_on, poll_once};
 use std::sync::{
     Arc,

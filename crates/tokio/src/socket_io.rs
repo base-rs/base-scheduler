@@ -4,7 +4,7 @@
 //! Synchronous, nonblocking IP syscalls. No native pointer escapes a call.
 
 use crate::Interest;
-use core_scheduler::{
+use base_scheduler::{
     IoBufSequence, IoBufSequenceMut, SocketDomain, SocketProtocol, SocketRecvFlags,
     SocketRecvResult, SocketSendFlags, SocketType,
 };

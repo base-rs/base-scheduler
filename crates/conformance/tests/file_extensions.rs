@@ -2,8 +2,8 @@
 // Copyright, 2026, by Samuel Williams.
 
 mod support;
-use core_scheduler::*;
-use core_scheduler_conformance::{
+use base_scheduler::*;
+use base_scheduler_conformance::{
     FileAdviceFixture, FileAllocateFixture, file_advice, file_allocate,
 };
 use futures_channel::oneshot;
@@ -165,7 +165,7 @@ fn run_allocate(test: impl AsyncFnOnce(&AllocationFixture) + Send + 'static) {
     support::run(move || block_on(test(&AllocationFixture::new(AllocationFault::None))));
 }
 mod allocation {
-    core_scheduler_conformance::file_allocate_tests!(run: super::run_allocate);
+    base_scheduler_conformance::file_allocate_tests!(run: super::run_allocate);
 }
 #[test]
 fn rejects_allocation_contract_violations() {
@@ -394,7 +394,7 @@ fn run_advice(test: impl AsyncFnOnce(&AdviceFixture) + Send + 'static) {
     support::run(move || block_on(test(&AdviceFixture::new(AdviceFault::None))));
 }
 mod advice {
-    core_scheduler_conformance::file_advice_tests!(run: super::run_advice);
+    base_scheduler_conformance::file_advice_tests!(run: super::run_advice);
 }
 #[test]
 fn rejects_advice_contract_violations() {

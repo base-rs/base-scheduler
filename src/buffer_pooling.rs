@@ -11,7 +11,7 @@ use std::io;
 /// Pools may retain backend resources for registration lifetime, but bound handles select their scheduler at construction and receive cancellation per operation. Backends document instance affinity and reject incompatible resources before submitting I/O. Closing a scheduler does not invalidate completed buffers or their retained views.
 ///
 /// ```
-/// use core_scheduler::{BufferPoolOptions, BufferPooling, Cancellation, IoBuf,
+/// use base_scheduler::{BufferPoolOptions, BufferPooling, Cancellation, IoBuf,
 ///     OperationResult, ReceiveBuffer, SocketPacketReading, SocketPacketReader, SocketRecvMessage};
 ///
 /// async fn receive<S: SocketPacketReading>(scheduler: &S, socket: &S::Socket,

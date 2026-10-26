@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::{After, Mode};
-use core_scheduler::{Cancellation, Timers};
+use base_scheduler::{Cancellation, Timers};
 use std::{
     future::{Future, poll_fn},
     pin::pin,

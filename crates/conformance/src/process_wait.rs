@@ -3,7 +3,7 @@
 
 //! Child-process wait assertions. The generated suite runs broad Unix selectors in an isolated subprocess so they cannot reap another test's children.
 
-use core_scheduler::{
+use base_scheduler::{
     Cancellation, OperationError, ProcessWait, ProcessWaitFlags, ProcessWaitResult,
 };
 use futures_lite::future::poll_once;
@@ -201,7 +201,7 @@ where
         .unwrap_err();
     assert_eq!(
         std::mem::discriminant(&error),
-        std::mem::discriminant(&OperationError::from(core_scheduler::Cancelled))
+        std::mem::discriminant(&OperationError::from(base_scheduler::Cancelled))
     );
     let result = scheduler
         .process_wait(
@@ -253,7 +253,7 @@ pub async fn cancellation_with_admission<S: ProcessWait, F: Future<Output = ()>>
         }
         Err(error) => assert_eq!(
             std::mem::discriminant(&error),
-            std::mem::discriminant(&OperationError::from(core_scheduler::Cancelled))
+            std::mem::discriminant(&OperationError::from(base_scheduler::Cancelled))
         ),
     }
     let result = scheduler

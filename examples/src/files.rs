@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::{
+use base_scheduler::{
     Cancellation, FileReader, FileReading, FileWriter, FileWriting, IoBuf, OperationResult,
 };
 use std::io;

@@ -2,8 +2,8 @@
 // Copyright, 2026, by Samuel Williams.
 
 use super::*;
-use core_scheduler::SocketStreamWriter;
-use core_scheduler::*;
+use base_scheduler::SocketStreamWriter;
+use base_scheduler::*;
 
 macro_rules! conformance {
     ($($name:ident),*) => {$ (
@@ -12,8 +12,8 @@ macro_rules! conformance {
             crate::test_support::run(|| {
                 let scheduler = crate::test_support::scheduler();
                 futures_lite::future::block_on(async {
-                    let (sender, receiver) = core_scheduler_conformance::socket::stream_pair(&scheduler, SocketDomain::Ipv4).await;
-                    core_scheduler_conformance::socket_stream_writing::$name(&scheduler, &sender, &receiver).await;
+                    let (sender, receiver) = base_scheduler_conformance::socket::stream_pair(&scheduler, SocketDomain::Ipv4).await;
+                    base_scheduler_conformance::socket_stream_writing::$name(&scheduler, &sender, &receiver).await;
                     scheduler.shutdown().await;
                 });
             });
@@ -34,9 +34,9 @@ fn close_pending() {
         let scheduler = crate::test_support::scheduler();
         futures_lite::future::block_on(async {
             let (sender, _receiver) =
-                core_scheduler_conformance::socket::stream_pair(&scheduler, SocketDomain::Ipv4)
+                base_scheduler_conformance::socket::stream_pair(&scheduler, SocketDomain::Ipv4)
                     .await;
-            core_scheduler_conformance::socket_stream_writing::close_pending(&scheduler, &sender)
+            base_scheduler_conformance::socket_stream_writing::close_pending(&scheduler, &sender)
                 .await;
             scheduler.shutdown().await;
         });
@@ -62,7 +62,7 @@ fn rejects_datagrams_and_closed_admission() {
                 io::ErrorKind::InvalidInput
             );
             let (sender, _receiver) =
-                core_scheduler_conformance::socket::stream_pair(&scheduler, SocketDomain::Ipv4)
+                base_scheduler_conformance::socket::stream_pair(&scheduler, SocketDomain::Ipv4)
                     .await;
             crate::socket_io::SOCKET_TYPE_ERROR
                 .with(|slot| slot.set(Some(io::ErrorKind::PermissionDenied)));
@@ -104,7 +104,7 @@ fn immediate_error_is_accepted_and_retained() {
         futures_lite::future::block_on(async {
             let never = Cancellation::never();
             let (sender, _receiver) =
-                core_scheduler_conformance::socket::stream_pair(&scheduler, SocketDomain::Ipv4)
+                base_scheduler_conformance::socket::stream_pair(&scheduler, SocketDomain::Ipv4)
                     .await;
             scheduler
                 .socket_shutdown(&sender, std::net::Shutdown::Write)
@@ -130,7 +130,7 @@ fn accepted_cancellation_and_drop_release_owners() {
         futures_lite::future::block_on(async {
             let never = Cancellation::never();
             let (sender, _receiver) =
-                core_scheduler_conformance::socket::stream_pair(&scheduler, SocketDomain::Ipv4)
+                base_scheduler_conformance::socket::stream_pair(&scheduler, SocketDomain::Ipv4)
                     .await;
             let pool = HeapBufferPool::new(1, 8 * 1024 * 1024).unwrap();
             let mut writer = scheduler.socket_stream_output(&sender).unwrap();
@@ -184,7 +184,7 @@ fn ready_submission_and_flush_allocate_nothing() {
         futures_lite::future::block_on(async {
             let never = Cancellation::never();
             let (sender, _receiver) =
-                core_scheduler_conformance::socket::stream_pair(&scheduler, SocketDomain::Ipv4)
+                base_scheduler_conformance::socket::stream_pair(&scheduler, SocketDomain::Ipv4)
                     .await;
             let mut writer = scheduler.socket_stream_output(&sender).unwrap();
             let mut context = std::task::Context::from_waker(std::task::Waker::noop());
@@ -262,7 +262,7 @@ fn partial_initial_sends_continue_from_the_accepted_offset() {
         futures_lite::future::block_on(async {
             let never = Cancellation::never();
             let (sender, receiver) =
-                core_scheduler_conformance::socket::stream_pair(&scheduler, SocketDomain::Ipv4)
+                base_scheduler_conformance::socket::stream_pair(&scheduler, SocketDomain::Ipv4)
                     .await;
             // Deliver the prefix represented by the injected partial syscall result.
             assert_eq!(
@@ -305,7 +305,7 @@ fn syscall_and_task_admission_failures_are_retained_after_acceptance() {
         futures_lite::future::block_on(async {
             let never = Cancellation::never();
             let (sender, _receiver) =
-                core_scheduler_conformance::socket::stream_pair(&scheduler, SocketDomain::Ipv4)
+                base_scheduler_conformance::socket::stream_pair(&scheduler, SocketDomain::Ipv4)
                     .await;
             let mut writer = scheduler.socket_stream_output(&sender).unwrap();
             inject([Ok(0)]);
@@ -342,7 +342,7 @@ fn background_retry_errors_and_pending_close_preserve_the_result() {
             let never = Cancellation::never();
             let stopping = Cancellation::new();
             let (sender, _receiver) =
-                core_scheduler_conformance::socket::stream_pair(&scheduler, SocketDomain::Ipv4)
+                base_scheduler_conformance::socket::stream_pair(&scheduler, SocketDomain::Ipv4)
                     .await;
             let mut buffer = vec![42; 8 * 1024 * 1024];
             inject([Err(io::ErrorKind::Interrupted.into()), Ok(0)]);
@@ -438,7 +438,7 @@ fn admission_rechecks_cancellation_and_shutdown_after_retiring_the_previous_owne
             futures_lite::future::block_on(async {
                 let never = Cancellation::never();
                 let cancellation = Cancellation::new();
-                let (sender, receiver) = core_scheduler_conformance::socket::stream_pair(
+                let (sender, receiver) = base_scheduler_conformance::socket::stream_pair(
                     &*scheduler,
                     SocketDomain::Ipv4,
                 )
@@ -532,7 +532,7 @@ fn every_write_form_waits_for_accepted_output_and_preserves_terminal_errors() {
             let cancelled = Cancellation::new();
             cancelled.cancel();
             let (sender, receiver) =
-                core_scheduler_conformance::socket::stream_pair(&scheduler, SocketDomain::Ipv4)
+                base_scheduler_conformance::socket::stream_pair(&scheduler, SocketDomain::Ipv4)
                     .await;
             let mut writer = scheduler.socket_stream_output::<Vec<u8>>(&sender).unwrap();
             writer.state.accept(
@@ -554,7 +554,7 @@ fn every_write_form_waits_for_accepted_output_and_preserves_terminal_errors() {
                             .tasks
                             .spawn(async move {
                                 stopping.cancelled().await;
-                                Err(core_scheduler::Cancelled.into())
+                                Err(base_scheduler::Cancelled.into())
                             })
                             .unwrap();
                         writer.state.accept(task);
@@ -632,7 +632,7 @@ fn every_write_form_waits_for_accepted_output_and_preserves_terminal_errors() {
                         .socket_recv_poll(
                             &receiver,
                             &mut byte,
-                            core_scheduler::SocketRecvFlags::default(),
+                            base_scheduler::SocketRecvFlags::default(),
                             &never
                         )
                         .await

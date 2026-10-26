@@ -3,7 +3,7 @@
 
 //! Blocking-work assertions. The caller drives futures on its own executor; synchronous closures run on the backend's blocking workers.
 pub use crate::BlockingFixture;
-use core_scheduler::{Blocking, BlockingError, Cancellation, TaskError};
+use base_scheduler::{Blocking, BlockingError, Cancellation, TaskError};
 use futures_lite::future::poll_once;
 use std::sync::{
     Arc,

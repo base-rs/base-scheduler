@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::{BufferLease, BufferSlice, FrozenBuffer, IoBuf, IoBufMut, ReceiveBuffer};
+use base_scheduler::{BufferLease, BufferSlice, FrozenBuffer, IoBuf, IoBufMut, ReceiveBuffer};
 use std::ops::Range;
 
 /// An exclusive initialized payload in an io_uring pool. Receive metadata stays outside the exposed range. Completed storage can move between threads; its final owner returns it directly to its original slab.

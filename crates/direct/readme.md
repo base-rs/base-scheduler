@@ -1,14 +1,14 @@
-# `core-scheduler-direct`
+# `base-scheduler-direct`
 
-`core-scheduler-direct` is a reference backend for `core-scheduler`, with task execution, clocks, native address resolution, file operations, IP sockets, scatter/gather I/O, and bounded blocking work. Operation futures work with any executor that polls standard Rust futures. Services belong to the explicit scheduler instance; there is no implicit current scheduler or global fallback executor.
+`base-scheduler-direct` is a reference backend for `base-scheduler`, with task execution, clocks, native address resolution, file operations, IP sockets, scatter/gather I/O, and bounded blocking work. Operation futures work with any executor that polls standard Rust futures. Services belong to the explicit scheduler instance; there is no implicit current scheduler or global fallback executor.
 
 ## Usage
 
-Add this package with `cargo add core-scheduler core-scheduler-direct`.
+Add this package with `cargo add base-scheduler base-scheduler-direct`.
 
 ```rust
-use core_scheduler::{Cancellation, FileClose, FileOpen, FileOptions, FileReader, FileReading};
-use core_scheduler_direct::{DirectOptions, DirectScheduler};
+use base_scheduler::{Cancellation, FileClose, FileOpen, FileOptions, FileReader, FileReading};
+use base_scheduler_direct::{DirectOptions, DirectScheduler};
 
 # async fn example(path: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
 let scheduler = DirectScheduler::new(DirectOptions::default())?;
@@ -41,7 +41,7 @@ This backend supports Unix and Windows. Positioned I/O leaves the shared cursor 
 
 | Capabilities | Supported platforms |
 | --- | --- |
-| Core file/socket I/O, message I/O, blocking work, tasks, clocks, address resolution, socket options, TCP registration | Unix and Windows |
+| Base file/socket I/O, message I/O, blocking work, tasks, clocks, address resolution, socket options, TCP registration | Unix and Windows |
 | Signal subscriptions | Unix |
 | File allocation and advice with the interface's Linux semantics | Linux |
 
@@ -63,7 +63,7 @@ Construct scheduler-bound stream and packet readers and writers for application 
 
 ## Development
 
-Behavioral tests use the capability-specific `core-scheduler-conformance` macros as a development dependency. Each generated case has its own fixture and ordinary Rust test name, including separate IPv4/IPv6 suites and scalar/prepared I/O lifecycle suites. Backend runners enforce deadlines, drain accepted work on assertion failure, and preserve panics for test reporting. The implementation never depends on conformance in production.
+Behavioral tests use the capability-specific `base-scheduler-conformance` macros as a development dependency. Each generated case has its own fixture and ordinary Rust test name, including separate IPv4/IPv6 suites and scalar/prepared I/O lifecycle suites. Backend runners enforce deadlines, drain accepted work on assertion failure, and preserve panics for test reporting. The implementation never depends on conformance in production.
 
 ## Releasing
 
@@ -81,4 +81,4 @@ The [workspace overview](../../readme.md) describes the interface and companion 
 
 ## Contributing
 
-Please open an issue or pull request on [GitHub](https://github.com/core-rs/core-scheduler).
+Please open an issue or pull request on [GitHub](https://github.com/base-rs/base-scheduler).

@@ -3,7 +3,7 @@
 
 use crate::Interest;
 use crate::{DirectScheduler, DirectSocket};
-use core_scheduler::{
+use base_scheduler::{
     BufferPool, BufferPoolOptions, BufferPooling, Cancellation, OperationResult,
     OwnedSocketRecvMessage, SocketPacketReader, SocketRecvFlags, SocketRecvResult, SocketType,
 };
@@ -19,7 +19,7 @@ pub(crate) struct DirectSocketPacketReader<'a> {
     scheduler: &'a DirectScheduler,
     operations: crate::operation_state::OperationState,
     socket: DirectSocket,
-    pool: Option<core_scheduler::HeapBufferPool>,
+    pool: Option<base_scheduler::HeapBufferPool>,
     closing: bool,
 }
 
@@ -42,14 +42,14 @@ impl<'a> DirectSocketPacketReader<'a> {
     }
 
     /// Select reusable owned receive storage, including between completed reads. Outstanding messages retain their earlier pool independently. Borrowed reads never acquire from this pool.
-    pub(crate) fn with_pool(mut self, pool: core_scheduler::HeapBufferPool) -> Self {
+    pub(crate) fn with_pool(mut self, pool: base_scheduler::HeapBufferPool) -> Self {
         self.pool = Some(pool);
         self
     }
 }
 
 impl SocketPacketReader for DirectSocketPacketReader<'_> {
-    type Message = OwnedSocketRecvMessage<<core_scheduler::HeapBufferPool as BufferPool>::Buffer>;
+    type Message = OwnedSocketRecvMessage<<base_scheduler::HeapBufferPool as BufferPool>::Buffer>;
 
     async fn read(
         &mut self,
@@ -116,9 +116,9 @@ impl SocketPacketReader for DirectSocketPacketReader<'_> {
     async fn read_vectored_with_flags(
         &mut self,
         buffers: &mut [std::io::IoSliceMut<'_>],
-        flags: core_scheduler::SocketRecvFlags,
+        flags: base_scheduler::SocketRecvFlags,
         cancellation: &Cancellation,
-    ) -> OperationResult<core_scheduler::SocketRecvResult> {
+    ) -> OperationResult<base_scheduler::SocketRecvResult> {
         cancellation.check()?;
         if self.closing {
             return Err(io::Error::from(io::ErrorKind::BrokenPipe).into());
@@ -131,12 +131,12 @@ impl SocketPacketReader for DirectSocketPacketReader<'_> {
         Ok(result)
     }
 
-    async fn read_owned_vectored<Buffers: core_scheduler::IoBufSequenceMut>(
+    async fn read_owned_vectored<Buffers: base_scheduler::IoBufSequenceMut>(
         &mut self,
         buffers: Buffers,
-        flags: core_scheduler::SocketRecvFlags,
+        flags: base_scheduler::SocketRecvFlags,
         cancellation: &Cancellation,
-    ) -> (OperationResult<core_scheduler::SocketRecvResult>, Buffers) {
+    ) -> (OperationResult<base_scheduler::SocketRecvResult>, Buffers) {
         if self.closing {
             return (
                 Err(io::Error::from(io::ErrorKind::BrokenPipe).into()),

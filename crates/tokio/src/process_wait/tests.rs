@@ -102,8 +102,8 @@ fn cancelling_a_running_pool_fallback_does_not_kill_the_child() {
             }
             Err(error) => assert_eq!(
                 std::mem::discriminant(&error),
-                std::mem::discriminant(&core_scheduler::OperationError::from(
-                    core_scheduler::Cancelled
+                std::mem::discriminant(&base_scheduler::OperationError::from(
+                    base_scheduler::Cancelled
                 ))
             ),
         }
@@ -164,7 +164,7 @@ fn notification_and_reactor_registration_failures_survive() {
 #[test]
 fn started_fallback_returns_status_after_cancellation() {
     run(async |scheduler| {
-        core_scheduler_conformance::process_wait::cancellation_with_admission(
+        base_scheduler_conformance::process_wait::cancellation_with_admission(
             scheduler,
             ProcessWaitFlags {
                 untraced: true,
@@ -193,7 +193,7 @@ fn started_windows_wait_returns_status_after_cancellation() {
         .unwrap();
     let scheduler = TokioScheduler::new(runtime.handle().clone());
     runtime.block_on(
-        core_scheduler_conformance::process_wait::cancellation_with_admission(
+        base_scheduler_conformance::process_wait::cancellation_with_admission(
             &scheduler,
             ProcessWaitFlags::default(),
             |pid| {

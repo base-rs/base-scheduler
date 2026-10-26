@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::TokioScheduler;
-use core_scheduler::{Cancellation, Clock, OperationResult, Timers};
+use base_scheduler::{Cancellation, Clock, OperationResult, Timers};
 use std::{
     future::{Future, poll_fn},
     io,
@@ -70,7 +70,7 @@ impl Timers for TokioScheduler {
                 return Poll::Ready(Ok(()));
             }
             if cancelled.as_mut().poll(context).is_ready() {
-                return Poll::Ready(Err(core_scheduler::Cancelled.into()));
+                return Poll::Ready(Err(base_scheduler::Cancelled.into()));
             }
             Poll::Pending
         })

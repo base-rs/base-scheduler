@@ -425,7 +425,7 @@ unsafe impl IoBufSequenceMut for InlineBuffers {
 #[test]
 fn inline_prepared_vectors_survive_submission_and_are_used_without_copying() {
     let (selector, mut driver) = pair(2);
-    let (sender, receiver) = block_on(core_scheduler_conformance::socket::stream_pair(
+    let (sender, receiver) = block_on(base_scheduler_conformance::socket::stream_pair(
         &selector,
         SocketDomain::Ipv4,
     ));

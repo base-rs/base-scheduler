@@ -1,9 +1,9 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::*;
-use core_scheduler_conformance::socket;
-use core_scheduler_native::{NativeOptions, NativeScheduler, NativeSocket};
+use base_scheduler::*;
+use base_scheduler_conformance::socket;
+use base_scheduler_native::{NativeOptions, NativeScheduler, NativeSocket};
 use futures_lite::future::block_on;
 use std::{sync::mpsc, time::Duration};
 
@@ -14,7 +14,7 @@ mod selector_packet_handles {
 
     fn run_case(
         test: impl AsyncFnOnce(
-            &core_scheduler_selector::ReadinessSelector,
+            &base_scheduler_selector::ReadinessSelector,
             &NativeSocket,
             &NativeSocket,
         ) + Send
@@ -28,7 +28,7 @@ mod selector_packet_handles {
         );
     }
 
-    core_scheduler_conformance::socket_packet_io_tests!(run: run_case);
+    base_scheduler_conformance::socket_packet_io_tests!(run: run_case);
 }
 
 fn run(test: impl FnOnce() + Send + 'static) {
@@ -148,46 +148,46 @@ mod ipv4 {
     #[test]
     fn pooled_stream_receiver() {
         run_stream_case(async |scheduler, sender, socket| {
-            core_scheduler_conformance::socket_receiving::demand_driven(scheduler, sender, socket)
+            base_scheduler_conformance::socket_receiving::demand_driven(scheduler, sender, socket)
                 .await;
-            core_scheduler_conformance::socket_receiving::stream(scheduler, sender, socket).await;
+            base_scheduler_conformance::socket_receiving::stream(scheduler, sender, socket).await;
         });
     }
     #[test]
     fn pooled_datagram_receiver() {
         run_datagram_case(async |scheduler, sender, socket| {
-            core_scheduler_conformance::socket_poll::datagram_first_poll(scheduler, sender, socket)
+            base_scheduler_conformance::socket_poll::datagram_first_poll(scheduler, sender, socket)
                 .await;
-            core_scheduler_conformance::socket_receiving::datagram(scheduler, sender, socket).await;
+            base_scheduler_conformance::socket_receiving::datagram(scheduler, sender, socket).await;
         });
     }
     mod borrowed_scalar {
         use super::*;
-        core_scheduler_conformance::socket_poll_tests!(run: run_stream_case);
+        base_scheduler_conformance::socket_poll_tests!(run: run_stream_case);
     }
     mod borrowed_messages {
         use super::*;
-        core_scheduler_conformance::socket_message_poll_tests!(run: run_stream_case);
+        base_scheduler_conformance::socket_message_poll_tests!(run: run_stream_case);
     }
     mod borrowed_datagrams {
         use super::*;
-        core_scheduler_conformance::socket_datagram_poll_tests!(run: run_datagram_case);
+        base_scheduler_conformance::socket_datagram_poll_tests!(run: run_datagram_case);
     }
     mod packet_handles {
         use super::*;
-        core_scheduler_conformance::socket_packet_io_tests!(run: run_datagram_case);
+        base_scheduler_conformance::socket_packet_io_tests!(run: run_datagram_case);
     }
     mod scalar {
         use super::*;
-        core_scheduler_conformance::socket_tests!(run: run_stream_case);
+        base_scheduler_conformance::socket_tests!(run: run_stream_case);
     }
     mod messages {
         use super::*;
-        core_scheduler_conformance::socket_message_tests!(run: run_stream_case);
+        base_scheduler_conformance::socket_message_tests!(run: run_stream_case);
     }
     mod datagrams {
         use super::*;
-        core_scheduler_conformance::socket_datagram_tests!(run: run_datagram_case);
+        base_scheduler_conformance::socket_datagram_tests!(run: run_datagram_case);
     }
 }
 
@@ -206,46 +206,46 @@ mod ipv6 {
     #[test]
     fn pooled_stream_receiver() {
         run_stream_case(async |scheduler, sender, socket| {
-            core_scheduler_conformance::socket_receiving::demand_driven(scheduler, sender, socket)
+            base_scheduler_conformance::socket_receiving::demand_driven(scheduler, sender, socket)
                 .await;
-            core_scheduler_conformance::socket_receiving::stream(scheduler, sender, socket).await;
+            base_scheduler_conformance::socket_receiving::stream(scheduler, sender, socket).await;
         });
     }
     #[test]
     fn pooled_datagram_receiver() {
         run_datagram_case(async |scheduler, sender, socket| {
-            core_scheduler_conformance::socket_poll::datagram_first_poll(scheduler, sender, socket)
+            base_scheduler_conformance::socket_poll::datagram_first_poll(scheduler, sender, socket)
                 .await;
-            core_scheduler_conformance::socket_receiving::datagram(scheduler, sender, socket).await;
+            base_scheduler_conformance::socket_receiving::datagram(scheduler, sender, socket).await;
         });
     }
     mod borrowed_scalar {
         use super::*;
-        core_scheduler_conformance::socket_poll_tests!(run: run_stream_case);
+        base_scheduler_conformance::socket_poll_tests!(run: run_stream_case);
     }
     mod borrowed_messages {
         use super::*;
-        core_scheduler_conformance::socket_message_poll_tests!(run: run_stream_case);
+        base_scheduler_conformance::socket_message_poll_tests!(run: run_stream_case);
     }
     mod borrowed_datagrams {
         use super::*;
-        core_scheduler_conformance::socket_datagram_poll_tests!(run: run_datagram_case);
+        base_scheduler_conformance::socket_datagram_poll_tests!(run: run_datagram_case);
     }
     mod packet_handles {
         use super::*;
-        core_scheduler_conformance::socket_packet_io_tests!(run: run_datagram_case);
+        base_scheduler_conformance::socket_packet_io_tests!(run: run_datagram_case);
     }
     mod scalar {
         use super::*;
-        core_scheduler_conformance::socket_tests!(run: run_stream_case);
+        base_scheduler_conformance::socket_tests!(run: run_stream_case);
     }
     mod messages {
         use super::*;
-        core_scheduler_conformance::socket_message_tests!(run: run_stream_case);
+        base_scheduler_conformance::socket_message_tests!(run: run_stream_case);
     }
     mod datagrams {
         use super::*;
-        core_scheduler_conformance::socket_datagram_tests!(run: run_datagram_case);
+        base_scheduler_conformance::socket_datagram_tests!(run: run_datagram_case);
     }
 }
 
@@ -322,10 +322,10 @@ fn aggregate_socket_helpers_remain_compatible() {
         socket::stream(scheduler, sender, receiver).await;
     });
     run_stream(SocketDomain::Ipv4, async |scheduler, sender, receiver| {
-        core_scheduler_conformance::socket_messages::stream(scheduler, sender, receiver).await;
+        base_scheduler_conformance::socket_messages::stream(scheduler, sender, receiver).await;
     });
     run_datagram(SocketDomain::Ipv4, async |scheduler, sender, receiver| {
-        core_scheduler_conformance::socket_messages::datagrams(scheduler, sender, receiver).await;
+        base_scheduler_conformance::socket_messages::datagrams(scheduler, sender, receiver).await;
     });
 }
 
@@ -333,7 +333,7 @@ fn aggregate_socket_helpers_remain_compatible() {
 fn pooled_messages_use_the_explicit_native_scheduler() {
     run(|| {
         let scheduler = scheduler();
-        block_on(core_scheduler_conformance::socket_receiving::messages(
+        block_on(base_scheduler_conformance::socket_receiving::messages(
             &scheduler,
         ));
         block_on(scheduler.shutdown());
@@ -344,7 +344,7 @@ fn pooled_messages_use_the_explicit_native_scheduler() {
 fn pooled_stream_uses_the_explicit_native_scheduler() {
     run(|| {
         let scheduler = scheduler();
-        block_on(core_scheduler_conformance::socket_receiving::stream_eof(
+        block_on(base_scheduler_conformance::socket_receiving::stream_eof(
             &scheduler,
         ));
         block_on(scheduler.shutdown());
@@ -354,6 +354,6 @@ fn pooled_stream_uses_the_explicit_native_scheduler() {
 #[test]
 fn bound_socket_handles_reuse_storage() {
     run_stream(SocketDomain::Ipv4, async |scheduler, sender, receiver| {
-        core_scheduler_conformance::socket_resources::stream(scheduler, sender, receiver).await;
+        base_scheduler_conformance::socket_resources::stream(scheduler, sender, receiver).await;
     });
 }

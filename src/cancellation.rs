@@ -60,7 +60,7 @@ impl Drop for Node {
 /// Clones share a persistent cancellation state. Child signals receive ancestor cancellation, but cancelling a child does not cancel its parent or siblings. Dropping a signal does not request cancellation. Signals neither own tasks nor abort futures; callers decide how to respond and separately await completion.
 ///
 /// ```
-/// use core_scheduler::{Cancellation, Cancelled};
+/// use base_scheduler::{Cancellation, Cancelled};
 ///
 /// let system = Cancellation::new();
 /// let server = system.child();

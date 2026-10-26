@@ -4,7 +4,7 @@
 //! Scheduler-bound packet handles over fresh, bound, unconnected datagram pairs.
 
 use crate::socket::cancelled;
-use core_scheduler::*;
+use base_scheduler::*;
 use futures_lite::future::{poll_once, zip};
 use std::{
     io::{IoSlice, IoSliceMut},

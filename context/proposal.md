@@ -2,19 +2,19 @@
 
 ## Status and intent
 
-These notes record the design discussion for a future `core-scheduler` crate. This directory is a place to preserve the proposal; no crate, implementation, or migration is being introduced yet. Names and API examples describe the intended boundaries rather than a finalized public API.
+These notes record the design discussion for a future `base-scheduler` crate. This directory is a place to preserve the proposal; no crate, implementation, or migration is being introduced yet. Names and API examples describe the intended boundaries rather than a finalized public API.
 
 The goal is an independent, explicit scheduler interface, similar in purpose to Zig's I/O interface. Protocol libraries should be able to express the operations they need without selecting an executor or event loop. An application selects a concrete implementation at compile time.
 
 ## Package boundaries
 
-- `core-scheduler` defines the abstract interface and its behavioral contracts.
+- `base-scheduler` defines the abstract interface and its behavioral contracts.
 - `socketry` provides concrete implementations of that interface.
 - `protocol-http` consumes the abstract interface, directly or through a richer protocol stream abstraction. It may use `socketry` as a development dependency for tests.
 - Applications depend on a protocol library and their chosen scheduler implementation.
 - Other implementation crates can independently provide adapters for existing runtimes or simulated environments.
 
-The normal dependency graph points from both consumers and implementations toward `core-scheduler`. The interface crate must not depend on a concrete scheduler. A protocol library's test-only dependency on `socketry` does not make Socketry a dependency of its published library implementation.
+The normal dependency graph points from both consumers and implementations toward `base-scheduler`. The interface crate must not depend on a concrete scheduler. A protocol library's test-only dependency on `socketry` does not make Socketry a dependency of its published library implementation.
 
 ## Interface contents
 
@@ -96,9 +96,9 @@ The suite could live in a companion support crate or another reusable test packa
 
 Socketry already has capability traits, associated resource types, multiple backends, and a generic interface probe with a simulator. Review these before introducing a parallel API:
 
-- [Socketry design](https://github.com/core-rs/socketry-rust/blob/b54b8d61bf80b71a1a5b97c3f5b80bae8a5ebabd/context/design.md).
-- [Socketry implementation guidance](https://github.com/core-rs/socketry-rust/blob/b54b8d61bf80b71a1a5b97c3f5b80bae8a5ebabd/context/implementation.md).
-- [Existing generic interface tests](https://github.com/core-rs/socketry-rust/blob/b54b8d61bf80b71a1a5b97c3f5b80bae8a5ebabd/crates/executor/examples/interface_probe/tests.rs).
-- [Existing simulator](https://github.com/core-rs/socketry-rust/blob/b54b8d61bf80b71a1a5b97c3f5b80bae8a5ebabd/crates/executor/examples/interface_probe/simulated.rs).
+- [Socketry design](https://github.com/base-rs/socketry-rust/blob/b54b8d61bf80b71a1a5b97c3f5b80bae8a5ebabd/context/design.md).
+- [Socketry implementation guidance](https://github.com/base-rs/socketry-rust/blob/b54b8d61bf80b71a1a5b97c3f5b80bae8a5ebabd/context/implementation.md).
+- [Existing generic interface tests](https://github.com/base-rs/socketry-rust/blob/b54b8d61bf80b71a1a5b97c3f5b80bae8a5ebabd/crates/executor/examples/interface_probe/tests.rs).
+- [Existing simulator](https://github.com/base-rs/socketry-rust/blob/b54b8d61bf80b71a1a5b97c3f5b80bae8a5ebabd/crates/executor/examples/interface_probe/simulated.rs).
 
 A future extraction should identify the minimal shared types, settle future bounds and optional capabilities, package the conformance suite, and migrate an implementation plus a representative consumer to validate the boundary. Publication, crate naming, and migration details remain open.

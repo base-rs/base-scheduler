@@ -4,7 +4,7 @@
 //! Standard-library TCP import retains established connections and listeners.
 
 use crate::SocketTestScheduler;
-use core_scheduler::*;
+use base_scheduler::*;
 use std::{
     io::{Read, Write},
     net::{TcpListener, TcpStream},

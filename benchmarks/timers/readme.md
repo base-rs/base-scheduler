@@ -1,4 +1,4 @@
-# core-scheduler-timer-benchmark
+# base-scheduler-timer-benchmark
 
 An experimental reusable timer inspired by C++ `Async::After`, compared with the existing `Clock::sleep_until` operation. This branch is a prototype, rather than a proposal to replace the clock interface or a released public API.
 
@@ -26,7 +26,7 @@ All timer and cancellation objects are ordinary owned Rust state. No borrowed ap
 
 ## Workloads and methodology
 
-Measurements use Aiko: AMD Ryzen 9 9950X3D, 32 logical CPUs, Linux 7.2.6-arch2-1, Rust 1.99.0, LLVM 23.1.1, and locked Tokio 1.53.3. Builds use Cargo's optimized release profile, without added LTO or target-CPU flags. CPU frequency scaling remains `powersave`, with boost enabled; processes are not CPU-pinned. Runs are serialized with `/tmp/core-scheduler-perf.lock`. No builds or tests run concurrently with the measured processes.
+Measurements use Aiko: AMD Ryzen 9 9950X3D, 32 logical CPUs, Linux 7.2.6-arch2-1, Rust 1.99.0, LLVM 23.1.1, and locked Tokio 1.53.3. Builds use Cargo's optimized release profile, without added LTO or target-CPU flags. CPU frequency scaling remains `powersave`, with boost enabled; processes are not CPU-pinned. Runs are serialized with `/tmp/base-scheduler-perf.lock`. No builds or tests run concurrently with the measured processes.
 
 Each repeat shuffles backend/workload pairs and runs their three modes consecutively in shuffled order. No separate machine or cross-network traffic is involved. The initial matrix retains the last six of seven repeats, excluding the first following a harness restart. The backend-deferral variant has five repeats. Each process constructs its runtime outside the timed region, then measures task admission, task work and joins. The reported `ns/op` is elapsed wall time divided by completed operation attempts across all tasks. For multiple workers it is aggregate throughput, not individual operation latency. Process CPU time is recorded separately, including timer threads. Small percentage differences should be treated cautiously, especially for Direct's contended mutex and timer-wheel-bound workloads.
 
@@ -48,16 +48,16 @@ The one-millisecond expiration rows reflect backend scheduling precision as well
 ## Reproduce
 
 ```sh
-cargo build --release --locked -p core-scheduler-timer-benchmark
-flock /tmp/core-scheduler-perf.lock python3 benchmarks/timers/run.py --output results.jsonl
+cargo build --release --locked -p base-scheduler-timer-benchmark
+flock /tmp/base-scheduler-perf.lock python3 benchmarks/timers/run.py --output results.jsonl
 python3 benchmarks/timers/summarize.py results.jsonl
 ```
 
 A single sample takes backend, mode, workload, tasks, iterations, workers and delay in microseconds:
 
 ```sh
-target/release/core-scheduler-timer-benchmark native reuse yield 64 75000 4 1000
-target/release/core-scheduler-timer-benchmark tokio after alloc 1 100000 1
+target/release/base-scheduler-timer-benchmark native reuse yield 64 75000 4 1000
+target/release/base-scheduler-timer-benchmark tokio after alloc 1 100000 1
 ```
 
 Use `--backends tokio native direct` on macOS. Process CPU time is available on Unix; the experimental harness reports zero on other systems. Performance results in this report are Linux measurements.

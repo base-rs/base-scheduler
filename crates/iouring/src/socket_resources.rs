@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::IoUringSelector;
-use core_scheduler::*;
+use base_scheduler::*;
 use std::io;
 impl SocketStreamReading for IoUringSelector {
     fn socket_stream_reader<'scheduler>(

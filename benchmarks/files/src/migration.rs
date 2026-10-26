@@ -1,11 +1,11 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::{
+use base_scheduler::{
     Cancellation, FileClose, FileOpen, FileOptions, FileReader, FileReading, FileWriter,
     FileWriting,
 };
-use core_scheduler_iouring::{IoUringOptions, IoUringSelector};
+use base_scheduler_iouring::{IoUringOptions, IoUringSelector};
 use futures_lite::future::block_on;
 use std::time::Instant;
 

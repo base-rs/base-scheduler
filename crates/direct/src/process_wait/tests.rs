@@ -8,7 +8,7 @@ use futures_lite::future::block_on;
 fn started_wait_returns_status_after_cancellation() {
     let scheduler = DirectScheduler::new(Default::default()).unwrap();
     block_on(
-        core_scheduler_conformance::process_wait::cancellation_with_admission(
+        base_scheduler_conformance::process_wait::cancellation_with_admission(
             &scheduler,
             ProcessWaitFlags::default(),
             |pid| {

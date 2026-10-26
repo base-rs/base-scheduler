@@ -10,7 +10,7 @@ use std::future::Future;
 /// A getter-only adapter needs neither a setter nor any core socket operations:
 ///
 /// ```
-/// use core_scheduler::{Cancellation, OperationResult, SocketGetOption, SocketOperation, SocketOption};
+/// use base_scheduler::{Cancellation, OperationResult, SocketGetOption, SocketOperation, SocketOption};
 /// struct Inspector<S>(S);
 /// impl<S: SocketOperation> SocketOperation for Inspector<S> {
 ///     type Socket = S::Socket;
@@ -25,7 +25,7 @@ use std::future::Future;
 /// Reading an option does not grant permission to set it:
 ///
 /// ```compile_fail,E0599
-/// use core_scheduler::{Cancellation, SocketGetOption, SocketSetOption, TcpNoDelay};
+/// use base_scheduler::{Cancellation, SocketGetOption, SocketSetOption, TcpNoDelay};
 /// async fn configure<S: SocketGetOption<TcpNoDelay>>(scheduler: &S, socket: &S::Socket) {
 ///     scheduler.socket_set_option(socket, TcpNoDelay, true, &Cancellation::never()).await;
 /// }

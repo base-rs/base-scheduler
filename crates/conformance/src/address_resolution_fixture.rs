@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::{AddressInfo, AddressResolution, AddressResolveError};
+use base_scheduler::{AddressInfo, AddressResolution, AddressResolveError};
 
 /// A resolver with a controlled successful name and a controlled failure. Configure answers independently of the implementation under test: include duplicates, both families, scoped IPv6, and native type/protocol values where supported. No public DNS or host service database is required.
 pub trait AddressResolutionFixture {
@@ -16,7 +16,7 @@ pub trait AddressResolutionFixture {
     /// Compare category, native code, message, and any underlying system error against an independently configured failure.
     fn assert_error(&self, error: &AddressResolveError);
     /// Verify that the actual native/table lookup received the supplied family, type, protocol, and flags. Inspect the resolver boundary, including its native flag translation, independently of its returned answers.
-    fn assert_hints(&self, hints: core_scheduler::AddressHints);
+    fn assert_hints(&self, hints: base_scheduler::AddressHints);
     /// Native/table lookup submissions, excluding argument validation. Observe the resolver boundary rather than calls to the async trait method.
     fn lookups(&self) -> usize;
 }

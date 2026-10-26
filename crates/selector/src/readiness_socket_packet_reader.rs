@@ -3,7 +3,7 @@
 
 use crate::Interest;
 use crate::{NativeSocket, ReadinessSelector};
-use core_scheduler::{
+use base_scheduler::{
     BufferPool, BufferPoolOptions, BufferPooling, Cancellation, OperationResult,
     OwnedSocketRecvMessage, SocketPacketReader, SocketRecvFlags, SocketRecvResult, SocketType,
 };
@@ -18,7 +18,7 @@ use std::{
 pub(crate) struct ReadinessSocketPacketReader<'a> {
     scheduler: &'a ReadinessSelector,
     socket: NativeSocket,
-    pool: Option<core_scheduler::HeapBufferPool>,
+    pool: Option<base_scheduler::HeapBufferPool>,
     closing: bool,
 }
 
@@ -42,14 +42,14 @@ impl<'a> ReadinessSocketPacketReader<'a> {
     }
 
     /// Select reusable owned receive storage, including between completed reads. Outstanding messages retain their earlier pool independently. Borrowed reads never acquire from this pool.
-    pub(crate) fn with_pool(mut self, pool: core_scheduler::HeapBufferPool) -> Self {
+    pub(crate) fn with_pool(mut self, pool: base_scheduler::HeapBufferPool) -> Self {
         self.pool = Some(pool);
         self
     }
 }
 
 impl SocketPacketReader for ReadinessSocketPacketReader<'_> {
-    type Message = OwnedSocketRecvMessage<<core_scheduler::HeapBufferPool as BufferPool>::Buffer>;
+    type Message = OwnedSocketRecvMessage<<base_scheduler::HeapBufferPool as BufferPool>::Buffer>;
 
     async fn read(
         &mut self,
@@ -127,7 +127,7 @@ impl SocketPacketReader for ReadinessSocketPacketReader<'_> {
         buffers: &mut [IoSliceMut<'_>],
         flags: SocketRecvFlags,
         cancellation: &Cancellation,
-    ) -> OperationResult<core_scheduler::SocketRecvResult> {
+    ) -> OperationResult<base_scheduler::SocketRecvResult> {
         cancellation.check()?;
         if self.closing {
             return Err(io::Error::from(io::ErrorKind::BrokenPipe).into());
@@ -137,12 +137,12 @@ impl SocketPacketReader for ReadinessSocketPacketReader<'_> {
             .await
     }
 
-    async fn read_owned_vectored<Buffers: core_scheduler::IoBufSequenceMut>(
+    async fn read_owned_vectored<Buffers: base_scheduler::IoBufSequenceMut>(
         &mut self,
         buffers: Buffers,
         flags: SocketRecvFlags,
         cancellation: &Cancellation,
-    ) -> (OperationResult<core_scheduler::SocketRecvResult>, Buffers) {
+    ) -> (OperationResult<base_scheduler::SocketRecvResult>, Buffers) {
         if self.closing {
             return (
                 Err(io::Error::from(io::ErrorKind::BrokenPipe).into()),

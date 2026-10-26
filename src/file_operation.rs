@@ -12,7 +12,7 @@
 /// Selecting a resource type does not supply any operations:
 ///
 /// ```compile_fail,E0599
-/// use core_scheduler::{Cancellation, FileOperation};
+/// use base_scheduler::{Cancellation, FileOperation};
 /// async fn read<S: FileOperation>(scheduler: &S, file: &S::File) {
 ///     scheduler.file_reader(file);
 /// }

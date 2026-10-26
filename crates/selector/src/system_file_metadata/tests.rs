@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use super::*;
-use core_scheduler::{FileMetadata, FileType};
+use base_scheduler::{FileMetadata, FileType};
 
 #[test]
 fn preserves_native_metadata_and_exposes_portable_observations() {

@@ -2,8 +2,8 @@
 // Copyright, 2026, by Samuel Williams.
 
 mod support;
-use core_scheduler::{Cancellation, Clock, OperationResult};
-use core_scheduler_conformance::{ClockFixture, clock};
+use base_scheduler::{Cancellation, Clock, OperationResult};
+use base_scheduler_conformance::{ClockFixture, clock};
 use futures_lite::future::block_on;
 use std::{
     collections::BTreeMap,
@@ -89,7 +89,7 @@ impl Clock for Fixture {
         let mut cancelled = pin!(cancellation.cancelled());
         poll_fn(|context| {
             if self.fault == Fault::CancellationWins && cancellation.is_cancelled() {
-                return Poll::Ready(Err(core_scheduler::Cancelled.into()));
+                return Poll::Ready(Err(base_scheduler::Cancelled.into()));
             }
             let mut state = self.state.lock().unwrap();
             if state.now >= deadline {
@@ -109,7 +109,7 @@ impl Clock for Fixture {
                 if self.fault == Fault::PendingSuccess {
                     return Poll::Ready(Ok(()));
                 }
-                Poll::Ready(Err(core_scheduler::Cancelled.into()))
+                Poll::Ready(Err(base_scheduler::Cancelled.into()))
             } else {
                 Poll::Pending
             }
@@ -169,7 +169,7 @@ fn run_case(test: impl AsyncFnOnce(&Fixture) + Send + 'static) {
     support::run(move || block_on(test(&Fixture::new(Fault::None))));
 }
 mod generated {
-    core_scheduler_conformance::clock_tests!(run: super::run_case);
+    base_scheduler_conformance::clock_tests!(run: super::run_case);
 }
 
 #[test]

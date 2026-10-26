@@ -3,9 +3,9 @@
 
 #[path = "support/socket_model.rs"]
 mod socket_model;
-use core_scheduler::*;
-use core_scheduler_conformance::{blocking, file};
-use core_scheduler_conformance::{socket, socket_messages};
+use base_scheduler::*;
+use base_scheduler_conformance::{blocking, file};
+use base_scheduler_conformance::{socket, socket_messages};
 use futures_lite::future::block_on;
 use socket_model::{SocketModel, socket_factories};
 use std::{

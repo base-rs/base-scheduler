@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::{
+use base_scheduler::{
     BufferPool, BufferPoolOptions, Cancellation, HeapBufferPool, IoBuf, ReceiveBuffer,
 };
 #[path = "support/buffer_pool.rs"]
@@ -347,7 +347,7 @@ fn aligned_slots_share_one_slab_without_aliasing_other_live_slots() {
 
 #[test]
 fn portable_pool_factories_need_only_the_ownership_contract() {
-    use core_scheduler::BufferPooling;
+    use base_scheduler::BufferPooling;
     struct Portable;
     impl BufferPooling for Portable {
         type Pool = HeapBufferPool;
@@ -365,8 +365,8 @@ fn leases_and_views_keep_their_send_and_sync_contracts() {
     fn send_and_sync<T: Send + Sync>() {}
     fn send<T: Send>(_: T) {}
     send_and_sync::<HeapBufferPool>();
-    send_and_sync::<core_scheduler::BufferLease>();
-    send_and_sync::<core_scheduler::FrozenBuffer>();
+    send_and_sync::<base_scheduler::BufferLease>();
+    send_and_sync::<base_scheduler::FrozenBuffer>();
     let pool = HeapBufferPool::new(1, 8).unwrap();
     send(pool.acquire(&Cancellation::never()));
 }

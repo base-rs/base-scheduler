@@ -9,7 +9,7 @@ use std::future::Future;
 /// Generic consumers use borrowed views without prescribing the resolver's storage:
 ///
 /// ```
-/// use core_scheduler::{AddressHints, AddressInfoCollection, AddressInfoView, AddressResolution, AddressService, Cancellation, OperationResult, SocketAddress};
+/// use base_scheduler::{AddressHints, AddressInfoCollection, AddressInfoView, AddressResolution, AddressService, Cancellation, OperationResult, SocketAddress};
 /// async fn first<S: AddressResolution>(scheduler: &S, cancellation: &Cancellation) -> OperationResult<Option<SocketAddress>> {
 ///     let result = scheduler.address_resolve(Some("example.com"), AddressService::Port(80), AddressHints::default(), cancellation).await?;
 ///     let address = result.entries().next().map(|entry| entry.address());
@@ -18,7 +18,7 @@ use std::future::Future;
 /// ```
 ///
 /// ```compile_fail
-/// use core_scheduler::{AddressResolution, AddressHints, AddressService, Cancellation, SocketOperation};
+/// use base_scheduler::{AddressResolution, AddressHints, AddressService, Cancellation, SocketOperation};
 /// async fn resolve<S: SocketOperation>(scheduler: &S) {
 ///     scheduler.address_resolve(Some("localhost"), AddressService::Port(80), AddressHints::default(), &Cancellation::never()).await;
 /// }

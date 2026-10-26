@@ -9,7 +9,7 @@ use std::future::{Ready, ready};
 fn retained_errors_preserve_classification_and_first_failure() {
     let mut state = SocketWriteState::<Ready<Result<OperationResult<()>, TaskError>>>::default();
     state.fail(io::Error::from_raw_os_error(1).into());
-    state.fail(core_scheduler::Cancelled.into());
+    state.fail(base_scheduler::Cancelled.into());
     assert_eq!(state.check_open().unwrap_err().raw_os_error(), Some(1));
     assert_eq!(
         block_on(state.flush(&Cancellation::never()))
@@ -48,14 +48,14 @@ fn cancelled_wait_retains_pending_operation_and_close_signals_retirement() {
         cancellation.cancel();
         assert_eq!(
             std::mem::discriminant(&state.flush(&cancellation).await.unwrap_err()),
-            std::mem::discriminant(&OperationError::Cancelled(core_scheduler::Cancelled))
+            std::mem::discriminant(&OperationError::Cancelled(base_scheduler::Cancelled))
         );
         let mut closing = Box::pin(state.close());
         assert!(poll_once(closing.as_mut()).await.is_none());
         assert!(stopping.is_cancelled());
         drop(closing);
         sender
-            .send(Ok(Err(core_scheduler::Cancelled.into())))
+            .send(Ok(Err(base_scheduler::Cancelled.into())))
             .unwrap();
         state.close().await.unwrap();
         state.close().await.unwrap();

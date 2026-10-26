@@ -3,8 +3,8 @@
 
 use super::*;
 use crate::{NativeScheduler, test_support};
-use core_scheduler::{Cancellation, Spawn, TaskError};
-use core_scheduler_conformance::SpawnFixture;
+use base_scheduler::{Cancellation, Spawn, TaskError};
+use base_scheduler_conformance::SpawnFixture;
 use futures_lite::future::block_on;
 use std::{
     panic::{AssertUnwindSafe, catch_unwind},
@@ -39,10 +39,10 @@ fn run(test: impl AsyncFnOnce(&NativeScheduler) + Send + 'static) {
     });
 }
 mod conformance {
-    core_scheduler_conformance::spawn_tests!(run: super::run);
+    base_scheduler_conformance::spawn_tests!(run: super::run);
 }
 mod dispatch {
-    core_scheduler_conformance::spawn_dispatch_tests!(run: super::run);
+    base_scheduler_conformance::spawn_dispatch_tests!(run: super::run);
 }
 
 // Keep workers at their admission boundary so stealing cannot obscure initial placement.
@@ -184,7 +184,7 @@ fn rejected_future_destructors_can_close_admission_again() {
 fn tasks_progress_without_occupying_syscall_workers_and_survive_admission_close() {
     test_support::run(|| {
         block_on(async {
-            use core_scheduler::Blocking;
+            use base_scheduler::Blocking;
             let scheduler = test_support::scheduler();
             let token = Cancellation::new();
             let child = token.clone();

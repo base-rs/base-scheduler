@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::{Cancellation, HeapBufferPool};
+use base_scheduler::{Cancellation, HeapBufferPool};
 use futures_lite::future::block_on;
 
 #[test]

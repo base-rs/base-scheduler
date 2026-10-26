@@ -3,7 +3,7 @@
 
 //! Ordered output assertions shared by completion and readiness backends.
 use crate::SocketTestScheduler;
-use core_scheduler::*;
+use base_scheduler::*;
 use futures_lite::future::{poll_once, zip};
 use std::io;
 

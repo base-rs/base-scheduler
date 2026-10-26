@@ -18,10 +18,10 @@ def main():
     parser.add_argument('--validation', action='store_true', help='Longer physical-network checks of large local TCP transfers')
     parser.add_argument('--cpus', default='2-5')
     parser.add_argument('--server-host', help='SSH server host when coordinating from another machine')
-    parser.add_argument('--server-binary', default='/home/samuel/.cache/core-scheduler-pooled-receivers/target/release/pipeline')
+    parser.add_argument('--server-binary', default='/home/samuel/.cache/base-scheduler-pooled-receivers/target/release/pipeline')
     parser.add_argument('--remote', help='SSH client host for a physical-network comparison')
     parser.add_argument('--address', default='192.168.1.29')
-    parser.add_argument('--client-binary', default='/home/samuel/.cache/core-scheduler-pipeline/pipeline')
+    parser.add_argument('--client-binary', default='/home/samuel/.cache/base-scheduler-pipeline/pipeline')
     args = parser.parse_args()
     binary = args.binary.resolve()
     identity = hashlib.sha256(binary.read_bytes()).hexdigest()
@@ -56,7 +56,7 @@ def main():
                            str(size), str(depth), str(iterations), ownership, placement]
                 if args.server_host:
                     command[3] = args.server_binary
-                    command = ['ssh', args.server_host, 'flock', '/tmp/core-scheduler-perf.lock'] + command
+                    command = ['ssh', args.server_host, 'flock', '/tmp/base-scheduler-perf.lock'] + command
                 if args.remote:
                     server = subprocess.Popen(command + ['0.0.0.0:0'], text=True,
                                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)

@@ -3,8 +3,8 @@
 
 use super::*;
 use crate::{TokioScheduler, test_support};
-use core_scheduler::{Cancellation, Spawn};
-use core_scheduler_conformance::SpawnFixture;
+use base_scheduler::{Cancellation, Spawn};
+use base_scheduler_conformance::SpawnFixture;
 use futures_lite::future::block_on;
 
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -159,10 +159,10 @@ fn run(test: impl AsyncFnOnce(&TokioScheduler) + Send + 'static) {
     });
 }
 mod conformance {
-    core_scheduler_conformance::spawn_tests!(run: super::run);
+    base_scheduler_conformance::spawn_tests!(run: super::run);
 }
 mod dispatch {
-    core_scheduler_conformance::spawn_dispatch_tests!(run: super::run);
+    base_scheduler_conformance::spawn_dispatch_tests!(run: super::run);
 }
 
 #[test]
@@ -200,7 +200,7 @@ fn identifier_exhaustion_rejects_without_polling() {
 fn tasks_progress_without_occupying_syscall_workers_and_survive_admission_close() {
     test_support::run(|| {
         block_on(async {
-            use core_scheduler::Blocking;
+            use base_scheduler::Blocking;
             let scheduler = test_support::scheduler();
             let token = Cancellation::new();
             let child = token.clone();
@@ -334,7 +334,7 @@ fn run_current_thread(test: impl AsyncFnOnce(&TokioScheduler) + Send + 'static) 
     });
 }
 mod current_thread {
-    core_scheduler_conformance::spawn_tests!(run: super::run_current_thread);
+    base_scheduler_conformance::spawn_tests!(run: super::run_current_thread);
 }
 
 #[test]

@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use super::*;
-use core_scheduler::{Clock, OperationError};
+use base_scheduler::{Clock, OperationError};
 
 async fn semantics<S: Timers>(scheduler: &S) {
     let never = Cancellation::never();
@@ -85,15 +85,15 @@ async fn semantics<S: Timers>(scheduler: &S) {
 
 #[test]
 fn direct_semantics() {
-    let scheduler = core_scheduler_direct::DirectScheduler::new(Default::default()).unwrap();
+    let scheduler = base_scheduler_direct::DirectScheduler::new(Default::default()).unwrap();
     futures_lite::future::block_on(semantics(&scheduler));
     futures_lite::future::block_on(scheduler.shutdown());
 }
 #[test]
 fn native_external_and_worker_semantics() {
     let scheduler = Arc::new(
-        core_scheduler_native::NativeScheduler::with_options(
-            core_scheduler_native::NativeOptions {
+        base_scheduler_native::NativeScheduler::with_options(
+            base_scheduler_native::NativeOptions {
                 workers: 2,
                 ..Default::default()
             },
@@ -118,14 +118,14 @@ fn tokio_semantics() {
         .enable_all()
         .build()
         .unwrap();
-    let scheduler = core_scheduler_tokio::TokioScheduler::new(runtime.handle().clone());
+    let scheduler = base_scheduler_tokio::TokioScheduler::new(runtime.handle().clone());
     runtime.block_on(semantics(&scheduler));
     runtime.block_on(scheduler.shutdown());
 }
 
 #[tokio::test(start_paused = true)]
 async fn deferred_deadline_and_waker_replacement() {
-    let scheduler = core_scheduler_tokio::TokioScheduler::new(tokio::runtime::Handle::current());
+    let scheduler = base_scheduler_tokio::TokioScheduler::new(tokio::runtime::Handle::current());
     let never = Cancellation::never();
     let mut after = After::new(scheduler.timer());
     let first = scheduler.now() + Duration::from_secs(1);
@@ -178,18 +178,18 @@ async fn incompatible<S: Timers>(first: &S, second: &S) {
 }
 #[test]
 fn rejects_incompatible_schedulers() {
-    let one = core_scheduler_direct::DirectScheduler::new(Default::default()).unwrap();
-    let two = core_scheduler_direct::DirectScheduler::new(Default::default()).unwrap();
+    let one = base_scheduler_direct::DirectScheduler::new(Default::default()).unwrap();
+    let two = base_scheduler_direct::DirectScheduler::new(Default::default()).unwrap();
     futures_lite::future::block_on(incompatible(&one, &two));
-    let one = core_scheduler_native::NativeScheduler::with_options(
-        core_scheduler_native::NativeOptions {
+    let one = base_scheduler_native::NativeScheduler::with_options(
+        base_scheduler_native::NativeOptions {
             workers: 1,
             ..Default::default()
         },
     )
     .unwrap();
-    let two = core_scheduler_native::NativeScheduler::with_options(
-        core_scheduler_native::NativeOptions {
+    let two = base_scheduler_native::NativeScheduler::with_options(
+        base_scheduler_native::NativeOptions {
             workers: 1,
             ..Default::default()
         },
@@ -206,12 +206,12 @@ fn rejects_incompatible_schedulers() {
         .enable_all()
         .build()
         .unwrap();
-    let one = core_scheduler_tokio::TokioScheduler::new(rt1.handle().clone());
-    let two = core_scheduler_tokio::TokioScheduler::new(rt2.handle().clone());
+    let one = base_scheduler_tokio::TokioScheduler::new(rt1.handle().clone());
+    let two = base_scheduler_tokio::TokioScheduler::new(rt2.handle().clone());
     rt1.block_on(incompatible(&one, &two));
 
     // Separate adapters for one runtime remain compatible.
-    let compatible = core_scheduler_tokio::TokioScheduler::new(rt1.handle().clone());
+    let compatible = base_scheduler_tokio::TokioScheduler::new(rt1.handle().clone());
     rt1.block_on(async {
         let never = Cancellation::never();
         let mut timer = one.timer();
@@ -227,8 +227,8 @@ fn rejects_incompatible_schedulers() {
 #[test]
 fn native_resource_moves_between_tasks_and_executors() {
     let scheduler = Arc::new(
-        core_scheduler_native::NativeScheduler::with_options(
-            core_scheduler_native::NativeOptions {
+        base_scheduler_native::NativeScheduler::with_options(
+            base_scheduler_native::NativeOptions {
                 workers: 2,
                 ..Default::default()
             },
@@ -274,8 +274,8 @@ fn native_resource_moves_between_tasks_and_executors() {
 
 #[test]
 fn native_capacity_and_resource_drop() {
-    let scheduler = core_scheduler_native::NativeScheduler::with_options(
-        core_scheduler_native::NativeOptions {
+    let scheduler = base_scheduler_native::NativeScheduler::with_options(
+        base_scheduler_native::NativeOptions {
             workers: 1,
             timer_capacity: 1,
             ..Default::default()
@@ -286,7 +286,7 @@ fn native_capacity_and_resource_drop() {
         let never = Cancellation::never();
         let far = scheduler.now() + Duration::from_secs(30);
         let capacity =
-            core_scheduler_timers::local::TimerQueue::<std::task::Waker>::with_capacity(1)
+            base_scheduler_timers::local::TimerQueue::<std::task::Waker>::with_capacity(1)
                 .capacity();
         let mut first: Vec<_> = (0..capacity).map(|_| scheduler.timer()).collect();
         // Extra resources do not reserve queue entries until their waits are polled.
@@ -319,7 +319,7 @@ fn native_capacity_and_resource_drop() {
 
 #[test]
 fn closed_backends_reject_pending_timers() {
-    let direct = core_scheduler_direct::DirectScheduler::new(Default::default()).unwrap();
+    let direct = base_scheduler_direct::DirectScheduler::new(Default::default()).unwrap();
     direct.close();
     futures_lite::future::block_on(async {
         assert_eq!(
@@ -340,7 +340,7 @@ fn closed_backends_reject_pending_timers() {
         .enable_all()
         .build()
         .unwrap();
-    let tokio = core_scheduler_tokio::TokioScheduler::new(runtime.handle().clone());
+    let tokio = base_scheduler_tokio::TokioScheduler::new(runtime.handle().clone());
     tokio.close();
     runtime.block_on(async {
         assert_eq!(
@@ -362,8 +362,8 @@ fn closed_backends_reject_pending_timers() {
 #[test]
 fn native_local_capacity_and_drop() {
     let scheduler = Arc::new(
-        core_scheduler_native::NativeScheduler::with_options(
-            core_scheduler_native::NativeOptions {
+        base_scheduler_native::NativeScheduler::with_options(
+            base_scheduler_native::NativeOptions {
                 workers: 1,
                 timer_capacity: 1,
                 ..Default::default()
@@ -378,7 +378,7 @@ fn native_local_capacity_and_drop() {
                 .spawn(async move {
                     let never = Cancellation::never();
                     let far = instance.now() + Duration::from_secs(30);
-                    let capacity = core_scheduler_timers::local::TimerQueue::<std::task::Waker>::with_capacity(1).capacity();
+                    let capacity = base_scheduler_timers::local::TimerQueue::<std::task::Waker>::with_capacity(1).capacity();
                     let mut first: Vec<_> = (0..capacity).map(|_| instance.timer()).collect();
                     let mut second = instance.timer();
                     for timer in &mut first { pending_once(instance.timer_wait_until(timer, far, &never)).await; }
@@ -405,7 +405,7 @@ fn benchmark_counts_immediate_expirations() {
         .enable_all()
         .build()
         .unwrap();
-    let scheduler = core_scheduler_tokio::TokioScheduler::new(runtime.handle().clone());
+    let scheduler = base_scheduler_tokio::TokioScheduler::new(runtime.handle().clone());
     for mode in [Mode::Sleep, Mode::Reuse, Mode::After] {
         let (operations, overshoot, expired) =
             runtime.block_on(workload(&scheduler, mode, "cycle", 2, Duration::ZERO));

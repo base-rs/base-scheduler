@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::{Cancellation, Cancelled, defer_cancel};
+use base_scheduler::{Cancellation, Cancelled, defer_cancel};
 use futures_lite::future::{block_on, yield_now};
 use std::cell::Cell;
 use std::future::{Future, pending, poll_fn};

@@ -1,10 +1,10 @@
-# `core-scheduler-conformance`
+# `base-scheduler-conformance`
 
-Reusable, capability-specific tests for implementations of `core-scheduler`. Add this crate as a **development dependency** of a backend. Generated suites report ordinary named Rust tests, while async assertion helpers remain available for custom fixtures and smaller capability sets.
+Reusable, capability-specific tests for implementations of `base-scheduler`. Add this crate as a **development dependency** of a backend. Generated suites report ordinary named Rust tests, while async assertion helpers remain available for custom fixtures and smaller capability sets.
 
 ## Usage
 
-Add this development dependency with `cargo add --dev core-scheduler-conformance`.
+Add this development dependency with `cargo add --dev base-scheduler-conformance`.
 
 ### Generated suites
 
@@ -12,11 +12,11 @@ Invoke a suite inside a dedicated module and supply a runner function:
 
 ```rust,ignore
 mod blocking {
-    core_scheduler_conformance::blocking_tests!(run: super::run_blocking);
+    base_scheduler_conformance::blocking_tests!(run: super::run_blocking);
 }
 
 mod ipv4 {
-    core_scheduler_conformance::socket_tests!(run: super::run_ipv4_stream);
+    base_scheduler_conformance::socket_tests!(run: super::run_ipv4_stream);
 }
 ```
 
@@ -53,12 +53,12 @@ For example, a resolver fixture can select a numeric family independently of its
 
 ```rust,ignore
 mod resolution {
-    core_scheduler_conformance::address_resolution_tests!(run: super::run_resolver);
+    base_scheduler_conformance::address_resolution_tests!(run: super::run_resolver);
 }
 mod resolution_ipv4 {
-    core_scheduler_conformance::address_resolution_ip_tests!(
+    base_scheduler_conformance::address_resolution_ip_tests!(
         run: super::run_resolver,
-        domain: core_scheduler::SocketDomain::Ipv4,
+        domain: base_scheduler::SocketDomain::Ipv4,
     );
 }
 ```
@@ -107,4 +107,4 @@ The [workspace overview](../../readme.md) describes the interface and companion 
 
 ## Contributing
 
-Please open an issue or pull request on [GitHub](https://github.com/core-rs/core-scheduler).
+Please open an issue or pull request on [GitHub](https://github.com/base-rs/base-scheduler).

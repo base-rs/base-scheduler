@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::{IoBuf, IoBufSequence, IoBufSequenceMut, IoBuffers, IoBuffersMut};
+use base_scheduler::{IoBuf, IoBufSequence, IoBufSequenceMut, IoBuffers, IoBuffersMut};
 use std::io::{IoSlice, IoSliceMut, Write};
 use std::panic::{AssertUnwindSafe, catch_unwind};
 

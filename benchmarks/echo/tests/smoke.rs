@@ -9,7 +9,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-const BINARY: &str = env!("CARGO_BIN_EXE_core-scheduler-echo-benchmark");
+const BINARY: &str = env!("CARGO_BIN_EXE_base-scheduler-echo-benchmark");
 struct Process(Child);
 impl Process {
     fn new(args: &[&str]) -> Self {

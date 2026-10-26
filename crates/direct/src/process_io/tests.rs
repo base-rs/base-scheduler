@@ -43,7 +43,7 @@ fn cancellation_and_io_errors_are_distinct() {
     let result = operation_result::<()>(Err(io::ErrorKind::Interrupted.into()), &cancellation);
     assert_eq!(
         std::mem::discriminant(&result.unwrap_err()),
-        std::mem::discriminant(&core_scheduler::OperationError::from(Cancelled))
+        std::mem::discriminant(&base_scheduler::OperationError::from(Cancelled))
     );
     assert_eq!(
         operation_result::<()>(Err(io::ErrorKind::PermissionDenied.into()), &cancellation)

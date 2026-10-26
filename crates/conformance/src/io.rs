@@ -3,7 +3,7 @@
 
 //! Test-only operations composed exclusively from the public bound resources.
 use crate::SocketTestScheduler;
-use core_scheduler::*;
+use base_scheduler::*;
 use std::io::{IoSlice, IoSliceMut};
 
 pub(crate) struct SocketMessage<B> {

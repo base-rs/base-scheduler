@@ -8,7 +8,7 @@ use crate::AddressInfoView;
 /// Native implementations can traverse an owned `addrinfo` list directly and free it once through the matching native deallocator on drop. Validation may inspect that list without materializing portable records. Concrete result types may expose additional native accessors. Arrays, vectors, and shared cached storage can provide the same portable accessors without native layouts.
 ///
 /// ```compile_fail
-/// use core_scheduler::{AddressInfo, AddressInfoCollection, AddressInfoView, SocketType};
+/// use base_scheduler::{AddressInfo, AddressInfoCollection, AddressInfoView, SocketType};
 /// let entry = {
 ///     let result = [AddressInfo { address: "127.0.0.1:80".parse().unwrap(), socket_type: SocketType::Stream, protocol: None }];
 ///     result.entries().next().unwrap()

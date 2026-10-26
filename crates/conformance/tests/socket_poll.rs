@@ -3,7 +3,7 @@
 
 #[path = "support/socket_model.rs"]
 mod socket_model;
-use core_scheduler::*;
+use base_scheduler::*;
 use futures_lite::future::block_on;
 use socket_model::{SocketModel, socket_factories};
 use std::io;
@@ -32,7 +32,7 @@ fn borrowed_suite_rejects_success_and_io_error_when_pre_cancelled() {
     for io_error in [false, true] {
         let result = std::panic::catch_unwind(|| {
             block_on(
-                core_scheduler_conformance::socket_poll::scalar_pre_cancelled(
+                base_scheduler_conformance::socket_poll::scalar_pre_cancelled(
                     &IgnoresCancellation(io_error),
                     &(),
                     &(),

@@ -4,8 +4,8 @@
 #[path = "support/socket_model.rs"]
 mod socket_model;
 mod support;
-use core_scheduler::*;
-use core_scheduler_conformance::{
+use base_scheduler::*;
+use base_scheduler_conformance::{
     SocketOptionFixture, SocketRegistrationFixture, socket_options, socket_registration,
 };
 use futures_lite::future::block_on;
@@ -299,10 +299,10 @@ fn run_set(test: impl AsyncFnOnce(&OptionsFixture<SetterOnly>) + Send + 'static)
     support::run(move || block_on(test(&OptionsFixture::new(Fault::None))));
 }
 mod getter_only {
-    core_scheduler_conformance::socket_get_option_tests!(run: super::run_get);
+    base_scheduler_conformance::socket_get_option_tests!(run: super::run_get);
 }
 mod setter_only {
-    core_scheduler_conformance::socket_set_option_tests!(run: super::run_set);
+    base_scheduler_conformance::socket_set_option_tests!(run: super::run_set);
 }
 struct RegistrationFixture {
     scheduler: Native,
@@ -334,10 +334,10 @@ fn run_ipv6(test: impl AsyncFnOnce(&RegistrationFixture) + Send + 'static) {
     });
 }
 mod ipv4 {
-    core_scheduler_conformance::socket_registration_tests!(run: super::run_ipv4);
+    base_scheduler_conformance::socket_registration_tests!(run: super::run_ipv4);
 }
 mod ipv6 {
-    core_scheduler_conformance::socket_registration_tests!(run: super::run_ipv6);
+    base_scheduler_conformance::socket_registration_tests!(run: super::run_ipv6);
 }
 #[test]
 fn rejects_socket_extension_contract_violations() {

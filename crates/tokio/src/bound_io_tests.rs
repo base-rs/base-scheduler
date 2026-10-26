@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::*;
-use core_scheduler::*;
+use base_scheduler::*;
 use std::{
     io::{IoSlice, IoSliceMut},
     net::Shutdown,
@@ -28,7 +28,7 @@ fn default_stream_pool_and_eof_are_consistent_across_read_forms() {
         cancelled.cancel();
         for mode in 0..4 {
             let (sender, socket) =
-                core_scheduler_conformance::socket::stream_pair(scheduler, SocketDomain::Ipv4)
+                base_scheduler_conformance::socket::stream_pair(scheduler, SocketDomain::Ipv4)
                     .await;
             let mut reader = scheduler.socket_stream_reader(&socket).unwrap();
             let mut writer = scheduler
@@ -225,7 +225,7 @@ fn owned_stream_reads_report_syscall_and_wait_errors_and_lazy_setup_rejects_shut
         assert!(reader.read(&never).await.is_err());
         reader.close().await.unwrap();
         let (sender, socket) =
-            core_scheduler_conformance::socket::stream_pair(scheduler, SocketDomain::Ipv4).await;
+            base_scheduler_conformance::socket::stream_pair(scheduler, SocketDomain::Ipv4).await;
         let readiness_cancellation = Cancellation::new();
         let mut readiness = Box::pin(scheduler.socket_wait(
             &socket,

@@ -2,8 +2,8 @@
 // Copyright, 2026, by Samuel Williams.
 
 mod support;
-use core_scheduler::{Notify, Signals};
-use core_scheduler_conformance::{SignalsFixture, signals};
+use base_scheduler::{Notify, Signals};
+use base_scheduler_conformance::{SignalsFixture, signals};
 use futures_lite::future::block_on;
 use std::{
     collections::BTreeMap,
@@ -139,10 +139,10 @@ fn run_case(test: impl AsyncFnOnce(&Fixture) + Send + 'static) {
     support::run(move || block_on(test(&Fixture::new(Fault::None))));
 }
 mod dispatch {
-    core_scheduler_conformance::signals_dispatch_tests!(run: super::run_case);
+    base_scheduler_conformance::signals_dispatch_tests!(run: super::run_case);
 }
 mod generated {
-    core_scheduler_conformance::signals_tests!(run: super::run_case);
+    base_scheduler_conformance::signals_tests!(run: super::run_case);
 }
 #[test]
 fn rejects_wrong_selection_detached_subscriptions_and_lost_setup_errors() {

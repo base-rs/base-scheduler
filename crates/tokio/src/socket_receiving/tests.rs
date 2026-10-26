@@ -68,7 +68,7 @@ fn bound_reader_cannot_switch_runtime_and_retains_received_chunks() {
     runtime.block_on(async {
         let never = Cancellation::never();
         let (socket, peer) =
-            core_scheduler_conformance::socket::stream_pair(&scheduler, SocketDomain::Ipv4).await;
+            base_scheduler_conformance::socket::stream_pair(&scheduler, SocketDomain::Ipv4).await;
         assert!(foreign.socket_stream_reader(&socket).is_err());
         let owners = std::sync::Arc::strong_count(&socket.inner);
         let mut reader = scheduler.socket_stream_reader(&socket).unwrap();

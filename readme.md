@@ -1,27 +1,27 @@
-# `core-scheduler`
+# `base-scheduler`
 
 Explicit scheduler capabilities for reusable Rust protocol libraries. Applications choose an execution environment; libraries ask for the operations they need.
 
-The root crate defines interfaces and runtime-independent support. It contains no executor, reactor, operating-system I/O implementation, or runtime adapter. The initial API is extracted from [Socketry](https://github.com/core-rs/socketry-rust).
+The root crate defines interfaces and runtime-independent support. It contains no executor, reactor, operating-system I/O implementation, or runtime adapter. The initial API is extracted from [Socketry](https://github.com/base-rs/socketry-rust).
 
 The workspace also contains seven companion crates, released together with the interface:
 
-- [`core-scheduler-conformance`](crates/conformance/readme.md): reusable capability-specific assertions for backend development dependencies.
-- [`core-scheduler-direct`](crates/direct/readme.md): reference implementations of tasks, clocks, native address resolution, file/socket operations, and platform-supported signals and filesystem extensions, with explicit service ownership and bounded syscall admission.
-- [`core-scheduler-tokio`](crates/tokio/readme.md): an adapter for an explicitly selected Tokio runtime, preserving owning task handles, owned I/O, cancellation, and bounded native-work admission.
-- [`core-scheduler-native`](crates/native/readme.md): Socketry's work-stealing executor and native readiness I/O, with Core ownership and shutdown semantics.
-- [`core-scheduler-selector`](crates/selector/readme.md): independent I/O lifecycle contracts and the portable readiness selector.
-- [`core-scheduler-iouring`](crates/iouring/readme.md): Linux completion file and socket I/O with a separately owned event driver and explicit readiness fallback.
-- [`core-scheduler-timers`](crates/timers/readme.md): runtime-independent batched timers, reusable sleep registrations, and deadline notifications.
+- [`base-scheduler-conformance`](crates/conformance/readme.md): reusable capability-specific assertions for backend development dependencies.
+- [`base-scheduler-direct`](crates/direct/readme.md): reference implementations of tasks, clocks, native address resolution, file/socket operations, and platform-supported signals and filesystem extensions, with explicit service ownership and bounded syscall admission.
+- [`base-scheduler-tokio`](crates/tokio/readme.md): an adapter for an explicitly selected Tokio runtime, preserving owning task handles, owned I/O, cancellation, and bounded native-work admission.
+- [`base-scheduler-native`](crates/native/readme.md): Socketry's work-stealing executor and native readiness I/O, with Base ownership and shutdown semantics.
+- [`base-scheduler-selector`](crates/selector/readme.md): independent I/O lifecycle contracts and the portable readiness selector.
+- [`base-scheduler-iouring`](crates/iouring/readme.md): Linux completion file and socket I/O with a separately owned event driver and explicit readiness fallback.
+- [`base-scheduler-timers`](crates/timers/readme.md): runtime-independent batched timers, reusable sleep registrations, and deadline notifications.
 
 ## Usage
 
-Add the interface with `cargo add core-scheduler`. Applications select a companion backend; reusable libraries depend on the interface capabilities they use.
+Add the interface with `cargo add base-scheduler`. Applications select a companion backend; reusable libraries depend on the interface capabilities they use.
 
 Construct readers and writers from the scheduler once, then pass cancellation to their operations. A protocol object can retain these bound capabilities alongside its parser and protocol state:
 
 ```rust
-use core_scheduler::{Cancellation, OperationResult, SocketStreamReader};
+use base_scheduler::{Cancellation, OperationResult, SocketStreamReader};
 
 struct Body<Reader> {
     reader: Reader,
@@ -79,7 +79,7 @@ Operation futures use static dispatch and are `Send`; no boxed future or runtime
 
 ## Development
 
-Install the launcher with `cargo install bake --locked`. The private `bake/` workspace member supplies the shared Core development tasks:
+Install the launcher with `cargo install bake --locked`. The private `bake/` workspace member supplies the shared Base development tasks:
 
 ```sh
 cargo bake --locked test:coverage --all-targets true --all-features true
@@ -89,7 +89,7 @@ The tests cover runtime-independent support, generic composition, reusable confo
 
 ## Releasing
 
-Prepare a release with `cargo bake cargo:version:patch` (or `minor`, `major`, or `bump --version X.Y.Z`), then run `cargo bake cargo:release` and open a pull request. After review and merge, GitHub Actions publishes the release when the configured `crates-io` environment approves it. Follow the shared [Releasing skill](https://github.com/core-rs/core-project/blob/main/context/releasing.md) for the standard process.
+Prepare a release with `cargo bake cargo:version:patch` (or `minor`, `major`, or `bump --version X.Y.Z`), then run `cargo bake cargo:release` and open a pull request. After review and merge, GitHub Actions publishes the release when the configured `crates-io` environment approves it. Follow the shared [Releasing skill](https://github.com/base-rs/base-project/blob/main/context/releasing.md) for the standard process.
 
 ## Releases
 
@@ -103,7 +103,7 @@ The [TCP echo benchmark](benchmarks/echo/readme.md) compares pure Tokio, the Tok
 
 ## Contributing
 
-Please open an issue or pull request on [GitHub](https://github.com/core-rs/core-scheduler).
+Please open an issue or pull request on [GitHub](https://github.com/base-rs/base-scheduler).
 
 ### Agent Context
 

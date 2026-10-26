@@ -7,7 +7,7 @@ use crate::{
     file_io,
     socket_retry::SocketRetry,
 };
-use core_scheduler::{
+use base_scheduler::{
     Blocking, BlockingError, BufferResult, Cancellation, FileClose, FileOpen, FileOperation,
     FileOptions, FileSeek, FileStat, FileSync, FileTruncate, IoBuf, OperationResult, Spawn,
     SpawnError, SyncMode, TaskError,

@@ -3,11 +3,11 @@
 
 use crate::Interest;
 use crate::{IoUringBufferPool, IoUringSelector, MonitorStorage};
-use core_scheduler::{
+use base_scheduler::{
     BufferPool, BufferPoolOptions, BufferPooling, Cancellation, OperationResult, ReceiveBuffer,
     SocketRecvFlags, SocketStreamReader,
 };
-use core_scheduler_selector::NativeSocket;
+use base_scheduler_selector::NativeSocket;
 use std::{
     future::{Future, poll_fn},
     io::{self, IoSliceMut},
@@ -15,7 +15,7 @@ use std::{
     task::Poll,
 };
 
-/// A scheduler-bound stream reader with reusable registration and lazily allocated receive storage. Normally obtained through [`SocketStreamReading`](core_scheduler::SocketStreamReading).
+/// A scheduler-bound stream reader with reusable registration and lazily allocated receive storage. Normally obtained through [`SocketStreamReading`](base_scheduler::SocketStreamReading).
 pub(crate) struct IoUringSocketStreamReader<'a> {
     scheduler: &'a IoUringSelector,
     operations: crate::operation_state::OperationState,
@@ -29,7 +29,7 @@ pub(crate) struct IoUringSocketStreamReader<'a> {
 impl<'a> IoUringSocketStreamReader<'a> {
     /// Construct the default backend composition without submitting payload I/O. Applications normally use the scheduler factory.
     pub(crate) fn new(scheduler: &'a IoUringSelector, socket: &NativeSocket) -> io::Result<Self> {
-        if scheduler.socket_type(socket)? != core_scheduler::SocketType::Stream {
+        if scheduler.socket_type(socket)? != base_scheduler::SocketType::Stream {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "stream readers require a stream socket",
@@ -167,12 +167,12 @@ impl SocketStreamReader for IoUringSocketStreamReader<'_> {
         buffers: &mut [IoSliceMut<'_>],
         flags: SocketRecvFlags,
         cancellation: &Cancellation,
-    ) -> OperationResult<core_scheduler::SocketRecvResult> {
+    ) -> OperationResult<base_scheduler::SocketRecvResult> {
         self.check_open()?;
         self.operations.check_idle()?;
         if self.eof || buffers.iter().all(|buffer| buffer.is_empty()) {
             cancellation.check()?;
-            return Ok(core_scheduler::SocketRecvResult {
+            return Ok(base_scheduler::SocketRecvResult {
                 bytes: 0,
                 address: None,
                 truncated: false,
@@ -183,12 +183,12 @@ impl SocketStreamReader for IoUringSocketStreamReader<'_> {
             .socket_monitor_recvmsg_poll(&mut self.monitor, buffers, flags, cancellation)
             .await
     }
-    async fn read_owned_vectored<Buffers: core_scheduler::IoBufSequenceMut>(
+    async fn read_owned_vectored<Buffers: base_scheduler::IoBufSequenceMut>(
         &mut self,
         buffers: Buffers,
         flags: SocketRecvFlags,
         cancellation: &Cancellation,
-    ) -> (OperationResult<core_scheduler::SocketRecvResult>, Buffers) {
+    ) -> (OperationResult<base_scheduler::SocketRecvResult>, Buffers) {
         if let Err(error) = self.check_open() {
             return (Err(error), buffers);
         }
@@ -197,7 +197,7 @@ impl SocketStreamReader for IoUringSocketStreamReader<'_> {
         }
         if self.eof || (0..buffers.buffer_count()).all(|index| buffers.buffer(index).is_empty()) {
             return (
-                Ok(core_scheduler::SocketRecvResult {
+                Ok(base_scheduler::SocketRecvResult {
                     bytes: 0,
                     address: None,
                     truncated: false,
@@ -216,11 +216,11 @@ impl SocketStreamReader for IoUringSocketStreamReader<'_> {
             .await;
         (result, buffers.into_inner())
     }
-    async fn read_owned<B: core_scheduler::IoBufMut>(
+    async fn read_owned<B: base_scheduler::IoBufMut>(
         &mut self,
         buffer: B,
         cancellation: &Cancellation,
-    ) -> core_scheduler::BufferResult<B> {
+    ) -> base_scheduler::BufferResult<B> {
         if let Err(error) = self.check_open() {
             return (Err(error), buffer);
         }

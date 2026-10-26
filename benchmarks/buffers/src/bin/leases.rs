@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::HeapBufferPool;
+use base_scheduler::HeapBufferPool;
 use std::{
     hint::black_box,
     sync::{Arc, Barrier},

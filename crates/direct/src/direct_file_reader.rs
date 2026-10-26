@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::{DirectFile, DirectScheduler, file_state::FileState};
-use core_scheduler::{
+use base_scheduler::{
     BufferResult, Cancellation, FileReader, FileReading, IoBufMut, OperationError,
 };
 use std::{future::Future, io};

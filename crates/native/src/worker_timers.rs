@@ -2,8 +2,8 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::{task_service::Shared, worker};
-use core_scheduler::{Cancellation, Clock, OperationResult};
-use core_scheduler_timers::local::TimerKey;
+use base_scheduler::{Cancellation, Clock, OperationResult};
+use base_scheduler_timers::local::TimerKey;
 use futures_channel::oneshot;
 use std::{
     future::{Future, poll_fn},
@@ -240,7 +240,7 @@ impl<S: crate::Selector> Clock for crate::NativeScheduler<S> {
                 return Poll::Ready(Ok(()));
             }
             if cancelled.as_mut().poll(context).is_ready() {
-                return Poll::Ready(Err(core_scheduler::Cancelled.into()));
+                return Poll::Ready(Err(base_scheduler::Cancelled.into()));
             }
             if self.tasks.shared.is_closed() {
                 return Poll::Ready(Err(closed().into()));
