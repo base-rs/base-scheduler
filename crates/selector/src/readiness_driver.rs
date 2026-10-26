@@ -3,7 +3,8 @@
 
 use crate::{Interest, SelectorDriver, SelectorWorker};
 use base_scheduler::Cancellation;
-use event_listener::Event as Notification;
+mod notification;
+use notification::Notification;
 use polling::{Event, PollMode};
 #[cfg(target_os = "macos")]
 mod kqueue;
@@ -20,6 +21,7 @@ use kqueue::INITIAL_FAILURE;
 use std::{
     cell::RefCell,
     collections::HashMap,
+    future::poll_fn,
     io,
     marker::PhantomData,
     rc::Rc,
@@ -27,7 +29,7 @@ use std::{
         Arc, Mutex, Weak,
         atomic::{AtomicUsize, Ordering},
     },
-    task::{Wake, Waker},
+    task::{Poll, Wake, Waker},
     time::Duration,
 };
 #[cfg(all(test, not(target_os = "macos")))]
@@ -89,8 +91,8 @@ impl Controller {
         };
         // Never invoke task wakers under the routing/table lock.
         for registration in registrations {
-            registration.readable.changed.notify(usize::MAX);
-            registration.writable.changed.notify(usize::MAX);
+            registration.readable.changed.notify();
+            registration.writable.changed.notify();
         }
         let _ = self.poller.notify();
     }
@@ -114,13 +116,11 @@ pub(crate) struct Direction {
 }
 impl Direction {
     fn new() -> Self {
-        let changed = Notification::new();
-        changed.notify(0);
         Self {
             tick: AtomicUsize::new(0),
             #[cfg(target_os = "macos")]
             available: AtomicUsize::new(0),
-            changed,
+            changed: Notification::new(),
         }
     }
     pub(crate) fn snapshot(&self) -> usize {
@@ -131,7 +131,7 @@ impl Direction {
         // can at most cause a spurious retry, never erase this notification.
         self.tick.fetch_add(4, Ordering::AcqRel);
         self.tick.fetch_or(1, Ordering::Release);
-        self.changed.notify(usize::MAX);
+        self.changed.notify();
     }
     #[cfg(target_os = "macos")]
     fn publish_readable(&self, available: usize, read_closed: bool) {
@@ -167,17 +167,26 @@ impl Direction {
         );
     }
     pub(crate) async fn wait(&self, group: &DriverGroup) -> io::Result<()> {
-        event_listener::listener!(self.changed => listener);
-        if group.closed.is_cancelled() {
-            return Err(closed());
-        }
-        if self.snapshot() & 1 == 0 {
-            listener.await;
-        }
-        if group.closed.is_cancelled() {
-            return Err(closed());
-        }
-        Ok(())
+        let mut listener = self.changed.listen();
+        poll_fn(|cx| {
+            if group.closed.is_cancelled() {
+                return Poll::Ready(Err(closed()));
+            }
+            if self.snapshot() & 1 != 0 {
+                return Poll::Ready(Ok(()));
+            }
+            let result = listener.poll(cx);
+            // Registration is lazy. A publication or closure between the
+            // initial check and registration must not leave this wait asleep.
+            if group.closed.is_cancelled() {
+                Poll::Ready(Err(closed()))
+            } else if self.snapshot() & 1 != 0 {
+                Poll::Ready(Ok(()))
+            } else {
+                result
+            }
+        })
+        .await
     }
 }
 fn closed() -> io::Error {
