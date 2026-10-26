@@ -2,15 +2,15 @@
 // Copyright, 2026, by Samuel Williams.
 
 #[cfg(target_os = "linux")]
-use core_scheduler::{SocketRecvFlags, SocketRecvMessage};
+use base_scheduler::{SocketRecvFlags, SocketRecvMessage};
 
 use crate::Result;
-use core_scheduler::{
+use base_scheduler::{
     BufferPooling, Cancellation, IoBuf, SocketAccept, SocketRegistration, SocketSetOption,
     SocketStreamReader, SocketStreamReading, SocketStreamWriter, SocketStreamWriting, Spawn,
     TcpNoDelay,
 };
-use core_scheduler_tokio::TokioScheduler;
+use base_scheduler_tokio::TokioScheduler;
 use std::{
     io::{self, Write},
     net::TcpListener,
@@ -127,7 +127,7 @@ where
 
 #[cfg(target_os = "linux")]
 async fn multishot_server(
-    scheduler: Arc<core_scheduler_native::NativeScheduler<core_scheduler_iouring::IoUringSelector>>,
+    scheduler: Arc<base_scheduler_native::NativeScheduler<base_scheduler_iouring::IoUringSelector>>,
     listener: TcpListener,
     connections: usize,
 ) {
@@ -154,7 +154,7 @@ async fn multishot_server(
                         .selector()
                         .socket_recvmsg_multishot(
                             &socket,
-                            core_scheduler_iouring::RecvMsgMultishotOptions::default(),
+                            base_scheduler_iouring::RecvMsgMultishotOptions::default(),
                             SocketRecvFlags::default(),
                             &never,
                         )
@@ -254,8 +254,8 @@ pub(crate) fn run(backend: &str, workers: usize, connections: usize) -> Result<(
         }
         #[cfg(target_os = "linux")]
         "iouring" | "iouring-poll" | "iouring-multishot" | "iouring-monitor" => {
-            use core_scheduler_iouring::{IoUringOptions, IoUringSelector};
-            use core_scheduler_native::{NativeExecutorOptions, NativeScheduler};
+            use base_scheduler_iouring::{IoUringOptions, IoUringSelector};
+            use base_scheduler_native::{NativeExecutorOptions, NativeScheduler};
             let (selector, drivers) = IoUringSelector::with_workers(
                 IoUringOptions {
                     capacity: connections.saturating_mul(2).max(256),

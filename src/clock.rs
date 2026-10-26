@@ -51,7 +51,7 @@ pub trait Clock: Send + Sync {
     /// Expiry returns [`TimeoutError::Elapsed`]; timer failures, including an unrepresentable deadline, return [`TimeoutError::Clock`]. The losing future is dropped before returning. Expiry or timer failure drops the operation without requesting cooperative cancellation or awaiting backend retirement. Accepted I/O can continue after abandonment; callers remain responsible for protocol state and cleanup. This wrapper cannot preempt a long-running poll.
     ///
     /// ```
-    /// use core_scheduler::{Clock, TimeoutError};
+    /// use base_scheduler::{Clock, TimeoutError};
     /// use std::{future::Future, time::Duration};
     ///
     /// async fn receive<C: Clock>(

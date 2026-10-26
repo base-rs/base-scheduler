@@ -3,7 +3,7 @@
 
 use super::*;
 use crate::Interest;
-use core_scheduler_selector::{SelectorDriver, SelectorWorker};
+use base_scheduler_selector::{SelectorDriver, SelectorWorker};
 use futures_lite::future::{block_on, poll_once};
 use std::{
     io::Write,
@@ -1231,8 +1231,8 @@ fn a_forgotten_wait_does_not_prevent_reuse_or_retirement() {
 
 #[test]
 fn dropping_a_task_retires_its_cached_waker_without_socket_activity() {
-    use core_scheduler::Spawn;
-    use core_scheduler_native::{NativeExecutorOptions, NativeScheduler};
+    use base_scheduler::Spawn;
+    use base_scheduler_native::{NativeExecutorOptions, NativeScheduler};
 
     let (selector, driver) = IoUringSelector::new(options()).unwrap();
     let (socket, _peer) = sockets(&selector);

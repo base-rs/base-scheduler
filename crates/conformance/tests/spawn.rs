@@ -2,8 +2,8 @@
 // Copyright, 2026, by Samuel Williams.
 
 mod support;
-use core_scheduler::{Spawn, SpawnError, TaskError};
-use core_scheduler_conformance::{SpawnFixture, spawn};
+use base_scheduler::{Spawn, SpawnError, TaskError};
+use base_scheduler_conformance::{SpawnFixture, spawn};
 use futures_lite::future::block_on;
 use std::{
     future::Future,
@@ -168,10 +168,10 @@ fn run_case(test: impl AsyncFnOnce(&Fixture) + Send + 'static) {
     support::run(move || block_on(test(&Fixture::new(Fault::None))));
 }
 mod dispatch {
-    core_scheduler_conformance::spawn_dispatch_tests!(run: super::run_case);
+    base_scheduler_conformance::spawn_dispatch_tests!(run: super::run_case);
 }
 mod generated {
-    core_scheduler_conformance::spawn_tests!(run: super::run_case);
+    base_scheduler_conformance::spawn_tests!(run: super::run_case);
 }
 #[test]
 fn rejects_detaching_lost_panics_and_closed_service_violations() {

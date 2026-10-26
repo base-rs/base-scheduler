@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::DirectScheduler;
-use core_scheduler::{BufferPoolOptions, BufferPooling, HeapBufferPool};
+use base_scheduler::{BufferPoolOptions, BufferPooling, HeapBufferPool};
 
 impl BufferPooling for DirectScheduler {
     type Pool = HeapBufferPool;

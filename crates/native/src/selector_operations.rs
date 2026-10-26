@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::{NativeScheduler, Selector};
-use core_scheduler::*;
+use base_scheduler::*;
 use std::{
     io,
     io::SeekFrom,

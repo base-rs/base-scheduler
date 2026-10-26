@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::{BlockingTask, TokioOptions};
-use core_scheduler::{BlockingError, Cancellation, OperationError, OperationResult, TaskError};
+use base_scheduler::{BlockingError, Cancellation, OperationError, OperationResult, TaskError};
 use event_listener::Event;
 use futures_channel::oneshot;
 use std::collections::VecDeque;
@@ -87,7 +87,7 @@ impl BlockingPool {
                 return Err(io::Error::other("injected thread startup failure"));
             }
             thread::Builder::new()
-                .name(format!("core-tokio-{identifier}"))
+                .name(format!("base-tokio-{identifier}"))
                 .spawn(move || work(shared))
                 .map(drop)
         })
@@ -375,7 +375,7 @@ mod tests;
 
 pub(crate) fn admission_error(error: BlockingError) -> OperationError {
     match error {
-        BlockingError::Cancelled => core_scheduler::Cancelled.into(),
+        BlockingError::Cancelled => base_scheduler::Cancelled.into(),
         BlockingError::SchedulerClosed => {
             io::Error::new(io::ErrorKind::BrokenPipe, "scheduler is closed").into()
         }

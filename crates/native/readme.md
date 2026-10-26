@@ -1,16 +1,16 @@
-# `core-scheduler-native`
+# `base-scheduler-native`
 
-A work-stealing executor composed with native I/O selectors for Core's explicit scheduler capabilities. Applications select this implementation; libraries depend only on `core-scheduler`.
+A work-stealing executor composed with native I/O selectors for Base's explicit scheduler capabilities. Applications select this implementation; libraries depend only on `base-scheduler`.
 
-Tasks run on worker-local queues with remote inboxes and work stealing. The default `ReadinessSelector` supplies I/O independently of those workers. Nonblocking sockets use `async-io` readiness. Files, address resolution, and blocking closures use a separate bounded pool; accepted cleanup has an independent pool. Monotonic sleeps use reserved timer storage from `core-scheduler-timers`.
+Tasks run on worker-local queues with remote inboxes and work stealing. The default `ReadinessSelector` supplies I/O independently of those workers. Nonblocking sockets use `async-io` readiness. Files, address resolution, and blocking closures use a separate bounded pool; accepted cleanup has an independent pool. Monotonic sleeps use reserved timer storage from `base-scheduler-timers`.
 
 ## Usage
 
-Add this package with `cargo add core-scheduler core-scheduler-native`.
+Add this package with `cargo add base-scheduler base-scheduler-native`.
 
 ```rust
-use core_scheduler::{Cancellation, Clock, Spawn};
-use core_scheduler_native::NativeScheduler;
+use base_scheduler::{Cancellation, Clock, Spawn};
+use base_scheduler_native::NativeScheduler;
 use std::time::Duration;
 
 let scheduler = NativeScheduler::new()?;
@@ -37,15 +37,15 @@ Each worker owns an unsynchronized timer queue and collects expiries in its even
 
 A sleep first polled on a worker registers directly with that worker. Root futures and other executors choose a worker by round robin and send it a registration command. A pending sleep retains its original owner when its future moves; waker changes, cancellation, and drop update that owner's queue. A subsequent sleep can choose the task's new worker. Shutdown wakes pending sleepers and waits for worker timer callbacks and driver retirement.
 
-The executor and readiness design come from [Socketry](https://github.com/core-rs/socketry-rust/tree/7a70586d5d37fb640d696d0c03a05b2ee3cbe06b/crates/executor). This adapter follows Core's current ownership, cancellation, and asynchronous shutdown contracts. It does not include Socketry's io\_uring backend.
+The executor and readiness design come from [Socketry](https://github.com/base-rs/socketry-rust/tree/7a70586d5d37fb640d696d0c03a05b2ee3cbe06b/crates/executor). This adapter follows Base's current ownership, cancellation, and asynchronous shutdown contracts. It does not include Socketry's io\_uring backend.
 
 ## Selector composition
 
 `NativeScheduler<S>` forwards the capabilities implemented by its selector, preserving the selector's resource types. Select I/O limits separately from executor configuration:
 
 ```rust
-use core_scheduler_native::{NativeExecutorOptions, NativeScheduler};
-use core_scheduler_selector::{ReadinessSelector, SelectorOptions};
+use base_scheduler_native::{NativeExecutorOptions, NativeScheduler};
+use base_scheduler_selector::{ReadinessSelector, SelectorOptions};
 
 let selector = ReadinessSelector::with_options(SelectorOptions {
     threads: 2,
@@ -81,4 +81,4 @@ The [workspace overview](../../readme.md) describes the interface and companion 
 
 ## Contributing
 
-Please open an issue or pull request on [GitHub](https://github.com/core-rs/core-scheduler).
+Please open an issue or pull request on [GitHub](https://github.com/base-rs/base-scheduler).

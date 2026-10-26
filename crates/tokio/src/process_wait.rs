@@ -5,7 +5,7 @@ use crate::{
     TokioScheduler,
     process_io::{Process, ProcessId, operation_result},
 };
-use core_scheduler::{
+use base_scheduler::{
     Cancellation, OperationResult, ProcessWait, ProcessWaitFlags, ProcessWaitResult,
 };
 
@@ -61,11 +61,11 @@ impl ProcessWait for TokioScheduler {
                         return Poll::Ready(
                             result
                                 .map(drop)
-                                .map_err(core_scheduler::OperationError::from),
+                                .map_err(base_scheduler::OperationError::from),
                         );
                     }
                     if Future::poll(cancelled.as_mut(), context).is_ready() {
-                        return Poll::Ready(Err(core_scheduler::Cancelled.into()));
+                        return Poll::Ready(Err(base_scheduler::Cancelled.into()));
                     }
                     Poll::Pending
                 })
@@ -82,7 +82,7 @@ impl ProcessWait for TokioScheduler {
             .execute((), cancellation, move |_| process.wait(false))
             .await;
         match result {
-            Err(core_scheduler::OperationError::Io(error)) => {
+            Err(base_scheduler::OperationError::Io(error)) => {
                 operation_result(Err(error), cancellation)
             }
             result => result,

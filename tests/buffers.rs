@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::{Cancelled, IoBuf, OperationError};
+use base_scheduler::{Cancelled, IoBuf, OperationError};
 use std::{error::Error, io, ops::Bound};
 
 #[test]

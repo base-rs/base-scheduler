@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::{BufferLease, BufferSlice, Cancellation, FrozenBuffer, HeapBufferPool, IoBuf};
+use base_scheduler::{BufferLease, BufferSlice, Cancellation, FrozenBuffer, HeapBufferPool, IoBuf};
 use io_uring::{IoUring, cqueue, opcode, types};
 use std::{
     collections::VecDeque,

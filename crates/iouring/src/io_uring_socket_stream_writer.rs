@@ -4,13 +4,13 @@
 use crate::Interest;
 use crate::io_uring_selector::stream_writer::IoUringStreamWriter;
 use crate::{IoUringSelector, MonitorStorage};
-use core_scheduler::{
+use base_scheduler::{
     Cancellation, IoBuf, OperationError, OperationResult, SocketSendFlags, SocketStreamWriter,
 };
-use core_scheduler_selector::NativeSocket;
+use base_scheduler_selector::NativeSocket;
 use std::io::{self, IoSlice};
 
-/// A scheduler-bound output lane combining borrowed writes with ordered owned submission. Construct through [`SocketStreamWriting`](core_scheduler::SocketStreamWriting).
+/// A scheduler-bound output lane combining borrowed writes with ordered owned submission. Construct through [`SocketStreamWriting`](base_scheduler::SocketStreamWriting).
 pub(crate) struct IoUringSocketStreamWriter<'a, B: IoBuf> {
     scheduler: &'a IoUringSelector,
     operations: crate::operation_state::OperationState,
@@ -129,7 +129,7 @@ impl<B: IoBuf> SocketStreamWriter for IoUringSocketStreamWriter<'_, B> {
             .socket_monitor_sendmsg_poll(&mut self.monitor, buffers, None, flags, cancellation)
             .await
     }
-    async fn write_owned_vectored<Buffers: core_scheduler::IoBufSequence>(
+    async fn write_owned_vectored<Buffers: base_scheduler::IoBufSequence>(
         &mut self,
         buffers: Buffers,
         flags: SocketSendFlags,
@@ -165,11 +165,11 @@ impl<B: IoBuf> SocketStreamWriter for IoUringSocketStreamWriter<'_, B> {
             .await;
         (result, message.buffers.into_inner())
     }
-    async fn write_owned<Owned: core_scheduler::IoBuf>(
+    async fn write_owned<Owned: base_scheduler::IoBuf>(
         &mut self,
         buffer: Owned,
         cancellation: &Cancellation,
-    ) -> core_scheduler::BufferResult<Owned> {
+    ) -> base_scheduler::BufferResult<Owned> {
         if let Err(error) = self.check_closed() {
             return (Err(error), buffer);
         }

@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler_timer_benchmark::{Mode, run};
+use base_scheduler_timer_benchmark::{Mode, run};
 use std::{sync::Arc, time::Duration};
 
 fn execute(args: &[String]) -> serde_json::Value {
@@ -20,7 +20,7 @@ fn execute(args: &[String]) -> serde_json::Value {
                 .enable_all()
                 .build()
                 .unwrap();
-            let scheduler = Arc::new(core_scheduler_tokio::TokioScheduler::new(
+            let scheduler = Arc::new(base_scheduler_tokio::TokioScheduler::new(
                 runtime.handle().clone(),
             ));
             let result = runtime.block_on(run(
@@ -36,7 +36,7 @@ fn execute(args: &[String]) -> serde_json::Value {
         }
         "direct" => {
             let scheduler = Arc::new(
-                core_scheduler_direct::DirectScheduler::new(core_scheduler_direct::DirectOptions {
+                base_scheduler_direct::DirectScheduler::new(base_scheduler_direct::DirectOptions {
                     threads: workers,
                     capacity: tasks.max(64),
                 })
@@ -55,8 +55,8 @@ fn execute(args: &[String]) -> serde_json::Value {
         }
         "native" => {
             let scheduler = Arc::new(
-                core_scheduler_native::NativeScheduler::with_options(
-                    core_scheduler_native::NativeOptions {
+                base_scheduler_native::NativeScheduler::with_options(
+                    base_scheduler_native::NativeOptions {
                         workers,
                         timer_capacity: tasks.max(1024),
                         ..Default::default()
@@ -78,13 +78,13 @@ fn execute(args: &[String]) -> serde_json::Value {
         #[cfg(target_os = "linux")]
         "iouring" => {
             let (selector, drivers) =
-                core_scheduler_iouring::IoUringSelector::with_workers(Default::default(), workers)
+                base_scheduler_iouring::IoUringSelector::with_workers(Default::default(), workers)
                     .unwrap();
             let scheduler = Arc::new(
-                core_scheduler_native::NativeScheduler::with_drivers(
+                base_scheduler_native::NativeScheduler::with_drivers(
                     selector,
                     drivers,
-                    core_scheduler_native::NativeExecutorOptions {
+                    base_scheduler_native::NativeExecutorOptions {
                         workers,
                         timer_capacity: tasks.max(1024),
                     },

@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::TokioTask;
-use core_scheduler::{SpawnError, TaskError};
+use base_scheduler::{SpawnError, TaskError};
 use event_listener::Event;
 use std::{
     collections::BTreeMap,

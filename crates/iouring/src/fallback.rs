@@ -2,8 +2,8 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::IoUringSelector;
-use core_scheduler::*;
-use core_scheduler_selector::{
+use base_scheduler::*;
+use base_scheduler_selector::{
     BlockingTask, NativeFile, NativeSocket, NativeSubscription, SystemAddresses, SystemFileMetadata,
 };
 use std::{
@@ -231,7 +231,7 @@ impl SocketRegistration for IoUringSelector {
 
 impl<O: SocketOption> SocketGetOption<O> for IoUringSelector
 where
-    core_scheduler_selector::ReadinessSelector: SocketGetOption<O>,
+    base_scheduler_selector::ReadinessSelector: SocketGetOption<O>,
 {
     async fn socket_get_option(
         &self,
@@ -247,7 +247,7 @@ where
 
 impl<O: SocketOption> SocketSetOption<O> for IoUringSelector
 where
-    core_scheduler_selector::ReadinessSelector: SocketSetOption<O>,
+    base_scheduler_selector::ReadinessSelector: SocketSetOption<O>,
 {
     async fn socket_set_option(
         &self,

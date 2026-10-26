@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::{AdviceMode, FileAdvice, FileOperation};
+use base_scheduler::{AdviceMode, FileAdvice, FileOperation};
 use std::io;
 
 /// A file containing `abcdef` with cursor 3. Advice can be ignored by an OS: observe calls at the actual advice boundary instead of asserting cache residency or eviction.

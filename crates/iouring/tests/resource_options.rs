@@ -3,9 +3,9 @@
 
 #![cfg(target_os = "linux")]
 
-use core_scheduler::*;
-use core_scheduler_iouring::{IoUringDriver, IoUringOptions, IoUringSelector};
-use core_scheduler_selector::NativeSocket;
+use base_scheduler::*;
+use base_scheduler_iouring::{IoUringDriver, IoUringOptions, IoUringSelector};
+use base_scheduler_selector::NativeSocket;
 use futures_lite::future::{block_on, poll_once};
 use std::{
     future::Future,
@@ -40,7 +40,7 @@ fn run(test: impl AsyncFnOnce(&IoUringSelector)) {
 }
 
 async fn stream_pair(scheduler: &IoUringSelector) -> (NativeSocket, NativeSocket) {
-    core_scheduler_conformance::socket::stream_pair(scheduler, SocketDomain::Ipv4).await
+    base_scheduler_conformance::socket::stream_pair(scheduler, SocketDomain::Ipv4).await
 }
 
 async fn packet_pair(scheduler: &IoUringSelector) -> (NativeSocket, NativeSocket) {

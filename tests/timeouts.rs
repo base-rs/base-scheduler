@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::{Cancellation, Clock, OperationError, OperationResult, TimeoutError};
+use base_scheduler::{Cancellation, Clock, OperationError, OperationResult, TimeoutError};
 use futures_lite::future::{block_on, poll_once};
 use std::{
     error::Error,
@@ -94,7 +94,7 @@ impl Clock for TestClock {
                 return Poll::Ready(Ok(()));
             }
             if cancelled.as_mut().poll(context).is_ready() {
-                return Poll::Ready(Err(core_scheduler::Cancelled.into()));
+                return Poll::Ready(Err(base_scheduler::Cancelled.into()));
             }
             state.deadline = Some(deadline);
             state.waker = Some(context.waker().clone());

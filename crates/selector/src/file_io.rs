@@ -50,10 +50,10 @@ pub(crate) fn stat(file: &File) -> io::Result<crate::SystemFileMetadata> {
     retry_interrupted(|| file.metadata()).map(crate::SystemFileMetadata::from)
 }
 
-pub(crate) fn sync(file: &File, mode: core_scheduler::SyncMode) -> io::Result<()> {
+pub(crate) fn sync(file: &File, mode: base_scheduler::SyncMode) -> io::Result<()> {
     retry_interrupted(|| match mode {
-        core_scheduler::SyncMode::All => file.sync_all(),
-        core_scheduler::SyncMode::Data => file.sync_data(),
+        base_scheduler::SyncMode::All => file.sync_all(),
+        base_scheduler::SyncMode::Data => file.sync_data(),
     })
 }
 

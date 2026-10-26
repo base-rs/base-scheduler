@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::{AddressResolveError, AddressResolveErrorKind as Kind};
+use base_scheduler::{AddressResolveError, AddressResolveErrorKind as Kind};
 use std::io;
 pub(crate) use sys::{
     ADDRINFOW as AddrInfo, FreeAddrInfoW as freeaddrinfo, GetAddrInfoW as getaddrinfo,

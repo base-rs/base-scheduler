@@ -5,7 +5,7 @@ use std::future::Future;
 
 /// Lifecycle shared by independently driven I/O capabilities.
 ///
-/// Implement the individual `core-scheduler` capability traits for operations. This trait supplies no task executor, resource representation, or driver thread. Constructors document how the selector makes progress and who owns its driver.
+/// Implement the individual `base-scheduler` capability traits for operations. This trait supplies no task executor, resource representation, or driver thread. Constructors document how the selector makes progress and who owns its driver.
 pub trait Selector: Send + Sync {
     /// Stop admission and notify pending operations without synchronously waiting. Repeated calls are harmless. Accepted cleanup and kernel-accessible storage remain owned until retirement.
     fn close(&self);

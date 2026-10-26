@@ -39,19 +39,19 @@ jobs:
       - name: Require complete timer coverage without optional features
         env:
           CARGO_LLVM_COV_TARGET_DIR: target/coverage-timers-default
-        run: cargo bake --locked test:coverage --package core-scheduler-timers --all-targets true
+        run: cargo bake --locked test:coverage --package base-scheduler-timers --all-targets true
       - name: Require complete timer coverage with the producer driver
         env:
           CARGO_LLVM_COV_TARGET_DIR: target/coverage-timers-driver
-        run: cargo bake --locked test:coverage --package core-scheduler-timers --all-targets true --features driver
+        run: cargo bake --locked test:coverage --package base-scheduler-timers --all-targets true --features driver
       - name: Require complete timer coverage with sharded queues
         env:
           CARGO_LLVM_COV_TARGET_DIR: target/coverage-timers-sharded
-        run: cargo bake --locked test:coverage --package core-scheduler-timers --all-targets true --features sharded
+        run: cargo bake --locked test:coverage --package base-scheduler-timers --all-targets true --features sharded
       - name: Require complete timer coverage with local queues
         env:
           CARGO_LLVM_COV_TARGET_DIR: target/coverage-timers-local
-        run: cargo bake --locked test:coverage --package core-scheduler-timers --all-targets true --features local
+        run: cargo bake --locked test:coverage --package base-scheduler-timers --all-targets true --features local
 
   msrv:
     runs-on: ubuntu-latest
@@ -59,7 +59,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@1.85.0
-      - run: cargo test --locked --workspace --all-features --exclude core-scheduler-bake
+      - run: cargo test --locked --workspace --all-features --exclude base-scheduler-bake
 
   test-result:
     if: always()

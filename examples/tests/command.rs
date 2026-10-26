@@ -3,7 +3,7 @@
 
 #[test]
 fn command_emits_a_validated_sample() {
-    let output = std::process::Command::new(env!("CARGO_BIN_EXE_core-scheduler-examples"))
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_base-scheduler-examples"))
         .args(["native", "frames", "257", "19", "2", "1024"])
         .output()
         .unwrap();

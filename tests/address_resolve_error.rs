@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::{AddressResolveError, AddressResolveErrorKind as Kind, AddressService};
+use base_scheduler::{AddressResolveError, AddressResolveErrorKind as Kind, AddressService};
 use std::{error::Error, io};
 
 #[test]

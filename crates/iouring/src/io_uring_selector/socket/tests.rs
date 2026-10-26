@@ -63,7 +63,7 @@ fn transient_socket_failures_retry_and_preserve_the_owner() {
 fn scalar_socket_requests_use_ring_opcodes_and_release_before_notification() {
     for write in [false, true] {
         let (selector, mut driver) = pair(2);
-        let (sender, receiver) = block_on(core_scheduler_conformance::socket::stream_pair(
+        let (sender, receiver) = block_on(base_scheduler_conformance::socket::stream_pair(
             &selector,
             SocketDomain::Ipv4,
         ));
@@ -150,7 +150,7 @@ fn scalar_socket_requests_use_ring_opcodes_and_release_before_notification() {
 
 #[test]
 fn socket_retries_keep_the_original_ring_across_threads_and_nested_workers() {
-    use core_scheduler_selector::{SelectorDriver, SelectorWorker};
+    use base_scheduler_selector::{SelectorDriver, SelectorWorker};
     let (selector, mut drivers) =
         IoUringSelector::with_workers(IoUringOptions::default(), 2).unwrap();
     let mut other_worker = drivers.pop().unwrap().enter();
@@ -264,7 +264,7 @@ fn socket_retry_readiness_cancels_and_closes_after_kernel_submission() {
 #[test]
 fn ready_owned_writes_preserve_the_owner_without_consuming_ring_capacity() {
     let (selector, mut driver) = pair(1);
-    let (sender, receiver) = block_on(core_scheduler_conformance::socket::stream_pair(
+    let (sender, receiver) = block_on(base_scheduler_conformance::socket::stream_pair(
         &selector,
         SocketDomain::Ipv4,
     ));
@@ -304,7 +304,7 @@ fn ready_owned_writes_preserve_the_owner_without_consuming_ring_capacity() {
 #[test]
 fn owned_write_fast_path_errors_and_ring_fallbacks_preserve_the_owner() {
     let (selector, mut driver) = pair(1);
-    let (sender, receiver) = block_on(core_scheduler_conformance::socket::stream_pair(
+    let (sender, receiver) = block_on(base_scheduler_conformance::socket::stream_pair(
         &selector,
         SocketDomain::Ipv4,
     ));
@@ -352,7 +352,7 @@ fn owned_write_fast_path_errors_and_ring_fallbacks_preserve_the_owner() {
 #[test]
 fn owned_write_checks_precancellation_and_closure_before_sending() {
     let (selector, mut driver) = pair(1);
-    let (sender, receiver) = block_on(core_scheduler_conformance::socket::stream_pair(
+    let (sender, receiver) = block_on(base_scheduler_conformance::socket::stream_pair(
         &selector,
         SocketDomain::Ipv4,
     ));

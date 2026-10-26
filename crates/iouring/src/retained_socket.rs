@@ -1,8 +1,8 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::{SocketRecvFlags, SocketRecvResult, SocketSendFlags};
-use core_scheduler_selector::NativeSocket;
+use base_scheduler::{SocketRecvFlags, SocketRecvResult, SocketSendFlags};
+use base_scheduler_selector::NativeSocket;
 use socket2::{SockAddr, Socket};
 use std::{
     io::{self, IoSlice, IoSliceMut},

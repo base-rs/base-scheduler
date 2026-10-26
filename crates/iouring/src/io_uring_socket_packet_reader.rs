@@ -3,12 +3,12 @@
 
 use crate::Interest;
 use crate::{IoUringBufferPool, IoUringSelector, MonitorStorage};
-use core_scheduler::{
+use base_scheduler::{
     BufferPool, BufferPoolOptions, BufferPooling, Cancellation, OperationResult,
     OwnedSocketRecvMessage, ReceiveBuffer, SocketPacketReader, SocketRecvFlags, SocketRecvResult,
     SocketType,
 };
-use core_scheduler_selector::NativeSocket;
+use base_scheduler_selector::NativeSocket;
 use std::{
     future::poll_fn,
     io::{self, IoSliceMut},
@@ -135,7 +135,7 @@ impl SocketPacketReader for IoUringSocketPacketReader<'_> {
         buffers: &mut [IoSliceMut<'_>],
         flags: SocketRecvFlags,
         cancellation: &Cancellation,
-    ) -> OperationResult<core_scheduler::SocketRecvResult> {
+    ) -> OperationResult<base_scheduler::SocketRecvResult> {
         cancellation.check()?;
         if self.closing {
             return Err(io::Error::from(io::ErrorKind::BrokenPipe).into());
@@ -145,12 +145,12 @@ impl SocketPacketReader for IoUringSocketPacketReader<'_> {
             .socket_monitor_recvmsg_poll(&mut self.monitor, buffers, flags, cancellation)
             .await
     }
-    async fn read_owned_vectored<Buffers: core_scheduler::IoBufSequenceMut>(
+    async fn read_owned_vectored<Buffers: base_scheduler::IoBufSequenceMut>(
         &mut self,
         buffers: Buffers,
         flags: SocketRecvFlags,
         cancellation: &Cancellation,
-    ) -> (OperationResult<core_scheduler::SocketRecvResult>, Buffers) {
+    ) -> (OperationResult<base_scheduler::SocketRecvResult>, Buffers) {
         if self.closing {
             return (
                 Err(io::Error::from(io::ErrorKind::BrokenPipe).into()),

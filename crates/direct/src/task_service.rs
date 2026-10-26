@@ -3,7 +3,7 @@
 
 use crate::{DirectTask, thread};
 use async_task::Runnable;
-use core_scheduler::{SpawnError, TaskError};
+use base_scheduler::{SpawnError, TaskError};
 use event_listener::Event;
 use std::{
     collections::{HashSet, VecDeque},
@@ -101,7 +101,7 @@ impl TaskService {
         };
         for _ in 0..threads {
             let shared = Arc::clone(&service.shared);
-            thread::start("core-direct-task", move || work(shared))?;
+            thread::start("base-direct-task", move || work(shared))?;
         }
         Ok(service)
     }

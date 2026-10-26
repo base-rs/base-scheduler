@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler_selector::ReadinessSelector;
+use base_scheduler_selector::ReadinessSelector;
 
 fn run(test: impl AsyncFnOnce(&ReadinessSelector) + Send + 'static) {
     let (done, completion) = std::sync::mpsc::channel();
@@ -27,12 +27,12 @@ fn run(test: impl AsyncFnOnce(&ReadinessSelector) + Send + 'static) {
         std::panic::resume_unwind(payload);
     }
 }
-core_scheduler_conformance::process_wait_tests!(run: run);
+base_scheduler_conformance::process_wait_tests!(run: run);
 
 #[test]
 fn pending_shutdown() {
     run(async |scheduler| {
-        core_scheduler_conformance::process_wait::shutdown(
+        base_scheduler_conformance::process_wait::shutdown(
             scheduler,
             || scheduler.close(),
             scheduler.shutdown(),
@@ -43,7 +43,7 @@ fn pending_shutdown() {
 #[test]
 fn dropped_and_forgotten_waits() {
     run(async |scheduler| {
-        core_scheduler_conformance::process_wait::abandonment(scheduler, scheduler.shutdown())
+        base_scheduler_conformance::process_wait::abandonment(scheduler, scheduler.shutdown())
             .await;
     });
 }
@@ -52,7 +52,7 @@ fn dropped_and_forgotten_waits() {
 #[test]
 fn suspended_wait_after_shutdown() {
     run(async |scheduler| {
-        core_scheduler_conformance::process_wait::suspended_shutdown(
+        base_scheduler_conformance::process_wait::suspended_shutdown(
             scheduler,
             scheduler.shutdown(),
         )

@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::{Cancellation, Clock, OperationError, OperationResult};
+use base_scheduler::{Cancellation, Clock, OperationError, OperationResult};
 use futures_lite::future::block_on;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};

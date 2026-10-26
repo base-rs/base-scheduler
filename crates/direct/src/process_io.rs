@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::{Cancellation, Cancelled, ProcessWaitFlags, ProcessWaitResult};
+use base_scheduler::{Cancellation, Cancelled, ProcessWaitFlags, ProcessWaitResult};
 use std::{io, process::ExitStatus};
 
 #[cfg(unix)]
@@ -133,7 +133,7 @@ impl Process {
 pub(crate) fn operation_result<T>(
     result: io::Result<T>,
     cancellation: &Cancellation,
-) -> core_scheduler::OperationResult<T> {
+) -> base_scheduler::OperationResult<T> {
     match result {
         Err(error) if error.kind() == io::ErrorKind::Interrupted && cancellation.is_cancelled() => {
             Err(Cancelled.into())

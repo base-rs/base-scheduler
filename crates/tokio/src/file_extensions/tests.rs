@@ -3,7 +3,7 @@
 
 use super::*;
 use crate::test_support;
-use core_scheduler_conformance::{FileAdviceFixture, FileAllocateFixture};
+use base_scheduler_conformance::{FileAdviceFixture, FileAllocateFixture};
 use futures_lite::future::{block_on, poll_once};
 use std::{
     io::{Seek, SeekFrom, Write},
@@ -169,10 +169,10 @@ fn run(test: impl AsyncFnOnce(&Fixture) + Send + 'static) {
     });
 }
 mod allocation {
-    core_scheduler_conformance::file_allocate_tests!(run: super::run);
+    base_scheduler_conformance::file_allocate_tests!(run: super::run);
 }
 mod advice {
-    core_scheduler_conformance::file_advice_tests!(run: super::run);
+    base_scheduler_conformance::file_advice_tests!(run: super::run);
 }
 
 #[test]

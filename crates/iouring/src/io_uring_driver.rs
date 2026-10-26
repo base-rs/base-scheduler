@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::io_uring_selector::{Controller, DriverGroup, Reactor, SignalCompletion};
-use core_scheduler_selector::SelectorDriver;
+use base_scheduler_selector::SelectorDriver;
 use std::{io, sync::Arc, time::Duration};
 
 /// Exclusive ring driver. Submission handles may be used on other threads; only this owner processes the ring.

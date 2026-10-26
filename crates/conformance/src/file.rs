@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 //! Assertions for independently implementable file capabilities. Fixtures supply regular files with exclusive test ownership and a cursor initially at zero unless documented otherwise.
-use core_scheduler::{
+use base_scheduler::{
     Cancellation, FileMetadata, FileReading, FileSeek, FileStat, FileSync, FileTruncate, FileType,
     FileWriting, IoBuf, OperationError, SyncMode,
 };
@@ -241,16 +241,16 @@ pub async fn write_error<S: FileWriting>(scheduler: &S, file: &S::File) {
 }
 
 /// Check lazy and pre-cancelled file creation using a backend-supplied absence assertion. Returns the newly created read/write file; the fixture owns cleanup.
-pub async fn create<S: core_scheduler::FileOpen>(
+pub async fn create<S: base_scheduler::FileOpen>(
     scheduler: &S,
     path: &std::path::Path,
     assert_absent: impl Fn(),
 ) -> S::File {
-    let options = core_scheduler::FileOptions {
+    let options = base_scheduler::FileOptions {
         read: true,
         write: true,
         create_new: true,
-        ..core_scheduler::FileOptions::CREATE
+        ..base_scheduler::FileOptions::CREATE
     };
     let never = Cancellation::never();
     drop(scheduler.file_open(path, options, &never));

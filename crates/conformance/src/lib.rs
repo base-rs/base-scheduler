@@ -78,7 +78,7 @@ pub use spawn_fixture::SpawnFixture;
 
 // Macro expansions must resolve their support dependency through this crate even when dependencies are renamed by a backend.
 #[doc(hidden)]
-pub use core_scheduler as __core_scheduler;
+pub use base_scheduler as __base_scheduler;
 
 mod file_submission_tests;
 

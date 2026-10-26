@@ -3,8 +3,8 @@
 
 use crate::{IoUringDriver, IoUringOptions};
 use crate::{MonitorStorage, SocketMonitor, retained_socket::SocketSource};
-use core_scheduler::*;
-use core_scheduler_selector::{NativeFile, NativeSocket, ReadinessSelector, Selector};
+use base_scheduler::*;
+use base_scheduler_selector::{NativeFile, NativeSocket, ReadinessSelector, Selector};
 use event_listener::Event as CompletionEvent;
 use futures_channel::oneshot;
 use io_uring::{IoUring, opcode, squeue, types};
@@ -632,7 +632,7 @@ impl IoUringSelector {
             return (
                 Err(io::Error::new(
                     io::ErrorKind::Interrupted,
-                    core_scheduler::Cancelled,
+                    base_scheduler::Cancelled,
                 )),
                 buffer,
             );
@@ -717,7 +717,7 @@ fn operation_result<T>(result: io::Result<T>, cancellation: &Cancellation) -> Op
                 && (error.kind() == io::ErrorKind::Interrupted
                     || error.raw_os_error() == Some(libc::ECANCELED)) =>
         {
-            Err(core_scheduler::Cancelled.into())
+            Err(base_scheduler::Cancelled.into())
         }
         result => result.map_err(Into::into),
     }

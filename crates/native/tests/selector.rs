@@ -1,10 +1,10 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::{
+use base_scheduler::{
     BufferResult, Cancellation, FileOperation, FileReader, FileReading, IoBufMut, Spawn,
 };
-use core_scheduler_native::{NativeExecutorOptions, NativeScheduler, ReadinessSelector, Selector};
+use base_scheduler_native::{NativeExecutorOptions, NativeScheduler, ReadinessSelector, Selector};
 use std::sync::{
     Arc,
     atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -117,46 +117,46 @@ fn failed_composition_closes_the_supplied_selector() {
 fn readiness_is_usable_without_native_task_workers() {
     futures_lite::future::block_on(async {
         let selector = ReadinessSelector::new().unwrap();
-        let (client, server) = core_scheduler_conformance::socket::stream_pair(
+        let (client, server) = base_scheduler_conformance::socket::stream_pair(
             &selector,
-            core_scheduler::SocketDomain::Ipv4,
+            base_scheduler::SocketDomain::Ipv4,
         )
         .await;
-        core_scheduler_conformance::socket::stream(&selector, &client, &server).await;
+        base_scheduler_conformance::socket::stream(&selector, &client, &server).await;
         selector.shutdown().await;
     });
 }
 
-impl core_scheduler::FileAllocate for MemorySelector {
+impl base_scheduler::FileAllocate for MemorySelector {
     async fn file_allocate(
         &self,
         file: &Self::File,
         offset: u64,
         length: u64,
-        mode: core_scheduler::AllocationMode,
+        mode: base_scheduler::AllocationMode,
         cancellation: &Cancellation,
-    ) -> core_scheduler::OperationResult<()> {
+    ) -> base_scheduler::OperationResult<()> {
         cancellation.check()?;
         assert_eq!(file, b"abc");
         assert_eq!(
             (offset, length, mode),
-            (1, 2, core_scheduler::AllocationMode::KeepSize)
+            (1, 2, base_scheduler::AllocationMode::KeepSize)
         );
         Err(std::io::Error::from(std::io::ErrorKind::Unsupported).into())
     }
 }
-impl core_scheduler::FileAdvice for MemorySelector {
+impl base_scheduler::FileAdvice for MemorySelector {
     async fn file_advise(
         &self,
         file: &Self::File,
         offset: u64,
         length: u64,
-        advice: core_scheduler::AdviceMode,
+        advice: base_scheduler::AdviceMode,
     ) -> std::io::Result<()> {
         assert_eq!(file, b"abc");
         assert_eq!(
             (offset, length, advice),
-            (1, 2, core_scheduler::AdviceMode::Sequential)
+            (1, 2, base_scheduler::AdviceMode::Sequential)
         );
         Err(std::io::ErrorKind::Unsupported.into())
     }
@@ -165,7 +165,7 @@ impl core_scheduler::FileAdvice for MemorySelector {
         file: &Self::File,
         offset: u64,
         length: u64,
-        advice: core_scheduler::AdviceMode,
+        advice: base_scheduler::AdviceMode,
     ) -> std::io::Result<()> {
         self.file_advise(file, offset, length, advice).await
     }
@@ -173,7 +173,7 @@ impl core_scheduler::FileAdvice for MemorySelector {
 
 #[test]
 fn optional_file_capabilities_preserve_custom_resources_arguments_and_errors() {
-    use core_scheduler::{AdviceMode, AllocationMode, FileAdvice, FileAllocate};
+    use base_scheduler::{AdviceMode, AllocationMode, FileAdvice, FileAllocate};
     let scheduler = NativeScheduler::with_selector(
         MemorySelector {
             closed: Arc::default(),
@@ -222,7 +222,7 @@ fn optional_file_capabilities_preserve_custom_resources_arguments_and_errors() {
 
 #[test]
 fn registered_sockets_options_resolution_and_signals_forward_to_the_selector() {
-    use core_scheduler::*;
+    use base_scheduler::*;
     use std::net::{TcpListener, TcpStream};
     let scheduler = NativeScheduler::new().unwrap();
     scheduler.block_on(async {
@@ -258,7 +258,7 @@ fn registered_sockets_options_resolution_and_signals_forward_to_the_selector() {
         drop(stream);
         scheduler.socket_close(peer).await.unwrap();
         scheduler.socket_close(listener).await.unwrap();
-        core_scheduler_conformance::address_resolution::numeric(&scheduler, SocketDomain::Ipv4)
+        base_scheduler_conformance::address_resolution::numeric(&scheduler, SocketDomain::Ipv4)
             .await;
         #[cfg(unix)]
         {
@@ -273,11 +273,11 @@ fn registered_sockets_options_resolution_and_signals_forward_to_the_selector() {
     });
 }
 
-impl core_scheduler::Signals for MemorySelector {
+impl base_scheduler::Signals for MemorySelector {
     type Signal = u8;
-    type Subscription = Box<dyn core_scheduler::Notify<u8>>;
+    type Subscription = Box<dyn base_scheduler::Notify<u8>>;
 
-    fn signal_subscribe<T: core_scheduler::Notify<u8> + 'static>(
+    fn signal_subscribe<T: base_scheduler::Notify<u8> + 'static>(
         &self,
         signals: &[u8],
         target: T,
@@ -289,7 +289,7 @@ impl core_scheduler::Signals for MemorySelector {
 
 #[test]
 fn custom_signal_capability_preserves_the_selectors_signal_and_subscription_types() {
-    use core_scheduler::Signals;
+    use base_scheduler::Signals;
     let scheduler = NativeScheduler::with_selector(
         MemorySelector {
             closed: Arc::default(),
@@ -315,9 +315,9 @@ fn custom_signal_capability_preserves_the_selectors_signal_and_subscription_type
 
 #[test]
 fn portable_pool_capacity_is_independent_of_worker_count() {
-    use core_scheduler::{BufferPoolOptions, BufferPooling};
+    use base_scheduler::{BufferPoolOptions, BufferPooling};
     for workers in [1, 3] {
-        let scheduler = NativeScheduler::with_options(core_scheduler_native::NativeOptions {
+        let scheduler = NativeScheduler::with_options(base_scheduler_native::NativeOptions {
             workers,
             ..Default::default()
         })

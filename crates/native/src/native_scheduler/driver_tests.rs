@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use super::*;
-use core_scheduler_selector::{SelectorDriver, SelectorWorker};
+use base_scheduler_selector::{SelectorDriver, SelectorWorker};
 use futures_channel::oneshot;
 use futures_lite::future::block_on;
 use std::{
@@ -144,7 +144,7 @@ fn wait(mut condition: impl FnMut() -> bool) {
 
 #[test]
 fn timer_deadlines_bound_driver_waits_and_survive_driver_retirement() {
-    use core_scheduler::{Cancellation, Clock};
+    use base_scheduler::{Cancellation, Clock};
     crate::test_support::run(|| {
         let state = Arc::new(State::default());
         let scheduler = Arc::new(construct(&[Arc::clone(&state)]));

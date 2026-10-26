@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use super::*;
-use core_scheduler::*;
+use base_scheduler::*;
 use std::{collections::VecDeque, io::ErrorKind, marker::PhantomData, pin::Pin, sync::Mutex};
 
 // A script describes one observable operation per step. It verifies retirement order as well as failures, without replacing any production syscall.
@@ -503,7 +503,7 @@ fn native_runtime_setup_failures_are_returned() {
             .unwrap_err();
         assert_eq!(error.to_string(), operation);
     }
-    if core_scheduler_iouring::IoUringSelector::new(Default::default()).is_ok() {
+    if base_scheduler_iouring::IoUringSelector::new(Default::default()).is_ok() {
         let error = crate::tests::fail_setup("io_uring runtime", || {
             serve("iouring-writer", 1, WORKLOAD, Vec::new())
         })

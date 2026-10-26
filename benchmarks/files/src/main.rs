@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler_file_benchmark::run;
+use base_scheduler_file_benchmark::run;
 use std::sync::Arc;
 
 fn execute(args: &[String]) -> serde_json::Value {
@@ -24,7 +24,7 @@ fn execute(args: &[String]) -> serde_json::Value {
                 .enable_all()
                 .build()
                 .unwrap();
-            let scheduler = Arc::new(core_scheduler_tokio::TokioScheduler::new(
+            let scheduler = Arc::new(base_scheduler_tokio::TokioScheduler::new(
                 runtime.handle().clone(),
             ));
             let result = runtime.block_on(run(
@@ -40,7 +40,7 @@ fn execute(args: &[String]) -> serde_json::Value {
         }
         "direct" => {
             let scheduler = Arc::new(
-                core_scheduler_direct::DirectScheduler::new(core_scheduler_direct::DirectOptions {
+                base_scheduler_direct::DirectScheduler::new(base_scheduler_direct::DirectOptions {
                     threads: workers,
                     capacity: tasks.max(64),
                 })
@@ -59,8 +59,8 @@ fn execute(args: &[String]) -> serde_json::Value {
         }
         "native" => {
             let scheduler = Arc::new(
-                core_scheduler_native::NativeScheduler::with_options(
-                    core_scheduler_native::NativeOptions {
+                base_scheduler_native::NativeScheduler::with_options(
+                    base_scheduler_native::NativeOptions {
                         workers,
                         timer_capacity: tasks.max(1024),
                         ..Default::default()
@@ -87,7 +87,7 @@ fn execute(args: &[String]) -> serde_json::Value {
                 "write-at" => true,
                 _ => panic!("unknown workload"),
             };
-            core_scheduler_file_benchmark::run_migration(
+            base_scheduler_file_benchmark::run_migration(
                 backend == "iouring-migration",
                 monitor,
                 write,
@@ -98,8 +98,8 @@ fn execute(args: &[String]) -> serde_json::Value {
         }
         #[cfg(target_os = "linux")]
         "iouring" | "iouring-unregistered" => {
-            let (selector, drivers) = core_scheduler_iouring::IoUringSelector::with_workers(
-                core_scheduler_iouring::IoUringOptions {
+            let (selector, drivers) = base_scheduler_iouring::IoUringSelector::with_workers(
+                base_scheduler_iouring::IoUringOptions {
                     fixed_files: if backend == "iouring-unregistered" {
                         0
                     } else {
@@ -111,10 +111,10 @@ fn execute(args: &[String]) -> serde_json::Value {
             )
             .unwrap();
             let scheduler = Arc::new(
-                core_scheduler_native::NativeScheduler::with_drivers(
+                base_scheduler_native::NativeScheduler::with_drivers(
                     selector,
                     drivers,
-                    core_scheduler_native::NativeExecutorOptions {
+                    base_scheduler_native::NativeExecutorOptions {
                         workers,
                         timer_capacity: tasks.max(1024),
                     },

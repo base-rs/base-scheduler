@@ -1,4 +1,4 @@
-# `core-scheduler-iouring`
+# `base-scheduler-iouring`
 
 A Linux selector with independently driven completion I/O. Owned file reads and writes (including positioned operations), socket reads/writes, and socket message sends/receives use io\_uring. Borrowed `_poll` operations try nonblocking syscalls directly and use ring readiness waits after `WouldBlock`. Other file operations, socket lifecycle, resolution, blocking work, and signals use an explicitly owned `ReadinessSelector` fallback.
 
@@ -6,15 +6,15 @@ Application code constructs scheduler-bound stream and packet readers and writer
 
 ## Usage
 
-Add this package with `cargo add core-scheduler-iouring core-scheduler-native`.
+Add this package with `cargo add base-scheduler-iouring base-scheduler-native`.
 
 `IoUringSelector::with_workers(options, workers)` creates one ring per worker, with one shared readiness fallback. `NativeScheduler::with_drivers` owns and drives those rings directly on its task workers:
 
 ```rust
 # #[cfg(target_os = "linux")]
 # {
-use core_scheduler_iouring::{IoUringOptions, IoUringSelector};
-use core_scheduler_native::{NativeExecutorOptions, NativeScheduler};
+use base_scheduler_iouring::{IoUringOptions, IoUringSelector};
+use base_scheduler_native::{NativeExecutorOptions, NativeScheduler};
 
 let workers = 2;
 let (selector, drivers) = IoUringSelector::with_workers(IoUringOptions::default(), workers)?;
@@ -57,7 +57,7 @@ Bound readers and writers attempt nonblocking syscalls with `MSG_DONTWAIT`. Read
 
 Readers receive on demand and do not retain a receive-ahead queue. Overlap input and output explicitly: read a chunk, submit owned output through the independent stream writer, then await the next read while accepted output progresses. Subsequent submissions await their predecessor, and `flush` completes the final output. Two reusable pool slots accommodate one read and one write; retained application views require additional capacity. Packet reads and writes can be polled together on independent handles.
 
-`IoUringSelector::socket_recvmsg_multishot` starts one persistent receive using a bounded provided-buffer ring. This is a concrete experimental API; import `RecvMsgMultishotOptions` from `core_scheduler_iouring`. With Native, construct it through `scheduler.selector()`, then use `recv(&cancellation).await` and `close().await` on the bound sequence. Portable application code uses demand-driven bound stream or packet readers; this experiment is independent of those readers. The concrete receiver exposes immutable owned messages and retires reception on pending-wait cancellation. Returned payloads can outlive close or move to another worker; local returns publish directly and remote returns use the owning ring's inbox.
+`IoUringSelector::socket_recvmsg_multishot` starts one persistent receive using a bounded provided-buffer ring. This is a concrete experimental API; import `RecvMsgMultishotOptions` from `base_scheduler_iouring`. With Native, construct it through `scheduler.selector()`, then use `recv(&cancellation).await` and `close().await` on the bound sequence. Portable application code uses demand-driven bound stream or packet readers; this experiment is independent of those readers. The concrete receiver exposes immutable owned messages and retires reception on pending-wait cancellation. Returned payloads can outlive close or move to another worker; local returns publish directly and remote returns use the owning ring's inbox.
 
 The kernel rearms a multishot request across receives. Only a CQE without `IORING_CQE_F_MORE` retires that submission. Exhaustion pauses the receiver instead of spinning: returning a buffer resubmits the request. TCP EOF ends reception; empty datagrams remain messages, and truncation and sender metadata are preserved. Peeking is rejected. Linux 6.0 or later and provided-buffer ring support are required; setup or operation errors are explicit, without a fallback.
 
@@ -95,4 +95,4 @@ The [workspace overview](../../readme.md) describes the interface and companion 
 
 ## Contributing
 
-Please open an issue or pull request on [GitHub](https://github.com/core-rs/core-scheduler).
+Please open an issue or pull request on [GitHub](https://github.com/base-rs/base-scheduler).

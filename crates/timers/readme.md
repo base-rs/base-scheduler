@@ -1,13 +1,13 @@
-# `core-scheduler-timers`
+# `base-scheduler-timers`
 
 Runtime-independent monotonic timer queues with batched expiry and constant-time cancellation. Capacity can be reserved during setup so registration and cancellation reuse existing storage.
 
 ## Usage
 
-Add this package with `cargo add core-scheduler-timers`.
+Add this package with `cargo add base-scheduler-timers`.
 
 ```rust
-use core_scheduler_timers::Timers;
+use base_scheduler_timers::Timers;
 use std::time::Instant;
 
 let mut timers = Timers::with_capacity(16);
@@ -25,7 +25,7 @@ The `local` feature provides an exclusively owned `local::TimerQueue<Value>` wit
 
 The `sharded` feature provides worker-owned queues, assistance views, deadline notifications, and lazy sleep futures. The optional `driver` feature provides a bounded producer inbox. These features create no threads and select no executor.
 
-Extracted from [Socketry](https://github.com/core-rs/socketry-rust/tree/7a70586d5d37fb640d696d0c03a05b2ee3cbe06b/crates/timers), retaining its MIT attribution.
+Extracted from [Socketry](https://github.com/base-rs/socketry-rust/tree/7a70586d5d37fb640d696d0c03a05b2ee3cbe06b/crates/timers), retaining its MIT attribution.
 
 ## Releasing
 
@@ -41,4 +41,4 @@ The [workspace overview](../../readme.md) describes the interface and companion 
 
 ## Contributing
 
-Please open an issue or pull request on [GitHub](https://github.com/core-rs/core-scheduler).
+Please open an issue or pull request on [GitHub](https://github.com/base-rs/base-scheduler).

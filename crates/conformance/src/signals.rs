@@ -4,7 +4,7 @@
 //! Signal subscription ownership and controlled-delivery assertions.
 
 use crate::{SignalsFixture, probe::DropProbe};
-use core_scheduler::{Cancellation, Notify, Signals};
+use base_scheduler::{Cancellation, Notify, Signals};
 use std::sync::{
     Arc, Mutex,
     atomic::{AtomicUsize, Ordering},

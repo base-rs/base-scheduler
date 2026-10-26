@@ -4,5 +4,5 @@
 #[derive(Debug)]
 pub(crate) struct SocketMessage<Buffers> {
     pub(crate) buffers: Buffers,
-    pub(crate) address: Option<core_scheduler::SocketAddress>,
+    pub(crate) address: Option<base_scheduler::SocketAddress>,
 }

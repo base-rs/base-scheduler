@@ -5,7 +5,7 @@ use crate::DirectScheduler;
 use crate::direct_socket_packet_reader::DirectSocketPacketReader;
 use crate::direct_socket_packet_writer::DirectSocketPacketWriter;
 use crate::direct_socket_stream_reader::DirectSocketStreamReader;
-use core_scheduler::*;
+use base_scheduler::*;
 use std::io;
 impl SocketStreamReading for DirectScheduler {
     fn socket_stream_reader<'scheduler>(

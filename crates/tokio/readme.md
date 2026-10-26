@@ -1,14 +1,14 @@
-# `core-scheduler-tokio`
+# `base-scheduler-tokio`
 
-`core-scheduler-tokio` adapts an explicitly selected Tokio runtime to the `core-scheduler` capabilities. It supplies owning tasks, clocks, native address resolution, files, IP sockets, scatter/gather I/O, and bounded blocking work. Unix additionally supports signals; Linux supports file allocation and advice.
+`base-scheduler-tokio` adapts an explicitly selected Tokio runtime to the `base-scheduler` capabilities. It supplies owning tasks, clocks, native address resolution, files, IP sockets, scatter/gather I/O, and bounded blocking work. Unix additionally supports signals; Linux supports file allocation and advice.
 
 ## Usage
 
-Add this package with `cargo add core-scheduler core-scheduler-tokio`. Add Tokio to the application with `cargo add tokio --features rt,net,time`.
+Add this package with `cargo add base-scheduler base-scheduler-tokio`. Add Tokio to the application with `cargo add tokio --features rt,net,time`.
 
 ```rust
-use core_scheduler::{Cancellation, FileClose, FileOpen, FileOptions, FileReader, FileReading};
-use core_scheduler_tokio::TokioScheduler;
+use base_scheduler::{Cancellation, FileClose, FileOpen, FileOptions, FileReader, FileReading};
+use base_scheduler_tokio::TokioScheduler;
 
 # async fn example(path: &std::path::Path, runtime: tokio::runtime::Handle) -> Result<(), Box<dyn std::error::Error>> {
 let scheduler = TokioScheduler::new(runtime);
@@ -52,7 +52,7 @@ Resolver results retain the native `addrinfo` list and matching deallocator, wit
 
 ## Development
 
-The companion `core-scheduler-conformance` crate is a development dependency. Shared suites run against real adapter operations, with additional tests for runtime affinity, external polling, ownership, bounded admission, shutdown, native errors, and destructor panics.
+The companion `base-scheduler-conformance` crate is a development dependency. Shared suites run against real adapter operations, with additional tests for runtime affinity, external polling, ownership, bounded admission, shutdown, native errors, and destructor panics.
 
 ## Releasing
 
@@ -70,4 +70,4 @@ The [workspace overview](../../readme.md) describes the interface and companion 
 
 ## Contributing
 
-Please open an issue or pull request on [GitHub](https://github.com/core-rs/core-scheduler).
+Please open an issue or pull request on [GitHub](https://github.com/base-rs/base-scheduler).

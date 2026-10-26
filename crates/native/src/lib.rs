@@ -18,8 +18,8 @@ mod worker;
 mod worker_timers;
 
 #[cfg(unix)]
-pub use core_scheduler_selector::NativeSubscription;
-pub use core_scheduler_selector::{
+pub use base_scheduler_selector::NativeSubscription;
+pub use base_scheduler_selector::{
     BlockingTask, NativeFile, NativeSocket, ReadinessSelector, Selector, SelectorOptions,
     SystemAddressInfo, SystemAddresses, SystemFileMetadata,
 };

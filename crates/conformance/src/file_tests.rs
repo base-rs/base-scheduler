@@ -43,7 +43,7 @@ macro_rules! file_tests {
                 $crate::file::sync(scheduler, &file).await;
             },
             write_error => |fixture, scheduler, file| {
-                let read_only = $crate::__core_scheduler::FileOpen::file_open(scheduler, fixture.path(), $crate::__core_scheduler::FileOptions::READ, &$crate::__core_scheduler::Cancellation::never()).await.unwrap();
+                let read_only = $crate::__base_scheduler::FileOpen::file_open(scheduler, fixture.path(), $crate::__base_scheduler::FileOptions::READ, &$crate::__base_scheduler::Cancellation::never()).await.unwrap();
                 $crate::file::write_error(scheduler, &read_only).await;
                 scheduler.file_close_submit(read_only).await.unwrap();
             },
@@ -60,13 +60,13 @@ macro_rules! __file_test_cases {
             fn $name() {
                 $run(async |$fixture| {
                     use $crate::FileTestFixture as _;
-                    use $crate::__core_scheduler::{FileClose as _, FileSeek as _};
+                    use $crate::__base_scheduler::{FileClose as _, FileSeek as _};
                     let $scheduler = $fixture.scheduler();
                     let $file = $crate::file::create($scheduler, $fixture.path(), || $fixture.assert_absent()).await;
                     $fixture.assert_contents(b"");
                     $crate::file::write($scheduler, &$file, b"abcdef").await;
                     $fixture.assert_contents(b"abcdef");
-                    $scheduler.file_seek(&$file, ::std::io::SeekFrom::Start(0), &$crate::__core_scheduler::Cancellation::never()).await.unwrap();
+                    $scheduler.file_seek(&$file, ::std::io::SeekFrom::Start(0), &$crate::__base_scheduler::Cancellation::never()).await.unwrap();
                     $body
                     $scheduler.file_close($file).await.unwrap();
                 });

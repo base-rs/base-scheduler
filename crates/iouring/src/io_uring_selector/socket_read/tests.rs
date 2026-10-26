@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use super::*;
-use core_scheduler_selector::{SelectorDriver, SelectorWorker};
+use base_scheduler_selector::{SelectorDriver, SelectorWorker};
 use futures_lite::future::{block_on, poll_once};
 use std::{
     io::Write,

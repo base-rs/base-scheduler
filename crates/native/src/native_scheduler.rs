@@ -2,8 +2,8 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::{NativeExecutorOptions, NativeOptions, NativeTask, ReadinessSelector};
-use core_scheduler::{Spawn, SpawnError};
-use core_scheduler_selector::{Selector, SelectorOptions};
+use base_scheduler::{Spawn, SpawnError};
+use base_scheduler_selector::{Selector, SelectorOptions};
 use std::{future::Future, io};
 
 /// Native task execution and timers composed with explicitly selected I/O capabilities.
@@ -62,7 +62,7 @@ impl<S: Selector> NativeScheduler<S> {
     /// Compose one independently owned I/O driver per native task worker. Drivers are entered and driven by those workers; no separate I/O thread is started. Root and external operations use the selector's documented routing policy.
     ///
     /// The number of drivers must equal `options.workers`. Failed construction closes the selector and drops unstarted drivers. Worker shutdown continues driving accepted I/O until it retires, even after task abandonment.
-    pub fn with_drivers<D: core_scheduler_selector::SelectorDriver>(
+    pub fn with_drivers<D: base_scheduler_selector::SelectorDriver>(
         selector: S,
         drivers: Vec<D>,
         options: NativeExecutorOptions,

@@ -3,7 +3,7 @@
 
 //! Portable pooled input assertions through the public reader resources.
 use crate::socket::stream_pair;
-use core_scheduler::*;
+use base_scheduler::*;
 use futures_lite::future::poll_once;
 use std::{net::Shutdown, pin::pin};
 

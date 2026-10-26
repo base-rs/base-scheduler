@@ -9,7 +9,7 @@ use std::{
     time::Duration,
 };
 
-const BINARY: &str = env!("CARGO_BIN_EXE_core-scheduler-write-benchmark");
+const BINARY: &str = env!("CARGO_BIN_EXE_base-scheduler-write-benchmark");
 
 struct Server(Child);
 
@@ -69,7 +69,7 @@ fn backends() -> Vec<&'static str> {
     #[cfg(target_os = "linux")]
     {
         backends.extend(["native-monitor", "native-monitor-alternating"]);
-        if core_scheduler_iouring::IoUringSelector::new(Default::default()).is_ok() {
+        if base_scheduler_iouring::IoUringSelector::new(Default::default()).is_ok() {
             backends.extend([
                 "iouring-monitor",
                 "iouring-monitor-alternating",

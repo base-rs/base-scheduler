@@ -140,7 +140,7 @@ impl IoUringSelector {
         let mut cancelled = pin!(cancellation.cancelled());
         poll_fn(|context| {
             if cancelled.as_mut().poll(context).is_ready() {
-                return Poll::Ready(Err(core_scheduler::Cancelled.into()));
+                return Poll::Ready(Err(base_scheduler::Cancelled.into()));
             }
             self.check_monitor(state)?;
             self.poll_monitor_wait(monitor, controller, &mut wait, context)
@@ -261,7 +261,7 @@ impl IoUringSelector {
                         // Retain the original route until this operation completes. A wake retries the syscall before touching readiness bookkeeping.
                         let controller = route.get_or_insert_with(|| self.route_ref());
                         if cancelled.as_mut().poll(context).is_ready() {
-                            return Poll::Ready(Err(core_scheduler::Cancelled.into()));
+                            return Poll::Ready(Err(base_scheduler::Cancelled.into()));
                         }
                         std::task::ready!(
                             self.poll_monitor_wait(monitor, controller, &mut wait, context)

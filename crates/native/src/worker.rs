@@ -56,7 +56,7 @@ struct LocalWorker {
     scheduler: Weak<Shared>,
     ready: Worker<Runnable>,
     current: Worker<Runnable>,
-    timers: core_scheduler_timers::local::TimerQueue<Waker>,
+    timers: base_scheduler_timers::local::TimerQueue<Waker>,
 }
 
 thread_local! {
@@ -78,7 +78,7 @@ pub(crate) fn assert_outside_worker() {
 pub(crate) fn timers<T>(
     shared: &Arc<Shared>,
     owner: Option<usize>,
-    apply: impl FnOnce(usize, &mut core_scheduler_timers::local::TimerQueue<Waker>) -> T,
+    apply: impl FnOnce(usize, &mut base_scheduler_timers::local::TimerQueue<Waker>) -> T,
 ) -> Option<T> {
     CURRENT_WORKER.with(|current| {
         let mut current = current.borrow_mut();
@@ -218,7 +218,7 @@ fn find_work(shared: &Shared, iteration: usize) -> Steal<Runnable> {
 }
 
 fn drive(
-    driver: &mut Option<&mut dyn core_scheduler_selector::SelectorWorker>,
+    driver: &mut Option<&mut dyn base_scheduler_selector::SelectorWorker>,
     timeout: Option<Duration>,
 ) {
     if let Some(active) = driver.as_mut() {
@@ -238,13 +238,13 @@ pub(crate) fn run(shared: Arc<Shared>, identifier: usize, queues: [Worker<Runnab
     run_loop(shared, identifier, queues, None);
 }
 
-pub(crate) fn run_driven<D: core_scheduler_selector::SelectorDriver>(
+pub(crate) fn run_driven<D: base_scheduler_selector::SelectorDriver>(
     shared: Arc<Shared>,
     identifier: usize,
     queues: [Worker<Runnable>; 2],
     driver: D,
 ) {
-    use core_scheduler_selector::SelectorWorker;
+    use base_scheduler_selector::SelectorWorker;
     let mut driver = driver.enter();
     shared.workers[identifier]
         .driver_waker
@@ -257,7 +257,7 @@ fn run_loop(
     shared: Arc<Shared>,
     identifier: usize,
     [ready, current]: [Worker<Runnable>; 2],
-    mut driver: Option<&mut dyn core_scheduler_selector::SelectorWorker>,
+    mut driver: Option<&mut dyn base_scheduler_selector::SelectorWorker>,
 ) {
     let worker = &shared.workers[identifier];
     worker
@@ -270,7 +270,7 @@ fn run_loop(
             scheduler: Arc::downgrade(&shared),
             ready,
             current,
-            timers: core_scheduler_timers::local::TimerQueue::with_capacity(shared.timer_capacity),
+            timers: base_scheduler_timers::local::TimerQueue::with_capacity(shared.timer_capacity),
         }))
     });
     let mut iteration = 0usize;

@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use super::*;
-use core_scheduler::{IoBuffers, IoBuffersMut};
+use base_scheduler::{IoBuffers, IoBuffersMut};
 use futures_lite::future::{block_on, poll_once};
 
 #[test]

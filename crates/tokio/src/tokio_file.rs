@@ -7,23 +7,23 @@ use std::{fs::File, sync::Arc};
 ///
 /// The backend privately retains the file while an operation uses it. Dropping an operation future does not establish completion; await the operation before explicitly closing the file. Cancellation-aware work can first receive a cooperative cancellation request; accepted submission-only work retains the descriptor until it finishes. Ordinary handle destruction releases ownership without waiting or reporting close errors.
 ///
-/// Open files through [`FileOpen::file_open`](core_scheduler::FileOpen::file_open). Native file import and access are deliberately unavailable: externally configured append flags or descriptor aliases would bypass positioned-write and exclusive-close guarantees.
+/// Open files through [`FileOpen::file_open`](base_scheduler::FileOpen::file_open). Native file import and access are deliberately unavailable: externally configured append flags or descriptor aliases would bypass positioned-write and exclusive-close guarantees.
 ///
 /// ```compile_fail
-/// use core_scheduler_tokio::TokioFile;
+/// use base_scheduler_tokio::TokioFile;
 /// fn duplicate(file: &TokioFile) -> TokioFile {
 ///     file.clone() // Cloning this reference cannot produce another owned handle.
 /// }
 /// ```
 ///
 /// ```compile_fail
-/// use core_scheduler_tokio::TokioFile;
+/// use base_scheduler_tokio::TokioFile;
 /// let append_file = std::fs::OpenOptions::new().append(true).open("log").unwrap();
 /// let file = TokioFile::from(append_file);
 /// ```
 ///
 /// ```compile_fail
-/// use core_scheduler_tokio::TokioFile;
+/// use base_scheduler_tokio::TokioFile;
 /// fn native(file: &TokioFile) -> &std::fs::File {
 ///     file.as_ref()
 /// }

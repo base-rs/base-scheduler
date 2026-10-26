@@ -12,7 +12,7 @@ fn rejected_readiness_admission_returns_the_unchanged_owner() {
         .flat_map(|payload| (0..5).map(move |mode| (payload, mode)))
     {
         let (selector, mut driver) = pair(1);
-        let (sender, receiver) = block_on(core_scheduler_conformance::socket::stream_pair(
+        let (sender, receiver) = block_on(base_scheduler_conformance::socket::stream_pair(
             &selector,
             SocketDomain::Ipv4,
         ));
@@ -89,7 +89,7 @@ fn taking_a_readiness_reply_preserves_the_owned_input_until_request_disposal() {
         }
     }
     let (selector, mut driver) = pair(1);
-    let (sender, receiver) = block_on(core_scheduler_conformance::socket::stream_pair(
+    let (sender, receiver) = block_on(base_scheduler_conformance::socket::stream_pair(
         &selector,
         SocketDomain::Ipv4,
     ));
@@ -130,7 +130,7 @@ fn taking_a_readiness_reply_preserves_the_owned_input_until_request_disposal() {
 #[test]
 fn unpublished_payload_requests_return_the_original_owner() {
     let (selector, mut driver) = pair(1);
-    let (sender, receiver) = block_on(core_scheduler_conformance::socket::stream_pair(
+    let (sender, receiver) = block_on(base_scheduler_conformance::socket::stream_pair(
         &selector,
         SocketDomain::Ipv4,
     ));
@@ -184,7 +184,7 @@ fn detaching_payload_failure_notification_preserves_ownership() {
     unsafe impl IoBuf for Input {}
     unsafe impl IoBufMut for Input {}
     let (selector, mut driver) = pair(1);
-    let (sender, receiver) = block_on(core_scheduler_conformance::socket::stream_pair(
+    let (sender, receiver) = block_on(base_scheduler_conformance::socket::stream_pair(
         &selector,
         SocketDomain::Ipv4,
     ));

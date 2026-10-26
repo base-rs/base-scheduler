@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::{BlockingError, TaskError};
+use base_scheduler::{BlockingError, TaskError};
 use std::error::Error;
 
 #[test]

@@ -1,9 +1,9 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::*;
-use core_scheduler_direct::DirectScheduler;
-use core_scheduler_examples::{datagrams, frames};
+use base_scheduler::*;
+use base_scheduler_direct::DirectScheduler;
+use base_scheduler_examples::{datagrams, frames};
 use futures_lite::future::block_on;
 use std::{
     collections::VecDeque,

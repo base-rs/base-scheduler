@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler_native::NativeScheduler;
+use base_scheduler_native::NativeScheduler;
 
 fn run(test: impl AsyncFnOnce(&NativeScheduler) + Send + 'static) {
     let (done, completion) = std::sync::mpsc::channel();
@@ -9,7 +9,7 @@ fn run(test: impl AsyncFnOnce(&NativeScheduler) + Send + 'static) {
         let _ = done.send(std::panic::catch_unwind(std::panic::AssertUnwindSafe(
             || {
                 let scheduler =
-                    NativeScheduler::with_options(core_scheduler_native::NativeOptions {
+                    NativeScheduler::with_options(base_scheduler_native::NativeOptions {
                         workers: 1,
                         ..Default::default()
                     })
@@ -32,12 +32,12 @@ fn run(test: impl AsyncFnOnce(&NativeScheduler) + Send + 'static) {
         std::panic::resume_unwind(payload);
     }
 }
-core_scheduler_conformance::process_wait_tests!(run: run);
+base_scheduler_conformance::process_wait_tests!(run: run);
 
 #[test]
 fn pending_shutdown() {
     run(async |scheduler| {
-        core_scheduler_conformance::process_wait::shutdown(
+        base_scheduler_conformance::process_wait::shutdown(
             scheduler,
             || scheduler.close(),
             scheduler.shutdown(),
@@ -48,7 +48,7 @@ fn pending_shutdown() {
 #[test]
 fn dropped_and_forgotten_waits() {
     run(async |scheduler| {
-        core_scheduler_conformance::process_wait::abandonment(scheduler, scheduler.shutdown())
+        base_scheduler_conformance::process_wait::abandonment(scheduler, scheduler.shutdown())
             .await;
     });
 }
@@ -57,7 +57,7 @@ fn dropped_and_forgotten_waits() {
 #[test]
 fn suspended_wait_after_shutdown() {
     run(async |scheduler| {
-        core_scheduler_conformance::process_wait::suspended_shutdown(
+        base_scheduler_conformance::process_wait::suspended_shutdown(
             scheduler,
             scheduler.shutdown(),
         )

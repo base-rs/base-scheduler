@@ -5,7 +5,7 @@ use crate::{
     DirectScheduler,
     process_io::{Process, ProcessId, operation_result},
 };
-use core_scheduler::{
+use base_scheduler::{
     Cancellation, OperationResult, ProcessWait, ProcessWaitFlags, ProcessWaitResult,
 };
 
@@ -24,7 +24,7 @@ impl ProcessWait for DirectScheduler {
             .execute((), cancellation, move |_| process.wait(false))
             .await;
         match result {
-            Err(core_scheduler::OperationError::Io(error)) => {
+            Err(base_scheduler::OperationError::Io(error)) => {
                 operation_result(Err(error), cancellation)
             }
             result => result,

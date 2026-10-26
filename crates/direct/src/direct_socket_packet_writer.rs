@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::{DirectScheduler, DirectSocket};
-use core_scheduler::{
+use base_scheduler::{
     BufferResult, Cancellation, IoBuf, OperationResult, SocketAddress, SocketPacketWriter,
     SocketSendFlags, SocketType,
 };
@@ -68,8 +68,8 @@ impl SocketPacketWriter for DirectSocketPacketWriter<'_> {
     async fn write_vectored_with_flags(
         &mut self,
         buffers: &[std::io::IoSlice<'_>],
-        address: Option<core_scheduler::SocketAddress>,
-        flags: core_scheduler::SocketSendFlags,
+        address: Option<base_scheduler::SocketAddress>,
+        flags: base_scheduler::SocketSendFlags,
         cancellation: &Cancellation,
     ) -> OperationResult<usize> {
         cancellation.check()?;
@@ -82,11 +82,11 @@ impl SocketPacketWriter for DirectSocketPacketWriter<'_> {
             .await
     }
 
-    async fn write_owned_vectored<Buffers: core_scheduler::IoBufSequence>(
+    async fn write_owned_vectored<Buffers: base_scheduler::IoBufSequence>(
         &mut self,
         buffers: Buffers,
-        address: Option<core_scheduler::SocketAddress>,
-        flags: core_scheduler::SocketSendFlags,
+        address: Option<base_scheduler::SocketAddress>,
+        flags: base_scheduler::SocketSendFlags,
         cancellation: &Cancellation,
     ) -> (OperationResult<usize>, Buffers) {
         if self.closing {

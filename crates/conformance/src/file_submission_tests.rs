@@ -7,8 +7,8 @@ macro_rules! file_submission_tests {
     (run: $run:path $(,)?) => {
         $crate::__file_test_cases! { $run;
             bound_file_submissions_separate_acceptance_from_owner_collection => |fixture, scheduler, file| {
-                use $crate::__core_scheduler::{FileReader as _, FileReading as _, FileWriter as _, FileWriting as _};
-                let never = $crate::__core_scheduler::Cancellation::never();
+                use $crate::__base_scheduler::{FileReader as _, FileReading as _, FileWriter as _, FileWriting as _};
+                let never = $crate::__base_scheduler::Cancellation::never();
                 let mut reader = scheduler.file_reader(&file).unwrap();
                 let mut writer = scheduler.file_writer(&file).unwrap();
                 let storage = ::std::vec![0; 3];
@@ -33,11 +33,11 @@ macro_rules! file_submission_tests {
                 writer.close().await.unwrap();
             },
             submission_is_lazy_and_pre_cancelled_admission_returns_the_owner => |fixture, scheduler, file| {
-                use $crate::__core_scheduler::{FileReader as _, FileReading as _, FileWriter as _, FileWriting as _};
+                use $crate::__base_scheduler::{FileReader as _, FileReading as _, FileWriter as _, FileWriting as _};
                 let mut reader = scheduler.file_reader(&file).unwrap();
                 let mut writer = scheduler.file_writer(&file).unwrap();
-                let never = $crate::__core_scheduler::Cancellation::never();
-                let cancelled = $crate::__core_scheduler::Cancellation::new();
+                let never = $crate::__base_scheduler::Cancellation::never();
+                let cancelled = $crate::__base_scheduler::Cancellation::new();
                 cancelled.cancel();
                 drop(reader.read_submit(::std::vec![0;3], &never));
                 drop(writer.write_submit(::std::vec![0;3], &never));
@@ -49,7 +49,7 @@ macro_rules! file_submission_tests {
                     .unwrap();
                 assert!(matches!(
                     error,
-                    $crate::__core_scheduler::OperationError::Cancelled(_)
+                    $crate::__base_scheduler::OperationError::Cancelled(_)
                 ));
                 assert_eq!(buffer, [7; 3]);
                 assert!(
@@ -72,10 +72,10 @@ macro_rules! file_submission_tests {
                 writer.close().await.unwrap();
             },
             submitted_reads_and_writes_return_the_original_storage => |fixture, scheduler, file| {
-                use $crate::__core_scheduler::{FileReader as _, FileReading as _, FileWriter as _, FileWriting as _};
+                use $crate::__base_scheduler::{FileReader as _, FileReading as _, FileWriter as _, FileWriting as _};
                 let mut reader = scheduler.file_reader(&file).unwrap();
                 let mut writer = scheduler.file_writer(&file).unwrap();
-                let never = $crate::__core_scheduler::Cancellation::never();
+                let never = $crate::__base_scheduler::Cancellation::never();
                 let buffer = ::std::vec![0;3];
                 let pointer = buffer.as_ptr();
                 let completion = reader.read_submit(buffer, &never)
@@ -131,10 +131,10 @@ macro_rules! file_submission_tests {
                 writer.close().await.unwrap();
             },
             accepted_write_progresses_without_polling_its_completion => |fixture, scheduler, file| {
-                use $crate::__core_scheduler::{FileReader as _, FileReading as _, FileWriter as _, FileWriting as _};
+                use $crate::__base_scheduler::{FileReader as _, FileReading as _, FileWriter as _, FileWriting as _};
                 let mut reader = scheduler.file_reader(&file).unwrap();
                 let mut writer = scheduler.file_writer(&file).unwrap();
-                let never = $crate::__core_scheduler::Cancellation::never();
+                let never = $crate::__base_scheduler::Cancellation::never();
                 let completion = writer.write_at_submit(b"UVWXYZ".to_vec(), 0, &never)
                     .await
                     .unwrap();
@@ -157,8 +157,8 @@ macro_rules! file_submission_tests {
                 writer.close().await.unwrap();
             },
             close_retires_accepted_work_before_its_completion_is_collected => |fixture, scheduler, file| {
-                use $crate::__core_scheduler::{FileWriter as _, FileWriting as _};
-                let never = $crate::__core_scheduler::Cancellation::never();
+                use $crate::__base_scheduler::{FileWriter as _, FileWriting as _};
+                let never = $crate::__base_scheduler::Cancellation::never();
                 let mut writer = scheduler.file_writer(&file).unwrap();
                 let buffer = b"UVWXYZ".to_vec();
                 let pointer = buffer.as_ptr();
@@ -170,11 +170,11 @@ macro_rules! file_submission_tests {
                 fixture.assert_contents(b"UVWXYZ");
             },
             dropping_an_unpolled_accepted_completion_releases_only_after_retirement => |fixture, scheduler, file| {
-                use $crate::__core_scheduler::{FileReader as _, FileReading as _, FileWriter as _, FileWriting as _};
+                use $crate::__base_scheduler::{FileReader as _, FileReading as _, FileWriter as _, FileWriting as _};
                 let mut reader = scheduler.file_reader(&file).unwrap();
                 let mut writer = scheduler.file_writer(&file).unwrap();
-                let never = $crate::__core_scheduler::Cancellation::never();
-                let pool = $crate::__core_scheduler::HeapBufferPool::new(1, 6).unwrap();
+                let never = $crate::__base_scheduler::Cancellation::never();
+                let pool = $crate::__base_scheduler::HeapBufferPool::new(1, 6).unwrap();
                 let buffer = pool.try_acquire().unwrap();
                 let completion = writer.write_at_submit(buffer, 0, &never)
                     .await

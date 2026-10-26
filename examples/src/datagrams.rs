@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::{Cancellation, OperationResult, SocketPacketReader, SocketRecvMessage, Spawn};
+use base_scheduler::{Cancellation, OperationResult, SocketPacketReader, SocketRecvMessage, Spawn};
 use std::{collections::VecDeque, io};
 
 /// Transfer complete messages, including peer metadata, to bounded independent tasks. The receiver never copies payloads for handoff.

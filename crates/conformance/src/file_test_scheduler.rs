@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::{
+use base_scheduler::{
     FileClose, FileOpen, FileReading, FileSeek, FileStat, FileSync, FileTruncate, FileWriting,
 };
 

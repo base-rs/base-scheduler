@@ -2,8 +2,8 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::{NativeSocket, ReadinessSelector};
-use core_scheduler::*;
-use core_scheduler_conformance::{socket, socket_stream_writing};
+use base_scheduler::*;
+use base_scheduler_conformance::{socket, socket_stream_writing};
 use futures_lite::future::block_on;
 use std::io::{self, IoSlice, IoSliceMut};
 

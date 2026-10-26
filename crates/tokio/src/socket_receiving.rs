@@ -5,7 +5,7 @@ use crate::TokioScheduler;
 use crate::tokio_socket_packet_reader::TokioSocketPacketReader;
 use crate::tokio_socket_packet_writer::TokioSocketPacketWriter;
 use crate::tokio_socket_stream_reader::TokioSocketStreamReader;
-use core_scheduler::*;
+use base_scheduler::*;
 use std::io;
 impl SocketStreamReading for TokioScheduler {
     fn socket_stream_reader<'scheduler>(

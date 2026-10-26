@@ -92,12 +92,12 @@ mod tests {
             socket::retain_socket,
             tests::{Failures, drive, pair},
         };
-        use core_scheduler::*;
+        use base_scheduler::*;
         use futures_lite::future::{block_on, poll_once};
         use std::{io, time::Duration};
 
         let (selector, mut driver) = pair(16);
-        let (sender, receiver) = block_on(core_scheduler_conformance::socket::stream_pair(
+        let (sender, receiver) = block_on(base_scheduler_conformance::socket::stream_pair(
             &selector,
             SocketDomain::Ipv4,
         ));
@@ -133,7 +133,7 @@ mod tests {
     #[test]
     fn issuance_handles_full_submission_queues_and_abandoned_waiters() {
         use super::super::{socket::retain_socket, tests::drive};
-        use core_scheduler::*;
+        use base_scheduler::*;
         use futures_lite::future::{block_on, poll_once};
         use std::time::Duration;
 
@@ -142,12 +142,12 @@ mod tests {
             ..Default::default()
         })
         .unwrap();
-        let (sender, receiver) = block_on(core_scheduler_conformance::socket::stream_pair(
+        let (sender, receiver) = block_on(base_scheduler_conformance::socket::stream_pair(
             &selector,
             SocketDomain::Ipv4,
         ));
         let (other_sender, other_receiver) = block_on(
-            core_scheduler_conformance::socket::stream_pair(&selector, SocketDomain::Ipv4),
+            base_scheduler_conformance::socket::stream_pair(&selector, SocketDomain::Ipv4),
         );
         retain_socket(&sender)
             .get_ref()
@@ -184,12 +184,12 @@ mod tests {
     #[test]
     fn terminal_failure_before_issuance_still_resolves_accepted_submission() {
         use super::super::tests::{drive, pair};
-        use core_scheduler::*;
+        use base_scheduler::*;
         use futures_lite::future::{block_on, poll_once};
         use std::time::Duration;
 
         let (selector, mut driver) = pair(16);
-        let (sender, receiver) = block_on(core_scheduler_conformance::socket::stream_pair(
+        let (sender, receiver) = block_on(base_scheduler_conformance::socket::stream_pair(
             &selector,
             SocketDomain::Ipv4,
         ));
@@ -219,7 +219,7 @@ mod tests {
             Command, Controller,
             tests::{Failures, drive, file, pair},
         };
-        use core_scheduler::*;
+        use base_scheduler::*;
         use futures_lite::future::{block_on, poll_once};
         use std::{
             future::Future,
@@ -249,7 +249,7 @@ mod tests {
 
         let (selector, mut driver) = pair(16);
         let (_directory, file) = file(&selector);
-        let (sender, receiver) = block_on(core_scheduler_conformance::socket::stream_pair(
+        let (sender, receiver) = block_on(base_scheduler_conformance::socket::stream_pair(
             &selector,
             SocketDomain::Ipv4,
         ));

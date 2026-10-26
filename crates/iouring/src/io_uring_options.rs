@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler_selector::SelectorOptions;
+use base_scheduler_selector::SelectorOptions;
 
 /// Limits for the ring, retained requests, and readiness fallback.
 #[derive(Clone, Copy, Debug)]

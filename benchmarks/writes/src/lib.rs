@@ -102,7 +102,7 @@ pub fn run(args: &[String]) -> Result<()> {
                 duration,
             ))
         }
-        _ => Err("Usage: core-scheduler-write-benchmark server BACKEND WORKERS CONNECTIONS BYTES CHUNKS WORK SEND_BUFFER\n       core-scheduler-write-benchmark client ADDRESS WORKERS CONNECTIONS BYTES CHUNKS WORK WARMUP_SECONDS MEASURE_SECONDS\nBackends: tokio, tokio-monitor, tokio-writer, native-monitor, iouring-monitor, iouring-writer. SEND_BUFFER=0 uses the OS default; otherwise it requests SO_SNDBUF bytes. Native backends require Linux.".into()),
+        _ => Err("Usage: base-scheduler-write-benchmark server BACKEND WORKERS CONNECTIONS BYTES CHUNKS WORK SEND_BUFFER\n       base-scheduler-write-benchmark client ADDRESS WORKERS CONNECTIONS BYTES CHUNKS WORK WARMUP_SECONDS MEASURE_SECONDS\nBackends: tokio, tokio-monitor, tokio-writer, native-monitor, iouring-monitor, iouring-writer. SEND_BUFFER=0 uses the OS default; otherwise it requests SO_SNDBUF bytes. Native backends require Linux.".into()),
     }
 }
 

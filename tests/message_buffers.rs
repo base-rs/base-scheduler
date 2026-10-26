@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::{
+use base_scheduler::{
     Cancellation, IoBufSequence, IoBufSequenceMut, IoBuffers, IoBuffersMut, OperationError,
     OperationResult, SocketOperation, SocketRecvFlags, SocketRecvResult, SocketSendFlags,
 };
@@ -16,7 +16,7 @@ use std::time::Duration;
 
 struct SocketMessage<Buffers = Vec<Vec<u8>>> {
     buffers: Buffers,
-    address: Option<core_scheduler::SocketAddress>,
+    address: Option<base_scheduler::SocketAddress>,
 }
 
 // A deliberately small message backend: one partial transfer, with no I/O-vector allocation.

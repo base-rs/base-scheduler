@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::TaskError;
+use base_scheduler::TaskError;
 use std::{
     future::Future,
     pin::Pin,

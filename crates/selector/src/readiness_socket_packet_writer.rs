@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::{NativeSocket, ReadinessSelector};
-use core_scheduler::{
+use base_scheduler::{
     BufferResult, Cancellation, IoBuf, OperationResult, SocketAddress, SocketPacketWriter,
     SocketSendFlags, SocketType,
 };
@@ -92,7 +92,7 @@ impl SocketPacketWriter for ReadinessSocketPacketWriter<'_> {
             .await
     }
 
-    async fn write_owned_vectored<Buffers: core_scheduler::IoBufSequence>(
+    async fn write_owned_vectored<Buffers: base_scheduler::IoBufSequence>(
         &mut self,
         buffers: Buffers,
         address: Option<SocketAddress>,

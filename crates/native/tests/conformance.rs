@@ -1,11 +1,11 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::{
+use base_scheduler::{
     Blocking, Cancellation, FileClose, FileMetadata, FileOpen, FileOptions, FileStat,
 };
-use core_scheduler_conformance::{blocking, file};
-use core_scheduler_native::{NativeOptions, NativeScheduler};
+use base_scheduler_conformance::{blocking, file};
+use base_scheduler_native::{NativeOptions, NativeScheduler};
 use futures_lite::future::block_on;
 use std::{sync::mpsc, time::Duration};
 
@@ -27,7 +27,7 @@ struct FileFixture {
     directory: tempfile::TempDir,
     path: std::path::PathBuf,
 }
-impl core_scheduler_conformance::FileTestFixture for FileFixture {
+impl base_scheduler_conformance::FileTestFixture for FileFixture {
     type Scheduler = NativeScheduler;
     fn scheduler(&self) -> &NativeScheduler {
         &self.scheduler
@@ -66,7 +66,7 @@ fn run_file(test: impl AsyncFnOnce(&FileFixture) + Send + 'static) {
 }
 mod files {
     use super::*;
-    use core_scheduler_conformance as conformance;
+    use base_scheduler_conformance as conformance;
     // Public macros must resolve support paths even when a caller shadows `std`.
     mod std {}
     conformance::file_tests!(run: run_file);
@@ -118,7 +118,7 @@ fn files_move_between_threads_and_compatible_scheduler_instances() {
 #[cfg(unix)]
 #[test]
 fn unix_positioned_operations_preserve_the_shared_cursor() {
-    use core_scheduler::FileSeek;
+    use base_scheduler::FileSeek;
     use std::io::SeekFrom;
 
     block_on(async {
@@ -163,7 +163,7 @@ fn unix_positioned_operations_preserve_the_shared_cursor() {
 struct QueueFixture(NativeScheduler);
 struct Hold {
     release: Option<mpsc::Sender<()>>,
-    _handle: core_scheduler_native::BlockingTask<()>,
+    _handle: base_scheduler_native::BlockingTask<()>,
 }
 impl Drop for Hold {
     fn drop(&mut self) {
@@ -234,11 +234,11 @@ fn run_queue(test: impl AsyncFnOnce(&QueueFixture) + Send + 'static) {
 }
 mod blocking_work {
     use super::*;
-    core_scheduler_conformance::blocking_tests!(run: run_blocking);
+    base_scheduler_conformance::blocking_tests!(run: run_blocking);
 }
 mod blocking_queue {
     use super::*;
-    core_scheduler_conformance::blocking_queue_tests!(run: run_queue);
+    base_scheduler_conformance::blocking_queue_tests!(run: run_queue);
 }
 
 #[derive(Clone, Copy)]
@@ -256,7 +256,7 @@ struct IncorrectQueue {
 impl Blocking for IncorrectQueue {
     type Handle<T>
         = std::pin::Pin<
-        Box<dyn std::future::Future<Output = Result<T, core_scheduler::TaskError>> + Send>,
+        Box<dyn std::future::Future<Output = Result<T, base_scheduler::TaskError>> + Send>,
     >
     where
         T: Send + 'static;
@@ -264,7 +264,7 @@ impl Blocking for IncorrectQueue {
         &self,
         operation: F,
         cancellation: &Cancellation,
-    ) -> Result<Self::Handle<T>, core_scheduler::BlockingError>
+    ) -> Result<Self::Handle<T>, base_scheduler::BlockingError>
     where
         F: FnOnce() -> T + Send + 'static,
         T: Send + 'static,
@@ -277,7 +277,7 @@ impl Blocking for IncorrectQueue {
                 cancellation.cancelled().await;
             }
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(operation))
-                .map_err(core_scheduler::TaskError::Panicked);
+                .map_err(base_scheduler::TaskError::Panicked);
             return Ok(Box::pin(std::future::ready(result)));
         }
         let never = Cancellation::never();

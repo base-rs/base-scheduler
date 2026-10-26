@@ -3,7 +3,7 @@
 
 use crate::operation_state::{OperationGuard, OperationState};
 use crate::{NativeFile, ReadinessSelector};
-use core_scheduler::{BufferResult, Cancellation, IoBuf, OperationError};
+use base_scheduler::{BufferResult, Cancellation, IoBuf, OperationError};
 use std::{future::Future, io};
 
 // Reader and writer lanes share admission and ownership retirement, without a public monitor protocol.

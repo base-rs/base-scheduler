@@ -7,23 +7,23 @@ use std::{fs::File, sync::Arc};
 ///
 /// The backend privately retains the file while an operation uses it. Dropping an operation future does not establish completion; await the operation before explicitly closing the file. Cancellation-aware work can first receive a cooperative cancellation request; accepted submission-only work retains the descriptor until it finishes. Ordinary handle destruction releases ownership without waiting or reporting close errors.
 ///
-/// Open files through [`FileOpen::file_open`](core_scheduler::FileOpen::file_open). Safe native import and access are unavailable because external append flags or descriptor aliases would bypass positioned-write and exclusive-close guarantees. Backend integrations can explicitly retain the native file through [`Self::retain_native`].
+/// Open files through [`FileOpen::file_open`](base_scheduler::FileOpen::file_open). Safe native import and access are unavailable because external append flags or descriptor aliases would bypass positioned-write and exclusive-close guarantees. Backend integrations can explicitly retain the native file through [`Self::retain_native`].
 ///
 /// ```compile_fail
-/// use core_scheduler_selector::NativeFile;
+/// use base_scheduler_selector::NativeFile;
 /// fn duplicate(file: &NativeFile) -> NativeFile {
 ///     file.clone() // Cloning this reference cannot produce another owned handle.
 /// }
 /// ```
 ///
 /// ```compile_fail
-/// use core_scheduler_selector::NativeFile;
+/// use base_scheduler_selector::NativeFile;
 /// let append_file = std::fs::OpenOptions::new().append(true).open("log").unwrap();
 /// let file = NativeFile::from(append_file);
 /// ```
 ///
 /// ```compile_fail
-/// use core_scheduler_selector::NativeFile;
+/// use base_scheduler_selector::NativeFile;
 /// fn native(file: &NativeFile) -> &std::fs::File {
 ///     file.as_ref()
 /// }

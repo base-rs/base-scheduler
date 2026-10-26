@@ -5,7 +5,7 @@ use crate::{
     IoUringDriver,
     io_uring_selector::{Command, Controller, DriverGroup, multishot::pool::Pool},
 };
-use core_scheduler_selector::SelectorWorker;
+use base_scheduler_selector::SelectorWorker;
 use std::{
     cell::{Cell, RefCell},
     collections::VecDeque,

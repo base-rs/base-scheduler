@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::{DirectScheduler, thread};
-use core_scheduler::{Cancellation, Clock, OperationResult};
+use base_scheduler::{Cancellation, Clock, OperationResult};
 use std::{
     collections::BTreeMap,
     future::{Future, poll_fn},
@@ -94,7 +94,7 @@ impl TimerService {
         let mut started = self.started.lock().unwrap();
         if !*started {
             let shared = Arc::clone(&self.shared);
-            thread::start("core-direct-timer", move || work(shared))?;
+            thread::start("base-direct-timer", move || work(shared))?;
             *started = true;
         }
         Ok(())
@@ -120,7 +120,7 @@ impl TimerService {
                 return Poll::Ready(Ok(()));
             }
             if cancelled.as_mut().poll(context).is_ready() {
-                return Poll::Ready(Err(core_scheduler::Cancelled.into()));
+                return Poll::Ready(Err(base_scheduler::Cancelled.into()));
             }
             // Clone the current waker and release any displaced waker outside the timer lock.
             let waker = context.waker().clone();

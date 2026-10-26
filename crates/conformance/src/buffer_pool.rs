@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 //! Shared ownership and backpressure checks for backend-created pools.
-use core_scheduler::*;
+use base_scheduler::*;
 use futures_lite::future::poll_once;
 use std::pin::pin;
 

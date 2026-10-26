@@ -5,7 +5,7 @@ mod after;
 mod allocation;
 pub use after::After;
 
-use core_scheduler::{Cancellation, Spawn, Timers};
+use base_scheduler::{Cancellation, Spawn, Timers};
 use std::{
     future::{Future, poll_fn},
     hint::black_box,
@@ -204,7 +204,7 @@ fn cpu_time() -> f64 {
     }
 }
 
-async fn probe(future: impl Future<Output = core_scheduler::OperationResult<()>>) -> bool {
+async fn probe(future: impl Future<Output = base_scheduler::OperationResult<()>>) -> bool {
     let mut future = pin!(future);
     poll_fn(|context| {
         Poll::Ready(match future.as_mut().poll(context) {

@@ -2,9 +2,9 @@
 // Copyright, 2026, by Samuel Williams.
 
 // These factories depend only on the public resource capabilities.
-use core_scheduler::*;
-use core_scheduler_native::{NativeExecutorOptions, NativeScheduler};
-use core_scheduler_selector::Selector;
+use base_scheduler::*;
+use base_scheduler_native::{NativeExecutorOptions, NativeScheduler};
+use base_scheduler_selector::Selector;
 use futures_lite::future::block_on;
 use std::{
     io::{self, IoSlice, IoSliceMut},

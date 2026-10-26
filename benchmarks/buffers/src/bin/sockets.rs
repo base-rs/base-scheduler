@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::*;
+use base_scheduler::*;
 #[path = "../multishot.rs"]
 mod multishot;
 use multishot::Multishot;
@@ -449,7 +449,7 @@ fn execute(args: &[String]) -> serde_json::Value {
     let mut result = match backend {
         "direct" => {
             let scheduler = Arc::new(
-                core_scheduler_direct::DirectScheduler::new(core_scheduler_direct::DirectOptions {
+                base_scheduler_direct::DirectScheduler::new(base_scheduler_direct::DirectOptions {
                     threads: workers,
                     capacity: 64,
                 })
@@ -467,7 +467,7 @@ fn execute(args: &[String]) -> serde_json::Value {
                 .enable_all()
                 .build()
                 .unwrap();
-            let scheduler = Arc::new(core_scheduler_tokio::TokioScheduler::new(
+            let scheduler = Arc::new(base_scheduler_tokio::TokioScheduler::new(
                 runtime.handle().clone(),
             ));
             let pool = scheduler.buffer_pool(options).unwrap();
@@ -477,8 +477,8 @@ fn execute(args: &[String]) -> serde_json::Value {
         }
         "native" => {
             let scheduler = Arc::new(
-                core_scheduler_native::NativeScheduler::with_options(
-                    core_scheduler_native::NativeOptions {
+                base_scheduler_native::NativeScheduler::with_options(
+                    base_scheduler_native::NativeOptions {
                         workers,
                         ..Default::default()
                     },
@@ -493,13 +493,13 @@ fn execute(args: &[String]) -> serde_json::Value {
         #[cfg(target_os = "linux")]
         "iouring" => {
             let (selector, drivers) =
-                core_scheduler_iouring::IoUringSelector::with_workers(Default::default(), workers)
+                base_scheduler_iouring::IoUringSelector::with_workers(Default::default(), workers)
                     .unwrap();
             let scheduler = Arc::new(
-                core_scheduler_native::NativeScheduler::with_drivers(
+                base_scheduler_native::NativeScheduler::with_drivers(
                     selector,
                     drivers,
-                    core_scheduler_native::NativeExecutorOptions {
+                    base_scheduler_native::NativeExecutorOptions {
                         workers,
                         ..Default::default()
                     },

@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler_direct::DirectScheduler;
+use base_scheduler_direct::DirectScheduler;
 
 fn run(test: impl AsyncFnOnce(&DirectScheduler) + Send + 'static) {
     let (done, completion) = std::sync::mpsc::channel();
@@ -27,12 +27,12 @@ fn run(test: impl AsyncFnOnce(&DirectScheduler) + Send + 'static) {
         std::panic::resume_unwind(payload);
     }
 }
-core_scheduler_conformance::process_wait_tests!(run: run);
+base_scheduler_conformance::process_wait_tests!(run: run);
 
 #[test]
 fn pending_shutdown() {
     run(async |scheduler| {
-        core_scheduler_conformance::process_wait::shutdown(
+        base_scheduler_conformance::process_wait::shutdown(
             scheduler,
             || scheduler.close(),
             scheduler.shutdown(),
@@ -43,7 +43,7 @@ fn pending_shutdown() {
 #[test]
 fn dropped_and_forgotten_waits() {
     run(async |scheduler| {
-        core_scheduler_conformance::process_wait::abandonment(scheduler, scheduler.shutdown())
+        base_scheduler_conformance::process_wait::abandonment(scheduler, scheduler.shutdown())
             .await;
     });
 }

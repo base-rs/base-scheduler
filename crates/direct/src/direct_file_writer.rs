@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::{DirectFile, DirectScheduler, file_state::FileState};
-use core_scheduler::{BufferResult, Cancellation, FileWriter, FileWriting, IoBuf, OperationError};
+use base_scheduler::{BufferResult, Cancellation, FileWriter, FileWriting, IoBuf, OperationError};
 use std::{future::Future, io};
 
 /// A sequential file writer bound to its constructing scheduler.

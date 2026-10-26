@@ -1,9 +1,9 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::*;
-use core_scheduler_direct::DirectScheduler;
-use core_scheduler_examples::stream;
+use base_scheduler::*;
+use base_scheduler_direct::DirectScheduler;
+use base_scheduler_examples::stream;
 use futures_lite::future::{block_on, poll_once};
 use std::{
     io::{self, Write},

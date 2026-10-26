@@ -3,11 +3,11 @@
 
 use crate::Interest;
 use crate::{IoUringSelector, MonitorStorage};
-use core_scheduler::{
+use base_scheduler::{
     BufferResult, Cancellation, IoBuf, OperationResult, SocketAddress, SocketPacketWriter,
     SocketSendFlags, SocketType,
 };
-use core_scheduler_selector::NativeSocket;
+use base_scheduler_selector::NativeSocket;
 use std::io::{self, IoSlice};
 
 /// A packet writer retaining one scheduler and writable monitor. All writes use a single nonblocking message-send operation, without payload allocation or packet splitting. Cancellation and send errors leave it usable.
@@ -95,7 +95,7 @@ impl SocketPacketWriter for IoUringSocketPacketWriter<'_> {
             .socket_monitor_sendmsg_poll(&mut self.monitor, buffers, address, flags, cancellation)
             .await
     }
-    async fn write_owned_vectored<Buffers: core_scheduler::IoBufSequence>(
+    async fn write_owned_vectored<Buffers: base_scheduler::IoBufSequence>(
         &mut self,
         buffers: Buffers,
         address: Option<SocketAddress>,

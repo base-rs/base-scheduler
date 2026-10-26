@@ -42,7 +42,7 @@ fn cached_readiness_does_not_delay_lifecycle_calls_or_invalid_operations() {
             );
 
             let (client, server) =
-                core_scheduler_conformance::socket::stream_pair(&scheduler, SocketDomain::Ipv4)
+                base_scheduler_conformance::socket::stream_pair(&scheduler, SocketDomain::Ipv4)
                     .await;
             let mut byte = [0];
             let mut read = std::pin::pin!(scheduler.socket_recv_poll(
@@ -123,7 +123,7 @@ fn socket_cleanup_is_independent_bounded_and_preserves_closed_admission_errors()
 fn accepted_shutdown_and_close_survive_abandonment_and_drain_during_shutdown() {
     for submit in [false, true] {
         let scheduler = scheduler(2);
-        let (client, server) = block_on(core_scheduler_conformance::socket::stream_pair(
+        let (client, server) = block_on(base_scheduler_conformance::socket::stream_pair(
             &scheduler,
             SocketDomain::Ipv4,
         ));
@@ -197,13 +197,13 @@ fn exclusive_close_rejects_retained_access_and_unpolled_close_drops_normally() {
 #[cfg(unix)]
 fn vectored_sends_preserve_short_counts_without_implicitly_advancing_the_owner() {
     let scheduler = scheduler(1);
-    let (client, server) = block_on(core_scheduler_conformance::socket::stream_pair(
+    let (client, server) = block_on(base_scheduler_conformance::socket::stream_pair(
         &scheduler,
         SocketDomain::Ipv4,
     ));
     client.get_ref().set_send_buffer_size(4096).unwrap();
     server.get_ref().set_recv_buffer_size(4096).unwrap();
-    block_on(core_scheduler_conformance::socket_messages::partial_send(
+    block_on(base_scheduler_conformance::socket_messages::partial_send(
         &scheduler,
         &client,
         [vec![1; 2 * 1024 * 1024], vec![2; 2 * 1024 * 1024]],
@@ -219,7 +219,7 @@ fn closure_preserves_pending_io_and_rejects_new_operations() {
         block_on(async {
             let scheduler = scheduler(1);
             let (client, server) =
-                core_scheduler_conformance::socket::stream_pair(&scheduler, SocketDomain::Ipv4)
+                base_scheduler_conformance::socket::stream_pair(&scheduler, SocketDomain::Ipv4)
                     .await;
             let never = Cancellation::never();
             let buffer = vec![0; 8];
@@ -295,7 +295,7 @@ fn shutdown_drains_task_owned_io_after_explicit_cancellation() {
         block_on(async {
             let scheduler = Arc::new(scheduler(1));
             let (_client, server) =
-                core_scheduler_conformance::socket::stream_pair(&*scheduler, SocketDomain::Ipv4)
+                base_scheduler_conformance::socket::stream_pair(&*scheduler, SocketDomain::Ipv4)
                     .await;
             let cancellation = Cancellation::new();
             let child = cancellation.clone();
@@ -335,7 +335,7 @@ fn incompatible_runtime_rejects_operations_and_returns_original_owners() {
                 .unwrap();
             let other = TokioScheduler::new(runtime.handle().clone());
             let (client, server) =
-                core_scheduler_conformance::socket::stream_pair(&first, SocketDomain::Ipv4).await;
+                base_scheduler_conformance::socket::stream_pair(&first, SocketDomain::Ipv4).await;
             let never = Cancellation::never();
             let buffer = vec![7; 8];
             let allocation = buffer.as_ptr();
@@ -414,7 +414,7 @@ fn incompatible_runtime_rejects_operations_and_returns_original_owners() {
 fn native_cleanup_failure_is_reported_by_each_cleanup_operation() {
     for operation in 0..4 {
         let mut scheduler = scheduler(1);
-        let (client, server) = block_on(core_scheduler_conformance::socket::stream_pair(
+        let (client, server) = block_on(base_scheduler_conformance::socket::stream_pair(
             &scheduler,
             SocketDomain::Ipv4,
         ));
@@ -510,7 +510,7 @@ fn prepared_message_io_reuses_vectors_and_payload_without_fresh_allocations() {
         }
     }
     let scheduler = scheduler(1);
-    let (client, server) = block_on(core_scheduler_conformance::socket::stream_pair(
+    let (client, server) = block_on(base_scheduler_conformance::socket::stream_pair(
         &scheduler,
         SocketDomain::Ipv4,
     ));
@@ -608,7 +608,7 @@ fn socket_registration_uses_the_selected_runtime_under_another_ambient_host() {
         let scheduler = scheduler(1);
         let (client, server) = {
             let scope = ambient.enter();
-            let pair = block_on(core_scheduler_conformance::socket::stream_pair(
+            let pair = block_on(base_scheduler_conformance::socket::stream_pair(
                 &scheduler,
                 SocketDomain::Ipv4,
             ));
@@ -616,7 +616,7 @@ fn socket_registration_uses_the_selected_runtime_under_another_ambient_host() {
             pair
         };
         drop(ambient);
-        block_on(core_scheduler_conformance::socket::transfer(
+        block_on(base_scheduler_conformance::socket::transfer(
             &scheduler, &client, &server,
         ));
         block_on(scheduler.socket_close(client)).unwrap();
@@ -715,7 +715,7 @@ fn borrowed_sends_preserve_short_counts_and_cancel_when_the_send_queue_is_full()
         use std::io::IoSlice;
         for message in [false, true] {
             let scheduler = scheduler(1);
-            let (client, server) = block_on(core_scheduler_conformance::socket::stream_pair(
+            let (client, server) = block_on(base_scheduler_conformance::socket::stream_pair(
                 &scheduler,
                 SocketDomain::Ipv4,
             ));
@@ -821,8 +821,8 @@ fn pooled_receivers_preserve_messages_and_stream_eof() {
     crate::test_support::run(|| {
         block_on(async {
             let scheduler = scheduler(4);
-            core_scheduler_conformance::socket_receiving::messages(&scheduler).await;
-            core_scheduler_conformance::socket_receiving::stream_eof(&scheduler).await;
+            base_scheduler_conformance::socket_receiving::messages(&scheduler).await;
+            base_scheduler_conformance::socket_receiving::stream_eof(&scheduler).await;
             scheduler.shutdown().await;
         });
     });

@@ -1,8 +1,8 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::*;
-use core_scheduler_examples::files;
+use base_scheduler::*;
+use base_scheduler_examples::files;
 use futures_lite::future::block_on;
 use std::{
     io,
@@ -289,7 +289,7 @@ fn copy_closes_both_handles_on_cancellation_empty_input_and_write_failure() {
     });
 }
 
-impl core_scheduler::FileReading for Files {
+impl base_scheduler::FileReading for Files {
     type Reader<'a> = Reader<'a>;
     fn file_reader(&self, file: &Self::File) -> std::io::Result<Self::Reader<'_>> {
         Ok(Reader {
@@ -299,7 +299,7 @@ impl core_scheduler::FileReading for Files {
     }
 }
 
-impl core_scheduler::FileWriting for Files {
+impl base_scheduler::FileWriting for Files {
     type Writer<'a> = Writer<'a>;
     fn file_writer(&self, file: &Self::File) -> std::io::Result<Self::Writer<'_>> {
         Ok(Writer {

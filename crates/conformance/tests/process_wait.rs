@@ -3,7 +3,7 @@
 
 mod support;
 
-use core_scheduler::{
+use base_scheduler::{
     Cancellation, OperationResult, ProcessWait, ProcessWaitFlags, ProcessWaitResult,
 };
 use std::{
@@ -49,7 +49,7 @@ fn shutdown_retirement_without_reaping_preserves_child_status() {
         let waiter = NotificationWaiter {
             closed: AtomicBool::new(false),
         };
-        futures_lite::future::block_on(core_scheduler_conformance::process_wait::shutdown(
+        futures_lite::future::block_on(base_scheduler_conformance::process_wait::shutdown(
             &waiter,
             || waiter.closed.store(true, Ordering::Release),
             std::future::ready(()),
@@ -60,5 +60,5 @@ fn shutdown_retirement_without_reaping_preserves_child_status() {
 #[test]
 #[ignore = "child fixture, invoked by process-wait conformance assertions"]
 fn process_child_fixture() {
-    core_scheduler_conformance::process_wait::child();
+    base_scheduler_conformance::process_wait::child();
 }

@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use super::*;
-use core_scheduler::TaskError;
+use base_scheduler::TaskError;
 use futures_lite::future::block_on;
 use std::{sync::Arc, task::Poll};
 

@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use atomic_waker::AtomicWaker;
-use core_scheduler::{IoBuf, IoBufMut, IoBufSequence, IoBufSequenceMut, OperationError};
+use base_scheduler::{IoBuf, IoBufMut, IoBufSequence, IoBufSequenceMut, OperationError};
 use std::{
     future::poll_fn,
     io,

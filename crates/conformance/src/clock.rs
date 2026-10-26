@@ -4,7 +4,7 @@
 //! Controlled monotonic-clock assertions; no wall-clock timing assumptions.
 
 use crate::{ClockFixture, probe::WakeProbe};
-use core_scheduler::{Cancellation, Clock, OperationError, TimeoutError};
+use base_scheduler::{Cancellation, Clock, OperationError, TimeoutError};
 use futures_lite::future::poll_once;
 use std::{
     future::Future,

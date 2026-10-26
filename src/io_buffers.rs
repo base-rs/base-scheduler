@@ -8,7 +8,7 @@ use std::io::IoSlice;
 /// An owned scatter/gather package with I/O vectors prepared once at construction. The vector allocation and source owners are reused between operations; payload bytes are never copied.
 ///
 /// ```
-/// use core_scheduler::{IoBuffers, IoBufSequence};
+/// use base_scheduler::{IoBuffers, IoBufSequence};
 /// let mut buffers = IoBuffers::new([b"header".to_vec(), b"body".to_vec()]);
 /// // After an operation returns its owner and reports a short transfer:
 /// buffers.advance(7);
@@ -21,7 +21,7 @@ use std::io::IoSlice;
 /// Borrowed I/O vectors cannot outlive the package, even when copied:
 ///
 /// ```compile_fail
-/// use core_scheduler::{IoBuffers, IoBufSequence};
+/// use base_scheduler::{IoBuffers, IoBufSequence};
 /// let vector = {
 ///     let buffers = IoBuffers::new([vec![1, 2]]);
 ///     buffers.io_slices().unwrap()[0]

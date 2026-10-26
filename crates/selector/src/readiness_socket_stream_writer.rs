@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::{NativeSocket, ReadinessSelector, socket_io};
-use core_scheduler::{
+use base_scheduler::{
     BufferPool, Cancellation, IoBuf, OperationError, OperationResult, SocketSendFlags,
     SocketStreamWriter, SocketStreamWriting,
 };
@@ -30,7 +30,7 @@ pub(crate) struct ReadinessSocketStreamWriter<'scheduler, B> {
 }
 impl<'scheduler, B> ReadinessSocketStreamWriter<'scheduler, B> {
     fn new(scheduler: &'scheduler ReadinessSelector, socket: &NativeSocket) -> io::Result<Self> {
-        if scheduler.socket_type(socket)? != core_scheduler::SocketType::Stream {
+        if scheduler.socket_type(socket)? != base_scheduler::SocketType::Stream {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "stream writers require a stream socket",
@@ -57,7 +57,7 @@ impl<'scheduler, B> ReadinessSocketStreamWriter<'scheduler, B> {
     fn result(&self) -> OperationResult<()> {
         match &self.error {
             None => Ok(()),
-            Some(OperationError::Cancelled(_)) => Err(core_scheduler::Cancelled.into()),
+            Some(OperationError::Cancelled(_)) => Err(base_scheduler::Cancelled.into()),
             Some(OperationError::Io(error)) => Err(match error.raw_os_error() {
                 Some(code) => io::Error::from_raw_os_error(code),
                 None => io::Error::new(error.kind(), error.to_string()),
@@ -75,7 +75,7 @@ impl<'scheduler, B> ReadinessSocketStreamWriter<'scheduler, B> {
                 cancelled
                     .as_mut()
                     .poll(context)
-                    .map(|()| Err(core_scheduler::Cancelled))
+                    .map(|()| Err(base_scheduler::Cancelled))
             })
             .await?;
             self.pending = None;
@@ -141,7 +141,7 @@ impl<B: IoBuf> SocketStreamWriter for ReadinessSocketStreamWriter<'_, B> {
             .socket_sendmsg_poll(&self.socket, buffers, None, flags, cancellation)
             .await
     }
-    async fn write_owned_vectored<Buffers: core_scheduler::IoBufSequence>(
+    async fn write_owned_vectored<Buffers: base_scheduler::IoBufSequence>(
         &mut self,
         buffers: Buffers,
         flags: SocketSendFlags,
@@ -169,11 +169,11 @@ impl<B: IoBuf> SocketStreamWriter for ReadinessSocketStreamWriter<'_, B> {
             .await;
         (result, message.buffers)
     }
-    async fn write_owned<Owned: core_scheduler::IoBuf>(
+    async fn write_owned<Owned: base_scheduler::IoBuf>(
         &mut self,
         buffer: Owned,
         cancellation: &Cancellation,
-    ) -> core_scheduler::BufferResult<Owned> {
+    ) -> base_scheduler::BufferResult<Owned> {
         if let Err(error) = self.check_open() {
             return (Err(error), buffer);
         }
@@ -276,7 +276,7 @@ impl<B: IoBuf> SocketStreamWriter for ReadinessSocketStreamWriter<'_, B> {
                             if completion_token.is_cancelled()
                                 && error.kind() == io::ErrorKind::Interrupted =>
                         {
-                            Err(core_scheduler::Cancelled.into())
+                            Err(base_scheduler::Cancelled.into())
                         }
                         result => result,
                     }
@@ -306,13 +306,13 @@ impl<B> Drop for ReadinessSocketStreamWriter<'_, B> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use core_scheduler::{SocketClose, SocketDomain};
+    use base_scheduler::{SocketClose, SocketDomain};
     use futures_lite::future::block_on;
 
     #[test]
     fn submitted_nonempty_output_reports_zero_progress() {
         let scheduler = ReadinessSelector::new().unwrap();
-        let (sender, receiver) = block_on(core_scheduler_conformance::socket::stream_pair(
+        let (sender, receiver) = block_on(base_scheduler_conformance::socket::stream_pair(
             &scheduler,
             SocketDomain::Ipv4,
         ));
@@ -336,7 +336,7 @@ mod tests {
 #[cfg(test)]
 mod cancellation_tests {
     use super::*;
-    use core_scheduler::{SocketClose, SocketDomain};
+    use base_scheduler::{SocketClose, SocketDomain};
     use futures_lite::future::block_on;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -361,7 +361,7 @@ mod cancellation_tests {
         send: fn(&socket2::Socket, &[u8], SocketSendFlags) -> io::Result<usize>,
     ) {
         let scheduler = ReadinessSelector::new().unwrap();
-        let (sender, receiver) = block_on(core_scheduler_conformance::socket::stream_pair(
+        let (sender, receiver) = block_on(base_scheduler_conformance::socket::stream_pair(
             &scheduler,
             SocketDomain::Ipv4,
         ));
@@ -384,7 +384,7 @@ mod cancellation_tests {
             assert!(
                 std::error::Error::source(&error)
                     .unwrap()
-                    .is::<core_scheduler::Cancelled>()
+                    .is::<base_scheduler::Cancelled>()
             );
         }
         assert!(block_on(writer.write(b"after failure", &never)).is_err());

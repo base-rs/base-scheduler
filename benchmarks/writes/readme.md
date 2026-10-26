@@ -15,14 +15,14 @@ Monitor backends also accept an `-alternating` suffix. This control holds the la
 ## Build and run
 
 ```sh
-cargo build --release --locked -p core-scheduler-write-benchmark
-target/release/core-scheduler-write-benchmark server iouring-writer 1 1 262144 8 8 65536
-target/release/core-scheduler-write-benchmark client 127.0.0.1:PORT 4 1 262144 8 8 1 3
+cargo build --release --locked -p base-scheduler-write-benchmark
+target/release/base-scheduler-write-benchmark server iouring-writer 1 1 262144 8 8 65536
+target/release/base-scheduler-write-benchmark client 127.0.0.1:PORT 4 1 262144 8 8 1 3
 ```
 
 The server prints its bound address. Arguments after the backend/address are worker count, connection count, bytes per chunk, chunks per response, and generation work per cache line. The server's final argument is requested send-buffer size; the client's final two arguments are warmup and measurement durations in seconds.
 
-Run `python3 benchmarks/writes/run.py --output RESULTS.json` on aiko.local for a randomized five-repetition screen. The script serializes work through `/tmp/core-scheduler-perf.lock`, pins servers to CPU 0 or CPUs 0–3 and the unchanged four-worker client to CPUs 4–7, and records all samples, source/binary identities, CPU information, and effective socket-buffer sizes. It does not change host power policy. Use `--suite immediate` or `--suite overlap` for focused comparisons, or repeat `--case workers,connections,bytes,chunks,work,send_buffer` to select exact cases. Freeze a client binary with `--client-binary` when comparing implementation revisions.
+Run `python3 benchmarks/writes/run.py --output RESULTS.json` on aiko.local for a randomized five-repetition screen. The script serializes work through `/tmp/base-scheduler-perf.lock`, pins servers to CPU 0 or CPUs 0–3 and the unchanged four-worker client to CPUs 4–7, and records all samples, source/binary identities, CPU information, and effective socket-buffer sizes. It does not change host power policy. Use `--suite immediate` or `--suite overlap` for focused comparisons, or repeat `--case workers,connections,bytes,chunks,work,send_buffer` to select exact cases. Freeze a client binary with `--client-binary` when comparing implementation revisions.
 
 `--variant LABEL=BACKEND=SERVER_BINARY` adds a named isolated server implementation; include the label in `--backends` to randomize it with ordinary controls. The client remains frozen, and the report records each variant's binary hash and actual backend argument.
 

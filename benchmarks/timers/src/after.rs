@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::{Cancellation, OperationResult, Timers};
+use base_scheduler::{Cancellation, OperationResult, Timers};
 use std::time::Instant;
 
 /// Experimental timeout state. Later deadlines retain the existing wake; earlier deadlines replace it immediately. No scheduler is stored here.

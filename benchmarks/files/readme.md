@@ -7,8 +7,8 @@ Compare fresh scheduler-bound file readers and writers with reused handles on Di
 Build every variant in the same optimized executable:
 
 ```sh
-cargo build --release --locked -p core-scheduler-file-benchmark
-TMPDIR=/dev/shm flock /tmp/core-scheduler-perf.lock python3 benchmarks/files/run.py --affinity --output /tmp/files.jsonl
+cargo build --release --locked -p base-scheduler-file-benchmark
+TMPDIR=/dev/shm flock /tmp/base-scheduler-perf.lock python3 benchmarks/files/run.py --affinity --output /tmp/files.jsonl
 python3 benchmarks/files/summarize.py /tmp/files.jsonl
 ```
 
@@ -17,10 +17,10 @@ python3 benchmarks/files/summarize.py /tmp/files.jsonl
 The executable also accepts one case directly:
 
 ```sh
-target/release/core-scheduler-file-benchmark iouring monitor read-at 16 50000 4 4096
+target/release/base-scheduler-file-benchmark iouring monitor read-at 16 50000 4 4096
 ```
 
-Arguments are backend, mode (`ordinary` or `monitor`), workload (`read-at` or `write-at`), tasks, iterations per task, workers, and bytes per operation. `native` selects readiness; `iouring` selects Native's executor with per-worker io_uring drivers. `tokio` measures the Core Tokio adapter, not raw `tokio::fs`.
+Arguments are backend, mode (`ordinary` or `monitor`), workload (`read-at` or `write-at`), tasks, iterations per task, workers, and bytes per operation. `native` selects readiness; `iouring` selects Native's executor with per-worker io_uring drivers. `tokio` measures the Base Tokio adapter, not raw `tokio::fs`.
 
 ## Method
 
@@ -49,7 +49,7 @@ See [results](results.md) for the measured comparison, source identity, and raw 
 Compare fixed-file caching with registration disabled in the same binary, and optionally the original monitor executable:
 
 ```sh
-TMPDIR=/dev/shm flock /tmp/core-scheduler-perf.lock python3 benchmarks/files/registration.py --baseline-binary /path/to/original/core-scheduler-file-benchmark --output /tmp/registration.jsonl
+TMPDIR=/dev/shm flock /tmp/base-scheduler-perf.lock python3 benchmarks/files/registration.py --baseline-binary /path/to/original/base-scheduler-file-benchmark --output /tmp/registration.jsonl
 ```
 
 `iouring` uses the default fixed-file cache; `iouring-unregistered` sets its capacity to zero while retaining the same ring-cache and request implementation. The optional original executable measures the previous monitor implementation before ring-cache changes. Registering files does not change application I/O semantics, and unavailable registration falls back to ordinary descriptors.

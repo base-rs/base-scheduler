@@ -10,7 +10,7 @@ pub struct DirectTimer {
     armed: Option<Instant>,
     waker: Option<Waker>,
 }
-impl core_scheduler::Timers for DirectScheduler {
+impl base_scheduler::Timers for DirectScheduler {
     type Timer = DirectTimer;
 
     fn timer(&self) -> DirectTimer {
@@ -50,7 +50,7 @@ impl core_scheduler::Timers for DirectScheduler {
                 return Poll::Ready(Ok(()));
             }
             if cancelled.as_mut().poll(context).is_ready() {
-                return Poll::Ready(Err(core_scheduler::Cancelled.into()));
+                return Poll::Ready(Err(base_scheduler::Cancelled.into()));
             }
             // Retain an earlier wake while postponing a timeout. Reuse its identifier when that wake expires.
             let armed = timer

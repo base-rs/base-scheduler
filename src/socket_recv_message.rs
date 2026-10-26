@@ -8,7 +8,7 @@ use crate::{IoBuf, SocketAddressView};
 /// Address views borrow the message and cannot survive extraction of its payload:
 ///
 /// ```compile_fail
-/// use core_scheduler::{OwnedSocketRecvMessage, SocketAddressView, SocketRecvMessage, SocketRecvResult};
+/// use base_scheduler::{OwnedSocketRecvMessage, SocketAddressView, SocketRecvMessage, SocketRecvResult};
 /// let message = OwnedSocketRecvMessage::new(SocketRecvResult {
 ///     bytes: 1, address: Some("127.0.0.1:1234".parse().unwrap()),
 ///     truncated: false, control_truncated: false,

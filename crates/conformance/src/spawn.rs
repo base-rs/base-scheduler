@@ -7,7 +7,7 @@ use crate::{
     SpawnFixture,
     probe::{DropProbe, WakeProbe},
 };
-use core_scheduler::{Cancellation, Spawn, SpawnError, TaskError};
+use base_scheduler::{Cancellation, Spawn, SpawnError, TaskError};
 use std::{
     future::poll_fn,
     pin::pin,

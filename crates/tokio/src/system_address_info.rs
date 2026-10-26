@@ -3,7 +3,7 @@
 
 #![allow(clippy::unnecessary_cast)]
 use crate::resolver::{self, AddrInfo, sys};
-use core_scheduler::{AddressInfoView, SocketAddress, SocketProtocol, SocketType};
+use base_scheduler::{AddressInfoView, SocketAddress, SocketProtocol, SocketType};
 
 /// A borrowed entry in an immutable, validated [`SystemAddresses`](crate::SystemAddresses) native list.
 #[repr(transparent)]

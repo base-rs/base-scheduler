@@ -183,7 +183,7 @@ fn setup_probes_and_errors_are_explicit() {
             ..Default::default()
         },
         IoUringOptions {
-            fallback: core_scheduler_selector::SelectorOptions {
+            fallback: base_scheduler_selector::SelectorOptions {
                 threads: 0,
                 capacity: 1,
             },
@@ -742,7 +742,7 @@ fn full_submission_queue_defers_cancellations_and_shutdown_tolerates_duplicate_r
 fn submission_racing_shutdown_or_driver_exit_returns_unpublished_storage() {
     for driver_exited in [false, true] {
         let (selector, driver) = pair(1);
-        let (socket, _peer) = block_on(core_scheduler_conformance::socket::stream_pair(
+        let (socket, _peer) = block_on(base_scheduler_conformance::socket::stream_pair(
             &selector,
             SocketDomain::Ipv4,
         ));
@@ -812,7 +812,7 @@ fn active(controller: &Controller) -> usize {
 
 #[test]
 fn workers_route_locally_and_external_operations_share_ring_capacity_fairly() {
-    use core_scheduler_selector::{SelectorDriver, SelectorWorker};
+    use base_scheduler_selector::{SelectorDriver, SelectorWorker};
     let (selector, drivers) = IoUringSelector::with_workers(
         IoUringOptions {
             capacity: 1,
@@ -865,7 +865,7 @@ fn workers_route_locally_and_external_operations_share_ring_capacity_fairly() {
 
 #[test]
 fn moving_a_waiter_to_another_thread_keeps_cancellation_on_the_original_ring() {
-    use core_scheduler_selector::{SelectorDriver, SelectorWorker};
+    use base_scheduler_selector::{SelectorDriver, SelectorWorker};
     let (selector, mut drivers) =
         IoUringSelector::with_workers(IoUringOptions::default(), 2).unwrap();
     let (_directory, file) = fifo(&selector);
@@ -910,7 +910,7 @@ fn moving_a_waiter_to_another_thread_keeps_cancellation_on_the_original_ring() {
 
 #[test]
 fn borrowed_routes_preserve_worker_identity_without_cloning_controllers() {
-    use core_scheduler_selector::SelectorDriver;
+    use base_scheduler_selector::SelectorDriver;
     let (selector, mut drivers) =
         IoUringSelector::with_workers(IoUringOptions::default(), 2).unwrap();
     let counts: Vec<_> = selector.controllers.iter().map(Arc::strong_count).collect();
@@ -956,7 +956,7 @@ fn borrowed_routes_preserve_worker_identity_without_cloning_controllers() {
 
 #[test]
 fn nested_selectors_restore_routes_and_never_use_another_selectors_ring() {
-    use core_scheduler_selector::{SelectorDriver, SelectorWorker};
+    use base_scheduler_selector::{SelectorDriver, SelectorWorker};
     let (outer, driver) = pair(2);
     let (_directory, file) = file(&outer);
     let mut outer_worker = driver.enter();
@@ -983,7 +983,7 @@ fn nested_selectors_restore_routes_and_never_use_another_selectors_ring() {
 
 #[test]
 fn dropping_local_driver_returns_queued_owners_before_shutdown_and_allows_reentrant_wakes() {
-    use core_scheduler_selector::{SelectorDriver, SelectorWorker};
+    use base_scheduler_selector::{SelectorDriver, SelectorWorker};
     use std::task::{Context, Wake, Waker};
     struct Reenter(Arc<Controller>, AtomicUsize);
     impl Wake for Reenter {
@@ -1026,7 +1026,7 @@ fn dropping_local_driver_returns_queued_owners_before_shutdown_and_allows_reentr
 
 #[test]
 fn closing_a_full_local_batch_drains_all_accepted_owners() {
-    use core_scheduler_selector::{SelectorDriver, SelectorWorker};
+    use base_scheduler_selector::{SelectorDriver, SelectorWorker};
     for remote_close in [false, true] {
         let (selector, driver) = pair(300);
         let (_directory, file) = fifo(&selector);
@@ -1077,7 +1077,7 @@ fn stopping_one_ring_closes_the_group_and_shared_fallback() {
 
 #[test]
 fn migrated_cancellation_cannot_overtake_a_queued_submission() {
-    use core_scheduler_selector::{SelectorDriver, SelectorWorker};
+    use base_scheduler_selector::{SelectorDriver, SelectorWorker};
     for submit_locally in [false, true] {
         let (selector, driver) = pair(4);
         let (_directory, file) = fifo(&selector);
@@ -1118,7 +1118,7 @@ fn migrated_cancellation_cannot_overtake_a_queued_submission() {
 
 #[test]
 fn native_workers_use_distinct_rings_without_external_submission_routing() {
-    use core_scheduler_native::{NativeExecutorOptions, NativeScheduler};
+    use base_scheduler_native::{NativeExecutorOptions, NativeScheduler};
     let (selector, drivers) = IoUringSelector::with_workers(IoUringOptions::default(), 2).unwrap();
     let (_directory, file) = file(&selector);
     let file = Arc::new(file);
@@ -1377,7 +1377,7 @@ fn pending_submissions_are_flushed_before_preparing_to_sleep() {
 
 #[test]
 fn owner_wakes_coalesce_without_writes_and_survive_productive_turns() {
-    use core_scheduler_selector::{SelectorDriver, SelectorWorker};
+    use base_scheduler_selector::{SelectorDriver, SelectorWorker};
     let (selector, driver) = pair(1);
     let (_directory, file) = file(&selector);
     let mut worker = driver.enter();
@@ -1419,10 +1419,10 @@ fn owner_wakes_coalesce_without_writes_and_survive_productive_turns() {
 
 #[test]
 fn local_readiness_submission_can_submit_and_wait_in_one_turn() {
-    use core_scheduler_selector::{SelectorDriver, SelectorWorker};
+    use base_scheduler_selector::{SelectorDriver, SelectorWorker};
     let _hooks = Failures;
     let (selector, driver) = pair(1);
-    let (sender, receiver) = block_on(core_scheduler_conformance::socket::stream_pair(
+    let (sender, receiver) = block_on(base_scheduler_conformance::socket::stream_pair(
         &selector,
         SocketDomain::Ipv4,
     ));
@@ -1461,14 +1461,14 @@ fn local_readiness_submission_can_submit_and_wait_in_one_turn() {
 
 #[test]
 fn a_full_local_readiness_batch_returns_before_waiting() {
-    use core_scheduler_selector::{SelectorDriver, SelectorWorker};
+    use base_scheduler_selector::{SelectorDriver, SelectorWorker};
     let (selector, driver) = IoUringSelector::new(IoUringOptions {
         entries: 512,
         capacity: 300,
         ..Default::default()
     })
     .unwrap();
-    let (_sender, receiver) = block_on(core_scheduler_conformance::socket::stream_pair(
+    let (_sender, receiver) = block_on(base_scheduler_conformance::socket::stream_pair(
         &selector,
         SocketDomain::Ipv4,
     ));
@@ -1500,9 +1500,9 @@ fn a_full_local_readiness_batch_returns_before_waiting() {
 
 #[test]
 fn readiness_submission_is_deferred_for_at_most_one_nonblocking_turn() {
-    use core_scheduler_selector::{SelectorDriver, SelectorWorker};
+    use base_scheduler_selector::{SelectorDriver, SelectorWorker};
     let (selector, driver) = pair(1);
-    let (_sender, receiver) = block_on(core_scheduler_conformance::socket::stream_pair(
+    let (_sender, receiver) = block_on(base_scheduler_conformance::socket::stream_pair(
         &selector,
         SocketDomain::Ipv4,
     ));
@@ -1551,7 +1551,7 @@ unsafe impl IoBufMut for WakeOnBufferAccess {}
 
 #[test]
 fn preparing_user_buffers_returns_to_the_executor_before_waiting() {
-    use core_scheduler_selector::{SelectorDriver, SelectorWorker};
+    use base_scheduler_selector::{SelectorDriver, SelectorWorker};
     struct CountWake(AtomicUsize);
     impl std::task::Wake for CountWake {
         fn wake(self: Arc<Self>) {
@@ -1597,7 +1597,7 @@ fn preparing_user_buffers_returns_to_the_executor_before_waiting() {
 
 #[test]
 fn idle_turn_consumes_local_and_remote_notifications_together() {
-    use core_scheduler_selector::{SelectorDriver, SelectorWorker};
+    use base_scheduler_selector::{SelectorDriver, SelectorWorker};
     let (selector, driver) = pair(1);
     let mut worker = driver.enter();
     let waker = worker.waker();
@@ -1623,7 +1623,7 @@ fn idle_turn_consumes_local_and_remote_notifications_together() {
 
 #[test]
 fn local_notifications_match_the_ring_controller_including_nested_workers() {
-    use core_scheduler_selector::{SelectorDriver, SelectorWorker};
+    use base_scheduler_selector::{SelectorDriver, SelectorWorker};
     let (selector, drivers) = IoUringSelector::with_workers(IoUringOptions::default(), 2).unwrap();
     let mut workers: Vec<_> = drivers.into_iter().map(SelectorDriver::enter).collect();
     for target in [0, 1] {
@@ -1648,7 +1648,7 @@ fn local_notifications_match_the_ring_controller_including_nested_workers() {
 
 #[test]
 fn remote_wakes_interrupt_entered_workers_during_idle_preparation() {
-    use core_scheduler_selector::{SelectorDriver, SelectorWorker};
+    use base_scheduler_selector::{SelectorDriver, SelectorWorker};
     for (name, already_armed) in [("submit", false), ("wait", false), ("wait", true)] {
         let (selector, driver) = pair(1);
         let mut worker = driver.enter();
@@ -1747,7 +1747,7 @@ fn idle_ring_waits_honor_finite_timeouts_and_rearm_after_notifications() {
 #[test]
 fn remote_notification_retires_before_waiting_with_a_socket_read_pending() {
     let (selector, mut driver) = pair(1);
-    let (sender, receiver) = block_on(core_scheduler_conformance::socket::stream_pair(
+    let (sender, receiver) = block_on(base_scheduler_conformance::socket::stream_pair(
         &selector,
         SocketDomain::Ipv4,
     ));
@@ -2221,7 +2221,7 @@ fn deferred_cancellations_prevent_waiting_while_originals_fill_the_submission_qu
 }
 
 fn drive_bound_worker<F: Future>(
-    worker: &mut impl core_scheduler_selector::SelectorWorker,
+    worker: &mut impl base_scheduler_selector::SelectorWorker,
     future: F,
 ) -> F::Output {
     let mut future = pin!(future);
@@ -2280,7 +2280,7 @@ fn movable_driver_never_upgrades_and_completes_inflight_io_after_thread_migratio
 
 #[test]
 fn fresh_bound_worker_attempts_optional_upgrade_without_losing_queued_io() {
-    use core_scheduler_selector::SelectorDriver;
+    use base_scheduler_selector::SelectorDriver;
     let (selector, driver) = pair(1);
     let (_directory, file) = file(&selector);
     let never = Cancellation::never();
@@ -2308,7 +2308,7 @@ fn fresh_bound_worker_attempts_optional_upgrade_without_losing_queued_io() {
 
 #[test]
 fn optional_worker_upgrade_failures_preserve_the_valid_ring_and_queued_io() {
-    use core_scheduler_selector::SelectorDriver;
+    use base_scheduler_selector::SelectorDriver;
     for code in [libc::EINVAL, libc::EPERM] {
         let (selector, driver) = pair(1);
         let (_directory, file) = file(&selector);
@@ -2328,7 +2328,7 @@ fn optional_worker_upgrade_failures_preserve_the_valid_ring_and_queued_io() {
 
 #[test]
 fn binding_an_already_driven_ring_preserves_inflight_io_without_upgrade() {
-    use core_scheduler_selector::SelectorDriver;
+    use base_scheduler_selector::SelectorDriver;
     let (selector, mut driver) = pair(1);
     let (directory, file) = fifo(&selector);
     let never = Cancellation::never();
@@ -2358,7 +2358,7 @@ fn binding_an_already_driven_ring_preserves_inflight_io_without_upgrade() {
 
 #[test]
 fn a_retired_driver_can_enter_a_worker_without_recreating_its_ring() {
-    use core_scheduler_selector::{SelectorDriver, SelectorWorker};
+    use base_scheduler_selector::{SelectorDriver, SelectorWorker};
     let (selector, mut driver) = pair(1);
     drain(&selector, &mut driver);
     assert!(driver.reactor.is_none());
@@ -2380,7 +2380,7 @@ fn a_retired_driver_can_enter_a_worker_without_recreating_its_ring() {
 
 #[test]
 fn idle_wait_publishes_completions_and_preserves_explicit_wakes() {
-    use core_scheduler_selector::{SelectorDriver, SelectorWorker};
+    use base_scheduler_selector::{SelectorDriver, SelectorWorker};
     use std::task::Context;
     let _hooks = Failures;
     let (selector, driver) = pair(1);

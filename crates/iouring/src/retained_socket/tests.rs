@@ -3,7 +3,7 @@
 
 use super::*;
 use crate::{IoUringSelector, test_buffers::LargeMapping};
-use core_scheduler::{Cancellation, SocketClose, SocketDomain, SocketOpen, SocketType};
+use base_scheduler::{Cancellation, SocketClose, SocketDomain, SocketOpen, SocketType};
 use futures_lite::future::block_on;
 use std::{
     io::{Read, Write},

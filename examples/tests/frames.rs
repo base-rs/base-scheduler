@@ -1,8 +1,8 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::*;
-use core_scheduler_examples::frames::{Frame, FrameDecoder};
+use base_scheduler::*;
+use base_scheduler_examples::frames::{Frame, FrameDecoder};
 
 #[test]
 fn retained_ranges_prevent_reuse_and_fragmented_records_copy_only_their_bytes() {

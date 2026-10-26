@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use super::*;
-use core_scheduler::IoBufMut;
+use base_scheduler::IoBufMut;
 use futures_lite::future::{block_on, poll_once};
 use std::sync::{
     Arc,

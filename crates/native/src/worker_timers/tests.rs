@@ -3,8 +3,8 @@
 
 use super::*;
 use crate::{NativeOptions, NativeScheduler, test_support};
-use core_scheduler::Spawn;
-use core_scheduler_conformance::ClockFixture;
+use base_scheduler::Spawn;
+use base_scheduler_conformance::ClockFixture;
 use futures_lite::future::{block_on, poll_once};
 use std::{
     sync::mpsc,
@@ -51,7 +51,7 @@ fn run(test: impl AsyncFnOnce(&NativeScheduler) + Send + 'static) {
 }
 
 mod conformance {
-    core_scheduler_conformance::clock_tests!(run: super::run);
+    base_scheduler_conformance::clock_tests!(run: super::run);
 }
 
 mod worker_conformance {
@@ -65,7 +65,7 @@ mod worker_conformance {
                     *scheduler.tasks.shared.paused.lock().unwrap() = Some(Instant::now());
                     let owned = Arc::clone(&scheduler);
                     let task = scheduler.spawn(async move {
-                        core_scheduler_conformance::clock::$name(&*owned).await;
+                        base_scheduler_conformance::clock::$name(&*owned).await;
                     }).unwrap();
                     let result = block_on(task);
                     block_on(scheduler.shutdown());
@@ -149,7 +149,7 @@ fn full_capacity_reclaims_cancelled_timers_and_shutdown_rejects_waits() {
         let deadline = scheduler.now() + Duration::from_secs(3600);
         // The timer engine can round reservations up to its minimum batch size.
         let capacity =
-            core_scheduler_timers::local::TimerQueue::<Waker>::with_capacity(1).capacity();
+            base_scheduler_timers::local::TimerQueue::<Waker>::with_capacity(1).capacity();
         let mut waits: Vec<_> = (0..capacity)
             .map(|_| Box::pin(scheduler.sleep_until(deadline, &never)))
             .collect();
@@ -305,7 +305,7 @@ fn moving_a_sleep_to_another_worker_updates_and_releases_its_original_queue() {
                 cancel.cancel();
                 assert!(matches!(
                     sleep.await,
-                    Err(core_scheduler::OperationError::Cancelled(_))
+                    Err(base_scheduler::OperationError::Cancelled(_))
                 ));
                 assert!(!owned.tasks.shared.workers[owner].timers.is_empty());
             })

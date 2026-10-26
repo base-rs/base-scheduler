@@ -74,12 +74,12 @@ dependencies = [
 
 [[package]]
 name = "bake-agent-context"
-version = "0.4.0"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "679a648005c2427a89cde61d5bfbd2752cba1d9d8bef7561a1bdb6bd7aefafc9"
+checksum = "6e0c536a159ae7aa41ed8f5f1accda4dbbb8064eefeec9ca629fb02207f9a397"
 dependencies = [
  "bake",
- "core-markdown",
+ "base-markdown",
  "serde",
  "serde_json",
  "serde_yaml_ng",
@@ -87,14 +87,14 @@ dependencies = [
 
 [[package]]
 name = "bake-cargo"
-version = "0.5.1"
+version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f96d1c8367071572484df8adecb856ee9e4a412eccbe7189ae32c791c59184e"
+checksum = "79ff5b8e99d484d51e46ea5e4a76f1e86c8751a7c92e62fa6825ab8858042c4b"
 dependencies = [
  "bake",
  "bake-license",
  "bake-releases",
- "core-markdown",
+ "base-markdown",
  "serde",
  "serde_json",
  "tempfile",
@@ -104,12 +104,12 @@ dependencies = [
 
 [[package]]
 name = "bake-license"
-version = "0.2.3"
+version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b8c26cf7448bcbbd9ab961531e7484409f47d0e65b5af34e5dbf7a3ad445be0"
+checksum = "6b873096492b2786ea7c0dd8ccc588b5919a052a13db753a5098950eb5e5e83e"
 dependencies = [
  "bake",
- "core-markdown",
+ "base-markdown",
  "tempfile",
 ]
 
@@ -126,34 +126,34 @@ dependencies = [
 
 [[package]]
 name = "bake-markdown"
-version = "0.4.0"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f1bd6360b257635676292741245853283d8c9285e70a16da020dfd5cf94bcdd"
+checksum = "4fb954a7e1e164bab8c4eca17399a2e79848b6b3b3a27afc89b35ec71b8130d5"
 dependencies = [
  "bake",
- "core-markdown",
+ "base-markdown",
 ]
 
 [[package]]
 name = "bake-readme"
-version = "0.2.5"
+version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11bf6d1221735038caa856a503e964e885d2379c1980518d3ce71165063d4949"
+checksum = "480bfb31790775eceb77a07726cfb1fb37e376bafcd68aa807047e3f0af09ffd"
 dependencies = [
  "bake",
- "core-markdown",
+ "base-markdown",
  "serde_json",
  "tempfile",
 ]
 
 [[package]]
 name = "bake-releases"
-version = "0.3.5"
+version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cc0fdf00e4504ec28c13e0dcc9be5098d7cc0bb9009c4cb84c34ea683114b212"
+checksum = "d31e33b847a5896ba5723b0391243e56172689720f9325c2c92e1fc57189e505"
 dependencies = [
  "bake",
- "core-markdown",
+ "base-markdown",
  "tempfile",
 ]
 
@@ -166,6 +166,264 @@ dependencies = [
  "bake",
  "serde_json",
  "toml_edit",
+]
+
+[[package]]
+name = "base-design"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "46f2f8db06d87ff80f4f96e56336afcb338b96b444ee8de7fe8919601e8de9b9"
+
+[[package]]
+name = "base-markdown"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7cfd2825b6e08635abf3737d8e15d8445c9d74ed80cefb4b469a19c140e90f33"
+dependencies = [
+ "memchr",
+]
+
+[[package]]
+name = "base-project"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b9e9c9d8865b2e1e53ee684ed25190c2c61b990e9d7e912069ced53270a64d2f"
+dependencies = [
+ "bake",
+ "bake-agent-context",
+ "bake-cargo",
+ "bake-license",
+ "bake-markdown",
+ "bake-readme",
+ "bake-releases",
+ "bake-test",
+ "base-design",
+]
+
+[[package]]
+name = "base-scheduler"
+version = "0.1.0"
+dependencies = [
+ "allocation-counter",
+ "event-listener",
+ "futures-channel",
+ "futures-lite",
+ "libc",
+]
+
+[[package]]
+name = "base-scheduler-bake"
+version = "0.0.0"
+dependencies = [
+ "bake",
+ "base-project",
+]
+
+[[package]]
+name = "base-scheduler-buffer-benchmark"
+version = "0.0.0"
+dependencies = [
+ "base-scheduler",
+ "base-scheduler-direct",
+ "base-scheduler-iouring",
+ "base-scheduler-native",
+ "base-scheduler-tokio",
+ "futures-lite",
+ "io-uring",
+ "libc",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
+name = "base-scheduler-conformance"
+version = "0.1.0"
+dependencies = [
+ "base-scheduler",
+ "futures-channel",
+ "futures-lite",
+ "libc",
+]
+
+[[package]]
+name = "base-scheduler-direct"
+version = "0.1.0"
+dependencies = [
+ "allocation-counter",
+ "async-task",
+ "base-scheduler",
+ "base-scheduler-conformance",
+ "event-listener",
+ "futures-channel",
+ "futures-lite",
+ "libc",
+ "signal-hook",
+ "socket2",
+ "tempfile",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "base-scheduler-echo-benchmark"
+version = "0.0.0"
+dependencies = [
+ "base-scheduler",
+ "base-scheduler-iouring",
+ "base-scheduler-native",
+ "base-scheduler-tokio",
+ "hdrhistogram",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "base-scheduler-examples"
+version = "0.0.0"
+dependencies = [
+ "base-scheduler",
+ "base-scheduler-direct",
+ "base-scheduler-iouring",
+ "base-scheduler-native",
+ "base-scheduler-tokio",
+ "futures-lite",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
+name = "base-scheduler-file-benchmark"
+version = "0.0.0"
+dependencies = [
+ "base-scheduler",
+ "base-scheduler-direct",
+ "base-scheduler-iouring",
+ "base-scheduler-native",
+ "base-scheduler-selector",
+ "base-scheduler-tokio",
+ "futures-lite",
+ "libc",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
+name = "base-scheduler-iouring"
+version = "0.1.0"
+dependencies = [
+ "allocation-counter",
+ "async-io",
+ "atomic-waker",
+ "base-scheduler",
+ "base-scheduler-conformance",
+ "base-scheduler-native",
+ "base-scheduler-selector",
+ "event-listener",
+ "futures-channel",
+ "futures-lite",
+ "io-uring",
+ "libc",
+ "socket2",
+ "tempfile",
+]
+
+[[package]]
+name = "base-scheduler-native"
+version = "0.1.0"
+dependencies = [
+ "allocation-counter",
+ "async-task",
+ "base-scheduler",
+ "base-scheduler-conformance",
+ "base-scheduler-selector",
+ "base-scheduler-timers",
+ "crossbeam-deque",
+ "crossbeam-queue",
+ "event-listener",
+ "futures-channel",
+ "futures-lite",
+ "libc",
+ "socket2",
+ "tempfile",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "base-scheduler-selector"
+version = "0.1.0"
+dependencies = [
+ "allocation-counter",
+ "async-io",
+ "base-scheduler",
+ "base-scheduler-conformance",
+ "event-listener",
+ "futures-channel",
+ "futures-lite",
+ "libc",
+ "signal-hook",
+ "socket2",
+ "tempfile",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "base-scheduler-timer-benchmark"
+version = "0.0.0"
+dependencies = [
+ "allocation-counter",
+ "base-scheduler",
+ "base-scheduler-direct",
+ "base-scheduler-iouring",
+ "base-scheduler-native",
+ "base-scheduler-timers",
+ "base-scheduler-tokio",
+ "futures-lite",
+ "libc",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "base-scheduler-timers"
+version = "0.1.0"
+dependencies = [
+ "crossbeam-queue",
+ "loom",
+]
+
+[[package]]
+name = "base-scheduler-tokio"
+version = "0.1.0"
+dependencies = [
+ "allocation-counter",
+ "async-io",
+ "base-scheduler",
+ "base-scheduler-conformance",
+ "event-listener",
+ "futures-channel",
+ "futures-lite",
+ "libc",
+ "signal-hook",
+ "socket2",
+ "tempfile",
+ "tokio",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "base-scheduler-write-benchmark"
+version = "0.0.0"
+dependencies = [
+ "base-scheduler",
+ "base-scheduler-iouring",
+ "base-scheduler-native",
+ "base-scheduler-tokio",
+ "hdrhistogram",
+ "serde_json",
+ "socket2",
+ "tokio",
 ]
 
 [[package]]
@@ -194,9 +452,9 @@ checksum = "fc652a48c352aef3ea3aed32080501cf3ef6ed5da78602a020c991775b0aff04"
 
 [[package]]
 name = "cc"
-version = "1.8.0"
+version = "1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6651c9ed80effdc7db0ff72512157f901af5e3549e341e24b1dd4887d836d838"
+checksum = "86e055fa6e3e40ad6187ba25b6855eeb635d5271f8e0f0e1e9a5826b8d75bea0"
 dependencies = [
  "find-msvc-tools",
  "shlex",
@@ -218,262 +476,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "core-markdown"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c12c75b62f77c8122be29431bcb028b97fa1e843e5a51cc9967a07ea9f4f08e3"
-dependencies = [
- "regex",
- "unicode-id",
-]
-
-[[package]]
-name = "core-project"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba92c01793a8a711943a3744713b1daf0bb4fa1d3f8881914644da825ea13b74"
-dependencies = [
- "bake",
- "bake-agent-context",
- "bake-cargo",
- "bake-license",
- "bake-markdown",
- "bake-readme",
- "bake-releases",
- "bake-test",
-]
-
-[[package]]
-name = "core-scheduler"
-version = "0.1.0"
-dependencies = [
- "allocation-counter",
- "event-listener",
- "futures-channel",
- "futures-lite",
- "libc",
-]
-
-[[package]]
-name = "core-scheduler-bake"
-version = "0.0.0"
-dependencies = [
- "bake",
- "core-project",
-]
-
-[[package]]
-name = "core-scheduler-buffer-benchmark"
-version = "0.0.0"
-dependencies = [
- "core-scheduler",
- "core-scheduler-direct",
- "core-scheduler-iouring",
- "core-scheduler-native",
- "core-scheduler-tokio",
- "futures-lite",
- "io-uring",
- "libc",
- "serde_json",
- "tempfile",
- "tokio",
-]
-
-[[package]]
-name = "core-scheduler-conformance"
-version = "0.1.0"
-dependencies = [
- "core-scheduler",
- "futures-channel",
- "futures-lite",
- "libc",
-]
-
-[[package]]
-name = "core-scheduler-direct"
-version = "0.1.0"
-dependencies = [
- "allocation-counter",
- "async-task",
- "core-scheduler",
- "core-scheduler-conformance",
- "event-listener",
- "futures-channel",
- "futures-lite",
- "libc",
- "signal-hook",
- "socket2",
- "tempfile",
- "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "core-scheduler-echo-benchmark"
-version = "0.0.0"
-dependencies = [
- "core-scheduler",
- "core-scheduler-iouring",
- "core-scheduler-native",
- "core-scheduler-tokio",
- "hdrhistogram",
- "serde_json",
- "tokio",
-]
-
-[[package]]
-name = "core-scheduler-examples"
-version = "0.0.0"
-dependencies = [
- "core-scheduler",
- "core-scheduler-direct",
- "core-scheduler-iouring",
- "core-scheduler-native",
- "core-scheduler-tokio",
- "futures-lite",
- "serde_json",
- "tempfile",
- "tokio",
-]
-
-[[package]]
-name = "core-scheduler-file-benchmark"
-version = "0.0.0"
-dependencies = [
- "core-scheduler",
- "core-scheduler-direct",
- "core-scheduler-iouring",
- "core-scheduler-native",
- "core-scheduler-selector",
- "core-scheduler-tokio",
- "futures-lite",
- "libc",
- "serde_json",
- "tempfile",
- "tokio",
-]
-
-[[package]]
-name = "core-scheduler-iouring"
-version = "0.1.0"
-dependencies = [
- "allocation-counter",
- "async-io",
- "atomic-waker",
- "core-scheduler",
- "core-scheduler-conformance",
- "core-scheduler-native",
- "core-scheduler-selector",
- "event-listener",
- "futures-channel",
- "futures-lite",
- "io-uring",
- "libc",
- "socket2",
- "tempfile",
-]
-
-[[package]]
-name = "core-scheduler-native"
-version = "0.1.0"
-dependencies = [
- "allocation-counter",
- "async-task",
- "core-scheduler",
- "core-scheduler-conformance",
- "core-scheduler-selector",
- "core-scheduler-timers",
- "crossbeam-deque",
- "crossbeam-queue",
- "event-listener",
- "futures-channel",
- "futures-lite",
- "libc",
- "socket2",
- "tempfile",
- "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "core-scheduler-selector"
-version = "0.1.0"
-dependencies = [
- "allocation-counter",
- "async-io",
- "core-scheduler",
- "core-scheduler-conformance",
- "event-listener",
- "futures-channel",
- "futures-lite",
- "libc",
- "signal-hook",
- "socket2",
- "tempfile",
- "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "core-scheduler-timer-benchmark"
-version = "0.0.0"
-dependencies = [
- "allocation-counter",
- "core-scheduler",
- "core-scheduler-direct",
- "core-scheduler-iouring",
- "core-scheduler-native",
- "core-scheduler-timers",
- "core-scheduler-tokio",
- "futures-lite",
- "libc",
- "serde_json",
- "tokio",
-]
-
-[[package]]
-name = "core-scheduler-timers"
-version = "0.1.0"
-dependencies = [
- "crossbeam-queue",
- "loom",
-]
-
-[[package]]
-name = "core-scheduler-tokio"
-version = "0.1.0"
-dependencies = [
- "allocation-counter",
- "async-io",
- "core-scheduler",
- "core-scheduler-conformance",
- "event-listener",
- "futures-channel",
- "futures-lite",
- "libc",
- "signal-hook",
- "socket2",
- "tempfile",
- "tokio",
- "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "core-scheduler-write-benchmark"
-version = "0.0.0"
-dependencies = [
- "core-scheduler",
- "core-scheduler-iouring",
- "core-scheduler-native",
- "core-scheduler-tokio",
- "hdrhistogram",
- "serde_json",
- "socket2",
- "tokio",
-]
-
-[[package]]
 name = "crc32fast"
-version = "1.5.2"
+version = "1.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "01a7799fd6b852db0e61728dde9a204c423b44d689dbd432522543614b490e78"
+checksum = "0ba106e844045ddc02c20768ac4b0b7cb45f2cc2ecbd833ac9f5dacb183c2055"
 dependencies = [
  "cfg-if",
 ]
@@ -557,9 +563,9 @@ checksum = "da7c62ceae207dd37ea5b845da6a0696c799f85e97da1ab5b7910be3c1c80223"
 
 [[package]]
 name = "find-msvc-tools"
-version = "0.1.14"
+version = "0.1.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aedcfb3409746eddb02b9e19ebda1c3394f759a152e48ee875a0844d1b955484"
+checksum = "1c66915cc5391097de7a2b0b972e8505aa33c0df401fd3a6811dbdb32881ba48"
 
 [[package]]
 name = "flate2"
@@ -992,18 +998,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
 
 [[package]]
-name = "regex"
-version = "1.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f020237b6c8eed93db2e2cb53c00c60a8e1bc73da7d073199a1180401450218d"
-dependencies = [
- "aho-corasick",
- "memchr",
- "regex-automata",
- "regex-syntax",
-]
-
-[[package]]
 name = "regex-automata"
 version = "0.4.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1073,9 +1067,9 @@ dependencies = [
 
 [[package]]
 name = "rustls-webpki"
-version = "0.103.15"
+version = "0.103.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3c3cf1d8b1e7d4927e2d154c3fcb02979afb9939629c62cd9048d4f07b60ac2"
+checksum = "4443b1b6d39d7c663139942cc4558262562d2c84123bb6282ef177009ca8b281"
 dependencies = [
  "ring",
  "rustls-pki-types",
@@ -1205,9 +1199,9 @@ checksum = "0c790de23124f9ab44544d7ac05d60440adc586479ce501c1d6d7da3cd8c9cf5"
 
 [[package]]
 name = "smallvec"
-version = "1.16.3"
+version = "1.16.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b3dc8af474f516a851ff4bd12db780f948b9250ad37211e4eec0bccea54e01b"
+checksum = "d0d5d4b1981b8bbbb7aed204cae5726d683d5d6ac7e74ec54122ea28f315e7c8"
 
 [[package]]
 name = "socket2"
@@ -1288,9 +1282,9 @@ dependencies = [
 
 [[package]]
 name = "tinystr"
-version = "0.8.4"
+version = "0.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1e27c91459209c2986af3dcf603a5a74a4368754ce37414f59acc971167f643"
+checksum = "abc840c238154d58f9e86b2792261edfde565a17696e1cda1a449de27979801a"
 dependencies = [
  "displaydoc",
  "zerovec",
@@ -1298,9 +1292,9 @@ dependencies = [
 
 [[package]]
 name = "tokio"
-version = "1.53.3"
+version = "1.54.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce3335fa71841cda333a58d7615b03901380ecf09d59b3296d21f8bbac0dde4e"
+checksum = "b52fd3255258d26fac7264ab5a76b53c13367136dc011d3d6ad4f8ed070396a3"
 dependencies = [
  "bytes",
  "libc",
@@ -1409,12 +1403,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "unicode-id"
-version = "0.3.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "65dd75ab2d9d379dbe86d4059e91d8b5a6e7054865eaba1ddbfc7a817ff96392"
-
-[[package]]
 name = "unicode-ident"
 version = "1.0.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1486,14 +1474,14 @@ version = "0.26.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "521bc38abb08001b01866da9f51eb7c5d647a19260e00054a8c7fd5f9e57f7a9"
 dependencies = [
- "webpki-roots 1.0.9",
+ "webpki-roots 1.0.11",
 ]
 
 [[package]]
 name = "webpki-roots"
-version = "1.0.9"
+version = "1.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7dcd9d09a39985f5344844e66b0c530a33843579125f23e21e9f0f220850f22a"
+checksum = "f5f280bbb2b287bc8e7de7e3852945a0ff50d1bbcb5ed42b6c7a568c546df171"
 dependencies = [
  "rustls-pki-types",
 ]
@@ -1612,9 +1600,9 @@ checksum = "3ad82d2a33cdc9674dc7465672f271e096168fcdbe0f799d9e6db8c5892679dc"
 
 [[package]]
 name = "yoke"
-version = "0.8.3"
+version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "709fe23a0424b6a435d82152b1bd3fdfb0833487d5fa90d05d42762a9891fef5"
+checksum = "417ef3fcf6c300b7dbd25c85531a746931c02ad536f3cf4786ed1e88223340b3"
 dependencies = [
  "stable_deref_trait",
  "yoke-derive",
@@ -1673,9 +1661,9 @@ dependencies = [
 
 [[package]]
 name = "zerovec"
-version = "0.11.8"
+version = "0.11.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb0464e17806c1d976d5cba29399c7f08e516e279e2ba493f63123b5fca67dd8"
+checksum = "f58a2799cfe9a1670c7ea8edbd52ef8edb93cb37a7f83bf31ba9e35d9dae6a40"
 dependencies = [
  "yoke",
  "zerofrom",
@@ -1684,9 +1672,9 @@ dependencies = [
 
 [[package]]
 name = "zerovec-derive"
-version = "0.11.6"
+version = "0.11.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34df6fc39dbd26ddc9c10e6a2984476e13acce22e64e4487636ef494369225da"
+checksum = "c3743ddbf47738d929cd1ae2e199d40d0162979dfe31aef8ae646d2bf00bf97a"
 dependencies = [
  "proc-macro2",
  "quote",

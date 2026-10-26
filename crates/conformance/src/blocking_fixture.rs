@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use core_scheduler::Blocking;
+use base_scheduler::Blocking;
 
 /// Backend fixture for deterministic queue tests. Exclusive fixture ownership is required while these assertions run.
 pub trait BlockingFixture {

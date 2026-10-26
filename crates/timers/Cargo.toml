@@ -1,10 +1,10 @@
 [package]
-name = "core-scheduler-timers"
+name = "base-scheduler-timers"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
 license = "MIT"
-repository = "https://github.com/core-rs/core-scheduler"
+repository = "https://github.com/base-rs/base-scheduler"
 description = "Reusable batched monotonic timers with constant-time cancellation"
 readme = "readme.md"
 

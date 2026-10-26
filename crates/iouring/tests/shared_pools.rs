@@ -3,8 +3,8 @@
 
 #![cfg(target_os = "linux")]
 
-use core_scheduler::*;
-use core_scheduler_iouring::{IoUringDriver, IoUringSelector};
+use base_scheduler::*;
+use base_scheduler_iouring::{IoUringDriver, IoUringSelector};
 use futures_lite::future::{block_on, or, poll_once};
 use std::{net::UdpSocket, pin::pin, sync::Arc, thread::JoinHandle, time::Duration};
 

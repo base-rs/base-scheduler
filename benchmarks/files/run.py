@@ -8,7 +8,7 @@ import subprocess
 from pathlib import Path
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--binary", default="target/release/core-scheduler-file-benchmark")
+parser.add_argument("--binary", default="target/release/base-scheduler-file-benchmark")
 parser.add_argument("--output", type=Path, required=True)
 parser.add_argument("--repeats", type=int, default=7)
 parser.add_argument("--iterations", type=int, default=50000)

@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::{TokioScheduler, TokioSubscription, thread};
-use core_scheduler::{Notify, Signals};
+use base_scheduler::{Notify, Signals};
 use event_listener::Event;
 use signal_hook::iterator::{Handle, Signals as NativeSignals};
 use std::{
@@ -98,7 +98,7 @@ impl SignalService {
             let native_handle = native.handle();
             let shared = Arc::clone(&self.shared);
             shared.state.lock().unwrap().exited = false;
-            if let Err(error) = thread::start("core-tokio-signal", move || {
+            if let Err(error) = thread::start("base-tokio-signal", move || {
                 let _exit = DispatchExit(shared.clone());
                 for signal in native.forever() {
                     shared.dispatch(signal);

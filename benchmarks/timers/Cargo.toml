@@ -1,25 +1,25 @@
 [package]
-name = "core-scheduler-timer-benchmark"
+name = "base-scheduler-timer-benchmark"
 version = "0.0.0"
 edition = "2024"
 rust-version = "1.85"
 publish = false
 
 [dependencies]
-core-scheduler = { path = "../.." }
-core-scheduler-direct = { path = "../../crates/direct" }
-core-scheduler-tokio = { path = "../../crates/tokio" }
-core-scheduler-native = { path = "../../crates/native" }
+base-scheduler = { path = "../.." }
+base-scheduler-direct = { path = "../../crates/direct" }
+base-scheduler-tokio = { path = "../../crates/tokio" }
+base-scheduler-native = { path = "../../crates/native" }
 futures-lite = "2.6.1"
 serde_json = "1"
 tokio = { version = "1.53.3", features = ["rt-multi-thread", "time", "macros", "test-util"] }
 allocation-counter = "0.8.1"
 
 [target.'cfg(target_os = "linux")'.dependencies]
-core-scheduler-iouring = { path = "../../crates/iouring" }
+base-scheduler-iouring = { path = "../../crates/iouring" }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
 
 [dev-dependencies]
-core-scheduler-timers = { path = "../../crates/timers", features = ["local"] }
+base-scheduler-timers = { path = "../../crates/timers", features = ["local"] }

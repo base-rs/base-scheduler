@@ -3,8 +3,8 @@
 
 use super::*;
 use crate::test_support;
-use core_scheduler::{SocketDomain, SocketOpen, SocketType};
-use core_scheduler_conformance::{SocketOptionFixture, SocketRegistrationFixture};
+use base_scheduler::{SocketDomain, SocketOpen, SocketType};
+use base_scheduler_conformance::{SocketOptionFixture, SocketRegistrationFixture};
 use futures_lite::future::block_on;
 use std::sync::atomic::Ordering;
 
@@ -110,22 +110,22 @@ fn run_reuse(test: impl AsyncFnOnce(&Fixture<SocketReuseAddress>) + Send + 'stat
     );
 }
 mod nodelay_get {
-    core_scheduler_conformance::socket_get_option_tests!(run: super::run_nodelay);
+    base_scheduler_conformance::socket_get_option_tests!(run: super::run_nodelay);
 }
 mod nodelay_set {
-    core_scheduler_conformance::socket_set_option_tests!(run: super::run_nodelay);
+    base_scheduler_conformance::socket_set_option_tests!(run: super::run_nodelay);
 }
 mod keepalive_get {
-    core_scheduler_conformance::socket_get_option_tests!(run: super::run_keepalive);
+    base_scheduler_conformance::socket_get_option_tests!(run: super::run_keepalive);
 }
 mod keepalive_set {
-    core_scheduler_conformance::socket_set_option_tests!(run: super::run_keepalive);
+    base_scheduler_conformance::socket_set_option_tests!(run: super::run_keepalive);
 }
 mod reuse_get {
-    core_scheduler_conformance::socket_get_option_tests!(run: super::run_reuse);
+    base_scheduler_conformance::socket_get_option_tests!(run: super::run_reuse);
 }
 mod reuse_set {
-    core_scheduler_conformance::socket_set_option_tests!(run: super::run_reuse);
+    base_scheduler_conformance::socket_set_option_tests!(run: super::run_reuse);
 }
 
 struct RegistrationFixture {
@@ -165,10 +165,10 @@ fn run_ipv6(test: impl AsyncFnOnce(&RegistrationFixture) + Send + 'static) {
     run_registration(SocketDomain::Ipv6, test);
 }
 mod ipv4 {
-    core_scheduler_conformance::socket_registration_tests!(run: super::run_ipv4);
+    base_scheduler_conformance::socket_registration_tests!(run: super::run_ipv4);
 }
 mod ipv6 {
-    core_scheduler_conformance::socket_registration_tests!(run: super::run_ipv6);
+    base_scheduler_conformance::socket_registration_tests!(run: super::run_ipv6);
 }
 
 #[test]
@@ -207,7 +207,7 @@ fn actual_option_syscall_errors_are_preserved() {
                 .socket_get_option(&socket, TcpNoDelay, &Cancellation::never())
                 .await
                 .unwrap_err();
-            let core_scheduler::OperationError::Io(error) = error else {
+            let base_scheduler::OperationError::Io(error) = error else {
                 panic!("lost syscall error")
             };
             assert_eq!(error.raw_os_error(), expected.raw_os_error());
@@ -216,7 +216,7 @@ fn actual_option_syscall_errors_are_preserved() {
                 .socket_set_option(&socket, TcpNoDelay, true, &Cancellation::never())
                 .await
                 .unwrap_err();
-            let core_scheduler::OperationError::Io(error) = error else {
+            let base_scheduler::OperationError::Io(error) = error else {
                 panic!("lost syscall error");
             };
             assert_eq!(error.raw_os_error(), expected.raw_os_error());

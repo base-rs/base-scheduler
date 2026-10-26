@@ -5,7 +5,7 @@ use crate::ReadinessSelector;
 use crate::readiness_socket_packet_reader::ReadinessSocketPacketReader;
 use crate::readiness_socket_packet_writer::ReadinessSocketPacketWriter;
 use crate::readiness_socket_stream_reader::ReadinessSocketStreamReader;
-use core_scheduler::*;
+use base_scheduler::*;
 use std::io;
 impl SocketStreamReading for ReadinessSelector {
     fn socket_stream_reader<'scheduler>(

@@ -3,10 +3,10 @@
 
 #![cfg(target_os = "linux")]
 
-use core_scheduler::*;
-use core_scheduler_conformance::FileTestFixture;
-use core_scheduler_iouring::{IoUringOptions, IoUringSelector};
-use core_scheduler_native::{NativeExecutorOptions, NativeScheduler};
+use base_scheduler::*;
+use base_scheduler_conformance::FileTestFixture;
+use base_scheduler_iouring::{IoUringOptions, IoUringSelector};
+use base_scheduler_native::{NativeExecutorOptions, NativeScheduler};
 use futures_lite::future::block_on;
 use std::{
     future::Future,
@@ -23,7 +23,7 @@ struct Fixture<S> {
     path: PathBuf,
     _directory: tempfile::TempDir,
 }
-impl<S: core_scheduler_conformance::FileTestScheduler> FileTestFixture for Fixture<S> {
+impl<S: base_scheduler_conformance::FileTestScheduler> FileTestFixture for Fixture<S> {
     type Scheduler = S;
     fn scheduler(&self) -> &S {
         &self.scheduler
@@ -137,12 +137,12 @@ macro_rules! ordered_writer_tests {
                         $run(async |fixture| {
                             let scheduler = &fixture.scheduler;
                             let (sender, receiver) =
-                                core_scheduler_conformance::socket::stream_pair(
+                                base_scheduler_conformance::socket::stream_pair(
                                     scheduler,
                                     SocketDomain::Ipv4,
                                 )
                                 .await;
-                            core_scheduler_conformance::socket_stream_writing::$name(
+                            base_scheduler_conformance::socket_stream_writing::$name(
                                 scheduler, &sender, &receiver,
                             )
                             .await;
@@ -161,12 +161,12 @@ macro_rules! ordered_writer_tests {
             fn close_pending() {
                 $run(async |fixture| {
                     let scheduler = &fixture.scheduler;
-                    let (sender, receiver) = core_scheduler_conformance::socket::stream_pair(
+                    let (sender, receiver) = base_scheduler_conformance::socket::stream_pair(
                         scheduler,
                         SocketDomain::Ipv4,
                     )
                     .await;
-                    core_scheduler_conformance::socket_stream_writing::close_pending(
+                    base_scheduler_conformance::socket_stream_writing::close_pending(
                         scheduler, &sender,
                     )
                     .await;
@@ -184,21 +184,21 @@ ordered_writer_tests!(ordered_writer_worker_rings, run_native_workers);
 
 mod native_worker_rings {
     use super::*;
-    core_scheduler_conformance::file_tests!(run: run_native_workers);
-    core_scheduler_conformance::file_resource_tests!(run: run_native_workers);
-    core_scheduler_conformance::file_submission_tests!(run: run_native_workers);
+    base_scheduler_conformance::file_tests!(run: run_native_workers);
+    base_scheduler_conformance::file_resource_tests!(run: run_native_workers);
+    base_scheduler_conformance::file_submission_tests!(run: run_native_workers);
 }
 mod independent_selector {
     use super::*;
-    core_scheduler_conformance::file_tests!(run: run_selector);
-    core_scheduler_conformance::file_resource_tests!(run: run_selector);
-    core_scheduler_conformance::file_submission_tests!(run: run_selector);
+    base_scheduler_conformance::file_tests!(run: run_selector);
+    base_scheduler_conformance::file_resource_tests!(run: run_selector);
+    base_scheduler_conformance::file_submission_tests!(run: run_selector);
 }
 mod native_composition {
     use super::*;
-    core_scheduler_conformance::file_tests!(run: run_native);
-    core_scheduler_conformance::file_resource_tests!(run: run_native);
-    core_scheduler_conformance::file_submission_tests!(run: run_native);
+    base_scheduler_conformance::file_tests!(run: run_native);
+    base_scheduler_conformance::file_resource_tests!(run: run_native);
+    base_scheduler_conformance::file_submission_tests!(run: run_native);
 }
 
 #[test]
@@ -257,9 +257,9 @@ fn composed_tasks_clocks_and_socket_completions_share_one_explicit_scheduler() {
             .await
             .unwrap();
         let (sender, receiver) =
-            core_scheduler_conformance::socket::stream_pair(scheduler, SocketDomain::Ipv4).await;
-        core_scheduler_conformance::socket_messages::stream(scheduler, &sender, &receiver).await;
-        core_scheduler_conformance::socket::stream(scheduler, &sender, &receiver).await;
+            base_scheduler_conformance::socket::stream_pair(scheduler, SocketDomain::Ipv4).await;
+        base_scheduler_conformance::socket_messages::stream(scheduler, &sender, &receiver).await;
+        base_scheduler_conformance::socket::stream(scheduler, &sender, &receiver).await;
         scheduler.socket_close(sender).await.unwrap();
         scheduler.socket_close(receiver).await.unwrap();
     });
@@ -312,7 +312,7 @@ fn fallback_capabilities_compose_with_completion_io() {
                 .unwrap(),
             42
         );
-        core_scheduler_conformance::address_resolution::numeric(scheduler, SocketDomain::Ipv4)
+        base_scheduler_conformance::address_resolution::numeric(scheduler, SocketDomain::Ipv4)
             .await;
         let subscription = scheduler
             .signal_subscribe(&[libc::SIGUSR1], Cancellation::new())
@@ -336,8 +336,8 @@ fn fallback_capabilities_compose_with_completion_io() {
                 .await
                 .unwrap()
         );
-        core_scheduler_conformance::socket_poll::scalar_transfer(scheduler, &client, &server).await;
-        core_scheduler_conformance::socket_poll::message_transfer(scheduler, &client, &server)
+        base_scheduler_conformance::socket_poll::scalar_transfer(scheduler, &client, &server).await;
+        base_scheduler_conformance::socket_poll::message_transfer(scheduler, &client, &server)
             .await;
         scheduler
             .socket_shutdown_submit(&client, Shutdown::Write)
@@ -359,11 +359,11 @@ macro_rules! socket_suites {
     ($name:ident, $run:ident, $scheduler:ty, $domain:expr) => {
         mod $name {
             use super::*;
-            use core_scheduler_selector::NativeSocket;
+            use base_scheduler_selector::NativeSocket;
             fn streams(test: impl AsyncFnOnce(&$scheduler, &NativeSocket, &NativeSocket) + Send + 'static) {
                 $run(async move |fixture| {
                     let scheduler = &fixture.scheduler;
-                    let (sender, receiver) = core_scheduler_conformance::socket::stream_pair(scheduler, $domain).await;
+                    let (sender, receiver) = base_scheduler_conformance::socket::stream_pair(scheduler, $domain).await;
                     test(scheduler, &sender, &receiver).await;
                     scheduler.socket_close(sender).await.unwrap();
                     scheduler.socket_close(receiver).await.unwrap();
@@ -372,7 +372,7 @@ macro_rules! socket_suites {
             fn borrowed_streams(test: impl AsyncFnOnce(&$scheduler, &NativeSocket, &NativeSocket) + Send + 'static) {
                 $run(async move |fixture| {
                     let scheduler = &fixture.scheduler;
-                    let (sender, receiver) = core_scheduler_conformance::socket::stream_pair(scheduler, $domain).await;
+                    let (sender, receiver) = base_scheduler_conformance::socket::stream_pair(scheduler, $domain).await;
                     test(scheduler, &sender, &receiver).await;
                     // Abandonment tests may leave a readiness-only request retiring. Ordinary destruction is safe; fixture shutdown drains those requests before ending the driver.
                     drop(sender);
@@ -399,22 +399,22 @@ macro_rules! socket_suites {
             #[test]
             fn pooled_messages() {
                 $run(async move |fixture| {
-                    core_scheduler_conformance::socket_receiving::messages(&fixture.scheduler).await;
+                    base_scheduler_conformance::socket_receiving::messages(&fixture.scheduler).await;
                 });
             }
             #[test]
             fn pooled_stream_eof() {
                 $run(async move |fixture| {
-                    core_scheduler_conformance::socket_receiving::stream_eof(&fixture.scheduler).await;
+                    base_scheduler_conformance::socket_receiving::stream_eof(&fixture.scheduler).await;
                 });
             }
-            mod scalar { use super::*; core_scheduler_conformance::socket_tests!(run: streams); }
-            mod message { use super::*; core_scheduler_conformance::socket_message_tests!(run: streams); }
-            mod datagram { use super::*; core_scheduler_conformance::socket_datagram_tests!(run: datagrams); }
-            mod borrowed_scalar { use super::*; core_scheduler_conformance::socket_poll_tests!(run: borrowed_streams); }
-            mod borrowed_message { use super::*; core_scheduler_conformance::socket_message_poll_tests!(run: borrowed_streams); }
-            mod borrowed_datagram { use super::*; core_scheduler_conformance::socket_datagram_poll_tests!(run: datagrams); }
-            mod packet_handles { use super::*; core_scheduler_conformance::socket_packet_io_tests!(run: datagrams); }
+            mod scalar { use super::*; base_scheduler_conformance::socket_tests!(run: streams); }
+            mod message { use super::*; base_scheduler_conformance::socket_message_tests!(run: streams); }
+            mod datagram { use super::*; base_scheduler_conformance::socket_datagram_tests!(run: datagrams); }
+            mod borrowed_scalar { use super::*; base_scheduler_conformance::socket_poll_tests!(run: borrowed_streams); }
+            mod borrowed_message { use super::*; base_scheduler_conformance::socket_message_poll_tests!(run: borrowed_streams); }
+            mod borrowed_datagram { use super::*; base_scheduler_conformance::socket_datagram_poll_tests!(run: datagrams); }
+            mod packet_handles { use super::*; base_scheduler_conformance::socket_packet_io_tests!(run: datagrams); }
         }
     };
 }
@@ -460,8 +460,8 @@ fn directional_monitors_work_with_an_independent_driver() {
     run_selector(async |fixture| {
         let scheduler = &fixture.scheduler;
         let (sender, receiver) =
-            core_scheduler_conformance::socket::stream_pair(scheduler, SocketDomain::Ipv4).await;
-        core_scheduler_conformance::socket_resources::stream(scheduler, &sender, &receiver).await;
+            base_scheduler_conformance::socket::stream_pair(scheduler, SocketDomain::Ipv4).await;
+        base_scheduler_conformance::socket_resources::stream(scheduler, &sender, &receiver).await;
         scheduler.socket_close(sender).await.unwrap();
         scheduler.socket_close(receiver).await.unwrap();
     });
@@ -472,8 +472,8 @@ fn directional_monitors_work_through_the_native_scheduler() {
     run_native(async |fixture| {
         let scheduler = &fixture.scheduler;
         let (sender, receiver) =
-            core_scheduler_conformance::socket::stream_pair(scheduler, SocketDomain::Ipv4).await;
-        core_scheduler_conformance::socket_resources::stream(scheduler, &sender, &receiver).await;
+            base_scheduler_conformance::socket::stream_pair(scheduler, SocketDomain::Ipv4).await;
+        base_scheduler_conformance::socket_resources::stream(scheduler, &sender, &receiver).await;
         scheduler.socket_close(sender).await.unwrap();
         scheduler.socket_close(receiver).await.unwrap();
     });
@@ -497,15 +497,15 @@ fn pooled_socket_receivers_work_on_worker_owned_rings() {
         let owned = scheduler.clone();
         scheduler.block_on(async move {
             let (sender, socket) =
-                core_scheduler_conformance::socket::stream_pair(owned.as_ref(), SocketDomain::Ipv4)
+                base_scheduler_conformance::socket::stream_pair(owned.as_ref(), SocketDomain::Ipv4)
                     .await;
-            core_scheduler_conformance::socket_receiving::demand_driven(
+            base_scheduler_conformance::socket_receiving::demand_driven(
                 owned.as_ref(),
                 &sender,
                 &socket,
             )
             .await;
-            core_scheduler_conformance::socket_receiving::stream(owned.as_ref(), &sender, &socket)
+            base_scheduler_conformance::socket_receiving::stream(owned.as_ref(), &sender, &socket)
                 .await;
             owned.socket_close(sender).await.unwrap();
             owned.socket_close(socket).await.unwrap();
@@ -526,13 +526,13 @@ fn pooled_socket_receivers_work_on_worker_owned_rings() {
                 .socket_bind(&socket, "127.0.0.1:0".parse().unwrap(), &never)
                 .await
                 .unwrap();
-            core_scheduler_conformance::socket_poll::datagram_first_poll(
+            base_scheduler_conformance::socket_poll::datagram_first_poll(
                 owned.as_ref(),
                 &sender,
                 &socket,
             )
             .await;
-            core_scheduler_conformance::socket_receiving::datagram(
+            base_scheduler_conformance::socket_receiving::datagram(
                 owned.as_ref(),
                 &sender,
                 &socket,

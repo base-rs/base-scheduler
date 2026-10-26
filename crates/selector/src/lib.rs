@@ -5,7 +5,7 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
 #[cfg(not(any(unix, windows)))]
-compile_error!("core-scheduler-selector currently supports Unix and Windows");
+compile_error!("base-scheduler-selector currently supports Unix and Windows");
 
 mod blocking_pool;
 mod blocking_task;
@@ -87,5 +87,5 @@ mod process_wait;
 #[test]
 #[ignore = "child fixture, invoked by process-wait conformance assertions"]
 fn process_child_fixture() {
-    core_scheduler_conformance::process_wait::child();
+    base_scheduler_conformance::process_wait::child();
 }

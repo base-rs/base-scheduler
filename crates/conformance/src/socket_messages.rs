@@ -5,7 +5,7 @@
 
 use crate::SocketTestScheduler;
 use crate::io::SocketMessage;
-use core_scheduler::*;
+use base_scheduler::*;
 use futures_lite::future::poll_once;
 use std::pin::pin;
 

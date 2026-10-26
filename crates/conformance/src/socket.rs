@@ -5,7 +5,7 @@
 
 use crate::SocketTestScheduler;
 use crate::{SocketIoFixture, SocketIoGuard};
-use core_scheduler::*;
+use base_scheduler::*;
 use futures_lite::future::{poll_once, zip};
 use std::{
     future::{Future, poll_fn},

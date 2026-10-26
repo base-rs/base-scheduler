@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use super::*;
-use core_scheduler::*;
+use base_scheduler::*;
 use std::{collections::VecDeque, marker::PhantomData, sync::Mutex};
 
 struct PartialSocket {

@@ -7,7 +7,7 @@ use crate::{
     thread,
     worker::{self, WorkerState},
 };
-use core_scheduler::SpawnError;
+use base_scheduler::SpawnError;
 use crossbeam_deque::Worker;
 use event_listener::Event;
 use std::{
@@ -168,14 +168,14 @@ impl TaskService {
         for (identifier, queue) in queues.into_iter().enumerate() {
             let shared = Arc::clone(&service.shared);
             let registration = WorkerRegistration::new(&shared);
-            thread::start("core-native-task", move || {
+            thread::start("base-native-task", move || {
                 let _registration = registration;
                 worker::run(shared, identifier, queue)
             })?;
         }
         Ok(service)
     }
-    pub(crate) fn with_drivers<D: core_scheduler_selector::SelectorDriver>(
+    pub(crate) fn with_drivers<D: base_scheduler_selector::SelectorDriver>(
         drivers: Vec<D>,
         timer_capacity: usize,
     ) -> io::Result<Self> {
@@ -188,7 +188,7 @@ impl TaskService {
         for (identifier, (queue, driver)) in queues.into_iter().zip(drivers).enumerate() {
             let shared = Arc::clone(&service.shared);
             let registration = WorkerRegistration::new(&shared);
-            thread::start("core-native-task", move || {
+            thread::start("base-native-task", move || {
                 let _registration = registration;
                 worker::run_driven(shared, identifier, queue, driver)
             })?;

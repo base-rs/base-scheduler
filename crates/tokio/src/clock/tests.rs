@@ -3,7 +3,7 @@
 
 use super::*;
 use crate::test_support;
-use core_scheduler_conformance::ClockFixture;
+use base_scheduler_conformance::ClockFixture;
 use futures_lite::future::{block_on, poll_once};
 use std::{
     sync::atomic::{AtomicUsize, Ordering},
@@ -61,7 +61,7 @@ fn run(test: impl AsyncFnOnce(&Fixture) + Send + 'static) {
     });
 }
 mod conformance {
-    core_scheduler_conformance::clock_tests!(run: super::run);
+    base_scheduler_conformance::clock_tests!(run: super::run);
 }
 
 #[test]
@@ -81,7 +81,7 @@ fn close_preserves_pending_timers_and_rejects_new_waits() {
         cancellation.cancel();
         assert!(matches!(
             cancellable.await,
-            Err(core_scheduler::OperationError::Cancelled(_))
+            Err(base_scheduler::OperationError::Cancelled(_))
         ));
         assert_eq!(
             unpolled.await.unwrap_err().kind(),

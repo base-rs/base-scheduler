@@ -3,7 +3,7 @@
 
 //! Keep the concrete io_uring control separate from the portable pooled receive benchmark.
 
-use core_scheduler::*;
+use base_scheduler::*;
 
 #[cfg(target_os = "linux")]
 pub trait Receiver: Send {
@@ -41,21 +41,21 @@ pub trait Multishot: SocketOperation + BufferPooling + Sync {
     }
 }
 
-impl Multishot for core_scheduler_direct::DirectScheduler {
+impl Multishot for base_scheduler_direct::DirectScheduler {
     #[cfg(target_os = "linux")]
     type Receiver = iouring::RingReceiver;
     #[cfg(all(not(target_os = "linux"), test))]
     type Receiver = std::convert::Infallible;
 }
 
-impl Multishot for core_scheduler_tokio::TokioScheduler {
+impl Multishot for base_scheduler_tokio::TokioScheduler {
     #[cfg(target_os = "linux")]
     type Receiver = iouring::RingReceiver;
     #[cfg(all(not(target_os = "linux"), test))]
     type Receiver = std::convert::Infallible;
 }
 
-impl Multishot for core_scheduler_native::NativeScheduler {
+impl Multishot for base_scheduler_native::NativeScheduler {
     #[cfg(target_os = "linux")]
     type Receiver = iouring::RingReceiver;
     #[cfg(all(not(target_os = "linux"), test))]
@@ -68,7 +68,7 @@ mod tests {
 
     #[test]
     fn portable_backends_reject_the_retired_multishot_control() {
-        let scheduler = core_scheduler_direct::DirectScheduler::new(Default::default()).unwrap();
+        let scheduler = base_scheduler_direct::DirectScheduler::new(Default::default()).unwrap();
         futures_lite::future::block_on(async {
             let never = Cancellation::never();
             let socket = scheduler
@@ -90,14 +90,14 @@ mod tests {
 #[cfg(target_os = "linux")]
 mod iouring {
     use super::*;
-    use core_scheduler_iouring::{IoUringSelector, RecvMsgMultishot, RecvMsgMultishotOptions};
-    use core_scheduler_native::NativeScheduler;
+    use base_scheduler_iouring::{IoUringSelector, RecvMsgMultishot, RecvMsgMultishotOptions};
+    use base_scheduler_native::NativeScheduler;
 
     pub struct RingReceiver(RecvMsgMultishot);
 
     impl Receiver for RingReceiver {
         type Message =
-            core_scheduler_iouring::IoUringRecvMessage<core_scheduler_iouring::RecvMsgBuffer>;
+            base_scheduler_iouring::IoUringRecvMessage<base_scheduler_iouring::RecvMsgBuffer>;
 
         async fn recv(
             &mut self,

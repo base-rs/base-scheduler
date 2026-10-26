@@ -1,14 +1,14 @@
-# `core-scheduler-selector`
+# `base-scheduler-selector`
 
 I/O capabilities independent of an executor. `ReadinessSelector` supplies socket operations through `async-io`, file and resolver operations through bounded native workers, and platform-supported signals. It can be polled from any executor while its services remain alive.
 
 ## Usage
 
-Add this package with `cargo add core-scheduler core-scheduler-selector`.
+Add this package with `cargo add base-scheduler base-scheduler-selector`.
 
 ```rust
-use core_scheduler::{Cancellation, SocketClose, SocketDomain, SocketOpen, SocketType};
-use core_scheduler_selector::ReadinessSelector;
+use base_scheduler::{Cancellation, SocketClose, SocketDomain, SocketOpen, SocketType};
+use base_scheduler_selector::ReadinessSelector;
 
 # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 let selector = ReadinessSelector::new()?;
@@ -22,7 +22,7 @@ selector.shutdown().await;
 
 ## Ownership and driving
 
-`Selector` describes admission and asynchronous retirement. Individual operations use the existing `core-scheduler` capability traits. Concrete selectors document how their event driver is run; the lifecycle interface does not create threads or require a universal set of operations.
+`Selector` describes admission and asynchronous retirement. Individual operations use the existing `base-scheduler` capability traits. Concrete selectors document how their event driver is run; the lifecycle interface does not create threads or require a universal set of operations.
 
 Call `shutdown().await` after coordinating application cancellation and cleanup. Dropping a selector closes admission without synchronously waiting; backend workers retain accepted I/O until access ends.
 
@@ -46,4 +46,4 @@ The [workspace overview](../../readme.md) describes the interface and companion 
 
 ## Contributing
 
-Please open an issue or pull request on [GitHub](https://github.com/core-rs/core-scheduler).
+Please open an issue or pull request on [GitHub](https://github.com/base-rs/base-scheduler).

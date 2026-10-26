@@ -4,7 +4,7 @@
 use crate::Interest;
 use crate::socket_write_state::SocketWriteState;
 use crate::{TokioScheduler, TokioSocket, TokioTask, socket_io};
-use core_scheduler::{
+use base_scheduler::{
     Cancellation, IoBuf, OperationError, OperationResult, SocketSendFlags, SocketStreamWriter,
 };
 use std::{
@@ -29,7 +29,7 @@ impl TokioScheduler {
         socket: &TokioSocket,
     ) -> io::Result<TokioStreamWriter<'_, B>> {
         self.check_socket(socket)?;
-        if socket_io::recvmsg_socket_type(socket.get_ref())? != core_scheduler::SocketType::Stream {
+        if socket_io::recvmsg_socket_type(socket.get_ref())? != base_scheduler::SocketType::Stream {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "ordered writers require a stream socket",
@@ -78,7 +78,7 @@ impl<B: IoBuf> SocketStreamWriter for TokioStreamWriter<'_, B> {
     async fn write_vectored_with_flags(
         &mut self,
         buffers: &[std::io::IoSlice<'_>],
-        flags: core_scheduler::SocketSendFlags,
+        flags: base_scheduler::SocketSendFlags,
         cancellation: &Cancellation,
     ) -> OperationResult<usize> {
         self.state.check_open()?;
@@ -90,10 +90,10 @@ impl<B: IoBuf> SocketStreamWriter for TokioStreamWriter<'_, B> {
             .await
     }
 
-    async fn write_owned_vectored<Buffers: core_scheduler::IoBufSequence>(
+    async fn write_owned_vectored<Buffers: base_scheduler::IoBufSequence>(
         &mut self,
         buffers: Buffers,
-        flags: core_scheduler::SocketSendFlags,
+        flags: base_scheduler::SocketSendFlags,
         cancellation: &Cancellation,
     ) -> (OperationResult<usize>, Buffers) {
         if let Err(error) = self.state.check_open() {
@@ -118,11 +118,11 @@ impl<B: IoBuf> SocketStreamWriter for TokioStreamWriter<'_, B> {
         (result, message.buffers)
     }
 
-    async fn write_owned<Owned: core_scheduler::IoBuf>(
+    async fn write_owned<Owned: base_scheduler::IoBuf>(
         &mut self,
         buffer: Owned,
         cancellation: &Cancellation,
-    ) -> core_scheduler::BufferResult<Owned> {
+    ) -> base_scheduler::BufferResult<Owned> {
         if let Err(error) = self.state.check_open() {
             return (Err(error), buffer);
         }
@@ -241,7 +241,7 @@ async fn write_remaining<B: IoBuf>(
             if cancelled.as_mut().poll(context).is_ready()
                 || stopped.as_mut().poll(context).is_ready()
             {
-                return Poll::Ready(Err(core_scheduler::Cancelled.into()));
+                return Poll::Ready(Err(base_scheduler::Cancelled.into()));
             }
             Poll::Pending
         })
@@ -267,19 +267,19 @@ fn send(socket: &socket2::Socket, bytes: &[u8]) -> io::Result<usize> {
     if let Some(result) = tests::SEND_RESULTS.with(|results| results.borrow_mut().pop_front()) {
         return result;
     }
-    socket_io::send_poll(socket, bytes, core_scheduler::SocketSendFlags::default())
+    socket_io::send_poll(socket, bytes, base_scheduler::SocketSendFlags::default())
 }
 
 #[cfg(test)]
 mod tests;
 
-impl core_scheduler::SocketStreamWriting for TokioScheduler {
+impl base_scheduler::SocketStreamWriting for TokioScheduler {
     fn socket_stream_writer<'scheduler>(
         &'scheduler self,
         socket: &Self::Socket,
     ) -> io::Result<
-        impl core_scheduler::SocketStreamWriter<
-            Buffer = <Self::Pool as core_scheduler::BufferPool>::Buffer,
+        impl base_scheduler::SocketStreamWriter<
+            Buffer = <Self::Pool as base_scheduler::BufferPool>::Buffer,
         > + 'scheduler,
     >
     where
@@ -291,7 +291,7 @@ impl core_scheduler::SocketStreamWriting for TokioScheduler {
     fn socket_stream_writer_with_buffer<'scheduler, B: IoBuf>(
         &'scheduler self,
         socket: &Self::Socket,
-    ) -> io::Result<impl core_scheduler::SocketStreamWriter<Buffer = B> + 'scheduler>
+    ) -> io::Result<impl base_scheduler::SocketStreamWriter<Buffer = B> + 'scheduler>
     where
         Self::Socket: 'static,
     {
