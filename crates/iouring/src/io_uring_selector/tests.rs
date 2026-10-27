@@ -99,7 +99,7 @@ pub(super) fn file(selector: &IoUringSelector) -> (tempfile::TempDir, NativeFile
     .unwrap();
     (directory, file)
 }
-fn fifo(selector: &IoUringSelector) -> (tempfile::TempDir, NativeFile) {
+pub(super) fn fifo(selector: &IoUringSelector) -> (tempfile::TempDir, NativeFile) {
     use std::os::unix::ffi::OsStrExt;
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("fifo");
