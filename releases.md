@@ -1,5 +1,9 @@
 # Releases
 
+## Unreleased
+
+- Add compile-time `SocketStreamReader::with_oob_support` selection, disabled by default. Native Linux epoll avoids an extra receive after ordinary short scalar reads and rejects reported urgent data; opt-in support preserves ordinary-byte progress across urgent marks. Other receive paths retain conservative behavior.
+
 ## v0.1.2
 
 - Avoid retrying blocked fallback socket operations on unrelated task wakes, reducing io\_uring listener overhead while preserving immediate I/O progress.
