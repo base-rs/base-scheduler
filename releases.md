@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Avoid an extra `WouldBlock` receive after short borrowed scalar stream reads on io\_uring when OOB support is disabled. Preserve EOF notifications, racing readiness, cancellation and registration retirement; opt-in OOB and message receives keep conservative retries.
+
 - Add compile-time `SocketStreamReader::with_oob_support` selection, disabled by default. Native Linux epoll avoids an extra receive after ordinary short scalar reads and rejects reported urgent data; opt-in support preserves ordinary-byte progress across urgent marks. Other receive paths retain conservative behavior.
 
 ## v0.1.2

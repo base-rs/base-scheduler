@@ -46,11 +46,15 @@ fn urgent<const OOB: bool>(consume_urgent: bool) {
         worker.turn(Some(Duration::from_millis(1))).unwrap();
         assert_eq!(drive(reading, &mut worker).unwrap(), 1);
     }
-    peer.write_all(b"before").unwrap();
+    if OOB {
+        peer.write_all(b"before").unwrap();
+    }
     socket2::SockRef::from(&peer)
         .send_with_flags(b"!", libc::MSG_OOB)
         .unwrap();
-    peer.write_all(b"after").unwrap();
+    if OOB {
+        peer.write_all(b"after").unwrap();
+    }
     std::thread::sleep(Duration::from_millis(10));
     if consume_urgent {
         let mut urgent = [std::mem::MaybeUninit::uninit(); 1];
@@ -62,6 +66,26 @@ fn urgent<const OOB: bool>(consume_urgent: bool) {
                 .unwrap(),
             1
         );
+    }
+    if !OOB {
+        worker.turn(Some(Duration::from_millis(10))).unwrap();
+        assert_eq!(
+            drive(reader.read_into(&mut buffer, &never), &mut worker)
+                .unwrap_err()
+                .kind(),
+            io::ErrorKind::Unsupported
+        );
+        // Urgent state remains sticky after normal readiness is consumed.
+        assert_eq!(
+            block_on(reader.read_into(&mut buffer, &never))
+                .unwrap_err()
+                .kind(),
+            io::ErrorKind::Unsupported
+        );
+    }
+    let mut reader = reader.with_oob_support::<true>();
+    if !OOB {
+        peer.write_all(b"beforeafter").unwrap();
     }
     let mut received = Vec::new();
     while received.len() < 11 {
@@ -88,7 +112,7 @@ fn urgent<const OOB: bool>(consume_urgent: bool) {
 }
 
 #[test]
-fn default_conservative_path_keeps_normal_data_readable_at_urgent_marks() {
+fn default_reader_rejects_reported_urgent_data_and_can_opt_in() {
     urgent::<false>(false);
 }
 

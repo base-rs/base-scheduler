@@ -16,17 +16,18 @@ use std::{
 };
 
 /// A scheduler-bound stream reader with reusable registration and lazily allocated receive storage. Normally obtained through [`SocketStreamReading`](base_scheduler::SocketStreamReading).
-pub(crate) struct IoUringSocketStreamReader<'a> {
+pub(crate) struct IoUringSocketStreamReader<'a, const SUPPORT_OOB: bool = false> {
     scheduler: &'a IoUringSelector,
     operations: crate::operation_state::OperationState,
     owned: Option<crate::io_uring_selector::socket_read::State>,
     monitor: MonitorStorage,
     pool: Option<IoUringBufferPool>,
+    probe: bool,
     eof: bool,
     closed: bool,
 }
 
-impl<'a> IoUringSocketStreamReader<'a> {
+impl<'a, const SUPPORT_OOB: bool> IoUringSocketStreamReader<'a, SUPPORT_OOB> {
     /// Construct the default backend composition without submitting payload I/O. Applications normally use the scheduler factory.
     pub(crate) fn new(scheduler: &'a IoUringSelector, socket: &NativeSocket) -> io::Result<Self> {
         if scheduler.socket_type(socket)? != base_scheduler::SocketType::Stream {
@@ -41,6 +42,7 @@ impl<'a> IoUringSocketStreamReader<'a> {
             owned: None,
             monitor: scheduler.socket_monitor(socket, Interest::Readable),
             pool: None,
+            probe: true,
             eof: false,
             closed: false,
         })
@@ -62,8 +64,21 @@ impl<'a> IoUringSocketStreamReader<'a> {
     }
 }
 
-impl SocketStreamReader for IoUringSocketStreamReader<'_> {
+impl<const SUPPORT_OOB: bool> SocketStreamReader for IoUringSocketStreamReader<'_, SUPPORT_OOB> {
     type Buffer = <IoUringBufferPool as BufferPool>::Buffer;
+
+    fn with_oob_support<const OOB: bool>(self) -> impl SocketStreamReader<Buffer = Self::Buffer> {
+        IoUringSocketStreamReader::<OOB> {
+            scheduler: self.scheduler,
+            operations: self.operations,
+            owned: self.owned,
+            monitor: self.monitor,
+            pool: self.pool,
+            probe: true,
+            eof: self.eof,
+            closed: self.closed,
+        }
+    }
 
     async fn read(&mut self, cancellation: &Cancellation) -> OperationResult<Option<Self::Buffer>> {
         cancellation.check()?;
@@ -123,10 +138,10 @@ impl SocketStreamReader for IoUringSocketStreamReader<'_> {
         }
         let count = self
             .scheduler
-            .socket_monitor_recv_poll(
+            .socket_stream_recv_poll::<SUPPORT_OOB>(
                 &mut self.monitor,
+                &mut self.probe,
                 buffer,
-                SocketRecvFlags::default(),
                 cancellation,
             )
             .await?;

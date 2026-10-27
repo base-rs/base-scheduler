@@ -9,6 +9,11 @@ use std::task::Waker;
 
 pub(super) const MONITOR_TAG: u64 = 1;
 const NO_SLOT: usize = usize::MAX;
+// Low bits retain conditions that make a short stream read unsafe to treat as
+// drained. The upper bits identify a notification, including across wraparound.
+const READ_CLOSED: u64 = 1;
+const URGENT: u64 = 2;
+const NEXT_GENERATION: u64 = 4;
 pub(crate) type State = SocketMonitor;
 pub(crate) type Storage = MonitorStorage;
 
@@ -51,15 +56,28 @@ impl IoUringMonitorRegistration {
     }
 
     fn clear_readiness(&self, observed: u64) {
-        // A WouldBlock consumes only the notification observed before its syscall. A later notification remains ready without a read-modify-write on either side.
+        // A drained read consumes only the notification observed before its syscall. A later notification remains ready without a read-modify-write on either side.
         self.cleared.store(observed, Ordering::Release);
     }
 
-    fn notify(&self) {
+    fn notify(&self, events: i32) {
         let waker = {
             let mut status = self.status.lock().unwrap();
-            // The status lock serializes publishers. Readers snapshot this wrapping generation before their syscall and clear that generation only after WouldBlock.
-            let next = self.readiness.load(Ordering::Relaxed).wrapping_add(1);
+            // The status lock serializes publishers. Sticky closure and urgent
+            // flags survive both subsequent notifications and readiness clears.
+            let closed = events & (libc::POLLRDHUP | libc::POLLHUP | libc::POLLERR) as i32 != 0;
+            // TCP's ordinary wake key includes POLLPRI too; ring poll
+            // completions can forward that hint without vfs_poll. Only an
+            // isolated priority notification is unambiguous here. Disabled OOB
+            // support does not guarantee detection; enabled reads probe until
+            // WouldBlock regardless of these hints.
+            let urgent = events & (libc::POLLPRI | libc::POLLIN) as i32 == libc::POLLPRI as i32;
+            let flags = (u64::from(closed) * READ_CLOSED) | (u64::from(urgent) * URGENT);
+            let next = self
+                .readiness
+                .load(Ordering::Relaxed)
+                .wrapping_add(NEXT_GENERATION)
+                | flags;
             self.readiness.store(next, Ordering::Release);
             status.waker.take()
         };
@@ -330,6 +348,70 @@ impl IoUringSelector {
         })
         .await
     }
+    // Ordinary scalar reads can wait after draining a stream. Flagged/message
+    // receives retain their syscall-first semantics, as does OOB-enabled input:
+    // an urgent mark can stop a short read while normal data remains queued.
+    pub(crate) async fn socket_stream_recv_poll<const SUPPORT_OOB: bool>(
+        &self,
+        monitor: &mut Storage,
+        probe: &mut bool,
+        buffer: &mut [u8],
+        cancellation: &Cancellation,
+    ) -> OperationResult<usize> {
+        if SUPPORT_OOB {
+            return self
+                .socket_monitor_recv_poll(monitor, buffer, SocketRecvFlags::default(), cancellation)
+                .await;
+        }
+        let state = monitor.as_ref();
+        let registration = state.registration();
+        let mut route = None;
+        let mut wait = Wait::new(registration);
+        let mut cancelled = pin!(cancellation.cancelled());
+        poll_fn(|context| {
+            loop {
+                cancellation.check()?;
+                self.check_monitor(state)?;
+                let observed = registration.readiness.load(Ordering::Acquire);
+                if observed & URGENT != 0 {
+                    return Poll::Ready(Err(io::Error::new(
+                        io::ErrorKind::Unsupported,
+                        "TCP urgent data is not supported by this reader",
+                    )
+                    .into()));
+                }
+                if *probe || registration.is_ready() {
+                    match syscall("monitor-recv", || {
+                        crate::retained_socket::recv(
+                            state.socket(),
+                            buffer,
+                            SocketRecvFlags::default(),
+                        )
+                    }) {
+                        Ok(count) => {
+                            *probe = count == buffer.len() || observed & READ_CLOSED != 0;
+                            if count != 0 && !*probe {
+                                registration.clear_readiness(observed);
+                            }
+                            return Poll::Ready(Ok(count));
+                        }
+                        Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                            *probe = false;
+                            registration.clear_readiness(observed);
+                        }
+                        Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+                        Err(error) => return Poll::Ready(Err(error.into())),
+                    }
+                }
+                let controller = route.get_or_insert_with(|| self.route_ref());
+                if cancelled.as_mut().poll(context).is_ready() {
+                    return Poll::Ready(Err(base_scheduler::Cancelled.into()));
+                }
+                std::task::ready!(self.poll_monitor_wait(monitor, controller, &mut wait, context))?;
+            }
+        })
+        .await
+    }
     pub(crate) async fn socket_monitor_send_poll(
         &self,
         monitor: &mut Storage,
@@ -454,7 +536,7 @@ impl Monitors {
             self.slots.len() - 1
         });
         let events = match submission.storage.interest() {
-            Interest::Readable => libc::POLLIN | libc::POLLRDHUP,
+            Interest::Readable => libc::POLLIN | libc::POLLPRI | libc::POLLRDHUP,
             Interest::Writable => libc::POLLOUT,
         };
         let entry = opcode::PollAdd::new(
@@ -517,9 +599,10 @@ impl Monitors {
                     result >= 0,
                     "multishot poll errors carry a final CQE without MORE"
                 );
-                entry.submission.storage.registration().notify();
+                entry.submission.storage.registration().notify(result);
                 return;
             }
+            let events = result;
             let result = if result < 0 {
                 Err(io::Error::from_raw_os_error(-result))
             } else {
@@ -536,7 +619,7 @@ impl Monitors {
                 entry.original = Some(Ok(()));
             } else {
                 if result.is_ok() {
-                    entry.submission.storage.registration().notify();
+                    entry.submission.storage.registration().notify(events);
                 }
                 entry.original = Some(result);
             }
