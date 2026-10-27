@@ -10,9 +10,15 @@ use polling::{Event, PollMode};
 mod kqueue;
 #[cfg(target_os = "macos")]
 use kqueue::{Events, Poller};
-#[cfg(not(target_os = "macos"))]
+#[cfg(target_os = "linux")]
+mod epoll;
+#[cfg(target_os = "linux")]
+use epoll::Events;
+#[cfg(all(target_os = "linux", not(test)))]
+use epoll::Poller;
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
 use polling::Events;
-#[cfg(all(not(target_os = "macos"), not(test)))]
+#[cfg(all(not(any(target_os = "macos", target_os = "linux")), not(test)))]
 use polling::Poller;
 #[cfg(all(not(target_os = "macos"), test))]
 mod test_poller;
@@ -382,8 +388,13 @@ struct DriverState {
 }
 
 impl DriverState {
-    fn dispatch(&self) {
+    fn dispatch(&self) -> io::Result<()> {
         for event in self.events.iter() {
+            #[cfg(target_os = "linux")]
+            if event.key == epoll::INTERRUPT {
+                self.controller.poller.clear_notification()?;
+                continue;
+            }
             #[cfg(target_os = "macos")]
             let (event, available, read_closed) =
                 (event.readiness, event.available, event.read_closed);
@@ -424,6 +435,7 @@ impl DriverState {
                 registration.writable.publish();
             }
         }
+        Ok(())
     }
 }
 
@@ -550,7 +562,14 @@ impl SelectorWorker for ReadinessWorker {
             inner.group.close();
             return Err(error);
         }
-        inner.dispatch();
+        #[cfg(target_os = "linux")]
+        if let Err(error) = inner.dispatch() {
+            inner.group.close();
+            return Err(error);
+        }
+        // Only Linux drains a fallible native notification descriptor.
+        #[cfg(not(target_os = "linux"))]
+        let _ = inner.dispatch();
         Ok(inner.group.closed.is_cancelled())
     }
 }

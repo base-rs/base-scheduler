@@ -627,7 +627,7 @@ fn collected_pointers_survive_remote_retirement_and_reclaim_at_the_next_boundary
         }
         // This dereferences the collected token after every external record
         // owner has gone. Inactive records must stay alive and be skipped.
-        inner.dispatch();
+        inner.dispatch().unwrap();
         assert_eq!(weak.upgrade().unwrap().readable.snapshot(), 0);
         workers[0].turn(Some(Duration::ZERO)).unwrap();
         assert!(weak.upgrade().is_none());
@@ -754,7 +754,13 @@ fn closing_one_worker_preserves_another_workers_collected_batch() {
     drop(socket);
     workers.remove(0); // Closes the whole group and reclaims only its own table.
     assert!(weak.upgrade().is_some());
-    workers[0].driver.inner.as_ref().unwrap().dispatch();
+    workers[0]
+        .driver
+        .inner
+        .as_ref()
+        .unwrap()
+        .dispatch()
+        .unwrap();
     drop(workers);
     assert!(weak.upgrade().is_none());
 }
@@ -897,7 +903,7 @@ fn the_first_callback_can_remotely_replace_sources_in_the_rest_of_the_batch() {
                 "both sources were not collected"
             );
         }
-        inner.dispatch();
+        inner.dispatch().unwrap();
         assert_eq!(
             registrations
                 .iter()

@@ -10,6 +10,8 @@ The [idle-search comparison](results/idle-search/readme.md) measures skipping Na
 
 The [completion-cost follow-up](results/worker-completions/readme.md) profiles the remaining busy single-worker gap, compares Tokio read policies, and measures rejected ring-policy and completion-collection refinements.
 
+The [native epoll comparison](native-epoll.md) measures worker-driven Linux readiness against the existing `polling` backend using the downstream HTTP hello workload, with precise timeouts and compatibility fallbacks.
+
 The [initial Aiko results](results.md) include throughput, latency, variation across repetitions, and raw samples.
 
 The [Native monitor polling investigation](native-monitor.md) measures syscall-first resumption and records the rejected monitor-bookkeeping and ring-send experiments.

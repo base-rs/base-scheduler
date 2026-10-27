@@ -1,0 +1,1263 @@
+diff --git a/crates/selector/readme.md b/crates/selector/readme.md
+index 375de9d..c59da30 100644
+--- a/crates/selector/readme.md
++++ b/crates/selector/readme.md
+@@ -26,7 +26,7 @@ selector.shutdown().await;
+ 
+ Call `shutdown().await` after coordinating application cancellation and cleanup. Dropping a selector closes admission without synchronously waiting; backend workers retain accepted I/O until access ends.
+ 
+-`SelectorDriver` and `SelectorWorker` support executor-owned event loops. A movable driver enters one worker, consuming itself into a possibly thread-bound owner. That owner provides interruptible waits and bounded completion batches. Completion processing wakes tasks; the executor polls its ready queue only after the driver returns. `ReadinessSelector::new` and `with_options` retain independent `async-io` progress. `with_workers(options, workers)` returns the selector and one `ReadinessDriver` per worker, suitable for `NativeScheduler::with_drivers`. On macOS these drivers own kqueues directly, using persistent `EV_CLEAR` filters and `EVFILT_USER` interruption. Other edge-capable platforms use `polling`; platforms without edge support retain independent progress and return retired drivers. Windows compiles only this retired-driver facade, without allocating worker-registration state or an unused poller. Kqueue writes into one reusable native-event vector; dispatch interprets its initialized entries directly, without a normalized event buffer or a separate conversion pass. Clearing the batch still precedes registration reclamation.
++`SelectorDriver` and `SelectorWorker` support executor-owned event loops. A movable driver enters one worker, consuming itself into a possibly thread-bound owner. That owner provides interruptible waits and bounded completion batches. Completion processing wakes tasks; the executor polls its ready queue only after the driver returns. `ReadinessSelector::new` and `with_options` retain independent `async-io` progress. `with_workers(options, workers)` returns the selector and one `ReadinessDriver` per worker, suitable for `NativeScheduler::with_drivers`. On macOS these drivers own kqueues directly, using persistent `EV_CLEAR` filters and `EVFILT_USER` interruption. Linux drivers own epoll, persistent edge registrations, and an eventfd directly, with precise finite waits supplied by a monotonic timerfd. Construction retains `polling` when native eventfd or timerfd creation fails. Other edge-capable platforms use `polling`; platforms without edge support retain independent progress and return retired drivers. Windows compiles only this retired-driver facade, without allocating worker-registration state or an unused poller. Native kqueue and epoll write into one reusable native-event vector; dispatch interprets its initialized entries directly, without a normalized event buffer or a separate conversion pass. Clearing the batch still precedes registration reclamation.
+ 
+ Worker-driven sockets register lazily after `WouldBlock`. Routing uses the explicitly selected selector's current worker, or round-robin for root and external callers. Each socket keeps its first owner within that selector group even when a future moves. Independent listeners support concurrent waits in either direction. Event generations prevent a racing `WouldBlock` from clearing a newer notification. The final socket alias deregisters synchronously before releasing its descriptor, including on another thread. Driver closure wakes pending operations; it never retains application payload pointers.
+ 
+diff --git a/crates/selector/src/readiness_driver.rs b/crates/selector/src/readiness_driver.rs
+index d91c7ee..70413e4 100644
+--- a/crates/selector/src/readiness_driver.rs
++++ b/crates/selector/src/readiness_driver.rs
+@@ -10,9 +10,15 @@ use polling::{Event, PollMode};
+ mod kqueue;
+ #[cfg(target_os = "macos")]
+ use kqueue::{Events, Poller};
+-#[cfg(not(target_os = "macos"))]
++#[cfg(target_os = "linux")]
++mod epoll;
++#[cfg(target_os = "linux")]
++use epoll::Events;
++#[cfg(all(target_os = "linux", not(test)))]
++use epoll::Poller;
++#[cfg(not(any(target_os = "macos", target_os = "linux")))]
+ use polling::Events;
+-#[cfg(all(not(target_os = "macos"), not(test)))]
++#[cfg(all(not(any(target_os = "macos", target_os = "linux")), not(test)))]
+ use polling::Poller;
+ #[cfg(all(not(target_os = "macos"), test))]
+ mod test_poller;
+@@ -382,8 +388,13 @@ struct DriverState {
+ }
+ 
+ impl DriverState {
+-    fn dispatch(&self) {
++    fn dispatch(&self) -> io::Result<()> {
+         for event in self.events.iter() {
++            #[cfg(target_os = "linux")]
++            if event.key == epoll::INTERRUPT {
++                self.controller.poller.clear_notification()?;
++                continue;
++            }
+             #[cfg(target_os = "macos")]
+             let (event, available, read_closed) =
+                 (event.readiness, event.available, event.read_closed);
+@@ -424,6 +435,7 @@ impl DriverState {
+                 registration.writable.publish();
+             }
+         }
++        Ok(())
+     }
+ }
+ 
+@@ -550,7 +562,14 @@ impl SelectorWorker for ReadinessWorker {
+             inner.group.close();
+             return Err(error);
+         }
+-        inner.dispatch();
++        #[cfg(target_os = "linux")]
++        if let Err(error) = inner.dispatch() {
++            inner.group.close();
++            return Err(error);
++        }
++        // Only Linux drains a fallible native notification descriptor.
++        #[cfg(not(target_os = "linux"))]
++        let _ = inner.dispatch();
+         Ok(inner.group.closed.is_cancelled())
+     }
+ }
+diff --git a/crates/selector/src/readiness_driver/epoll.rs b/crates/selector/src/readiness_driver/epoll.rs
+new file mode 100644
+index 0000000..47d79fd
+--- /dev/null
++++ b/crates/selector/src/readiness_driver/epoll.rs
+@@ -0,0 +1,322 @@
++// Released under the MIT License.
++// Copyright, 2026, by Samuel Williams.
++
++//! Worker-owned Linux epoll. One worker owns each wait loop and result buffer.
++
++use polling::{Event, PollMode};
++use std::{
++    io,
++    os::fd::{AsRawFd, FromRawFd, OwnedFd},
++    ptr,
++    time::Duration,
++};
++mod syscalls;
++
++pub(super) const INTERRUPT: usize = usize::MAX;
++const TIMER: usize = usize::MAX - 1;
++const BATCH: usize = 1024;
++const READ: u32 = (libc::EPOLLIN | libc::EPOLLPRI | libc::EPOLLERR | libc::EPOLLHUP) as u32;
++const WRITE: u32 = (libc::EPOLLOUT | libc::EPOLLERR | libc::EPOLLHUP) as u32;
++
++pub(super) struct Poller {
++    backend: Backend,
++}
++enum Backend {
++    Native(NativePoller),
++    Compatible(polling::Poller),
++}
++impl Poller {
++    pub(super) fn new() -> io::Result<Self> {
++        let backend = match NativePoller::try_new()? {
++            Some(native) => Backend::Native(native),
++            // Choose compatibility before exposing any socket registrations. polling retains its optional timerfd and pipe-notifier fallbacks.
++            None => Backend::Compatible(syscalls::compatible_new()?),
++        };
++        Ok(Self { backend })
++    }
++    pub(super) fn supports_edge(&self) -> bool {
++        match &self.backend {
++            Backend::Native(_) => true,
++            Backend::Compatible(poller) => poller.supports_edge(),
++        }
++    }
++    /// The socket must remain owned until synchronous deletion succeeds or this poller stops.
++    pub(super) unsafe fn add_with_mode(
++        &self,
++        socket: &socket2::Socket,
++        event: Event,
++        mode: PollMode,
++    ) -> io::Result<()> {
++        match &self.backend {
++            Backend::Native(poller) => {
++                debug_assert_eq!(mode, PollMode::Edge);
++                poller.change(
++                    libc::EPOLL_CTL_ADD,
++                    socket.as_raw_fd(),
++                    event.key,
++                    flags(event) | libc::EPOLLET as u32,
++                )
++            }
++            // SAFETY: The caller retains the socket through deletion or poller shutdown.
++            Backend::Compatible(poller) => unsafe { poller.add_with_mode(socket, event, mode) },
++        }
++    }
++    pub(super) fn delete(&self, socket: &socket2::Socket) -> io::Result<()> {
++        match &self.backend {
++            Backend::Native(poller) => poller.change(libc::EPOLL_CTL_DEL, socket.as_raw_fd(), 0, 0),
++            Backend::Compatible(poller) => poller.delete(socket),
++        }
++    }
++    pub(super) fn notify(&self) -> io::Result<()> {
++        match &self.backend {
++            Backend::Native(poller) => poller.notify(),
++            Backend::Compatible(poller) => poller.notify(),
++        }
++    }
++    pub(super) fn clear_notification(&self) -> io::Result<()> {
++        match &self.backend {
++            Backend::Native(poller) => poller.clear_notification(),
++            Backend::Compatible(_) => {
++                unreachable!("polling filters its notification token before dispatch")
++            }
++        }
++    }
++    pub(super) fn wait(&self, events: &mut Events, timeout: Option<Duration>) -> io::Result<usize> {
++        match &self.backend {
++            Backend::Native(poller) => poller.wait(&mut events.raw, timeout),
++            Backend::Compatible(poller) => {
++                let compatible = events.compatible.get_or_insert_with(polling::Events::new);
++                compatible.clear();
++                let count = syscalls::compatible_wait(poller, compatible, timeout)?;
++                // Normalize only the compatibility path; the native worker dispatches directly from its kernel result vector.
++                events
++                    .raw
++                    .extend(compatible.iter().map(|event| libc::epoll_event {
++                        events: (u32::from(event.readable) * libc::EPOLLIN as u32)
++                            | (u32::from(event.writable) * libc::EPOLLOUT as u32),
++                        u64: event.key as u64,
++                    }));
++                Ok(count)
++            }
++        }
++    }
++}
++fn flags(event: Event) -> u32 {
++    let mut flags = 0;
++    if event.readable {
++        flags |= READ;
++    }
++    if event.writable {
++        flags |= WRITE;
++    }
++    flags
++}
++
++struct NativePoller {
++    queue: OwnedFd,
++    interrupt: OwnedFd,
++    timer: OwnedFd,
++}
++impl NativePoller {
++    fn try_new() -> io::Result<Option<Self>> {
++        // SAFETY: The calls create new descriptors with no borrowed storage.
++        let queue = owned(unsafe { syscalls::epoll_create1(libc::EPOLL_CLOEXEC) })?;
++        let Ok(interrupt) =
++            owned(unsafe { syscalls::eventfd(0, libc::EFD_CLOEXEC | libc::EFD_NONBLOCK) })
++        else {
++            return Ok(None);
++        };
++        let Ok(timer) = owned(unsafe {
++            syscalls::timerfd_create(
++                libc::CLOCK_MONOTONIC,
++                libc::TFD_CLOEXEC | libc::TFD_NONBLOCK,
++            )
++        }) else {
++            // polling treats timerfd as optional, including when descriptor limits prevent creating it.
++            return Ok(None);
++        };
++        let poller = Self {
++            queue,
++            interrupt,
++            timer,
++        };
++        poller.change(
++            libc::EPOLL_CTL_ADD,
++            poller.interrupt.as_raw_fd(),
++            INTERRUPT,
++            libc::EPOLLIN as u32,
++        )?;
++        poller.change(
++            libc::EPOLL_CTL_ADD,
++            poller.timer.as_raw_fd(),
++            TIMER,
++            libc::EPOLLIN as u32,
++        )?;
++        Ok(Some(poller))
++    }
++    fn change(&self, operation: i32, descriptor: i32, key: usize, flags: u32) -> io::Result<()> {
++        let mut event = libc::epoll_event {
++            events: flags,
++            u64: key as u64,
++        };
++        loop {
++            // SAFETY: Descriptor owners and event storage live through this synchronous call.
++            let result = unsafe {
++                syscalls::epoll_ctl(self.queue.as_raw_fd(), operation, descriptor, &mut event)
++            };
++            if result >= 0 {
++                return Ok(());
++            }
++            let error = io::Error::last_os_error();
++            if error.kind() != io::ErrorKind::Interrupted {
++                return Err(error);
++            }
++        }
++    }
++    fn notify(&self) -> io::Result<()> {
++        let value = 1u64;
++        loop {
++            // SAFETY: eventfd synchronously borrows exactly eight initialized bytes.
++            let result = unsafe {
++                syscalls::write(self.interrupt.as_raw_fd(), (&value as *const u64).cast(), 8)
++            };
++            if result >= 0 {
++                return Ok(());
++            }
++            let error = io::Error::last_os_error();
++            match error.kind() {
++                io::ErrorKind::Interrupted => continue,
++                // A saturated eventfd is already readable and retains the wake.
++                io::ErrorKind::WouldBlock => return Ok(()),
++                _ => return Err(error),
++            }
++        }
++    }
++    fn clear_notification(&self) -> io::Result<()> {
++        let mut value = 0u64;
++        loop {
++            // SAFETY: The result has room for eventfd's eight-byte counter.
++            let result = unsafe {
++                syscalls::read(
++                    self.interrupt.as_raw_fd(),
++                    (&mut value as *mut u64).cast(),
++                    8,
++                )
++            };
++            if result >= 0 {
++                return Ok(());
++            }
++            let error = io::Error::last_os_error();
++            match error.kind() {
++                io::ErrorKind::Interrupted => continue,
++                io::ErrorKind::WouldBlock => return Ok(()),
++                _ => return Err(error),
++            }
++        }
++    }
++    fn set_timeout(&self, duration: Duration) -> io::Result<()> {
++        let setting = libc::itimerspec {
++            it_interval: libc::timespec {
++                tv_sec: 0,
++                tv_nsec: 0,
++            },
++            it_value: libc::timespec {
++                tv_sec: duration.as_secs().min(libc::time_t::MAX as u64) as libc::time_t,
++                tv_nsec: duration.subsec_nanos() as libc::c_long,
++            },
++        };
++        loop {
++            // SAFETY: The kernel borrows the initialized setting only for this call; no old setting is requested.
++            let result = unsafe {
++                syscalls::timerfd_settime(self.timer.as_raw_fd(), 0, &setting, ptr::null_mut())
++            };
++            if result >= 0 {
++                return Ok(());
++            }
++            let error = io::Error::last_os_error();
++            if error.kind() != io::ErrorKind::Interrupted {
++                return Err(error);
++            }
++        }
++    }
++    fn wait(
++        &self,
++        events: &mut Vec<libc::epoll_event>,
++        timeout: Option<Duration>,
++    ) -> io::Result<usize> {
++        events.reserve(BATCH);
++        let length = events.len();
++        let timed = timeout.is_some_and(|duration| !duration.is_zero());
++        if let Some(duration) = timeout.filter(|_| timed) {
++            self.set_timeout(duration)?;
++        }
++        let millis = if timeout == Some(Duration::ZERO) {
++            0
++        } else {
++            -1
++        };
++        // SAFETY: epoll writes exclusively into BATCH reserved tail entries. The null signal mask preserves the worker's existing mask.
++        let count = unsafe {
++            syscalls::epoll_pwait(
++                self.queue.as_raw_fd(),
++                events.as_mut_ptr().add(length),
++                BATCH as i32,
++                millis,
++                ptr::null(),
++            )
++        };
++        // Capture errno before timer cleanup can replace it.
++        let result = if count < 0 {
++            Err(io::Error::last_os_error())
++        } else {
++            Ok(count as usize)
++        };
++        if timed {
++            // Disarming resets timerfd's expiration count as well as cancelling the timer. Always do this after an interrupted/failed wait too; a cleanup failure is terminal, even if the wait itself was interrupted.
++            self.set_timeout(Duration::ZERO)?;
++        }
++        let count = result?;
++        // SAFETY: Only the returned prefix was initialized by the synchronous wait; errors leave the existing prefix unchanged.
++        unsafe { events.set_len(length + count) };
++        Ok(count)
++    }
++}
++fn owned(descriptor: i32) -> io::Result<OwnedFd> {
++    if descriptor < 0 {
++        return Err(io::Error::last_os_error());
++    }
++    // SAFETY: The caller transfers sole ownership of a newly created descriptor.
++    Ok(unsafe { OwnedFd::from_raw_fd(descriptor) })
++}
++
++pub(super) struct Events {
++    raw: Vec<libc::epoll_event>,
++    compatible: Option<polling::Events>,
++}
++impl Events {
++    pub(super) fn new() -> Self {
++        Self {
++            raw: Vec::with_capacity(BATCH),
++            compatible: None,
++        }
++    }
++    pub(super) fn clear(&mut self) {
++        self.raw.clear();
++    }
++    pub(super) fn iter(&self) -> impl Iterator<Item = Event> + '_ {
++        // Timer expirations end a timed turn; disarm already reset their counter. Interrupts are drained during the same dispatch pass, before pointer decoding.
++        self.raw
++            .iter()
++            .filter(|event| event.u64 as usize != TIMER)
++            .map(|event| {
++                Event::new(
++                    event.u64 as usize,
++                    event.events & READ != 0,
++                    event.events & WRITE != 0,
++                )
++            })
++    }
++}
++
++#[cfg(test)]
++mod tests;
+diff --git a/crates/selector/src/readiness_driver/epoll/syscalls.rs b/crates/selector/src/readiness_driver/epoll/syscalls.rs
+new file mode 100644
+index 0000000..cff5035
+--- /dev/null
++++ b/crates/selector/src/readiness_driver/epoll/syscalls.rs
+@@ -0,0 +1,155 @@
++// Released under the MIT License.
++// Copyright, 2026, by Samuel Williams.
++
++//! Production calls libc directly. Tests inject only selected native operations on their own thread.
++
++#[cfg(not(test))]
++pub(super) use libc::{
++    epoll_create1, epoll_ctl, epoll_pwait, eventfd, read, timerfd_create, timerfd_settime, write,
++};
++
++#[cfg(test)]
++pub(super) use fault::{
++    epoll_create1, epoll_ctl, epoll_pwait, eventfd, read, timerfd_create, timerfd_settime, write,
++};
++
++// Keep compatibility resource/wait failures deterministic without affecting native production calls.
++pub(super) fn compatible_new() -> std::io::Result<polling::Poller> {
++    #[cfg(test)]
++    fault::check(fault::Call::CompatibleCreate)?;
++    polling::Poller::new()
++}
++pub(super) fn compatible_wait(
++    poller: &polling::Poller,
++    events: &mut polling::Events,
++    timeout: Option<std::time::Duration>,
++) -> std::io::Result<usize> {
++    #[cfg(test)]
++    fault::check(fault::Call::CompatibleWait)?;
++    poller.wait(events, timeout)
++}
++
++#[cfg(test)]
++pub(super) mod fault {
++    use std::{cell::RefCell, collections::VecDeque};
++
++    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
++    pub(in super::super) enum Call {
++        Queue,
++        Interrupt,
++        Timer,
++        Control,
++        Wait,
++        Read,
++        Write,
++        SetTime,
++        CompatibleCreate,
++        CompatibleWait,
++    }
++    thread_local! {
++        static PLAN: RefCell<VecDeque<(Call, i32)>> = const { RefCell::new(VecDeque::new()) };
++    }
++    pub(in super::super) fn plan(entries: &[(Call, i32)]) {
++        PLAN.with(|plan| {
++            let mut plan = plan.borrow_mut();
++            assert!(plan.is_empty(), "previous native failure was not consumed");
++            plan.extend(entries.iter().copied());
++        });
++    }
++    pub(in super::super) fn drained() {
++        PLAN.with(|plan| assert!(plan.borrow().is_empty()));
++    }
++    fn take_error(call: Call) -> Option<i32> {
++        PLAN.with(|plan| {
++            let mut plan = plan.borrow_mut();
++            if plan.front().is_some_and(|(next, _)| *next == call) {
++                plan.pop_front().map(|(_, error)| error)
++            } else {
++                None
++            }
++        })
++    }
++    pub(in super::super) fn check(call: Call) -> std::io::Result<()> {
++        match take_error(call) {
++            Some(error) if error != 0 => Err(std::io::Error::from_raw_os_error(error)),
++            _ => Ok(()),
++        }
++    }
++    fn invoke(call: Call, operation: impl FnOnce() -> libc::c_long) -> libc::c_long {
++        match take_error(call) {
++            // A zero entry delegates one occurrence, allowing tests to fail a later call of the same operation.
++            None | Some(0) => operation(),
++            Some(error) => {
++                // SAFETY: errno is thread-local on Linux.
++                unsafe {
++                    *libc::__errno_location() = error;
++                }
++                -1
++            }
++        }
++    }
++    pub(in super::super) unsafe fn epoll_create1(flags: i32) -> i32 {
++        invoke(Call::Queue, || unsafe {
++            libc::epoll_create1(flags) as libc::c_long
++        }) as i32
++    }
++    pub(in super::super) unsafe fn eventfd(value: u32, flags: i32) -> i32 {
++        invoke(Call::Interrupt, || unsafe {
++            libc::eventfd(value, flags) as libc::c_long
++        }) as i32
++    }
++    pub(in super::super) unsafe fn timerfd_create(clock: libc::clockid_t, flags: i32) -> i32 {
++        invoke(Call::Timer, || unsafe {
++            libc::timerfd_create(clock, flags) as libc::c_long
++        }) as i32
++    }
++    pub(in super::super) unsafe fn epoll_ctl(
++        queue: i32,
++        operation: i32,
++        descriptor: i32,
++        event: *mut libc::epoll_event,
++    ) -> i32 {
++        invoke(Call::Control, || unsafe {
++            libc::epoll_ctl(queue, operation, descriptor, event) as libc::c_long
++        }) as i32
++    }
++    pub(in super::super) unsafe fn epoll_pwait(
++        queue: i32,
++        events: *mut libc::epoll_event,
++        capacity: i32,
++        timeout: i32,
++        mask: *const libc::sigset_t,
++    ) -> i32 {
++        invoke(Call::Wait, || unsafe {
++            libc::epoll_pwait(queue, events, capacity, timeout, mask) as libc::c_long
++        }) as i32
++    }
++    pub(in super::super) unsafe fn read(
++        descriptor: i32,
++        output: *mut libc::c_void,
++        count: usize,
++    ) -> libc::ssize_t {
++        invoke(Call::Read, || unsafe {
++            libc::read(descriptor, output, count) as libc::c_long
++        }) as libc::ssize_t
++    }
++    pub(in super::super) unsafe fn write(
++        descriptor: i32,
++        input: *const libc::c_void,
++        count: usize,
++    ) -> libc::ssize_t {
++        invoke(Call::Write, || unsafe {
++            libc::write(descriptor, input, count) as libc::c_long
++        }) as libc::ssize_t
++    }
++    pub(in super::super) unsafe fn timerfd_settime(
++        descriptor: i32,
++        flags: i32,
++        setting: *const libc::itimerspec,
++        old: *mut libc::itimerspec,
++    ) -> i32 {
++        invoke(Call::SetTime, || unsafe {
++            libc::timerfd_settime(descriptor, flags, setting, old) as libc::c_long
++        }) as i32
++    }
++}
+diff --git a/crates/selector/src/readiness_driver/epoll/tests.rs b/crates/selector/src/readiness_driver/epoll/tests.rs
+new file mode 100644
+index 0000000..cb96d86
+--- /dev/null
++++ b/crates/selector/src/readiness_driver/epoll/tests.rs
+@@ -0,0 +1,610 @@
++// Released under the MIT License.
++// Copyright, 2026, by Samuel Williams.
++
++use super::*;
++use std::{
++    io::{Read, Write},
++    os::unix::net::UnixStream,
++    time::Instant,
++};
++
++#[test]
++fn notification_is_retained_drained_and_reusable() {
++    let poller = Poller::new().unwrap();
++    let mut events = Events::new();
++    poller.notify().unwrap();
++    poller.notify().unwrap();
++    assert_eq!(poller.wait(&mut events, None).unwrap(), 1);
++    assert_eq!(events.iter().next().unwrap().key, INTERRUPT);
++    poller.clear_notification().unwrap();
++    events.clear();
++    assert_eq!(poller.wait(&mut events, Some(Duration::ZERO)).unwrap(), 0);
++    // A notification arriving after the previous drain survives into the next turn.
++    poller.notify().unwrap();
++    assert_eq!(poller.wait(&mut events, None).unwrap(), 1);
++    poller.clear_notification().unwrap();
++    events.clear();
++    assert!(events.iter().next().is_none());
++}
++
++#[test]
++fn another_thread_can_interrupt_an_indefinite_wait() {
++    let poller = Poller::new().unwrap();
++    std::thread::scope(|scope| {
++        let (started, ready) = std::sync::mpsc::channel();
++        let notify = &poller;
++        scope.spawn(move || {
++            ready.recv().unwrap();
++            notify.notify().unwrap();
++        });
++        started.send(()).unwrap();
++        let mut events = Events::new();
++        assert_eq!(poller.wait(&mut events, None).unwrap(), 1);
++        poller.clear_notification().unwrap();
++    });
++}
++
++#[test]
++fn edge_registration_reuses_the_native_buffer_and_deletes_synchronously() {
++    let poller = Poller::new().unwrap();
++    let (stream, mut peer) = UnixStream::pair().unwrap();
++    stream.set_nonblocking(true).unwrap();
++    let socket: socket2::Socket = stream.into();
++    // SAFETY: The socket stays owned until after successful synchronous deletion.
++    unsafe {
++        poller
++            .add_with_mode(&socket, Event::readable(17), PollMode::Edge)
++            .unwrap();
++    }
++    peer.write_all(b"a").unwrap();
++    let mut events = Events::new();
++    assert_eq!(
++        poller
++            .wait(&mut events, Some(Duration::from_secs(1)))
++            .unwrap(),
++        1
++    );
++    let event = events.iter().next().unwrap();
++    assert_eq!(event.key, 17);
++    assert!(event.readable);
++    assert!(!event.writable);
++    let allocation = events.raw.as_ptr();
++    events.clear();
++    assert_eq!(poller.wait(&mut events, Some(Duration::ZERO)).unwrap(), 0);
++    assert_eq!(events.raw.as_ptr(), allocation);
++    let mut byte = [0];
++    (&socket).read_exact(&mut byte).unwrap();
++    assert_eq!(byte, [b'a']);
++    peer.write_all(b"b").unwrap();
++    assert_eq!(
++        poller
++            .wait(&mut events, Some(Duration::from_secs(1)))
++            .unwrap(),
++        1
++    );
++    poller.delete(&socket).unwrap();
++    events.clear();
++    assert_eq!(poller.wait(&mut events, Some(Duration::ZERO)).unwrap(), 0);
++}
++
++use super::syscalls::fault::{Call, drained, plan};
++
++// Exercise real backpressure without allowing a fixture error to masquerade as WouldBlock.
++fn until_blocked(mut operation: impl FnMut() -> io::Result<usize>) {
++    let deadline = Instant::now() + Duration::from_secs(3);
++    loop {
++        assert!(Instant::now() < deadline, "socket did not reach WouldBlock");
++        match operation() {
++            Ok(0) => panic!("unexpected zero progress"),
++            Ok(_) => {}
++            Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
++            Err(error) if error.kind() == io::ErrorKind::WouldBlock => return,
++            Err(error) => panic!("unexpected socket failure: {error}"),
++        }
++    }
++}
++
++fn native(poller: &Poller) -> &NativePoller {
++    let Backend::Native(native) = &poller.backend else {
++        panic!("expected native epoll")
++    };
++    native
++}
++
++fn disarmed(poller: &Poller) {
++    let mut value = std::mem::MaybeUninit::uninit();
++    // SAFETY: timerfd_gettime initializes the complete setting on success.
++    assert_eq!(
++        unsafe { libc::timerfd_gettime(native(poller).timer.as_raw_fd(), value.as_mut_ptr()) },
++        0
++    );
++    let value = unsafe { value.assume_init() };
++    assert_eq!(value.it_value.tv_sec, 0);
++    assert_eq!(value.it_value.tv_nsec, 0);
++}
++
++#[test]
++fn precise_expiry_is_filtered_and_does_not_leave_stale_readiness() {
++    let poller = Poller::new().unwrap();
++    assert!(poller.supports_edge());
++    let mut events = Events::new();
++    assert_eq!(poller.wait(&mut events, Some(Duration::ZERO)).unwrap(), 0);
++    let started = Instant::now();
++    assert_eq!(
++        poller
++            .wait(&mut events, Some(Duration::from_micros(100)))
++            .unwrap(),
++        1
++    );
++    assert!(started.elapsed() >= Duration::from_micros(100));
++    assert!(events.iter().next().is_none());
++    disarmed(&poller);
++    // Appending a later notification leaves the retained timer record filtered.
++    poller.notify().unwrap();
++    poller.wait(&mut events, None).unwrap();
++    assert_eq!(
++        events.iter().map(|event| event.key).collect::<Vec<_>>(),
++        [INTERRUPT]
++    );
++    poller.clear_notification().unwrap();
++    events.clear();
++    assert_eq!(poller.wait(&mut events, Some(Duration::ZERO)).unwrap(), 0);
++    std::thread::scope(|scope| {
++        scope.spawn(|| poller.notify().unwrap());
++        poller.wait(&mut events, None).unwrap();
++    });
++    assert_eq!(events.iter().next().unwrap().key, INTERRUPT);
++}
++
++#[test]
++fn early_socket_and_notification_wakes_disarm_the_timer() {
++    let poller = Poller::new().unwrap();
++    let (stream, mut peer) = UnixStream::pair().unwrap();
++    let socket: socket2::Socket = stream.into();
++    unsafe {
++        poller
++            .add_with_mode(&socket, Event::readable(23), PollMode::Edge)
++            .unwrap()
++    };
++    let mut events = Events::new();
++    peer.write_all(b"a").unwrap();
++    poller
++        .wait(&mut events, Some(Duration::from_millis(2)))
++        .unwrap();
++    assert_eq!(events.iter().next().unwrap().key, 23);
++    disarmed(&poller);
++    poller.notify().unwrap();
++    events.clear();
++    poller
++        .wait(&mut events, Some(Duration::from_millis(2)))
++        .unwrap();
++    assert_eq!(events.iter().next().unwrap().key, INTERRUPT);
++    disarmed(&poller);
++    poller.clear_notification().unwrap();
++    std::thread::sleep(Duration::from_millis(4));
++    events.clear();
++    assert_eq!(poller.wait(&mut events, Some(Duration::ZERO)).unwrap(), 0);
++    poller.delete(&socket).unwrap();
++}
++
++#[test]
++fn constructor_failures_preserve_compatible_backends() {
++    plan(&[(Call::Queue, libc::EMFILE)]);
++    assert_eq!(
++        Poller::new().err().unwrap().raw_os_error(),
++        Some(libc::EMFILE)
++    );
++    drained();
++    for call in [Call::Interrupt, Call::Timer] {
++        for error in [
++            libc::ENOSYS,
++            libc::EPERM,
++            libc::EACCES,
++            libc::EMFILE,
++            libc::ENOMEM,
++        ] {
++            plan(&[(call, error)]);
++            let poller = Poller::new().unwrap();
++            drained();
++            assert!(matches!(poller.backend, Backend::Compatible(_)));
++            assert!(poller.supports_edge());
++            let mut events = Events::new();
++            assert_eq!(poller.wait(&mut events, Some(Duration::ZERO)).unwrap(), 0);
++            poller.notify().unwrap();
++            assert_eq!(poller.wait(&mut events, None).unwrap(), 0);
++            let start = Instant::now();
++            poller
++                .wait(&mut events, Some(Duration::from_micros(100)))
++                .unwrap();
++            assert!(start.elapsed() >= Duration::from_micros(100));
++            let (stream, mut peer) = UnixStream::pair().unwrap();
++            let socket: socket2::Socket = stream.into();
++            unsafe {
++                poller
++                    .add_with_mode(&socket, Event::all(25), PollMode::Edge)
++                    .unwrap()
++            };
++            peer.write_all(b"x").unwrap();
++            poller.wait(&mut events, None).unwrap();
++            let event = events.iter().next().unwrap();
++            assert_eq!(event.key, 25);
++            assert!(event.readable && event.writable);
++            events.clear();
++            assert_eq!(poller.wait(&mut events, Some(Duration::ZERO)).unwrap(), 0);
++            poller.delete(&socket).unwrap();
++        }
++    }
++    for prefix in [vec![], vec![(Call::Control, 0)]] {
++        let mut calls = prefix;
++        calls.push((Call::Control, libc::EIO));
++        plan(&calls);
++        assert_eq!(Poller::new().err().unwrap().raw_os_error(), Some(libc::EIO));
++        drained();
++    }
++}
++
++#[test]
++fn native_control_retries_and_propagates_failures_for_every_interest() {
++    plan(&[(Call::Control, libc::EINTR)]);
++    let poller = Poller::new().unwrap();
++    drained();
++    for interest in [
++        Event::none(1),
++        Event::readable(2),
++        Event::writable(3),
++        Event::all(4),
++    ] {
++        let (stream, _peer) = UnixStream::pair().unwrap();
++        let socket: socket2::Socket = stream.into();
++        plan(&[(Call::Control, libc::EIO)]);
++        assert_eq!(
++            unsafe { poller.add_with_mode(&socket, interest, PollMode::Edge) }
++                .unwrap_err()
++                .raw_os_error(),
++            Some(libc::EIO)
++        );
++        drained();
++        plan(&[(Call::Control, libc::EINTR)]);
++        unsafe {
++            poller
++                .add_with_mode(&socket, interest, PollMode::Edge)
++                .unwrap()
++        };
++        drained();
++        plan(&[(Call::Control, libc::EIO)]);
++        assert_eq!(
++            poller.delete(&socket).unwrap_err().raw_os_error(),
++            Some(libc::EIO)
++        );
++        drained();
++        poller.delete(&socket).unwrap();
++    }
++}
++
++#[test]
++fn notification_retries_and_saturation_preserve_wakes() {
++    let poller = Poller::new().unwrap();
++    poller.clear_notification().unwrap(); // real EAGAIN
++    let value = u64::MAX - 1;
++    assert_eq!(
++        unsafe {
++            libc::write(
++                native(&poller).interrupt.as_raw_fd(),
++                (&value as *const u64).cast(),
++                8,
++            )
++        },
++        8
++    );
++    poller.notify().unwrap(); // real saturation/EAGAIN
++    let mut events = Events::new();
++    poller.wait(&mut events, None).unwrap();
++    assert_eq!(events.iter().next().unwrap().key, INTERRUPT);
++    plan(&[(Call::Read, libc::EINTR)]);
++    poller.clear_notification().unwrap();
++    drained();
++    plan(&[(Call::Write, libc::EINTR)]);
++    poller.notify().unwrap();
++    drained();
++    plan(&[(Call::Read, libc::EIO)]);
++    assert_eq!(
++        poller.clear_notification().unwrap_err().raw_os_error(),
++        Some(libc::EIO)
++    );
++    drained();
++    poller.clear_notification().unwrap();
++    plan(&[(Call::Write, libc::EIO)]);
++    assert_eq!(poller.notify().unwrap_err().raw_os_error(), Some(libc::EIO));
++    drained();
++}
++
++#[test]
++fn wait_errors_keep_retained_events_and_disarm_before_returning() {
++    let poller = Poller::new().unwrap();
++    let mut events = Events::new();
++    poller
++        .wait(&mut events, Some(Duration::from_micros(1)))
++        .unwrap();
++    poller.notify().unwrap();
++    poller.wait(&mut events, None).unwrap();
++    let length = events.raw.len();
++    for timeout in [Some(Duration::ZERO), Some(Duration::from_secs(1)), None] {
++        for error in [libc::EINTR, libc::EIO] {
++            plan(&[(Call::Wait, error)]);
++            assert_eq!(
++                poller
++                    .wait(&mut events, timeout)
++                    .unwrap_err()
++                    .raw_os_error(),
++                Some(error)
++            );
++            drained();
++            disarmed(&poller);
++            assert_eq!(events.raw.len(), length);
++            assert_eq!(
++                events.iter().map(|event| event.key).collect::<Vec<_>>(),
++                [INTERRUPT]
++            );
++        }
++    }
++    plan(&[(Call::SetTime, libc::EINTR)]);
++    poller
++        .wait(&mut events, Some(Duration::from_secs(1)))
++        .unwrap();
++    drained();
++    disarmed(&poller);
++    plan(&[(Call::SetTime, libc::EIO)]);
++    assert_eq!(
++        poller
++            .wait(&mut events, Some(Duration::from_secs(1)))
++            .unwrap_err()
++            .raw_os_error(),
++        Some(libc::EIO)
++    );
++    drained();
++    for wait in [0, libc::EINTR, libc::EBADF] {
++        plan(&[
++            (Call::SetTime, 0),
++            (Call::Wait, wait),
++            (Call::SetTime, libc::EIO),
++        ]);
++        assert_eq!(
++            poller
++                .wait(&mut events, Some(Duration::from_secs(1)))
++                .unwrap_err()
++                .raw_os_error(),
++            Some(libc::EIO)
++        );
++        drained();
++        // Cleanup failure is terminal for workers; this lower-level test explicitly repairs it.
++        native(&poller).set_timeout(Duration::ZERO).unwrap();
++    }
++    plan(&[
++        (Call::SetTime, 0),
++        (Call::Wait, libc::EBADF),
++        (Call::SetTime, libc::EINTR),
++    ]);
++    assert_eq!(
++        poller
++            .wait(&mut events, Some(Duration::from_secs(1)))
++            .unwrap_err()
++            .raw_os_error(),
++        Some(libc::EBADF)
++    );
++    drained();
++    disarmed(&poller);
++    poller.clear_notification().unwrap();
++    events.clear();
++    assert_eq!(poller.wait(&mut events, Some(Duration::ZERO)).unwrap(), 0);
++}
++
++#[test]
++fn fatal_notification_and_timer_cleanup_errors_close_the_worker() {
++    use crate::{ReadinessSelector, SelectorDriver, SelectorOptions, SelectorWorker};
++    for notification in [true, false] {
++        let (selector, drivers) =
++            ReadinessSelector::with_workers(SelectorOptions::default(), 1).unwrap();
++        let mut worker = drivers.into_iter().next().unwrap().enter();
++        worker.waker().wake_by_ref();
++        if notification {
++            plan(&[(Call::Read, libc::EIO)]);
++        } else {
++            plan(&[
++                (Call::SetTime, 0),
++                (Call::Wait, libc::EINTR),
++                (Call::SetTime, libc::EIO),
++            ]);
++        }
++        assert_eq!(
++            worker
++                .turn(Some(Duration::from_secs(1)))
++                .unwrap_err()
++                .raw_os_error(),
++            Some(libc::EIO)
++        );
++        drained();
++        assert!(selector.readiness.as_ref().unwrap().closed.is_cancelled());
++        assert!(worker.turn(None).unwrap());
++    }
++}
++
++#[test]
++fn compatible_events_preserve_direction_and_reuse_their_scratch() {
++    plan(&[(Call::Timer, libc::EPERM)]);
++    let poller = Poller::new().unwrap();
++    drained();
++    let (stream, mut peer) = UnixStream::pair().unwrap();
++    stream.set_nonblocking(true).unwrap();
++    let mut socket: socket2::Socket = stream.into();
++    // Saturate output so only readable readiness can be delivered.
++    let bytes = [0; 8192];
++    until_blocked(|| socket.write(&bytes));
++    unsafe {
++        poller
++            .add_with_mode(&socket, Event::all(37), PollMode::Edge)
++            .unwrap()
++    };
++    peer.write_all(b"x").unwrap();
++    let mut events = Events::new();
++    poller
++        .wait(&mut events, Some(Duration::from_secs(1)))
++        .unwrap();
++    let event = events.iter().next().unwrap();
++    assert_eq!(event.key, 37);
++    assert!(event.readable);
++    assert!(!event.writable);
++    poller.delete(&socket).unwrap();
++    events.clear();
++    let (stream, _peer) = UnixStream::pair().unwrap();
++    let socket: socket2::Socket = stream.into();
++    unsafe {
++        poller
++            .add_with_mode(&socket, Event::all(41), PollMode::Edge)
++            .unwrap()
++    };
++    poller
++        .wait(&mut events, Some(Duration::from_secs(1)))
++        .unwrap();
++    let event = events.iter().next().unwrap();
++    assert_eq!(event.key, 41);
++    assert!(!event.readable);
++    assert!(event.writable);
++    poller.delete(&socket).unwrap();
++}
++
++#[test]
++fn compatible_worker_preserves_duplex_waiters_cancellation_and_closure() {
++    use crate::{NativeSocket, ReadinessSelector, SelectorDriver, SelectorOptions, SelectorWorker};
++    use base_scheduler::*;
++    use futures_lite::future::{block_on, poll_once};
++    plan(&[(Call::Timer, libc::EPERM)]);
++    let (selector, drivers) =
++        ReadinessSelector::with_workers(SelectorOptions::default(), 1).unwrap();
++    drained();
++    let mut worker = drivers.into_iter().next().unwrap().enter();
++    let (stream, mut peer) = UnixStream::pair().unwrap();
++    stream.set_nonblocking(true).unwrap();
++    let mut socket: socket2::Socket = stream.into();
++    let bytes = [0; 8192];
++    until_blocked(|| socket.write(&bytes));
++    let socket = NativeSocket::new(socket).unwrap();
++    let never = Cancellation::never();
++    let cancel = Cancellation::new();
++    let mut first = Box::pin(selector.socket_read(&socket, vec![0; 1], &cancel));
++    let mut second = Box::pin(selector.socket_read(&socket, vec![0; 1], &never));
++    let mut output = Box::pin(selector.socket_write(&socket, b"y".to_vec(), &never));
++    assert!(block_on(poll_once(first.as_mut())).is_none());
++    assert!(block_on(poll_once(second.as_mut())).is_none());
++    assert!(block_on(poll_once(output.as_mut())).is_none());
++    cancel.cancel();
++    assert!(matches!(
++        block_on(first).0,
++        Err(OperationError::Cancelled(_))
++    ));
++    peer.write_all(b"x").unwrap();
++    worker.turn(Some(Duration::from_secs(1))).unwrap();
++    assert_eq!(block_on(second).0.unwrap(), 1);
++    assert!(block_on(poll_once(output.as_mut())).is_none());
++    peer.set_nonblocking(true).unwrap();
++    until_blocked(|| peer.read(&mut [0; 8192]));
++    worker.turn(Some(Duration::from_secs(1))).unwrap();
++    assert_eq!(block_on(output).0.unwrap(), 1);
++    let mut pending = Box::pin(selector.socket_read(&socket, vec![0; 1], &never));
++    assert!(block_on(poll_once(pending.as_mut())).is_none());
++    worker.close();
++    assert_eq!(
++        block_on(pending).0.unwrap_err().kind(),
++        io::ErrorKind::BrokenPipe
++    );
++    assert!(worker.turn(None).unwrap());
++    drop(socket);
++}
++
++#[test]
++fn native_failed_registration_and_deletion_quarantine_until_stop() {
++    use crate::{NativeSocket, ReadinessSelector, SelectorDriver, SelectorOptions};
++    for add in [false, true] {
++        let (selector, drivers) =
++            ReadinessSelector::with_workers(SelectorOptions::default(), 1).unwrap();
++        let worker = drivers.into_iter().next().unwrap().enter();
++        let group = selector.readiness.as_ref().unwrap();
++        let owner = &group.controllers[0];
++        let socket =
++            NativeSocket::new(std::net::UdpSocket::bind("127.0.0.1:0").unwrap().into()).unwrap();
++        if add {
++            plan(&[(Call::Control, libc::EIO)]);
++            assert_eq!(
++                socket
++                    .registrations
++                    .get(group, socket.get_ref())
++                    .err()
++                    .unwrap()
++                    .raw_os_error(),
++                Some(libc::EIO)
++            );
++            drained();
++        } else {
++            let registration = socket.registrations.get(group, socket.get_ref()).unwrap();
++            let weak = std::sync::Arc::downgrade(&registration);
++            drop(registration);
++            plan(&[(Call::Control, libc::EIO)]);
++            drop(socket);
++            drained();
++            assert!(
++                weak.upgrade()
++                    .unwrap()
++                    .inactive
++                    .load(std::sync::atomic::Ordering::Acquire)
++            );
++        }
++        assert_eq!(owner.table.lock().unwrap().registrations.len(), 1);
++        selector.close();
++        assert_eq!(owner.table.lock().unwrap().registrations.len(), 1);
++        drop(worker);
++        assert!(owner.table.lock().unwrap().registrations.is_empty());
++    }
++}
++
++#[test]
++fn compatible_creation_and_wait_errors_preserve_os_errors_and_retained_events() {
++    plan(&[
++        (Call::Timer, libc::EPERM),
++        (Call::CompatibleCreate, libc::EMFILE),
++    ]);
++    assert_eq!(
++        Poller::new().err().unwrap().raw_os_error(),
++        Some(libc::EMFILE)
++    );
++    drained();
++    plan(&[(Call::Interrupt, libc::ENOSYS)]);
++    let poller = Poller::new().unwrap();
++    drained();
++    let (stream, mut peer) = UnixStream::pair().unwrap();
++    let socket: socket2::Socket = stream.into();
++    unsafe {
++        poller
++            .add_with_mode(&socket, Event::readable(43), PollMode::Edge)
++            .unwrap()
++    };
++    peer.write_all(b"x").unwrap();
++    let mut events = Events::new();
++    poller.wait(&mut events, None).unwrap();
++    for error in [libc::EINTR, libc::EIO] {
++        plan(&[(Call::CompatibleWait, error)]);
++        assert_eq!(
++            poller
++                .wait(&mut events, Some(Duration::ZERO))
++                .unwrap_err()
++                .raw_os_error(),
++            Some(error)
++        );
++        drained();
++        let retained = events.iter().collect::<Vec<_>>();
++        assert_eq!(retained.len(), 1);
++        assert_eq!(retained[0].key, 43);
++        assert!(retained[0].readable && !retained[0].writable);
++    }
++    events.clear();
++    assert_eq!(poller.wait(&mut events, Some(Duration::ZERO)).unwrap(), 0);
++    poller.delete(&socket).unwrap();
++}
+diff --git a/crates/selector/src/readiness_driver/test_poller.rs b/crates/selector/src/readiness_driver/test_poller.rs
+index 3a7b1a0..e6572b2 100644
+--- a/crates/selector/src/readiness_driver/test_poller.rs
++++ b/crates/selector/src/readiness_driver/test_poller.rs
+@@ -2,9 +2,13 @@
+ // Copyright, 2026, by Samuel Williams.
+ 
+ //! Resource-local failure injection for worker poller tests. Production uses
+-//! polling::Poller directly, without this wrapper or fault state.
++//! the selected native poller directly, without this wrapper or fault state.
+ 
+-use polling::{Event, Events, PollMode};
++#[cfg(target_os = "linux")]
++use super::epoll::{Events, Poller as Backend};
++use polling::{Event, PollMode};
++#[cfg(not(target_os = "linux"))]
++use polling::{Events, Poller as Backend};
+ use std::{
+     io,
+     sync::atomic::{AtomicI32, Ordering},
+@@ -15,13 +19,13 @@ thread_local! {
+     pub(super) static INITIAL_FAILURE: std::cell::Cell<i32> = const { std::cell::Cell::new(0) };
+ }
+ pub(super) struct Poller {
+-    inner: polling::Poller,
++    inner: Backend,
+     pub(super) failure: AtomicI32,
+ }
+ impl Poller {
+     pub(super) fn new() -> io::Result<Self> {
+         let result = match INITIAL_FAILURE.with(std::cell::Cell::take) {
+-            0 => polling::Poller::new(),
++            0 => Backend::new(),
+             error => Err(io::Error::from_raw_os_error(error)),
+         };
+         result.map(|inner| Self {
+@@ -53,6 +57,10 @@ impl Poller {
+         self.check()?;
+         self.inner.delete(socket)
+     }
++    #[cfg(target_os = "linux")]
++    pub(super) fn clear_notification(&self) -> io::Result<()> {
++        self.inner.clear_notification()
++    }
+     pub(super) fn notify(&self) -> io::Result<()> {
+         self.inner.notify()
+     }
+diff --git a/crates/selector/src/readiness_driver/tests.rs b/crates/selector/src/readiness_driver/tests.rs
+index 05930c1..d250661 100644
+--- a/crates/selector/src/readiness_driver/tests.rs
++++ b/crates/selector/src/readiness_driver/tests.rs
+@@ -627,7 +627,7 @@ fn collected_pointers_survive_remote_retirement_and_reclaim_at_the_next_boundary
+         }
+         // This dereferences the collected token after every external record
+         // owner has gone. Inactive records must stay alive and be skipped.
+-        inner.dispatch();
++        inner.dispatch().unwrap();
+         assert_eq!(weak.upgrade().unwrap().readable.snapshot(), 0);
+         workers[0].turn(Some(Duration::ZERO)).unwrap();
+         assert!(weak.upgrade().is_none());
+@@ -754,7 +754,13 @@ fn closing_one_worker_preserves_another_workers_collected_batch() {
+     drop(socket);
+     workers.remove(0); // Closes the whole group and reclaims only its own table.
+     assert!(weak.upgrade().is_some());
+-    workers[0].driver.inner.as_ref().unwrap().dispatch();
++    workers[0]
++        .driver
++        .inner
++        .as_ref()
++        .unwrap()
++        .dispatch()
++        .unwrap();
+     drop(workers);
+     assert!(weak.upgrade().is_none());
+ }
+@@ -897,7 +903,7 @@ fn the_first_callback_can_remotely_replace_sources_in_the_rest_of_the_batch() {
+                 "both sources were not collected"
+             );
+         }
+-        inner.dispatch();
++        inner.dispatch().unwrap();
+         assert_eq!(
+             registrations
+                 .iter()
