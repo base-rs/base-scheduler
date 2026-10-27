@@ -250,3 +250,6 @@ impl SocketStreamReader for IoUringSocketStreamReader<'_> {
         self.scheduler.socket_monitor_close(&mut self.monitor).await
     }
 }
+
+#[cfg(test)]
+mod tests;

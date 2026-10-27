@@ -448,6 +448,11 @@ fn socket_defaults_preserve_owners_and_forward_flags_and_addresses() {
         let (result, owner) = reader.read_owned(owner, &cancelled).await;
         assert!(matches!(result, Err(OperationError::Cancelled(_))));
         assert_eq!(owner.as_ptr(), pointer);
+        let mut reader = reader
+            .with_oob_support::<true>()
+            .with_oob_support::<false>();
+        assert_eq!(reader.read_into(&mut buffer, &never).await.unwrap(), 1);
+        assert_eq!(buffer[0], b'c');
         let mut writer = StreamWriter {
             bytes: Vec::new(),
             dont_route: false,

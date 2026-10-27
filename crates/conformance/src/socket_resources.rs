@@ -11,7 +11,10 @@ where
     S::Socket: 'static,
 {
     let never = Cancellation::never();
-    let mut reader = scheduler.socket_stream_reader(receiver).unwrap();
+    let mut reader = scheduler
+        .socket_stream_reader(receiver)
+        .unwrap()
+        .with_oob_support::<true>();
     let mut writer = scheduler.socket_stream_writer(receiver).unwrap();
     let mut sender_read = scheduler.socket_stream_reader(sender).unwrap();
     let mut sender_write = scheduler.socket_stream_writer(sender).unwrap();
@@ -35,6 +38,8 @@ where
         assert_eq!(write.unwrap(), 1);
         assert_eq!(returned, [byte]);
     }
+    // Selecting a different const specialization preserves the live reader.
+    let mut reader = reader.with_oob_support::<false>();
     let mut incoming = [0];
     let mut outgoing = [0];
     let (server, client) = zip(

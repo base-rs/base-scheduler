@@ -3,8 +3,9 @@
 
 use super::*;
 use crate::{ReadinessWorker, SelectorDriver, SelectorOptions, SelectorWorker};
+use base_scheduler::SocketStreamReading;
 use futures_lite::future::{block_on, poll_once};
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::{
     io::Write,
@@ -44,8 +45,8 @@ fn drive<F: Future>(future: F, worker: &mut ReadinessWorker) -> F::Output {
     }
 }
 
-fn prime(
-    reader: &mut ReadinessSocketStreamReader<'_>,
+fn prime<const OOB: bool>(
+    reader: &mut ReadinessSocketStreamReader<'_, OOB>,
     peer: &mut std::net::TcpStream,
     worker: &mut ReadinessWorker,
 ) {
@@ -58,7 +59,7 @@ fn prime(
     assert_eq!(buffer[0], b'x');
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 #[test]
 fn short_reads_wait_without_a_syscall_and_full_reads_keep_ready() {
     let (selector, mut worker, socket, mut peer) = setup();
@@ -66,7 +67,7 @@ fn short_reads_wait_without_a_syscall_and_full_reads_keep_ready() {
         return;
     }
     let never = Cancellation::never();
-    let mut reader = ReadinessSocketStreamReader::new(&selector, &socket).unwrap();
+    let mut reader = ReadinessSocketStreamReader::<false>::new(&selector, &socket).unwrap();
     // Initial ready progress still needs no registration.
     peer.write_all(b"a").unwrap();
     assert_eq!(
@@ -125,7 +126,7 @@ fn short_reads_wait_without_a_syscall_and_full_reads_keep_ready() {
     assert_eq!(block_on(reader.read_into(&mut buffer, &never)).unwrap(), 0);
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 #[test]
 fn a_readability_event_during_a_short_read_is_not_erased() {
     let (selector, mut worker, socket, mut peer) = setup();
@@ -133,7 +134,7 @@ fn a_readability_event_during_a_short_read_is_not_erased() {
         return;
     }
     let never = Cancellation::never();
-    let mut reader = ReadinessSocketStreamReader::new(&selector, &socket).unwrap();
+    let mut reader = ReadinessSocketStreamReader::<false>::new(&selector, &socket).unwrap();
     prime(&mut reader, &mut peer, &mut worker);
     let registration = reader.registration.as_ref().unwrap().clone();
     let direction = registration.direction(Interest::Readable);
@@ -169,7 +170,7 @@ fn cancellation_shutdown_and_immediate_errors_preserve_stream_state() {
     if selector.readiness.is_none() {
         return;
     }
-    let mut reader = ReadinessSocketStreamReader::new(&selector, &socket).unwrap();
+    let mut reader = ReadinessSocketStreamReader::<false>::new(&selector, &socket).unwrap();
     let cancellation = Cancellation::new();
     let mut buffer = [0x5a; 8];
     {
@@ -222,7 +223,7 @@ fn cancellation_shutdown_and_immediate_errors_preserve_stream_state() {
     );
 
     let (selector, _worker, socket, _peer) = setup();
-    let mut reader = ReadinessSocketStreamReader::new(&selector, &socket).unwrap();
+    let mut reader = ReadinessSocketStreamReader::<false>::new(&selector, &socket).unwrap();
     // Closure between the initial attempt and lazy registration is propagated.
     let error = block_on(reader.read_with(8, &never, |_| {
         selector.close();
@@ -236,18 +237,18 @@ fn cancellation_shutdown_and_immediate_errors_preserve_stream_state() {
         socket2::Socket::new(socket2::Domain::IPV4, socket2::Type::STREAM, None).unwrap(),
     )
     .unwrap();
-    let mut reader = ReadinessSocketStreamReader::new(&selector, &socket).unwrap();
+    let mut reader = ReadinessSocketStreamReader::<false>::new(&selector, &socket).unwrap();
     assert!(block_on(reader.read_into(&mut buffer, &never)).is_err());
     assert!(reader.registration.is_none());
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 #[test]
 fn data_and_peer_eof_in_one_event_leave_eof_immediately_readable() {
     for shutdown in [std::net::Shutdown::Write, std::net::Shutdown::Both] {
         let (selector, mut worker, socket, mut peer) = setup();
         let never = Cancellation::never();
-        let mut reader = ReadinessSocketStreamReader::new(&selector, &socket).unwrap();
+        let mut reader = ReadinessSocketStreamReader::<false>::new(&selector, &socket).unwrap();
         prime(&mut reader, &mut peer, &mut worker);
         let registration = reader.registration.as_ref().unwrap().clone();
         let direction = registration.direction(Interest::Readable);
@@ -268,13 +269,13 @@ fn data_and_peer_eof_in_one_event_leave_eof_immediately_readable() {
     }
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 #[test]
 fn urgent_boundaries_keep_trailing_bytes_ready_even_if_an_alias_consumes_urgent_data() {
     for consume_urgent in [false, true] {
         let (selector, mut worker, socket, mut peer) = setup();
         let never = Cancellation::never();
-        let mut reader = ReadinessSocketStreamReader::new(&selector, &socket).unwrap();
+        let mut reader = ReadinessSocketStreamReader::<true>::new(&selector, &socket).unwrap();
         prime(&mut reader, &mut peer, &mut worker);
         let registration = reader.registration.as_ref().unwrap().clone();
         let direction = registration.direction(Interest::Readable);
@@ -315,4 +316,92 @@ fn urgent_boundaries_keep_trailing_bytes_ready_even_if_an_alias_consumes_urgent_
         }
         assert_eq!(&buffer[..5], b"after");
     }
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn default_reader_rejects_urgent_data_and_opt_in_preserves_the_live_reader() {
+    let (selector, mut worker, socket, mut peer) = setup();
+    let never = Cancellation::never();
+    let mut reader = selector.socket_stream_reader(&socket).unwrap();
+    let mut buffer = [0; 64];
+    {
+        let mut reading = Box::pin(reader.read_into(&mut buffer, &never));
+        assert!(block_on(poll_once(&mut reading)).is_none());
+        peer.write_all(b"x").unwrap();
+        assert_eq!(drive(reading, &mut worker).unwrap(), 1);
+    }
+    peer.write_all(b"before").unwrap();
+    socket2::SockRef::from(&peer)
+        .send_with_flags(b"!", libc::MSG_OOB)
+        .unwrap();
+    peer.write_all(b"after").unwrap();
+    std::thread::sleep(Duration::from_millis(10));
+    assert_eq!(
+        drive(reader.read_into(&mut buffer, &never), &mut worker)
+            .unwrap_err()
+            .kind(),
+        io::ErrorKind::Unsupported
+    );
+    // Changing the specialization keeps registration and unread normal bytes.
+    let mut reader = reader.with_oob_support::<true>();
+    assert_eq!(
+        drive(reader.read_into(&mut buffer, &never), &mut worker).unwrap(),
+        6
+    );
+    assert_eq!(&buffer[..6], b"before");
+    assert_eq!(
+        drive(reader.read_into(&mut buffer, &never), &mut worker).unwrap(),
+        5
+    );
+    assert_eq!(&buffer[..5], b"after");
+    peer.shutdown(std::net::Shutdown::Write).unwrap();
+    assert_eq!(
+        drive(reader.read_into(&mut buffer, &never), &mut worker).unwrap(),
+        0
+    );
+    let mut reader = reader.with_oob_support::<false>();
+    assert_eq!(block_on(reader.read_into(&mut buffer, &never)).unwrap(), 0);
+    block_on(reader.close()).unwrap();
+    let mut reader = reader.with_oob_support::<true>();
+    assert_eq!(
+        block_on(reader.read_into(&mut buffer, &never))
+            .unwrap_err()
+            .kind(),
+        io::ErrorKind::BrokenPipe
+    );
+}
+
+#[test]
+fn compile_time_options_preserve_the_pool_eof_and_closed_state() {
+    let (selector, mut worker, socket, mut peer) = setup();
+    let never = Cancellation::never();
+    let pool = selector.buffer_pool(BufferPoolOptions::new(1, 8)).unwrap();
+    let lease = block_on(pool.acquire(&never)).unwrap();
+    let reader = selector
+        .socket_stream_reader_with_pool(&socket, pool)
+        .unwrap();
+    let mut reader = reader.with_oob_support::<true>();
+    {
+        let mut reading = pin!(reader.read(&never));
+        assert!(block_on(poll_once(reading.as_mut())).is_none());
+    }
+    drop(lease);
+    peer.write_all(b"one").unwrap();
+    let chunk = drive(reader.read(&never), &mut worker).unwrap().unwrap();
+    assert_eq!(chunk.as_ref(), b"one");
+    drop(chunk);
+    let mut reader = reader.with_oob_support::<false>();
+    peer.shutdown(std::net::Shutdown::Write).unwrap();
+    assert!(drive(reader.read(&never), &mut worker).unwrap().is_none());
+    let mut reader = reader.with_oob_support::<true>();
+    assert_eq!(block_on(reader.read_into(&mut [0; 8], &never)).unwrap(), 0);
+    block_on(reader.close()).unwrap();
+    let mut reader = reader.with_oob_support::<false>();
+    assert_eq!(
+        block_on(reader.read_into(&mut [0; 8], &never))
+            .unwrap_err()
+            .kind(),
+        io::ErrorKind::BrokenPipe
+    );
 }

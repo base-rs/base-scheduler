@@ -15,6 +15,25 @@ use std::{
 pub trait SocketStreamReader: Send {
     type Buffer: ReceiveBuffer;
 
+    /// Select whether ordinary reads must preserve progress across TCP urgent-data
+    /// boundaries. OOB support is disabled by default. The const parameter lets
+    /// backends specialize readiness handling without a runtime option check.
+    ///
+    /// With support disabled, backends may reject observed urgent data with
+    /// `Unsupported`; this is not a filter or a guarantee that every urgent byte
+    /// is detected. Socket aliases must not consume urgent data in this mode.
+    /// With support enabled, ordinary reads remain usable across urgent marks;
+    /// receiving the urgent byte itself remains a separate socket operation.
+    /// Backends that always use conservative reads need no specialization.
+    fn with_oob_support<const SUPPORT_OOB: bool>(
+        self,
+    ) -> impl SocketStreamReader<Buffer = Self::Buffer>
+    where
+        Self: Sized,
+    {
+        self
+    }
+
     /// Read an owned initialized chunk. `None` means EOF or a closed reader. Holding every pool lease waits for capacity with cancellation. Idle readiness waits need not retain a payload buffer.
     fn read(
         &mut self,
