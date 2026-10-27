@@ -785,14 +785,24 @@ impl Reactor {
     }
 
     pub(crate) fn bind_worker(&mut self) {
-        // Cooperative task work belongs to its submitting thread. Enable it only for a never-driven ring after its owner becomes thread-bound; a movable driver must keep the default interrupt behavior.
+        // Deferred task work belongs to one issuer. Enable it only for a never-driven ring after its owner becomes thread-bound; a movable driver must keep the default interrupt behavior. TASKRUN_FLAG also makes busy nonblocking turns enter GETEVENTS to publish completions.
         if !self.started {
-            if let Ok(ring) = syscall("cooperative-ring", || {
+            let upgraded = syscall("deferred-ring", || {
                 IoUring::builder()
-                    .setup_coop_taskrun()
+                    .setup_single_issuer()
+                    .setup_defer_taskrun()
                     .setup_taskrun_flag()
                     .build(self.ring.params().sq_entries())
-            }) {
+            })
+            .or_else(|_| {
+                syscall("cooperative-ring", || {
+                    IoUring::builder()
+                        .setup_coop_taskrun()
+                        .setup_taskrun_flag()
+                        .build(self.ring.params().sq_entries())
+                })
+            });
+            if let Ok(ring) = upgraded {
                 // Setup already validated this kernel's operations and completion features. No request or notification has reached the old ring, and queued commands remain on the controller. Failure to obtain this optional replacement leaves the original valid ring intact.
                 self.ring = ring;
             }
