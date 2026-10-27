@@ -2156,7 +2156,12 @@ fn repeated_external_notifications_cannot_starve_a_one_entry_ring_payload() {
     let never = Cancellation::never();
     let mut operation = Box::pin(selector.file_read_at(&file, vec![0; 6], 0, &never));
     assert!(block_on(poll_once(&mut operation)).is_none());
-    assert!(!driver.turn(Some(Duration::ZERO)).unwrap());
+    {
+        // Leave the first SQ entry unpublished so the direct wait below cannot wait for a CQE that this submitting turn already collected.
+        let _failure = Failures::new([("submit", io::ErrorKind::Interrupted.into())]);
+        assert!(!driver.turn(Some(Duration::ZERO)).unwrap());
+        assert!(FAILURES.with(|failures| failures.borrow().is_empty()));
+    }
     let (wake, requests) = mpsc::channel();
     let (completed, acknowledgements) = mpsc::channel();
     let waker = driver.waker();
@@ -2173,12 +2178,14 @@ fn repeated_external_notifications_cannot_starve_a_one_entry_ring_payload() {
             wake.send(()).unwrap();
             acknowledgements.recv().unwrap();
             // Make each preceding polling request observably ready before the next turn. With notification-first insertion this repeats the interrupt CQ indefinitely while the payload remains pending.
+            let timeout = types::Timespec::new().sec(1);
             driver
                 .reactor
                 .as_mut()
                 .unwrap()
                 .ring
-                .submit_and_wait(1)
+                .submitter()
+                .submit_with_args(1, &types::SubmitArgs::new().timespec(&timeout))
                 .unwrap();
             assert!(!driver.turn(Some(Duration::ZERO)).unwrap());
             result = block_on(poll_once(&mut operation));
