@@ -1004,11 +1004,12 @@ fn a_driver_failure_wakes_close_that_already_waits_for_retirement() {
     let mut worker = driver.enter();
     let waker = worker.waker();
     let mut context = Context::from_waker(&waker);
-    let (_directory, file) = super::super::tests::file(&selector);
+    // Keep the read pending until driver failure so close is waiting for payload retirement, rather than only fixed-file registration release.
+    let (_directory, file) = super::super::tests::fifo(&selector);
     let never = Cancellation::never();
     let mut monitor = selector.file_monitor(&file).unwrap();
     let completion =
-        block_on(selector.file_monitor_read_at_submit(&mut monitor, vec![42], 0, &never)).unwrap();
+        block_on(selector.file_monitor_read_submit(&mut monitor, vec![42], &never)).unwrap();
     worker.turn(Some(Duration::ZERO)).unwrap();
     drop(completion);
     {
