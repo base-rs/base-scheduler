@@ -93,7 +93,7 @@ Prepare a release with `cargo bake cargo:version:patch` (or `minor`, `major`, or
 
 ## Releases
 
-Version v0.1.1 improves Native worker-owned socket readiness, kqueue and epoll event delivery, and borrowed stream writes. See the [release notes](releases.md).
+Version v0.1.2 reduces fallback socket overhead by waiting for descriptor readiness before retrying blocked I/O. See the [release notes](releases.md).
 
 ## See Also
 

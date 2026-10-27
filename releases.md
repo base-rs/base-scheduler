@@ -1,8 +1,8 @@
 # Releases
 
-## Unreleased
+## v0.1.2
 
-- Avoid retrying blocked fallback socket operations on unrelated task wakes, reducing io_uring listener overhead while preserving immediate I/O progress.
+- Avoid retrying blocked fallback socket operations on unrelated task wakes, reducing io\_uring listener overhead while preserving immediate I/O progress.
 
 ## v0.1.1
 
