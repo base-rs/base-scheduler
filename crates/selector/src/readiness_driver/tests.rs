@@ -766,7 +766,7 @@ fn closing_one_worker_preserves_another_workers_collected_batch() {
 }
 
 #[test]
-fn retirement_interrupts_a_driver_already_waiting_without_socket_events() {
+fn retirement_interrupts_a_prepared_driver_without_socket_events() {
     let (selector, mut drivers) =
         ReadinessSelector::with_workers(SelectorOptions::default(), 1).unwrap();
     let Some(group) = &selector.readiness else {
@@ -786,8 +786,20 @@ fn retirement_interrupts_a_driver_already_waiting_without_socket_events() {
         let mut worker = driver.enter();
         // Drain initial writable edges before testing the idle interrupt.
         worker.turn(Some(Duration::ZERO)).unwrap();
+        let inner = worker.driver.inner.as_mut().unwrap();
+        // Complete the next turn's batch boundary before allowing retirement.
+        // Otherwise turn() can reclaim a prefix of the sixteen records while
+        // the main thread drops them, leaving fewer than the wake threshold.
+        inner.events.clear();
+        inner.controller.release();
         ready.send(()).unwrap();
-        worker.turn(Some(Duration::from_secs(3))).unwrap();
+        // A retirement notification must survive both sides of kernel entry.
+        inner
+            .controller
+            .poller
+            .wait(&mut inner.events, Some(Duration::from_secs(3)))
+            .unwrap();
+        inner.dispatch().unwrap();
         done.send(()).unwrap();
     });
     started.recv_timeout(Duration::from_secs(3)).unwrap();
