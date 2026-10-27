@@ -1173,6 +1173,8 @@ impl Reactor {
                         result?;
                     }
                 }
+                // Submission can produce completions immediately. Publish that snapshot before returning so its wakeups do not wait for another reactor turn.
+                self.collect_completions()?;
             }
             return Ok(false);
         }
