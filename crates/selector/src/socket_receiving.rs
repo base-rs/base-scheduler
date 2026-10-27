@@ -13,7 +13,7 @@ impl SocketStreamReading for ReadinessSelector {
         socket: &Self::Socket,
     ) -> io::Result<impl SocketStreamReader<Buffer = <Self::Pool as BufferPool>::Buffer> + 'scheduler>
     {
-        ReadinessSocketStreamReader::new(self, socket)
+        ReadinessSocketStreamReader::<false>::new(self, socket)
     }
     fn socket_stream_reader_with_pool<'scheduler>(
         &'scheduler self,
@@ -21,7 +21,7 @@ impl SocketStreamReading for ReadinessSelector {
         pool: Self::Pool,
     ) -> io::Result<impl SocketStreamReader<Buffer = <Self::Pool as BufferPool>::Buffer> + 'scheduler>
     {
-        ReadinessSocketStreamReader::new(self, socket).map(|reader| reader.with_pool(pool))
+        ReadinessSocketStreamReader::<false>::new(self, socket).map(|reader| reader.with_pool(pool))
     }
 }
 impl SocketPacketReading for ReadinessSelector {

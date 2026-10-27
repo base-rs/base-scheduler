@@ -141,8 +141,9 @@ impl Wake for Controller {
 }
 
 pub(crate) struct Direction {
-    // Low bits are advisory readiness and readable EOF; upper bits identify
-    // the notification. EOF inhibits short-read clearing, not WouldBlock clear.
+    // Low bits are advisory readiness (1), EOF (2), and urgent data (4);
+    // upper bits identify the notification. EOF inhibits short-read clearing,
+    // not WouldBlock clear. Urgent data remains sticky for OOB-disabled readers.
     tick: AtomicUsize,
     #[cfg(target_os = "macos")]
     available: AtomicUsize,
@@ -163,7 +164,7 @@ impl Direction {
     pub(crate) fn publish(&self) {
         // Increment the generation before publishing readiness. A racing clear
         // can at most cause a spurious retry, never erase this notification.
-        self.tick.fetch_add(4, Ordering::AcqRel);
+        self.tick.fetch_add(8, Ordering::AcqRel);
         self.tick.fetch_or(1, Ordering::Release);
         self.changed.notify();
     }
@@ -177,7 +178,25 @@ impl Direction {
         }
         self.publish();
     }
-    pub(crate) fn clear_after_read(&self, observed: usize, count: usize, capacity: usize) {
+    #[cfg(target_os = "linux")]
+    fn publish_readable(&self, read_closed: bool, urgent: bool) {
+        // These conditions stay sticky even when ordinary readiness is cleared.
+        let flags = (usize::from(read_closed) << 1) | (usize::from(urgent) << 2);
+        if flags != 0 {
+            self.tick.fetch_or(flags, Ordering::Release);
+        }
+        self.publish();
+    }
+    pub(crate) fn clear_after_read<const SUPPORT_OOB: bool>(
+        &self,
+        observed: usize,
+        count: usize,
+        capacity: usize,
+    ) {
+        #[cfg(target_os = "linux")]
+        if !SUPPORT_OOB && count != 0 && count < capacity && observed & 2 == 0 {
+            self.clear(observed);
+        }
         #[cfg(target_os = "macos")]
         if count != 0
             && count < capacity
@@ -188,7 +207,7 @@ impl Direction {
         }
         // polling's other edge backends do not expose directional EOF here.
         // Retain advisory readiness until WouldBlock rather than lose EOF.
-        #[cfg(not(target_os = "macos"))]
+        #[cfg(not(any(target_os = "macos", target_os = "linux")))]
         let _ = (observed, count, capacity);
     }
     pub(crate) fn clear(&self, observed: usize) {
@@ -335,7 +354,7 @@ impl SocketRegistrations {
         if let Err(error) = unsafe {
             owner
                 .poller
-                .add_with_mode(socket, Event::all(token), PollMode::Edge)
+                .add_with_mode(socket, Event::all(token).with_priority(), PollMode::Edge)
         } {
             registration.inactive.store(true, Ordering::Release);
             return Err(error);
@@ -428,7 +447,11 @@ impl DriverState {
                 registration
                     .readable
                     .publish_readable(available, read_closed);
-                #[cfg(not(target_os = "macos"))]
+                #[cfg(target_os = "linux")]
+                registration
+                    .readable
+                    .publish_readable(event.is_interrupt(), event.is_priority());
+                #[cfg(not(any(target_os = "macos", target_os = "linux")))]
                 registration.readable.publish();
             }
             if event.writable {

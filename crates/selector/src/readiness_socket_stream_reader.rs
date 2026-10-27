@@ -20,7 +20,7 @@ use std::{
 };
 
 /// Scheduler-bound stream reader; registration remains private to this backend.
-pub(crate) struct ReadinessSocketStreamReader<'a> {
+pub(crate) struct ReadinessSocketStreamReader<'a, const SUPPORT_OOB: bool = false> {
     scheduler: &'a ReadinessSelector,
     socket: NativeSocket,
     #[cfg(unix)]
@@ -32,7 +32,7 @@ pub(crate) struct ReadinessSocketStreamReader<'a> {
     closed: bool,
 }
 
-impl<'a> ReadinessSocketStreamReader<'a> {
+impl<'a, const SUPPORT_OOB: bool> ReadinessSocketStreamReader<'a, SUPPORT_OOB> {
     /// Construct the default backend composition without submitting payload I/O. Applications normally use the scheduler factory.
     pub(crate) fn new(scheduler: &'a ReadinessSelector, socket: &NativeSocket) -> io::Result<Self> {
         if scheduler.socket_type(socket)? != base_scheduler::SocketType::Stream {
@@ -107,6 +107,13 @@ impl<'a> ReadinessSocketStreamReader<'a> {
                     .direction(Interest::Readable);
                 loop {
                     let observed = direction.snapshot();
+                    #[cfg(target_os = "linux")]
+                    if !SUPPORT_OOB && observed & 4 != 0 {
+                        return Err(io::Error::new(
+                            io::ErrorKind::Unsupported,
+                            "TCP urgent data is not supported by this reader",
+                        ));
+                    }
                     if !probe && observed & 1 == 0 {
                         direction.wait(group).await?;
                         continue;
@@ -114,10 +121,9 @@ impl<'a> ReadinessSocketStreamReader<'a> {
                     probe = false;
                     match receive(self.socket.get_ref()) {
                         Ok(count) => {
-                            // A short read must consume the event's reported
-                            // bytes before clearing. An urgent-data boundary can
-                            // leave bytes queued even after a short receive.
-                            direction.clear_after_read(observed, count, capacity);
+                            // The backend and OOB policy determine when a short
+                            // receive is sufficient to clear this generation.
+                            direction.clear_after_read::<SUPPORT_OOB>(observed, count, capacity);
                             return Ok(count);
                         }
                         Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
@@ -147,8 +153,22 @@ impl<'a> ReadinessSocketStreamReader<'a> {
     }
 }
 
-impl SocketStreamReader for ReadinessSocketStreamReader<'_> {
+impl<const SUPPORT_OOB: bool> SocketStreamReader for ReadinessSocketStreamReader<'_, SUPPORT_OOB> {
     type Buffer = <base_scheduler::HeapBufferPool as BufferPool>::Buffer;
+
+    fn with_oob_support<const OOB: bool>(self) -> impl SocketStreamReader<Buffer = Self::Buffer> {
+        ReadinessSocketStreamReader::<OOB> {
+            scheduler: self.scheduler,
+            socket: self.socket,
+            #[cfg(unix)]
+            registration: self.registration,
+            #[cfg(unix)]
+            established: self.established,
+            pool: self.pool,
+            eof: self.eof,
+            closed: self.closed,
+        }
+    }
 
     async fn read(&mut self, cancellation: &Cancellation) -> OperationResult<Option<Self::Buffer>> {
         cancellation.check()?;

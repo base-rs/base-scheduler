@@ -15,7 +15,8 @@ mod syscalls;
 pub(super) const INTERRUPT: usize = usize::MAX;
 const TIMER: usize = usize::MAX - 1;
 const BATCH: usize = 1024;
-const READ: u32 = (libc::EPOLLIN | libc::EPOLLPRI | libc::EPOLLERR | libc::EPOLLHUP) as u32;
+const READ: u32 =
+    (libc::EPOLLIN | libc::EPOLLPRI | libc::EPOLLRDHUP | libc::EPOLLERR | libc::EPOLLHUP) as u32;
 const WRITE: u32 = (libc::EPOLLOUT | libc::EPOLLERR | libc::EPOLLHUP) as u32;
 
 pub(super) struct Poller {
@@ -93,7 +94,8 @@ impl Poller {
                     .raw
                     .extend(compatible.iter().map(|event| libc::epoll_event {
                         events: (u32::from(event.readable) * libc::EPOLLIN as u32)
-                            | (u32::from(event.writable) * libc::EPOLLOUT as u32),
+                            | (u32::from(event.writable) * libc::EPOLLOUT as u32)
+                            | (u32::from(event.is_priority()) * libc::EPOLLPRI as u32),
                         u64: event.key as u64,
                     }));
                 Ok(count)
@@ -308,12 +310,20 @@ impl Events {
         self.raw
             .iter()
             .filter(|event| event.u64 as usize != TIMER)
-            .map(|event| {
-                Event::new(
-                    event.u64 as usize,
-                    event.events & READ != 0,
-                    event.events & WRITE != 0,
-                )
+            .map(|raw| {
+                let mut event = Event::new(
+                    raw.u64 as usize,
+                    raw.events & READ != 0,
+                    raw.events & WRITE != 0,
+                );
+                event.set_priority(raw.events & libc::EPOLLPRI as u32 != 0);
+                // The compatibility backend does not expose directional EOF;
+                // inhibit short-read clearing there rather than lose closure.
+                event.set_interrupt(
+                    self.compatible.is_some()
+                        || raw.events & (libc::EPOLLHUP | libc::EPOLLRDHUP) as u32 != 0,
+                );
+                event
             })
     }
 }
