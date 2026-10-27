@@ -1,5 +1,9 @@
 # Releases
 
+## Unreleased
+
+- Avoid retrying blocked fallback socket operations on unrelated task wakes, reducing io_uring listener overhead while preserving immediate I/O progress.
+
 ## v0.1.1
 
 - Reduce Linux worker-readiness overhead with native epoll event delivery and eventfd interruption, preserving precise timeouts and compatibility fallbacks.

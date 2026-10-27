@@ -64,14 +64,21 @@ impl NativeSocket {
     where
         Operation: FnMut(&socket2::Socket) -> io::Result<Output> + Send,
     {
-        // Invalid socket states must return their immediate OS error instead of waiting for readiness that cannot occur.
-        let result = operation(self.get_ref());
-        if !matches!(&result, Err(error) if error.kind() == io::ErrorKind::WouldBlock) {
-            return result;
-        }
-        match interest {
-            Interest::Readable => self.inner.read_with(|socket| operation(socket)).await,
-            Interest::Writable => self.inner.write_with(|socket| operation(socket)).await,
+        loop {
+            // Preserve immediate progress/errors. A pending descriptor must
+            // observe actual readiness before retrying: an unrelated wake of
+            // the containing task says nothing about this socket.
+            let result = operation(self.get_ref());
+            if !matches!(&result, Err(error) if error.kind() == io::ErrorKind::WouldBlock) {
+                return result;
+            }
+            let ready = match interest {
+                Interest::Readable => self.inner.readable().await,
+                Interest::Writable => self.inner.writable().await,
+            };
+            #[cfg(test)]
+            let ready = tests::readiness_result(ready);
+            ready?;
         }
     }
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
