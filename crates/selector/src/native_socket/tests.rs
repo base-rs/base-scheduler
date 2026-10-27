@@ -4,6 +4,18 @@
 use super::*;
 use crate::Interest;
 
+thread_local! {
+    static READINESS_ERROR: std::cell::Cell<Option<io::ErrorKind>> = const { std::cell::Cell::new(None) };
+}
+
+// Inject reactor failures after a real readiness wait without invalidating a live descriptor.
+pub(super) fn readiness_result(result: io::Result<()>) -> io::Result<()> {
+    match READINESS_ERROR.replace(None) {
+        Some(kind) => Err(kind.into()),
+        None => result,
+    }
+}
+
 #[test]
 fn direct_nonblocking_calls_support_scalar_and_vectored_datagrams() {
     crate::test_support::run(|| {
@@ -127,4 +139,57 @@ fn native_retention_preserves_the_registration_until_completion() {
     drop(retained);
     assert_eq!(Arc::strong_count(&socket.inner), 1);
     socket.into_close()().unwrap();
+}
+
+#[test]
+fn unrelated_polls_do_not_retry_a_blocked_socket_operation() {
+    use futures_lite::future::{block_on, poll_once};
+    use std::io::Write;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    crate::test_support::run(|| {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let mut peer = std::net::TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+        let socket = super::NativeSocket::new(listener.accept().unwrap().0.into()).unwrap();
+        let calls = AtomicUsize::new(0);
+        let mut buffer = [0; 8];
+        let mut operation = Box::pin(socket.io(crate::Interest::Readable, |socket| {
+            calls.fetch_add(1, Ordering::Relaxed);
+            crate::socket_io::recv_poll(
+                socket,
+                &mut buffer,
+                base_scheduler::SocketRecvFlags::default(),
+            )
+        }));
+        for _ in 0..5 {
+            assert!(block_on(poll_once(&mut operation)).is_none());
+            assert_eq!(calls.load(Ordering::Relaxed), 1);
+        }
+        peer.write_all(b"ready").unwrap();
+        assert_eq!(block_on(operation).unwrap(), 5);
+        assert_eq!(&buffer[..5], b"ready");
+    });
+}
+
+#[test]
+fn readiness_errors_return_without_retrying_the_operation() {
+    crate::test_support::run(|| {
+        for interest in [Interest::Readable, Interest::Writable] {
+            let socket =
+                NativeSocket::new(std::net::UdpSocket::bind("127.0.0.1:0").unwrap().into())
+                    .unwrap();
+            let peer = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
+            peer.send_to(b"ready", socket.local_addr().unwrap())
+                .unwrap();
+            READINESS_ERROR.set(Some(io::ErrorKind::PermissionDenied));
+            let mut calls = 0;
+            let error = futures_lite::future::block_on(socket.io(interest, |_| {
+                calls += 1;
+                Err::<(), _>(io::ErrorKind::WouldBlock.into())
+            }))
+            .unwrap_err();
+            assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
+            assert_eq!(calls, 1);
+            assert_eq!(READINESS_ERROR.get(), None);
+        }
+    });
 }
