@@ -2243,7 +2243,7 @@ fn movable_driver_never_upgrades_and_completes_inflight_io_after_thread_migratio
     let _failures = Failures::new([]);
     BEFORE_SYSCALL.with(|hook| {
         *hook.borrow_mut() = Some((
-            "cooperative-ring",
+            "deferred-ring",
             Box::new(|| {
                 panic!("a movable driver must preserve cross-thread ring progress");
             }),
@@ -2291,7 +2291,7 @@ fn fresh_bound_worker_attempts_optional_upgrade_without_losing_queued_io() {
     BEFORE_SYSCALL.with(|hook| {
         let attempted = Arc::clone(&attempted);
         *hook.borrow_mut() = Some((
-            "cooperative-ring",
+            "deferred-ring",
             Box::new(move || {
                 attempted.store(true, Ordering::SeqCst);
             }),
@@ -2307,6 +2307,42 @@ fn fresh_bound_worker_attempts_optional_upgrade_without_losing_queued_io() {
 }
 
 #[test]
+fn unsupported_deferred_worker_setup_preserves_cooperative_upgrade() {
+    let (selector, mut driver) = pair(1);
+    let (_directory, file) = file(&selector);
+    let never = Cancellation::never();
+    let mut reading = Box::pin(selector.file_read_at(&file, vec![0; 3], 1, &never));
+    assert!(block_on(poll_once(&mut reading)).is_none());
+    let _failures = Failures::new([("deferred-ring", io::Error::from_raw_os_error(libc::EINVAL))]);
+    let attempted = Arc::new(AtomicBool::new(false));
+    BEFORE_SYSCALL.with(|hook| {
+        let attempted = Arc::clone(&attempted);
+        *hook.borrow_mut() = Some((
+            "cooperative-ring",
+            Box::new(move || {
+                attempted.store(true, Ordering::SeqCst);
+            }),
+        ));
+    });
+    driver.reactor.as_mut().unwrap().bind_worker();
+    assert!(attempted.load(Ordering::SeqCst));
+    assert!(
+        !driver
+            .reactor
+            .as_ref()
+            .unwrap()
+            .ring
+            .params()
+            .is_setup_single_issuer()
+    );
+    let (result, buffer) = drive(&mut driver, reading);
+    assert_eq!(result.unwrap(), 3);
+    assert_eq!(buffer, b"bcd");
+    block_on(selector.file_close(file)).unwrap();
+    drain(&selector, &mut driver);
+}
+
+#[test]
 fn optional_worker_upgrade_failures_preserve_the_valid_ring_and_queued_io() {
     use base_scheduler_selector::SelectorDriver;
     for code in [libc::EINVAL, libc::EPERM] {
@@ -2315,7 +2351,10 @@ fn optional_worker_upgrade_failures_preserve_the_valid_ring_and_queued_io() {
         let never = Cancellation::never();
         let mut reading = Box::pin(selector.file_read(&file, vec![0; 6], &never));
         assert!(block_on(poll_once(&mut reading)).is_none());
-        let _failures = Failures::new([("cooperative-ring", io::Error::from_raw_os_error(code))]);
+        let _failures = Failures::new([
+            ("deferred-ring", io::Error::from_raw_os_error(code)),
+            ("cooperative-ring", io::Error::from_raw_os_error(code)),
+        ]);
         let mut worker = driver.enter();
         FAILURES.with(|failures| assert!(failures.borrow().is_empty()));
         let (result, buffer) = drive_bound_worker(&mut worker, reading);
@@ -2340,7 +2379,7 @@ fn binding_an_already_driven_ring_preserves_inflight_io_without_upgrade() {
     let _failures = Failures::new([]);
     BEFORE_SYSCALL.with(|hook| {
         *hook.borrow_mut() = Some((
-            "cooperative-ring",
+            "deferred-ring",
             Box::new(|| {
                 panic!("an already-driven ring must retain its accepted work");
             }),
@@ -2365,7 +2404,7 @@ fn a_retired_driver_can_enter_a_worker_without_recreating_its_ring() {
     let _failures = Failures::new([]);
     BEFORE_SYSCALL.with(|hook| {
         *hook.borrow_mut() = Some((
-            "cooperative-ring",
+            "deferred-ring",
             Box::new(|| {
                 panic!("a retired driver must not create another ring");
             }),

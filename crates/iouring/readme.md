@@ -31,6 +31,8 @@ scheduler.block_on(scheduler.shutdown());
 
 `IoUringSelector::new` returns the selector and an `IoUringDriver`. It starts no ring thread. An application can call `driver.turn(timeout)` from its event loop or move the driver into a dedicated thread and call `run`. Operation futures use ordinary wakers and can be polled on any executor. Idle turns wait directly on the ring; cross-thread wakeups signal an eventfd watched by a single outstanding `PollAdd`. The poll retains only the descriptor, with no userspace destination buffer to keep alive. Setup requires `IORING_FEAT_EXT_ARG` for timed turns, available since Linux 5.11.
 
+A fresh driver entering a thread-bound worker prefers single-issuer deferred task running, with the taskrun flag preserving completion progress during nonblocking turns. If unavailable, it tries cooperative task running before keeping the original ring. Movable and already-driven rings keep their existing configuration. This changes completion processing without changing buffer ownership or cancellation semantics.
+
 A separately driven selector composes with `NativeScheduler::with_selector`. The driver must remain active throughout operation and asynchronous shutdown. Dropping a pending operation requests cancellation while the driver retains its buffer and file until original completion. Cancellation completion alone never releases original request storage.
 
 ## Owned I/O

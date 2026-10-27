@@ -61,6 +61,67 @@ fn until(driver: &mut impl SelectorWorker, mut condition: impl FnMut() -> bool) 
 }
 
 #[test]
+fn worker_owned_receives_complete_cancel_and_abandon_with_only_nonblocking_turns() {
+    let (selector, driver) = IoUringSelector::new(options()).unwrap();
+    let mut worker = driver.enter();
+    let wake = worker.waker();
+    let mut context = Context::from_waker(&wake);
+    let (socket, peer) = sockets(&selector);
+    let mut reader = selector.socket_stream_reader(&socket).unwrap();
+    let never = Cancellation::never();
+    {
+        let mut read = Box::pin(reader.read_owned(vec![7; 16], &never));
+        assert!(read.as_mut().poll(&mut context).is_pending());
+        worker.turn(Some(Duration::ZERO)).unwrap();
+        worker.turn(Some(Duration::ZERO)).unwrap();
+        assert!(read.as_mut().poll(&mut context).is_pending());
+        let peer = std::thread::spawn(move || {
+            let mut peer = peer;
+            peer.write_all(b"x").unwrap();
+            peer
+        })
+        .join()
+        .unwrap();
+        let (result, buffer) = drive(&mut worker, &mut context, read.as_mut());
+        assert_eq!(result.unwrap(), 1);
+        assert_eq!(buffer[0], b'x');
+        drop(peer);
+    }
+    // Use another connection so EOF on the first cannot satisfy the cancellation probe.
+    drive(&mut worker, &mut context, Box::pin(reader.close()).as_mut()).unwrap();
+    drop(reader);
+    block_on(selector.socket_close(socket)).unwrap();
+    let (socket, _peer) = sockets(&selector);
+    let mut reader = selector.socket_stream_reader(&socket).unwrap();
+    {
+        let token = Cancellation::new();
+        let mut read = Box::pin(reader.read_owned(vec![7; 16], &token));
+        assert!(read.as_mut().poll(&mut context).is_pending());
+        worker.turn(Some(Duration::ZERO)).unwrap();
+        worker.turn(Some(Duration::ZERO)).unwrap();
+        token.cancel();
+        let (result, buffer) = drive(&mut worker, &mut context, read.as_mut());
+        assert!(matches!(result, Err(OperationError::Cancelled(_))));
+        assert_eq!(buffer, [7; 16]);
+    }
+    {
+        let mut read = Box::pin(reader.read_owned(vec![7; 16], &never));
+        assert!(read.as_mut().poll(&mut context).is_pending());
+        worker.turn(Some(Duration::ZERO)).unwrap();
+        worker.turn(Some(Duration::ZERO)).unwrap();
+        // Abandonment must not strand the buffer owner or the bound reader's close.
+    }
+    drive(&mut worker, &mut context, Box::pin(reader.close()).as_mut()).unwrap();
+    drop(reader);
+    block_on(selector.socket_close(socket)).unwrap();
+    drive(
+        &mut worker,
+        &mut context,
+        Box::pin(selector.shutdown()).as_mut(),
+    );
+}
+
+#[test]
 fn repeated_notifications_retain_one_registration_without_allocations() {
     let (selector, driver) = IoUringSelector::new(options()).unwrap();
     let mut worker = driver.enter();
