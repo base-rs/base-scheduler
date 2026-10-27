@@ -448,6 +448,63 @@ fn transient_syscall_errors_preserve_progress_and_fatal_errors_stop_the_driver()
 }
 
 #[test]
+fn nonblocking_owned_read_deferral_is_bounded_even_with_a_monitor_batch() {
+    use base_scheduler_selector::{SelectorDriver, SelectorWorker};
+
+    for with_monitor in [false, true] {
+        let (selector, driver) = pair(8);
+        let (sender, receiver) = block_on(base_scheduler_conformance::socket::stream_pair(
+            &selector,
+            SocketDomain::Ipv4,
+        ));
+        let mut worker = driver.enter();
+        worker.turn(Some(Duration::ZERO)).unwrap();
+        let never = Cancellation::never();
+        let mut monitor = selector.socket_monitor(&receiver, Interest::Readable);
+        let mut waiting = Box::pin(selector.socket_monitor_wait(&mut monitor, &never));
+        if with_monitor {
+            assert!(block_on(poll_once(&mut waiting)).is_none());
+        }
+        let mut reader = selector.socket_stream_reader(&receiver).unwrap();
+        let mut reading = Box::pin(reader.read_owned(vec![0; 1], &never));
+        assert!(block_on(poll_once(&mut reading)).is_none());
+        {
+            // Observe a submission attempt without depending on completion timing.
+            // A fresh batch can be deferred, but not on successive busy turns.
+            // An earlier attempt is also valid; interruption keeps its owner pending.
+            let _failure = Failures::new([("submit", io::ErrorKind::Interrupted.into())]);
+            worker.turn(Some(Duration::ZERO)).unwrap();
+            worker.turn(Some(Duration::ZERO)).unwrap();
+            assert!(FAILURES.with(|failures| failures.borrow().is_empty()));
+        }
+        assert!(block_on(poll_once(&mut reading)).is_none());
+        assert_eq!(
+            sender.try_send(b"x", SocketSendFlags::default()).unwrap(),
+            1
+        );
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let (result, buffer) = loop {
+            worker.turn(Some(Duration::ZERO)).unwrap();
+            if let Some(result) = block_on(poll_once(&mut reading)) {
+                break result;
+            }
+            assert!(Instant::now() < deadline);
+        };
+        assert_eq!(result.unwrap(), 1);
+        assert_eq!(buffer, b"x");
+        drop(reading);
+        drop(reader);
+        drop(waiting);
+        drop(monitor);
+        selector.close();
+        while !worker.turn(Some(Duration::from_millis(10))).unwrap() {
+            assert!(Instant::now() < deadline);
+        }
+        block_on(selector.shutdown());
+    }
+}
+
+#[test]
 fn nonblocking_submission_publishes_immediate_completions_before_returning() {
     use base_scheduler_selector::{SelectorDriver, SelectorWorker};
 

@@ -1116,7 +1116,7 @@ impl Reactor {
                     .expect("submission capacity was checked and the local queue has not changed");
                 self.notification_armed = true;
             }
-            // A readiness-only batch can join the next idle wait. Existing SQ entries must be submitted on this turn, even if tasks stay busy.
+            // A newly prepared batch which cannot wake tasks can join the next idle wait, including owned reads with precomputed entries. Existing SQ entries require a submission attempt on this turn, even if tasks stay busy.
             defer_submission = prepared
                 && !progressed
                 && !command_batch_full
@@ -1134,7 +1134,7 @@ impl Reactor {
             return Ok(true);
         }
 
-        // Nonblocking turns may stage one readiness-only batch for the next turn. An idle wait submits it and waits in one entry; a busy worker submits it on its next nonblocking turn. Overflow and task work always enter. Short-circuiting preserves the local permit through productive turns. At the actual wait decision, consume it; the armed poll retains remote notifications until their CQE drains the counter.
+        // Nonblocking turns may stage one batch for the next turn when preparation cannot wake tasks. An idle wait submits it and waits in one entry; a busy worker submits it on its next nonblocking turn. Overflow and task work always enter. Short-circuiting preserves the local permit through productive turns. At the actual wait decision, consume it; the armed poll retains remote notifications until their CQE drains the counter.
         let return_to_executor = progressed
             // Issuance waiters may need to run before their I/O can complete. Never enter a blocking completion wait while an unconsumed SQE still owes its caller a submission notification.
             || self.submission_notifications.pending()

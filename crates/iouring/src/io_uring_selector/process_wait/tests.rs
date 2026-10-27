@@ -180,6 +180,11 @@ fn unsubmitted_driver_drop_reports_an_error_and_unknown_kernel_access_is_retaine
             Box::pin(selector.process_wait(i32::MAX, ProcessWaitFlags::default(), &never));
         assert!(block_on(poll_once(wait.as_mut())).is_none());
         if submitted {
+            // Keep the invalid PID from completing if this turn attempts issuance.
+            // The fixture needs a retained staged request, independently of the
+            // batching policy. Driver teardown conservatively retains that owner.
+            let _failure =
+                super::super::tests::Failures::new([("submit", io::ErrorKind::Interrupted.into())]);
             driver.turn(Some(Duration::ZERO)).unwrap();
             assert_eq!(driver.reactor.as_ref().unwrap().in_flight.0.len(), 1);
         }

@@ -1,0 +1,228 @@
+--- a/crates/iouring/src/io_uring_selector.rs
++++ b/crates/iouring/src/io_uring_selector.rs
+@@ -26,6 +26,104 @@
+ };
+ const CANCEL_TAG: u64 = 1 << 63;
+ const NOTIFICATION_TAG: u64 = u64::MAX;
++
++#[derive(Default)]
++struct Diagnostic {
++    turns: u64,
++    payload_batches: u64,
++    payload_requests: u64,
++    deferred_batches: u64,
++    deferred_requests: u64,
++    submits: u64,
++    waits: u64,
++    deferred_at: Option<std::time::Instant>,
++    delays: u64,
++    delay_ns: u128,
++    max_delay_ns: u128,
++    delay_buckets: [u64; 13],
++    admissions: u64,
++    queue_delays: u64,
++    queue_delay_ns: u128,
++    max_queue_delay_ns: u128,
++    queue_buckets: [u64; 13],
++    publications: u64,
++    poll_delays: u64,
++    poll_delay_ns: u128,
++    max_poll_delay_ns: u128,
++    poll_buckets: [u64; 13],
++}
++std::thread_local! {
++    static DIAGNOSTIC: std::cell::RefCell<Diagnostic> = std::cell::RefCell::new(Diagnostic::default());
++}
++fn diagnostic(action: &str, payloads: u64) {
++    DIAGNOSTIC.with(|slot| {
++        let mut d = slot.borrow_mut();
++        match action {
++            "turn" => {
++                d.turns += 1;
++                if d.turns % 4096 == 0 {
++                    eprintln!("DIAG {{\"turns\":{},\"payload_batches\":{},\"payload_requests\":{},\"deferred_batches\":{},\"deferred_requests\":{},\"submits\":{},\"waits\":{},\"delays\":{},\"delay_sum_ns\":{},\"max_delay_ns\":{},\"delay_buckets_le_us\":{:?}}}", d.turns,d.payload_batches,d.payload_requests,d.deferred_batches,d.deferred_requests,d.submits,d.waits,d.delays,d.delay_ns,d.max_delay_ns,d.delay_buckets);
++                    eprintln!("POLL {{\"publications\":{},\"samples\":{},\"sum_ns\":{},\"max_ns\":{},\"buckets_le_us\":{:?}}}",d.publications,d.poll_delays,d.poll_delay_ns,d.max_poll_delay_ns,d.poll_buckets);
++                    eprintln!("QUEUE {{\"admissions\":{},\"samples\":{},\"sum_ns\":{},\"max_ns\":{},\"buckets_le_us\":{:?}}}",d.admissions,d.queue_delays,d.queue_delay_ns,d.max_queue_delay_ns,d.queue_buckets);
++                }
++            }
++            "prepare" => { if payloads > 0 {d.payload_batches+=1; d.payload_requests+=payloads;} }
++            "defer" => {
++                if payloads > 0 {
++                    assert!(d.deferred_at.is_none());
++                    d.deferred_batches+=1; d.deferred_requests+=payloads;
++                    d.deferred_at=Some(std::time::Instant::now());
++                }
++            }
++            "submit" | "wait" => {
++                if action == "submit" {d.submits+=1;} else {d.waits+=1;}
++                if let Some(start)=d.deferred_at.take() {
++                    let ns=start.elapsed().as_nanos();
++                    d.delays+=1; d.delay_ns+=ns; d.max_delay_ns=d.max_delay_ns.max(ns);
++                    let limits=[1,2,4,8,16,32,64,128,256,512,1024,2048];
++                    let index=limits.iter().position(|us| ns <= us*1000).unwrap_or(12);
++                    d.delay_buckets[index]+=1;
++                }
++            }
++            _ => unreachable!(),
++        }
++    });
++}
++fn diagnostic_admit_sample() -> bool {
++    DIAGNOSTIC.with(|slot| {
++        let mut d=slot.borrow_mut();
++        d.admissions+=1;
++        d.admissions%128==0
++    })
++}
++fn diagnostic_queue_delay(start: std::time::Instant) {
++    let ns=start.elapsed().as_nanos();
++    DIAGNOSTIC.with(|slot| {
++        let mut d=slot.borrow_mut();
++        d.queue_delays+=1; d.queue_delay_ns+=ns; d.max_queue_delay_ns=d.max_queue_delay_ns.max(ns);
++        let limits=[1,2,4,8,16,32,64,128,256,512,1024,2048];
++        let index=limits.iter().position(|us| ns <= us*1000).unwrap_or(12);
++        d.queue_buckets[index]+=1;
++    });
++}
++fn diagnostic_sample() -> bool {
++    DIAGNOSTIC.with(|slot| {
++        let mut d=slot.borrow_mut();
++        d.publications+=1;
++        d.publications%128==0
++    })
++}
++fn diagnostic_poll_delay(start: std::time::Instant) {
++    let ns=start.elapsed().as_nanos();
++    DIAGNOSTIC.with(|slot| {
++        let mut d=slot.borrow_mut();
++        d.poll_delays+=1; d.poll_delay_ns+=ns; d.max_poll_delay_ns=d.max_poll_delay_ns.max(ns);
++        let limits=[1,2,4,8,16,32,64,128,256,512,1024,2048];
++        let index=limits.iter().position(|us| ns <= us*1000).unwrap_or(12);
++        d.poll_buckets[index]+=1;
++    });
++}
++
+ 
+ // Keep syscall failures deterministic in unit tests while production calls the OS directly.
+ fn syscall<T>(name: &'static str, operation: impl FnOnce() -> io::Result<T>) -> io::Result<T> {
+@@ -1044,11 +1142,13 @@
+ 
+     pub(crate) fn turn(&mut self, timeout: Option<Duration>) -> io::Result<bool> {
+         self.started = true;
++        diagnostic("turn",0);
+         let (mut progressed, command_batch_full) = self.process_commands();
+ 
+         progressed |= self.collect_completions()?;
+ 
+         let defer_submission;
++        let mut payloads = 0;
+         {
+             let (submitter, mut submissions, _) = self.ring.split();
+             let had_submissions = !submissions.is_empty();
+@@ -1078,6 +1178,7 @@
+                 let identifier = request.identifier();
+                 let request = self.in_flight.0.entry(identifier).or_insert(request);
+                 let entry = request.entry();
++                payloads += u64::from(entry.get_opcode() != u32::from(opcode::PollAdd::CODE));
+                 progressed |= request.entry_may_wake();
+                 prepared = true;
+                 // SAFETY: InFlight owns the buffer allocation and descriptor before publication. Neither is released or accessed until the original CQE, even when cancellation completes first. A failed push does not publish the entry.
+@@ -1124,6 +1225,8 @@
+                 && timeout == Some(Duration::ZERO);
+         }
+ 
++        diagnostic("prepare", payloads);
++        if defer_submission {diagnostic("defer",payloads);}
+         if self.closing
+             && !command_batch_full
+             && self.in_flight.0.is_empty()
+@@ -1157,6 +1260,7 @@
+                     .submission_notifications
+                     .pending()
+                     .then(|| self.ring.submission().len());
++                diagnostic("submit",0);
+                 let result = syscall("submit", || self.ring.submit());
+                 if let Some(before) = before {
+                     self.submission_notifications
+@@ -1178,6 +1282,7 @@
+             }
+             return Ok(false);
+         }
++        diagnostic("wait",0);
+         let result = syscall("wait", || match timeout {
+             None => self.ring.submit_and_wait(1),
+             Some(duration) => {
+--- a/crates/iouring/src/io_uring_selector/socket_read.rs
++++ b/crates/iouring/src/io_uring_selector/socket_read.rs
+@@ -16,6 +16,7 @@
+                 slot: Mutex::new(Slot {
+                     result: None,
+                     collecting: false,
++                    diagnostic_published: None,
+                 }),
+                 ready: AtomicBool::new(false),
+                 waker: atomic_waker::AtomicWaker::new(),
+@@ -33,6 +34,7 @@
+ struct Slot {
+     result: Option<Completion>,
+     collecting: bool,
++    diagnostic_published: Option<std::time::Instant>,
+ }
+ struct Shared {
+     slot: Mutex<Slot>,
+@@ -44,6 +46,7 @@
+         let abandoned = {
+             let mut slot = self.slot.lock().unwrap();
+             let abandoned = if slot.collecting {
++                slot.diagnostic_published=super::diagnostic_sample().then(std::time::Instant::now);
+                 slot.result = Some(result);
+                 None
+             } else {
+@@ -94,6 +97,7 @@
+     socket: Option<RegisteredSocket>,
+     buffer: Option<B>,
+     pointer: *mut u8,
++    diagnostic_queued: Option<std::time::Instant>,
+     length: u32,
+     reply: Cell<Option<Arc<Shared>>>,
+     cancelling: Cell<bool>,
+@@ -105,6 +109,7 @@
+         self.identifier
+     }
+     fn entry(&mut self) -> squeue::Entry {
++        if let Some(start)=self.diagnostic_queued.take() {super::diagnostic_queue_delay(start);}
+         opcode::Recv::new(
+             types::Fd(self.socket.as_ref().unwrap().get_ref().as_raw_fd()),
+             self.pointer,
+@@ -182,6 +187,7 @@
+                     socket: None,
+                     buffer: None,
+                     pointer: std::ptr::null_mut(),
++                    diagnostic_queued: None,
+                     length: 0,
+                     reply: Cell::new(None),
+                     cancelling: Cell::new(false),
+@@ -213,6 +219,7 @@
+             },
+             shared: Some(&self.shared),
+         };
++        request.diagnostic_queued=super::diagnostic_admit_sample().then(std::time::Instant::now);
+         completion.cancel.controller.submit(request);
+         let mut cancelled = pin!(cancellation.cancelled());
+         poll_fn(|context| {
+@@ -231,11 +238,12 @@
+         })
+         .await;
+         completion.cancel.armed = false;
+-        let result = {
++        let (result, published) = {
+             let mut slot = self.shared.slot.lock().unwrap();
+             slot.collecting = false;
+-            slot.result.take().unwrap()
+-        };
++            (slot.result.take().unwrap(), slot.diagnostic_published.take())
++        };
++        if let Some(start)=published {super::diagnostic_poll_delay(start);}
+         completion.shared = None;
+         drop(completion);
+         match result {

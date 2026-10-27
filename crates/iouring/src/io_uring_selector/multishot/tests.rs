@@ -148,7 +148,13 @@ fn shutdown_during_buffer_exhaustion_retires_without_a_transport_error() {
     sender
         .try_send(b"abcdefgh", SocketSendFlags::default())
         .unwrap();
-    driver.turn(Some(Duration::ZERO)).unwrap();
+    {
+        // Leave this turn's SQEs unissued so post-submit collection cannot
+        // consume the CQEs which the direct wait below needs to retain.
+        let _failure =
+            super::super::tests::Failures::new([("submit", io::ErrorKind::Interrupted.into())]);
+        driver.turn(Some(Duration::ZERO)).unwrap();
+    }
     {
         let reactor = driver.reactor.as_mut().unwrap();
         let deadline = std::time::Instant::now() + Duration::from_secs(3);
