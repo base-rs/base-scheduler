@@ -99,7 +99,7 @@ pub(super) fn file(selector: &IoUringSelector) -> (tempfile::TempDir, NativeFile
     .unwrap();
     (directory, file)
 }
-fn fifo(selector: &IoUringSelector) -> (tempfile::TempDir, NativeFile) {
+pub(super) fn fifo(selector: &IoUringSelector) -> (tempfile::TempDir, NativeFile) {
     use std::os::unix::ffi::OsStrExt;
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("fifo");
@@ -445,6 +445,51 @@ fn transient_syscall_errors_preserve_progress_and_fatal_errors_stop_the_driver()
         assert!(driver.turn(None).unwrap());
         block_on(selector.shutdown());
     }
+}
+
+#[test]
+fn nonblocking_submission_publishes_immediate_completions_before_returning() {
+    use base_scheduler_selector::{SelectorDriver, SelectorWorker};
+
+    struct ImmediateRequest {
+        identifier: u64,
+        completed: Arc<AtomicBool>,
+    }
+    impl PendingRequest for ImmediateRequest {
+        fn identifier(&self) -> u64 {
+            self.identifier
+        }
+        fn entry(&mut self) -> squeue::Entry {
+            opcode::Nop::new().build().user_data(self.identifier)
+        }
+        fn finish(self: Box<Self>, result: io::Result<usize>) {
+            assert_eq!(result.unwrap(), 0);
+            self.completed.store(true, Ordering::SeqCst);
+        }
+        fn begin_cancellation(&self) -> bool {
+            false
+        }
+        fn take_reply(&self) -> Option<Box<dyn Send>> {
+            None
+        }
+    }
+
+    let (selector, driver) = pair(4);
+    let mut worker = driver.enter();
+    let completed = Arc::new(AtomicBool::new(false));
+    let controller = selector.route_ref();
+    controller.submit(Box::new(ImmediateRequest {
+        identifier: controller.next_identifier().unwrap(),
+        completed: Arc::clone(&completed),
+    }));
+
+    // NOP completes during submission. Its owner must observe completion after this nonblocking turn, without requiring another driver turn to publish it.
+    assert!(!worker.turn(Some(Duration::ZERO)).unwrap());
+    assert!(completed.load(Ordering::SeqCst));
+
+    selector.close();
+    while !worker.turn(Some(Duration::from_millis(10))).unwrap() {}
+    block_on(selector.shutdown());
 }
 
 #[test]
@@ -1270,14 +1315,24 @@ fn nonblocking_and_productive_turns_do_not_prepare_an_idle_wait() {
 }
 
 #[test]
-fn nonblocking_turn_preserves_notifications_for_the_next_idle_turn() {
+fn nonblocking_turn_delivers_notifications_without_an_idle_wait() {
     let (selector, mut driver) = pair(1);
     driver.waker().wake_by_ref();
-    assert!(!driver.turn(Some(Duration::ZERO)).unwrap());
     {
         let _failures = Failures::new([("wait", io::ErrorKind::PermissionDenied.into())]);
-        // The previously published notification must return us to the executor before rearming or waiting.
-        assert!(!driver.turn(None).unwrap());
+        let delivered = Arc::new(AtomicBool::new(false));
+        let observed = Arc::clone(&delivered);
+        BEFORE_SYSCALL.with(|hook| {
+            *hook.borrow_mut() = Some((
+                "notification-read",
+                Box::new(move || observed.store(true, Ordering::SeqCst)),
+            ));
+        });
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while !delivered.load(Ordering::SeqCst) {
+            assert!(!driver.turn(Some(Duration::ZERO)).unwrap());
+            assert!(Instant::now() < deadline);
+        }
         assert_eq!(FAILURES.with(|failures| failures.borrow().len()), 1);
     }
     drain(&selector, &mut driver);
@@ -1841,13 +1896,8 @@ fn full_eventfd_preserves_existing_notifications_without_failing_the_waker() {
     // Adding one would exceed the eventfd counter's limit; the existing counter already wakes the worker.
     driver.waker().wake_by_ref();
     assert!(!driver.turn(Some(Duration::ZERO)).unwrap());
-    driver
-        .reactor
-        .as_mut()
-        .unwrap()
-        .ring
-        .submit_and_wait(1)
-        .unwrap();
+    // Submission may already have published the notification completion.
+    assert!(!driver.turn(Some(Duration::from_millis(1))).unwrap());
     assert!(!driver.turn(Some(Duration::ZERO)).unwrap());
     assert!(!driver.turn(Some(Duration::from_millis(1))).unwrap());
     drain(&selector, &mut driver);
@@ -1942,13 +1992,8 @@ fn interrupted_notification_reads_yield_without_losing_the_wake() {
     }
     // The unread counter still completes the next poll after the bounded interrupted retries.
     assert!(!driver.turn(Some(Duration::ZERO)).unwrap());
-    driver
-        .reactor
-        .as_mut()
-        .unwrap()
-        .ring
-        .submit_and_wait(1)
-        .unwrap();
+    // Submission may already have published the notification completion.
+    assert!(!driver.turn(Some(Duration::from_millis(1))).unwrap());
     assert!(!driver.turn(Some(Duration::ZERO)).unwrap());
     drain(&selector, &mut driver);
 }
@@ -1957,21 +2002,21 @@ fn interrupted_notification_reads_yield_without_losing_the_wake() {
 fn notification_completion_read_failure_stops_the_driver() {
     let (selector, mut driver) = pair(1);
     driver.waker().wake_by_ref();
-    assert!(!driver.turn(Some(Duration::ZERO)).unwrap());
-    driver
-        .reactor
-        .as_mut()
-        .unwrap()
-        .ring
-        .submit_and_wait(1)
-        .unwrap();
     {
         let _failure =
             Failures::new([("notification-read", io::ErrorKind::PermissionDenied.into())]);
-        assert_eq!(
-            driver.turn(Some(Duration::ZERO)).unwrap_err().kind(),
-            io::ErrorKind::PermissionDenied
-        );
+        let deadline = Instant::now() + Duration::from_secs(10);
+        loop {
+            // An immediately available notification can fail collection in the submitting turn; a later one must report the same driver error.
+            match driver.turn(Some(Duration::ZERO)) {
+                Err(error) => {
+                    assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
+                    break;
+                }
+                Ok(closed) => assert!(!closed),
+            }
+            assert!(Instant::now() < deadline);
+        }
         assert!(FAILURES.with(|failures| failures.borrow().is_empty()));
     }
     assert!(driver.turn(None).unwrap());
@@ -2111,7 +2156,12 @@ fn repeated_external_notifications_cannot_starve_a_one_entry_ring_payload() {
     let never = Cancellation::never();
     let mut operation = Box::pin(selector.file_read_at(&file, vec![0; 6], 0, &never));
     assert!(block_on(poll_once(&mut operation)).is_none());
-    assert!(!driver.turn(Some(Duration::ZERO)).unwrap());
+    {
+        // Leave the first SQ entry unpublished so the direct wait below cannot wait for a CQE that this submitting turn already collected.
+        let _failure = Failures::new([("submit", io::ErrorKind::Interrupted.into())]);
+        assert!(!driver.turn(Some(Duration::ZERO)).unwrap());
+        assert!(FAILURES.with(|failures| failures.borrow().is_empty()));
+    }
     let (wake, requests) = mpsc::channel();
     let (completed, acknowledgements) = mpsc::channel();
     let waker = driver.waker();
@@ -2128,12 +2178,14 @@ fn repeated_external_notifications_cannot_starve_a_one_entry_ring_payload() {
             wake.send(()).unwrap();
             acknowledgements.recv().unwrap();
             // Make each preceding polling request observably ready before the next turn. With notification-first insertion this repeats the interrupt CQ indefinitely while the payload remains pending.
+            let timeout = types::Timespec::new().sec(1);
             driver
                 .reactor
                 .as_mut()
                 .unwrap()
                 .ring
-                .submit_and_wait(1)
+                .submitter()
+                .submit_with_args(1, &types::SubmitArgs::new().timespec(&timeout))
                 .unwrap();
             assert!(!driver.turn(Some(Duration::ZERO)).unwrap());
             result = block_on(poll_once(&mut operation));

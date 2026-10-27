@@ -356,17 +356,15 @@ fn queued_requests_return_owners_but_unknown_kernel_retirement_never_does() {
         let mut worker = driver.enter();
         let waker = worker.waker();
         let mut context = Context::from_waker(&waker);
-        let directory = tempfile::tempdir().unwrap();
-        let path = directory.path().join("file");
-        std::fs::write(&path, b"abcdef").unwrap();
+        // A FIFO without input keeps the submitted read in flight, even when submission publishes immediately available completions.
+        let (_directory, file) = super::super::tests::fifo(&selector);
         let never = Cancellation::never();
-        let file = block_on(selector.file_open(&path, FileOptions::READ, &never)).unwrap();
         let mut monitor = selector.file_monitor(&file).unwrap();
-        let mut operation =
-            Box::pin(selector.file_monitor_read_at(&mut monitor, vec![42; 6], 0, &never));
+        let mut operation = Box::pin(selector.file_monitor_read(&mut monitor, vec![42; 6], &never));
         assert!(operation.as_mut().poll(&mut context).is_pending());
         if submit {
             worker.turn(Some(Duration::ZERO)).unwrap();
+            assert!(operation.as_mut().poll(&mut context).is_pending());
         }
         drop(worker);
         if submit {
@@ -406,21 +404,19 @@ fn close_and_reuse_both_report_an_abandoned_driver_failure() {
         let mut worker = driver.enter();
         let waker = worker.waker();
         let mut context = Context::from_waker(&waker);
-        let directory = tempfile::tempdir().unwrap();
-        let path = directory.path().join("file");
-        std::fs::write(&path, b"abcdef").unwrap();
+        // Exercise abandoned kernel ownership with a genuinely pending read rather than a regular-file read that may already have completed.
+        let (_directory, file) = super::super::tests::fifo(&selector);
         let never = Cancellation::never();
-        let file = block_on(selector.file_open(&path, FileOptions::READ, &never)).unwrap();
         let mut monitor = selector.file_monitor(&file).unwrap();
-        let mut operation =
-            Box::pin(selector.file_monitor_read_at(&mut monitor, vec![42; 6], 0, &never));
+        let mut operation = Box::pin(selector.file_monitor_read(&mut monitor, vec![42; 6], &never));
         assert!(operation.as_mut().poll(&mut context).is_pending());
         worker.turn(Some(Duration::ZERO)).unwrap();
+        assert!(operation.as_mut().poll(&mut context).is_pending());
         std::mem::forget(operation);
         drop(worker);
         if reuse {
             assert_eq!(
-                block_on(selector.file_monitor_read_at(&mut monitor, vec![0], 0, &never))
+                block_on(selector.file_monitor_read(&mut monitor, vec![0], &never))
                     .0
                     .unwrap_err()
                     .kind(),
@@ -1008,11 +1004,12 @@ fn a_driver_failure_wakes_close_that_already_waits_for_retirement() {
     let mut worker = driver.enter();
     let waker = worker.waker();
     let mut context = Context::from_waker(&waker);
-    let (_directory, file) = super::super::tests::file(&selector);
+    // Keep the read pending until driver failure so close is waiting for payload retirement, rather than only fixed-file registration release.
+    let (_directory, file) = super::super::tests::fifo(&selector);
     let never = Cancellation::never();
     let mut monitor = selector.file_monitor(&file).unwrap();
     let completion =
-        block_on(selector.file_monitor_read_at_submit(&mut monitor, vec![42], 0, &never)).unwrap();
+        block_on(selector.file_monitor_read_submit(&mut monitor, vec![42], &never)).unwrap();
     worker.turn(Some(Duration::ZERO)).unwrap();
     drop(completion);
     {

@@ -288,6 +288,9 @@ mod tests {
                 .is_ready()
         );
         drop(submission);
+        // Issuance and completion can wake the same waiter. A repeated wake must not publish its follow-up command twice.
+        waker.wake();
+        assert_eq!(enqueue.published.load(Ordering::Acquire), 1);
         let (result, bytes) = drive(&mut driver, later);
         assert_eq!(result.unwrap(), 6);
         assert_eq!(bytes, b"abcdef");
