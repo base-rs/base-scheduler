@@ -10,7 +10,7 @@ impl SocketStreamReading for IoUringSelector {
         socket: &Self::Socket,
     ) -> io::Result<impl SocketStreamReader<Buffer = <Self::Pool as BufferPool>::Buffer> + 'scheduler>
     {
-        crate::io_uring_socket_stream_reader::IoUringSocketStreamReader::new(self, socket)
+        crate::io_uring_socket_stream_reader::IoUringSocketStreamReader::<false>::new(self, socket)
     }
     fn socket_stream_reader_with_pool<'scheduler>(
         &'scheduler self,
@@ -18,7 +18,7 @@ impl SocketStreamReading for IoUringSelector {
         pool: Self::Pool,
     ) -> io::Result<impl SocketStreamReader<Buffer = <Self::Pool as BufferPool>::Buffer> + 'scheduler>
     {
-        crate::io_uring_socket_stream_reader::IoUringSocketStreamReader::new(self, socket)
+        crate::io_uring_socket_stream_reader::IoUringSocketStreamReader::<false>::new(self, socket)
             .map(|reader| reader.with_pool(pool))
     }
 }

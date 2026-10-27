@@ -221,7 +221,7 @@ fn full_reads_keep_progress_and_short_reads_preserve_racing_notifications() {
     super::super::tests::BEFORE_SYSCALL.with(|hook| {
         *hook.borrow_mut() = Some((
             "monitor-recv",
-            Box::new(move || notified.registration().notify()),
+            Box::new(move || notified.registration().notify(libc::POLLIN as i32)),
         ));
     });
     let mut short = [0; 8];
@@ -910,7 +910,7 @@ fn cached_readiness_survives_success_and_newer_notifications_survive_would_block
     let (socket, _peer) = sockets(&selector);
     let mut writer = selector.socket_monitor(&socket, Interest::Writable);
     let inspect = writer.retained();
-    inspect.registration().notify();
+    inspect.registration().notify(libc::POLLIN as i32);
     let before = inspect.registration().readiness.load(Ordering::Acquire);
     let mut attempts = 0;
     assert_eq!(
@@ -922,7 +922,7 @@ fn cached_readiness_survives_success_and_newer_notifications_survive_would_block
                 attempts += 1;
                 if attempts == 1 {
                     // A notification racing the syscall's EAGAIN must not be cleared using the older readiness tick.
-                    inspect.registration().notify();
+                    inspect.registration().notify(libc::POLLIN as i32);
                     Err(io::ErrorKind::WouldBlock.into())
                 } else {
                     Ok(5)
@@ -951,7 +951,7 @@ fn readiness_generations_preserve_a_notification_across_wraparound() {
     registration.readiness.store(u64::MAX, Ordering::Release);
     registration.cleared.store(u64::MAX, Ordering::Release);
     assert!(!registration.is_ready());
-    registration.notify();
+    registration.notify(libc::POLLIN as i32);
     assert!(registration.is_ready());
     registration.clear_readiness(u64::MAX);
     assert!(registration.is_ready());
@@ -1424,7 +1424,7 @@ fn a_general_tcp_monitor_keeps_syscall_first_behavior_after_short_reads() {
     let (socket, mut peer) = sockets(&selector);
     let mut reader = selector.socket_monitor(&socket, Interest::Readable);
     let never = Cancellation::never();
-    reader.registration().notify();
+    reader.registration().notify(libc::POLLIN as i32);
     peer.write_all(b"a").unwrap();
     let mut buffer = [0; 16];
     assert_eq!(
@@ -1467,7 +1467,7 @@ fn a_stream_monitor_on_a_datagram_socket_keeps_message_semantics() {
         .unwrap();
     let mut reader = selector.socket_monitor(&socket, Interest::Readable);
 
-    reader.registration().notify();
+    reader.registration().notify(libc::POLLIN as i32);
     for payload in [&b"x"[..], b"", b"yz"] {
         peer.send(payload).unwrap();
     }
@@ -1797,4 +1797,339 @@ fn cancellation_racing_would_block_does_not_wait_for_readiness() {
         ))
         .is_none()
     );
+}
+
+#[test]
+fn scalar_stream_reads_skip_empty_probes_and_continue_after_full_reads() {
+    let (selector, driver) = IoUringSelector::new(options()).unwrap();
+    let mut worker = driver.enter();
+    let waker = worker.waker();
+    let mut context = Context::from_waker(&waker);
+    let (socket, mut peer) = sockets(&selector);
+    let mut monitor = selector.socket_monitor(&socket, Interest::Readable);
+    let mut probe = true;
+    let never = Cancellation::never();
+    let mut bytes = [0; 2];
+    peer.write_all(b"abc").unwrap();
+    assert_eq!(
+        block_on(selector.socket_stream_recv_poll::<false>(
+            &mut monitor,
+            &mut probe,
+            &mut bytes,
+            &never
+        ))
+        .unwrap(),
+        2
+    );
+    assert_eq!(&bytes, b"ab");
+    assert_eq!(
+        block_on(selector.socket_stream_recv_poll::<false>(
+            &mut monitor,
+            &mut probe,
+            &mut bytes,
+            &never
+        ))
+        .unwrap(),
+        1
+    );
+    assert_eq!(bytes[0], b'c');
+    let attempts = Arc::new(AtomicUsize::new(0));
+    let counted = Arc::clone(&attempts);
+    let _cleanup = super::super::tests::Failures::new([]);
+    super::super::tests::BEFORE_SYSCALL.with(|hook| {
+        *hook.borrow_mut() = Some((
+            "monitor-recv",
+            Box::new(move || {
+                counted.fetch_add(1, Ordering::Relaxed);
+            }),
+        ));
+    });
+    {
+        let mut receive = pin!(selector.socket_stream_recv_poll::<false>(
+            &mut monitor,
+            &mut probe,
+            &mut bytes,
+            &never
+        ));
+        assert!(receive.as_mut().poll(&mut context).is_pending());
+        assert!(receive.as_mut().poll(&mut context).is_pending());
+        assert_eq!(
+            attempts.load(Ordering::Relaxed),
+            0,
+            "a drained scalar stream should wait without another receive"
+        );
+        peer.write_all(b"d").unwrap();
+        assert_eq!(
+            drive(&mut worker, &mut context, receive.as_mut()).unwrap(),
+            1
+        );
+    }
+    assert_eq!(attempts.load(Ordering::Relaxed), 1);
+    assert_eq!(bytes[0], b'd');
+    let mut close = pin!(selector.socket_monitor_close(&mut monitor));
+    drive(&mut worker, &mut context, close.as_mut()).unwrap();
+}
+
+#[test]
+fn scalar_short_reads_preserve_notifications_racing_the_syscall() {
+    let (selector, _driver) = IoUringSelector::new(options()).unwrap();
+    let (socket, mut peer) = sockets(&selector);
+    let mut monitor = selector.socket_monitor(&socket, Interest::Readable);
+    let inspect = monitor.retained();
+    inspect.registration().notify(libc::POLLIN as i32);
+    let mut probe = false;
+    let never = Cancellation::never();
+    let mut bytes = [0; 8];
+    peer.write_all(b"a").unwrap();
+    let notified = inspect.retained();
+    let _cleanup = super::super::tests::Failures::new([]);
+    super::super::tests::BEFORE_SYSCALL.with(|hook| {
+        *hook.borrow_mut() = Some((
+            "monitor-recv",
+            Box::new(move || notified.registration().notify(libc::POLLIN as i32)),
+        ));
+    });
+    assert_eq!(
+        block_on(selector.socket_stream_recv_poll::<false>(
+            &mut monitor,
+            &mut probe,
+            &mut bytes,
+            &never
+        ))
+        .unwrap(),
+        1
+    );
+    assert!(inspect.registration().is_ready());
+    peer.write_all(b"b").unwrap();
+    assert_eq!(
+        block_on(selector.socket_stream_recv_poll::<false>(
+            &mut monitor,
+            &mut probe,
+            &mut bytes,
+            &never
+        ))
+        .unwrap(),
+        1
+    );
+    assert_eq!(bytes[0], b'b');
+    assert!(!inspect.registration().is_ready());
+}
+
+#[test]
+fn scalar_short_reads_preserve_shutdown_and_eof() {
+    let (selector, driver) = IoUringSelector::new(options()).unwrap();
+    let mut worker = driver.enter();
+    let waker = worker.waker();
+    let mut context = Context::from_waker(&waker);
+    let (socket, mut peer) = sockets(&selector);
+    let mut monitor = selector.socket_monitor(&socket, Interest::Readable);
+    let inspect = monitor.retained();
+    let mut probe = true;
+    let never = Cancellation::never();
+    let mut bytes = [0; 8];
+    {
+        let mut read = pin!(selector.socket_stream_recv_poll::<false>(
+            &mut monitor,
+            &mut probe,
+            &mut bytes,
+            &never
+        ));
+        assert!(read.as_mut().poll(&mut context).is_pending());
+    }
+    peer.write_all(b"last").unwrap();
+    peer.shutdown(std::net::Shutdown::Write).unwrap();
+    until(&mut worker, || {
+        inspect.registration().readiness.load(Ordering::Acquire) & READ_CLOSED != 0
+    });
+    assert_eq!(
+        block_on(selector.socket_stream_recv_poll::<false>(
+            &mut monitor,
+            &mut probe,
+            &mut bytes,
+            &never
+        ))
+        .unwrap(),
+        4
+    );
+    assert_eq!(&bytes[..4], b"last");
+    assert_eq!(
+        block_on(selector.socket_stream_recv_poll::<false>(
+            &mut monitor,
+            &mut probe,
+            &mut bytes,
+            &never
+        ))
+        .unwrap(),
+        0
+    );
+    let mut close = pin!(selector.socket_monitor_close(&mut monitor));
+    drive(&mut worker, &mut context, close.as_mut()).unwrap();
+}
+
+#[test]
+fn scalar_stream_waits_can_be_cancelled_and_abandoned_without_consuming_input() {
+    let (selector, driver) = IoUringSelector::new(options()).unwrap();
+    let mut worker = driver.enter();
+    let waker = worker.waker();
+    let mut context = Context::from_waker(&waker);
+    let (socket, mut peer) = sockets(&selector);
+    let mut monitor = selector.socket_monitor(&socket, Interest::Readable);
+    let mut probe = true;
+    let cancellation = Cancellation::new();
+    let never = Cancellation::never();
+    let mut bytes = [0; 8];
+    {
+        let mut read = pin!(selector.socket_stream_recv_poll::<false>(
+            &mut monitor,
+            &mut probe,
+            &mut bytes,
+            &cancellation
+        ));
+        assert!(read.as_mut().poll(&mut context).is_pending());
+        peer.write_all(b"saved").unwrap();
+        cancellation.cancel();
+        assert!(matches!(
+            read.as_mut().poll(&mut context),
+            Poll::Ready(Err(OperationError::Cancelled(_)))
+        ));
+    }
+    {
+        let mut read = pin!(selector.socket_stream_recv_poll::<false>(
+            &mut monitor,
+            &mut probe,
+            &mut bytes,
+            &never
+        ));
+        assert!(read.as_mut().poll(&mut context).is_pending());
+    }
+    bytes.fill(0xff);
+    {
+        let mut read = pin!(selector.socket_stream_recv_poll::<false>(
+            &mut monitor,
+            &mut probe,
+            &mut bytes,
+            &never
+        ));
+        assert_eq!(drive(&mut worker, &mut context, read.as_mut()).unwrap(), 5);
+    }
+    assert_eq!(&bytes[..5], b"saved");
+    peer.write_all(b"again").unwrap();
+    let _failures =
+        super::super::tests::Failures::new([("monitor-recv", io::ErrorKind::Interrupted.into())]);
+    {
+        let mut read = pin!(selector.socket_stream_recv_poll::<false>(
+            &mut monitor,
+            &mut probe,
+            &mut bytes,
+            &never
+        ));
+        assert_eq!(drive(&mut worker, &mut context, read.as_mut()).unwrap(), 5);
+    }
+    assert_eq!(&bytes[..5], b"again");
+    probe = true;
+    let _failures = super::super::tests::Failures::new([(
+        "monitor-recv",
+        io::ErrorKind::ConnectionReset.into(),
+    )]);
+    assert_eq!(
+        block_on(selector.socket_stream_recv_poll::<false>(
+            &mut monitor,
+            &mut probe,
+            &mut bytes,
+            &never
+        ))
+        .unwrap_err()
+        .kind(),
+        io::ErrorKind::ConnectionReset
+    );
+    let mut close = pin!(selector.socket_monitor_close(&mut monitor));
+    drive(&mut worker, &mut context, close.as_mut()).unwrap();
+}
+
+#[test]
+fn scalar_stream_reads_report_wait_failures_and_selector_shutdown() {
+    let (selector, _driver) = IoUringSelector::new(options()).unwrap();
+    let (socket, _peer) = sockets(&selector);
+    let mut monitor = selector.socket_monitor(&socket, Interest::Readable);
+    let submission = staged(&selector, &monitor);
+    let token = submission.token();
+    let mut monitors = Monitors::new(1);
+    monitors.insert(submission);
+    monitors.complete(token, -libc::EBADF, false, false);
+    let mut probe = false;
+    let never = Cancellation::never();
+    let mut bytes = [0; 8];
+    let error = block_on(selector.socket_stream_recv_poll::<false>(
+        &mut monitor,
+        &mut probe,
+        &mut bytes,
+        &never,
+    ))
+    .unwrap_err();
+    assert!(
+        matches!(error, OperationError::Io(error) if error.raw_os_error() == Some(libc::EBADF))
+    );
+    selector.close();
+    assert_eq!(
+        block_on(selector.socket_stream_recv_poll::<false>(
+            &mut monitor,
+            &mut probe,
+            &mut bytes,
+            &never
+        ))
+        .unwrap_err()
+        .kind(),
+        io::ErrorKind::BrokenPipe
+    );
+}
+
+#[test]
+fn cancellation_racing_a_scalar_would_block_registers_no_wait() {
+    let (selector, _driver) = IoUringSelector::new(options()).unwrap();
+    let (socket, _peer) = sockets(&selector);
+    let mut monitor = selector.socket_monitor(&socket, Interest::Readable);
+    let cancellation = Cancellation::new();
+    let token = cancellation.clone();
+    let _cleanup = super::super::tests::Failures::new([]);
+    super::super::tests::BEFORE_SYSCALL.with(|hook| {
+        *hook.borrow_mut() = Some((
+            "monitor-recv",
+            Box::new(move || {
+                token.cancel();
+            }),
+        ));
+    });
+    let mut probe = true;
+    let mut bytes = [0; 8];
+    assert!(matches!(
+        block_on(selector.socket_stream_recv_poll::<false>(
+            &mut monitor,
+            &mut probe,
+            &mut bytes,
+            &cancellation
+        )),
+        Err(OperationError::Cancelled(_))
+    ));
+    assert!(!monitor.registration().status.lock().unwrap().pending);
+}
+
+#[test]
+fn broad_tcp_wake_hints_are_not_urgent_and_closure_remains_sticky() {
+    let (selector, _driver) = IoUringSelector::new(options()).unwrap();
+    let (socket, _peer) = sockets(&selector);
+    let monitor = selector.socket_monitor(&socket, Interest::Readable);
+    let registration = monitor.registration();
+    registration.notify((libc::POLLIN | libc::POLLPRI) as i32);
+    assert_eq!(registration.readiness.load(Ordering::Acquire) & URGENT, 0);
+    registration.notify(libc::POLLRDHUP as i32);
+    registration.clear_readiness(registration.readiness.load(Ordering::Acquire));
+    registration.notify(libc::POLLIN as i32);
+    assert_ne!(
+        registration.readiness.load(Ordering::Acquire) & READ_CLOSED,
+        0
+    );
+    registration.notify(libc::POLLPRI as i32);
+    registration.clear_readiness(registration.readiness.load(Ordering::Acquire));
+    registration.notify(libc::POLLIN as i32);
+    assert_ne!(registration.readiness.load(Ordering::Acquire) & URGENT, 0);
 }
