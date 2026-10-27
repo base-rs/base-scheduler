@@ -2,9 +2,13 @@
 // Copyright, 2026, by Samuel Williams.
 
 //! Resource-local failure injection for worker poller tests. Production uses
-//! polling::Poller directly, without this wrapper or fault state.
+//! the selected native poller directly, without this wrapper or fault state.
 
-use polling::{Event, Events, PollMode};
+#[cfg(target_os = "linux")]
+use super::epoll::{Events, Poller as Backend};
+use polling::{Event, PollMode};
+#[cfg(not(target_os = "linux"))]
+use polling::{Events, Poller as Backend};
 use std::{
     io,
     sync::atomic::{AtomicI32, Ordering},
@@ -15,13 +19,13 @@ thread_local! {
     pub(super) static INITIAL_FAILURE: std::cell::Cell<i32> = const { std::cell::Cell::new(0) };
 }
 pub(super) struct Poller {
-    inner: polling::Poller,
+    inner: Backend,
     pub(super) failure: AtomicI32,
 }
 impl Poller {
     pub(super) fn new() -> io::Result<Self> {
         let result = match INITIAL_FAILURE.with(std::cell::Cell::take) {
-            0 => polling::Poller::new(),
+            0 => Backend::new(),
             error => Err(io::Error::from_raw_os_error(error)),
         };
         result.map(|inner| Self {
@@ -52,6 +56,10 @@ impl Poller {
     pub(super) fn delete(&self, socket: &socket2::Socket) -> io::Result<()> {
         self.check()?;
         self.inner.delete(socket)
+    }
+    #[cfg(target_os = "linux")]
+    pub(super) fn clear_notification(&self) -> io::Result<()> {
+        self.inner.clear_notification()
     }
     pub(super) fn notify(&self) -> io::Result<()> {
         self.inner.notify()

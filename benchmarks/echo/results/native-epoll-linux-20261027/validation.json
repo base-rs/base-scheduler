@@ -1,0 +1,30 @@
+{
+  "base": "549603509de7577f76ccce9a8a261be743d07af4",
+  "linux": {
+    "platform": "aarch64 Linux 6.12.13-200.fc41.aarch64 in Podman VM",
+    "compiler": "Rust 1.98.1",
+    "workspace_all_targets_all_features_source_regions": {
+      "covered": 40589,
+      "measured": 40589,
+      "invariant_unreachable_excluded": 12
+    },
+    "clippy_workspace_all_targets_all_features": "passed"
+  },
+  "macos": {
+    "platform": "Apple Silicon macOS",
+    "compiler": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+    "workspace_all_targets_all_features_source_regions": {
+      "covered": 29279,
+      "measured": 29279,
+      "invariant_unreachable_excluded": 3
+    },
+    "clippy_workspace_all_targets_all_features": "passed"
+  },
+  "notes": [
+    "Linux full coverage was run with default container seccomp disabled, so the existing io_uring suite could execute.",
+    "Incremental compilation and dev/test debug data were disabled in the final Linux coverage run to fit the available host disk space.",
+    "Timing uses release binaries built with the unchanged hello benchmark release profile.",
+    "Windows and MSRV remain for GitHub CI."
+  ],
+  "logs": "validation-logs.tar.gz"
+}

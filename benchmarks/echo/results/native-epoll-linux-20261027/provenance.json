@@ -1,0 +1,17 @@
+{
+  "recorded_utc": "2026-10-27T00:29:39.919685+00:00",
+  "base": "549603509de7577f76ccce9a8a261be743d07af4",
+  "final_source_patch": "final-source.patch",
+  "final_binary_sha256": {
+    "polling": "6dc812d8ebba7c54954c908b6948619bdf241f22f26c8bbda741332019ca8bd5",
+    "native-final": "62cb18001bda73d1d05acf813c8d732081513094c1418b090018e7104049c73a"
+  },
+  "final_samples": 30,
+  "final_requests": 56256713,
+  "final_wrk_reported_errors": 0,
+  "prototype_evidence": "prototype-evidence.tar.gz",
+  "final_evidence": "final-evidence.tar.gz",
+  "container": "Rust 1.98.1 bookworm image with wrk, Python, taskset and testing tools installed; default seccomp disabled for existing io_uring conformance tests",
+  "original_http_evidence": "/Users/samuel/Developer/base-rs/base-http/benchmarks/hello/results/native-epoll-linux-20261027",
+  "original_checkout_pending_files_verified_unchanged": 26
+}
