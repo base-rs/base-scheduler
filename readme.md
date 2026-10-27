@@ -93,7 +93,7 @@ Prepare a release with `cargo bake cargo:version:patch` (or `minor`, `major`, or
 
 ## Releases
 
-The initial v0.1.0 release provides explicit scheduler capabilities and companion backends. See the [release notes](releases.md).
+Version v0.1.1 improves Native worker-owned socket readiness, kqueue and epoll event delivery, and borrowed stream writes. See the [release notes](releases.md).
 
 ## See Also
 
