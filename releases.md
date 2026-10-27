@@ -1,13 +1,17 @@
 # Releases
 
-## Unreleased
+## v0.1.1
 
 - Reduce Linux worker-readiness overhead with native epoll event delivery and eventfd interruption, preserving precise timeouts and compatibility fallbacks.
 
 - Drive Native socket readiness on executor workers, with lazy per-socket registration, independent concurrent waiters, and cached stream-read readiness.
+
 - Reduce worker-readiness notification overhead while preserving independent waiters, cancellation, and shutdown wakeups.
+
 - Return successful borrowed stream writes before constructing wait futures; retain lazy registration and ordered owned output.
+
 - Dispatch macOS and Linux/Android readiness events through stable registration pointers, with deferred retirement and failed-registration quarantine.
+
 - Decode macOS kqueue events directly from one reusable native-event vector, removing normalized event staging.
 
 ## v0.1.0
@@ -25,10 +29,10 @@ Initial release of the runtime-independent scheduler interface and its seven com
 
 - Add reusable buffer pools, unique writable chunks, retained immutable views, and owned scatter/gather storage. Support explicit read/write overlap, ordered owned stream submission and flushing, and separate file acceptance/completion waits.
 
-- Include Direct reference and Tokio adapter backends, plus the Native work-stealing executor with worker-local event loops and timers. Provide independently driven readiness and Linux io_uring selectors, with per-worker rings, reusable request state, and optional fixed-file registrations.
+- Include Direct reference and Tokio adapter backends, plus the Native work-stealing executor with worker-local event loops and timers. Provide independently driven readiness and Linux io\_uring selectors, with per-worker rings, reusable request state, and optional fixed-file registrations.
 
-- Support child process status waits, Unix process-group selection and state-change flags, native process notifications, optional io_uring `WAITID`, and bounded blocking fallbacks. A started blocking wait may finish after cancellation and delay shutdown.
+- Support child process status waits, Unix process-group selection and state-change flags, native process notifications, optional io\_uring `WAITID`, and bounded blocking fallbacks. A started blocking wait may finish after cancellation and delay shutdown.
 
 - Supply reusable conformance suites, cross-backend I/O examples, and matched network, file, buffer, and timer benchmarks. CI checks Linux, macOS, Windows, the minimum Rust version, and complete measured source-region coverage.
 
-- Keep the reusable timer capability and concrete io_uring multishot receiver API experimental. Portable application code uses the bound reader/writer capabilities.
+- Keep the reusable timer capability and concrete io\_uring multishot receiver API experimental. Portable application code uses the bound reader/writer capabilities.
