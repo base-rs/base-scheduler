@@ -388,54 +388,63 @@ impl FileWriting for Capabilities<'_> {
         Ok(self.writer(*file))
     }
 }
-impl SocketStreamReading for Capabilities<'_> {
+impl<'selector> SocketStreamReading for Capabilities<'selector> {
     fn socket_stream_reader<'a>(
         &'a self,
         socket: &u8,
-    ) -> io::Result<impl SocketStreamReader<Buffer = Buffer> + 'a> {
+    ) -> io::Result<impl SocketStreamReader<Buffer = Buffer> + 'a + use<'a, 'selector>> {
         Ok(self.reader(*socket, None))
     }
     fn socket_stream_reader_with_pool<'a>(
         &'a self,
         socket: &u8,
         pool: HeapBufferPool,
-    ) -> io::Result<impl SocketStreamReader<Buffer = Buffer> + 'a> {
+    ) -> io::Result<impl SocketStreamReader<Buffer = Buffer> + 'a + use<'a, 'selector>> {
         Ok(self.reader(*socket, Some(pool)))
     }
 }
-impl SocketPacketReading for Capabilities<'_> {
+impl<'selector> SocketPacketReading for Capabilities<'selector> {
     fn socket_packet_reader<'a>(
         &'a self,
         socket: &u8,
-    ) -> io::Result<impl SocketPacketReader<Message: SocketRecvMessageMut<Payload = Buffer>> + 'a>
-    {
+    ) -> io::Result<
+        impl SocketPacketReader<Message: SocketRecvMessageMut<Payload = Buffer>>
+        + 'a
+        + use<'a, 'selector>,
+    > {
         Ok(self.reader(*socket, None))
     }
     fn socket_packet_reader_with_pool<'a>(
         &'a self,
         socket: &u8,
         pool: HeapBufferPool,
-    ) -> io::Result<impl SocketPacketReader<Message: SocketRecvMessageMut<Payload = Buffer>> + 'a>
-    {
+    ) -> io::Result<
+        impl SocketPacketReader<Message: SocketRecvMessageMut<Payload = Buffer>>
+        + 'a
+        + use<'a, 'selector>,
+    > {
         Ok(self.reader(*socket, Some(pool)))
     }
 }
-impl SocketStreamWriting for Capabilities<'_> {
+impl<'selector> SocketStreamWriting for Capabilities<'selector> {
     fn socket_stream_writer<'a>(
         &'a self,
         socket: &u8,
-    ) -> io::Result<impl SocketStreamWriter<Buffer = Buffer> + 'a> {
+    ) -> io::Result<impl SocketStreamWriter<Buffer = Buffer> + 'a + use<'a, 'selector>> {
         Ok(self.writer(*socket))
     }
     fn socket_stream_writer_with_buffer<'a, B: IoBuf>(
         &'a self,
         socket: &u8,
-    ) -> io::Result<impl SocketStreamWriter<Buffer = B> + 'a> {
+    ) -> io::Result<impl SocketStreamWriter<Buffer = B> + 'a + use<'a, 'selector, B>> {
         Ok(self.writer(*socket))
     }
 }
-impl SocketPacketWriting for Capabilities<'_> {
-    fn socket_packet_writer<'a>(&'a self, socket: &u8) -> io::Result<impl SocketPacketWriter + 'a> {
+impl<'selector> SocketPacketWriting for Capabilities<'selector> {
+    fn socket_packet_writer<'a>(
+        &'a self,
+        socket: &u8,
+    ) -> io::Result<impl SocketPacketWriter + 'a + use<'a, 'selector>> {
         Ok(self.writer::<Vec<u8>>(*socket))
     }
 }

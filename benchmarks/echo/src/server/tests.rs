@@ -114,14 +114,14 @@ impl SocketStreamReading for PartialSocket {
     fn socket_stream_reader<'a>(
         &'a self,
         _: &(),
-    ) -> io::Result<impl SocketStreamReader<Buffer = BufferLease> + 'a> {
+    ) -> io::Result<impl SocketStreamReader<Buffer = BufferLease> + 'a + use<'a>> {
         Ok(Reader(self))
     }
     fn socket_stream_reader_with_pool<'a>(
         &'a self,
         _: &(),
         _: Self::Pool,
-    ) -> io::Result<impl SocketStreamReader<Buffer = BufferLease> + 'a> {
+    ) -> io::Result<impl SocketStreamReader<Buffer = BufferLease> + 'a + use<'a>> {
         Ok(Reader(self))
     }
 }
@@ -129,13 +129,13 @@ impl SocketStreamWriting for PartialSocket {
     fn socket_stream_writer<'a>(
         &'a self,
         _: &(),
-    ) -> io::Result<impl SocketStreamWriter<Buffer = BufferLease> + 'a> {
+    ) -> io::Result<impl SocketStreamWriter<Buffer = BufferLease> + 'a + use<'a>> {
         Ok(Writer(self, PhantomData))
     }
     fn socket_stream_writer_with_buffer<'a, B: IoBuf>(
         &'a self,
         _: &(),
-    ) -> io::Result<impl SocketStreamWriter<Buffer = B> + 'a> {
+    ) -> io::Result<impl SocketStreamWriter<Buffer = B> + 'a + use<'a, B>> {
         Ok(Writer(self, PhantomData))
     }
 }

@@ -321,14 +321,14 @@ macro_rules! socket_factories {
             fn socket_stream_reader<'a>(
                 &'a self,
                 socket: &Self::Socket,
-            ) -> std::io::Result<impl SocketStreamReader<Buffer = BufferLease> + 'a> {
+            ) -> std::io::Result<impl SocketStreamReader<Buffer = BufferLease> + 'a + use<'a>> {
                 Ok(socket_model::Reader::new(self, socket))
             }
             fn socket_stream_reader_with_pool<'a>(
                 &'a self,
                 socket: &Self::Socket,
                 _: Self::Pool,
-            ) -> std::io::Result<impl SocketStreamReader<Buffer = BufferLease> + 'a> {
+            ) -> std::io::Result<impl SocketStreamReader<Buffer = BufferLease> + 'a + use<'a>> {
                 Ok(socket_model::Reader::new(self, socket))
             }
         }
@@ -336,13 +336,13 @@ macro_rules! socket_factories {
             fn socket_stream_writer<'a>(
                 &'a self,
                 socket: &Self::Socket,
-            ) -> std::io::Result<impl SocketStreamWriter<Buffer = BufferLease> + 'a> {
+            ) -> std::io::Result<impl SocketStreamWriter<Buffer = BufferLease> + 'a + use<'a>> {
                 Ok(socket_model::Writer::new(self, socket))
             }
             fn socket_stream_writer_with_buffer<'a, B: IoBuf>(
                 &'a self,
                 socket: &Self::Socket,
-            ) -> std::io::Result<impl SocketStreamWriter<Buffer = B> + 'a> {
+            ) -> std::io::Result<impl SocketStreamWriter<Buffer = B> + 'a + use<'a, B>> {
                 Ok(socket_model::Writer::new(self, socket))
             }
         }
@@ -351,7 +351,9 @@ macro_rules! socket_factories {
                 &'a self,
                 socket: &Self::Socket,
             ) -> std::io::Result<
-                impl SocketPacketReader<Message: SocketRecvMessageMut<Payload = BufferLease>> + 'a,
+                impl SocketPacketReader<Message: SocketRecvMessageMut<Payload = BufferLease>>
+                + 'a
+                + use<'a>,
             > {
                 Ok(socket_model::Reader::new(self, socket))
             }
@@ -360,7 +362,9 @@ macro_rules! socket_factories {
                 socket: &Self::Socket,
                 _: Self::Pool,
             ) -> std::io::Result<
-                impl SocketPacketReader<Message: SocketRecvMessageMut<Payload = BufferLease>> + 'a,
+                impl SocketPacketReader<Message: SocketRecvMessageMut<Payload = BufferLease>>
+                + 'a
+                + use<'a>,
             > {
                 Ok(socket_model::Reader::new(self, socket))
             }
@@ -369,7 +373,7 @@ macro_rules! socket_factories {
             fn socket_packet_writer<'a>(
                 &'a self,
                 socket: &Self::Socket,
-            ) -> std::io::Result<impl SocketPacketWriter + 'a> {
+            ) -> std::io::Result<impl SocketPacketWriter + 'a + use<'a>> {
                 Ok(socket_model::Writer::<Self>::new(self, socket))
             }
         }

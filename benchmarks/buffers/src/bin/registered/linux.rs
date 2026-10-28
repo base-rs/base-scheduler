@@ -76,7 +76,7 @@ impl Driver {
             .map(|buffer| {
                 let base = buffer.as_mut().as_mut_ptr() as usize;
                 let offset = base.wrapping_neg() & (ALIGNMENT - 1);
-                if work.size % ALIGNMENT == 0 {
+                if work.size.is_multiple_of(ALIGNMENT) {
                     let pointer = (base + offset) as *mut libc::c_void;
                     // SAFETY: These whole pages are exclusively owned by this lease. Refault them without transparent huge pages in both modes so registration stays within the host's 8 MiB locked-memory limit. The entire range is reinitialized before use.
                     assert_eq!(

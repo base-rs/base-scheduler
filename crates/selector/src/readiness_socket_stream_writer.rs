@@ -166,14 +166,17 @@ impl SocketStreamWriting for ReadinessSelector {
     fn socket_stream_writer<'scheduler>(
         &'scheduler self,
         socket: &NativeSocket,
-    ) -> io::Result<impl SocketStreamWriter<Buffer = <Self::Pool as BufferPool>::Buffer> + 'scheduler>
-    {
+    ) -> io::Result<
+        impl SocketStreamWriter<Buffer = <Self::Pool as BufferPool>::Buffer>
+        + 'scheduler
+        + use<'scheduler>,
+    > {
         ReadinessSocketStreamWriter::new(self, socket)
     }
     fn socket_stream_writer_with_buffer<'scheduler, B: IoBuf>(
         &'scheduler self,
         socket: &NativeSocket,
-    ) -> io::Result<impl SocketStreamWriter<Buffer = B> + 'scheduler> {
+    ) -> io::Result<impl SocketStreamWriter<Buffer = B> + 'scheduler + use<'scheduler, B>> {
         ReadinessSocketStreamWriter::new(self, socket)
     }
 }

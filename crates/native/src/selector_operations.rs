@@ -316,7 +316,11 @@ where
     fn socket_stream_reader<'scheduler>(
         &'scheduler self,
         socket: &Self::Socket,
-    ) -> io::Result<impl SocketStreamReader<Buffer = <Self::Pool as BufferPool>::Buffer> + 'scheduler>
+    ) -> io::Result<
+        impl SocketStreamReader<Buffer = <Self::Pool as BufferPool>::Buffer>
+        + 'scheduler
+        + use<'scheduler, S>,
+    >
     where
         Self::Socket: 'static,
     {
@@ -327,7 +331,11 @@ where
         &'scheduler self,
         socket: &Self::Socket,
         pool: Self::Pool,
-    ) -> io::Result<impl SocketStreamReader<Buffer = <Self::Pool as BufferPool>::Buffer> + 'scheduler>
+    ) -> io::Result<
+        impl SocketStreamReader<Buffer = <Self::Pool as BufferPool>::Buffer>
+        + 'scheduler
+        + use<'scheduler, S>,
+    >
     where
         Self::Socket: 'static,
     {
@@ -345,7 +353,9 @@ where
     ) -> io::Result<
         impl SocketPacketReader<
             Message: SocketRecvMessageMut<Payload = <Self::Pool as BufferPool>::Buffer>,
-        > + 'scheduler,
+        >
+        + 'scheduler
+        + use<'scheduler, S>,
     >
     where
         Self::Socket: 'static,
@@ -360,7 +370,9 @@ where
     ) -> io::Result<
         impl SocketPacketReader<
             Message: SocketRecvMessageMut<Payload = <Self::Pool as BufferPool>::Buffer>,
-        > + 'scheduler,
+        >
+        + 'scheduler
+        + use<'scheduler, S>,
     >
     where
         Self::Socket: 'static,
@@ -376,7 +388,7 @@ where
     fn socket_packet_writer<'scheduler>(
         &'scheduler self,
         socket: &Self::Socket,
-    ) -> io::Result<impl SocketPacketWriter + 'scheduler>
+    ) -> io::Result<impl SocketPacketWriter + 'scheduler + use<'scheduler, S>>
     where
         Self::Socket: 'static,
     {
@@ -408,7 +420,11 @@ impl<S: Selector + SocketStreamWriting> SocketStreamWriting for NativeScheduler<
     fn socket_stream_writer<'scheduler>(
         &'scheduler self,
         socket: &Self::Socket,
-    ) -> io::Result<impl SocketStreamWriter<Buffer = <Self::Pool as BufferPool>::Buffer> + 'scheduler>
+    ) -> io::Result<
+        impl SocketStreamWriter<Buffer = <Self::Pool as BufferPool>::Buffer>
+        + 'scheduler
+        + use<'scheduler, S>,
+    >
     where
         Self::Socket: 'static,
     {
@@ -418,7 +434,7 @@ impl<S: Selector + SocketStreamWriting> SocketStreamWriting for NativeScheduler<
     fn socket_stream_writer_with_buffer<'scheduler, B: IoBuf>(
         &'scheduler self,
         socket: &Self::Socket,
-    ) -> io::Result<impl SocketStreamWriter<Buffer = B> + 'scheduler>
+    ) -> io::Result<impl SocketStreamWriter<Buffer = B> + 'scheduler + use<'scheduler, B, S>>
     where
         Self::Socket: 'static,
     {

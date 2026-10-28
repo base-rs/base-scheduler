@@ -280,7 +280,9 @@ impl base_scheduler::SocketStreamWriting for TokioScheduler {
     ) -> io::Result<
         impl base_scheduler::SocketStreamWriter<
             Buffer = <Self::Pool as base_scheduler::BufferPool>::Buffer,
-        > + 'scheduler,
+        >
+        + 'scheduler
+        + use<'scheduler>,
     >
     where
         Self::Socket: 'static,
@@ -291,7 +293,9 @@ impl base_scheduler::SocketStreamWriting for TokioScheduler {
     fn socket_stream_writer_with_buffer<'scheduler, B: IoBuf>(
         &'scheduler self,
         socket: &Self::Socket,
-    ) -> io::Result<impl base_scheduler::SocketStreamWriter<Buffer = B> + 'scheduler>
+    ) -> io::Result<
+        impl base_scheduler::SocketStreamWriter<Buffer = B> + 'scheduler + use<'scheduler, B>,
+    >
     where
         Self::Socket: 'static,
     {

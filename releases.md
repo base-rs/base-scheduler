@@ -1,6 +1,8 @@
 # Releases
 
-## Unreleased
+## v0.2.0
+
+- Correct all socket reader/writer factory lifetime bounds so connections can own sockets alongside their directional handles. Handles retain scheduler and backend access without borrowing the temporary socket reference. Backend implementors must add compatible precise capture bounds (`use<...>`); raise the workspace minimum Rust version to 1.87.
 
 - Publish immediately available io\_uring completions after nonblocking submission, reducing delivery latency while preserving cancellation, notification handling and shutdown.
 

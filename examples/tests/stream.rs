@@ -147,7 +147,7 @@ impl SocketStreamReading for FailedReaderFactory {
     fn socket_stream_reader(
         &self,
         _: &(),
-    ) -> io::Result<impl SocketStreamReader<Buffer = BufferLease> + '_> {
+    ) -> io::Result<impl SocketStreamReader<Buffer = BufferLease> + '_ + use<'_>> {
         if self.0 {
             Err(io::ErrorKind::PermissionDenied.into())
         } else {
@@ -158,7 +158,7 @@ impl SocketStreamReading for FailedReaderFactory {
         &self,
         socket: &(),
         _: HeapBufferPool,
-    ) -> io::Result<impl SocketStreamReader<Buffer = BufferLease> + '_> {
+    ) -> io::Result<impl SocketStreamReader<Buffer = BufferLease> + '_ + use<'_>> {
         self.socket_stream_reader(socket)
     }
 }
