@@ -4,6 +4,8 @@ Explicit scheduler capabilities for reusable Rust protocol libraries. Applicatio
 
 The root crate defines interfaces and runtime-independent support. It contains no executor, reactor, operating-system I/O implementation, or runtime adapter. The initial API is extracted from [Socketry](https://github.com/base-rs/socketry-rust).
 
+The minimum supported Rust version is 1.87. Socket reader/writer factories use precise lifetime captures: their handles borrow the scheduler, not the temporary socket reference, allowing a connection to own its socket and directional handles together.
+
 The workspace also contains seven companion crates, released together with the interface:
 
 - [`base-scheduler-conformance`](crates/conformance/readme.md): reusable capability-specific assertions for backend development dependencies.
@@ -93,7 +95,7 @@ Prepare a release with `cargo bake cargo:version:patch` (or `minor`, `major`, or
 
 ## Releases
 
-Version v0.1.2 reduces fallback socket overhead by waiting for descriptor readiness before retrying blocked I/O. See the [release notes](releases.md).
+Version v0.2.0 corrects socket-handle lifetime captures and requires Rust 1.87. See the [release notes](releases.md).
 
 ## See Also
 

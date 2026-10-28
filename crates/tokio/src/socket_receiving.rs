@@ -11,16 +11,22 @@ impl SocketStreamReading for TokioScheduler {
     fn socket_stream_reader<'scheduler>(
         &'scheduler self,
         socket: &Self::Socket,
-    ) -> io::Result<impl SocketStreamReader<Buffer = <Self::Pool as BufferPool>::Buffer> + 'scheduler>
-    {
+    ) -> io::Result<
+        impl SocketStreamReader<Buffer = <Self::Pool as BufferPool>::Buffer>
+        + 'scheduler
+        + use<'scheduler>,
+    > {
         TokioSocketStreamReader::new(self, socket)
     }
     fn socket_stream_reader_with_pool<'scheduler>(
         &'scheduler self,
         socket: &Self::Socket,
         pool: Self::Pool,
-    ) -> io::Result<impl SocketStreamReader<Buffer = <Self::Pool as BufferPool>::Buffer> + 'scheduler>
-    {
+    ) -> io::Result<
+        impl SocketStreamReader<Buffer = <Self::Pool as BufferPool>::Buffer>
+        + 'scheduler
+        + use<'scheduler>,
+    > {
         TokioSocketStreamReader::new(self, socket).map(|reader| reader.with_pool(pool))
     }
 }
@@ -31,7 +37,9 @@ impl SocketPacketReading for TokioScheduler {
     ) -> io::Result<
         impl SocketPacketReader<
             Message: SocketRecvMessageMut<Payload = <Self::Pool as BufferPool>::Buffer>,
-        > + 'scheduler,
+        >
+        + 'scheduler
+        + use<'scheduler>,
     > {
         TokioSocketPacketReader::new(self, socket)
     }
@@ -42,7 +50,9 @@ impl SocketPacketReading for TokioScheduler {
     ) -> io::Result<
         impl SocketPacketReader<
             Message: SocketRecvMessageMut<Payload = <Self::Pool as BufferPool>::Buffer>,
-        > + 'scheduler,
+        >
+        + 'scheduler
+        + use<'scheduler>,
     > {
         TokioSocketPacketReader::new(self, socket).map(|reader| reader.with_pool(pool))
     }
@@ -51,7 +61,7 @@ impl SocketPacketWriting for TokioScheduler {
     fn socket_packet_writer<'scheduler>(
         &'scheduler self,
         socket: &Self::Socket,
-    ) -> io::Result<impl SocketPacketWriter + 'scheduler> {
+    ) -> io::Result<impl SocketPacketWriter + 'scheduler + use<'scheduler>> {
         TokioSocketPacketWriter::new(self, socket)
     }
 }

@@ -11,16 +11,22 @@ impl SocketStreamReading for ReadinessSelector {
     fn socket_stream_reader<'scheduler>(
         &'scheduler self,
         socket: &Self::Socket,
-    ) -> io::Result<impl SocketStreamReader<Buffer = <Self::Pool as BufferPool>::Buffer> + 'scheduler>
-    {
+    ) -> io::Result<
+        impl SocketStreamReader<Buffer = <Self::Pool as BufferPool>::Buffer>
+        + 'scheduler
+        + use<'scheduler>,
+    > {
         ReadinessSocketStreamReader::<false>::new(self, socket)
     }
     fn socket_stream_reader_with_pool<'scheduler>(
         &'scheduler self,
         socket: &Self::Socket,
         pool: Self::Pool,
-    ) -> io::Result<impl SocketStreamReader<Buffer = <Self::Pool as BufferPool>::Buffer> + 'scheduler>
-    {
+    ) -> io::Result<
+        impl SocketStreamReader<Buffer = <Self::Pool as BufferPool>::Buffer>
+        + 'scheduler
+        + use<'scheduler>,
+    > {
         ReadinessSocketStreamReader::<false>::new(self, socket).map(|reader| reader.with_pool(pool))
     }
 }
@@ -31,7 +37,9 @@ impl SocketPacketReading for ReadinessSelector {
     ) -> io::Result<
         impl SocketPacketReader<
             Message: SocketRecvMessageMut<Payload = <Self::Pool as BufferPool>::Buffer>,
-        > + 'scheduler,
+        >
+        + 'scheduler
+        + use<'scheduler>,
     > {
         ReadinessSocketPacketReader::new(self, socket)
     }
@@ -42,7 +50,9 @@ impl SocketPacketReading for ReadinessSelector {
     ) -> io::Result<
         impl SocketPacketReader<
             Message: SocketRecvMessageMut<Payload = <Self::Pool as BufferPool>::Buffer>,
-        > + 'scheduler,
+        >
+        + 'scheduler
+        + use<'scheduler>,
     > {
         ReadinessSocketPacketReader::new(self, socket).map(|reader| reader.with_pool(pool))
     }
@@ -51,7 +61,7 @@ impl SocketPacketWriting for ReadinessSelector {
     fn socket_packet_writer<'scheduler>(
         &'scheduler self,
         socket: &Self::Socket,
-    ) -> io::Result<impl SocketPacketWriter + 'scheduler> {
+    ) -> io::Result<impl SocketPacketWriter + 'scheduler + use<'scheduler>> {
         ReadinessSocketPacketWriter::new(self, socket)
     }
 }

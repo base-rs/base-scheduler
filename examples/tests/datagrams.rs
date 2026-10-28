@@ -484,14 +484,14 @@ impl SocketStreamReading for Receives {
     fn socket_stream_reader(
         &self,
         socket: &SocketType,
-    ) -> io::Result<impl SocketStreamReader<Buffer = BufferLease> + '_> {
+    ) -> io::Result<impl SocketStreamReader<Buffer = BufferLease> + '_ + use<'_>> {
         self.socket_stream_reader_with_pool(socket, HeapBufferPool::new(2, 64 * 1024)?)
     }
     fn socket_stream_reader_with_pool(
         &self,
         _: &SocketType,
         pool: HeapBufferPool,
-    ) -> io::Result<impl SocketStreamReader<Buffer = BufferLease> + '_> {
+    ) -> io::Result<impl SocketStreamReader<Buffer = BufferLease> + '_ + use<'_>> {
         Ok(Reader {
             source: self,
             pool,
@@ -505,7 +505,7 @@ impl SocketPacketReading for Receives {
         &self,
         socket: &SocketType,
     ) -> io::Result<
-        impl SocketPacketReader<Message: SocketRecvMessageMut<Payload = BufferLease>> + '_,
+        impl SocketPacketReader<Message: SocketRecvMessageMut<Payload = BufferLease>> + '_ + use<'_>,
     > {
         self.socket_packet_reader_with_pool(socket, HeapBufferPool::new(2, 64 * 1024)?)
     }
@@ -514,7 +514,7 @@ impl SocketPacketReading for Receives {
         _: &SocketType,
         pool: HeapBufferPool,
     ) -> io::Result<
-        impl SocketPacketReader<Message: SocketRecvMessageMut<Payload = BufferLease>> + '_,
+        impl SocketPacketReader<Message: SocketRecvMessageMut<Payload = BufferLease>> + '_ + use<'_>,
     > {
         Ok(Reader {
             source: self,

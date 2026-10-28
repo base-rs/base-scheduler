@@ -58,7 +58,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@1.85.0
+      - uses: dtolnay/rust-toolchain@1.87.0
       - run: cargo test --locked --workspace --all-features --exclude base-scheduler-bake
 
   test-result:

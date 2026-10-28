@@ -122,7 +122,7 @@ impl SocketStreamReading for Script {
     fn socket_stream_reader<'a>(
         &'a self,
         _: &(),
-    ) -> io::Result<impl SocketStreamReader<Buffer = BufferLease> + 'a> {
+    ) -> io::Result<impl SocketStreamReader<Buffer = BufferLease> + 'a + use<'a>> {
         self.step("monitor")?;
         Ok(Reader(self))
     }
@@ -130,7 +130,7 @@ impl SocketStreamReading for Script {
         &'a self,
         _: &(),
         _: Self::Pool,
-    ) -> io::Result<impl SocketStreamReader<Buffer = BufferLease> + 'a> {
+    ) -> io::Result<impl SocketStreamReader<Buffer = BufferLease> + 'a + use<'a>> {
         self.step("monitor")?;
         Ok(Reader(self))
     }
@@ -139,14 +139,14 @@ impl SocketStreamWriting for Script {
     fn socket_stream_writer<'a>(
         &'a self,
         _: &(),
-    ) -> io::Result<impl SocketStreamWriter<Buffer = BufferLease> + 'a> {
+    ) -> io::Result<impl SocketStreamWriter<Buffer = BufferLease> + 'a + use<'a>> {
         self.step("monitor")?;
         Ok(Writer(self, PhantomData))
     }
     fn socket_stream_writer_with_buffer<'a, B: IoBuf>(
         &'a self,
         _: &(),
-    ) -> io::Result<impl SocketStreamWriter<Buffer = B> + 'a> {
+    ) -> io::Result<impl SocketStreamWriter<Buffer = B> + 'a + use<'a, B>> {
         self.step("writer")?;
         Ok(Writer(self, PhantomData))
     }

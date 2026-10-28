@@ -1,15 +1,15 @@
 [package]
 name = "base-scheduler-selector"
-version = "0.1.2"
+version = "0.2.0"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.87"
 license = "MIT"
 repository = "https://github.com/base-rs/base-scheduler"
 description = "Independent native I/O selectors and lifecycle contracts"
 readme = "readme.md"
 
 [dependencies]
-base-scheduler = { path = "../..", version = "0.1.2" }
+base-scheduler = { path = "../..", version = "0.2.0" }
 event-listener = "5.4.2"
 futures-channel = "0.3.31"
 futures-lite = "2.6.1"
@@ -25,7 +25,7 @@ signal-hook = "0.4.5"
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Networking_WinSock", "Win32_System_IO", "Win32_System_Threading"] }
 
 [dev-dependencies]
-base-scheduler-conformance = { path = "../conformance", version = "0.1.2" }
+base-scheduler-conformance = { path = "../conformance", version = "0.2.0" }
 tempfile = "3"
 allocation-counter = "0.8.1"
 

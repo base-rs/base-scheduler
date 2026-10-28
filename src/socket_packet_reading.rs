@@ -5,6 +5,10 @@ use crate::{BufferPool, BufferPooling, SocketOperation, SocketPacketReader, Sock
 use std::io;
 
 /// Construct sequential packet input bound to this scheduler. Backends choose the static reader and completed message representation without exposing their receive mechanism.
+///
+/// The returned handle may borrow the scheduler, but never the temporary socket
+/// reference. It retains backend access independently, so the socket and handle
+/// can move together. Retire and drop handles before exclusively closing the socket.
 pub trait SocketPacketReading: SocketOperation + BufferPooling {
     /// Retain the socket and reusable backend state without submitting a receive or allocating a payload pool. Owned reads initialize default storage lazily.
     fn socket_packet_reader<'scheduler>(
@@ -13,7 +17,9 @@ pub trait SocketPacketReading: SocketOperation + BufferPooling {
     ) -> io::Result<
         impl SocketPacketReader<
             Message: SocketRecvMessageMut<Payload = <Self::Pool as BufferPool>::Buffer>,
-        > + 'scheduler,
+        >
+        + 'scheduler
+        + use<'scheduler, Self>,
     >
     where
         Self: Sized,
@@ -27,7 +33,9 @@ pub trait SocketPacketReading: SocketOperation + BufferPooling {
     ) -> io::Result<
         impl SocketPacketReader<
             Message: SocketRecvMessageMut<Payload = <Self::Pool as BufferPool>::Buffer>,
-        > + 'scheduler,
+        >
+        + 'scheduler
+        + use<'scheduler, Self>,
     >
     where
         Self: Sized,

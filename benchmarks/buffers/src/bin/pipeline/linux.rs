@@ -58,7 +58,7 @@ impl Storage {
             .map(|lease| {
                 let base = lease.as_mut().as_mut_ptr() as usize;
                 let offset = base.wrapping_neg() & (ALIGNMENT - 1);
-                if work.size % ALIGNMENT == 0 {
+                if work.size.is_multiple_of(ALIGNMENT) {
                     let pointer = (base + offset) as *mut libc::c_void;
                     // SAFETY: Only full pages wholly within this exclusive allocation are discarded. They are reinitialized before any read or registration.
                     assert_eq!(
