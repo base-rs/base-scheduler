@@ -240,7 +240,7 @@ fn cancellation_shutdown_and_immediate_errors_preserve_stream_state() {
         assert_eq!(block_on(reading).unwrap(), 3);
     }
     assert_eq!(calls, 1);
-    // A publication racing the wait's registration completes it immediately.
+    // A publication after the receive's readiness check completes its wait immediately.
     direction.clear(direction.snapshot());
     let racing = Arc::clone(&registration);
     BEFORE_WAIT.set(Some(Box::new(move || {
