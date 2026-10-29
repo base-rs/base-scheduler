@@ -57,8 +57,9 @@ Five interleaved randomized rounds at 240,000 offered requests/s validate all
 target; every planned measurement request is retained, including late results.
 A separate five-round unpaced cohort measures capacity at 1 and 64 connections.
 The source, candidate patch and frozen binaries remain available for reproduction.
-The [measurement record](results/worker-reactor/readme.md) includes per-sample
-data, environment, diagnostic patches, checksums and verification.
+The [measurement record](https://github.com/base-rs/base-scheduler/tree/b515ad0928bd8637c05a7abda046abbfdd1c6f5c/benchmarks/echo/results/worker-reactor)
+in #66 includes per-sample data, environment, diagnostic patches, checksums and
+verification; it is not retained on main.
 The retained implementation change corrects the misleading readiness-only
 comments and adds a bounded-owned-read deferral regression. It also removes
 batching-dependent timing assumptions from two lifecycle fixtures; it does not
