@@ -1,0 +1,52 @@
+diff --git a/crates/selector/src/readiness_driver.rs b/crates/selector/src/readiness_driver.rs
+index b6c195c..7d6388c 100644
+--- a/crates/selector/src/readiness_driver.rs
++++ b/crates/selector/src/readiness_driver.rs
+@@ -162,10 +162,21 @@ impl Direction {
+         self.tick.load(Ordering::Acquire)
+     }
+     pub(crate) fn publish(&self) {
+-        // Increment the generation before publishing readiness. A racing clear
+-        // can at most cause a spurious retry, never erase this notification.
+-        self.tick.fetch_add(8, Ordering::AcqRel);
+-        self.tick.fetch_or(1, Ordering::Release);
++        self.publish_with(0);
++    }
++    fn publish_with(&self, flags: usize) {
++        // Advance the generation, set readiness and any sticky flags in one
++        // update. A racing clear can at most cause a spurious retry, never
++        // erase this notification.
++        let mut current = self.tick.load(Ordering::Relaxed);
++        while let Err(actual) = self.tick.compare_exchange_weak(
++            current,
++            current.wrapping_add(8) | 1 | flags,
++            Ordering::AcqRel,
++            Ordering::Relaxed,
++        ) {
++            current = actual;
++        }
+         self.changed.notify();
+     }
+     #[cfg(target_os = "macos")]
+@@ -173,19 +184,12 @@ impl Direction {
+         // Publish the byte hint before advancing the event generation. A
+         // concurrent reader either sees this hint or fails its generation clear.
+         self.available.store(available, Ordering::Release);
+-        if read_closed {
+-            self.tick.fetch_or(2, Ordering::Release);
+-        }
+-        self.publish();
++        self.publish_with(usize::from(read_closed) << 1);
+     }
+     #[cfg(target_os = "linux")]
+     fn publish_readable(&self, read_closed: bool, urgent: bool) {
+         // These conditions stay sticky even when ordinary readiness is cleared.
+-        let flags = (usize::from(read_closed) << 1) | (usize::from(urgent) << 2);
+-        if flags != 0 {
+-            self.tick.fetch_or(flags, Ordering::Release);
+-        }
+-        self.publish();
++        self.publish_with((usize::from(read_closed) << 1) | (usize::from(urgent) << 2));
+     }
+     pub(crate) fn clear_after_read<const SUPPORT_OOB: bool>(
+         &self,

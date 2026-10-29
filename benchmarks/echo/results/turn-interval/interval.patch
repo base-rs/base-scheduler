@@ -1,0 +1,259 @@
+diff --git a/context/design.md b/context/design.md
+index 5ccc33b..820f0ce 100644
+--- a/context/design.md
++++ b/context/design.md
+@@ -149,7 +149,7 @@ batching and idle transitions, and the distinction between operation cost and
+ queueing delay. [Worker progress requirements](../design/worker-progress.md)
+ record the boundaries performance changes must preserve.
+ 
+-`base-scheduler-native` ports Socketry's default work-stealing executor and `async-io` readiness backend from revision `7a70586d5d37fb640d696d0c03a05b2ee3cbe06b`. Worker-local queues, preferred-worker remote inboxes, idle work stealing, external fairness, and the publication/parking fence remain. This branch experiments with alternating ready batches, as described under worker ownership below. Before another ready batch runs, the worker makes a nonblocking driver turn to publish available completions; when its queues are empty, the normal idle turn prepares and waits directly without a preceding nonblocking probe. Internal worker identity exists only for queue locality and blocking-wait detection; operations never find an implicit current scheduler. The root future can borrow local state and is polled on the caller's thread by `block_on`.
++`base-scheduler-native` ports Socketry's default work-stealing executor and `async-io` readiness backend from revision `7a70586d5d37fb640d696d0c03a05b2ee3cbe06b`. Worker-local queues, preferred-worker remote inboxes, idle work stealing, external fairness, and the publication/parking fence remain. This branch experiments with alternating ready batches, as described under worker ownership below. Before another ready batch runs, the worker makes a nonblocking driver turn to publish available completions. A driver can space those turns by task polls through `SelectorWorker::nonblocking_interval`: with an OS poller, the epoll and kqueue readiness worker turns at the first batch boundary after 61 polls, since each of its nonblocking turns is a system call, while io\_uring keeps publishing after every batch. When its queues are empty, the normal idle turn prepares and waits directly without a preceding nonblocking probe. Internal worker identity exists only for queue locality and blocking-wait detection; operations never find an implicit current scheduler. The root future can borrow local state and is polled on the caller's thread by `block_on`.
+ 
+ The adapter adopts Base's owning task handles, guarded user destructors, lazy cancellation, and asynchronous shutdown. A short admission lock serializes spawning with closure; no task-ID registry is needed. Separate counters track task-future ownership and queued or running runnables: shutdown needs both to retire, since destroying a task future can precede the return of its final runnable. Runnable quiescence notifications arm when the first drain wait registers, so ordinary dispatch avoids notifying an unused event. Arming shares the runnable counter's modification order and remains enabled thereafter, preserving concurrent and abandoned waits. Closing admission preserves live task owners and wakes socket and clock operations. Drop does not join. Explicit shutdown drains tasks, accepted blocking/file/resolver work, cleanup, timers, and signal delivery. Applications coordinate cooperative cancellation and await tasks before shutdown. A task must not await shutdown of its own scheduler.
+ 
+@@ -201,7 +201,7 @@ A private thread-local lookup selects the current ring only when it belongs to t
+ 
+ The local and remote command queues are serviced with alternating preference and a bounded total batch. Cancellation may arrive through the other queue before an already-published submission is processed. An unknown cancellation is replayed once at the tail of the opposite FIFO, which places it after that submission; the replay never repeats. This handles migration without allocating a separate shared cancellation record or accumulating tombstones for already-completed operations.
+ 
+-CQ processing completes operations and publishes runnable tasks; it never polls application futures inline. The owning worker publishes the entire available CQ snapshot before polling any of those tasks. Other workers may steal published tasks immediately. The experimental worker loop alternates two reusable FIFO ready queues: it drains a finite current batch while new wakes enter the next queue, then runs a nonblocking driver turn before starting the next task batch. External wakes are admitted at batch boundaries, and both queue generations remain stealable. These are independent worker batches, not global scheduling rounds. Self-wakes cannot extend the owning worker's current batch. There is no fixed maximum batch size or preemption of an individual future poll, so a large batch can delay I/O checks. Driver command processing remains bounded independently. When idle, the worker publishes its sleeping state, rechecks runnable work, and enters an interruptible driver turn which checks both I/O queues before waiting. New runnable tasks, remote I/O, timers, and shutdown can interrupt the wait. Local submissions need no interrupt because their owning worker processes them before sleeping. A Native wake of its own executing worker clears the sleeping flag without calling thread unpark or the driver waker. Drivers must return after publishing completions or otherwise waking tasks, including cancellation and owner-drop paths, so those tasks can run; they must not wait for an interrupt from their own thread. Remote wakes retain the sleeping-flag exchange and interrupt path, including wakes racing the final queue recheck and wait. Explicit same-thread calls to an entered io\_uring driver's waker still record a coalescing local notification flag instead of writing the eventfd. Productive and nonblocking turns retain this flag until the selector reaches its actual wait decision, where it consumes the local flag and returns before waiting. Remote notifications remain in the eventfd until its poll CQE is collected; one successful read clears the accumulated counter before rearming. Wakes from another thread or for a controller not entered on this thread still use the eventfd; matching uses controller identity rather than selector-group identity.
++CQ processing completes operations and publishes runnable tasks; it never polls application futures inline. The owning worker publishes the entire available CQ snapshot before polling any of those tasks. Other workers may steal published tasks immediately. The experimental worker loop alternates two reusable FIFO ready queues: it drains a finite current batch while new wakes enter the next queue, then runs a nonblocking driver turn before starting the next task batch once the driver's poll interval has elapsed. External wakes are admitted at batch boundaries, and both queue generations remain stealable. These are independent worker batches, not global scheduling rounds. Self-wakes cannot extend the owning worker's current batch. There is no fixed maximum batch size or preemption of an individual future poll, so a large batch can delay I/O checks. A batch reaching the poll interval is always followed by a turn, so the interval never extends that delay beyond one batch; it only combines small batches. Driver command processing remains bounded independently. When idle, the worker publishes its sleeping state, rechecks runnable work, and enters an interruptible driver turn which checks both I/O queues before waiting. New runnable tasks, remote I/O, timers, and shutdown can interrupt the wait. Local submissions need no interrupt because their owning worker processes them before sleeping. A Native wake of its own executing worker clears the sleeping flag without calling thread unpark or the driver waker. Drivers must return after publishing completions or otherwise waking tasks, including cancellation and owner-drop paths, so those tasks can run; they must not wait for an interrupt from their own thread. Remote wakes retain the sleeping-flag exchange and interrupt path, including wakes racing the final queue recheck and wait. Explicit same-thread calls to an entered io\_uring driver's waker still record a coalescing local notification flag instead of writing the eventfd. Productive and nonblocking turns retain this flag until the selector reaches its actual wait decision, where it consumes the local flag and returns before waiting. Remote notifications remain in the eventfd until its poll CQE is collected; one successful read clears the accumulated counter before rearming. Wakes from another thread or for a controller not entered on this thread still use the eventfd; matching uses controller identity rather than selector-group identity.
+ 
+ Closing admission does not permit a worker to exit while its ring retains kernel-accessible requests, even if all task futures have been abandoned. Stopping or failing any ring closes admission across the selector group and its shared fallback; the other drivers continue retiring accepted work. Queued local owners are returned before signaling driver retirement. After a driver retires, live tasks can still progress using the executor's ordinary parking and wakeup path. Partial worker startup closes the selector and drops unstarted drivers, while started workers retire normally.
+ 
+diff --git a/context/execution.md b/context/execution.md
+index 0312c5c..77e5e92 100644
+--- a/context/execution.md
++++ b/context/execution.md
+@@ -27,7 +27,10 @@ The source of truth is `crates/native/src/worker.rs`:
+ 2. `search` admits remote runnable work, tries the local ready queue, and then
+    attempts stealing. A contention retry yields rather than parking.
+ 3. With work available after an earlier task batch, the worker calls its driver
+-   with a zero timeout before running the next batch.
++   with a zero timeout before running the next batch, once
++   `SelectorWorker::nonblocking_interval` task polls have run since the last
++   turn. Readiness workers with an OS poller use 61 polls because each such
++   turn is a system call; io_uring turns after every batch.
+ 4. `run_ready_batch` freezes the existing ready queue. It polls its first task
+    and the remaining frozen tasks; new wakes enter the next queue. Other workers
+    can steal from both generations. This bounds a batch by membership, not time.
+diff --git a/crates/native/src/native_scheduler/driver_tests.rs b/crates/native/src/native_scheduler/driver_tests.rs
+index f46571b..5902980 100644
+--- a/crates/native/src/native_scheduler/driver_tests.rs
++++ b/crates/native/src/native_scheduler/driver_tests.rs
+@@ -34,6 +34,7 @@ struct State {
+     only_idle_completions: AtomicBool,
+     interrupts: AtomicUsize,
+     completion_interrupts: AtomicUsize,
++    interval: AtomicUsize,
+ }
+ impl Wake for State {
+     fn wake(self: Arc<Self>) {
+@@ -68,6 +69,9 @@ impl SelectorDriver for Driver {
+     }
+ }
+ impl SelectorWorker for Driver {
++    fn nonblocking_interval(&self) -> u32 {
++        self.0.interval.load(Ordering::SeqCst).max(1) as u32
++    }
+     fn waker(&self) -> Waker {
+         Waker::from(Arc::clone(&self.0))
+     }
+@@ -294,8 +298,15 @@ fn completion_batch_is_published_before_any_local_task_resumes() {
+ 
+ #[test]
+ fn busy_tasks_do_not_starve_driver_turns() {
+-    crate::test_support::run(|| {
++    for interval in [1, 61] {
++        busy_tasks_do_not_starve_driver_turns_with(interval);
++    }
++}
++
++fn busy_tasks_do_not_starve_driver_turns_with(interval: usize) {
++    crate::test_support::run(move || {
+         let state = Arc::new(State::default());
++        state.interval.store(interval, Ordering::SeqCst);
+         let scheduler = construct(&[Arc::clone(&state)]);
+         let state2 = Arc::clone(&state);
+         let task = scheduler
+@@ -318,6 +329,86 @@ fn busy_tasks_do_not_starve_driver_turns() {
+     });
+ }
+ 
++#[test]
++fn nonblocking_turns_follow_the_driver_interval() {
++    crate::test_support::run(|| {
++        let state = Arc::new(State::default());
++        state.interval.store(4, Ordering::SeqCst);
++        let scheduler = construct(&[Arc::clone(&state)]);
++        let observed = Arc::clone(&state);
++        let task = scheduler
++            .spawn(async move {
++                let mut turns = Vec::new();
++                poll_fn(|context| {
++                    turns.push(observed.turns.load(Ordering::SeqCst));
++                    if turns.len() == 17 {
++                        Poll::Ready(())
++                    } else {
++                        context.waker().wake_by_ref();
++                        Poll::Pending
++                    }
++                })
++                .await;
++                turns
++            })
++            .unwrap();
++        let turns = block_on(task).unwrap();
++        // Each poll is its own batch. A busy worker still turns after every
++        // fourth poll, and only then.
++        let advanced = turns.windows(2).filter(|pair| pair[1] > pair[0]).count();
++        assert_eq!(advanced, 4, "{turns:?}");
++        assert!(
++            turns.windows(5).all(|window| window[4] > window[0]),
++            "{turns:?}"
++        );
++        block_on(scheduler.shutdown());
++        wait(|| state.retired.load(Ordering::SeqCst));
++    });
++}
++
++#[test]
++fn batches_reaching_the_interval_turn_after_every_batch() {
++    const TASKS: usize = 8;
++    crate::test_support::run(|| {
++        let state = Arc::new(State::default());
++        state.interval.store(4, Ordering::SeqCst);
++        let scheduler = construct(&[Arc::clone(&state)]);
++        let started = Arc::new(AtomicUsize::new(0));
++        let tasks: Vec<_> = (0..TASKS)
++            .map(|_| {
++                let observed = Arc::clone(&state);
++                let started = Arc::clone(&started);
++                scheduler
++                    .spawn(async move {
++                        started.fetch_add(1, Ordering::SeqCst);
++                        let mut turns = Vec::new();
++                        poll_fn(|context| {
++                            // Record only once every task self-wakes into the same batch.
++                            if started.load(Ordering::SeqCst) == TASKS {
++                                turns.push(observed.turns.load(Ordering::SeqCst));
++                            }
++                            if turns.len() == 8 {
++                                Poll::Ready(())
++                            } else {
++                                context.waker().wake_by_ref();
++                                Poll::Pending
++                            }
++                        })
++                        .await;
++                        turns
++                    })
++                    .unwrap()
++            })
++            .collect();
++        for task in tasks {
++            let turns = block_on(task).unwrap();
++            assert!(turns.windows(2).all(|pair| pair[1] > pair[0]), "{turns:?}");
++        }
++        block_on(scheduler.shutdown());
++        wait(|| state.retired.load(Ordering::SeqCst));
++    });
++}
++
+ #[test]
+ fn self_wakes_wait_for_the_next_driver_turn() {
+     crate::test_support::run(|| {
+diff --git a/crates/native/src/worker.rs b/crates/native/src/worker.rs
+index 7e39468..0f49900 100644
+--- a/crates/native/src/worker.rs
++++ b/crates/native/src/worker.rs
+@@ -275,6 +275,10 @@ fn run_loop(
+     });
+     let mut iteration = 0usize;
+     let mut needs_turn = false;
++    let interval = driver
++        .as_ref()
++        .map_or(1, |active| active.nonblocking_interval().max(1));
++    let mut polls = 0u32;
+     loop {
+         iteration = iteration.wrapping_add(1);
+         crate::worker_timers::turn(&shared, identifier);
+@@ -302,6 +306,7 @@ fn run_loop(
+                     || !shared.finished(),
+                     || {
+                         needs_turn = false;
++                        polls = 0;
+                         drive(
+                             &mut driver,
+                             crate::worker_timers::timeout(&shared, identifier),
+@@ -314,18 +319,19 @@ fn run_loop(
+         let Some(runnable) = runnable else {
+             continue;
+         };
+-        // Publish completions between ready batches. If the queue emptied, the idle path above already collected them with its actual wait timeout.
+-        if needs_turn {
++        // Publish completions between ready batches once the driver's poll interval has elapsed. If the queue emptied, the idle path above already collected them with its actual wait timeout.
++        if needs_turn && polls >= interval {
++            polls = 0;
+             drive(&mut driver, Some(Duration::ZERO));
+         }
+-        run_ready_batch(&shared, runnable);
++        polls = polls.saturating_add(run_ready_batch(&shared, runnable));
+         needs_turn = true;
+     }
+     CURRENT_WORKER.with(|current| current.take());
+ }
+ 
+ #[inline(always)]
+-fn run_ready_batch(shared: &Shared, first: Runnable) {
++fn run_ready_batch(shared: &Shared, first: Runnable) -> u32 {
+     // Freeze the batch. Wakes during task polling go into the now-empty next queue.
+     let (identifier, has_more) = CURRENT_WORKER.with(|current| {
+         let mut current = current.borrow_mut();
+@@ -337,7 +343,9 @@ fn run_ready_batch(shared: &Shared, first: Runnable) {
+         shared.wake_idle(usize::MAX);
+     }
+     let mut runnable = Some(first);
++    let mut polls = 0u32;
+     while let Some(task) = runnable {
++        polls = polls.saturating_add(1);
+         task.metadata().worker.store(identifier, Ordering::Relaxed);
+         // Contain task-machinery panics as well as the guarded future's panics.
+         crate::panic::contain(|| {
+@@ -353,6 +361,7 @@ fn run_ready_batch(shared: &Shared, first: Runnable) {
+                 .pop()
+         });
+     }
++    polls
+ }
+ 
+ #[cfg(test)]
+diff --git a/crates/selector/src/readiness_driver.rs b/crates/selector/src/readiness_driver.rs
+index b6c195c..f227eb9 100644
+--- a/crates/selector/src/readiness_driver.rs
++++ b/crates/selector/src/readiness_driver.rs
+@@ -556,6 +556,11 @@ impl SelectorDriver for ReadinessDriver {
+     }
+ }
+ impl SelectorWorker for ReadinessWorker {
++    fn nonblocking_interval(&self) -> u32 {
++        // Each nonblocking poll is a system call, unlike a completion ring
++        // check. Tokio likewise polls I/O after every 61 task polls.
++        if self.driver.inner.is_some() { 61 } else { 1 }
++    }
+     fn waker(&self) -> Waker {
+         match &self.driver.inner {
+             Some(inner) => Waker::from(Arc::clone(&inner.controller)),
+diff --git a/crates/selector/src/selector_worker.rs b/crates/selector/src/selector_worker.rs
+index 80a3998..71dd75d 100644
+--- a/crates/selector/src/selector_worker.rs
++++ b/crates/selector/src/selector_worker.rs
+@@ -15,4 +15,9 @@ pub trait SelectorWorker {
+ 
+     /// Publish a bounded batch of completions and wait at most `timeout`. Zero is nonblocking; `None` permits an indefinite event wait. Check local and remote submissions before waiting. After publishing completions or otherwise waking tasks, return without waiting so the executor can poll those tasks; the executor need not interrupt a driver from its own thread. Return `true` when closed and drained. An error permanently stops the driver and must notify its waiters while preserving any storage still accessible to the OS.
+     fn turn(&mut self, timeout: Option<Duration>) -> io::Result<bool>;
++
++    /// How many task polls an executor may run between nonblocking turns. Executors turn only at batch boundaries, so a batch with at least this many polls is followed by a turn. A driver whose nonblocking turn needs a system call can amortize it; one that only reads shared memory should publish after every batch. Waiting turns are unaffected.
++    fn nonblocking_interval(&self) -> u32 {
++        1
++    }
+ }

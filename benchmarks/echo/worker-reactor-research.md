@@ -84,6 +84,68 @@ preceding study. Its controls and baselines also vary. In particular, difference
 between medians are not the paired median changes, and saturated p99 values at
 different throughput do not establish equal-load tail behavior.
 
+## Experiment 2: spacing readiness worker turns
+
+Baseline: main `aaf337eab1d0fc99e6177a61649dfc94fe6b30f1`.
+
+**Hypothesis:** a busy worker's zero-timeout turn between ready batches is a
+system call on epoll and kqueue. Spacing those turns removes that cost where
+consecutive small batches are common. A single-worker timer-and-yield loop
+takes 760 ns per iteration on Native readiness, against 359 ns on Tokio in the
+same run.
+
+**Isolated variants:**
+
+- turn after 61 task polls, as Tokio polls I/O after 61 ticks;
+- the same on one FIFO per worker, with each batch counted before polling it
+  instead of alternating two queues, with and without a 61-poll batch cap;
+- skip zero-timeout turns after an empty poll, with backoff.
+
+**Validation:** interleaved base-http hello cohorts at one and two workers,
+with supervisor and task-per-connection servers, measuring user instructions,
+cycles and throughput; plus the Native timer suite.
+
+**Decision: reject all three.** The timed variants bring the yield loop to
+about 255 ns, but HTTP serving on Hana either does not change or regresses by
+1–7%:
+
+- At 64 connections, two workers with a task per connection gain about 150
+  instructions per request under every interval variant.
+- The adaptive skip keeps instructions level but costs cycles and throughput.
+- The one-FIFO counted batch shows no gain over the alternating queues.
+
+The [measurement record](results/turn-interval/readme.md) retains the patches,
+per-sample data and method.
+
+## Experiment 3: readiness publication atomics
+
+Baseline: main `aaf337eab1d0fc99e6177a61649dfc94fe6b30f1`.
+
+**Hypothesis:** Native readiness spends about 21 locked instructions per echo
+round trip, against Tokio's 13. Publishing a direction takes two or three
+atomic updates and then locks its notification mutex even when nobody waits.
+Fewer atomics should show in instructions and throughput.
+
+**Isolated variants:**
+
+- one compare-and-swap for the generation, readiness and sticky flags, plus a
+  waiter count that lets publication skip the lock when nobody waits;
+- the compare-and-swap alone.
+
+**Validation:** interleaved echo runs on `native-poll` with one worker and 32
+connections, counting locked loads; and interleaved base-http hello cohorts at
+one and two workers for the first variant.
+
+**Decision: reject both as marginal.** The first variant removes about three
+locked instructions per echo round trip and 46–56 user instructions per HTTP
+request, but throughput is within noise in six of eight configurations, and
+its lock skip adds a SeqCst handshake that later changes must preserve. The
+compare-and-swap alone removes two locked instructions but adds about ten
+instructions, and its echo throughput was below baseline in every pair.
+
+The [measurement record](results/readiness-publication/readme.md) retains the
+patches, per-sample data and method.
+
 ## Diagnostic boundaries
 
 Separate instrumented executables count prepared/deferred payload requests and
@@ -132,7 +194,7 @@ Tokio's implementation choices alone:
 | --- | --- | --- |
 | Staged payload to kernel issuance | Deferred batches and requests, elapsed time until the next kernel entry | A recurring delay with repeatable end-to-end benefit when removed |
 | Published result to application consumption | Sample timestamps under the existing completion-state lock, collected on consumption | Material delay attributable to executor or supervisor polling, confirmed without probes |
-| Ready batch to next driver/timer visit | Mixed self-waking and socket/timer workloads; distinguish independently spawned tasks from inner futures | Better cost/delay tradeoff while preserving external work, I/O and timer progress |
+| Ready batch to next driver/timer visit | Mixed self-waking and socket/timer workloads; distinguish independently spawned tasks from inner futures. Turn spacing by poll count, a one-FIFO counted batch and empty-poll backoff were rejected (Experiment 2) | Better cost/delay tradeoff while preserving external work, I/O and timer progress, with no HTTP regression at one and two workers |
 | Demand-driven read/write to overlapping progress | Streaming full-duplex traffic and slow-peer backpressure with bounded owned storage | Useful overlap beyond the one-read/one-write control, without unbounded buffering |
 
 Instrumentation is compiled into separate executables. It can change batching

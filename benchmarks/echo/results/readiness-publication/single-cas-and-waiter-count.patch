@@ -1,0 +1,113 @@
+diff --git a/crates/selector/src/readiness_driver.rs b/crates/selector/src/readiness_driver.rs
+index b6c195c..ee87971 100644
+--- a/crates/selector/src/readiness_driver.rs
++++ b/crates/selector/src/readiness_driver.rs
+@@ -164,28 +164,33 @@ impl Direction {
+     pub(crate) fn publish(&self) {
+         // Increment the generation before publishing readiness. A racing clear
+         // can at most cause a spurious retry, never erase this notification.
+-        self.tick.fetch_add(8, Ordering::AcqRel);
+-        self.tick.fetch_or(1, Ordering::Release);
+-        self.changed.notify();
++        self.publish_with(0);
++    }
++    fn publish_with(&self, flags: usize) {
++        // One read-modify-write advances the generation, sets readiness and any
++        // sticky flags. SeqCst pairs with a listener's registration.
++        let mut current = self.tick.load(Ordering::Relaxed);
++        while let Err(actual) = self.tick.compare_exchange_weak(
++            current,
++            current.wrapping_add(8) | 1 | flags,
++            Ordering::SeqCst,
++            Ordering::Relaxed,
++        ) {
++            current = actual;
++        }
++        self.changed.notify_waiting();
+     }
+     #[cfg(target_os = "macos")]
+     fn publish_readable(&self, available: usize, read_closed: bool) {
+         // Publish the byte hint before advancing the event generation. A
+         // concurrent reader either sees this hint or fails its generation clear.
+         self.available.store(available, Ordering::Release);
+-        if read_closed {
+-            self.tick.fetch_or(2, Ordering::Release);
+-        }
+-        self.publish();
++        self.publish_with(usize::from(read_closed) << 1);
+     }
+     #[cfg(target_os = "linux")]
+     fn publish_readable(&self, read_closed: bool, urgent: bool) {
+         // These conditions stay sticky even when ordinary readiness is cleared.
+-        let flags = (usize::from(read_closed) << 1) | (usize::from(urgent) << 2);
+-        if flags != 0 {
+-            self.tick.fetch_or(flags, Ordering::Release);
+-        }
+-        self.publish();
++        self.publish_with((usize::from(read_closed) << 1) | (usize::from(urgent) << 2));
+     }
+     pub(crate) fn clear_after_read<const SUPPORT_OOB: bool>(
+         &self,
+@@ -233,7 +238,8 @@ impl Direction {
+             // initial check and registration must not leave this wait asleep.
+             if group.closed.is_cancelled() {
+                 Poll::Ready(Err(closed()))
+-            } else if self.snapshot() & 1 != 0 {
++            } else if self.tick.load(Ordering::SeqCst) & 1 != 0 {
++                // SeqCst after registration pairs with publish_with.
+                 Poll::Ready(Ok(()))
+             } else {
+                 result
+diff --git a/crates/selector/src/readiness_driver/notification.rs b/crates/selector/src/readiness_driver/notification.rs
+index 3a7f7fe..c776232 100644
+--- a/crates/selector/src/readiness_driver/notification.rs
++++ b/crates/selector/src/readiness_driver/notification.rs
+@@ -27,6 +27,9 @@ struct State {
+ pub(super) struct Notification {
+     state: Mutex<State>,
+     notified_through: AtomicUsize,
++    // Registered, unnotified listeners. Changed only under the lock; read
++    // without it so publications skip the lock when nobody waits.
++    waiting: AtomicUsize,
+ }
+ impl Notification {
+     pub(super) fn new() -> Self {
+@@ -40,6 +43,14 @@ impl Notification {
+             before_drop_lock: None,
+         }
+     }
++    /// Notify after a SeqCst publication. A listener registers with a SeqCst
++    /// increment and then rechecks the published state with a SeqCst load, so
++    /// either this load observes it or the listener observes the publication.
++    pub(super) fn notify_waiting(&self) {
++        if self.waiting.load(Ordering::SeqCst) != 0 {
++            self.notify();
++        }
++    }
+     pub(super) fn notify(&self) {
+         let mut first = None;
+         let mut rest = Vec::new();
+@@ -55,6 +66,7 @@ impl Notification {
+                 }
+             }
+             state.entries.clear();
++            self.waiting.store(0, Ordering::Relaxed);
+             // Detached listeners need no lock on completion/drop. New
+             // registrations get higher IDs, including when reusing a slot.
+             self.notified_through
+@@ -115,6 +127,7 @@ impl Listener<'_> {
+                         state.entries.len() - 1
+                     }
+                 };
++                self.notification.waiting.fetch_add(1, Ordering::SeqCst);
+                 self.key = Some((id, index));
+                 Poll::Pending
+             } else {
+@@ -141,6 +154,7 @@ impl Drop for Listener<'_> {
+                     None
+                 } else {
+                     debug_assert_eq!(state.entries[index].as_ref().unwrap().id, id);
++                    self.notification.waiting.fetch_sub(1, Ordering::Relaxed);
+                     state.entries[index].take()
+                 }
+             };
