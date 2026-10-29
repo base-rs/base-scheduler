@@ -144,10 +144,7 @@ Unix sockets retain the selected runtime identity and initialize their Tokio `As
 
 ## Native backend and reusable timers
 
-See [the worker/reactor execution model](execution.md) for progress stages,
-batching and idle transitions, and the distinction between operation cost and
-queueing delay. [Worker progress requirements](../design/worker-progress.md)
-record the boundaries performance changes must preserve.
+See [the worker/reactor execution model](execution.md) for progress stages, batching and idle transitions, and the distinction between operation cost and queueing delay. [Worker progress requirements](../design/worker-progress.md) record the boundaries performance changes must preserve.
 
 `base-scheduler-native` ports Socketry's default work-stealing executor and `async-io` readiness backend from revision `7a70586d5d37fb640d696d0c03a05b2ee3cbe06b`. Worker-local queues, preferred-worker remote inboxes, idle work stealing, external fairness, and the publication/parking fence remain. This branch experiments with alternating ready batches, as described under worker ownership below. Before another ready batch runs, the worker makes a nonblocking driver turn to publish available completions; when its queues are empty, the normal idle turn prepares and waits directly without a preceding nonblocking probe. Internal worker identity exists only for queue locality and blocking-wait detection; operations never find an implicit current scheduler. The root future can borrow local state and is polled on the caller's thread by `block_on`.
 
