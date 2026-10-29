@@ -3,7 +3,6 @@
 
 use crate::Cancelled;
 use event_listener::Event;
-use std::collections::HashMap;
 use std::future::pending;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, PoisonError, Weak};
@@ -15,11 +14,44 @@ struct Node {
     tree: Arc<Mutex<()>>,
     // Children retain ancestors, but ancestors only hold weak child references.
     parent: Option<Arc<Node>>,
-    children: Mutex<HashMap<usize, Weak<Node>>>,
+    // This node's slot in its parent's children.
+    index: usize,
+    children: Mutex<Children>,
+}
+
+// Weak child registrations, addressed by a slot each child records.
+#[derive(Default)]
+struct Children {
+    slots: Vec<Option<Weak<Node>>>,
+    free: Vec<usize>,
+}
+
+impl Children {
+    #[cfg(test)]
+    fn is_empty(&self) -> bool {
+        self.slots.iter().all(Option::is_none)
+    }
+    fn next(&self) -> usize {
+        self.free.last().copied().unwrap_or(self.slots.len())
+    }
+    fn insert(&mut self, child: Weak<Node>) {
+        match self.free.pop() {
+            Some(index) => self.slots[index] = Some(child),
+            None => self.slots.push(Some(child)),
+        }
+    }
+    fn remove(&mut self, index: usize) {
+        // A live child keeps its slot until it drops, and a cancelled parent
+        // takes every slot and registers no further children.
+        if let Some(slot) = self.slots.get_mut(index) {
+            *slot = None;
+            self.free.push(index);
+        }
+    }
 }
 
 impl Node {
-    fn new(tree: Arc<Mutex<()>>, parent: Option<Arc<Node>>) -> Self {
+    fn new(tree: Arc<Mutex<()>>, parent: Option<Arc<Node>>, index: usize) -> Self {
         let event = Event::new();
         // Allocate shared event state during setup, rather than on the first wait.
         event.notify(0);
@@ -28,23 +60,24 @@ impl Node {
             event,
             tree,
             parent,
-            children: Mutex::new(HashMap::new()),
+            index,
+            children: Mutex::new(Children::default()),
         }
     }
 }
 
 impl Drop for Node {
     fn drop(&mut self) {
-        let mut identifier = self as *const Self as usize;
+        let mut index = self.index;
         let mut parent = self.parent.take();
         // Release an exclusively owned ancestor chain without recursive drops.
         while let Some(node) = parent {
-            // The allocation's address identifies its weak registration until destruction removes it, so recycled addresses cannot alias it.
+            // A slot is reused only after its child's destruction removes it, so the index cannot alias a later registration.
             node.children
                 .lock()
                 .unwrap_or_else(PoisonError::into_inner)
-                .remove(&identifier);
-            identifier = Arc::as_ptr(&node) as usize;
+                .remove(index);
+            index = node.index;
             match Arc::try_unwrap(node) {
                 Ok(mut node) => {
                     parent = node.parent.take();
@@ -78,7 +111,7 @@ impl Cancellation {
     /// Create an independent, uncancelled signal.
     pub fn new() -> Self {
         Self {
-            node: Some(Arc::new(Node::new(Arc::new(Mutex::new(())), None))),
+            node: Some(Arc::new(Node::new(Arc::new(Mutex::new(())), None, 0))),
         }
     }
 
@@ -98,18 +131,19 @@ impl Cancellation {
             return Self::new();
         };
         let _tree = parent.tree.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut children = parent
+            .children
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
         let child = Arc::new(Node::new(
             Arc::clone(&parent.tree),
             Some(Arc::clone(parent)),
+            children.next(),
         ));
         if parent.cancelled.load(Ordering::Acquire) {
             child.cancelled.store(true, Ordering::Release);
         } else {
-            parent
-                .children
-                .lock()
-                .unwrap_or_else(PoisonError::into_inner)
-                .insert(Arc::as_ptr(&child) as usize, Arc::downgrade(&child));
+            children.insert(Arc::downgrade(&child));
         }
         Self { node: Some(child) }
     }
@@ -129,7 +163,9 @@ impl Cancellation {
             node.cancelled.store(true, Ordering::Release);
             pending.extend(
                 std::mem::take(&mut *node.children.lock().unwrap_or_else(PoisonError::into_inner))
-                    .into_values()
+                    .slots
+                    .into_iter()
+                    .flatten()
                     .filter_map(|child| child.upgrade()),
             );
             cancelled.push(node);
