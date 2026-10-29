@@ -95,7 +95,7 @@ Prepare a release with `cargo bake cargo:version:patch` (or `minor`, `major`, or
 
 ## Releases
 
-Version v0.2.0 corrects socket-handle lifetime captures and requires Rust 1.87. See the [release notes](releases.md).
+Version v0.3.0 reduces Native readiness and child-cancellation overhead, and changes `NativeSocket::retain_native` to return `RegisteredSocket`, which is breaking for backend integrations. See the [release notes](releases.md).
 
 ## See Also
 
