@@ -8,6 +8,9 @@ behavior. This ledger distinguishes observations from hypotheses.
 
 ## Starting evidence
 
+Measurements use Hana, an Arch Linux 7.2 host with a four-core, eight-thread
+Intel Xeon E3-1240 v6.
+
 The preceding raw hello-world experiment on Hana compared equivalent owned
 reads before/after post-submit CQ collection. At 240,000 offered requests/s,
 five paired rounds improved median actual-send RTT from 127.6 to 74.8 us;
