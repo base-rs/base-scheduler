@@ -18,6 +18,8 @@ use std::{
     pin::pin,
     task::Poll,
 };
+#[cfg(unix)]
+use std::{pin::Pin, task::Context};
 
 /// Scheduler-bound stream reader; registration remains private to this backend.
 pub(crate) struct ReadinessSocketStreamReader<'a, const SUPPORT_OOB: bool = false> {
@@ -78,8 +80,31 @@ impl<'a, const SUPPORT_OOB: bool> ReadinessSocketStreamReader<'a, SUPPORT_OOB> {
         &mut self,
         capacity: usize,
         cancellation: &Cancellation,
-        mut receive: impl FnMut(&socket2::Socket) -> io::Result<usize> + Send,
+        mut receive: impl FnMut(&socket2::Socket) -> io::Result<usize> + Send + Unpin,
     ) -> OperationResult<usize> {
+        // An established registration needs no setup, and a never-cancelled
+        // worker wait observes driver closure itself. Keep its state compact.
+        if let (true, Some(group), Some(registration)) = (
+            cancellation.is_never(),
+            &self.scheduler.readiness,
+            &self.registration,
+        ) {
+            self.scheduler.check_open()?;
+            let result = Receive::<_, SUPPORT_OOB> {
+                group,
+                direction: registration.direction(Interest::Readable),
+                socket: self.socket.get_ref(),
+                receive,
+                capacity,
+                probe: !self.established,
+                listener: None,
+            }
+            .await;
+            if matches!(result, Ok(count) if count != 0) {
+                self.established = true;
+            }
+            return result.map_err(Into::into);
+        }
         let result = {
             let scheduler = self.scheduler;
             let operation = pin!(async {
@@ -100,38 +125,20 @@ impl<'a, const SUPPORT_OOB: bool> ReadinessSocketStreamReader<'a, SUPPORT_OOB> {
                     );
                     probe = true;
                 }
-                let direction = self
-                    .registration
-                    .as_ref()
-                    .expect("a waiting stream retains its registration")
-                    .direction(Interest::Readable);
-                loop {
-                    let observed = direction.snapshot();
-                    #[cfg(target_os = "linux")]
-                    if !SUPPORT_OOB && observed & 4 != 0 {
-                        return Err(io::Error::new(
-                            io::ErrorKind::Unsupported,
-                            "TCP urgent data is not supported by this reader",
-                        ));
-                    }
-                    if !probe && observed & 1 == 0 {
-                        direction.wait(group).await?;
-                        continue;
-                    }
-                    probe = false;
-                    match receive(self.socket.get_ref()) {
-                        Ok(count) => {
-                            // The backend and OOB policy determine when a short
-                            // receive is sufficient to clear this generation.
-                            direction.clear_after_read::<SUPPORT_OOB>(observed, count, capacity);
-                            return Ok(count);
-                        }
-                        Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
-                            direction.clear(observed);
-                        }
-                        Err(error) => return Err(error),
-                    }
+                Receive::<_, SUPPORT_OOB> {
+                    group,
+                    direction: self
+                        .registration
+                        .as_ref()
+                        .expect("a waiting stream retains its registration")
+                        .direction(Interest::Readable),
+                    socket: self.socket.get_ref(),
+                    receive,
+                    capacity,
+                    probe,
+                    listener: None,
                 }
+                .await
             });
             scheduler.cancellable(cancellation, operation).await
         };
@@ -150,6 +157,63 @@ impl<'a, const SUPPORT_OOB: bool> ReadinessSocketStreamReader<'a, SUPPORT_OOB> {
         self.scheduler
             .cancellable(cancellation, self.socket.io(Interest::Readable, receive))
             .await
+    }
+}
+
+// The registered receive loop. Between polls it retains only the borrowed
+// socket state and a pending wait's listener.
+#[cfg(unix)]
+struct Receive<'a, F, const SUPPORT_OOB: bool> {
+    group: &'a crate::readiness_driver::DriverGroup,
+    direction: &'a crate::readiness_driver::Direction,
+    socket: &'a socket2::Socket,
+    receive: F,
+    capacity: usize,
+    probe: bool,
+    listener: Option<crate::readiness_driver::Listener<'a>>,
+}
+#[cfg(unix)]
+impl<F, const SUPPORT_OOB: bool> Future for Receive<'_, F, SUPPORT_OOB>
+where
+    F: FnMut(&socket2::Socket) -> io::Result<usize> + Unpin,
+{
+    type Output = io::Result<usize>;
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.get_mut();
+        loop {
+            let observed = this.direction.snapshot();
+            #[cfg(target_os = "linux")]
+            if !SUPPORT_OOB && observed & 4 != 0 {
+                return Poll::Ready(Err(io::Error::new(
+                    io::ErrorKind::Unsupported,
+                    "TCP urgent data is not supported by this reader",
+                )));
+            }
+            if !this.probe && observed & 1 == 0 {
+                #[cfg(test)]
+                tests::before_wait();
+                if let Err(error) =
+                    std::task::ready!(this.direction.poll_wait(this.group, &mut this.listener, cx))
+                {
+                    return Poll::Ready(Err(error));
+                }
+                continue;
+            }
+            this.probe = false;
+            match (this.receive)(this.socket) {
+                Ok(count) => {
+                    // The backend and OOB policy determine when a short
+                    // receive is sufficient to clear this generation.
+                    this.direction
+                        .clear_after_read::<SUPPORT_OOB>(observed, count, this.capacity);
+                    return Poll::Ready(Ok(count));
+                }
+                Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                    this.direction.clear(observed);
+                }
+                Err(error) => return Poll::Ready(Err(error)),
+            }
+        }
     }
 }
 

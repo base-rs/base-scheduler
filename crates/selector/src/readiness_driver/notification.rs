@@ -69,7 +69,7 @@ impl Notification {
     }
 }
 
-pub(super) struct Listener<'a> {
+pub(crate) struct Listener<'a> {
     notification: &'a Notification,
     key: Option<(usize, usize)>,
     // Force the cancellation/notification interleaving without timing assumptions.

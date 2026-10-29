@@ -1,0 +1,16 @@
+p4 native-poll 32 225357 task-clock:u=4.436us instructions:u=1216.7 cycles:u=1085.4 mem_inst_retired.lock_loads:u=19.3 L1-dcache-load-misses:u=37.8
+p6 native-poll 32 222671 task-clock:u=4.490us instructions:u=1271.8 cycles:u=1146.3 mem_inst_retired.lock_loads:u=19.3 L1-dcache-load-misses:u=41.4
+p4 native-poll 256 215168 task-clock:u=4.648us instructions:u=1221.5 cycles:u=1195.3 mem_inst_retired.lock_loads:u=19.2 L1-dcache-load-misses:u=40.1
+p6 native-poll 256 211445 task-clock:u=4.730us instructions:u=1278.6 cycles:u=1200.2 mem_inst_retired.lock_loads:u=19.2 L1-dcache-load-misses:u=41.6
+p4 native-poll 32 218275 task-clock:u=4.580us instructions:u=1219.9 cycles:u=1153.1 mem_inst_retired.lock_loads:u=19.3 L1-dcache-load-misses:u=38.1
+p6 native-poll 32 215682 task-clock:u=4.632us instructions:u=1277.4 cycles:u=1125.5 mem_inst_retired.lock_loads:u=19.3 L1-dcache-load-misses:u=39.8
+p4 native-poll 256 214619 task-clock:u=4.660us instructions:u=1223.4 cycles:u=1203.8 mem_inst_retired.lock_loads:u=19.2 L1-dcache-load-misses:u=40.7
+p6 native-poll 256 215287 task-clock:u=4.645us instructions:u=1276.3 cycles:u=1197.3 mem_inst_retired.lock_loads:u=19.2 L1-dcache-load-misses:u=45.4
+p4 native-poll 32 218997 task-clock:u=4.564us instructions:u=1220.2 cycles:u=1101.7 mem_inst_retired.lock_loads:u=19.3 L1-dcache-load-misses:u=38.0
+p6 native-poll 32 229396 task-clock:u=4.359us instructions:u=1269.8 cycles:u=1114.4 mem_inst_retired.lock_loads:u=19.2 L1-dcache-load-misses:u=39.5
+p4 native-poll 256 214515 task-clock:u=4.661us instructions:u=1222.1 cycles:u=1156.9 mem_inst_retired.lock_loads:u=19.2 L1-dcache-load-misses:u=38.8
+p6 native-poll 256 213497 task-clock:u=4.684us instructions:u=1273.3 cycles:u=1208.3 mem_inst_retired.lock_loads:u=19.1 L1-dcache-load-misses:u=43.0
+p4 native-poll 32 223615 task-clock:u=4.443us instructions:u=1216.5 cycles:u=1155.9 mem_inst_retired.lock_loads:u=19.2 L1-dcache-load-misses:u=37.7
+p6 native-poll 32 223218 task-clock:u=4.477us instructions:u=1271.7 cycles:u=1154.9 mem_inst_retired.lock_loads:u=19.3 L1-dcache-load-misses:u=41.2
+p4 native-poll 256 212185 task-clock:u=4.713us instructions:u=1224.0 cycles:u=1324.0 mem_inst_retired.lock_loads:u=19.2 L1-dcache-load-misses:u=40.8
+p6 native-poll 256 211811 task-clock:u=4.722us instructions:u=1278.0 cycles:u=1211.4 mem_inst_retired.lock_loads:u=19.2 L1-dcache-load-misses:u=43.6

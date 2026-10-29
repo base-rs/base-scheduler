@@ -12,6 +12,18 @@ use std::{
     time::{Duration, Instant},
 };
 
+thread_local! {
+    static BEFORE_WAIT: std::cell::Cell<Option<Box<dyn FnOnce()>>> = const { std::cell::Cell::new(None) };
+}
+
+// Force a publication between a receive's readiness check and its wait.
+#[cfg(unix)]
+pub(super) fn before_wait() {
+    if let Some(hook) = BEFORE_WAIT.take() {
+        hook();
+    }
+}
+
 fn setup() -> (
     ReadinessSelector,
     ReadinessWorker,
@@ -214,11 +226,45 @@ fn cancellation_shutdown_and_immediate_errors_preserve_stream_state() {
                 .snapshot(),
         );
     let never = Cancellation::never();
+    // A pending established read receives once after the next publication.
+    let registration = Arc::clone(reader.registration.as_ref().unwrap());
+    let direction = registration.direction(Interest::Readable);
+    let mut calls = 0;
+    {
+        let mut reading = Box::pin(reader.read_with(8, &never, |_| {
+            calls += 1;
+            Ok(3)
+        }));
+        assert!(block_on(poll_once(&mut reading)).is_none());
+        direction.publish();
+        assert_eq!(block_on(reading).unwrap(), 3);
+    }
+    assert_eq!(calls, 1);
+    // A publication racing the wait's registration completes it immediately.
+    direction.clear(direction.snapshot());
+    let racing = Arc::clone(&registration);
+    BEFORE_WAIT.set(Some(Box::new(move || {
+        racing.direction(Interest::Readable).publish();
+    })));
+    assert_eq!(
+        block_on(poll_once(reader.read_with(8, &never, |_| Ok(2))))
+            .unwrap()
+            .unwrap(),
+        2
+    );
+    direction.clear(direction.snapshot());
     let mut reading = Box::pin(reader.read_into(&mut buffer, &never));
     assert!(block_on(poll_once(&mut reading)).is_none());
     selector.close();
     assert_eq!(
         block_on(reading).unwrap_err().kind(),
+        io::ErrorKind::BrokenPipe
+    );
+    // Later established reads observe the closed scheduler before waiting.
+    assert_eq!(
+        block_on(reader.read_into(&mut buffer, &never))
+            .unwrap_err()
+            .kind(),
         io::ErrorKind::BrokenPipe
     );
 

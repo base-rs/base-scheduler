@@ -34,7 +34,7 @@ mod thread;
 
 pub use blocking_task::BlockingTask;
 pub use native_file::NativeFile;
-pub use native_socket::NativeSocket;
+pub use native_socket::{NativeSocket, RegisteredSocket};
 #[cfg(unix)]
 pub use native_subscription::NativeSubscription;
 pub use system_address_info::SystemAddressInfo;

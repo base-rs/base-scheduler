@@ -3,7 +3,7 @@
 
 use base_scheduler::{SocketRecvFlags, SocketRecvResult, SocketSendFlags};
 use base_scheduler_selector::NativeSocket;
-use socket2::{SockAddr, Socket};
+use socket2::SockAddr;
 use std::{
     io::{self, IoSlice, IoSliceMut},
     net::SocketAddr,
@@ -11,7 +11,7 @@ use std::{
     sync::Arc,
 };
 
-type RegisteredSocket = Arc<async_io::Async<Socket>>;
+type RegisteredSocket = Arc<base_scheduler_selector::RegisteredSocket>;
 
 // Factories and queued requests can retain either a native endpoint or an already-retained registration.
 pub(crate) trait SocketSource: Send + Sync {

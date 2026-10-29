@@ -8,6 +8,19 @@ thread_local! {
     static READINESS_ERROR: std::cell::Cell<Option<io::ErrorKind>> = const { std::cell::Cell::new(None) };
 }
 
+thread_local! {
+    static REGISTRATION_ERROR: std::cell::Cell<Option<io::ErrorKind>> = const { std::cell::Cell::new(None) };
+}
+
+pub(super) fn registration_result(
+    result: io::Result<async_io::Async<Descriptor>>,
+) -> io::Result<async_io::Async<Descriptor>> {
+    match REGISTRATION_ERROR.replace(None) {
+        Some(kind) => Err(kind.into()),
+        None => result,
+    }
+}
+
 // Inject reactor failures after a real readiness wait without invalidating a live descriptor.
 pub(super) fn readiness_result(result: io::Result<()>) -> io::Result<()> {
     match READINESS_ERROR.replace(None) {
@@ -78,10 +91,65 @@ fn direct_nonblocking_calls_support_scalar_and_vectored_datagrams() {
 }
 #[test]
 fn failed_registration_returns_the_original_error() {
-    let socket = socket2::Socket::new(socket2::Domain::IPV4, socket2::Type::STREAM, None).unwrap();
-    let error = NativeSocket::new_with(socket, |_| Err(io::ErrorKind::PermissionDenied.into()))
-        .unwrap_err();
+    let socket = NativeSocket::new(
+        socket2::Socket::new(socket2::Domain::IPV4, socket2::Type::DGRAM, None).unwrap(),
+    )
+    .unwrap();
+    REGISTRATION_ERROR.set(Some(io::ErrorKind::PermissionDenied));
+    let error = futures_lite::future::block_on(socket.io(Interest::Readable, |_| {
+        Err::<(), _>(io::ErrorKind::WouldBlock.into())
+    }))
+    .unwrap_err();
     assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
+    // A failed registration is not retained; the next wait registers.
+    assert!(socket.inner.fallback().is_ok());
+}
+
+#[test]
+fn the_portable_reactor_registers_only_for_a_fallback_wait() {
+    crate::test_support::run(|| {
+        let socket = NativeSocket::new(
+            socket2::Socket::new(socket2::Domain::IPV4, socket2::Type::DGRAM, None).unwrap(),
+        )
+        .unwrap();
+        #[cfg(unix)]
+        assert!(socket.get_ref().nonblocking().unwrap());
+        // Immediate progress needs no reactor registration.
+        futures_lite::future::block_on(socket.io(Interest::Writable, |_| Ok(()))).unwrap();
+        assert!(socket.inner.fallback.get().is_none());
+        let mut attempts = 0;
+        futures_lite::future::block_on(socket.io(Interest::Writable, |_| {
+            attempts += 1;
+            if attempts == 1 {
+                return Err(io::ErrorKind::WouldBlock.into());
+            }
+            Ok(())
+        }))
+        .unwrap();
+        assert!(socket.inner.fallback.get().is_some());
+        // Later fallback waits reuse the registration.
+        assert!(std::ptr::eq(
+            socket.inner.fallback().unwrap(),
+            socket.inner.fallback.get().unwrap()
+        ));
+        // Retained owners expose the socket's own handle.
+        #[cfg(unix)]
+        {
+            use std::os::fd::{AsFd, AsRawFd};
+            let raw = socket.get_ref().as_raw_fd();
+            assert_eq!(socket.inner.as_raw_fd(), raw);
+            assert_eq!(socket.inner.as_fd().as_raw_fd(), raw);
+        }
+        #[cfg(windows)]
+        {
+            use std::os::windows::io::{AsRawSocket, AsSocket};
+            let raw = socket.get_ref().as_raw_socket();
+            assert_eq!(socket.inner.as_raw_socket(), raw);
+            assert_eq!(socket.inner.as_socket().as_raw_socket(), raw);
+        }
+        // Closing deregisters the borrowed view before closing the descriptor.
+        socket.into_close()().unwrap();
+    });
 }
 
 #[test]
