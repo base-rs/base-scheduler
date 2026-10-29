@@ -1,0 +1,125 @@
+diff --git a/crates/selector/src/readiness_driver/notification.rs b/crates/selector/src/readiness_driver/notification.rs
+index 852a003..0a64c19 100644
+--- a/crates/selector/src/readiness_driver/notification.rs
++++ b/crates/selector/src/readiness_driver/notification.rs
+@@ -18,7 +18,33 @@ struct Entry {
+ struct State {
+     // Highest issued ID, never reused even when a slot is recycled.
+     last_id: usize,
+-    entries: Vec<Option<Entry>>,
++    // A direction usually has one waiter. Keep it inline, beside the lock.
++    first: Option<Entry>,
++    rest: Vec<Option<Entry>>,
++}
++impl State {
++    fn slot(&mut self, index: usize) -> &mut Option<Entry> {
++        match index {
++            0 => &mut self.first,
++            index => &mut self.rest[index - 1],
++        }
++    }
++    fn insert(&mut self, entry: Entry) -> usize {
++        if self.first.is_none() {
++            self.first = Some(entry);
++            return 0;
++        }
++        match self.rest.iter().position(Option::is_none) {
++            Some(index) => {
++                self.rest[index] = Some(entry);
++                index + 1
++            }
++            None => {
++                self.rest.push(Some(entry));
++                self.rest.len()
++            }
++        }
++    }
+ }
+ 
+ /// A broadcast notification with registration and waker storage in one step.
+@@ -45,7 +71,8 @@ impl Notification {
+         let mut rest = Vec::new();
+         {
+             let mut state = self.state.lock().unwrap();
+-            for entry in &mut state.entries {
++            let state = &mut *state;
++            for entry in std::iter::once(&mut state.first).chain(&mut state.rest) {
+                 if let Some(entry) = entry.take() {
+                     if first.is_none() {
+                         first = Some(entry.waker);
+@@ -54,7 +81,7 @@ impl Notification {
+                     }
+                 }
+             }
+-            state.entries.clear();
++            state.rest.clear();
+             // Detached listeners need no lock on completion/drop. New
+             // registrations get higher IDs, including when reusing a slot.
+             self.notified_through
+@@ -93,7 +120,7 @@ impl Listener<'_> {
+             if self.notified() {
+                 Poll::Ready(Ok(()))
+             } else if let Some((id, index)) = self.key {
+-                let entry = state.entries[index].as_mut().unwrap();
++                let entry = state.slot(index).as_mut().unwrap();
+                 debug_assert_eq!(entry.id, id);
+                 if !entry.waker.will_wake(cx.waker()) {
+                     std::mem::swap(&mut entry.waker, replacement.as_mut().unwrap());
+@@ -101,20 +128,10 @@ impl Listener<'_> {
+                 Poll::Pending
+             } else if let Some(id) = state.last_id.checked_add(1) {
+                 state.last_id = id;
+-                let entry = Some(Entry {
++                let index = state.insert(Entry {
+                     id,
+                     waker: replacement.take().unwrap(),
+                 });
+-                let index = match state.entries.iter().position(Option::is_none) {
+-                    Some(index) => {
+-                        state.entries[index] = entry;
+-                        index
+-                    }
+-                    None => {
+-                        state.entries.push(entry);
+-                        state.entries.len() - 1
+-                    }
+-                };
+                 self.key = Some((id, index));
+                 Poll::Pending
+             } else {
+@@ -140,8 +157,9 @@ impl Drop for Listener<'_> {
+                 if self.notified() {
+                     None
+                 } else {
+-                    debug_assert_eq!(state.entries[index].as_ref().unwrap().id, id);
+-                    state.entries[index].take()
++                    let slot = state.slot(index);
++                    debug_assert_eq!(slot.as_ref().unwrap().id, id);
++                    slot.take()
+                 }
+             };
+             drop(entry);
+diff --git a/crates/selector/src/readiness_driver/notification/tests.rs b/crates/selector/src/readiness_driver/notification/tests.rs
+index e112372..ef7e840 100644
+--- a/crates/selector/src/readiness_driver/notification/tests.rs
++++ b/crates/selector/src/readiness_driver/notification/tests.rs
+@@ -140,15 +140,10 @@ fn racing_cancellation_and_notification_leave_no_stale_waiters() {
+         }
+         sender.join().unwrap();
+     });
+-    assert!(
+-        notification
+-            .state
+-            .lock()
+-            .unwrap()
+-            .entries
+-            .iter()
+-            .all(Option::is_none)
+-    );
++    {
++        let state = notification.state.lock().unwrap();
++        assert!(state.first.is_none() && state.rest.iter().all(Option::is_none));
++    }
+     let mut listener = notification.listen();
+     pending(&mut listener, Waker::noop());
+     notification.notify();

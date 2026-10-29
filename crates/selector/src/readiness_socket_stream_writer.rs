@@ -149,7 +149,12 @@ impl<'scheduler, B> ReadinessSocketStreamWriter<'scheduler, B> {
                 }
             }
         });
-        scheduler.cancellable(cancellation, operation).await
+        if cancellation.is_never() && scheduler.readiness.is_some() {
+            scheduler.check_open()?;
+            operation.await.map_err(Into::into)
+        } else {
+            scheduler.cancellable(cancellation, operation).await
+        }
     }
     #[cfg(not(unix))]
     async fn write_with(

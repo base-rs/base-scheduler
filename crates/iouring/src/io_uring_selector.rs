@@ -93,7 +93,7 @@ fn discard<T>(value: T) {
 
 type RawBufferResult<B> = (io::Result<usize>, B);
 
-pub(crate) type RegisteredSocket = Arc<async_io::Async<socket2::Socket>>;
+pub(crate) type RegisteredSocket = Arc<base_scheduler_selector::RegisteredSocket>;
 
 struct Request<B: IoBuf = Vec<u8>> {
     identifier: u64,

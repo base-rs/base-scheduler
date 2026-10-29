@@ -1,0 +1,7 @@
+# echo-cpu0.sh BIN BACKEND 256 cycles,cycles:u,cycles:k,instructions:k — per round trip, server CPU 0 system-wide, two alternating rounds
+p3 native-poll 256 211893 cycles=16575.0 cycles:u=1191.9 cycles:k=15351.2 instructions:k=12261.5
+p4 native-poll 256 214180 cycles=16537.8 cycles:u=1182.3 cycles:k=15323.6 instructions:k=12238.6
+g0 tokio 256 214851 cycles=16455.4 cycles:u=944.5 cycles:k=15478.5 instructions:k=12290.4
+p3 native-poll 256 211270 cycles=16652.1 cycles:u=1203.4 cycles:k=15416.7 instructions:k=12272.3
+p4 native-poll 256 216262 cycles=16536.1 cycles:u=1200.6 cycles:k=15303.7 instructions:k=12243.9
+g0 tokio 256 218000 cycles=16566.1 cycles:u=1032.3 cycles:k=15501.6 instructions:k=12272.6

@@ -1,0 +1,419 @@
+diff --git a/crates/selector/src/readiness_driver.rs b/crates/selector/src/readiness_driver.rs
+index b6c195c..9bb8ba4 100644
+--- a/crates/selector/src/readiness_driver.rs
++++ b/crates/selector/src/readiness_driver.rs
+@@ -99,8 +99,7 @@ impl Controller {
+         };
+         // Closure wakes waits but cannot free pointers in a collected batch.
+         for registration in registrations {
+-            registration.readable.changed.notify();
+-            registration.writable.changed.notify();
++            registration.readiness.notify();
+         }
+         let _ = self.poller.notify();
+     }
+@@ -140,55 +139,128 @@ impl Wake for Controller {
+     }
+ }
+ 
+-pub(crate) struct Direction {
+-    // Low bits are advisory readiness (1), EOF (2), and urgent data (4);
+-    // upper bits identify the notification. EOF inhibits short-read clearing,
+-    // not WouldBlock clear. Urgent data remains sticky for OOB-disabled readers.
++const READABLE: usize = 1;
++const WRITABLE: usize = 8;
++const GENERATION: usize = 16;
++
++pub(crate) struct Readiness {
++    // Low bits are advisory readable (1), EOF (2), urgent data (4), and
++    // writable (8) readiness; upper bits identify the notification, shared by
++    // both directions. EOF inhibits short-read clearing, not WouldBlock clear.
++    // Urgent data remains sticky for OOB-disabled readers.
+     tick: AtomicUsize,
+     #[cfg(target_os = "macos")]
+     available: AtomicUsize,
+-    changed: Notification,
++    readable: Notification,
++    writable: Notification,
+ }
+-impl Direction {
++impl Readiness {
+     fn new() -> Self {
+         Self {
+             tick: AtomicUsize::new(0),
+             #[cfg(target_os = "macos")]
+             available: AtomicUsize::new(0),
+-            changed: Notification::new(),
++            readable: Notification::new(),
++            writable: Notification::new(),
+         }
+     }
+-    pub(crate) fn snapshot(&self) -> usize {
+-        self.tick.load(Ordering::Acquire)
++    #[cfg(test)]
++    pub(crate) fn new_for_size() -> Self {
++        Self::new()
+     }
+-    pub(crate) fn publish(&self) {
+-        // Increment the generation before publishing readiness. A racing clear
+-        // can at most cause a spurious retry, never erase this notification.
+-        self.tick.fetch_add(8, Ordering::AcqRel);
+-        self.tick.fetch_or(1, Ordering::Release);
+-        self.changed.notify();
++    pub(crate) fn direction(&self, interest: Interest) -> Direction<'_> {
++        Direction {
++            readiness: self,
++            interest,
++        }
++    }
++    fn publish(&self, set: usize) {
++        if set == 0 {
++            return;
++        }
++        // Advance the generation with the readiness bits. A racing clear can
++        // at most cause a spurious retry, never erase this notification.
++        let mut previous = self.tick.load(Ordering::Relaxed);
++        while let Err(actual) = self.tick.compare_exchange_weak(
++            previous,
++            previous.wrapping_add(GENERATION) | set,
++            Ordering::AcqRel,
++            Ordering::Relaxed,
++        ) {
++            previous = actual;
++        }
++        // A wait registers only after observing its bit clear, so the
++        // publication which sets it wakes every pending wait. Repeated edges
++        // on an already ready direction have no waiter to notify.
++        if set & READABLE != 0 && previous & READABLE == 0 {
++            self.readable.notify();
++        }
++        if set & WRITABLE != 0 && previous & WRITABLE == 0 {
++            self.writable.notify();
++        }
+     }
+     #[cfg(target_os = "macos")]
+-    fn publish_readable(&self, available: usize, read_closed: bool) {
+-        // Publish the byte hint before advancing the event generation. A
+-        // concurrent reader either sees this hint or fails its generation clear.
+-        self.available.store(available, Ordering::Release);
+-        if read_closed {
+-            self.tick.fetch_or(2, Ordering::Release);
++    fn publish_event(&self, readable: bool, writable: bool, available: usize, read_closed: bool) {
++        if readable {
++            // Publish the byte hint before advancing the event generation. A
++            // concurrent reader either sees this hint or fails its clear.
++            self.available.store(available, Ordering::Release);
+         }
+-        self.publish();
++        let read = (usize::from(readable) * READABLE) | (usize::from(readable && read_closed) << 1);
++        self.publish(read | (usize::from(writable) * WRITABLE));
+     }
+     #[cfg(target_os = "linux")]
+-    fn publish_readable(&self, read_closed: bool, urgent: bool) {
++    fn publish_event(&self, readable: bool, writable: bool, read_closed: bool, urgent: bool) {
+         // These conditions stay sticky even when ordinary readiness is cleared.
+-        let flags = (usize::from(read_closed) << 1) | (usize::from(urgent) << 2);
+-        if flags != 0 {
+-            self.tick.fetch_or(flags, Ordering::Release);
++        let read = usize::from(readable)
++            * (READABLE | (usize::from(read_closed) << 1) | (usize::from(urgent) << 2));
++        self.publish(read | (usize::from(writable) * WRITABLE));
++    }
++    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
++    fn publish_event(&self, readable: bool, writable: bool) {
++        self.publish((usize::from(readable) * READABLE) | (usize::from(writable) * WRITABLE));
++    }
++    fn notify(&self) {
++        self.readable.notify();
++        self.writable.notify();
++    }
++}
++
++/// One direction of a shared readiness word. Snapshots keep readable bits in
++/// place and move writable readiness to bit 1, with the shared generation.
++#[derive(Clone, Copy)]
++pub(crate) struct Direction<'a> {
++    readiness: &'a Readiness,
++    interest: Interest,
++}
++impl<'a> Direction<'a> {
++    fn view(self, tick: usize) -> usize {
++        match self.interest {
++            Interest::Readable => tick & !WRITABLE,
++            Interest::Writable => (tick & !(GENERATION - 1)) | ((tick & WRITABLE) >> 3),
+         }
+-        self.publish();
++    }
++    fn bit(self) -> usize {
++        match self.interest {
++            Interest::Readable => READABLE,
++            Interest::Writable => WRITABLE,
++        }
++    }
++    fn changed(self) -> &'a Notification {
++        match self.interest {
++            Interest::Readable => &self.readiness.readable,
++            Interest::Writable => &self.readiness.writable,
++        }
++    }
++    pub(crate) fn snapshot(self) -> usize {
++        self.view(self.readiness.tick.load(Ordering::Acquire))
++    }
++    #[cfg(test)]
++    pub(crate) fn publish(self) {
++        self.readiness.publish(self.bit());
+     }
+     pub(crate) fn clear_after_read<const SUPPORT_OOB: bool>(
+-        &self,
++        self,
+         observed: usize,
+         count: usize,
+         capacity: usize,
+@@ -201,7 +273,7 @@ impl Direction {
+         if count != 0
+             && count < capacity
+             && observed & 2 == 0
+-            && count >= self.available.load(Ordering::Acquire)
++            && count >= self.readiness.available.load(Ordering::Acquire)
+         {
+             self.clear(observed);
+         }
+@@ -210,17 +282,24 @@ impl Direction {
+         #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+         let _ = (observed, count, capacity);
+     }
+-    pub(crate) fn clear(&self, observed: usize) {
++    pub(crate) fn clear(self, observed: usize) {
+         // A WouldBlock must not erase an edge delivered during the syscall.
+-        let _ = self.tick.compare_exchange(
+-            observed,
+-            observed & !1,
+-            Ordering::AcqRel,
+-            Ordering::Acquire,
+-        );
++        // The other direction's clears change only its own bit.
++        let mut tick = self.readiness.tick.load(Ordering::Acquire);
++        while self.view(tick) == observed {
++            match self.readiness.tick.compare_exchange_weak(
++                tick,
++                tick & !self.bit(),
++                Ordering::AcqRel,
++                Ordering::Acquire,
++            ) {
++                Ok(_) => return,
++                Err(actual) => tick = actual,
++            }
++        }
+     }
+-    pub(crate) async fn wait(&self, group: &DriverGroup) -> io::Result<()> {
+-        let mut listener = self.changed.listen();
++    pub(crate) async fn wait(self, group: &DriverGroup) -> io::Result<()> {
++        let mut listener = self.changed().listen();
+         poll_fn(|cx| {
+             if group.closed.is_cancelled() {
+                 return Poll::Ready(Err(closed()));
+@@ -250,8 +329,7 @@ pub(crate) struct Registration {
+     owner: Weak<Controller>,
+     key: usize,
+     inactive: AtomicBool,
+-    readable: Direction,
+-    writable: Direction,
++    readiness: Readiness,
+ }
+ impl Registration {
+     fn token(&self) -> usize {
+@@ -266,11 +344,8 @@ impl Registration {
+             self.key
+         }
+     }
+-    pub(crate) fn direction(&self, interest: Interest) -> &Direction {
+-        match interest {
+-            Interest::Readable => &self.readable,
+-            Interest::Writable => &self.writable,
+-        }
++    pub(crate) fn direction(&self, interest: Interest) -> Direction<'_> {
++        self.readiness.direction(interest)
+     }
+ }
+ 
+@@ -342,8 +417,7 @@ impl SocketRegistrations {
+             owner: Arc::downgrade(&owner),
+             key,
+             inactive: AtomicBool::new(false),
+-            readable: Direction::new(),
+-            writable: Direction::new(),
++            readiness: Readiness::new(),
+         });
+         // Publish ownership before the kernel can return this pointer. Failed
+         // adds can have installed one filter, even when rollback also fails.
+@@ -442,21 +516,24 @@ impl DriverState {
+             if registration.inactive.load(Ordering::Acquire) {
+                 continue;
+             }
+-            if event.readable {
+-                #[cfg(target_os = "macos")]
+-                registration
+-                    .readable
+-                    .publish_readable(available, read_closed);
+-                #[cfg(target_os = "linux")]
+-                registration
+-                    .readable
+-                    .publish_readable(event.is_interrupt(), event.is_priority());
+-                #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+-                registration.readable.publish();
+-            }
+-            if event.writable {
+-                registration.writable.publish();
+-            }
++            #[cfg(target_os = "macos")]
++            registration.readiness.publish_event(
++                event.readable,
++                event.writable,
++                available,
++                read_closed,
++            );
++            #[cfg(target_os = "linux")]
++            registration.readiness.publish_event(
++                event.readable,
++                event.writable,
++                event.is_interrupt(),
++                event.is_priority(),
++            );
++            #[cfg(not(any(target_os = "macos", target_os = "linux")))]
++            registration
++                .readiness
++                .publish_event(event.readable, event.writable);
+         }
+         Ok(())
+     }
+diff --git a/crates/selector/src/readiness_driver/notification/tests.rs b/crates/selector/src/readiness_driver/notification/tests.rs
+index e112372..a25164c 100644
+--- a/crates/selector/src/readiness_driver/notification/tests.rs
++++ b/crates/selector/src/readiness_driver/notification/tests.rs
+@@ -277,25 +277,26 @@ fn id_exhaustion_preserves_live_waiters_and_rejects_registration() {
+ 
+ #[test]
+ fn lazy_registration_checks_readiness_and_closure_after_waker_clone() {
+-    use super::super::{Direction, create};
++    use super::super::{Readiness, create};
++    use crate::Interest;
+     use base_scheduler::Cancellation;
+     use std::{future::Future, pin::pin};
+     for close in [false, true] {
+         let (group, _drivers) = create(1, Cancellation::new()).unwrap();
+         let Some(group) = group else { return };
+-        let direction = Arc::new(Direction::new());
++        let readiness = Arc::new(Readiness::new());
+         let hook = Hook::new(&Arc::new(Notification::new()));
+-        let publish = Arc::clone(&direction);
++        let publish = Arc::clone(&readiness);
+         let owner = Arc::clone(&group);
+         *hook.cloned.lock().unwrap() = Some(Box::new(move || {
+             if close {
+                 owner.close();
+             } else {
+-                publish.publish();
++                publish.direction(Interest::Readable).publish();
+             }
+         }));
+         let waker = hook.waker();
+-        let mut waiting = pin!(direction.wait(&group));
++        let mut waiting = pin!(readiness.direction(Interest::Readable).wait(&group));
+         match waiting.as_mut().poll(&mut Context::from_waker(&waker)) {
+             Poll::Ready(Ok(())) => assert!(!close),
+             Poll::Ready(Err(error)) => {
+@@ -309,12 +310,14 @@ fn lazy_registration_checks_readiness_and_closure_after_waker_clone() {
+ 
+ #[test]
+ fn a_notified_direction_wait_completes_even_after_another_reader_clears_readiness() {
+-    use super::super::{Direction, create};
++    use super::super::{Readiness, create};
++    use crate::Interest;
+     use base_scheduler::Cancellation;
+     use std::{future::Future, pin::pin};
+     let (group, _drivers) = create(1, Cancellation::new()).unwrap();
+     let Some(group) = group else { return };
+-    let direction = Direction::new();
++    let readiness = Readiness::new();
++    let direction = readiness.direction(Interest::Readable);
+     let mut first = pin!(direction.wait(&group));
+     let mut second = pin!(direction.wait(&group));
+     let mut cx = Context::from_waker(Waker::noop());
+diff --git a/crates/selector/src/readiness_driver/tests.rs b/crates/selector/src/readiness_driver/tests.rs
+index e594531..0dab3b5 100644
+--- a/crates/selector/src/readiness_driver/tests.rs
++++ b/crates/selector/src/readiness_driver/tests.rs
+@@ -46,7 +46,8 @@ fn read<'a>(
+ 
+ #[test]
+ fn notification_during_syscall_survives_would_block_clear() {
+-    let direction = Direction::new();
++    let readiness = Readiness::new();
++    let direction = readiness.direction(Interest::Readable);
+     assert_eq!(direction.snapshot(), 0);
+     direction.publish();
+     let before = direction.snapshot();
+@@ -448,7 +449,8 @@ fn simultaneous_listeners_have_distinct_wakers_and_drop_unregisters_only_one() {
+     let Some(group) = &selector.readiness else {
+         return;
+     };
+-    let direction = Direction::new();
++    let readiness = Readiness::new();
++    let direction = readiness.direction(Interest::Readable);
+     let first = Arc::new(Count::default());
+     let second = Arc::new(Count::default());
+     let abandoned = Arc::new(Count::default());
+@@ -507,8 +509,8 @@ fn inactive_events_do_not_notify_the_old_registration() {
+         .send_to(b"retired", socket.local_addr().unwrap())
+         .unwrap();
+     assert!(!workers[0].turn(Some(Duration::from_secs(1))).unwrap());
+-    assert_eq!(registration.readable.snapshot(), 0);
+-    assert_eq!(registration.writable.snapshot(), 0);
++    assert_eq!(registration.direction(Interest::Readable).snapshot(), 0);
++    assert_eq!(registration.direction(Interest::Writable).snapshot(), 0);
+     drop(registration);
+     block_on(selector.socket_close(socket)).unwrap();
+ }
+@@ -628,7 +630,7 @@ fn collected_pointers_survive_remote_retirement_and_reclaim_at_the_next_boundary
+         // This dereferences the collected token after every external record
+         // owner has gone. Inactive records must stay alive and be skipped.
+         inner.dispatch().unwrap();
+-        assert_eq!(weak.upgrade().unwrap().readable.snapshot(), 0);
++        assert_eq!(weak.upgrade().unwrap().direction(Interest::Readable).snapshot(), 0);
+         workers[0].turn(Some(Duration::ZERO)).unwrap();
+         assert!(weak.upgrade().is_none());
+     }
+@@ -673,7 +675,7 @@ fn failed_deletion_and_partial_add_are_quarantined_until_the_driver_stops() {
+             let sender = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
+             sender.send_to(b"orphan", address).unwrap();
+             workers[0].turn(Some(Duration::from_secs(1))).unwrap();
+-            assert_eq!(weak.upgrade().unwrap().readable.snapshot(), 0);
++            assert_eq!(weak.upgrade().unwrap().direction(Interest::Readable).snapshot(), 0);
+         } else if !failed_add {
+             owner.poller.failure.store(libc::ENOMEM, Ordering::Relaxed);
+         }
+@@ -874,7 +876,7 @@ fn the_first_callback_can_remotely_replace_sources_in_the_rest_of_the_batch() {
+         let waker = Waker::from(Arc::clone(&wake));
+         let mut waiting = registrations
+             .iter()
+-            .map(|record| Box::pin(record.readable.wait(group)))
++            .map(|record| Box::pin(record.direction(Interest::Readable).wait(group)))
+             .collect::<Vec<_>>();
+         for wait in &mut waiting {
+             assert!(
+@@ -919,13 +921,13 @@ fn the_first_callback_can_remotely_replace_sources_in_the_rest_of_the_batch() {
+         assert_eq!(
+             registrations
+                 .iter()
+-                .filter(|record| record.readable.snapshot() != 0)
++                .filter(|record| record.direction(Interest::Readable).snapshot() & 1 != 0)
+                 .count(),
+             1
+         );
+         for replacement in wake.replacements.lock().unwrap().iter() {
+             let record = replacement.registrations.existing(group).unwrap();
+-            assert_eq!(record.readable.snapshot(), 0);
++            assert_eq!(record.direction(Interest::Readable).snapshot(), 0);
+             assert!(
+                 registrations
+                     .iter()

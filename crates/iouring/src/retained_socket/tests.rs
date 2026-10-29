@@ -5,13 +5,14 @@ use super::*;
 use crate::{IoUringSelector, test_buffers::LargeMapping};
 use base_scheduler::{Cancellation, SocketClose, SocketDomain, SocketOpen, SocketType};
 use futures_lite::future::block_on;
+use socket2::Socket;
 use std::{
     io::{Read, Write},
     os::unix::net::{UnixDatagram, UnixStream},
 };
 
 fn registered(socket: impl Into<Socket>) -> RegisteredSocket {
-    Arc::new(async_io::Async::new(socket.into()).unwrap())
+    Arc::new(base_scheduler_selector::RegisteredSocket::new(socket.into()).unwrap())
 }
 
 #[test]

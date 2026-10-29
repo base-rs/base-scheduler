@@ -4,6 +4,7 @@
 use crate::{Interest, SelectorDriver, SelectorWorker};
 use base_scheduler::Cancellation;
 mod notification;
+pub(crate) use notification::Listener;
 use notification::Notification;
 use polling::{Event, PollMode};
 #[cfg(target_os = "macos")]
@@ -43,7 +44,7 @@ use test_poller::INITIAL_FAILURE;
 #[cfg(all(not(target_os = "macos"), test))]
 use test_poller::Poller;
 
-type Native = async_io::Async<socket2::Socket>;
+type Native = crate::native_socket::RegisteredSocket;
 
 pub(crate) struct DriverGroup {
     closed: Cancellation,
@@ -165,8 +166,12 @@ impl Direction {
         // Increment the generation before publishing readiness. A racing clear
         // can at most cause a spurious retry, never erase this notification.
         self.tick.fetch_add(8, Ordering::AcqRel);
-        self.tick.fetch_or(1, Ordering::Release);
-        self.changed.notify();
+        // A wait registers only after observing this bit clear, so the
+        // publication which sets it wakes every pending wait. Repeated edges
+        // on an already ready direction have no waiter to notify.
+        if self.tick.fetch_or(1, Ordering::AcqRel) & 1 == 0 {
+            self.changed.notify();
+        }
     }
     #[cfg(target_os = "macos")]
     fn publish_readable(&self, available: usize, read_closed: bool) {
@@ -220,15 +225,25 @@ impl Direction {
         );
     }
     pub(crate) async fn wait(&self, group: &DriverGroup) -> io::Result<()> {
-        let mut listener = self.changed.listen();
-        poll_fn(|cx| {
-            if group.closed.is_cancelled() {
-                return Poll::Ready(Err(closed()));
-            }
-            if self.snapshot() & 1 != 0 {
-                return Poll::Ready(Ok(()));
-            }
-            let result = listener.poll(cx);
+        let mut listener = None;
+        poll_fn(|cx| self.poll_wait(group, &mut listener, cx)).await
+    }
+    /// Poll one wait for readiness, keeping its lazily registered listener in
+    /// caller-owned storage. Completion resets it for the next wait.
+    pub(crate) fn poll_wait<'a>(
+        &'a self,
+        group: &DriverGroup,
+        listener: &mut Option<Listener<'a>>,
+        cx: &mut std::task::Context<'_>,
+    ) -> Poll<io::Result<()>> {
+        let result = if group.closed.is_cancelled() {
+            Poll::Ready(Err(closed()))
+        } else if self.snapshot() & 1 != 0 {
+            Poll::Ready(Ok(()))
+        } else {
+            let result = listener
+                .get_or_insert_with(|| self.changed.listen())
+                .poll(cx);
             // Registration is lazy. A publication or closure between the
             // initial check and registration must not leave this wait asleep.
             if group.closed.is_cancelled() {
@@ -238,8 +253,11 @@ impl Direction {
             } else {
                 result
             }
-        })
-        .await
+        };
+        if result.is_ready() {
+            *listener = None;
+        }
+        result
     }
 }
 fn closed() -> io::Error {

@@ -434,6 +434,55 @@ fn failed_driver_creation_and_registration_return_the_os_error() {
 }
 
 #[test]
+fn publication_notifies_pending_waits_when_it_sets_readiness() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::task::{Context, Wake, Waker};
+    #[derive(Default)]
+    struct Count(AtomicUsize);
+    impl Wake for Count {
+        fn wake(self: Arc<Self>) {
+            self.0.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+    let (selector, _workers) = setup(1);
+    let Some(group) = &selector.readiness else {
+        return;
+    };
+    let direction = Direction::new();
+    let count = Arc::new(Count::default());
+    let waker = Waker::from(Arc::clone(&count));
+    let mut context = Context::from_waker(&waker);
+    let mut one = Box::pin(direction.wait(group));
+    let mut two = Box::pin(direction.wait(group));
+    assert!(one.as_mut().poll(&mut context).is_pending());
+    assert!(two.as_mut().poll(&mut context).is_pending());
+    direction.publish();
+    assert_eq!(count.0.load(Ordering::Relaxed), 2);
+    // Repeated edges find readiness set and skip notification, so even a
+    // listener registered without checking readiness is not woken.
+    let mut bypass = direction.changed.listen();
+    assert!(bypass.poll(&mut context).is_pending());
+    direction.publish();
+    assert_eq!(count.0.load(Ordering::Relaxed), 2);
+    drop(bypass);
+    assert!(one.as_mut().poll(&mut context).is_ready());
+    assert!(two.as_mut().poll(&mut context).is_ready());
+    assert!(
+        Box::pin(direction.wait(group))
+            .as_mut()
+            .poll(&mut context)
+            .is_ready()
+    );
+    // After a clear, the next publication sets readiness and notifies again.
+    direction.clear(direction.snapshot());
+    let mut three = Box::pin(direction.wait(group));
+    assert!(three.as_mut().poll(&mut context).is_pending());
+    direction.publish();
+    assert_eq!(count.0.load(Ordering::Relaxed), 3);
+    assert!(three.as_mut().poll(&mut context).is_ready());
+}
+
+#[test]
 fn simultaneous_listeners_have_distinct_wakers_and_drop_unregisters_only_one() {
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::task::{Context, Wake, Waker};
