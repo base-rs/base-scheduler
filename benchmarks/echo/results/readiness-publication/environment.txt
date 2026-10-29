@@ -1,0 +1,13 @@
+host: hana
+Linux 7.2.11-arch1-1
+CPU(s):                                  8
+Model name:                              Intel(R) Xeon(R) CPU E3-1240 v6 @ 3.70GHz
+Thread(s) per core:                      2
+Core(s) per socket:                      4
+CPU(s) scaling MHz:                      87%
+CPU max MHz:                             4100.0000
+CPU min MHz:                             800.0000
+powersave
+rustc 1.99.1 (58cf8f9c3 2026-10-13) (Arch Linux rust 1:1.99.1-1)
+cargo 1.99.1 (5f94df478 2026-08-27) (Arch Linux rust 1:1.99.1-1)
+wrk 4.1.0-22-g556f8db [epoll] Copyright (C) 2012 Will Glozer

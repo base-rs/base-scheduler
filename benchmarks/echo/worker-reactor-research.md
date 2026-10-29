@@ -117,6 +117,35 @@ about 255 ns, but HTTP serving on Hana either does not change or regresses by
 The [measurement record](results/turn-interval/readme.md) retains the patches,
 per-sample data and method.
 
+## Experiment 3: readiness publication atomics
+
+Baseline: main `aaf337eab1d0fc99e6177a61649dfc94fe6b30f1`.
+
+**Hypothesis:** Native readiness spends about 21 locked instructions per echo
+round trip, against Tokio's 13. Publishing a direction takes two or three
+atomic updates and then locks its notification mutex even when nobody waits.
+Fewer atomics should show in instructions and throughput.
+
+**Isolated variants:**
+
+- one compare-and-swap for the generation, readiness and sticky flags, plus a
+  waiter count that lets publication skip the lock when nobody waits;
+- the compare-and-swap alone.
+
+**Validation:** interleaved echo runs on `native-poll` with one worker and 32
+connections, counting locked loads; and interleaved base-http hello cohorts at
+one and two workers for the first variant.
+
+**Decision: reject both as marginal.** The first variant removes about three
+locked instructions per echo round trip and 46–56 user instructions per HTTP
+request, but throughput is within noise in six of eight configurations, and
+its lock skip adds a SeqCst handshake that later changes must preserve. The
+compare-and-swap alone removes two locked instructions but adds about ten
+instructions, and its echo throughput was below baseline in every pair.
+
+The [measurement record](results/readiness-publication/readme.md) retains the
+patches, per-sample data and method.
+
 ## Diagnostic boundaries
 
 Separate instrumented executables count prepared/deferred payload requests and

@@ -12,6 +12,8 @@ The [completion-cost follow-up](results/worker-completions/readme.md) profiles t
 
 The [turn-spacing comparison](results/turn-interval/readme.md) records rejected attempts to space readiness worker driver turns, including a one-FIFO counted batch, against real HTTP servers at one and two workers.
 
+The [readiness publication comparison](results/readiness-publication/readme.md) records rejected reductions of the atomic operations used to publish readiness events.
+
 The [native epoll comparison](native-epoll.md) measures worker-driven Linux readiness against the existing `polling` backend using the downstream HTTP hello workload, with precise timeouts and compatibility fallbacks.
 
 The [initial Aiko results](results.md) include throughput, latency, variation across repetitions, and raw samples.

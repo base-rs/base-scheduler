@@ -1,0 +1,23 @@
+# bash echo-events.sh BINARY native-poll 32 instructions:u,cycles:u,mem_inst_retired.lock_loads:u,L1-dcache-load-misses:u
+# Values are per round trip; the second column is requests per second.
+# First cohort (e0, r1):
+e0 native-poll 32 215245 instructions:u=1418.8 cycles:u=1341.2 mem_inst_retired.lock_loads:u=21.2 L1-dcache-load-misses:u=45.8
+r1 native-poll 32 214291 instructions:u=1370.1 cycles:u=1295.4 mem_inst_retired.lock_loads:u=18.2 L1-dcache-load-misses:u=46.0
+e0 native-poll 32 211763 instructions:u=1416.1 cycles:u=1430.4 mem_inst_retired.lock_loads:u=21.2 L1-dcache-load-misses:u=46.5
+r1 native-poll 32 213270 instructions:u=1378.0 cycles:u=1388.6 mem_inst_retired.lock_loads:u=18.3 L1-dcache-load-misses:u=46.8
+e0 native-poll 32 217646 instructions:u=1429.0 cycles:u=1470.5 mem_inst_retired.lock_loads:u=21.3 L1-dcache-load-misses:u=47.3
+r1 native-poll 32 217344 instructions:u=1379.7 cycles:u=1390.0 mem_inst_retired.lock_loads:u=18.3 L1-dcache-load-misses:u=46.1
+# Second cohort (e0, r2, r1):
+e0 native-poll 32 217094 instructions:u=1419.9 cycles:u=1278.9 mem_inst_retired.lock_loads:u=21.3 L1-dcache-load-misses:u=45.5
+r2 native-poll 32 216242 instructions:u=1435.4 cycles:u=1247.1 mem_inst_retired.lock_loads:u=19.3 L1-dcache-load-misses:u=44.4
+r1 native-poll 32 222484 instructions:u=1373.9 cycles:u=1248.6 mem_inst_retired.lock_loads:u=18.3 L1-dcache-load-misses:u=45.0
+e0 native-poll 32 221017 instructions:u=1422.7 cycles:u=1327.8 mem_inst_retired.lock_loads:u=21.3 L1-dcache-load-misses:u=46.0
+r2 native-poll 32 215823 instructions:u=1428.3 cycles:u=1275.3 mem_inst_retired.lock_loads:u=19.2 L1-dcache-load-misses:u=44.4
+r1 native-poll 32 220431 instructions:u=1371.6 cycles:u=1256.5 mem_inst_retired.lock_loads:u=18.2 L1-dcache-load-misses:u=44.1
+e0 native-poll 32 224666 instructions:u=1418.7 cycles:u=1298.2 mem_inst_retired.lock_loads:u=21.2 L1-dcache-load-misses:u=47.7
+r2 native-poll 32 212879 instructions:u=1430.2 cycles:u=1265.2 mem_inst_retired.lock_loads:u=19.2 L1-dcache-load-misses:u=45.3
+r1 native-poll 32 223113 instructions:u=1380.9 cycles:u=1257.4 mem_inst_retired.lock_loads:u=18.3 L1-dcache-load-misses:u=46.4
+# Tokio reference, with the e0 build's tokio backend:
+e0 tokio 32 221525 instructions:u=1458.7 cycles:u=1072.0 mem_inst_retired.lock_loads:u=13.1 L1-dcache-load-misses:u=23.1
+e0 tokio 32 223018 instructions:u=1458.9 cycles:u=998.4 mem_inst_retired.lock_loads:u=13.1 L1-dcache-load-misses:u=23.7
+e0 tokio 32 225336 instructions:u=1456.7 cycles:u=963.0 mem_inst_retired.lock_loads:u=13.1 L1-dcache-load-misses:u=24.1
