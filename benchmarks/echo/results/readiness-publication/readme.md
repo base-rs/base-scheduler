@@ -20,7 +20,7 @@ Medians per round trip from two interleaved cohorts in [echo-events.txt](echo-ev
 | r2 | 19.2 | 1,430 | 1,265 | 44.4 | 215.8k |
 | Tokio | 13.1 | 1,459 | 998 | 23.7 | 223.0k |
 
-r1 saves three locked instructions and about 45 instructions per round trip. r2 saves two locked instructions, but the retry loop adds about 10 instructions, and its throughput is below every e0 run of its cohort, although it used fewer cycles than e0 in each of them. Cycles differ by up to 190 per round trip between runs of the same build, so they are not compared.
+r1 saves three locked instructions and about 43 instructions per round trip. r2 saves two locked instructions, but its load and compare-and-swap loop add about 10 instructions, and its throughput is below every e0 run of its cohort, although it used fewer cycles than e0 in each of them. Cycles differ by up to 190 per round trip between runs of the same build, so the cycle difference is not treated as significant.
 
 ## HTTP
 
@@ -41,4 +41,4 @@ r1 removes 46–56 instructions per request in every configuration, about 0.8%. 
 
 ## Decision
 
-Reject both as marginal. r1's gain is repeatable in instructions but not in throughput, and its lock skip adds a SeqCst handshake that every later change to `Notification` or `Direction::wait` must preserve. r2 is no simpler than the existing two updates and is not faster. After r1, the remaining locked-instruction gap to Tokio is mostly task machinery: running and waking an `async_task` task, and the global outstanding-runnable counter updated on every schedule and retirement.
+Reject both as marginal. r1's gain is repeatable in instructions but not consistently in throughput, and its lock skip adds a SeqCst handshake that every later change to `Notification` or `Direction::wait` must preserve. r2 is no simpler than the existing two updates and is not faster. After r1, the remaining locked-instruction gap to Tokio is expected to be mostly task machinery: running and waking an `async_task` task, and the global outstanding-runnable counter updated on every schedule and retirement.
