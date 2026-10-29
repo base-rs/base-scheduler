@@ -1,0 +1,49 @@
+diff --git a/crates/selector/src/readiness_driver.rs b/crates/selector/src/readiness_driver.rs
+index b6c195c..c96d34c 100644
+--- a/crates/selector/src/readiness_driver.rs
++++ b/crates/selector/src/readiness_driver.rs
+@@ -537,6 +537,9 @@ thread_local! {
+ /// polling application futures.
+ pub struct ReadinessWorker {
+     driver: ReadinessDriver,
++    // Experiment: zero-timeout turns to skip after empty polls, and the current backoff.
++    skip: u32,
++    backoff: u32,
+     thread: PhantomData<Rc<()>>,
+ }
+ impl SelectorDriver for ReadinessDriver {
+@@ -551,6 +554,8 @@ impl SelectorDriver for ReadinessDriver {
+         }
+         ReadinessWorker {
+             driver: self,
++            skip: 0,
++            backoff: 0,
+             thread: PhantomData,
+         }
+     }
+@@ -571,6 +576,11 @@ impl SelectorWorker for ReadinessWorker {
+         let Some(inner) = &mut self.driver.inner else {
+             return Ok(true);
+         };
++        let nonblocking = timeout == Some(Duration::ZERO);
++        if nonblocking && self.skip > 0 {
++            self.skip -= 1;
++            return Ok(inner.group.closed.is_cancelled());
++        }
+         // Forget the previous batch before reclaiming successfully deleted
+         // registrations. Concurrent retirements stay owned until a later turn.
+         inner.events.clear();
+@@ -585,6 +595,13 @@ impl SelectorWorker for ReadinessWorker {
+             inner.group.close();
+             return Err(error);
+         }
++        if nonblocking && inner.events.iter().next().is_none() {
++            self.backoff = (self.backoff * 2).clamp(1, 60);
++            self.skip = self.backoff;
++        } else {
++            self.backoff = 0;
++            self.skip = 0;
++        }
+         #[cfg(target_os = "linux")]
+         if let Err(error) = inner.dispatch() {
+             inner.group.close();

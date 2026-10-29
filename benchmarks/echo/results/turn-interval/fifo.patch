@@ -1,0 +1,185 @@
+diff --git a/crates/native/src/worker.rs b/crates/native/src/worker.rs
+index 0f49900..9704732 100644
+--- a/crates/native/src/worker.rs
++++ b/crates/native/src/worker.rs
+@@ -55,7 +55,6 @@ struct LocalWorker {
+     identifier: usize,
+     scheduler: Weak<Shared>,
+     ready: Worker<Runnable>,
+-    current: Worker<Runnable>,
+     timers: base_scheduler_timers::local::TimerQueue<Waker>,
+ }
+ 
+@@ -256,7 +255,7 @@ pub(crate) fn run_driven<D: base_scheduler_selector::SelectorDriver>(
+ fn run_loop(
+     shared: Arc<Shared>,
+     identifier: usize,
+-    [ready, current]: [Worker<Runnable>; 2],
++    [ready, _unused]: [Worker<Runnable>; 2],
+     mut driver: Option<&mut dyn base_scheduler_selector::SelectorWorker>,
+ ) {
+     let worker = &shared.workers[identifier];
+@@ -269,7 +268,6 @@ fn run_loop(
+             identifier,
+             scheduler: Arc::downgrade(&shared),
+             ready,
+-            current,
+             timers: base_scheduler_timers::local::TimerQueue::with_capacity(shared.timer_capacity),
+         }))
+     });
+@@ -279,6 +277,12 @@ fn run_loop(
+         .as_ref()
+         .map_or(1, |active| active.nonblocking_interval().max(1));
+     let mut polls = 0u32;
++    // Experiment: BASE_NATIVE_BATCH_CAP=1 caps each batch at the driver's poll interval when it exceeds one.
++    let limit = if interval > 1 && std::env::var_os("BASE_NATIVE_BATCH_CAP").is_some() {
++        interval as usize
++    } else {
++        usize::MAX
++    };
+     loop {
+         iteration = iteration.wrapping_add(1);
+         crate::worker_timers::turn(&shared, identifier);
+@@ -324,24 +328,24 @@ fn run_loop(
+             polls = 0;
+             drive(&mut driver, Some(Duration::ZERO));
+         }
+-        polls = polls.saturating_add(run_ready_batch(&shared, runnable));
++        polls = polls.saturating_add(run_ready_batch(&shared, runnable, limit));
+         needs_turn = true;
+     }
+     CURRENT_WORKER.with(|current| current.take());
+ }
+ 
+ #[inline(always)]
+-fn run_ready_batch(shared: &Shared, first: Runnable) -> u32 {
+-    // Freeze the batch. Wakes during task polling go into the now-empty next queue.
+-    let (identifier, has_more) = CURRENT_WORKER.with(|current| {
+-        let mut current = current.borrow_mut();
+-        let local = current.as_mut().expect("worker context is installed");
+-        std::mem::swap(&mut local.ready, &mut local.current);
+-        (local.identifier, !local.current.is_empty())
++fn run_ready_batch(shared: &Shared, first: Runnable, limit: usize) -> u32 {
++    // Count the batch before polling it. Wakes during task polling queue behind its members.
++    let (identifier, members) = CURRENT_WORKER.with(|current| {
++        let current = current.borrow();
++        let local = current.as_ref().expect("worker context is installed");
++        (local.identifier, local.ready.len())
+     });
+-    if has_more {
++    if members > 0 {
+         shared.wake_idle(usize::MAX);
+     }
++    let mut remaining = members.min(limit.saturating_sub(1));
+     let mut runnable = Some(first);
+     let mut polls = 0u32;
+     while let Some(task) = runnable {
+@@ -352,14 +356,19 @@ fn run_ready_batch(shared: &Shared, first: Runnable) -> u32 {
+             task.run();
+         });
+         shared.retire_runnable();
+-        runnable = CURRENT_WORKER.with(|current| {
+-            current
+-                .borrow()
+-                .as_ref()
+-                .expect("worker context is installed")
+-                .current
+-                .pop()
+-        });
++        runnable = if remaining == 0 {
++            None
++        } else {
++            remaining -= 1;
++            CURRENT_WORKER.with(|current| {
++                current
++                    .borrow()
++                    .as_ref()
++                    .expect("worker context is installed")
++                    .ready
++                    .pop()
++            })
++        };
+     }
+     polls
+ }
+diff --git a/crates/native/src/worker/tests.rs b/crates/native/src/worker/tests.rs
+index c1c6d55..f7746ad 100644
+--- a/crates/native/src/worker/tests.rs
++++ b/crates/native/src/worker/tests.rs
+@@ -208,12 +208,12 @@ fn batch_search_admits_incoming_tasks_before_local_work() {
+     let service = TaskService {
+         shared: Arc::clone(&shared),
+     };
+-    let [ready, current] = queues;
++    let [ready, _current] = queues;
+     let local = LocalWorker {
+         identifier: 0,
+         scheduler: Arc::downgrade(&shared),
+         ready,
+-        current,
++        // single queue
+         timers: base_scheduler_timers::local::TimerQueue::with_capacity(8),
+     };
+     let task = service.spawn(async {}).unwrap();
+@@ -244,14 +244,14 @@ fn nested_admission_distributes_tasks_instead_of_inheriting_the_worker() {
+     let service = TaskService {
+         shared: Arc::clone(&shared),
+     };
+-    let [ready, current] = queues.remove(0);
++    let [ready, _current] = queues.remove(0);
+     CURRENT_WORKER.with(|context| {
+         assert!(context.borrow().is_none());
+         context.replace(Some(LocalWorker {
+             identifier: 0,
+             scheduler: Arc::downgrade(&shared),
+             ready,
+-            current,
++            // single queue
+             timers: base_scheduler_timers::local::TimerQueue::with_capacity(8),
+         }));
+     });
+@@ -296,12 +296,12 @@ fn idle_worker_steals_remote_wakes_when_preferred_worker_is_busy() {
+     let service = TaskService {
+         shared: Arc::clone(&shared),
+     };
+-    let [ready, current] = queues.remove(0);
++    let [ready, _current] = queues.remove(0);
+     let local = LocalWorker {
+         identifier: 0,
+         scheduler: Arc::downgrade(&shared),
+         ready,
+-        current,
++        // single queue
+         timers: base_scheduler_timers::local::TimerQueue::with_capacity(8),
+     };
+     let first = service.spawn(async {}).unwrap();
+@@ -329,12 +329,12 @@ fn idle_worker_can_steal_both_ready_generations() {
+     let service = TaskService {
+         shared: Arc::clone(&shared),
+     };
+-    let [ready, current] = queues.remove(0);
++    let [ready, _current] = queues.remove(0);
+     let local = LocalWorker {
+         identifier: 0,
+         scheduler: Arc::downgrade(&shared),
+         ready,
+-        current,
++        // single queue
+         timers: base_scheduler_timers::local::TimerQueue::with_capacity(8),
+     };
+     for queue in &queues[0] {
+@@ -385,12 +385,12 @@ fn quiescent_publication(after_recheck: bool) {
+     shared.retire_runnable();
+     block_on(first).unwrap();
+ 
+-    let [ready, current] = queues.remove(0);
++    let [ready, _current] = queues.remove(0);
+     let local = LocalWorker {
+         identifier: 0,
+         scheduler: Arc::downgrade(&shared),
+         ready,
+-        current,
++        // single queue
+         timers: base_scheduler_timers::local::TimerQueue::with_capacity(8),
+     };
+     let published = Arc::new(AtomicBool::new(false));
