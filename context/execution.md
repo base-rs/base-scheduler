@@ -139,8 +139,7 @@ notifications remain observable until their CQE is collected and the counter is
 read. Those are progress mechanisms, separate from payload completion.
 
 New owned payloads whose entry preparation cannot wake tasks can also be staged
-on a zero-timeout turn and submitted with the next turn. The former
-“readiness-only” source comment described this too narrowly. The policy bounds
+on a zero-timeout turn and submitted with the next turn. The policy bounds
 deferral by reactor visits, not elapsed time or successful issuance despite
 kernel errors. The measured experiment excluding payloads did not justify its
 extra low-concurrency CPU cost, so this policy remains. See the research ledger

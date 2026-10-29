@@ -28,8 +28,8 @@ and all kernel-visible lifetimes.
 ## Rationale
 
 The HTTP performance investigation found both avoidable per-operation work and
-results delayed across worker/reactor boundaries. The user requested a cohesive
-model to guide subsequent research and implementation. Batching necessary work
+results delayed across worker/reactor boundaries. A cohesive model guides
+subsequent research and implementation. Batching necessary work
 must not lose wakeups, require an interrupt from the executing thread, conflate
 issuance with completion, or shorten resource ownership.
 
