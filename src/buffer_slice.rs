@@ -33,6 +33,7 @@ impl<B: IoBuf> BufferSlice<B> {
         }
     }
 
+    /// Discard the view's range and return the complete underlying buffer.
     pub fn into_inner(self) -> B {
         self.buffer
     }

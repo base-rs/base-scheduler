@@ -19,6 +19,7 @@ use std::{future::Future, time::Instant};
 /// }
 /// ```
 pub trait Timers: Clock {
+    /// Reusable timer state created by [`timer`](Self::timer) and borrowed by each [`timer_wait_until`](Self::timer_wait_until).
     type Timer: Send;
 
     /// Construct reusable state compatible with this scheduler, without registering a deadline or selecting a worker. Construction is infallible even after closure; waits retain the backend's clock admission rules.

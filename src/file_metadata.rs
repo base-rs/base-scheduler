@@ -8,6 +8,7 @@ use std::time::SystemTime;
 ///
 /// `None` means a field was not supplied or cannot be represented. Fields can reflect different instants during concurrent modification; metadata is an observation, not an atomic snapshot or synchronization operation. Native fields remain available through the concrete result type.
 pub trait FileMetadata: Send + Sync + 'static {
+    /// The kind of filesystem object.
     fn file_type(&self) -> Option<FileType>;
 
     /// Logical length in bytes for regular files. Other file types follow the platform's meaning; this is not allocated disk space.

@@ -7,6 +7,7 @@ use std::{future::Future, path::Path};
 
 /// Create file resources through the chosen scheduler.
 pub trait FileOpen: FileOperation {
+    /// Open the file at `path` according to `options`, returning a resource for this scheduler's file operations.
     fn file_open(
         &self,
         path: &Path,

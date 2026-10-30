@@ -7,9 +7,11 @@ use std::{fmt, io};
 /// Resolver-specific details stored inside `OperationError::Io`. Recover this value with `io_error.get_ref().and_then(|error| error.downcast_ref::<AddressResolveError>())`.
 #[derive(Debug)]
 pub struct AddressResolveError {
+    /// The portable failure category, which selects the [`io::ErrorKind`] when converted into an [`io::Error`].
     pub kind: AddressResolveErrorKind,
     /// A backend-specific resolver code (`EAI_*` or Winsock). Simulators may omit it. Do not interpret it as errno or carry it between platforms.
     pub code: Option<i32>,
+    /// A human-readable description, used as this error's `Display` output.
     pub message: String,
     /// An underlying system failure, such as errno captured immediately after `EAI_SYSTEM`.
     pub system_error: Option<io::Error>,

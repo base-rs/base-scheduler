@@ -18,6 +18,7 @@ use crate::{IoBuf, SocketAddressView};
 /// let endpoint = address.to_socket_address();
 /// ```
 pub trait SocketRecvMessage: Send + 'static {
+    /// The independently owned storage returned by [`into_payload`](Self::into_payload).
     type Payload: IoBuf;
 
     /// The source endpoint when supplied by the receive operation. Stream chunks may have no address; use `socket_peer_address` for the connected peer. The view's lifetime is bounded by this message. Its representation and any conversion costs are implementation details.

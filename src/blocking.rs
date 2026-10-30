@@ -6,6 +6,7 @@ use std::future::Future;
 
 /// Optional scheduler capability for owned synchronous work on blocking threads.
 pub trait Blocking {
+    /// The owning completion handle returned by [`spawn_blocking`](Self::spawn_blocking), resolving to the closure's output or a [`TaskError`].
     type Handle<Output>: Future<Output = Result<Output, TaskError>> + Send + 'static
     where
         Output: Send + 'static;

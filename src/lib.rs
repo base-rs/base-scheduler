@@ -43,6 +43,7 @@
 //!
 //! See the [I/O usage guide](https://github.com/base-rs/base-scheduler/blob/main/context/io.md), [interface reference](https://github.com/base-rs/base-scheduler/blob/main/context/interface.md), [design and behavioral contracts](https://github.com/base-rs/base-scheduler/blob/main/context/design.md), and [runnable examples](https://github.com/base-rs/base-scheduler/blob/main/examples/readme.md).
 #![deny(unsafe_op_in_unsafe_fn)]
+#![warn(missing_docs)]
 
 mod address_hints;
 mod address_info;

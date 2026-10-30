@@ -5,5 +5,6 @@
 ///
 /// Backends implement `SocketGetOption<Self>` and/or `SocketSetOption<Self>` for each supported operation and option; `SocketOptions<Self>` automatically aggregates both. Additional option types can be defined without changing the core `SocketOperation` trait or introducing a runtime option enum.
 pub trait SocketOption: Send {
+    /// The type of this option's value.
     type Value: Send;
 }

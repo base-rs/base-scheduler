@@ -31,6 +31,8 @@ use std::io;
 /// }
 /// ```
 pub trait BufferPooling {
+    /// The pool type constructed by [`buffer_pool`](Self::buffer_pool).
     type Pool: BufferPool;
+    /// Construct a pool satisfying `options`, or return an error if the backend cannot.
     fn buffer_pool(&self, options: BufferPoolOptions) -> io::Result<Self::Pool>;
 }

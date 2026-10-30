@@ -11,6 +11,7 @@ use std::{
 ///
 /// If an owned-operation future is abandoned while backend access continues, subsequent operations may report `WouldBlock` until it retires. Await `close` to establish retirement; separate handles provide independent lanes.
 pub trait SocketPacketReader: Send {
+    /// The owned message returned by [`read`](Self::read), whose payload is pooled receive storage.
     type Message: SocketRecvMessageMut<Payload: ReceiveBuffer>;
 
     /// Receive independently owned storage. `None` means the reader has been closed. Retained messages remain valid after subsequent reads, pool replacement, and close. Pool exhaustion waits with cancellation.

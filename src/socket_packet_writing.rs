@@ -10,6 +10,7 @@ use std::io;
 /// reference. It retains backend access independently, so the socket and handle
 /// can move together. Retire and drop handles before exclusively closing the socket.
 pub trait SocketPacketWriting: SocketOperation {
+    /// Construct a packet writer for `socket` without performing payload I/O. Stream sockets are rejected.
     fn socket_packet_writer<'scheduler>(
         &'scheduler self,
         socket: &Self::Socket,
