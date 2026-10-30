@@ -10,11 +10,14 @@ use std::future::Future;
 ///
 /// Acquisition returns a fully initialized `buffer_size()` prefix with at least `alignment()` alignment. Its previous contents are unspecified. Exhaustion waits with cancellation instead of growing the pool. Retained views and accepted I/O count against capacity until their access retires, including after future abandonment. Kernel registration and publication are implementation details; neither may grant concurrent access to a leased buffer.
 pub trait BufferPool: Clone + Send + Sync + 'static {
+    /// The exclusively writable receive storage returned by acquisition.
     type Buffer: ReceiveBuffer;
 
     /// Total slot capacity, including leased and published buffers, rather than the number currently free. Worker-local caches are part of this total.
     fn capacity(&self) -> usize;
+    /// The initialized length, in bytes, of each acquired buffer.
     fn buffer_size(&self) -> usize;
+    /// The minimum alignment, in bytes, of each acquired buffer's first byte.
     fn alignment(&self) -> usize;
 
     /// Acquire immediately, or return `None` without waiting for capacity.

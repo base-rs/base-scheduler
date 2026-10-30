@@ -16,6 +16,7 @@ use crate::AddressInfoView;
 /// let address = entry.address(); // A borrowed entry cannot outlive its owner.
 /// ```
 pub trait AddressInfoCollection: Send + Sync + 'static {
+    /// Iterate borrowed entry views in resolver order, preserving duplicates. The views cannot outlive this collection.
     fn entries(&self) -> impl Iterator<Item: AddressInfoView + Send> + Send;
 }
 

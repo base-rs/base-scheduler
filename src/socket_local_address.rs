@@ -7,5 +7,6 @@ use std::io;
 
 /// Inspect the local IP address of a socket.
 pub trait SocketLocalAddress: SocketOperation {
+    /// Return the local address the socket is bound to.
     fn socket_local_address(&self, socket: &Self::Socket) -> io::Result<SocketAddress>;
 }

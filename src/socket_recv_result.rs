@@ -6,6 +6,7 @@ use crate::SocketAddress;
 /// Metadata from one receive. Only `bytes` bytes, spread across the buffers in order, were written; their initialized lengths remain unchanged.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct SocketRecvResult {
+    /// The number of bytes written into the supplied buffers.
     pub bytes: usize,
     /// The sender when supplied by the OS, usually for datagrams. Stream receives may return `None`; use `socket_peer_address` for the connected peer.
     pub address: Option<SocketAddress>,

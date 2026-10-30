@@ -6,6 +6,7 @@ use std::io;
 
 /// Construct a sequential file writer bound to this scheduler. Backends select the handle representation; protocols need no monitor or raw dispatch capabilities.
 pub trait FileWriting: FileOperation {
+    /// The scheduler-bound writer returned by [`file_writer`](Self::file_writer).
     type Writer<'scheduler>: FileWriter + 'scheduler
     where
         Self: 'scheduler;

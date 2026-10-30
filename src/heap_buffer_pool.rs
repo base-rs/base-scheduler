@@ -64,11 +64,14 @@ pub(crate) struct Slab {
 unsafe impl Sync for Slab {}
 
 impl HeapBufferPool {
+    /// Reserve `buffers` slots of `buffer_size` bytes each, with an alignment of 1. This is [`with_options`](Self::with_options) applied to [`BufferPoolOptions::new`](crate::BufferPoolOptions::new).
     pub fn new(buffers: usize, buffer_size: usize) -> io::Result<Self> {
         Self::with_options(crate::BufferPoolOptions::new(buffers, buffer_size))
     }
 
     /// Reserve one contiguous initialized allocation. Slot starts satisfy the requested alignment; padding is outside the usable payload budget.
+    ///
+    /// Returns [`io::ErrorKind::InvalidInput`] if `buffers` or `buffer_size` is zero, the alignment is not a power of two, or the total allocation is not representable.
     pub fn with_options(options: crate::BufferPoolOptions) -> io::Result<Self> {
         options.validate()?;
         let crate::BufferPoolOptions {
@@ -114,13 +117,16 @@ impl HeapBufferPool {
         })))
     }
 
+    /// The total number of slots, including leased and frozen ones.
     pub fn capacity(&self) -> usize {
         self.0.slab.slots.len()
     }
+    /// The usable length, in bytes, of each slot.
     pub fn buffer_size(&self) -> usize {
         self.0.slab.size
     }
 
+    /// The requested minimum alignment, in bytes, of each slot's first byte.
     pub fn alignment(&self) -> usize {
         self.0.slab.alignment
     }

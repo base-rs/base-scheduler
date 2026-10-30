@@ -8,6 +8,7 @@ pub trait AddressInfoView {
     /// Decode the IP endpoint on demand, preserving IPv6 flow information and scope identifiers.
     fn address(&self) -> SocketAddress;
 
+    /// The socket type for creating a socket to this endpoint.
     fn socket_type(&self) -> SocketType;
 
     /// `None` represents the resolver's zero/default protocol.

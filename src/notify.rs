@@ -10,6 +10,7 @@ use std::sync::{Arc, mpsc};
 ///
 /// Channel implementations enqueue without waiting for capacity. A closed receiver discards the value. Bounded senders have no default implementation: an application must choose its own overflow policy in a wrapper.
 pub trait Notify<Value>: Send + Sync {
+    /// Deliver `value` to this destination. Implementations should return promptly.
     fn notify(&self, value: Value);
 }
 

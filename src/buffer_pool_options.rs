@@ -6,13 +6,16 @@ use std::io;
 /// Usable payload capacity and alignment, independent of kernel registration strategy. Backends must satisfy these requirements or return an error; backend metadata and allocation padding may require additional memory.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct BufferPoolOptions {
+    /// The number of buffers, which is the pool's exact shared capacity. Must be nonzero.
     pub buffers: usize,
+    /// The usable payload length, in bytes, of each buffer. Must be nonzero.
     pub buffer_size: usize,
     /// Nonzero power-of-two alignment of each acquired buffer's first byte.
     pub alignment: usize,
 }
 
 impl BufferPoolOptions {
+    /// Request `buffers` buffers of `buffer_size` bytes each, with an `alignment` of 1.
     pub const fn new(buffers: usize, buffer_size: usize) -> Self {
         Self {
             buffers,

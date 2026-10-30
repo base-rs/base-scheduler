@@ -11,6 +11,7 @@ use std::{
 ///
 /// If an owned-operation future is abandoned while backend access continues, subsequent operations may report `WouldBlock` until it retires. Await `close` to establish retirement; separate handles provide independent lanes.
 pub trait SocketStreamWriter: Send {
+    /// The owned storage accepted by [`submit`](Self::submit).
     type Buffer: IoBuf;
 
     /// Await previous accepted output, then write once from borrowed storage. The count can be short; this call does not accept the unwritten suffix. No backend accesses the borrowed bytes between polls.

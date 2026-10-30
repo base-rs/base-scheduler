@@ -7,7 +7,9 @@ use std::{fmt, io};
 /// Cooperative cancellation is distinct from an operating-system error.
 #[derive(Debug)]
 pub enum OperationError {
+    /// The operation observed a cooperative cancellation request.
     Cancelled(Cancelled),
+    /// The operation failed with an I/O error, including resolver failures carried as [`AddressResolveError`](crate::AddressResolveError).
     Io(io::Error),
 }
 
@@ -23,6 +25,7 @@ impl OperationError {
         }
     }
 
+    /// The OS error code of an `Io` error, or `None` for cancellation and errors without one.
     pub fn raw_os_error(&self) -> Option<i32> {
         match self {
             Self::Cancelled(_) => None,

@@ -6,8 +6,11 @@ use crate::{SocketDomain, SocketProtocol, SocketType};
 /// Typed hints passed to the resolver. Defaults request either IP family, any socket type/protocol, and no flags.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct AddressHints {
+    /// Restrict results to one IP family; `None` accepts either.
     pub domain: Option<SocketDomain>,
+    /// Restrict results to one socket type; `None` accepts any.
     pub socket_type: Option<SocketType>,
+    /// Restrict results to one protocol; `None` accepts any.
     pub protocol: Option<SocketProtocol>,
     /// With no hostname, request wildcard addresses suitable for binding; otherwise this flag has no effect. Without this flag, an absent hostname selects loopback addresses.
     pub passive: bool,

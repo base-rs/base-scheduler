@@ -6,7 +6,9 @@ use crate::{AddressInfoView, SocketAddress, SocketProtocol, SocketType};
 /// An owned IP endpoint and its socket creation parameters. Obtain its domain with `SocketDomain::from(info.address)`; pass its type and protocol directly to `socket_open`.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct AddressInfo {
+    /// The resolved IP endpoint, including any IPv6 flow information and scope identifier.
     pub address: SocketAddress,
+    /// The socket type to pass to `socket_open`.
     pub socket_type: SocketType,
     /// `None` represents the resolver's zero/default protocol.
     pub protocol: Option<SocketProtocol>,

@@ -6,6 +6,7 @@ use std::io;
 
 /// Construct a sequential file reader bound to this scheduler. Backends select the handle representation; protocols need no monitor or raw dispatch capabilities.
 pub trait FileReading: FileOperation {
+    /// The scheduler-bound reader returned by [`file_reader`](Self::file_reader).
     type Reader<'scheduler>: FileReader + 'scheduler
     where
         Self: 'scheduler;

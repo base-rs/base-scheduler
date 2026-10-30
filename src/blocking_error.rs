@@ -6,7 +6,9 @@ use std::{fmt, io};
 /// Blocking work could not be admitted. Job completion separately reports `TaskError`.
 #[derive(Debug)]
 pub enum BlockingError {
+    /// Cancellation was requested before the closure was admitted.
     Cancelled,
+    /// The scheduler no longer admits blocking work.
     SchedulerClosed,
     /// The dedicated pool could not start its worker threads.
     Io(io::Error),

@@ -11,6 +11,7 @@ use std::{
 ///
 /// If an owned-operation future is abandoned while backend access continues, subsequent operations may report `WouldBlock` until it retires. Await `close` to establish retirement; separate handles provide independent lanes.
 pub trait SocketPacketWriter: Send {
+    /// Send `buffer` as one packet to `address`, or to the connected peer when it is `None`, returning the byte count reported by the single send.
     fn write(
         &mut self,
         buffer: &[u8],

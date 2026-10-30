@@ -13,6 +13,7 @@ use std::{
 ///
 /// If an owned-operation future is abandoned while backend access continues, subsequent operations may report `WouldBlock` until it retires. Await `close` to establish retirement; separate handles provide independent lanes.
 pub trait SocketStreamReader: Send {
+    /// The owned chunk returned by [`read`](Self::read).
     type Buffer: ReceiveBuffer;
 
     /// Select whether ordinary reads must preserve progress across TCP urgent-data
