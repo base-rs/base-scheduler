@@ -2,23 +2,9 @@
 
 Explicit scheduler capabilities for reusable Rust protocol libraries. Applications choose an execution environment; libraries ask for the operations they need.
 
-The root crate defines interfaces and runtime-independent support. It contains no executor, reactor, operating-system I/O implementation, or runtime adapter. The initial API is extracted from [Socketry](https://github.com/base-rs/socketry-rust).
-
-The minimum supported Rust version is 1.87. Socket reader/writer factories use precise lifetime captures: their handles borrow the scheduler, not the temporary socket reference, allowing a connection to own its socket and directional handles together.
-
-The workspace also contains seven companion crates, released together with the interface:
-
-- [`base-scheduler-conformance`](crates/conformance/readme.md): reusable capability-specific assertions for backend development dependencies.
-- [`base-scheduler-direct`](crates/direct/readme.md): reference implementations of tasks, clocks, native address resolution, file/socket operations, and platform-supported signals and filesystem extensions, with explicit service ownership and bounded syscall admission.
-- [`base-scheduler-tokio`](crates/tokio/readme.md): an adapter for an explicitly selected Tokio runtime, preserving owning task handles, owned I/O, cancellation, and bounded native-work admission.
-- [`base-scheduler-native`](crates/native/readme.md): Socketry's work-stealing executor and native readiness I/O, with Base ownership and shutdown semantics.
-- [`base-scheduler-selector`](crates/selector/readme.md): independent I/O lifecycle contracts and the portable readiness selector.
-- [`base-scheduler-iouring`](crates/iouring/readme.md): Linux completion file and socket I/O with a separately owned event driver and explicit readiness fallback.
-- [`base-scheduler-timers`](crates/timers/readme.md): runtime-independent batched timers, reusable sleep registrations, and deadline notifications.
-
 ## Usage
 
-Add the interface with `cargo add base-scheduler`. Applications select a companion backend; reusable libraries depend on the interface capabilities they use.
+Add the interface with `cargo add base-scheduler`. Applications also add a backend crate, such as `base-scheduler-direct`, `base-scheduler-tokio`, or `base-scheduler-native`; reusable libraries depend only on the interface capabilities they use.
 
 Construct readers and writers from the scheduler once, then pass cancellation to their operations. A protocol object can retain these bound capabilities alongside its parser and protocol state:
 
@@ -42,62 +28,51 @@ impl<Reader: SocketStreamReader> Body<Reader> {
 
 Create the reader with `scheduler.socket_stream_reader(&socket)`. Its scheduler is fixed at construction; cancellation belongs to each call. Moving the protocol object or its future between workers leaves registration, routing, and retirement to the selected backend.
 
-## Socket and file I/O
-
-The four socket handles are the normal application interface:
-
-| Resource | Operations |
-| --- | --- |
-| `SocketStreamReader` | `read` returns an owned chunk; `read_into` and `read_vectored` use borrowed parser storage. |
-| `SocketStreamWriter` | `write` and `write_vectored` make borrowed transfers; `submit` accepts owned output that progresses independently, and `flush` waits for all accepted bytes. |
-| `SocketPacketReader` | `read` returns an owned message with source metadata; borrowed forms fill caller storage and report truncation. |
-| `SocketPacketWriter` | Send one packet from borrowed scalar/vector storage or an owned buffer, with an optional destination. |
-
-Construct them through `scheduler.socket_stream_reader`, `socket_stream_writer`, `socket_packet_reader`, and `socket_packet_writer`. Reuse one handle per sequential execution, with separate readers and writers for concurrent tasks. Borrowed-only readers do not allocate a receive pool. Owned reads initialize a default pool lazily, or use a shared pool supplied to `socket_stream_reader_with_pool` or `socket_packet_reader_with_pool`. Retained chunks can freeze into immutable views and move between tasks; their final owner returns storage for reuse.
-
-`scheduler.file_reader(&file)` and `scheduler.file_writer(&file)` provide the same construction pattern for reusable owned-buffer file I/O. `read` and `write` use the OS cursor; `read_at` and `write_at` take explicit offsets. Handles have no private logical file position. File operations return the original owner alongside success, error, or cancellation. Join independent read and write futures to overlap a file pipeline.
-
-Call `close().await` on each reader and writer before dropping it and exclusively closing its resource. Flush successful stream output first. Close has no cancellation argument and establishes backend retirement; dropping a handle is not an awaited cleanup barrier.
-
-See the [I/O usage guide](context/io.md), [interface reference](context/interface.md), and [runnable examples](examples/readme.md) for complete loops, buffer retention, partial transfers, and cleanup. The backend selects persistent readiness, request reuse, and buffer registration behind these handles. Adapters implement the same resource traits and keep dispatch, registration, and retirement state private.
-
-## Other capabilities
-
-File and socket lifecycle operations remain explicit scheduler capabilities: open, bind, listen, connect, accept, options, metadata, synchronization, and close. Protocol libraries require the individual capabilities they use; there is no universal scheduler requirement.
-
-| Capability | Contract |
-| --- | --- |
-| `Clock` | Monotonic observations, cancellable relative or absolute waits, and operation timeouts. |
-| `Spawn` | Task dispatch with implementation-associated, owning completion handles. |
-| `Blocking` | Bounded admission of owned synchronous work. |
-| `ProcessWait` | Individual child and Unix process-group status waits with cooperative cancellation. |
-| `Signals` | Notification subscriptions with implementation-associated guards and signal identifiers. |
-| `BufferPooling` | Shareable bounded storage with retained immutable views and cancellable capacity waits. |
-| Extension capabilities | Typed socket options, address resolution, standard TCP resource registration, file advice, and allocation. |
-
-Operation futures use static dispatch and are `Send`; no boxed future or runtime-selection feature is required. Spawned futures and outputs are `Send + 'static`. Backend resource types and construction establish compatibility.
-
-`Cancellation` is a runtime-independent cooperative signal. Clones share state, children inherit ancestor cancellation, and dropping a signal does not cancel it. Pre-cancellation prevents cancellable operation submission; successful progress can win a concurrent request. Cancellation does not roll back bytes or cursor changes. A task handle owns its execution lifetime: await it to observe completion, or drop it to request destruction after any active poll returns. Keep the scheduler and its drivers alive while accepted work retires.
-
-## Development
-
-Install the launcher with `cargo install bake --locked`. The private `bake/` workspace member supplies the shared Base development tasks:
-
-```sh
-cargo bake --locked test:coverage --all-targets true --all-features true
-```
-
-The tests cover runtime-independent support, generic composition, reusable conformance assertions, and the Direct, Tokio, Native, readiness, and io\_uring backends.
+See the [I/O usage guide](context/io.md), [interface reference](context/interface.md), and [runnable examples](examples/readme.md) for complete loops, buffer retention, partial transfers, cleanup, and the other scheduler capabilities.
 
 ## Releasing
 
-Prepare a release with `cargo bake cargo:version:patch` (or `minor`, `major`, or `bump --version X.Y.Z`), then run `cargo bake cargo:release` and open a pull request. After review and merge, GitHub Actions publishes the release when the configured `crates-io` environment approves it. Follow the shared [Releasing skill](https://github.com/base-rs/base-project/blob/main/context/releasing.md) for the standard process.
+Prepare a release with `cargo bake cargo:version:patch` (or `minor`, `major`, or `bump --version X.Y.Z`), commit it with a `Release: vVERSION` trailer, then run `cargo bake cargo:release` and open a pull request. After review and merge, GitHub Actions publishes the release when the configured `crates-io` environment approves it, then creates or updates the matching GitHub Release from `releases.md`. Follow the shared [Releasing skill](https://github.com/base-rs/base-project/blob/main/context/releasing.md) for the standard process.
 
 ## Releases
 
-Version v0.3.0 reduces Native readiness and child-cancellation overhead, and changes `NativeSocket::retain_native` to return `RegisteredSocket`, which is breaking for backend integrations. See the [release notes](releases.md).
+<!-- bake-readme:releases:start -->
+See [releases.md](releases.md) for the full release history.
+
+### v0.3.0
+
+- Register child cancellation signals in reusable slots instead of a hash map. Creating and dropping a child no longer hashes, and steady churn does not grow the parent's registry. In the HTTP client benchmark at 32 concurrent requests, this saves about 245 user instructions per response.
+
+- Reduce Native readiness overhead on established stream reads: skip redundant notifications for directions that are already ready, bypass cancellation wrappers for never-cancelled operations, and poll a compact receive future. Native sockets now register with the portable reactor only when a fallback wait first needs it, so `NativeSocket::retain_native` returns the new `RegisteredSocket`, which exposes the socket and its descriptor but not async-io's readiness methods. This is a breaking change for backend integrations, and a reactor registration failure surfaces at that wait.
+
+### v0.2.0
+
+- Correct all socket reader/writer factory lifetime bounds so connections can own sockets alongside their directional handles. Handles retain scheduler and backend access without borrowing the temporary socket reference. Backend implementors must add compatible precise capture bounds (`use<...>`); raise the workspace minimum Rust version to 1.87.
+
+- Publish immediately available io\_uring completions after nonblocking submission, reducing delivery latency while preserving cancellation, notification handling and shutdown.
+
+- Batch io\_uring completion task work on fresh thread-bound workers with deferred task running. Preserve cooperative and original-ring fallbacks, nonblocking completion progress, cancellation and movable drivers.
+
+- Avoid an extra `WouldBlock` receive after short borrowed scalar stream reads on io\_uring when OOB support is disabled. Preserve EOF notifications, racing readiness, cancellation and registration retirement; opt-in OOB and message receives keep conservative retries.
+
+- Add compile-time `SocketStreamReader::with_oob_support` selection, disabled by default. Native Linux epoll avoids an extra receive after ordinary short scalar reads and rejects reported urgent data; opt-in support preserves ordinary-byte progress across urgent marks. Other receive paths retain conservative behavior.
+
+### v0.1.2
+
+- Avoid retrying blocked fallback socket operations on unrelated task wakes, reducing io\_uring listener overhead while preserving immediate I/O progress.
+<!-- bake-readme:releases:end -->
 
 ## See Also
+
+The workspace also contains seven companion crates, released together with the interface:
+
+- [`base-scheduler-conformance`](crates/conformance/readme.md): reusable capability-specific assertions for backend development dependencies.
+- [`base-scheduler-direct`](crates/direct/readme.md): reference implementations of tasks, clocks, native address resolution, file/socket operations, and platform-supported signals and filesystem extensions, with explicit service ownership and bounded syscall admission.
+- [`base-scheduler-tokio`](crates/tokio/readme.md): an adapter for an explicitly selected Tokio runtime, preserving owning task handles, owned I/O, cancellation, and bounded native-work admission.
+- [`base-scheduler-native`](crates/native/readme.md): Socketry's work-stealing executor and native readiness I/O, with Base ownership and shutdown semantics.
+- [`base-scheduler-selector`](crates/selector/readme.md): independent I/O lifecycle contracts and the portable readiness selector.
+- [`base-scheduler-iouring`](crates/iouring/readme.md): Linux completion file and socket I/O with a separately owned event driver and explicit readiness fallback.
+- [`base-scheduler-timers`](crates/timers/readme.md): runtime-independent batched timers, reusable sleep registrations, and deadline notifications.
 
 See the [design and behavioral contracts](context/design.md) for resource compatibility, shutdown, cancellation boundaries, and extraction decisions.
 
@@ -109,4 +84,4 @@ Please open an issue or pull request on [GitHub](https://github.com/base-rs/base
 
 ### Agent Context
 
-Run `cargo bake agent:context:install` to install shared context and skills. Use `cargo bake agent:context:list` and `cargo bake agent:context:show` to discover guidance. Follow `agents.md` and the relevant skills under `.agents/skills/`.
+Run `cargo bake agent:context:install` to install shared context and skills. Use `cargo bake agent:context:list` and `cargo bake agent:context:show` to discover relevant guides, follow `agents.md` if present, and apply skills under `.agents/skills/`. The installer preserves repository-owned `agents.md`; it does not create or regenerate that file.

@@ -2,7 +2,46 @@
 // Copyright, 2026, by Samuel Williams.
 
 //! Explicit, runtime-independent scheduler capabilities for protocol libraries.
-#![doc = include_str!("../readme.md")]
+//!
+//! Applications choose an execution environment; libraries ask for the operations they need. This crate defines the interface and runtime-independent support such as [`Cancellation`] and [`HeapBufferPool`]. It contains no executor, reactor, operating-system I/O implementation, or runtime adapter; companion crates such as `base-scheduler-direct`, `base-scheduler-tokio`, and `base-scheduler-native` provide those.
+//!
+//! # Socket and file I/O
+//!
+//! Construct a handle from the scheduler once, then pass a [`Cancellation`] to each operation. A handle keeps its scheduler for its whole lifetime, and protocol code can retain it alongside parser state.
+//!
+//! | Factory | Handle | Operations |
+//! | --- | --- | --- |
+//! | [`SocketStreamReading`] | [`SocketStreamReader`] | `read` returns an owned chunk; `read_into` and `read_vectored` use borrowed parser storage. |
+//! | [`SocketStreamWriting`] | [`SocketStreamWriter`] | `write` and `write_vectored` make borrowed transfers; `submit` accepts owned output that progresses independently, and `flush` waits for all accepted bytes. |
+//! | [`SocketPacketReading`] | [`SocketPacketReader`] | `read` returns an owned message with source metadata; borrowed forms fill caller storage and report truncation. |
+//! | [`SocketPacketWriting`] | [`SocketPacketWriter`] | Send one packet from borrowed scalar/vector storage or an owned buffer, with an optional destination. |
+//! | [`FileReading`] | [`FileReader`] | Owned-buffer `read` at the OS cursor, or `read_at` an explicit offset. |
+//! | [`FileWriting`] | [`FileWriter`] | Owned-buffer `write` at the OS cursor, `write_at` an explicit offset, or `write_all`. |
+//!
+//! Use one handle per sequential execution, with separate readers and writers for concurrent tasks. Borrowed-only readers allocate no receive pool; owned reads initialize a default pool lazily, or use a shared [`BufferPool`] passed to `socket_stream_reader_with_pool` or `socket_packet_reader_with_pool`. Retained chunks can [`freeze`](ReceiveBuffer::freeze) into immutable views that move between tasks. File handles have no private logical position, and file operations return the original buffer owner alongside the [`BufferResult`].
+//!
+//! Call `close().await` on each handle before dropping it and exclusively closing its resource, flushing successful stream output first. Dropping a handle is not an awaited cleanup barrier.
+//!
+//! # Other capabilities
+//!
+//! Protocol libraries require the individual capabilities they use; there is no universal scheduler trait. Socket and file lifecycle operations are separate capabilities, such as [`SocketOpen`], [`SocketBind`], [`SocketListen`], [`SocketConnect`], [`SocketAccept`], [`FileOpen`], [`FileStat`], [`FileSync`], [`SocketClose`], and [`FileClose`].
+//!
+//! | Capability | Contract |
+//! | --- | --- |
+//! | [`Clock`] | Monotonic observations, cancellable relative or absolute waits, and operation timeouts. |
+//! | [`Timers`] | Experimental reusable timer state for repeated deadline waits. |
+//! | [`Spawn`] | Task dispatch with implementation-associated, owning completion handles. |
+//! | [`Blocking`] | Bounded admission of owned synchronous work. |
+//! | [`ProcessWait`] | Individual child and Unix process-group status waits with cooperative cancellation. |
+//! | [`Signals`] | Notification subscriptions with implementation-associated guards and signal identifiers. |
+//! | [`BufferPooling`] | Shareable bounded storage with retained immutable views and cancellable capacity waits. |
+//! | Extensions | Typed socket options ([`SocketGetOption`], [`SocketSetOption`]), [`AddressResolution`], [`SocketRegistration`], [`FileAdvice`], and [`FileAllocate`]. |
+//!
+//! Operation futures use static dispatch and are `Send`; no boxed future or runtime-selection feature is required. Spawned futures and outputs are `Send + 'static`.
+//!
+//! [`Cancellation`] is a cooperative signal: clones share state, children inherit ancestor cancellation, and dropping a signal does not cancel it. Pre-cancellation prevents submission, successful progress can win a concurrent request, and cancellation does not roll back transferred bytes or cursor changes. A task handle owns its execution: await it to observe completion, or drop it to request destruction after any active poll returns. Keep the scheduler and its drivers alive while accepted work retires.
+//!
+//! See the [I/O usage guide](https://github.com/base-rs/base-scheduler/blob/main/context/io.md), [interface reference](https://github.com/base-rs/base-scheduler/blob/main/context/interface.md), [design and behavioral contracts](https://github.com/base-rs/base-scheduler/blob/main/context/design.md), and [runnable examples](https://github.com/base-rs/base-scheduler/blob/main/examples/readme.md).
 #![deny(unsafe_op_in_unsafe_fn)]
 
 mod address_hints;
@@ -200,3 +239,8 @@ pub use timers::Timers;
 
 /// An IP endpoint, compatible with standard-library socket addresses.
 pub use std::net::SocketAddr as SocketAddress;
+
+/// Compiles and runs the readme examples as doctests.
+#[cfg(doctest)]
+#[doc = include_str!("../readme.md")]
+pub struct ReadmeDoctests;
