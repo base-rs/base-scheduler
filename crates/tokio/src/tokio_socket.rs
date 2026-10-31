@@ -70,13 +70,13 @@ impl Drop for PollWaiter<'_> {
 #[cfg(windows)]
 type RegisteredSocket = async_io::Async<socket2::Socket>;
 
-// Bounds a readiness wait whose wakeup was still lost; the timer's insertion, not its expiry, normally rescues the wait.
+// Bounds a readiness wait whose wakeup was still lost; the timer's insertion, not its expiry, normally rescues the wait. Idle waits retry their syscall once per bound.
 #[cfg(windows)]
-const WINDOWS_READY_BOUND: std::time::Duration = std::time::Duration::from_secs(1);
+const WINDOWS_READY_BOUND: std::time::Duration = std::time::Duration::from_secs(10);
 
-/// Wait for readiness after a `WouldBlock` syscall; the caller retries the syscall after any wake.
+/// Wait for readiness after a `WouldBlock` syscall; like `Async::read_with`, the caller optimistically retries the syscall after any wake.
 ///
-/// polling's IOCP backend can leave interest registered from a non-reactor thread queued while the reactor thread blocks without a timeout (smol-rs/polling#271), so a ready socket is never reported. Inserting a timer after registering interest notifies the reactor, which then submits the queued poll before waiting again. Remove this once a polling release fixes the race.
+/// polling's IOCP backend can leave interest registered from a non-reactor thread queued while the reactor thread blocks without a timeout (smol-rs/polling#271), so a ready socket is never reported. Inserting a timer after registering interest notifies the reactor, which then submits the queued poll before waiting again. Remove this once a polling release includes the fix (smol-rs/polling#272).
 #[cfg(windows)]
 async fn windows_ready(ready: impl std::future::Future<Output = io::Result<()>>) -> io::Result<()> {
     use std::{
