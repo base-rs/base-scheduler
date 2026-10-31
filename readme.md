@@ -37,6 +37,7 @@ Prepare a release with `cargo bake cargo:version:patch` (or `minor`, `major`, or
 ## Releases
 
 <!-- bake-readme:releases:start -->
+
 See [releases.md](releases.md) for the full release history.
 
 ### v0.3.0
@@ -60,6 +61,7 @@ See [releases.md](releases.md) for the full release history.
 ### v0.1.2
 
 - Avoid retrying blocked fallback socket operations on unrelated task wakes, reducing io\_uring listener overhead while preserving immediate I/O progress.
+
 <!-- bake-readme:releases:end -->
 
 ## See Also
