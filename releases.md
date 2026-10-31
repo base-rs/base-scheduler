@@ -1,5 +1,9 @@
 # Releases
 
+## Unreleased
+
+- Fix Tokio adapter socket waits on Windows that could hang although the socket was ready. async-io's IOCP reactor can miss interest registered from another thread ([smol-rs/polling#271](https://github.com/smol-rs/polling/issues/271)); each wait now wakes the reactor after registering interest and retries its syscall at least every 10 seconds.
+
 ## v0.3.0
 
 - Register child cancellation signals in reusable slots instead of a hash map. Creating and dropping a child no longer hashes, and steady churn does not grow the parent's registry. In the HTTP client benchmark at 32 concurrent requests, this saves about 245 user instructions per response.
