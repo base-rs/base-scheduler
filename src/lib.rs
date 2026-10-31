@@ -33,6 +33,7 @@
 //! | [`Spawn`] | Task dispatch with implementation-associated, owning completion handles. |
 //! | [`Blocking`] | Bounded admission of owned synchronous work. |
 //! | [`ProcessWait`] | Individual child and Unix process-group status waits with cooperative cancellation. |
+//! | `PipeReading`, `PipeWriting` | Unix adoption of owned pipe descriptors, such as child process standard streams, as sequential readers and writers. |
 //! | [`Signals`] | Notification subscriptions with implementation-associated guards and signal identifiers. |
 //! | [`BufferPooling`] | Shareable bounded storage with retained immutable views and cancellable capacity waits. |
 //! | Extensions | Typed socket options ([`SocketGetOption`], [`SocketSetOption`]), [`AddressResolution`], [`SocketRegistration`], [`FileAdvice`], and [`FileAllocate`]. |
@@ -95,6 +96,14 @@ mod io_buffers_mut;
 mod notify;
 mod operation_error;
 mod owned_socket_recv_message;
+#[cfg(unix)]
+mod pipe_reader;
+#[cfg(unix)]
+mod pipe_reading;
+#[cfg(unix)]
+mod pipe_writer;
+#[cfg(unix)]
+mod pipe_writing;
 mod process_wait;
 mod process_wait_flags;
 mod process_wait_result;
@@ -191,6 +200,14 @@ pub use io_buffers_mut::IoBuffersMut;
 pub use notify::Notify;
 pub use operation_error::{OperationError, OperationResult};
 pub use owned_socket_recv_message::OwnedSocketRecvMessage;
+#[cfg(unix)]
+pub use pipe_reader::PipeReader;
+#[cfg(unix)]
+pub use pipe_reading::PipeReading;
+#[cfg(unix)]
+pub use pipe_writer::PipeWriter;
+#[cfg(unix)]
+pub use pipe_writing::PipeWriting;
 pub use process_wait::ProcessWait;
 pub use process_wait_flags::ProcessWaitFlags;
 pub use process_wait_result::ProcessWaitResult;

@@ -455,3 +455,23 @@ impl<S: Selector + ProcessWait> ProcessWait for NativeScheduler<S> {
             .await
     }
 }
+
+#[cfg(unix)]
+impl<S: Selector + PipeReading> PipeReading for NativeScheduler<S> {
+    fn pipe_reader<'scheduler>(
+        &'scheduler self,
+        pipe: std::os::fd::OwnedFd,
+    ) -> io::Result<impl PipeReader + 'scheduler + use<'scheduler, S>> {
+        self.selector().pipe_reader(pipe)
+    }
+}
+
+#[cfg(unix)]
+impl<S: Selector + PipeWriting> PipeWriting for NativeScheduler<S> {
+    fn pipe_writer<'scheduler>(
+        &'scheduler self,
+        pipe: std::os::fd::OwnedFd,
+    ) -> io::Result<impl PipeWriter + 'scheduler + use<'scheduler, S>> {
+        self.selector().pipe_writer(pipe)
+    }
+}

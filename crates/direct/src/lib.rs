@@ -12,6 +12,10 @@ mod blocking_task;
 mod buffer_pooling;
 mod direct_file;
 mod direct_options;
+#[cfg(unix)]
+mod direct_pipe_reader;
+#[cfg(unix)]
+mod direct_pipe_writer;
 mod direct_scheduler;
 mod direct_socket;
 #[cfg(unix)]
@@ -21,6 +25,8 @@ mod direct_task;
 mod file_extensions;
 mod file_io;
 mod panic;
+#[cfg(unix)]
+mod pipe_io;
 mod resolver;
 #[cfg(unix)]
 mod signal_service;

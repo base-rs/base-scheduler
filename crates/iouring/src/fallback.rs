@@ -306,3 +306,22 @@ impl Signals for IoUringSelector {
         self.fallback.signal_subscribe(signals, target)
     }
 }
+
+// Pipes use the readiness fallback and its portable reactor rather than ring polling. Their borrowed transfers complete synchronously inside each poll, and handles borrow the fallback, which closes with this selector.
+impl PipeReading for IoUringSelector {
+    fn pipe_reader<'scheduler>(
+        &'scheduler self,
+        pipe: std::os::fd::OwnedFd,
+    ) -> io::Result<impl PipeReader + 'scheduler + use<'scheduler>> {
+        self.fallback.pipe_reader(pipe)
+    }
+}
+
+impl PipeWriting for IoUringSelector {
+    fn pipe_writer<'scheduler>(
+        &'scheduler self,
+        pipe: std::os::fd::OwnedFd,
+    ) -> io::Result<impl PipeWriter + 'scheduler + use<'scheduler>> {
+        self.fallback.pipe_writer(pipe)
+    }
+}

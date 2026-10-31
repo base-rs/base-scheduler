@@ -14,7 +14,7 @@ use std::{io, net::Shutdown};
 
 impl ReadinessSelector {
     // All payload access happens synchronously inside the readiness callback. Pending futures retain their owners; the reactor retains no payload pointers.
-    async fn socket_operation<Input: Send, Output: Send>(
+    pub(crate) async fn socket_operation<Input: Send, Output: Send>(
         &self,
         socket: &NativeSocket,
         mut input: Input,
