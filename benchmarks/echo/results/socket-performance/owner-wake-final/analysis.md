@@ -7,7 +7,7 @@ Optimized release builds use `cargo build --release --locked -p core-scheduler-e
 ## Concurrent throughput
 
 | Workers | Connections | Bytes | Backend | Original requests/s | Final requests/s | Change |
-|---:|---:|---:|---|---:|---:|---:|
+| ---: | ---: | ---: | --- | ---: | ---: | ---: |
 | 1 | 32 | 64 | iouring | 535,082 | 629,140 | +17.58% |
 | 1 | 32 | 64 | iouring-poll | 565,031 | 565,627 | +0.11% |
 | 1 | 32 | 4096 | iouring | 485,437 | 556,065 | +14.55% |
@@ -20,7 +20,7 @@ Optimized release builds use `cargo build --release --locked -p core-scheduler-e
 ## Serial 64-byte throughput
 
 | Workers | Connections | Bytes | Backend | Original requests/s | Final requests/s | Change |
-|---:|---:|---:|---|---:|---:|---:|
+| ---: | ---: | ---: | --- | ---: | ---: | ---: |
 | 1 | 1 | 64 | iouring | 234,402 | 234,387 | -0.01% |
 | 1 | 1 | 64 | iouring-poll | 184,665 | 230,231 | +24.67% |
 

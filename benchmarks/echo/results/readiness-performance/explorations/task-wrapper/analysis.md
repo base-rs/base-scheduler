@@ -5,7 +5,7 @@ The scheduler task wrapper does not explain the echo gap. Bypassing `TaskService
 This diagnostic duplicates the scheduler server function and replaces only `scheduler.spawn` with `tokio::spawn`; adapter I/O and all workload settings are retained. Every backend runs from one optimized executable. No runtime source code changed. Three randomized repetitions, 1 worker on CPU 0, 32 connections, 64-byte payload, 1-second warmup, 3-second measured interval, fixed four-worker client on CPUs 4–7. Exclusive `/tmp/core-scheduler-perf.lock` throughout. All samples validate payload and complete with empty stderr.
 
 | Backend | Median requests/s | Pure Tokio | Range |
-|---|---:|---:|---:|
+| --- | ---: | ---: | ---: |
 | tokio | 699,326 | 100.00% | 695,682–706,266 |
 | tokio-adapter | 621,289 | 88.84% | 620,277–622,731 |
 | tokio-adapter-rawtask | 623,076 | 89.10% | 620,248–624,816 |

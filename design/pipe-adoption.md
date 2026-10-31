@@ -12,8 +12,8 @@ Tomori's server runs agent, speech recognition and synthesis workers as child pr
 
 ## Scope
 
-The `PipeReading`, `PipeWriting`, `PipeReader` and `PipeWriter` traits; Direct, readiness selector, Tokio, Native forwarding, and io\_uring through its readiness fallback; and reusable conformance assertions. Owned-buffer reads and writes, FIFOs, regular files, terminals, and Windows anonymous pipes are out of scope. Linux and macOS are validated; other Unix platforms may reject readiness registration for the opposite direction of a pipe end. Setting `O_NONBLOCK` affects the shared file description, including other descriptors duplicated from it.
+The `PipeReading`, `PipeWriting`, `PipeReader` and `PipeWriter` traits; Direct, readiness selector, Tokio, Native forwarding, and io_uring through its readiness fallback; and reusable conformance assertions. Owned-buffer reads and writes, FIFOs, regular files, terminals, and Windows anonymous pipes are out of scope. Linux and macOS are validated; other Unix platforms may reject readiness registration for the opposite direction of a pipe end. Setting `O_NONBLOCK` affects the shared file description, including other descriptors duplicated from it.
 
 ## Validation
 
-Round-trip data through a real `cat` child on every Unix backend, including concurrent reads and writes larger than the pipe buffer. Exercise vectored transfers, end of file, empty transfers, broken pipes, cancellation of blocked operations, and close semantics including operations after close. Run the workspace tests and coverage on macOS and Linux, including io\_uring.
+Round-trip data through a real `cat` child on every Unix backend, including concurrent reads and writes larger than the pipe buffer. Exercise vectored transfers, end of file, empty transfers, broken pipes, cancellation of blocked operations, and close semantics including operations after close. Run the workspace tests and coverage on macOS and Linux, including io_uring.

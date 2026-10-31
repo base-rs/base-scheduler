@@ -6,7 +6,7 @@ This follow-up keeps the writer's ownership, ordering, cancellation and submissi
 
 ## Changes
 
-`Cancellation::is_never()` identifies signals which cannot be cancelled. Stalled io\_uring writes with such signals now omit both the boxed cancellation future and the cancellation wake allocation. Actual cancellable writes retain their listener and reuse the wake allocation when `Arc::get_mut` establishes exclusive ownership. A delayed notification may retain an older wake object; that case allocates a new object rather than changing the older request ID. Unique request IDs also prevent already-queued old cancellation commands from affecting new writes. Explicit writer close and drop still cancel accepted output independently of its submission token.
+`Cancellation::is_never()` identifies signals which cannot be cancelled. Stalled io_uring writes with such signals now omit both the boxed cancellation future and the cancellation wake allocation. Actual cancellable writes retain their listener and reuse the wake allocation when `Arc::get_mut` establishes exclusive ownership. A delayed notification may retain an older wake object; that case allocates a new object rather than changing the older request ID. Unique request IDs also prevent already-queued old cancellation commands from affecting new writes. Explicit writer close and drop still cancel accepted output independently of its submission token.
 
 Worker rings now retain the ordinary ring created during selector setup. Removed code includes optional cooperative-ring replacement, its failure fallback, the started flag and the taskrun-only flush branch. CQ overflow still forces kernel progress. Submission receipts still wait until the kernel consumes the first SQE, and a subsequent submission still completes its predecessor before accepting another buffer.
 
@@ -81,7 +81,7 @@ The full macOS Bake gate passes at `4e3fcd9`: 23,922/23,922 measured regions, wi
 
 Independent review approved both production changes and confirmed preservation of queued and in-flight work, worker migration, retired workers, submission acknowledgement, cancellation and overflow handling. The delayed-notification regression test exercises both exclusive wake reuse and surviving older notifications.
 
-Formatting, strict workspace Clippy across all targets and features on macOS and Linux, Rust documentation with warnings denied, macOS Rust 1.85.1 package checks and the Linux-target io\_uring test check pass. The test-only mutable-binding removal and fixture alias address lint clarity and change no reachable behavior. No Windows execution results are claimed.
+Formatting, strict workspace Clippy across all targets and features on macOS and Linux, Rust documentation with warnings denied, macOS Rust 1.85.1 package checks and the Linux-target io_uring test check pass. The test-only mutable-binding removal and fixture alias address lint clarity and change no reachable behavior. No Windows execution results are claimed.
 
 ## Retained artifacts
 

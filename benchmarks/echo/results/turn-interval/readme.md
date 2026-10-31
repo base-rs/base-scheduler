@@ -9,7 +9,7 @@ All candidates start from main `aaf337eab1d0fc99e6177a61649dfc94fe6b30f1`. The p
 | A | — | main |
 | B | [interval.patch](interval.patch) | `SelectorWorker::nonblocking_interval`; the readiness worker turns at the first batch boundary after 61 task polls |
 | C | [fifo.patch](fifo.patch), on B | One FIFO per worker instead of two alternating queues. A batch is the queue length counted before polling it, so self-wakes queue behind its members |
-| C+cap | C, with `BASE_NATIVE_BATCH_CAP=1` | C, with readiness batches capped at 61 polls. The cap applies only when the interval exceeds one, so on io\_uring C+cap is the same configuration as C |
+| C+cap | C, with `BASE_NATIVE_BATCH_CAP=1` | C, with readiness batches capped at 61 polls. The cap applies only when the interval exceeds one, so on io_uring C+cap is the same configuration as C |
 | E | [adaptive.patch](adaptive.patch) | Skip zero-timeout readiness turns after a turn that found no events, backing off up to 60 skips; any productive or waiting turn resets it |
 
 [echo-native-backend.patch](echo-native-backend.patch) adds the `native`, `native-poll` and `native-monitor` echo backends used for the earlier echo profiling. It is retained for reproduction only.
@@ -62,8 +62,8 @@ Medians as requests per second / user instructions per request:
 - **The supervisor server's instructions are unchanged.** Likely it rarely runs consecutive batches, so there was little turn work to save; no diagnostic here measures that.
 - **Two epoll workers regress under every interval variant.** At 64 connections, all nine B, C and C+cap samples are at least 6,159 instructions per request, about 150 more than all three A samples (6,021–6,022). At 256 connections the increase is only 8–20.
 - **One worker with a task per connection at 256 connections** is slower under B in every sample (162.5–170.1k, against A's 179.0–183.5k).
-- **The single FIFO (C) shows no gain over the alternating queues.** Instructions match B. On io\_uring, C is 0.2–2.4% above A in throughput, which is within noise.
-- **One connection** is level in throughput. Cycles per request mostly rise (−1% to +13%), including on io\_uring where B does not change turns, so treat them as noisy at three repeats.
+- **The single FIFO (C) shows no gain over the alternating queues.** Instructions match B. On io_uring, C is 0.2–2.4% above A in throughput, which is within noise.
+- **One connection** is level in throughput. Cycles per request mostly rise (−1% to +13%), including on io_uring where B does not change turns, so treat them as noisy at three repeats.
 
 The second cohort, as requests per second / instructions per request / cycles per request:
 

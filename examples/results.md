@@ -18,7 +18,7 @@ Reproduce with `python3 examples/benchmark.py --repeats 5 --output /tmp/core-sch
 
 ## Throughput
 
-Each cell is **median MiB/s [minimum–maximum]** across five invocations. Compare a row across backends; different recipes perform different ownership and validation work.
+Each cell is **median MiB/s \[minimum–maximum]** across five invocations. Compare a row across backends; different recipes perform different ownership and validation work.
 
 | Recipe | Workers | Direct | Tokio adapter | Native readiness | Native io_uring |
 | --- | ---: | ---: | ---: | ---: | ---: |

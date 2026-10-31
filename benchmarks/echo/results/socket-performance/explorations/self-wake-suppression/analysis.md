@@ -5,7 +5,7 @@ The runtime patch retains sleeping.swap(false, SeqCst), publication fences, peer
 Three randomized serial TCP echo samples per executable: one worker, one connection, 64 bytes, 1 s warmup plus 3 s measurement. All server context switches and source counters cover lifecycle including warmup and shutdown. Counter builds and plain timing builds are separate. Builds held shared /tmp/core-scheduler-perf.lock; the matrix held it exclusively.
 
 | Variant | Median measured req/s | Median lifecycle voluntary CSW | req/s samples |
-|---|---:|---:|---|
+| --- | ---: | ---: | --- |
 | prototype-frozen | 209,795 | 820,786 | 209,795, 199,023, 210,923 |
 | prototype-fixed | 188,243 | 756,434 | 188,243, 188,848, 187,096 |
 | selected-frozen | 231,874 | 195,265 | 231,874, 229,642, 237,379 |
@@ -21,7 +21,7 @@ Plain fixed/frozen median throughput changes:
 - selected: -23.80%.
 
 | Counter variant/repeat | Payload CQEs / 2 | Same-worker notify success | Other-thread notify success | Interrupt SQEs/CQEs | Wait syscalls | Voluntary CSW |
-|---|---:|---:|---:|---|---:|---:|
+| --- | ---: | ---: | ---: | --- | ---: | ---: |
 | prototype-frozen-counted/1 | 854,108.5 | 831,147 | 2 | 830,890/830,890 | 853,953 | 853,772 |
 | prototype-frozen-counted/2 | 856,754.5 | 833,703 | 3 | 833,493/833,493 | 856,629 | 856,457 |
 | prototype-frozen-counted/3 | 812,097.5 | 790,262 | 2 | 790,051/790,051 | 811,973 | 811,823 |

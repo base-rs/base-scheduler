@@ -28,7 +28,7 @@ Use one handle per sequential execution, with independent readers and writers fo
 
 The default stream writer accepts the same pooled owner type returned by the default stream reader, with no type annotation needed for borrowed-only output. `socket_stream_writer_with_buffer::<B>(K)` selects another stable owner type. Reader factories allocate no payload pool; the first owned read initializes default storage lazily. `socket_stream_reader_with_pool(K, pool)` and `socket_packet_reader_with_pool(K, pool)` select an application-owned shared budget at construction. Factories return implementation-selected handles through the reader/writer contracts; backends choose their composition without changing application operations.
 
-The Direct and Tokio backends provide all four socket handles. Native forwards its selector’s capabilities; both readiness and io\_uring provide all four.
+The Direct and Tokio backends provide all four socket handles. Native forwards its selector’s capabilities; both readiness and io_uring provide all four.
 
 ### Stream input
 
@@ -230,15 +230,15 @@ The selector lifecycle hooks below live in `base-scheduler-selector`, not the po
 | `SelectorWorker::close` | `(&mut worker) → ()` | Begin retirement without synchronously waiting. |
 | `SelectorWorker::turn` | `(&mut worker, Option<Duration>) → io::Result<bool>` | Publish a bounded completion batch and wait at most the timeout. Zero is nonblocking; `None` permits indefinite waiting. True means closed and drained. After waking tasks, return so the executor can poll them. |
 
-Drivers publish results and wake tasks; they never poll application futures from completion processing. The executor manages runnable tasks, stealing, worker-local timers, and the timeout passed to `turn`. io\_uring uses one ring per worker; active operations stay with their original ring through retirement, while subsequent operations can follow a migrated task.
+Drivers publish results and wake tasks; they never poll application futures from completion processing. The executor manages runnable tasks, stealing, worker-local timers, and the timeout passed to `turn`. io_uring uses one ring per worker; active operations stay with their original ring through retirement, while subsequent operations can follow a migrated task.
 
 Constructors, `block_on`, worker counts, `selector()`, concrete admission `close`, and runtime `shutdown` belong to the chosen backend, not a universal scheduler trait. Tokio's adapter borrows an application-owned runtime which must remain alive and driven. Native owns its executor and composes selectors. Direct supplies a reference implementation. An application must keep execution services running while awaiting graceful cleanup.
 
-The concrete io\_uring multishot receiver remains a standalone backend experiment. It is not required by the bound reader/writer contract and is not an application default.
+The concrete io_uring multishot receiver remains a standalone backend experiment. It is not required by the bound reader/writer contract and is not an application default.
 
 ## Adopted pipes
 
-On Unix, `PipeReading::pipe_reader(OwnedFd)` and `PipeWriting::pipe_writer(OwnedFd)` adopt an owned pipe descriptor, such as one converted from `ChildStdout` or `ChildStdin`, and set it nonblocking. `PipeReader` supplies `read_into` and `read_vectored`, where zero means end of file; `PipeWriter` supplies `write` and `write_vectored`, reporting a closed read end as `BrokenPipe`. Empty transfers complete without I/O. `close().await` retires the handle and closes the descriptor; later operations fail with `BrokenPipe`. Dropping a handle closes the descriptor. Backends reuse their socket readiness machinery with `read`/`write` system calls; io\_uring uses its readiness fallback and portable reactor rather than ring polling. Unlike socket and file handles, pipe handles own their descriptor. FIFOs are unsupported. See [Pipe Adoption](../design/pipe-adoption.md).
+On Unix, `PipeReading::pipe_reader(OwnedFd)` and `PipeWriting::pipe_writer(OwnedFd)` adopt an owned pipe descriptor, such as one converted from `ChildStdout` or `ChildStdin`, and set it nonblocking. `PipeReader` supplies `read_into` and `read_vectored`, where zero means end of file; `PipeWriter` supplies `write` and `write_vectored`, reporting a closed read end as `BrokenPipe`. Empty transfers complete without I/O. `close().await` retires the handle and closes the descriptor; later operations fail with `BrokenPipe`. Dropping a handle closes the descriptor. Backends reuse their socket readiness machinery with `read`/`write` system calls; io_uring uses its readiness fallback and portable reactor rather than ring polling. Unlike socket and file handles, pipe handles own their descriptor. FIFOs are unsupported. See [Pipe Adoption](../design/pipe-adoption.md).
 
 ## Child process waits
 

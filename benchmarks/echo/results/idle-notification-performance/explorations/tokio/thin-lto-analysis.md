@@ -9,7 +9,7 @@ Thin-LTO release build: `CARGO_PROFILE_RELEASE_LTO=thin cargo build --release --
 Compiler: rustc 1.99.0 (b940084d7 2026-09-28) (Arch Linux rust 1:1.99.0-1).
 
 | Profile | Binary bytes | SHA-256 |
-|---|---:|---|
+| --- | ---: | --- |
 | baseline | 2,194,000 | `c461c4a6c690f83823148970badfdf3cc4a30a06157c4edfeea66f8777c61f59` |
 | thin-lto | 2,098,112 | `21af5d1e4ff8774150f550eaea5744031ca49b4906b1fd0198c383854b175e32` |
 
@@ -20,7 +20,7 @@ Timing uses all five backends, one worker, 32 connections, 64-byte messages, 3 r
 All 30 samples completed successfully. Values below are median requests/second, followed by the observed minimum–maximum across three repeats. Relative columns compare each backend with pure Tokio built using the same profile.
 
 | Backend | Default release | Thin LTO | Throughput change | Default / Tokio | Thin LTO / Tokio |
-|---|---:|---:|---:|---:|---:|
+| --- | ---: | ---: | ---: | ---: | ---: |
 | tokio | 697,481 (695,563–707,125) | 704,078 (702,442–705,278) | +0.95% | 100.00% | 100.00% |
 | tokio-adapter | 646,027 (644,807–651,031) | 653,849 (649,455–656,419) | +1.21% | 92.62% | 92.87% |
 | tokio-adapter-poll | 647,820 (640,003–649,124) | 649,960 (649,153–653,337) | +0.33% | 92.88% | 92.31% |

@@ -28,7 +28,7 @@ The clearer reason to retain a monitor is reusable sequential operation state wi
 Throughput is in thousands of operations per second. Changes are medians of matched-pair ratios; they need not equal the ratio of the two displayed throughput medians. Ranges are observed pair minima and maxima, not confidence intervals. `native` means Native readiness, `iouring` means Native with per-worker io_uring, and `tokio` means the Core Tokio adapter.
 
 | Backend | Operation | Bytes | Tasks/workers | Ordinary kops/s | Monitor kops/s | Paired change (range) |
-|---|---|---:|---:|---:|---:|---:|
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
 | direct | read-at | 4096 | 1/1 | 602.0 | 589.4 | -2.2% (-4.6–-1.3%) |
 | direct | read-at | 4096 | 16/4 | 2779.7 | 2790.6 | -0.8% (-1.7–+0.8%) |
 | direct | read-at | 65536 | 1/1 | 398.8 | 393.0 | -1.2% (-2.8–-0.9%) |

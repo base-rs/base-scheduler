@@ -66,6 +66,6 @@ Both sustained every offered rate. Latency is level at 1 and 64 connections. At 
 | Resume through the listener | none | Completing a woken receive through `poll_wait`, rather than re-reading readiness at the top of its loop, made the post-wait path reachable without a race. In [g-cohort-p6.txt](g-cohort-p6.txt) it added 54 instructions and 3 L1 misses per round trip at 32 and 256 connections. The race is instead covered by a test hook that publishes before the wait |
 | Skip writable publication | none | Skipping the writable direction's generation increment while it is already ready saved two locked instructions per event, but a racing `WouldBlock` clear could then erase a real edge and leave a writer waiting. Unsound |
 
-Only Linux epoll was measured. The macOS kqueue driver and the io\_uring selector, whose sockets also no longer register with async-io, are covered by tests but not by measurement.
+Only Linux epoll was measured. The macOS kqueue driver and the io_uring selector, whose sockets also no longer register with async-io, are covered by tests but not by measurement.
 
 Hand-written `read_into` and `write` futures, which would make the echo task's hot state contiguous, are the remaining footprint lever; their estimated gain of at most 0.5% did not yet justify the added code. The rest of the locked-instruction gap is task machinery: the global outstanding-runnable counter, `async_task` state transitions and the crossbeam deque.

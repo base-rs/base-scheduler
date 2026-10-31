@@ -5,7 +5,7 @@ Both experimental variants start from c4f7eef (same-thread suppression on select
 Three randomized repetitions per plain executable, one worker, one connection, 64 bytes, 1 s warmup plus 3 s measurement. Client binary fixed. Builds held shared /tmp/core-scheduler-perf.lock; the entire timing matrix held the exclusive lock. Release optimizations enabled with profile debug info and RUSTFLAGS unset.
 
 | Variant | Median measured req/s | Median lifecycle voluntary CSW | req/s samples |
-|---|---:|---:|---|
+| --- | ---: | ---: | --- |
 | selected-frozen | 238,077 | 67,177 | 237,485, 238,077, 239,464 |
 | selected-fixed | 174,671 | 692,670 | 177,426, 171,602, 174,671 |
 | selected-permit-skip | 185,913 | 757,819 | 185,913, 181,517, 191,857 |

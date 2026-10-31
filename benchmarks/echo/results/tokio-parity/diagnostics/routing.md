@@ -1,8 +1,8 @@
-# Borrowed io\_uring controller routing
+# Borrowed io_uring controller routing
 
 The selector already owns each worker controller in an immutable vector. TLS now returns the worker index for the explicitly matching DriverGroup. Borrowed monitor operations retain a reference to that selector-owned Arc rather than incrementing/decrementing it for each operation. The active ring binding continues owning its controller during cancellation, retirement, abandonment and migration. No new cache, allocation or unsafe code is added. Owned completion operations still clone their controller where they require independent retention.
 
-The final cleanup uses the same route\_index helper for worker-local buffer-pool selection, eliminating its clone-to-read-worker step and the duplicate TLS lookup helper. The focused regression test checks external round-robin selection, unchanged controller strong counts, nested selector identity with different worker indices, and a retained reference crossing threads.
+The final cleanup uses the same route_index helper for worker-local buffer-pool selection, eliminating its clone-to-read-worker step and the duplicate TLS lookup helper. The focused regression test checks external round-robin selection, unchanged controller strong counts, nested selector identity with different worker indices, and a retained reference crossing threads.
 
 ## Screening
 
@@ -24,6 +24,6 @@ Aiko had unrelated game/Wine processes active, last observed on CPU 11 with broa
 
 ## Validation
 
-The borrowed route plus the generation-based Wait cleanup guard passes the complete Linux core-scheduler-iouring suite: 216 unit tests, 3 file-resource tests, 273 conformance tests, 11 resource-options tests, 2 shared-pool tests and 1 doctest (506 total). This includes active-monitor migration, cancellation, retirement and the new abandoned-task ownership regression. The final shared route\_index buffer-pool cleanup also passes the same complete suite.
+The borrowed route plus the generation-based Wait cleanup guard passes the complete Linux core-scheduler-iouring suite: 216 unit tests, 3 file-resource tests, 273 conformance tests, 11 resource-options tests, 2 shared-pool tests and 1 doctest (506 total). This includes active-monitor migration, cancellation, retirement and the new abandoned-task ownership regression. The final shared route_index buffer-pool cleanup also passes the same complete suite.
 
 The raw samples and executable hashes are in `route-screen.json`; `route-screen.patch` records the screened source. The shared comparison runner is `../compare.py`.

@@ -7,7 +7,7 @@ Server source: `938e7e641f8d186991a0f46f211f4ce3d19c929e`; executable SHA-256 `f
 Each sample: one worker on CPU 0, 32 connections, 64-byte messages, client CPUs 4–7, no warmup, 0.5-second measurement. `strace -f -C -s 0` captured data syscalls plus accept/close. The parser tracks accepted socket descriptors and excludes loader, stdout, notifier, and other unrelated reads/writes. Exact EAGAIN errno counts come from raw syscall returns; summary error counts alone were not used. Raw traces are retained compressed beside short `summary.strace` and parsed `syscalls.json` files.
 
 | Backend | Measured complete requests | Socket recv calls | Recv EAGAIN | Socket send calls | Send EAGAIN | Recv calls/measured request | Recv EAGAIN/measured request |
-|---|---:|---:|---:|---:|---:|---:|---:|
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | tokio | 28,402 | 28,466 | 0 | 28,434 | 0 | 1.002253 | 0.000000 |
 | tokio-adapter | 40,083 | 40,150 | 3 | 40,115 | 0 | 1.001672 | 0.000075 |
 | tokio-adapter-poll | 31,950 | 32,030 | 16 | 31,982 | 0 | 1.002504 | 0.000501 |

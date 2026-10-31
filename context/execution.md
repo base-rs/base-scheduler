@@ -1,6 +1,6 @@
 # Worker and reactor execution model
 
-This guide describes the Native worker and its worker-driven readiness and io\_uring selectors. It explains where work happens and where progress can wait. It is an implementation model, not a latency guarantee or a prescription for other executors. See [the progress requirements](../design/worker-progress.md), [ownership contracts](design.md), and [I/O usage](io.md).
+This guide describes the Native worker and its worker-driven readiness and io_uring selectors. It explains where work happens and where progress can wait. It is an implementation model, not a latency guarantee or a prescription for other executors. See [the progress requirements](../design/worker-progress.md), [ownership contracts](design.md), and [I/O usage](io.md).
 
 ## Two performance questions
 
@@ -50,11 +50,11 @@ A successful borrowed write performs admission checks and a nonblocking send ins
 
 Native epoll/kqueue registers a stable socket record and publishes directional readiness directly from native events. Readiness generations prevent a stale clear from losing a newer notification. The ordinary scalar reader may clear after a short read under the platform's EOF/OOB rules; conservative paths drain through `WouldBlock`. See [urgent-data policy](../design/socket-stream-oob.md).
 
-The io\_uring borrowed path uses direct nonblocking transfers plus a persistent directional `PollAdd` monitor when it must wait. Its monitor CQE publishes readiness; the payload syscall still happens on the subsequent application poll. An owned scalar read instead queues a `Recv` carrying stable owned storage. Its CQE supplies the transfer result. Request/completion storage is reused by bound scalar readers. Successful scalar owned writes also try a direct send. Completion I/O therefore need not mean a kernel submission for every write.
+The io_uring borrowed path uses direct nonblocking transfers plus a persistent directional `PollAdd` monitor when it must wait. Its monitor CQE publishes readiness; the payload syscall still happens on the subsequent application poll. An owned scalar read instead queues a `Recv` carrying stable owned storage. Its CQE supplies the transfer result. Request/completion storage is reused by bound scalar readers. Successful scalar owned writes also try a direct send. Completion I/O therefore need not mean a kernel submission for every write.
 
 Here “owned read” specifically means `read_owned(buffer)`. The pooled chunk API `read(cancellation)` also returns an owned value, but currently acquires a pool slot and uses the borrowed readiness-driven receive path, releasing that slot while waiting. Ownership of the returned value does not by itself select completion I/O.
 
-## An io\_uring turn
+## An io_uring turn
 
 `Reactor::turn` in `crates/iouring/src/io_uring_selector.rs` currently:
 

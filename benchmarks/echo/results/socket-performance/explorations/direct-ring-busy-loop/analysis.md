@@ -16,8 +16,8 @@ The candidate replaces native ring epoll waiting with io_uring submit_and_wait(1
 
 Three randomized repeats, backend iouring, 1 worker pinned CPU0, 1 connection, 64 bytes; client CPUs4-7, one second warmup and three seconds measurement.
 
-- before: requests/sec [230396, 238292, 233745], median 233,745; voluntary switches [154313, 106041, 143216].
-- after: requests/sec [255608, 255564, 258359], median 255,608; voluntary switches [11, 11, 11].
+- before: requests/sec \[230396, 238292, 233745], median 233,745; voluntary switches \[154313, 106041, 143216].
+- after: requests/sec \[255608, 255564, 258359], median 255,608; voluntary switches \[11, 11, 11].
 
 Candidate median throughput delta: +9.35%.
 

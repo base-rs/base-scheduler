@@ -7,7 +7,7 @@ Selected: direct io_uring idle waits, remote eventfd notification with owner TLS
 Three randomized repeats per cell; median requests/s. Plain optimized release builds, fixed client, server CPUs 0 or 0–3 and client CPUs 4–7. One-second warmup and three-second measurement. Exclusive benchmark lock.
 
 | Workers | Connections | Bytes | Backend | Original | Candidate | Change |
-|---:|---:|---:|---|---:|---:|---:|
+| ---: | ---: | ---: | --- | ---: | ---: | ---: |
 | 1 | 32 | 64 | iouring | 532,161 | 626,804 | +17.78% |
 | 1 | 32 | 64 | iouring-poll | 561,774 | 565,945 | +0.74% |
 | 1 | 32 | 4096 | iouring | 479,236 | 559,441 | +16.74% |
@@ -26,7 +26,7 @@ Owned concurrent throughput improves 9–18%; borrowed concurrent throughput is 
 Five randomized repetitions per binary/backend/payload, one worker and one connection. Full per-sample metadata retained in `serial-five/aiko.json`.
 
 | Bytes | Backend | Original | Candidate | Change |
-|---:|---|---:|---:|---:|
+| ---: | --- | ---: | ---: | ---: |
 | 64 | iouring | 237,522 | 230,564 | -2.93% |
 | 64 | iouring-poll | 181,897 | 223,304 | +22.76% |
 | 4096 | iouring | 186,810 | 232,078 | +24.23% |
@@ -41,7 +41,7 @@ Frozen plain candidate: zero CPU ticks across owned/borrowed × one/four workers
 A separately instrumented binary counts actual eventfd write attempts/success by exact controller TLS ownership; it also counts owner wakeups that avoided a syscall. Instrumented throughput is excluded from all timing tables.
 
 | Backend | Workers/connections | Owner writes | Remote successful writes | Avoided owner wakes |
-|---|---|---:|---:|---:|
+| --- | --- | ---: | ---: | ---: |
 | iouring | 1/1 | 0 | 2 | 39 |
 | iouring-poll | 1/1 | 0 | 2 | 12 |
 | iouring | 4/128 | 0 | 38,052 | 14,139 |
