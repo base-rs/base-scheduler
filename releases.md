@@ -1,6 +1,6 @@
 # Releases
 
-## Unreleased
+## v0.3.1
 
 - Add Unix `PipeReading` and `PipeWriting` capabilities which adopt an owned pipe descriptor, such as a child process's standard input or output, as a sequential reader or writer. Direct, readiness, Tokio and Native support them natively; io\_uring uses its readiness fallback.
 
