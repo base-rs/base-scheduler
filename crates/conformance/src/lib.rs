@@ -90,3 +90,8 @@ pub mod socket_packet_io;
 
 pub mod process_wait;
 mod process_wait_tests;
+
+#[cfg(unix)]
+pub mod pipe;
+#[cfg(unix)]
+mod pipe_tests;

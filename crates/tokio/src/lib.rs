@@ -15,6 +15,8 @@ mod clock;
 mod file_extensions;
 mod file_io;
 mod panic;
+#[cfg(unix)]
+mod pipe_io;
 mod resolver;
 #[cfg(unix)]
 mod signal_service;
@@ -31,6 +33,10 @@ mod test_support;
 mod thread;
 mod tokio_file;
 mod tokio_options;
+#[cfg(unix)]
+mod tokio_pipe_reader;
+#[cfg(unix)]
+mod tokio_pipe_writer;
 mod tokio_scheduler;
 mod tokio_socket;
 #[cfg(unix)]

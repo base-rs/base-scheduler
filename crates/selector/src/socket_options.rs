@@ -83,6 +83,11 @@ impl Probe {
 }
 
 impl ReadinessSelector {
+    /// Adopt a pipe descriptor through the same nonblocking descriptor wrapper as sockets. Pipe handles use descriptor reads and writes rather than socket calls.
+    #[cfg(unix)]
+    pub(crate) fn adopt_pipe(&self, pipe: std::os::fd::OwnedFd) -> io::Result<NativeSocket> {
+        self.register_tcp(pipe.into())
+    }
     fn register_tcp(&self, socket: Socket) -> io::Result<NativeSocket> {
         self.check_open()?;
         NativeSocket::new(socket)
