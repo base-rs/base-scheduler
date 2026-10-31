@@ -70,6 +70,35 @@ impl Drop for PollWaiter<'_> {
 #[cfg(windows)]
 type RegisteredSocket = async_io::Async<socket2::Socket>;
 
+// Bounds a readiness wait whose wakeup was still lost; the timer's insertion, not its expiry, normally rescues the wait.
+#[cfg(windows)]
+const WINDOWS_READY_BOUND: std::time::Duration = std::time::Duration::from_secs(1);
+
+/// Wait for readiness after a `WouldBlock` syscall; the caller retries the syscall after any wake.
+///
+/// polling's IOCP backend can leave interest registered from a non-reactor thread queued while the reactor thread blocks without a timeout (smol-rs/polling#271), so a ready socket is never reported. Inserting a timer after registering interest notifies the reactor, which then submits the queued poll before waiting again. Remove this once a polling release fixes the race.
+#[cfg(windows)]
+async fn windows_ready(ready: impl std::future::Future<Output = io::Result<()>>) -> io::Result<()> {
+    use std::{
+        future::Future,
+        pin::{Pin, pin},
+        task::Poll,
+    };
+    let mut ready = pin!(ready);
+    let mut rescue = None;
+    std::future::poll_fn(|context| {
+        if rescue.is_some() {
+            return Poll::Ready(Ok(()));
+        }
+        // Register interest first, so the timer's reactor notification follows any queued registration.
+        let registered = ready.as_mut().poll(context);
+        let timer = rescue.insert(async_io::Timer::after(WINDOWS_READY_BOUND));
+        let _ = Pin::new(timer).poll(context);
+        registered
+    })
+    .await
+}
+
 /// A nonblocking socket associated with the adapter's Tokio runtime.
 ///
 /// A descriptor can represent an unconnected, bound, listening, connected, or datagram socket. Unix readiness registration is deferred until an operation needs to wait, so an unconnected socket cannot retain stale closed readiness after connecting or listening. It is deliberately not `Clone`; operation futures borrow it, and accepted shutdown jobs privately retain its registration until completion. Explicit close consumes exclusive ownership.
@@ -191,13 +220,15 @@ impl TokioSocket {
         #[cfg(windows)]
         {
             let _ = read_nonempty;
-            let result = operation(self.get_ref());
-            if !matches!(&result, Err(error) if error.kind() == io::ErrorKind::WouldBlock) {
-                return result;
-            }
-            match interest {
-                Interest::Readable => self.inner.read_with(|socket| operation(socket)).await,
-                Interest::Writable => self.inner.write_with(|socket| operation(socket)).await,
+            loop {
+                let result = operation(self.get_ref());
+                if !matches!(&result, Err(error) if error.kind() == io::ErrorKind::WouldBlock) {
+                    return result;
+                }
+                match interest {
+                    Interest::Readable => windows_ready(self.inner.readable()).await?,
+                    Interest::Writable => windows_ready(self.inner.writable()).await?,
+                }
             }
         }
     }
