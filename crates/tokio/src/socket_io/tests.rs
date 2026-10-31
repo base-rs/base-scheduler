@@ -3,7 +3,6 @@
 
 use super::*;
 use base_scheduler::{IoBuffers, IoBuffersMut};
-use std::net::TcpListener;
 use std::time::{Duration, Instant};
 
 thread_local! {
@@ -308,7 +307,7 @@ fn missing_control_storage_reports_discarded_packet_metadata() {
 #[cfg(windows)]
 #[test]
 fn message_receive_preserves_shutdown_errors() {
-    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let socket =
         Socket::from(std::net::TcpStream::connect(listener.local_addr().unwrap()).unwrap());
     let (_peer, _) = listener.accept().unwrap();
