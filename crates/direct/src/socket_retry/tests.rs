@@ -46,6 +46,28 @@ fn retries_wake_without_workers_and_cancellation_and_close_do_not_lose_wakeups()
 }
 
 #[test]
+fn waiters_registered_while_the_worker_sleeps_are_woken_promptly() {
+    let retry = Arc::new(SocketRetry::new());
+    for _ in 0..100 {
+        let idle = retry.shared.idle.listen();
+        let (done, completion) = std::sync::mpsc::channel();
+        let waiting = Arc::clone(&retry);
+        thread::spawn(move || {
+            let _ = done.send(block_on(waiting.wait(&Cancellation::never())));
+        });
+        completion
+            .recv_timeout(Duration::from_secs(5))
+            .expect("a waiter registered while the retry worker was idle was not woken")
+            .unwrap();
+        // The next waiter registers only after the worker has entered its indefinite wait.
+        assert!(
+            idle.wait_timeout(Duration::from_secs(5)).is_some(),
+            "retry worker did not sleep while idle"
+        );
+    }
+}
+
+#[test]
 fn retry_startup_failure_is_reported_consistently() {
     let mut retry = SocketRetry::new();
     retry.fail_start = true;

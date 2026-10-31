@@ -13,8 +13,14 @@ use std::task::Poll;
 use std::thread;
 use std::time::Duration;
 
+struct State {
+    closed: bool,
+    /// The worker is in its indefinite wait and needs a notification to resume pulsing.
+    sleeping: bool,
+}
+
 struct Shared {
-    closed: Mutex<bool>,
+    state: Mutex<State>,
     work: Condvar,
     retry: Event,
     #[cfg(test)]
@@ -34,7 +40,10 @@ impl SocketRetry {
         retry.notify(0);
         Self {
             shared: Arc::new(Shared {
-                closed: Mutex::new(false),
+                state: Mutex::new(State {
+                    closed: false,
+                    sleeping: false,
+                }),
                 work: Condvar::new(),
                 retry,
                 #[cfg(test)]
@@ -47,7 +56,7 @@ impl SocketRetry {
     }
 
     pub(crate) fn check_open(&self) -> io::Result<()> {
-        if *self.shared.closed.lock().unwrap() {
+        if self.shared.state.lock().unwrap().closed {
             Err(io::Error::new(
                 io::ErrorKind::BrokenPipe,
                 "scheduler is closed",
@@ -60,9 +69,9 @@ impl SocketRetry {
     pub(crate) async fn wait(&self, cancellation: &Cancellation) -> OperationResult<()> {
         event_listener::listener!(self.shared.retry => retry);
         {
-            let closed = self.shared.closed.lock().unwrap();
+            let state = self.shared.state.lock().unwrap();
             cancellation.check()?;
-            if *closed {
+            if state.closed {
                 return Err(
                     io::Error::new(io::ErrorKind::BrokenPipe, "scheduler is closed").into(),
                 );
@@ -82,10 +91,13 @@ impl SocketRetry {
             })
             .as_ref()
             .map_err(|error| io::Error::new(error.kind(), error.to_string()))?;
-        // Registration precedes notification. The worker checks listeners under this same lock before sleeping indefinitely.
+        // Registration precedes this check. The worker checks listeners under the same lock before sleeping indefinitely, so either it observes this listener or it is already sleeping and we wake it. A pulse in progress already covers this listener; cutting its period short would let idle waiters keep waking each other.
         {
-            let _closed = self.shared.closed.lock().unwrap();
-            self.shared.work.notify_one();
+            let mut state = self.shared.state.lock().unwrap();
+            if state.sleeping {
+                state.sleeping = false;
+                self.shared.work.notify_one();
+            }
         }
         let mut cancelled = pin!(cancellation.cancelled());
         let mut retry = pin!(retry);
@@ -99,7 +111,7 @@ impl SocketRetry {
     }
 
     pub(crate) fn close(&self) {
-        *self.shared.closed.lock().unwrap() = true;
+        self.shared.state.lock().unwrap().closed = true;
         self.shared.work.notify_all();
         self.shared.retry.notify(usize::MAX);
     }
@@ -112,22 +124,26 @@ impl Drop for SocketRetry {
 }
 
 fn work(shared: Arc<Shared>) {
-    let mut closed = shared.closed.lock().unwrap();
-    while !*closed {
+    let mut state = shared.state.lock().unwrap();
+    while !state.closed {
         if shared.retry.total_listeners() == 0 {
+            state.sleeping = true;
             #[cfg(test)]
             shared.idle.notify(usize::MAX);
-            closed = shared.work.wait(closed).unwrap();
+            state = shared.work.wait(state).unwrap();
+            // A spurious wakeup simply rechecks listeners.
+            state.sleeping = false;
         } else {
-            closed = shared
+            // Only closure notifies this wait; new waiters join the pulse already in progress.
+            state = shared
                 .work
-                .wait_timeout(closed, Duration::from_millis(2))
+                .wait_timeout(state, Duration::from_millis(2))
                 .unwrap()
                 .0;
-            // Wake executor code outside backend locks. Retrying early after a new waiter is harmless.
-            drop(closed);
+            // Wake executor code outside backend locks.
+            drop(state);
             shared.retry.notify(usize::MAX);
-            closed = shared.closed.lock().unwrap();
+            state = shared.state.lock().unwrap();
         }
     }
 }
