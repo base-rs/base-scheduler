@@ -220,15 +220,17 @@ impl TokioSocket {
         #[cfg(windows)]
         {
             let _ = read_nonempty;
+            // A readiness registration error ends the operation in place of the next syscall.
+            let mut ready = Ok(());
             loop {
-                let result = operation(self.get_ref());
+                let result = ready.and_then(|()| operation(self.get_ref()));
                 if !matches!(&result, Err(error) if error.kind() == io::ErrorKind::WouldBlock) {
                     return result;
                 }
-                match interest {
-                    Interest::Readable => windows_ready(self.inner.readable()).await?,
-                    Interest::Writable => windows_ready(self.inner.writable()).await?,
-                }
+                ready = match interest {
+                    Interest::Readable => windows_ready(self.inner.readable()).await,
+                    Interest::Writable => windows_ready(self.inner.writable()).await,
+                };
             }
         }
     }
