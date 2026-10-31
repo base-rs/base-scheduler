@@ -307,7 +307,7 @@ impl Signals for IoUringSelector {
     }
 }
 
-// Pipes use the readiness fallback; their transfers are borrowed and complete synchronously inside each poll, as for borrowed socket I/O.
+// Pipes use the readiness fallback and its portable reactor rather than ring polling. Their borrowed transfers complete synchronously inside each poll, and handles borrow the fallback, which closes with this selector.
 impl PipeReading for IoUringSelector {
     fn pipe_reader<'scheduler>(
         &'scheduler self,

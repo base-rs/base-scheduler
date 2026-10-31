@@ -14,13 +14,22 @@ use std::{
     process::{Command, Stdio},
 };
 
-// Spawning a child can briefly duplicate every descriptor in this process until the child closes its close-on-exec copies, which keeps a closed pipe end alive. End-of-file assertions tolerate the delay; broken-pipe assertions retry until any such copy is gone.
+// Spawning a child duplicates every descriptor in this process until the child closes its close-on-exec copies. macOS sets close-on-exec after creating a pipe, so a copy can even outlive the exec. The generated cases therefore run serially, and broken-pipe probes also retry until any transient copy is gone.
+static SERIAL: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// Serialize adopted pipe cases within a test binary, so that a concurrent child spawn cannot retain another case's pipe end. Hold the guard outside the async runner.
+pub fn serial() -> std::sync::MutexGuard<'static, ()> {
+    SERIAL
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
 fn pipe() -> (OwnedFd, OwnedFd) {
     let (reader, writer) = io::pipe().unwrap();
     (reader.into(), writer.into())
 }
 
-// Write through a blocking standard-library alias until the read end is gone, returning the first error.
+// Write through a standard-library alias until the read end is gone, returning the first error.
 fn broken(mut probe: io::PipeWriter) -> io::Error {
     std::iter::repeat_with(|| {
         std::thread::yield_now();
@@ -121,6 +130,31 @@ pub async fn vectored<S: PipeReading + PipeWriting>(scheduler: &S) {
     assert_eq!(&first, b"hell");
     assert_eq!(&second[..6], b"o pipe");
 
+    // Leading empty ranges beyond the vector limit must not hide the nonempty range.
+    let mut gather = vec![IoSlice::new(&[]); 1100];
+    gather.push(IoSlice::new(b"z"));
+    assert_eq!(
+        writer.write_vectored(&gather, &cancellation).await.unwrap(),
+        1
+    );
+    let mut empty: Vec<[u8; 0]> = vec![[]; 1100];
+    let mut last = [0; 1];
+    {
+        let mut scatter: Vec<IoSliceMut<'_>> = empty
+            .iter_mut()
+            .map(|range| IoSliceMut::new(range))
+            .collect();
+        scatter.push(IoSliceMut::new(&mut last));
+        assert_eq!(
+            reader
+                .read_vectored(&mut scatter, &cancellation)
+                .await
+                .unwrap(),
+            1
+        );
+    }
+    assert_eq!(&last, b"z");
+
     let filled = fill(&mut writer).await;
     assert!(filled > 0);
     {
@@ -186,8 +220,8 @@ pub async fn empty_transfers<S: PipeReading + PipeWriting>(scheduler: &S) {
     reader.close().await.unwrap();
 }
 
-/// Writing after the read end closes reports `BrokenPipe` instead of raising `SIGPIPE`, because Rust executables ignore that signal.
-pub async fn broken_pipe<S: PipeWriting>(scheduler: &S) {
+/// Writing after the read end closes, including a write already waiting for capacity, reports `BrokenPipe` instead of raising `SIGPIPE`, because Rust executables ignore that signal.
+pub async fn broken_pipe<S: PipeReading + PipeWriting>(scheduler: &S) {
     let (input, output) = pipe();
     let probe = io::PipeWriter::from(output.try_clone().unwrap());
     let mut writer = scheduler.pipe_writer(output).unwrap();
@@ -199,6 +233,20 @@ pub async fn broken_pipe<S: PipeWriting>(scheduler: &S) {
             .write_vectored(&[IoSlice::new(b"lost")], &Cancellation::never())
             .await,
     );
+    writer.close().await.unwrap();
+
+    // A write waiting for capacity wakes with `BrokenPipe` when the adopted reader is dropped.
+    let (input, output) = pipe();
+    let reader = scheduler.pipe_reader(input).unwrap();
+    let mut writer = scheduler.pipe_writer(output).unwrap();
+    fill(&mut writer).await;
+    {
+        let never = Cancellation::never();
+        let mut writing = pin!(writer.write(b"x", &never));
+        assert!(poll_once(writing.as_mut()).await.is_none());
+        drop(reader);
+        assert_broken_pipe(writing.await);
+    }
     writer.close().await.unwrap();
 }
 

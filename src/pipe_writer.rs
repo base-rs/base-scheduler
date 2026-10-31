@@ -27,6 +27,6 @@ pub trait PipeWriter: Send {
         cancellation: &Cancellation,
     ) -> impl Future<Output = OperationResult<usize>> + Send;
 
-    /// Stop output, retire backend registration and close the descriptor, reporting the close result. There is no buffered output to flush. Readers observe end of file once no other write ends remain. Later operations fail with `BrokenPipe`; repeating `close` succeeds without further effect. Dropping the writer also closes the descriptor, without awaiting retirement.
+    /// Stop output, retire backend registration and close the descriptor, reporting the close result. There is no buffered output to flush. Readers observe end of file once no other write ends remain. Later operations fail with `BrokenPipe`; repeating `close` succeeds without further effect. Dropping the writer also closes the descriptor, without awaiting retirement. Unlike socket and file handles, a pipe handle owns its descriptor. After backend shutdown, `close` can report the shutdown error; the descriptor is closed regardless.
     fn close(&mut self) -> impl Future<Output = io::Result<()>> + Send;
 }

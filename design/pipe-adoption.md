@@ -12,7 +12,7 @@ Tomori's server runs agent, speech recognition and synthesis workers as child pr
 
 ## Scope
 
-The `PipeReading`, `PipeWriting`, `PipeReader` and `PipeWriter` traits; Direct, readiness selector, Tokio, Native forwarding, and io\_uring through its readiness fallback; and reusable conformance assertions. Owned-buffer reads and writes, regular files, terminals, and Windows anonymous pipes are out of scope. Setting `O_NONBLOCK` affects the shared file description, including other descriptors duplicated from it.
+The `PipeReading`, `PipeWriting`, `PipeReader` and `PipeWriter` traits; Direct, readiness selector, Tokio, Native forwarding, and io\_uring through its readiness fallback; and reusable conformance assertions. Owned-buffer reads and writes, FIFOs, regular files, terminals, and Windows anonymous pipes are out of scope. Linux and macOS are validated; other Unix platforms may reject readiness registration for the opposite direction of a pipe end. Setting `O_NONBLOCK` affects the shared file description, including other descriptors duplicated from it.
 
 ## Validation
 

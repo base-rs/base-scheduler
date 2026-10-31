@@ -25,6 +25,6 @@ pub trait PipeReader: Send {
         cancellation: &Cancellation,
     ) -> impl Future<Output = OperationResult<usize>> + Send;
 
-    /// Stop input, retire backend registration and close the descriptor, reporting the close result. Later operations fail with `BrokenPipe`; repeating `close` succeeds without further effect. Dropping the reader also closes the descriptor, without awaiting retirement.
+    /// Stop input, retire backend registration and close the descriptor, reporting the close result. Later operations fail with `BrokenPipe`; repeating `close` succeeds without further effect. Dropping the reader also closes the descriptor, without awaiting retirement. Unlike socket and file handles, a pipe handle owns its descriptor. After backend shutdown, `close` can report the shutdown error; the descriptor is closed regardless.
     fn close(&mut self) -> impl Future<Output = io::Result<()>> + Send;
 }

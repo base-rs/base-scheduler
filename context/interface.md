@@ -238,7 +238,7 @@ The concrete io\_uring multishot receiver remains a standalone backend experimen
 
 ## Adopted pipes
 
-On Unix, `PipeReading::pipe_reader(OwnedFd)` and `PipeWriting::pipe_writer(OwnedFd)` adopt an owned pipe descriptor, such as one converted from `ChildStdout` or `ChildStdin`, and set it nonblocking. `PipeReader` supplies `read_into` and `read_vectored`, where zero means end of file; `PipeWriter` supplies `write` and `write_vectored`, reporting a closed read end as `BrokenPipe`. Empty transfers complete without I/O. `close().await` retires the handle and closes the descriptor; later operations fail with `BrokenPipe`. Dropping a handle closes the descriptor. Backends reuse their socket readiness machinery with `read`/`write` system calls; io\_uring uses its readiness fallback. See [Pipe Adoption](../design/pipe-adoption.md).
+On Unix, `PipeReading::pipe_reader(OwnedFd)` and `PipeWriting::pipe_writer(OwnedFd)` adopt an owned pipe descriptor, such as one converted from `ChildStdout` or `ChildStdin`, and set it nonblocking. `PipeReader` supplies `read_into` and `read_vectored`, where zero means end of file; `PipeWriter` supplies `write` and `write_vectored`, reporting a closed read end as `BrokenPipe`. Empty transfers complete without I/O. `close().await` retires the handle and closes the descriptor; later operations fail with `BrokenPipe`. Dropping a handle closes the descriptor. Backends reuse their socket readiness machinery with `read`/`write` system calls; io\_uring uses its readiness fallback and portable reactor rather than ring polling. Unlike socket and file handles, pipe handles own their descriptor. FIFOs are unsupported. See [Pipe Adoption](../design/pipe-adoption.md).
 
 ## Child process waits
 
