@@ -40,6 +40,10 @@ Prepare a release with `cargo bake cargo:version:patch` (or `minor`, `major`, or
 
 See [releases.md](releases.md) for the full release history.
 
+### v0.3.1
+
+- Add Unix `PipeReading` and `PipeWriting` capabilities which adopt an owned pipe descriptor, such as a child process's standard input or output, as a sequential reader or writer. Direct, readiness, Tokio and Native support them natively; io\_uring uses its readiness fallback.
+
 ### v0.3.0
 
 - Register child cancellation signals in reusable slots instead of a hash map. Creating and dropping a child no longer hashes, and steady churn does not grow the parent's registry. In the HTTP client benchmark at 32 concurrent requests, this saves about 245 user instructions per response.
@@ -57,10 +61,6 @@ See [releases.md](releases.md) for the full release history.
 - Avoid an extra `WouldBlock` receive after short borrowed scalar stream reads on io\_uring when OOB support is disabled. Preserve EOF notifications, racing readiness, cancellation and registration retirement; opt-in OOB and message receives keep conservative retries.
 
 - Add compile-time `SocketStreamReader::with_oob_support` selection, disabled by default. Native Linux epoll avoids an extra receive after ordinary short scalar reads and rejects reported urgent data; opt-in support preserves ordinary-byte progress across urgent marks. Other receive paths retain conservative behavior.
-
-### v0.1.2
-
-- Avoid retrying blocked fallback socket operations on unrelated task wakes, reducing io\_uring listener overhead while preserving immediate I/O progress.
 
 <!-- bake-readme:releases:end -->
 

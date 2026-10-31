@@ -1,6 +1,6 @@
 [package]
 name = "base-scheduler-tokio"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2024"
 rust-version = "1.87"
 license = "MIT"
@@ -9,7 +9,7 @@ description = "Tokio runtime adapter for explicit scheduler capabilities"
 readme = "readme.md"
 
 [dependencies]
-base-scheduler = { path = "../..", version = "0.3.0" }
+base-scheduler = { path = "../..", version = "0.3.1" }
 event-listener = "5.4.2"
 futures-channel = "0.3.31"
 socket2 = { version = "0.6.3", features = ["all"] }
@@ -25,7 +25,7 @@ windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Network
 
 [dev-dependencies]
 tokio = { version = "1.53.3", features = ["rt-multi-thread", "test-util", "macros"] }
-base-scheduler-conformance = { path = "../conformance", version = "0.3.0" }
+base-scheduler-conformance = { path = "../conformance", version = "0.3.1" }
 futures-lite = "2.6.1"
 tempfile = "3"
 allocation-counter = "0.8.1"
