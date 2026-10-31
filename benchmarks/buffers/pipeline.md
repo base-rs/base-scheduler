@@ -9,7 +9,7 @@ The [960 loopback samples](results/pipeline-loopback-summary.md), [360 physical-
 The longer validation uses seven randomized repeats per 64/128 KiB cell, one TCP connection, retained parser views, one ring, and 128 MiB of incoming request data per mode. Fixed-zero-copy/ordinary throughput ratios are medians of matched per-repeat ratios:
 
 | Request chunk | Fixed zero-copy / ordinary throughput | Observed pair range | Fixed / unregistered zero-copy throughput |
-|---|---:|---:|---:|
+| --- | ---: | ---: | ---: |
 | 64 KiB | 1.004× | 0.998–1.017× | 1.002× |
 | 128 KiB | 0.989× | 0.931–1.132× | 0.998× |
 

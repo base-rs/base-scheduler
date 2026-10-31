@@ -2,7 +2,7 @@
 
 ## v0.3.1
 
-- Add Unix `PipeReading` and `PipeWriting` capabilities which adopt an owned pipe descriptor, such as a child process's standard input or output, as a sequential reader or writer. Direct, readiness, Tokio and Native support them natively; io\_uring uses its readiness fallback.
+- Add Unix `PipeReading` and `PipeWriting` capabilities which adopt an owned pipe descriptor, such as a child process's standard input or output, as a sequential reader or writer. Direct, readiness, Tokio and Native support them natively; io_uring uses its readiness fallback.
 
 ## v0.3.0
 
@@ -14,17 +14,17 @@
 
 - Correct all socket reader/writer factory lifetime bounds so connections can own sockets alongside their directional handles. Handles retain scheduler and backend access without borrowing the temporary socket reference. Backend implementors must add compatible precise capture bounds (`use<...>`); raise the workspace minimum Rust version to 1.87.
 
-- Publish immediately available io\_uring completions after nonblocking submission, reducing delivery latency while preserving cancellation, notification handling and shutdown.
+- Publish immediately available io_uring completions after nonblocking submission, reducing delivery latency while preserving cancellation, notification handling and shutdown.
 
-- Batch io\_uring completion task work on fresh thread-bound workers with deferred task running. Preserve cooperative and original-ring fallbacks, nonblocking completion progress, cancellation and movable drivers.
+- Batch io_uring completion task work on fresh thread-bound workers with deferred task running. Preserve cooperative and original-ring fallbacks, nonblocking completion progress, cancellation and movable drivers.
 
-- Avoid an extra `WouldBlock` receive after short borrowed scalar stream reads on io\_uring when OOB support is disabled. Preserve EOF notifications, racing readiness, cancellation and registration retirement; opt-in OOB and message receives keep conservative retries.
+- Avoid an extra `WouldBlock` receive after short borrowed scalar stream reads on io_uring when OOB support is disabled. Preserve EOF notifications, racing readiness, cancellation and registration retirement; opt-in OOB and message receives keep conservative retries.
 
 - Add compile-time `SocketStreamReader::with_oob_support` selection, disabled by default. Native Linux epoll avoids an extra receive after ordinary short scalar reads and rejects reported urgent data; opt-in support preserves ordinary-byte progress across urgent marks. Other receive paths retain conservative behavior.
 
 ## v0.1.2
 
-- Avoid retrying blocked fallback socket operations on unrelated task wakes, reducing io\_uring listener overhead while preserving immediate I/O progress.
+- Avoid retrying blocked fallback socket operations on unrelated task wakes, reducing io_uring listener overhead while preserving immediate I/O progress.
 
 ## v0.1.1
 
@@ -55,10 +55,10 @@ Initial release of the runtime-independent scheduler interface and its seven com
 
 - Add reusable buffer pools, unique writable chunks, retained immutable views, and owned scatter/gather storage. Support explicit read/write overlap, ordered owned stream submission and flushing, and separate file acceptance/completion waits.
 
-- Include Direct reference and Tokio adapter backends, plus the Native work-stealing executor with worker-local event loops and timers. Provide independently driven readiness and Linux io\_uring selectors, with per-worker rings, reusable request state, and optional fixed-file registrations.
+- Include Direct reference and Tokio adapter backends, plus the Native work-stealing executor with worker-local event loops and timers. Provide independently driven readiness and Linux io_uring selectors, with per-worker rings, reusable request state, and optional fixed-file registrations.
 
-- Support child process status waits, Unix process-group selection and state-change flags, native process notifications, optional io\_uring `WAITID`, and bounded blocking fallbacks. A started blocking wait may finish after cancellation and delay shutdown.
+- Support child process status waits, Unix process-group selection and state-change flags, native process notifications, optional io_uring `WAITID`, and bounded blocking fallbacks. A started blocking wait may finish after cancellation and delay shutdown.
 
 - Supply reusable conformance suites, cross-backend I/O examples, and matched network, file, buffer, and timer benchmarks. CI checks Linux, macOS, Windows, the minimum Rust version, and complete measured source-region coverage.
 
-- Keep the reusable timer capability and concrete io\_uring multishot receiver API experimental. Portable application code uses the bound reader/writer capabilities.
+- Keep the reusable timer capability and concrete io_uring multishot receiver API experimental. Portable application code uses the bound reader/writer capabilities.

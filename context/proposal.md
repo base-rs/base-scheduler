@@ -24,7 +24,7 @@ Resource types belong to the implementation through associated types. A file ope
 
 Cancellation, operation results, buffer ownership, and resource lifetimes need consistent public semantics. Those shared types may contain runtime-independent implementation code. An interface crate can have no concrete scheduler while still providing useful code for cancellation state and future notification.
 
-The interface must not expose Tokio task handles, readiness registrations, or io\_uring request records as mandatory public types. Generic consumers should require only the capabilities they use. Higher-level concurrency primitives and task groups can be built above the primitive interface.
+The interface must not expose Tokio task handles, readiness registrations, or io_uring request records as mandatory public types. Generic consumers should require only the capabilities they use. Higher-level concurrency primitives and task groups can be built above the primitive interface.
 
 ## Compile-time selection
 
@@ -52,9 +52,9 @@ Task execution, I/O execution, and event waiting are distinct responsibilities:
 | Perform I/O operations | Blocking thread pool, readiness plus system calls, or io_uring |
 | Wait for events and wake tasks | An independent reactor or the host runtime's reactor |
 
-A scheduler implementation can combine these responsibilities behind one coherent interface. Choosing Tokio for task execution should allow choosing Socketry's io\_uring machinery for I/O.
+A scheduler implementation can combine these responsibilities behind one coherent interface. Choosing Tokio for task execution should allow choosing Socketry's io_uring machinery for I/O.
 
-For example, a Tokio adapter could submit operations to a Socketry-owned ring, register the ring descriptor with Tokio through `AsyncFd`, and run a driver task that consumes completion entries and wakes the corresponding operation futures. Readiness signals when to inspect the ring; operation results come from its completion queue. Tokio's [public descriptor registration interface](https://docs.rs/tokio/latest/tokio/io/unix/struct.AsyncFd.html) and [internal io\_uring driver](https://docs.rs/tokio/latest/src/tokio/runtime/io/driver/uring.rs.html) provide relevant reference points.
+For example, a Tokio adapter could submit operations to a Socketry-owned ring, register the ring descriptor with Tokio through `AsyncFd`, and run a driver task that consumes completion entries and wakes the corresponding operation futures. Readiness signals when to inspect the ring; operation results come from its completion queue. Tokio's [public descriptor registration interface](https://docs.rs/tokio/latest/tokio/io/unix/struct.AsyncFd.html) and [internal io_uring driver](https://docs.rs/tokio/latest/src/tokio/runtime/io/driver/uring.rs.html) provide relevant reference points.
 
 The reusable ring machinery would own operation encoding, buffers, cancellation, and completion handling. It could be driven by a dedicated reactor thread or by a host runtime task. This separation is a proposed implementation direction, not an additional public capability requirement.
 

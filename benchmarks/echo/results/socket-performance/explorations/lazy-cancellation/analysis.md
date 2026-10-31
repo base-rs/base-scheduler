@@ -7,7 +7,7 @@ Build: `CARGO_PROFILE_RELEASE_DEBUG=1 cargo build --release --locked -p core-sch
 Screen: three randomized repetitions, one worker, 32 connections, 64-byte messages, one-second warmup and three-second measurement. Server CPU 0; fixed client CPUs 4–7. Both source variants use the same benchmark dispatch implementation.
 
 | Backend | Baseline median req/s | Candidate median req/s | Change |
-|---|---:|---:|---:|
+| --- | ---: | ---: | ---: |
 | tokio-adapter | 618,989 | 626,032 | +1.14% |
 | tokio-adapter-poll | 624,154 | 627,897 | +0.60% |
 

@@ -37,7 +37,7 @@ Each worker owns an unsynchronized timer queue and collects expiries in its even
 
 A sleep first polled on a worker registers directly with that worker. Root futures and other executors choose a worker by round robin and send it a registration command. A pending sleep retains its original owner when its future moves; waker changes, cancellation, and drop update that owner's queue. A subsequent sleep can choose the task's new worker. Shutdown wakes pending sleepers and waits for worker timer callbacks and driver retirement.
 
-The executor and readiness design come from [Socketry](https://github.com/base-rs/socketry-rust/tree/7a70586d5d37fb640d696d0c03a05b2ee3cbe06b/crates/executor). This adapter follows Base's current ownership, cancellation, and asynchronous shutdown contracts. It does not include Socketry's io\_uring backend.
+The executor and readiness design come from [Socketry](https://github.com/base-rs/socketry-rust/tree/7a70586d5d37fb640d696d0c03a05b2ee3cbe06b/crates/executor). This adapter follows Base's current ownership, cancellation, and asynchronous shutdown contracts. It does not include Socketry's io_uring backend.
 
 ## Selector composition
 
@@ -59,11 +59,11 @@ scheduler.block_on(scheduler.shutdown());
 # Ok::<(), std::io::Error>(())
 ```
 
-Selectors may supply their own progress mechanism. The readiness selector is independently driven by `async-io`. `with_drivers(selector, drivers, options)` instead assigns one driver to each task worker, with no separate ring thread. Each `SelectorDriver` enters its worker and supplies `SelectorWorker` event waits, interruptible wakeups, and bounded completion processing. Native polls ready tasks only after a complete driver turn publishes its completions. Workers continue retiring accepted I/O after tasks are abandoned, and can keep executing tasks after a driver has retired. See the [io\_uring selector](../iouring/readme.md) for per-worker ring construction and routing.
+Selectors may supply their own progress mechanism. The readiness selector is independently driven by `async-io`. `with_drivers(selector, drivers, options)` instead assigns one driver to each task worker, with no separate ring thread. Each `SelectorDriver` enters its worker and supplies `SelectorWorker` event waits, interruptible wakeups, and bounded completion processing. Native polls ready tasks only after a complete driver turn publishes its completions. Workers continue retiring accepted I/O after tasks are abandoned, and can keep executing tasks after a driver has retired. See the [io_uring selector](../iouring/readme.md) for per-worker ring construction and routing.
 
 Construct scheduler-bound stream and packet readers and writers for application I/O, and file readers and writers for repeated file operations. Their operations take cancellation without another scheduler argument. Borrowed-only readers allocate no payload pool; owned reads use lazy default storage or an explicit shared pool. Close and drop every handle before exclusively closing its underlying resource. See the [I/O usage guide](../../context/io.md) for the recommended paths.
 
-Native forwards the selected backend’s bound reader and writer factories directly. Both readiness and io\_uring provide stream and packet readers and writers, plus file readers and writers; registration and retirement state remain private to those handles.
+Native forwards the selected backend’s bound reader and writer factories directly. Both readiness and io_uring provide stream and packet readers and writers, plus file readers and writers; registration and retirement state remain private to those handles.
 
 ## Releasing
 

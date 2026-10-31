@@ -1,6 +1,6 @@
 # `base-scheduler-iouring`
 
-A Linux selector with independently driven completion I/O. Owned file reads and writes (including positioned operations), socket reads/writes, and socket message sends/receives use io\_uring. Borrowed `_poll` operations try nonblocking syscalls directly and use ring readiness waits after `WouldBlock`. Other file operations, socket lifecycle, resolution, blocking work, and signals use an explicitly owned `ReadinessSelector` fallback.
+A Linux selector with independently driven completion I/O. Owned file reads and writes (including positioned operations), socket reads/writes, and socket message sends/receives use io_uring. Borrowed `_poll` operations try nonblocking syscalls directly and use ring readiness waits after `WouldBlock`. Other file operations, socket lifecycle, resolution, blocking work, and signals use an explicitly owned `ReadinessSelector` fallback.
 
 Application code constructs scheduler-bound stream and packet readers and writers, plus file readers and writers. Operations accept cancellation without another scheduler argument; registration, request reuse, and worker migration remain internal. See the [I/O usage guide](../../context/io.md).
 

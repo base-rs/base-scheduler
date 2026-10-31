@@ -5,7 +5,7 @@ Base: merged `427be5d2ef6c610a5d5de5b10570c938b65d6c2d`, isolated `perf/native-n
 All builds are optimized default release builds with the same fixed owner-wake-final client and baseline server. Initial screens have three randomized baseline/candidate repetitions per workload, one-second warmup and three-second measured window; server CPU0 or CPUs0-3, client CPUs4-7. Timings and profiles held the exclusive shared performance lock; builds held its shared mode. Raw sample files, runner sources, candidate binaries, exact patches and hashes are preserved here.
 
 | Candidate | Workers/connections | Baseline median req/s | Candidate median req/s | Change |
-|---|---:|---:|---:|---:|
+| --- | ---: | ---: | ---: | ---: |
 | completion | 1/32 | 566,143 | 572,647 | +1.15% |
 | completion | 4/128 | 1,959,167 | 1,987,163 | +1.43% |
 | route | 1/1 | 229,742 | 225,198 | -1.98% |

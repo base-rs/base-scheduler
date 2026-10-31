@@ -28,7 +28,7 @@ Typed request boxes and completion slots were already reusable in the preceding 
 ## Other optimization opportunities
 
 | State | Existing reuse or proposed opportunity | Decision and constraint |
-|---|---|---|
+| --- | --- | --- |
 | File request and completion | Reuse typed request and completion storage. | Implemented in the original monitor prototype; changing buffer-owner type replaces the request. Fresh identifiers protect delayed cancellation. |
 | Fixed-file registration | Cache passive registration on each visited ring. | Implemented here; bounded table and ordinary-descriptor fallback. Measure incremental benefit separately from request reuse. |
 | Socket readiness | Retain directional multishot poll and cached readiness. | Already implemented. Registering the socket as a fixed file could only help poll setup/rearm; direct recv/send syscalls still need the ordinary descriptor. No measured reason to add this lease complexity yet. |
@@ -80,7 +80,7 @@ The useful result is a shared ownership model and a small, measured local read o
 Throughput medians are thousands of operations per second. Changes are medians of matched-pair ratios, with observed ranges; they need not equal ratios of the throughput medians. `Unregistered/original` exposes added cache/lease overhead without fixed-file benefit.
 
 | Operation | Bytes | Tasks/workers | Original kops/s | Unregistered kops/s | Registered kops/s | Registered/unregistered | Registered/original | Unregistered/original |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | read-at | 4096 | 1/1 | 659.9 | 641.5 | 665.4 | +3.7% (+2.3% to +6.7%) | +0.9% (-0.7% to +4.3%) | -2.9% (-3.2% to -2.3%) |
 | read-at | 4096 | 16/4 | 4119.6 | 4193.2 | 4249.3 | +1.7% (+0.5% to +4.6%) | +3.0% (+2.7% to +4.3%) | +1.7% (-0.3% to +2.4%) |
 | read-at | 65536 | 1/1 | 419.5 | 419.6 | 436.7 | +4.1% (-0.5% to +6.0%) | +4.4% (-1.3% to +6.7%) | -0.2% (-1.0% to +1.0%) |
@@ -95,7 +95,7 @@ Throughput medians are thousands of operations per second. Changes are medians o
 One caller submits through the remote queue, using one driver for the same-ring control and two drivers for alternating rings. Absolute throughput includes remote scheduling and wakeups. This does not measure task stealing or isolate a pure migration instruction cost.
 
 | Operation | Bytes | Drivers | Unregistered kops/s | Registered kops/s | Registered/unregistered |
-|---|---:|---:|---:|---:|---:|
+| --- | ---: | ---: | ---: | ---: | ---: |
 | read-at | 4096 | 1 | 271.9 | 275.7 | +0.9% (-2.2% to +2.3%) |
 | read-at | 4096 | 2 | 224.3 | 229.6 | +0.0% (-11.6% to +22.0%) |
 | read-at | 65536 | 1 | 219.7 | 218.9 | -0.4% (-1.6% to +0.2%) |

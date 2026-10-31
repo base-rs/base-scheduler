@@ -63,7 +63,7 @@ TMPDIR=/dev/shm taskset -c 0-31 strace -f -qq -e io_uring_register -c /tmp/migra
 Negative changes mean invalidation is slower. Batch delta is the median difference of matched mean batch latencies; large-batch noise and same-worker differences are not pure migration cost.
 
 | Workers | Operations per batch | Bytes | Operation | Invalidation throughput change (observed range) | Batch delta (µs) |
-|---:|---:|---:|---|---:|---:|
+| ---: | ---: | ---: | --- | ---: | ---: |
 | 1 | 1 | 4096 | read-at | +1.0% (-2.5% to +6.1%) | -0.04 |
 | 1 | 1 | 4096 | write-at | -0.5% (-3.4% to +3.0%) | +0.02 |
 | 1 | 1 | 65536 | read-at | +0.9% (-2.3% to +5.5%) | -0.05 |

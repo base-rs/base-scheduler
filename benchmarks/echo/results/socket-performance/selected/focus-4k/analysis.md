@@ -3,7 +3,7 @@
 Five randomized repeats each for baseline native, selected native, and baseline pure Tokio; one worker, one connection, 1-second warmup and 3-second measurement. Exclusive timing flock; no builds or source edits.
 
 | Variant | Median req/s | Range req/s | Mean req/s | Median server lifecycle CPU s | Median p99 µs |
-|---|---:|---:|---:|---:|---:|
+| --- | ---: | ---: | ---: | ---: | ---: |
 | before iouring | 188,916 | 167,470–191,310 | 184,712 | 3.008 | 8.011 |
 | after iouring | 186,524 | 183,803–196,132 | 189,266 | 3.070 | 7.663 |
 | before tokio | 234,407 | 233,155–242,741 | 236,140 | 1.596 | 5.383 |

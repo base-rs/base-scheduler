@@ -13,7 +13,7 @@ Frozen server sources and executable SHA-256 hashes:
 All four profiles use 1 worker, 32 connections, 64-byte messages, a 1-second warmup and 5-second measurement, `cycles:u` at 999 Hz, and DWARF call stacks. Server CPU 0; client CPUs 4–7. All report zero lost samples. See each `self.txt` and `callgraph.txt` for full output.
 
 | Self sample location | Before owned adapter | After owned adapter | After adapter poll | After pure Tokio |
-|---|---:|---:|---:|---:|
+| --- | ---: | ---: | ---: | ---: |
 | `Readiness::poll` | 13.72% | <0.5% | <0.5% | <0.5% |
 | `Readiness::drop` | 13.81% | <0.5% | <0.5% | <0.5% |
 | `TaskFuture::poll` | 13.07% | 12.33% | 14.01% | N/A |
@@ -29,7 +29,7 @@ These are sampled instruction locations, not predicted wall-clock savings. Altho
 Each trace uses 64-byte messages, no warmup, and a 0.5-second measurement. Whole-process totals include startup and shutdown.
 
 | Backend/case | Before measured requests | After measured requests | Before `io_uring_enter` | After `io_uring_enter` | Before `epoll_ctl` / `epoll_pwait` | After `epoll_ctl` / `epoll_pwait` |
-|---|---:|---:|---:|---:|---:|---:|
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | Owned, 1w/1c | 15,098 | 15,328 | 60,406 | 61,329 | 19 / 1 | 7 / 0 |
 | Poll, 1w/1c | 42,621 | 41,132 | 54 | 39 | 38 / 6 | 7 / 0 |
 | Owned, 4w/32c | 325,492 | 390,281 | 137,868 | 172,294 | 172 / 18 | 69 / 0 |

@@ -9,7 +9,7 @@ These source-change screens use default Cargo release optimization without profi
 `waiter-swap` replaces compare_exchange(false, true, Acquire, Relaxed) with swap(true, Acquire). `flat-state` combines that with caching the initial OnceCell registration reference and flattening one nested async block.
 
 | Variant | Backend | Median req/s | Minimum | Maximum |
-|---|---|---:|---:|---:|
+| --- | --- | ---: | ---: | ---: |
 | baseline | tokio-adapter | 648,433 | 646,751 | 649,339 |
 | swap | tokio-adapter | 648,195 | 643,778 | 649,228 |
 | flat | tokio-adapter | 648,906 | 646,664 | 649,131 |
@@ -23,7 +23,7 @@ These source-change screens use default Cargo release optimization without profi
 `cancellation-inline` restores baseline and adds `#[inline]` to Cancellation::check, is_cancelled, and cancelled. Baseline optimized disassembly retains indirect GOT calls to check()/is_cancelled() in hot Tokio/native task pollers. The inline build eliminates those two symbols/calls, while its Tokio poll bodies grow slightly.
 
 | Variant | Backend | Median req/s | Minimum | Maximum |
-|---|---|---:|---:|---:|
+| --- | --- | ---: | ---: | ---: |
 | baseline | tokio-adapter | 648,114 | 646,271 | 649,183 |
 | inline | tokio-adapter | 650,347 | 649,019 | 657,932 |
 | baseline | tokio-adapter-poll | 653,272 | 648,271 | 655,450 |
@@ -41,7 +41,7 @@ The waiter/state screen is flat for owned operations and weakly positive for bor
 `wrappers-inline` restores baseline then adds `#[inline]` to TokioScheduler::check_open/check_socket and socket_io::recv/send/recv_poll/send_poll. All six symbols disappear from the optimized binary as intended. No public semantics change.
 
 | Variant | Backend | Median req/s | Minimum | Maximum |
-|---|---|---:|---:|---:|
+| --- | --- | ---: | ---: | ---: |
 | baseline | tokio-adapter | 650,932 | 650,424 | 653,853 |
 | inline | tokio-adapter | 643,558 | 635,744 | 645,638 |
 | baseline | tokio-adapter-poll | 652,592 | 648,581 | 656,445 |

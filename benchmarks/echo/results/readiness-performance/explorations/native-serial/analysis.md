@@ -3,7 +3,7 @@
 Five randomized repetitions per frozen binary, exclusive shared performance lock, one-second warmup and three-second measurement, default optimized release builds, fixed client, 1 worker/1 connection/64 bytes. The no-coop variant differs from selected source only by removing `setup_coop_taskrun` and `setup_taskrun_flag`; started tracking and replacement-ring construction remain.
 
 | Binary | Median requests/s | Mean requests/s | Range requests/s |
-|---|---:|---:|---:|
+| --- | ---: | ---: | ---: |
 | before | 233,158 | 231,266 | 224,197–235,865 |
 | selected | 227,074 | 227,887 | 223,232–233,437 |
 | no-coop | 230,621 | 228,613 | 224,394–232,609 |

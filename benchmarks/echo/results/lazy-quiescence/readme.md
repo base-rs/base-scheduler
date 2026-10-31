@@ -15,7 +15,7 @@ The five-run confirmation improves owned serial throughput by 2.68%, from 256,60
 | 1 connection, 64 bytes | 256,609 | 263,498 | 273,293 | 5.443 µs | 4.331 µs |
 | 32 connections, 64 bytes | 645,983 | 642,574 | 701,639 | 53.919 µs | 53.375 µs |
 
-The candidate remains 3.58% below ordinary Tokio in the serial confirmation and 8.42% below it with 32 connections. These are throughput ratios within this screen, not a complete attribution of the remaining difference. Owned Native still submits actual io\_uring receives; borrowed Native retains its conservative readable-until-`WouldBlock` policy, while ordinary Tokio may clear readiness after a short successful stream read. User buffer ownership, cancellation, panic containment, and cleanup are unchanged.
+The candidate remains 3.58% below ordinary Tokio in the serial confirmation and 8.42% below it with 32 connections. These are throughput ratios within this screen, not a complete attribution of the remaining difference. Owned Native still submits actual io_uring receives; borrowed Native retains its conservative readable-until-`WouldBlock` policy, while ordinary Tokio may clear readiness after a short successful stream read. User buffer ownership, cancellation, panic containment, and cleanup are unchanged.
 
 The wider screen has owned throughput changes from −1.27% to +1.40%, and borrowed changes from −1.38% to +0.27%. These small, mixed differences do not establish a general throughput gain. P99 changes are retained below and every run range remains in the generated summary. The selected benefit is avoiding unused quiescence synchronization, with the clearest measured improvement in small serial owned reads.
 

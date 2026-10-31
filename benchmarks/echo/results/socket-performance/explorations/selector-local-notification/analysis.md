@@ -5,7 +5,7 @@ The plain runtime source is 46f11468be79f4bf46ff8171f7b66498d8405e56: base 63da7
 Three randomized samples each of frozen selected and plain local-flag builds, then a separate three-sample counted comparison. One worker, one connection, 64 bytes, 1 s warmup plus 3 s measurement. Source counters were not used in the plain performance comparison. Builds held the shared /tmp/core-scheduler-perf.lock and each timing matrix held it exclusively.
 
 | Matrix / variant | Median measured req/s | Median lifecycle voluntary CSW | req/s samples |
-|---|---:|---:|---|
+| --- | ---: | ---: | --- |
 | plain/selected-frozen | 237,924 | 89,000 | 240,279, 237,924, 234,969 |
 | plain/selected-local-notify | 179,447 | 719,886 | 179,175, 179,447, 180,713 |
 | counted/selected-frozen-counted | 235,021 | 140,796 | 235,021, 234,274, 238,299 |
@@ -14,7 +14,7 @@ Three randomized samples each of frozen selected and plain local-flag builds, th
 Plain local flag median throughput change versus frozen: **-24.58%**. This fails the performance screen; no larger workload matrix was run.
 
 | Counter variant/repeat | Same-worker pipe writes | Other-thread pipe writes | Local flag set/taken | Wait syscalls | Voluntary CSW |
-|---|---:|---:|---|---:|---:|
+| --- | ---: | ---: | --- | ---: | ---: |
 | selected-frozen-counted/1 | 915,672 | 2 | 0/0 | 940,090 | 140,796 |
 | selected-frozen-counted/2 | 917,306 | 2 | 0/0 | 942,302 | 135,038 |
 | selected-frozen-counted/3 | 913,534 | 2 | 0/0 | 938,212 | 146,119 |

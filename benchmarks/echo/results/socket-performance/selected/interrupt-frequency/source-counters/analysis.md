@@ -5,7 +5,7 @@ Experimental source counters on exact prototype `4a061fbc` and direct-read varia
 Three randomized repetitions per executable; one worker, one connection, 64 bytes; 1-second warmup and 3-second measurement. Frozen controls are the exact previously retained binaries. Counter builds use `cargo build --release --locked` with `CARGO_PROFILE_RELEASE_DEBUG=1`, RUSTFLAGS unset. The older frozen direct-read executable originally used RUSTFLAGS=-Cdebuginfo=1; its hash is preserved. Shared build locks and exclusive timing locks were used.
 
 | Variant | Median measured req/s | Median lifecycle voluntary CSW | Measured req/s samples |
-|---|---:|---:|---|
+| --- | ---: | ---: | --- |
 | prototype-frozen | 220,754 | 887,177 | 220,754, 199,077, 223,692 |
 | prototype-counted | 219,220 | 870,959 | 219,220, 227,445, 212,531 |
 | direct-read-frozen | 189,884 | 750,051 | 190,473, 179,903, 189,884 |
@@ -18,7 +18,7 @@ direct-read counter/frozen median measured throughput change: +2.17%.
 All counts below are full server lifecycle totals, including warmup and shutdown. `payload CQE pairs` is payload CQEs / 2 and approximates completed echo RTTs over the lifecycle; the final EOF receive contributes half a pair, so it is kept as an explicit .5 rather than confused with measured client requests. Untagged CQEs in this workload are original socket receive/send completions, including any unsuccessful attempts or partial transfers. This counter does not independently prove the absence of retries, so the denominator is an estimate rather than an exact successful-request count. A blocking-capable wait count is the number of wait calls, not proof that every call actually slept. Voluntary CSWs provide a separate scheduling observation.
 
 | Variant / repeat | Measured client requests | Lifecycle payload CQEs | Lifecycle payload CQE pairs | Local notify writes | Remote notify writes | Notification SQEs / CQEs | Wait calls | Synchronous read success / EAGAIN | Voluntary CSW |
-|---|---:|---:|---:|---:|---:|---|---:|---|---:|
+| --- | ---: | ---: | ---: | ---: | ---: | --- | ---: | --- | ---: |
 | direct-read-counted / 1 | 581,985 | 1,532,891 | 766,445.5 | 749,903 | 2 | 749,820 / 749,820 | 766,447 | 0 / 0 | 766,333 |
 | direct-read-counted / 2 | 585,839 | 1,566,669 | 783,334.5 | 766,403 | 2 | 766,334 / 766,334 | 783,336 | 0 / 0 | 783,232 |
 | direct-read-counted / 3 | 570,196 | 1,529,811 | 764,905.5 | 748,401 | 2 | 748,315 / 748,315 | 764,907 | 0 / 0 | 764,787 |
@@ -27,7 +27,7 @@ All counts below are full server lifecycle totals, including warmup and shutdown
 | prototype-counted / 3 | 682,336 | 1,800,893 | 900,446.5 | 876,225 | 2 | 876,021 / 876,021 | 900,314 | 876,093 / 1,776,407 | 900,163 |
 
 | Variant | Notification CQEs / lifecycle RTT estimate | Local writes / lifecycle RTT estimate | Wait calls / lifecycle RTT estimate | Voluntary CSW / lifecycle RTT estimate |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | prototype-counted | 0.9728–0.9729 | 0.9731–0.9731 | 0.9998–0.9999 | 0.9996–0.9997 |
 | direct-read-counted | 0.9783–0.9783 | 0.9784–0.9784 | 1.0000–1.0000 | 0.9998–0.9999 |
 

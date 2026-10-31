@@ -5,7 +5,7 @@ Recommendation: retain the original native interrupt and wait policy for the shi
 Each stage uses three randomized repetitions, 1-second warmup plus 3-second measurement, server CPU 0, fixed client CPUs 4–7. Frozen before/current controls are rerun inside each stage; compare within a stage. Builds use release opt-level 3 and RUSTFLAGS=-Cdebuginfo=1. Shared flock for builds; exclusive flock for timed samples. These are screening results, not replacements for the original 300-sample matrix.
 
 | Screen | Backend | Connections | Variant | Median req/s | Range req/s | Lifecycle server CPU s | Median p99 µs |
-|---|---|---:|---|---:|---:|---:|---:|
+| --- | --- | ---: | --- | ---: | ---: | ---: | ---: |
 | ppoll | tokio | 1 | before | 272,852 | 270,298–274,079 | 1.620 | 4.363 |
 | ppoll | iouring | 1 | after | 200,553 | 196,050–220,939 | 2.382 | 7.583 |
 | ppoll | iouring | 1 | before | 237,237 | 234,521–240,851 | 3.360 | 5.943 |
@@ -51,7 +51,7 @@ Each stage uses three randomized repetitions, 1-second warmup plus 3-second meas
 
 Interpretation: the event counter/direct-ring changes reduce CPU usage substantially but park more readily. Restoring the old stream notifier recovers some owned throughput while increasing CPU; it still leaves a reproducible roughly 5% owned gap. A direct eventfd Read improves borrowed serial throughput but worsens owned throughput, and adds userspace storage lifetime obligations. Sixteen bounded spin rechecks before parking also fails to recover owned throughput. This evidence supports rejecting the overhaul from the default shipping path; it does not establish a single causal kernel mechanism.
 
-The direct Read prototype uses stable Box<UnsafeCell<u64>> storage, explicitly cancels and awaits the original internal read CQE on orderly shutdown, and intentionally retains pending storage on exceptional drop. It was built and screened only, not promoted through the conformance/coverage gate. No prototype here should be shipped merely because it compiles.
+The direct Read prototype uses stable Box\<UnsafeCell<u64>> storage, explicitly cancels and awaits the original internal read CQE on orderly shutdown, and intentionally retains pending storage on exceptional drop. It was built and screened only, not promoted through the conformance/coverage gate. No prototype here should be shipped merely because it compiles.
 
 See provenance.json for exact commits, binary paths/hashes, and raw results.
 
