@@ -15,7 +15,7 @@ use std::{io, net::Shutdown};
 
 impl DirectScheduler {
     // Borrowed payload stays in the polling future. Only the retry pulse outlives a synchronous attempt; nothing is dispatched to the worker pool.
-    async fn socket_poll_operation<Output>(
+    pub(crate) async fn socket_poll_operation<Output>(
         &self,
         socket: &DirectSocket,
         cancellation: &Cancellation,

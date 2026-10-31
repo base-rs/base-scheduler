@@ -97,6 +97,8 @@ This package releases with the workspace. Follow the [workspace release process]
 
 `process_wait_tests!` runs individual exit, nonblocking, lazy, and cancellation cases. Invoke it at the root of a dedicated integration test; its ignored child and group fixtures are launched in isolated subprocesses. Unix group/state-change cases cannot reap another parallel test’s children. The separate `shutdown`, `suspended_shutdown`, and `abandonment` assertions accept backend lifecycle futures and verify retirement without child termination.
 
+`pipe_tests!` (Unix) round-trips data through a real `cat` child and checks vectored transfers, end of file, empty transfers, broken pipes, cancellation and close semantics for adopted pipes.
+
 ## Releases
 
 See the shared [release notes](../../releases.md).

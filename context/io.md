@@ -11,6 +11,7 @@ Use scheduler-bound readers and writers for repeated I/O. Construct them once fr
 | Receive UDP or other packets | `scheduler.socket_packet_reader(&socket)`; use `read_into` or `read_vectored` inside a receive loop, or `read` to hand complete owned messages to independent tasks. |
 | Send packets | `scheduler.socket_packet_writer(&socket)`; use `write` or `write_vectored` for borrowed storage, or `write_owned` to transfer a stable owner through completion. |
 | Copy or transform files | `scheduler.file_reader(&input)` and `scheduler.file_writer(&output)`, reusable owned buffers, and joined independent reads/writes. |
+| Exchange data with a child process (Unix) | `scheduler.pipe_writer(child.stdin.take().unwrap().into())` and `scheduler.pipe_reader(child.stdout.take().unwrap().into())`; use `write` and `read_into`, and `close` the writer to signal end of input. |
 
 Each handle represents one sequential operation stream. Create independent readers and writers for concurrent execution; several file readers or writers may share the same underlying file. Keep the scheduler and its drivers alive while those handles operate and close. A task moving to another worker does not change its handle's selected scheduler; the backend handles worker-local registration and migration internally.
 

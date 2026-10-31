@@ -18,6 +18,12 @@ mod native_socket;
 #[cfg(unix)]
 mod native_subscription;
 mod panic;
+#[cfg(unix)]
+mod pipe_io;
+#[cfg(unix)]
+mod readiness_pipe_reader;
+#[cfg(unix)]
+mod readiness_pipe_writer;
 mod resolver;
 #[cfg(unix)]
 mod signal_service;

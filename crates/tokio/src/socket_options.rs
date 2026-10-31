@@ -83,6 +83,11 @@ impl Probe {
 }
 
 impl TokioScheduler {
+    /// Adopt a pipe descriptor through the same nonblocking descriptor wrapper as sockets. Pipe handles use descriptor reads and writes rather than socket calls.
+    #[cfg(unix)]
+    pub(crate) fn adopt_pipe(&self, pipe: std::os::fd::OwnedFd) -> io::Result<TokioSocket> {
+        self.register_tcp(pipe.into())
+    }
     fn register_tcp(&self, socket: Socket) -> io::Result<TokioSocket> {
         self.check_open()?;
         TokioSocket::new(&self.runtime, socket)
