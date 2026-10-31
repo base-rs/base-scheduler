@@ -94,6 +94,18 @@ fn rejects_empty_forbidden_native_and_closed_registrations_and_startup_failure()
     drop(subscription);
 }
 #[test]
+fn subscriptions_outliving_their_service_release_nothing() {
+    // A dispatch thread releases the service asynchronously after shutdown; one never started releases it before this drop.
+    let service = SignalService::new();
+    let subscription = NativeSubscription {
+        shared: Arc::downgrade(&service.shared),
+        id: 0,
+    };
+    drop(service);
+    assert!(subscription.shared.upgrade().is_none());
+    drop(subscription);
+}
+#[test]
 fn panicking_targets_do_not_poison_dispatch_or_prevent_other_targets() {
     struct Panics;
     impl Notify<i32> for Panics {

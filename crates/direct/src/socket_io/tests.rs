@@ -3,7 +3,6 @@
 
 use super::*;
 use base_scheduler::{IoBuffers, IoBuffersMut};
-use std::net::TcpListener;
 use std::time::{Duration, Instant};
 
 thread_local! {
@@ -94,9 +93,8 @@ fn native_connect_preserves_immediate_and_deferred_results() {
     );
     let socket = open(SocketDomain::Ipv4, SocketType::Stream, None).unwrap();
     assert!(connect(&socket, "[::1]:9".parse().unwrap(), &mut false).is_err());
-    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    let refused = listener.local_addr().unwrap();
-    drop(listener);
+    // Ephemeral binds never assign a reserved port, so a concurrent test cannot be listening on it.
+    let refused = "127.0.0.1:1".parse().unwrap();
     let socket = open(SocketDomain::Ipv4, SocketType::Stream, None).unwrap();
     let mut started = false;
     assert!(retry(|| connect(&socket, refused, &mut started)).is_err());
@@ -298,7 +296,7 @@ fn missing_control_storage_reports_discarded_packet_metadata() {
 #[cfg(windows)]
 #[test]
 fn message_receive_preserves_shutdown_errors() {
-    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let socket =
         Socket::from(std::net::TcpStream::connect(listener.local_addr().unwrap()).unwrap());
     let (_peer, _) = listener.accept().unwrap();
