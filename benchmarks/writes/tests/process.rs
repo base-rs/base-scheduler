@@ -195,21 +195,9 @@ fn invalid_command_lines_fail_without_starting_work() {
 
 #[test]
 fn connection_refusal_is_reported() {
-    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    let address = listener.local_addr().unwrap();
-    drop(listener);
+    // Ephemeral binds never assign a reserved port, so a concurrent test's server cannot be listening on it.
     let client = Command::new(BINARY)
-        .args([
-            "client",
-            &address.to_string(),
-            "1",
-            "1",
-            "1",
-            "1",
-            "0",
-            "0",
-            "0.1",
-        ])
+        .args(["client", "127.0.0.1:1", "1", "1", "1", "1", "0", "0", "0.1"])
         .output()
         .unwrap();
     assert!(!client.status.success());
