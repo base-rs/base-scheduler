@@ -1,9 +1,12 @@
 # Releases
 
+## Unreleased
+
+- Fix Tokio adapter socket waits on Windows that could hang although the socket was ready. async-io's IOCP reactor can miss interest registered from another thread ([smol-rs/polling#271](https://github.com/smol-rs/polling/issues/271)); each wait now wakes the reactor after registering interest and retries its syscall at least every 10 seconds.
+
 ## v0.3.1
 
 - Add Unix `PipeReading` and `PipeWriting` capabilities which adopt an owned pipe descriptor, such as a child process's standard input or output, as a sequential reader or writer. Direct, readiness, Tokio and Native support them natively; io\_uring uses its readiness fallback.
-- Fix Tokio adapter socket waits on Windows that could hang although the socket was ready. async-io's IOCP reactor can miss interest registered from another thread ([smol-rs/polling#271](https://github.com/smol-rs/polling/issues/271)); each wait now wakes the reactor after registering interest and retries its syscall at least every 10 seconds.
 
 ## v0.3.0
 
