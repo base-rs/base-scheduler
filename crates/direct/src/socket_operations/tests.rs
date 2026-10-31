@@ -534,3 +534,64 @@ fn pooled_receivers_preserve_messages_and_stream_eof() {
         scheduler.shutdown().await;
     });
 }
+
+#[test]
+fn idle_socket_attempts_retry_at_the_pulse_rate_independent_of_waiter_count() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    const WAITERS: usize = 8;
+    const WINDOW: Duration = Duration::from_millis(500);
+    // A pulse every 2 ms allows at most one attempt per waiter every 2 ms of the measured window; the bound allows twice that. Registering a waiter must not cut a running pulse short; otherwise idle waiters keep waking each other and attempts grow with the number of waiters.
+    const ATTEMPTS_PER_MILLISECOND: u128 = 1;
+    let scheduler = scheduler(WAITERS);
+    let socket = socket();
+    let token = Cancellation::new();
+    let counts: Vec<_> = (0..WAITERS)
+        .map(|_| Arc::new(AtomicUsize::new(0)))
+        .collect();
+    let (started, start) = mpsc::channel();
+    let (all_started, observed, elapsed) = std::thread::scope(|scope| {
+        for count in &counts {
+            let count = Arc::clone(count);
+            let started = started.clone();
+            let (scheduler, socket, token) = (&scheduler, &socket, &token);
+            scope.spawn(move || {
+                let (result, ()) =
+                    block_on(scheduler.socket_operation(socket, (), token, move |_, _| {
+                        count.fetch_add(1, Ordering::Relaxed);
+                        let _ = started.send(());
+                        Err::<(), _>(io::ErrorKind::WouldBlock.into())
+                    }));
+                assert!(matches!(result, Err(OperationError::Cancelled(_))));
+            });
+        }
+        // Waiters can retry before every one has started, so wait for one attempt per waiter by count rather than by message. Nothing in this scope panics before cancellation, so a failure cannot leave the spawned waiters unjoinable.
+        let deadline = std::time::Instant::now() + TIMEOUT;
+        let all_started = std::iter::from_fn(|| start.recv_timeout(TIMEOUT).ok())
+            .take_while(|()| std::time::Instant::now() < deadline)
+            .any(|()| counts.iter().all(|count| count.load(Ordering::Relaxed) > 0));
+        let window = std::time::Instant::now();
+        let before: Vec<_> = counts
+            .iter()
+            .map(|count| count.load(Ordering::Relaxed))
+            .collect();
+        std::thread::sleep(WINDOW);
+        let observed: Vec<_> = counts
+            .iter()
+            .zip(before)
+            .map(|(count, before)| count.load(Ordering::Relaxed) - before)
+            .collect();
+        // The sleeping thread can overrun the nominal window on a loaded machine; bound attempts by the time actually measured.
+        let elapsed = window.elapsed();
+        token.cancel();
+        (all_started, observed, elapsed)
+    });
+    assert!(all_started, "waiters did not start");
+    let maximum = (elapsed.as_millis() * ATTEMPTS_PER_MILLISECOND) as usize;
+    for attempts in &observed {
+        assert!(
+            (1..=maximum).contains(attempts),
+            "idle waiters retried {observed:?} times in {elapsed:?}"
+        );
+    }
+    block_on(scheduler.shutdown());
+}

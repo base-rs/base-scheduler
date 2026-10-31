@@ -4,6 +4,8 @@
 
 - Fix Tokio adapter socket waits on Windows that could hang although the socket was ready. async-io's IOCP reactor can miss interest registered from another thread ([smol-rs/polling#271](https://github.com/smol-rs/polling/issues/271)); each wait now wakes the reactor after registering interest and retries its syscall at least every 10 seconds.
 
+- Fix Direct socket waits spinning while idle. Each new retry waiter cut the running two-millisecond pulse short, so idle sockets kept waking each other and an idle listener could retry thousands of times a second. A new waiter now wakes the retry thread only when it is sleeping, so each idle waiter retries about every two milliseconds regardless of how many are waiting.
+
 ## v0.3.1
 
 - Add Unix `PipeReading` and `PipeWriting` capabilities which adopt an owned pipe descriptor, such as a child process's standard input or output, as a sequential reader or writer. Direct, readiness, Tokio and Native support them natively; io_uring uses its readiness fallback.
