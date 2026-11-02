@@ -4,10 +4,10 @@
 //! Resource-local failure injection for worker poller tests. Production uses
 //! the selected native poller directly, without this wrapper or fault state.
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use super::epoll::{Events, Poller as Backend};
 use polling::{Event, PollMode};
-#[cfg(not(target_os = "linux"))]
+#[cfg(not(any(target_os = "linux", target_os = "android")))]
 use polling::{Events, Poller as Backend};
 use std::{
     io,
@@ -57,7 +57,7 @@ impl Poller {
         self.check()?;
         self.inner.delete(socket)
     }
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     pub(super) fn clear_notification(&self) -> io::Result<()> {
         self.inner.clear_notification()
     }

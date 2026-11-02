@@ -11,15 +11,18 @@ use polling::{Event, PollMode};
 mod kqueue;
 #[cfg(target_os = "macos")]
 use kqueue::{Events, Poller};
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 mod epoll;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use epoll::Events;
-#[cfg(all(target_os = "linux", not(test)))]
+#[cfg(all(any(target_os = "linux", target_os = "android"), not(test)))]
 use epoll::Poller;
-#[cfg(not(any(target_os = "macos", target_os = "linux")))]
+#[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "android")))]
 use polling::Events;
-#[cfg(all(not(any(target_os = "macos", target_os = "linux")), not(test)))]
+#[cfg(all(
+    not(any(target_os = "macos", target_os = "linux", target_os = "android")),
+    not(test)
+))]
 use polling::Poller;
 #[cfg(all(not(target_os = "macos"), test))]
 mod test_poller;
@@ -183,7 +186,7 @@ impl Direction {
         }
         self.publish();
     }
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     fn publish_readable(&self, read_closed: bool, urgent: bool) {
         // These conditions stay sticky even when ordinary readiness is cleared.
         let flags = (usize::from(read_closed) << 1) | (usize::from(urgent) << 2);
@@ -198,7 +201,7 @@ impl Direction {
         count: usize,
         capacity: usize,
     ) {
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         if !SUPPORT_OOB && count != 0 && count < capacity && observed & 2 == 0 {
             self.clear(observed);
         }
@@ -212,7 +215,7 @@ impl Direction {
         }
         // polling's other edge backends do not expose directional EOF here.
         // Retain advisory readiness until WouldBlock rather than lose EOF.
-        #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+        #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "android")))]
         let _ = (observed, count, capacity);
     }
     pub(crate) fn clear(&self, observed: usize) {
@@ -427,7 +430,7 @@ struct DriverState {
 impl DriverState {
     fn dispatch(&self) -> io::Result<()> {
         for event in self.events.iter() {
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             if event.key == epoll::INTERRUPT {
                 self.controller.poller.clear_notification()?;
                 continue;
@@ -465,11 +468,11 @@ impl DriverState {
                 registration
                     .readable
                     .publish_readable(available, read_closed);
-                #[cfg(target_os = "linux")]
+                #[cfg(any(target_os = "linux", target_os = "android"))]
                 registration
                     .readable
                     .publish_readable(event.is_interrupt(), event.is_priority());
-                #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+                #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "android")))]
                 registration.readable.publish();
             }
             if event.writable {
@@ -603,13 +606,13 @@ impl SelectorWorker for ReadinessWorker {
             inner.group.close();
             return Err(error);
         }
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         if let Err(error) = inner.dispatch() {
             inner.group.close();
             return Err(error);
         }
         // Only Linux drains a fallible native notification descriptor.
-        #[cfg(not(target_os = "linux"))]
+        #[cfg(not(any(target_os = "linux", target_os = "android")))]
         let _ = inner.dispatch();
         Ok(inner.group.closed.is_cancelled())
     }

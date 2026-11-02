@@ -31,6 +31,8 @@ fn interruptions_and_notification_reaping_races_use_the_pool() {
             Some(libc::ECHILD)
         );
         drop(_injection);
+        // Platforms without exit notification wait on the pool alone.
+        #[cfg(any(target_os = "linux", target_os = "macos", target_os = "freebsd"))]
         for result in [Ok(0), Err(io::Error::from_raw_os_error(libc::EINTR))] {
             use std::{io::Write, os::fd::IntoRawFd, os::unix::net::UnixStream};
             let (notification, mut sender) = UnixStream::pair().unwrap();
@@ -121,7 +123,7 @@ fn run(test: impl AsyncFnOnce(&ReadinessSelector)) {
 thread_local! {
     pub(super) static REGISTRATION_ERROR: std::cell::Cell<Option<io::Error>> = const { std::cell::Cell::new(None) };
 }
-#[cfg(unix)]
+#[cfg(any(target_os = "linux", target_os = "macos", target_os = "freebsd"))]
 #[test]
 fn notification_and_reactor_registration_failures_survive() {
     run(async |scheduler| {
