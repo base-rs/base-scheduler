@@ -406,6 +406,7 @@ macro_rules! socket_suites {
             fn pooled_stream_eof() {
                 $run(async move |fixture| {
                     base_scheduler_conformance::socket_receiving::stream_eof(&fixture.scheduler).await;
+                    base_scheduler_conformance::socket_receiving::stream_try_read(&fixture.scheduler).await;
                 });
             }
             mod scalar { use super::*; base_scheduler_conformance::socket_tests!(run: streams); }

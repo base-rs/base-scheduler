@@ -30,6 +30,9 @@ impl SocketStreamReader for EmptyReader {
     async fn read_into(&mut self, _: &mut [u8], _: &Cancellation) -> OperationResult<usize> {
         Ok(0)
     }
+    fn try_read_into(&mut self, _: &mut [u8]) -> std::io::Result<usize> {
+        Ok(0)
+    }
     async fn read_vectored(
         &mut self,
         _: &mut [io::IoSliceMut<'_>],

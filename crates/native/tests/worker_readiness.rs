@@ -175,3 +175,60 @@ fn shutdown_wakes_a_worker_waiting_for_input() {
     drop(client);
     scheduler.block_on(scheduler.shutdown());
 }
+
+// Windows selector reads attempt the syscall on every poll, so only Unix readers wait on cached readiness.
+#[cfg(unix)]
+#[test]
+fn immediate_reads_observe_input_while_the_only_worker_is_busy() {
+    use futures_lite::future::{block_on, poll_once};
+    let scheduler = scheduler(1);
+    let never = Cancellation::never();
+    block_on(async {
+        let (client, server) =
+            base_scheduler_conformance::socket::stream_pair(&*scheduler, SocketDomain::Ipv4).await;
+        let mut reader = scheduler.socket_stream_reader(&server).unwrap();
+        let mut writer = scheduler.socket_stream_writer(&client).unwrap();
+        let mut data = [0; 4];
+        assert_eq!(writer.write(b"a", &never).await.unwrap(), 1);
+        assert_eq!(reader.read_into(&mut data, &never).await.unwrap(), 1);
+        let (started, busy) = std::sync::mpsc::channel();
+        let (release, released) = std::sync::mpsc::channel::<()>();
+        let task = scheduler
+            .spawn(async move {
+                started.send(()).unwrap();
+                released.recv().unwrap();
+            })
+            .unwrap();
+        busy.recv_timeout(Duration::from_secs(10)).unwrap();
+        // With the worker busy, its driver publishes no readiness, so a readiness-first read stays pending once cached readiness is clear.
+        assert!(
+            poll_once(reader.read_into(&mut data, &never))
+                .await
+                .is_none()
+        );
+        assert_eq!(writer.write(b"b", &never).await.unwrap(), 1);
+        assert!(
+            poll_once(reader.read_into(&mut data, &never))
+                .await
+                .is_none()
+        );
+        let start = std::time::Instant::now();
+        let count = loop {
+            match reader.try_read_into(&mut data) {
+                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                    assert!(start.elapsed() < Duration::from_secs(10));
+                    std::thread::sleep(Duration::from_millis(1));
+                }
+                result => break result.unwrap(),
+            }
+        };
+        assert_eq!((count, data[0]), (1, b'b'));
+        release.send(()).unwrap();
+        task.await.unwrap();
+        reader.close().await.unwrap();
+        writer.close().await.unwrap();
+        drop((reader, writer));
+        scheduler.socket_close(client).await.unwrap();
+        scheduler.socket_close(server).await.unwrap();
+    });
+}

@@ -209,7 +209,13 @@ fn abandoned_owned_socket_transfers_reserve_the_lane_until_retirement() {
         let mut bytes = [0; 1];
         exercise!(
             reader.read_owned(vec![0; 8], &never),
-            reader.read_into(&mut bytes, &never),
+            async {
+                assert_eq!(
+                    reader.try_read_into(&mut bytes).unwrap_err().kind(),
+                    std::io::ErrorKind::WouldBlock
+                );
+                reader.read_into(&mut bytes, &never).await
+            },
             reader.close()
         );
     }

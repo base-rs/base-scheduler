@@ -531,6 +531,7 @@ fn pooled_receivers_preserve_messages_and_stream_eof() {
         let scheduler = scheduler(4);
         base_scheduler_conformance::socket_receiving::messages(&scheduler).await;
         base_scheduler_conformance::socket_receiving::stream_eof(&scheduler).await;
+        base_scheduler_conformance::socket_receiving::stream_try_read(&scheduler).await;
         scheduler.shutdown().await;
     });
 }

@@ -347,6 +347,7 @@ fn pooled_stream_uses_the_explicit_native_scheduler() {
         block_on(base_scheduler_conformance::socket_receiving::stream_eof(
             &scheduler,
         ));
+        block_on(base_scheduler_conformance::socket_receiving::stream_try_read(&scheduler));
         block_on(scheduler.shutdown());
     });
 }

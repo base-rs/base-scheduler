@@ -211,3 +211,81 @@ where
     scheduler.socket_close(socket).await.unwrap();
     scheduler.socket_close(sender).await.unwrap();
 }
+
+/// Immediate reads reach the transport without waiting: they report no input as `WouldBlock`, then queued input and EOF after an established read, whatever readiness the backend has cached.
+pub async fn stream_try_read<S>(scheduler: &S)
+where
+    S: SocketOpen
+        + SocketBind
+        + SocketListen
+        + SocketConnect
+        + SocketAccept
+        + SocketLocalAddress
+        + SocketPeerAddress
+        + SocketClose
+        + SocketStreamWriting
+        + SocketShutdown
+        + SocketStreamReading,
+    S::Socket: 'static,
+{
+    let never = Cancellation::never();
+    let (sender, socket) = stream_pair(scheduler, SocketDomain::Ipv4).await;
+    let mut reader = scheduler.socket_stream_reader(&socket).unwrap();
+    let mut writer = scheduler.socket_stream_writer(&sender).unwrap();
+    let mut data = [0; 4];
+    assert_eq!(reader.try_read_into(&mut []).unwrap(), 0);
+    let quiet = std::time::Duration::from_millis(5);
+    assert_eq!(
+        attempt(|| reader.try_read_into(&mut data), quiet)
+            .unwrap_err()
+            .kind(),
+        std::io::ErrorKind::WouldBlock
+    );
+    // A short read establishes the reader, after which backends may wait on cached readiness first.
+    assert_eq!(writer.write(b"a", &never).await.unwrap(), 1);
+    assert_eq!(reader.read_into(&mut data, &never).await.unwrap(), 1);
+    assert_eq!(writer.write(b"b", &never).await.unwrap(), 1);
+    assert_eq!(
+        attempt(|| reader.try_read_into(&mut data), DELIVERY).unwrap(),
+        1
+    );
+    assert_eq!(data[0], b'b');
+    writer.close().await.unwrap();
+    scheduler
+        .socket_shutdown(&sender, Shutdown::Write)
+        .await
+        .unwrap();
+    assert_eq!(
+        attempt(|| reader.try_read_into(&mut data), DELIVERY).unwrap(),
+        0
+    );
+    assert_eq!(reader.try_read_into(&mut data).unwrap(), 0);
+    assert_eq!(reader.read_into(&mut data, &never).await.unwrap(), 0);
+    reader.close().await.unwrap();
+    assert_eq!(
+        reader.try_read_into(&mut data).unwrap_err().kind(),
+        std::io::ErrorKind::BrokenPipe
+    );
+    drop((reader, writer));
+    scheduler.socket_close(socket).await.unwrap();
+    scheduler.socket_close(sender).await.unwrap();
+}
+
+const DELIVERY: std::time::Duration = std::time::Duration::from_secs(10);
+
+// Retry an immediate read for up to `patience` while the transport delivers loopback input, without yielding to the scheduler.
+fn attempt(
+    mut read: impl FnMut() -> std::io::Result<usize>,
+    patience: std::time::Duration,
+) -> std::io::Result<usize> {
+    let start = std::time::Instant::now();
+    loop {
+        let result = read();
+        let waiting =
+            matches!(&result, Err(error) if error.kind() == std::io::ErrorKind::WouldBlock);
+        if !waiting || start.elapsed() >= patience {
+            return result;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(1));
+    }
+}

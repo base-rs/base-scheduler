@@ -45,6 +45,9 @@ impl SocketStreamReader for Reader<'_> {
         buffer[0] = request as u8;
         Ok(usize::from(request != 0))
     }
+    fn try_read_into(&mut self, _: &mut [u8]) -> io::Result<usize> {
+        Err(ErrorKind::Unsupported.into())
+    }
     async fn read_vectored(
         &mut self,
         _: &mut [io::IoSliceMut<'_>],

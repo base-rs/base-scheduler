@@ -32,6 +32,9 @@ impl SocketStreamReader for Reader<'_> {
         buffer[..bytes.len()].copy_from_slice(&bytes);
         Ok(bytes.len())
     }
+    fn try_read_into(&mut self, _: &mut [u8]) -> io::Result<usize> {
+        Err(io::ErrorKind::Unsupported.into())
+    }
     async fn read_vectored(
         &mut self,
         _: &mut [io::IoSliceMut<'_>],

@@ -133,6 +133,9 @@ impl<M: SocketModel> SocketStreamReader for Reader<'_, M> {
     ) -> OperationResult<usize> {
         self.scheduler.recv(&self.socket, buffer, cancellation)
     }
+    fn try_read_into(&mut self, _: &mut [u8]) -> std::io::Result<usize> {
+        Err(std::io::ErrorKind::WouldBlock.into())
+    }
     async fn read_vectored(
         &mut self,
         buffers: &mut [IoSliceMut<'_>],
