@@ -56,7 +56,7 @@ enum Fault {
     CancelWins,
 }
 
-// A controlled backend: each accepted attempt runs on its own thread, which holds the input at a known boundary until released. Real readiness backends cannot provide this boundary: they perform each attempt synchronously inside the polling future, so holding it would also block the poll that must observe it.
+// A controlled backend: each accepted attempt runs on its own thread, which holds the input at a known boundary until released. Readiness backends cannot provide this boundary: they perform each attempt synchronously inside the polling future, so holding it would also block the poll that must observe it.
 struct Fixture {
     input: Mutex<Option<Input>>,
     pointer: usize,
