@@ -3,7 +3,7 @@
 
 //! Explicit, runtime-independent scheduler capabilities for protocol libraries.
 //!
-//! Applications choose an execution environment; libraries ask for the operations they need. This crate defines the interface and runtime-independent support such as [`Cancellation`] and [`HeapBufferPool`]. It contains no executor, reactor, operating-system I/O implementation, or runtime adapter; companion crates such as `base-scheduler-direct`, `base-scheduler-tokio`, and `base-scheduler-native` provide those.
+//! Applications choose an execution environment; libraries ask for the operations they need. This crate defines the interface and runtime-independent support such as [`Cancellation`] and [`HeapBufferPool`]. It contains no executor, reactor, operating-system I/O implementation, or runtime adapter; companion crates such as `base-scheduler-native` and `base-scheduler-tokio` provide those.
 //!
 //! # Socket and file I/O
 //!

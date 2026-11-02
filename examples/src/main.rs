@@ -320,18 +320,6 @@ fn execute(args: &[String]) -> serde_json::Value {
         buffer_size,
     };
     let seconds = match backend {
-        "direct" => {
-            let scheduler = Arc::new(
-                base_scheduler_direct::DirectScheduler::new(base_scheduler_direct::DirectOptions {
-                    threads: workers,
-                    capacity: 64,
-                })
-                .unwrap(),
-            );
-            let result = futures_lite::future::block_on(measure(Arc::clone(&scheduler), workload));
-            futures_lite::future::block_on(scheduler.shutdown());
-            result
-        }
         "tokio" => {
             let runtime = tokio::runtime::Builder::new_multi_thread()
                 .worker_threads(workers)
@@ -413,7 +401,6 @@ mod tests {
     #[test]
     fn recipes_preserve_data_on_every_backend() {
         for backend in [
-            "direct",
             "tokio",
             "native",
             #[cfg(target_os = "linux")]

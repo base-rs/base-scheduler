@@ -4,7 +4,7 @@ The portable multishot API has been consolidated into pooled receives. Historica
 
 Use bounded reusable storage and independently owned completed chunks. For a file pipeline, poll the output write and next input read concurrently. Separating submission from completion is useful when admission itself matters, but it is not a generally faster replacement for joining ordinary operations.
 
-The scheduler implementations support these choices across Direct, the Tokio adapter, Native readiness, and Native io_uring. The portable `buffer_pool(options)` factory has an exact shared budget independent of worker count. Buffer reuse, registration, and receive strategy remain backend implementation details. The [worker-owned slabs and provided-buffer rings](worker-owned.md) report preserves the removed receive-ahead experiment at its measured revisions; current readers receive on demand and overlap reads and writes explicitly. The [preceding shared-budget provided-ring experiment](worker-pools.md) is retained for comparison. Fixed-buffer registration remains separate. The standalone [zero-copy pipeline experiment](pipeline.md) tests registered storage through parsing and sending before scheduler integration.
+The scheduler implementations support these choices across the Tokio adapter, Native readiness, and Native io_uring. The portable `buffer_pool(options)` factory has an exact shared budget independent of worker count. Buffer reuse, registration, and receive strategy remain backend implementation details. The [worker-owned slabs and provided-buffer rings](worker-owned.md) report preserves the removed receive-ahead experiment at its measured revisions; current readers receive on demand and overlap reads and writes explicitly. The [preceding shared-budget provided-ring experiment](worker-pools.md) is retained for comparison. Fixed-buffer registration remains separate. The standalone [zero-copy pipeline experiment](pipeline.md) tests registered storage through parsing and sending before scheduler integration.
 
 Subsequent experiments measure [receive fast paths and shared-pool contention](fast-path.md) and [fixed registered buffers](registered.md). The latter isolates ordinary versus fixed io_uring reads/writes with the same leases, rather than integrating registration into the scheduler.
 
@@ -18,7 +18,7 @@ Parse or decrypt in place while the lease is unique. `freeze()` consumes writabl
 
 A parser owns framing and compaction: retain views of complete frames and copy a partial tail when contiguous storage is needed. Retaining one small view keeps its entire slot unavailable, so selectively copying long-lived fragments can reduce memory pressure. The receiver does not hide a growing receive queue.
 
-Current applications construct bound stream or packet readers with a supplied pool. Completed buffers implement `ReceiveBuffer`, allowing backends to specialize storage without changing generic consumers. Direct, readiness-native, Tokio, and ordinary io_uring readers use persistent readable monitors and demand-driven nonblocking receives. The standalone concrete multishot receiver retains its own separate provided-buffer pool for backend comparisons.
+Current applications construct bound stream or packet readers with a supplied pool. Completed buffers implement `ReceiveBuffer`, allowing backends to specialize storage without changing generic consumers. Readiness-native, Tokio, and ordinary io_uring readers use persistent readable monitors and demand-driven nonblocking receives. The standalone concrete multishot receiver retains its own separate provided-buffer pool for backend comparisons.
 
 For a shared pool, drive both branches and release each completed write's returned owner inside that branch:
 
@@ -120,7 +120,7 @@ target/release/sockets iouring pool 65536 10000 1 tcp
 target/release/sockets iouring shared 1200 10000 2 udp
 ```
 
-Direct, Native readiness, and the Tokio adapter are also supported on macOS and Windows by the Rust binaries. The matched measurement script uses Linux `taskset` and includes io_uring. Binary smoke tests verify copying partial tails and TCP/UDP behavior on each available backend. Conformance tests verify separate admission, independent progress before polling completion, retained owners, cancellation, and safe abandonment; deterministic blocking-pool tests additionally exercise forgotten completions and capacity retirement. Miri checks the pool's unsafe aliasing and reuse model. Linux and macOS workspace coverage reached 100% of measured source regions; Windows validation remains for CI.
+Native readiness and the Tokio adapter are also supported on macOS and Windows by the Rust binaries. The matched measurement script uses Linux `taskset` and includes io_uring. Binary smoke tests verify copying partial tails and TCP/UDP behavior on each available backend. Conformance tests verify separate admission, independent progress before polling completion, retained owners, cancellation, and safe abandonment; deterministic blocking-pool tests additionally exercise forgotten completions and capacity retirement. Miri checks the pool's unsafe aliasing and reuse model. Linux and macOS workspace coverage reached 100% of measured source regions; Windows validation remains for CI.
 
 ## Common pool contract
 

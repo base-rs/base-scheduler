@@ -35,7 +35,7 @@ def main():
         cases.append(("sockets", [backend, mode, str(size), str(max(2000, 20000 // connections)),
                                   str(workers), transport, "8", "receive", str(connections)]))
     for backend, size, mode in itertools.product(
-        ["direct", "native", "tokio", "iouring"], [65536, 131072], ["join", "submit"],
+        ["native", "tokio", "iouring"], [65536, 131072], ["join", "submit"],
     ):
         cases.append(("files", [backend, mode, str(size), str(64 * 1024 * 1024), "1"]))
     if args.validation:

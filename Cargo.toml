@@ -20,7 +20,6 @@ members = [
     "benchmarks/writes",
     "examples",
     "crates/conformance",
-    "crates/direct",
     "crates/tokio",
     "crates/native",
     "crates/selector",

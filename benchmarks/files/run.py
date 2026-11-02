@@ -12,7 +12,7 @@ parser.add_argument("--binary", default="target/release/base-scheduler-file-benc
 parser.add_argument("--output", type=Path, required=True)
 parser.add_argument("--repeats", type=int, default=7)
 parser.add_argument("--iterations", type=int, default=50000)
-parser.add_argument("--backends", nargs="+", default=["direct", "tokio", "native", "iouring"])
+parser.add_argument("--backends", nargs="+", default=["tokio", "native", "iouring"])
 parser.add_argument("--affinity", action="store_true", help="Linux: pin one worker to CPU 2, four workers to CPUs 0-7")
 args = parser.parse_args()
 randomizer = random.Random(20261022)

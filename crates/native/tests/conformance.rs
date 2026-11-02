@@ -249,7 +249,7 @@ enum QueueFault {
     DetachOnDrop,
 }
 struct IncorrectQueue {
-    direct: NativeScheduler,
+    native: NativeScheduler,
     calls: std::sync::atomic::AtomicUsize,
     fault: QueueFault,
 }
@@ -286,7 +286,7 @@ impl Blocking for IncorrectQueue {
         } else {
             cancellation
         };
-        let handle = self.direct.spawn_blocking(operation, token).await?;
+        let handle = self.native.spawn_blocking(operation, token).await?;
         if call == 2 && matches!(self.fault, QueueFault::DetachOnDrop) {
             std::thread::spawn(move || {
                 let _ = block_on(handle);
@@ -308,7 +308,7 @@ impl blocking::BlockingFixture for IncorrectFixture {
         let (release, released) = mpsc::channel();
         let handle = self
             .0
-            .direct
+            .native
             .spawn_blocking(
                 move || {
                     started.send(()).unwrap();
@@ -334,7 +334,7 @@ fn queue_conformance_rejects_cancellation_capacity_and_handle_ownership_violatio
         QueueFault::DetachOnDrop,
     ] {
         let fixture = IncorrectFixture(IncorrectQueue {
-            direct: NativeScheduler::with_options(NativeOptions {
+            native: NativeScheduler::with_options(NativeOptions {
                 workers: 1,
                 threads: 1,
                 capacity: 2,
@@ -347,7 +347,7 @@ fn queue_conformance_rejects_cancellation_capacity_and_handle_ownership_violatio
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             block_on(blocking::queue(&fixture))
         }));
-        block_on(fixture.0.direct.shutdown());
+        block_on(fixture.0.native.shutdown());
         assert!(result.is_err(), "conformance accepted an incorrect backend");
     }
 }

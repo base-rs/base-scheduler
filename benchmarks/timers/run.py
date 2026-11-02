@@ -9,7 +9,7 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--binary", default="target/release/base-scheduler-timer-benchmark")
 parser.add_argument("--output", required=True)
 parser.add_argument("--repeats", type=int, default=7)
-parser.add_argument("--backends", nargs="+", default=["tokio", "native", "iouring", "direct"])
+parser.add_argument("--backends", nargs="+", default=["tokio", "native", "iouring"])
 args = parser.parse_args()
 configs = [
     ("refresh", 1, 3_000_000, 1, 1000),

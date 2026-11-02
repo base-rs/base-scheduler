@@ -7,7 +7,6 @@ publish = false
 
 [dependencies]
 base-scheduler = { path = ".." }
-base-scheduler-direct = { path = "../crates/direct" }
 base-scheduler-tokio = { path = "../crates/tokio" }
 base-scheduler-native = { path = "../crates/native" }
 futures-lite = "2.6.1"

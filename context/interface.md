@@ -28,7 +28,7 @@ Use one handle per sequential execution, with independent readers and writers fo
 
 The default stream writer accepts the same pooled owner type returned by the default stream reader, with no type annotation needed for borrowed-only output. `socket_stream_writer_with_buffer::<B>(K)` selects another stable owner type. Reader factories allocate no payload pool; the first owned read initializes default storage lazily. `socket_stream_reader_with_pool(K, pool)` and `socket_packet_reader_with_pool(K, pool)` select an application-owned shared budget at construction. Factories return implementation-selected handles through the reader/writer contracts; backends choose their composition without changing application operations.
 
-The Direct and Tokio backends provide all four socket handles. Native forwards its selector’s capabilities; both readiness and io_uring provide all four.
+The Tokio backend provides all four socket handles. Native forwards its selector’s capabilities; both readiness and io_uring provide all four.
 
 ### Stream input
 
@@ -127,7 +127,7 @@ Destination arguments apply to packet writers only. Stream writes await earlier 
 
 | Capability/hook | Arguments → awaited result | Semantics |
 | --- | --- | --- |
-| [`FileOpen::file_open`](https://github.com/base-rs/base-scheduler/blob/main/src/file_open.rs) | `(&Path, FileOptions, C) → OperationResult<File>` | Options expose read, write, create, create-new, and truncate; append is omitted. |
+| [`FileOpen::file_open`](https://github.com/base-rs/base-scheduler/blob/main/src/file_open.rs) | `(&Path, FileOptions, C) → OperationResult<File>` | Options expose read, write, create, create-new, and truncate; append is omitted, because Linux positioned writes on an append-mode descriptor append instead of honoring their offsets. |
 | [`FileSeek::file_seek`](https://github.com/base-rs/base-scheduler/blob/main/src/file_seek.rs) | `(F, SeekFrom, C) → OperationResult<u64>` | Set the shared cursor and return its new position. Serialize dependent cursor operations. |
 | [`FileStat::file_stat`](https://github.com/base-rs/base-scheduler/blob/main/src/file_stat.rs) | `(F, C) → OperationResult<Metadata>` | Associated owned metadata; an observation rather than a globally atomic snapshot. |
 | [`FileTruncate::file_truncate`](https://github.com/base-rs/base-scheduler/blob/main/src/file_truncate.rs) | `(F, length: u64, C) → OperationResult<()>` | Change logical size without changing the cursor. |
@@ -137,6 +137,8 @@ Destination arguments apply to packet writers only. Stream writes await earlier 
 | `file_advise_submit` | same arguments → `io::Result<()>` | Await admission only; execution errors are not returned. Accepted work survives abandonment. |
 | [`FileClose::file_close`](https://github.com/base-rs/base-scheduler/blob/main/src/file_close.rs) | `(File by value) → io::Result<()>` | Consume exclusive ownership and await admission plus OS close. Finish operations and close/drop bound readers and writers first. Not retried after close errors. |
 | `file_close_submit` | `(File by value) → io::Result<()>` | Admission only; accepted cleanup is drained by graceful shutdown. |
+
+Files are opened only through `FileOpen`. Importing native file descriptors or handles is deferred until descriptor flags and aliases can preserve the positioned-write and exclusive-close guarantees; accepting an append-mode descriptor, for example, would let Linux positioned writes append.
 
 [`FileMetadata`](https://github.com/base-rs/base-scheduler/blob/main/src/file_metadata.rs) exposes synchronous `file_type() → Option<FileType>`, `size() → Option<u64>`, and `accessed()`, `modified()`, `created() → Option<SystemTime>`. Absence represents unavailable information. Backends can retain native metadata and compute accessors without eagerly copying every field.
 
@@ -233,7 +235,7 @@ The selector lifecycle hooks below live in `base-scheduler-selector`, not the po
 
 Drivers publish results and wake tasks; they never poll application futures from completion processing. The executor manages runnable tasks, stealing, worker-local timers, and the timeout passed to `turn`. io_uring uses one ring per worker; active operations stay with their original ring through retirement, while subsequent operations can follow a migrated task.
 
-Constructors, `block_on`, worker counts, `selector()`, concrete admission `close`, and runtime `shutdown` belong to the chosen backend, not a universal scheduler trait. Tokio's adapter borrows an application-owned runtime which must remain alive and driven. Native owns its executor and composes selectors. Direct supplies a reference implementation. An application must keep execution services running while awaiting graceful cleanup.
+Constructors, `block_on`, worker counts, `selector()`, concrete admission `close`, and runtime `shutdown` belong to the chosen backend, not a universal scheduler trait. Tokio's adapter borrows an application-owned runtime which must remain alive and driven. Native owns its executor and composes selectors. An application must keep execution services running while awaiting graceful cleanup.
 
 The concrete io_uring multishot receiver remains a standalone backend experiment. It is not required by the bound reader/writer contract and is not an application default.
 

@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use base_scheduler::*;
-use base_scheduler_direct::DirectScheduler;
+use base_scheduler_native::{NativeOptions, NativeScheduler};
 use futures_lite::future::block_on;
 use std::io;
 
@@ -52,7 +52,11 @@ where
 
 #[test]
 fn connection_owns_socket_and_all_factory_handle_variants() {
-    let scheduler = DirectScheduler::new(Default::default()).unwrap();
+    let scheduler = NativeScheduler::with_options(NativeOptions {
+        workers: 1,
+        ..Default::default()
+    })
+    .unwrap();
     block_on(async {
         let never = Cancellation::never();
         let socket = scheduler

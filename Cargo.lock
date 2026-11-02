@@ -224,7 +224,6 @@ name = "base-scheduler-buffer-benchmark"
 version = "0.0.0"
 dependencies = [
  "base-scheduler",
- "base-scheduler-direct",
  "base-scheduler-iouring",
  "base-scheduler-native",
  "base-scheduler-tokio",
@@ -247,24 +246,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "base-scheduler-direct"
-version = "0.4.0"
-dependencies = [
- "allocation-counter",
- "async-task",
- "base-scheduler",
- "base-scheduler-conformance",
- "event-listener",
- "futures-channel",
- "futures-lite",
- "libc",
- "signal-hook",
- "socket2",
- "tempfile",
- "windows-sys 0.61.2",
-]
-
-[[package]]
 name = "base-scheduler-echo-benchmark"
 version = "0.0.0"
 dependencies = [
@@ -282,7 +263,6 @@ name = "base-scheduler-examples"
 version = "0.0.0"
 dependencies = [
  "base-scheduler",
- "base-scheduler-direct",
  "base-scheduler-iouring",
  "base-scheduler-native",
  "base-scheduler-tokio",
@@ -297,7 +277,6 @@ name = "base-scheduler-file-benchmark"
 version = "0.0.0"
 dependencies = [
  "base-scheduler",
- "base-scheduler-direct",
  "base-scheduler-iouring",
  "base-scheduler-native",
  "base-scheduler-selector",
@@ -375,7 +354,6 @@ version = "0.0.0"
 dependencies = [
  "allocation-counter",
  "base-scheduler",
- "base-scheduler-direct",
  "base-scheduler-iouring",
  "base-scheduler-native",
  "base-scheduler-timers",

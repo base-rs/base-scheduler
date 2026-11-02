@@ -57,6 +57,116 @@ fn shutdown_retirement_without_reaping_preserves_child_status() {
     });
 }
 
+// Model a blocking fallback, as a pool-based backend uses: each accepted wait reaps on its own thread. Closure rejects new waits but lets accepted waits collect their status, and an abandoned wait can still reap.
+#[cfg(unix)]
+struct BlockingWaiter {
+    closed: AtomicBool,
+    threads: std::sync::Mutex<Vec<std::thread::JoinHandle<()>>>,
+}
+
+#[cfg(unix)]
+impl BlockingWaiter {
+    fn new() -> Self {
+        Self {
+            closed: AtomicBool::new(false),
+            threads: std::sync::Mutex::new(Vec::new()),
+        }
+    }
+    fn close(&self) {
+        self.closed.store(true, Ordering::Release);
+    }
+    async fn shutdown(&self) {
+        self.close();
+        for thread in self.threads.lock().unwrap().drain(..) {
+            thread.join().unwrap();
+        }
+    }
+}
+
+#[cfg(unix)]
+impl ProcessWait for BlockingWaiter {
+    type ProcessId = i32;
+
+    async fn process_wait(
+        &self,
+        process: i32,
+        _: ProcessWaitFlags,
+        _: &Cancellation,
+    ) -> OperationResult<Option<ProcessWaitResult>> {
+        if self.closed.load(Ordering::Acquire) {
+            return Err(std::io::Error::from(std::io::ErrorKind::BrokenPipe).into());
+        }
+        let (complete, completion) = futures_channel::oneshot::channel();
+        self.threads
+            .lock()
+            .unwrap()
+            .push(std::thread::spawn(move || {
+                let result = loop {
+                    let mut status = 0;
+                    // SAFETY: `status` is valid writable storage, and the fixture owns this specific child.
+                    let pid = unsafe { libc::waitpid(process, &mut status, 0) };
+                    if pid > 0 {
+                        break Ok((pid, status));
+                    }
+                    let error = std::io::Error::last_os_error();
+                    if error.kind() != std::io::ErrorKind::Interrupted {
+                        break Err(error);
+                    }
+                };
+                let _ = complete.send(result);
+            }));
+        let (pid, status) = completion.await.unwrap()?;
+        Ok(Some(ProcessWaitResult {
+            pid: pid as u32,
+            status: std::os::unix::process::ExitStatusExt::from_raw(status),
+        }))
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn accepted_blocking_waits_collect_status_after_closure() {
+    support::run(|| {
+        let waiter = BlockingWaiter::new();
+        futures_lite::future::block_on(base_scheduler_conformance::process_wait::shutdown(
+            &waiter,
+            || waiter.close(),
+            waiter.shutdown(),
+        ));
+    });
+}
+
+#[cfg(unix)]
+#[test]
+fn abandoned_blocking_waits_may_reap() {
+    support::run(|| {
+        let waiter = BlockingWaiter::new();
+        futures_lite::future::block_on(base_scheduler_conformance::process_wait::abandonment(
+            &waiter,
+            waiter.shutdown(),
+        ));
+    });
+}
+
+#[cfg(unix)]
+#[test]
+fn blocking_wait_errors_are_reported() {
+    support::run(|| {
+        let waiter = BlockingWaiter::new();
+        // The test process is never the parent of init, so the wait fails with `ECHILD`.
+        let error = futures_lite::future::block_on(waiter.process_wait(
+            1,
+            ProcessWaitFlags::default(),
+            &Cancellation::never(),
+        ))
+        .unwrap_err();
+        assert!(
+            matches!(error, base_scheduler::OperationError::Io(error) if error.raw_os_error() == Some(libc::ECHILD))
+        );
+        futures_lite::future::block_on(waiter.shutdown());
+    });
+}
+
 #[test]
 #[ignore = "child fixture, invoked by process-wait conformance assertions"]
 fn process_child_fixture() {

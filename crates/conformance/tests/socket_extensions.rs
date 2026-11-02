@@ -19,7 +19,7 @@ use std::{
     },
 };
 
-// A test-only, synchronous native adapter. These exchanges arrange traffic before reads; this is not a production scheduler or a certificate for direct.
+// A test-only, synchronous native adapter. These exchanges arrange traffic before reads; this is not a production scheduler or a certificate for any backend.
 #[derive(Clone, Copy, PartialEq)]
 enum Fault {
     None,

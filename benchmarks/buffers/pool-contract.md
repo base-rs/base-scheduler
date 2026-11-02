@@ -18,7 +18,7 @@ if let Some(message) = receiver.recv(scheduler, cancellation).await? {
 receiver.close(scheduler).await?;
 ```
 
-`BufferPool` describes bounded acquisition and owns an associated `ReceiveBuffer` representation. `BufferPooling` constructs an associated pool; Native forwards construction to its selected selector. Direct, Tokio, Readiness, and io_uring currently return `HeapBufferPool`. The previous concrete `BufferPool::new` constructor is now `HeapBufferPool::new`; portable application code can use `scheduler.buffer_pool` instead.
+`BufferPool` describes bounded acquisition and owns an associated `ReceiveBuffer` representation. `BufferPooling` constructs an associated pool; Native forwards construction to its selected selector. At the time of this prototype, Direct, Tokio, Readiness, and io_uring returned `HeapBufferPool`. Direct has since been removed, and the default backend matrix of `pool_contract.py` no longer includes it. The previous concrete `BufferPool::new` constructor is now `HeapBufferPool::new`; portable application code can use `scheduler.buffer_pool` instead.
 
 Options specify exact usable buffer count and size, plus minimum power-of-two alignment. The heap fallback uses stable initialized allocations with at most `alignment - 1` padding bytes per slot. Alignment does not require kernel registration. The options have no registered/unregistered switch; any later policy must distinguish fixed registration from provided-buffer publication and preserve portable ownership semantics during fallback.
 

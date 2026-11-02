@@ -2,8 +2,8 @@
 // Copyright, 2026, by Samuel Williams.
 
 use base_scheduler::*;
-use base_scheduler_direct::DirectScheduler;
 use base_scheduler_examples::{datagrams, frames};
+use base_scheduler_native::NativeScheduler;
 use futures_lite::future::block_on;
 use std::{
     collections::VecDeque,
@@ -23,7 +23,7 @@ enum Packet {
 }
 
 struct Receives {
-    executor: DirectScheduler,
+    executor: NativeScheduler,
     packets: Arc<Mutex<VecDeque<Packet>>>,
     closed: Arc<AtomicUsize>,
     reject_spawn: bool,
@@ -33,7 +33,7 @@ struct Receives {
 impl Receives {
     fn new(packets: impl IntoIterator<Item = Packet>) -> Self {
         Self {
-            executor: DirectScheduler::new(Default::default()).unwrap(),
+            executor: NativeScheduler::new().unwrap(),
             packets: Arc::new(Mutex::new(packets.into_iter().collect())),
             closed: Arc::new(AtomicUsize::new(0)),
             reject_spawn: false,
@@ -51,7 +51,7 @@ impl BufferPooling for Receives {
     }
 }
 impl Spawn for Receives {
-    type Handle<T: Send + 'static> = <DirectScheduler as Spawn>::Handle<T>;
+    type Handle<T: Send + 'static> = <NativeScheduler as Spawn>::Handle<T>;
     fn spawn<F: std::future::Future + Send + 'static>(
         &self,
         future: F,

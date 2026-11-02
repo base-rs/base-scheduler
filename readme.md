@@ -4,7 +4,7 @@ Explicit scheduler capabilities for reusable Rust protocol libraries. Applicatio
 
 ## Usage
 
-Add the interface with `cargo add base-scheduler`. Applications also add a backend crate, such as `base-scheduler-direct`, `base-scheduler-tokio`, or `base-scheduler-native`; reusable libraries depend only on the interface capabilities they use.
+Add the interface with `cargo add base-scheduler`. Applications also add a backend crate, such as `base-scheduler-native` or `base-scheduler-tokio`; reusable libraries depend only on the interface capabilities they use.
 
 Construct readers and writers from the scheduler once, then pass cancellation to their operations. A protocol object can retain these bound capabilities alongside its parser and protocol state:
 
@@ -61,10 +61,9 @@ See [releases.md](releases.md) for the full release history.
 
 ## See Also
 
-The workspace also contains seven companion crates, released together with the interface:
+The workspace also contains six companion crates, released together with the interface:
 
 - [`base-scheduler-conformance`](crates/conformance/readme.md): reusable capability-specific assertions for backend development dependencies.
-- [`base-scheduler-direct`](crates/direct/readme.md): reference implementations of tasks, clocks, native address resolution, file/socket operations, and platform-supported signals and filesystem extensions, with explicit service ownership and bounded syscall admission.
 - [`base-scheduler-tokio`](crates/tokio/readme.md): an adapter for an explicitly selected Tokio runtime, preserving owning task handles, owned I/O, cancellation, and bounded native-work admission.
 - [`base-scheduler-native`](crates/native/readme.md): Socketry's work-stealing executor and native readiness I/O, with Base ownership and shutdown semantics.
 - [`base-scheduler-selector`](crates/selector/readme.md): independent I/O lifecycle contracts and the portable readiness selector.

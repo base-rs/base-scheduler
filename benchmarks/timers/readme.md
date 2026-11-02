@@ -18,9 +18,9 @@ The initial experiment separated two mechanisms:
 - `reuse`: retain the backend timer resource, replacing its deadline eagerly.
 - `after`: an additional portable wrapper retains an earlier wake when the desired deadline moves later. If that earlier deadline fires, it waits again for the desired deadline. Earlier desired deadlines replace the old registration immediately.
 
-The second experiment moves postponement into the backend's resource. Native already stores an armed deadline; it can retain that registration until the old wake or an earlier desired deadline. Direct can do the same while retaining its map identifier. This needs no new queue algorithm or public policy switch. Tokio already has a fast deadline-extension path in its existing timer entry. The `after` wrapper remains in the benchmark to measure its additional cost, rather than being necessary for Native or Direct.
+The second experiment moves postponement into the backend's resource. Native already stores an armed deadline; it can retain that registration until the old wake or an earlier desired deadline. The since-removed Direct backend could do the same while retaining its map identifier. This needs no new queue algorithm or public policy switch. Tokio already has a fast deadline-extension path in its existing timer entry. The `after` wrapper remains in the benchmark to measure its additional cost, rather than being necessary for Native.
 
-Native uses its existing reserved worker-local queue, with no timer thread. Registrations remain with their owner when the task moves; replacements and release use existing local routing or that owner's inbox. It does not add an io_uring timer opcode. The `iouring` case uses exactly the same Native timer engine, with per-worker io_uring drivers providing interruptible waits bounded by the earliest deadline. The `native` case uses the default scheduler's thread parking for idle task workers. Direct retains its simple dedicated timer thread. Tokio retains one pinned sleep allocation per resource, reused across waits; its fresh-sleep baseline does not require that allocation.
+Native uses its existing reserved worker-local queue, with no timer thread. Registrations remain with their owner when the task moves; replacements and release use existing local routing or that owner's inbox. It does not add an io_uring timer opcode. The `iouring` case uses exactly the same Native timer engine, with per-worker io_uring drivers providing interruptible waits bounded by the earliest deadline. The `native` case uses the default scheduler's thread parking for idle task workers. Direct, measured here and since removed, used a simple dedicated timer thread. Tokio retains one pinned sleep allocation per resource, reused across waits; its fresh-sleep baseline does not require that allocation.
 
 All timer and cancellation objects are ordinary owned Rust state. No borrowed application pointer is retained by a worker. No timer API requires a caller to prevent future abandonment, or silently obtains its scheduler from TLS.
 
@@ -60,7 +60,7 @@ target/release/base-scheduler-timer-benchmark native reuse yield 64 75000 4 1000
 target/release/base-scheduler-timer-benchmark tokio after alloc 1 100000 1
 ```
 
-Use `--backends tokio native direct` on macOS. Process CPU time is available on Unix; the experimental harness reports zero on other systems. Performance results in this report are Linux measurements.
+Use `--backends tokio native` on macOS. Process CPU time is available on Unix; the experimental harness reports zero on other systems. Performance results in this report are Linux measurements.
 
 ## Results
 

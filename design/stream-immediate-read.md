@@ -12,7 +12,7 @@ base-http probes an idle pooled connection by polling one read with a no-op wake
 
 ## Scope
 
-The `SocketStreamReader` interface and its backend implementations: the readiness selector (used by Native), io_uring, the Tokio adapter and Direct. Packet readers, pipes and files are outside this requirement.
+The `SocketStreamReader` interface and its backend implementations: the readiness selector (used by Native), io_uring and the Tokio adapter. Packet readers, pipes and files are outside this requirement.
 
 ## Validation
 
