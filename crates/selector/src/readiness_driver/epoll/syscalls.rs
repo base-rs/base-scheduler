@@ -3,10 +3,28 @@
 
 //! Production calls libc directly. Tests inject only selected native operations on their own thread.
 
+#[cfg(all(target_os = "android", not(test)))]
+pub(super) use android::epoll_pwait;
+#[cfg(all(target_os = "linux", not(test)))]
+pub(super) use libc::epoll_pwait;
 #[cfg(not(test))]
 pub(super) use libc::{
-    epoll_create1, epoll_ctl, epoll_pwait, eventfd, read, timerfd_create, timerfd_settime, write,
+    epoll_create1, epoll_ctl, eventfd, read, timerfd_create, timerfd_settime, write,
 };
+
+// The libc crate does not bind bionic's `epoll_pwait`, which Android has provided since API level 21.
+#[cfg(target_os = "android")]
+mod android {
+    unsafe extern "C" {
+        pub(crate) fn epoll_pwait(
+            queue: libc::c_int,
+            events: *mut libc::epoll_event,
+            capacity: libc::c_int,
+            timeout: libc::c_int,
+            mask: *const libc::sigset_t,
+        ) -> libc::c_int;
+    }
+}
 
 #[cfg(test)]
 pub(super) use fault::{
@@ -31,6 +49,10 @@ pub(super) fn compatible_wait(
 
 #[cfg(test)]
 pub(super) mod fault {
+    #[cfg(target_os = "android")]
+    use super::android::epoll_pwait as epoll_pwait_native;
+    #[cfg(target_os = "linux")]
+    use libc::epoll_pwait as epoll_pwait_native;
     use std::{cell::RefCell, collections::VecDeque};
 
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -80,9 +102,14 @@ pub(super) mod fault {
             // A zero entry delegates one occurrence, allowing tests to fail a later call of the same operation.
             None | Some(0) => operation(),
             Some(error) => {
-                // SAFETY: errno is thread-local on Linux.
+                // SAFETY: errno is thread-local on Linux and Android.
+                #[cfg(target_os = "linux")]
                 unsafe {
                     *libc::__errno_location() = error;
+                }
+                #[cfg(target_os = "android")]
+                unsafe {
+                    *libc::__errno() = error;
                 }
                 -1
             }
@@ -121,7 +148,7 @@ pub(super) mod fault {
         mask: *const libc::sigset_t,
     ) -> i32 {
         invoke(Call::Wait, || unsafe {
-            libc::epoll_pwait(queue, events, capacity, timeout, mask) as libc::c_long
+            epoll_pwait_native(queue, events, capacity, timeout, mask) as libc::c_long
         }) as i32
     }
     pub(in super::super) unsafe fn read(

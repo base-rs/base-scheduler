@@ -182,7 +182,7 @@ where
         let this = self.get_mut();
         loop {
             let observed = this.direction.snapshot();
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             if !SUPPORT_OOB && observed & 4 != 0 {
                 return Poll::Ready(Err(io::Error::new(
                     io::ErrorKind::Unsupported,

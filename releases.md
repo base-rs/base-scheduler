@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Use Native's own epoll readiness driver on Android, as on Linux, rather than the portable `polling` fallback.
 - Fix Tokio adapter socket waits on Windows that could hang although the socket was ready. async-io's IOCP reactor can miss interest registered from another thread ([smol-rs/polling#271](https://github.com/smol-rs/polling/issues/271)); each wait now wakes the reactor after registering interest and retries its syscall at least every 10 seconds.
 
 ## v0.3.1
