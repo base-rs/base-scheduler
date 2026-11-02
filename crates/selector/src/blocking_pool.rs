@@ -370,7 +370,7 @@ fn work(shared: Arc<Shared>) {
     }
 }
 
-/// How long an idle worker waits before waiting again, on Apple platforms. There, a condition variable stops waking anyone, permanently, once one waiter has been passed over for 2^23 newer waits (<https://github.com/ioquatix/macos-pthread-cond-hang>). A worker that times out waits again with a new sequence number, so it never falls that far behind.
+/// How long an idle worker waits before waiting again, on Apple platforms. There, the default pthread condition variable stops waking anyone, permanently, once one waiter has been passed over for 2^23 newer waits (<https://github.com/ioquatix/macos-pthread-cond-hang>). A worker that times out waits again with a new sequence number, so it can only fall that far behind if the pool waits more than 2^23 times a second.
 #[cfg(target_vendor = "apple")]
 const IDLE_WAIT: std::time::Duration = std::time::Duration::from_secs(1);
 
