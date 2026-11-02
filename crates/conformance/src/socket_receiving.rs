@@ -234,22 +234,31 @@ where
     let mut writer = scheduler.socket_stream_writer(&sender).unwrap();
     let mut data = [0; 4];
     assert_eq!(reader.try_read_into(&mut []).unwrap(), 0);
+    let quiet = std::time::Duration::from_millis(5);
     assert_eq!(
-        reader.try_read_into(&mut data).unwrap_err().kind(),
+        attempt(|| reader.try_read_into(&mut data), quiet)
+            .unwrap_err()
+            .kind(),
         std::io::ErrorKind::WouldBlock
     );
     // A short read establishes the reader, after which backends may wait on cached readiness first.
     assert_eq!(writer.write(b"a", &never).await.unwrap(), 1);
     assert_eq!(reader.read_into(&mut data, &never).await.unwrap(), 1);
     assert_eq!(writer.write(b"b", &never).await.unwrap(), 1);
-    assert_eq!(immediately(|| reader.try_read_into(&mut data)), 1);
+    assert_eq!(
+        attempt(|| reader.try_read_into(&mut data), DELIVERY).unwrap(),
+        1
+    );
     assert_eq!(data[0], b'b');
     writer.close().await.unwrap();
     scheduler
         .socket_shutdown(&sender, Shutdown::Write)
         .await
         .unwrap();
-    assert_eq!(immediately(|| reader.try_read_into(&mut data)), 0);
+    assert_eq!(
+        attempt(|| reader.try_read_into(&mut data), DELIVERY).unwrap(),
+        0
+    );
     assert_eq!(reader.try_read_into(&mut data).unwrap(), 0);
     assert_eq!(reader.read_into(&mut data, &never).await.unwrap(), 0);
     reader.close().await.unwrap();
@@ -262,19 +271,21 @@ where
     scheduler.socket_close(sender).await.unwrap();
 }
 
-// Retry an immediate read while the transport delivers loopback input, without yielding to the scheduler.
-fn immediately(mut read: impl FnMut() -> std::io::Result<usize>) -> usize {
+const DELIVERY: std::time::Duration = std::time::Duration::from_secs(10);
+
+// Retry an immediate read for up to `patience` while the transport delivers loopback input, without yielding to the scheduler.
+fn attempt(
+    mut read: impl FnMut() -> std::io::Result<usize>,
+    patience: std::time::Duration,
+) -> std::io::Result<usize> {
     let start = std::time::Instant::now();
     loop {
-        match read() {
-            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
-                assert!(
-                    start.elapsed() < std::time::Duration::from_secs(10),
-                    "queued input never became readable"
-                );
-                std::thread::sleep(std::time::Duration::from_millis(1));
-            }
-            result => return result.unwrap(),
+        let result = read();
+        let waiting =
+            matches!(&result, Err(error) if error.kind() == std::io::ErrorKind::WouldBlock);
+        if !waiting || start.elapsed() >= patience {
+            return result;
         }
+        std::thread::sleep(std::time::Duration::from_millis(1));
     }
 }
