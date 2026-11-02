@@ -79,6 +79,9 @@ impl SocketStreamReader for Reader<'_> {
     ) -> OperationResult<usize> {
         self.fill(bytes, cancellation)
     }
+    fn try_read_into(&mut self, _: &mut [u8]) -> io::Result<usize> {
+        Err(io::ErrorKind::WouldBlock.into())
+    }
     async fn read_vectored(
         &mut self,
         buffers: &mut [IoSliceMut<'_>],

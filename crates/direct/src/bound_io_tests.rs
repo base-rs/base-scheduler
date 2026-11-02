@@ -380,6 +380,10 @@ fn abandoned_owned_transfers_keep_the_lane_busy_until_worker_retirement() {
                             reader.read_owned(vec![0], &never),
                             {
                                 assert_eq!(
+                                    reader.try_read_into(&mut [0]).unwrap_err().kind(),
+                                    std::io::ErrorKind::WouldBlock
+                                );
+                                assert_eq!(
                                     reader.read_into(&mut [0], &never).await.unwrap_err().kind(),
                                     std::io::ErrorKind::WouldBlock
                                 );

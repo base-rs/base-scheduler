@@ -39,6 +39,7 @@ The Direct and Tokio backends provide all four socket handles. Native forwards i
 | `read` | `(C) → OperationResult<Option<Buffer>>` | One owned initialized chunk. `None` means EOF or closed input. The returned chunk can outlive the reader and subsequent reads. |
 | `read_into` | `(&mut [u8], C) → OperationResult<usize>` | One possibly short borrowed transfer. Zero with nonempty capacity means EOF; an empty destination completes immediately after handle and cancellation checks, without establishing EOF. |
 | `read_vectored` | `(&mut [IoSliceMut], C) → OperationResult<usize>` | One scatter read into borrowed initialized ranges. No read-exact or framing behavior. |
+| `try_read_into` | `(&mut [u8]) → io::Result<usize>`, synchronous | One borrowed read attempted now. It never waits, registers interest or consults cached readiness, so it observes input, EOF and errors the transport has already queued. `WouldBlock` means no input now. Zero with nonempty capacity means EOF; an empty destination returns zero after the handle check. Wrappers forward it to their inner reader. |
 | `close` | `() → io::Result<()>` | Stop input and await registration retirement. Does not close or shut down the socket; returned chunks remain valid. |
 
 Ordinary errors and cancellation end the current wait without closing the reader or rolling back consumed bytes. An owned read waiting for storage is cancellable. Idle demand-driven reception returns its payload storage before waiting for readiness, so unused connections need not reserve the entire shared budget.

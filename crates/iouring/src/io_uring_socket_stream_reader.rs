@@ -151,6 +151,23 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for IoUringSocketStreamReader<'
         Ok(count)
     }
 
+    fn try_read_into(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+        self.check_open()?;
+        self.operations.check_idle()?;
+        if self.eof || buffer.is_empty() {
+            return Ok(0);
+        }
+        let count = crate::retained_socket::recv(
+            self.monitor.as_ref().socket(),
+            buffer,
+            SocketRecvFlags::default(),
+        )?;
+        if count == 0 {
+            self.eof = true;
+        }
+        Ok(count)
+    }
+
     async fn read_vectored(
         &mut self,
         buffers: &mut [IoSliceMut<'_>],
