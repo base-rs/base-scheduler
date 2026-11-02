@@ -176,6 +176,8 @@ fn shutdown_wakes_a_worker_waiting_for_input() {
     scheduler.block_on(scheduler.shutdown());
 }
 
+// Windows selector reads attempt the syscall on every poll, so only Unix readers wait on cached readiness.
+#[cfg(unix)]
 #[test]
 fn immediate_reads_observe_input_while_the_only_worker_is_busy() {
     use futures_lite::future::{block_on, poll_once};

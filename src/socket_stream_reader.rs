@@ -48,7 +48,7 @@ pub trait SocketStreamReader: Send {
         cancellation: &Cancellation,
     ) -> impl Future<Output = OperationResult<usize>> + Send;
 
-    /// Attempt one borrowed read now, without waiting, registering interest, or consulting cached readiness. Unlike polling [`read_into`](Self::read_into) once, this always reaches the transport, so it observes input, EOF or errors the operating system has already queued. Zero with nonempty storage is EOF; `WouldBlock` means no input is available now, including while an abandoned owned operation still retains the handle. An empty destination completes with zero after checking that the handle is open, without establishing EOF. Wrappers must forward this to their inner reader rather than polling a read.
+    /// Attempt one borrowed read now, without waiting, registering interest, or consulting cached readiness. Unlike polling [`read_into`](Self::read_into) once, this always reaches the transport, so it observes input, EOF or errors the operating system has already queued. Zero with nonempty storage is EOF; `WouldBlock` means no input is available now, including while an abandoned owned operation still retains the handle. An empty destination completes with zero after checking that the handle is open, without establishing EOF. It checks only this reader's handle, not whether the scheduler is closed, and does not detect urgent data. Wrappers must forward this to their inner reader rather than polling a read.
     fn try_read_into(&mut self, buffer: &mut [u8]) -> io::Result<usize>;
 
     /// Scatter a single read across borrowed ranges without allocating an I/O-vector array or copying payloads. Entirely empty storage follows `read_into`'s zero-capacity behavior.
