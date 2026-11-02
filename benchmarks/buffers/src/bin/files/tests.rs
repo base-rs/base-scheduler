@@ -130,9 +130,9 @@ fn submitted_output_retries_only_the_suffix_and_propagates_errors() {
 #[test]
 fn pipelines_copy_partial_tails_on_each_backend() {
     #[cfg(target_os = "linux")]
-    let backends = ["direct", "tokio", "native", "iouring"];
+    let backends = ["tokio", "native", "iouring"];
     #[cfg(not(target_os = "linux"))]
-    let backends = ["direct", "tokio", "native"];
+    let backends = ["tokio", "native"];
     for backend in backends {
         for mode in ["vec-serial", "vec-join", "serial", "join", "submit"] {
             let args = ["files", backend, mode, "4096", "10001", "2"].map(str::to_owned);
@@ -147,7 +147,7 @@ fn pipelines_copy_partial_tails_on_each_backend() {
 #[test]
 fn empty_input_returns_eof() {
     assert_eq!(
-        execute(&["files", "direct", "join", "4096", "0", "1"].map(str::to_owned))["bytes"],
+        execute(&["files", "native", "join", "4096", "0", "1"].map(str::to_owned))["bytes"],
         0
     );
 }
@@ -155,7 +155,7 @@ fn empty_input_returns_eof() {
 #[test]
 #[should_panic(expected = "unknown pipeline mode")]
 fn rejects_unknown_mode() {
-    execute(&["files", "direct", "unknown"].map(str::to_owned));
+    execute(&["files", "native", "unknown"].map(str::to_owned));
 }
 
 #[test]

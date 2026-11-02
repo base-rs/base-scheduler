@@ -177,17 +177,6 @@ fn execute(args: &[String]) -> serde_json::Value {
         .unwrap_or(64 * 1024 * 1024);
     let workers: usize = args.get(5).map(|s| s.parse().unwrap()).unwrap_or(1);
     let mut result = match backend {
-        "direct" => {
-            let scheduler =
-                base_scheduler_direct::DirectScheduler::new(base_scheduler_direct::DirectOptions {
-                    threads: workers,
-                    capacity: 64,
-                })
-                .unwrap();
-            let result = futures_lite::future::block_on(run(&scheduler, mode, size, bytes));
-            futures_lite::future::block_on(scheduler.shutdown());
-            result
-        }
         "tokio" => {
             let runtime = tokio::runtime::Builder::new_multi_thread()
                 .worker_threads(workers)

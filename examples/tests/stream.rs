@@ -2,8 +2,8 @@
 // Copyright, 2026, by Samuel Williams.
 
 use base_scheduler::*;
-use base_scheduler_direct::DirectScheduler;
 use base_scheduler_examples::stream;
+use base_scheduler_native::NativeScheduler;
 use futures_lite::future::{block_on, poll_once};
 use std::{
     io::{self, Write},
@@ -89,7 +89,7 @@ fn stream_reports_reader_setup_and_close_failures() {
 #[test]
 fn stream_cleanup_allows_exclusive_close_after_cancellation_and_consumer_errors() {
     block_on(async {
-        let scheduler = DirectScheduler::new(Default::default()).unwrap();
+        let scheduler = NativeScheduler::new().unwrap();
         for mode in 0..3 {
             let listener = TcpListener::bind("127.0.0.1:0").unwrap();
             let socket = scheduler

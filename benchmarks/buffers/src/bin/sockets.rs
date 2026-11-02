@@ -447,20 +447,6 @@ fn execute(args: &[String]) -> serde_json::Value {
     };
     let options = BufferPoolOptions::new(8 * workload.connections, size);
     let mut result = match backend {
-        "direct" => {
-            let scheduler = Arc::new(
-                base_scheduler_direct::DirectScheduler::new(base_scheduler_direct::DirectOptions {
-                    threads: workers,
-                    capacity: 64,
-                })
-                .unwrap(),
-            );
-            let pool = scheduler.buffer_pool(options).unwrap();
-            let result =
-                futures_lite::future::block_on(run_group(Arc::clone(&scheduler), workload, pool));
-            futures_lite::future::block_on(scheduler.shutdown());
-            result
-        }
         "tokio" => {
             let runtime = tokio::runtime::Builder::new_multi_thread()
                 .worker_threads(workers)
@@ -536,9 +522,9 @@ mod tests {
     #[test]
     fn receivers_preserve_tcp_and_udp_data_on_each_backend() {
         #[cfg(target_os = "linux")]
-        let backends = ["direct", "tokio", "native", "iouring"];
+        let backends = ["tokio", "native", "iouring"];
         #[cfg(not(target_os = "linux"))]
-        let backends = ["direct", "tokio", "native"];
+        let backends = ["tokio", "native"];
         for backend in backends {
             for mode in ["raw", "pool", "shared", "multi", "multi-retain"] {
                 if mode.starts_with("multi") && backend != "iouring" {
@@ -571,9 +557,9 @@ mod tests {
     #[test]
     fn receivers_share_capacity_across_concurrent_connections() {
         #[cfg(target_os = "linux")]
-        let backends = ["direct", "tokio", "native", "iouring"];
+        let backends = ["tokio", "native", "iouring"];
         #[cfg(not(target_os = "linux"))]
-        let backends = ["direct", "tokio", "native"];
+        let backends = ["tokio", "native"];
         for backend in backends {
             for mode in ["pool", "shared"] {
                 for transport in ["tcp", "udp"] {
@@ -606,13 +592,13 @@ mod tests {
     #[test]
     #[should_panic(expected = "unknown receiver mode")]
     fn rejects_unknown_mode() {
-        execute(&["sockets", "direct", "unknown"].map(str::to_owned));
+        execute(&["sockets", "native", "unknown"].map(str::to_owned));
     }
 
     #[test]
     #[should_panic(expected = "unknown transport")]
     fn rejects_unknown_transport() {
-        execute(&["sockets", "direct", "pool", "64", "2", "1", "unknown"].map(str::to_owned));
+        execute(&["sockets", "native", "pool", "64", "2", "1", "unknown"].map(str::to_owned));
     }
 
     #[test]

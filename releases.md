@@ -1,5 +1,9 @@
 # Releases
 
+## Unreleased
+
+- **Breaking:** remove the Direct backend, `base-scheduler-direct`; 0.4.0 is its final release. Its blocking pool could stop running jobs on Apple platforms ([#83](https://github.com/base-rs/base-scheduler/issues/83)), and its socket retry pulse spun instead of waiting ([#85](https://github.com/base-rs/base-scheduler/issues/85)). Applications should use `base-scheduler-native` as the general backend, or `base-scheduler-tokio` to run on an existing Tokio runtime.
+
 ## v0.4.0
 
 - **Breaking:** add the required `SocketStreamReader::try_read_into`, which attempts one borrowed read now without waiting or consulting cached readiness. Polling `read_into` once with a no-op waker is not equivalent: Native, readiness and Tokio readers that have established progress wait on cached readiness first, so a single poll can miss input or EOF the kernel has already queued. Implementations of `SocketStreamReader` outside this workspace must add the method; wrappers should forward it.

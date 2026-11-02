@@ -41,13 +41,6 @@ pub trait Multishot: SocketOperation + BufferPooling + Sync {
     }
 }
 
-impl Multishot for base_scheduler_direct::DirectScheduler {
-    #[cfg(target_os = "linux")]
-    type Receiver = iouring::RingReceiver;
-    #[cfg(all(not(target_os = "linux"), test))]
-    type Receiver = std::convert::Infallible;
-}
-
 impl Multishot for base_scheduler_tokio::TokioScheduler {
     #[cfg(target_os = "linux")]
     type Receiver = iouring::RingReceiver;
@@ -68,8 +61,14 @@ mod tests {
 
     #[test]
     fn portable_backends_reject_the_retired_multishot_control() {
-        let scheduler = base_scheduler_direct::DirectScheduler::new(Default::default()).unwrap();
-        futures_lite::future::block_on(async {
+        let scheduler = base_scheduler_native::NativeScheduler::with_options(
+            base_scheduler_native::NativeOptions {
+                workers: 1,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        scheduler.block_on(async {
             let never = Cancellation::never();
             let socket = scheduler
                 .socket_open(SocketDomain::Ipv4, SocketType::Datagram, None, &never)

@@ -24,7 +24,7 @@ def main():
     print("64 KiB file throughput (GiB/s):")
     print("backend workers serial join submit join/serial submit/join join/vec-join")
     for workers in [1, 2]:
-        for backend in ["direct", "native", "tokio", "iouring"]:
+        for backend in ["native", "tokio", "iouring"]:
             samples = [values for key, values in groups.items() if key[:4] == ("files", backend, workers, 65536)]
             medians = [statistics.median(sample[mode] for sample in samples) for mode in ["serial", "join", "submit"]]
             ratios = [statistics.median(sample[left] / sample[right] for sample in samples) for left, right in [("join", "serial"), ("submit", "join"), ("join", "vec-join")]]
@@ -39,7 +39,7 @@ def main():
     samples = [values for key, values in groups.items() if key[0] == "sockets"]
     print("Overall network ratios:", *(f"{statistics.median(sample[mode] / sample['raw'] for sample in samples):.3f}" for mode in ["pool", "shared"]))
     print("4 KiB submitted/joined ratios:")
-    for backend in ["direct", "native", "tokio", "iouring"]:
+    for backend in ["native", "tokio", "iouring"]:
         for workers in [1, 2]:
             samples = [values for key, values in groups.items() if key[:4] == ("files", backend, workers, 4096)]
             print(backend, workers, f"{statistics.median(sample['submit'] / sample['join'] for sample in samples):.3f}")

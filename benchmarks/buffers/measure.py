@@ -13,7 +13,7 @@ def groups(repeats):
     randomizer = random.Random(22361)
     cases = []
     for backend, workers, size in itertools.product(
-        ["direct", "native", "tokio", "iouring"], [1, 2], [4096, 65536, 131072]
+        ["native", "tokio", "iouring"], [1, 2], [4096, 65536, 131072]
     ):
         for repeat in range(repeats):
             modes = ["vec-serial", "vec-join", "serial", "join", "submit"]

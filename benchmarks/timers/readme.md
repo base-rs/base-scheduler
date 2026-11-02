@@ -60,7 +60,7 @@ target/release/base-scheduler-timer-benchmark native reuse yield 64 75000 4 1000
 target/release/base-scheduler-timer-benchmark tokio after alloc 1 100000 1
 ```
 
-Use `--backends tokio native direct` on macOS. Process CPU time is available on Unix; the experimental harness reports zero on other systems. Performance results in this report are Linux measurements.
+Use `--backends tokio native` on macOS. Process CPU time is available on Unix; the experimental harness reports zero on other systems. Performance results in this report are Linux measurements.
 
 ## Results
 

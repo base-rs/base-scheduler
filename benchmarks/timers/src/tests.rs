@@ -84,12 +84,6 @@ async fn semantics<S: Timers>(scheduler: &S) {
 }
 
 #[test]
-fn direct_semantics() {
-    let scheduler = base_scheduler_direct::DirectScheduler::new(Default::default()).unwrap();
-    futures_lite::future::block_on(semantics(&scheduler));
-    futures_lite::future::block_on(scheduler.shutdown());
-}
-#[test]
 fn native_external_and_worker_semantics() {
     let scheduler = Arc::new(
         base_scheduler_native::NativeScheduler::with_options(
@@ -178,9 +172,6 @@ async fn incompatible<S: Timers>(first: &S, second: &S) {
 }
 #[test]
 fn rejects_incompatible_schedulers() {
-    let one = base_scheduler_direct::DirectScheduler::new(Default::default()).unwrap();
-    let two = base_scheduler_direct::DirectScheduler::new(Default::default()).unwrap();
-    futures_lite::future::block_on(incompatible(&one, &two));
     let one = base_scheduler_native::NativeScheduler::with_options(
         base_scheduler_native::NativeOptions {
             workers: 1,
@@ -319,23 +310,6 @@ fn native_capacity_and_resource_drop() {
 
 #[test]
 fn closed_backends_reject_pending_timers() {
-    let direct = base_scheduler_direct::DirectScheduler::new(Default::default()).unwrap();
-    direct.close();
-    futures_lite::future::block_on(async {
-        assert_eq!(
-            direct
-                .timer_wait_until(
-                    &mut direct.timer(),
-                    direct.now() + Duration::from_secs(1),
-                    &Cancellation::never()
-                )
-                .await
-                .unwrap_err()
-                .kind(),
-            std::io::ErrorKind::BrokenPipe
-        );
-        direct.shutdown().await;
-    });
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()

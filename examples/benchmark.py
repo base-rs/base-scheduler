@@ -42,7 +42,7 @@ def main():
         "repeats": args.repeats,
         "seed": 0,
     }
-    backends = ["direct", "tokio", "native"]
+    backends = ["tokio", "native"]
     if platform.system() == "Linux":
         backends.append("iouring")
     workloads = [("stream", 65536, 4096), ("frames", 4093, 32768), ("datagrams", 1200, 16384), ("files", 65536, 4096)]

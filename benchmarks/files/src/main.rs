@@ -38,25 +38,6 @@ fn execute(args: &[String]) -> serde_json::Value {
             runtime.block_on(scheduler.shutdown());
             result
         }
-        "direct" => {
-            let scheduler = Arc::new(
-                base_scheduler_direct::DirectScheduler::new(base_scheduler_direct::DirectOptions {
-                    threads: workers,
-                    capacity: tasks.max(64),
-                })
-                .unwrap(),
-            );
-            let result = futures_lite::future::block_on(run(
-                scheduler.clone(),
-                monitor,
-                workload.clone(),
-                tasks,
-                iterations,
-                size,
-            ));
-            futures_lite::future::block_on(scheduler.shutdown());
-            result
-        }
         "native" => {
             let scheduler = Arc::new(
                 base_scheduler_native::NativeScheduler::with_options(
@@ -155,15 +136,9 @@ mod tests {
     #[test]
     fn matched_workloads_run_on_each_backend() {
         #[cfg(target_os = "linux")]
-        let backends = [
-            "native",
-            "tokio",
-            "direct",
-            "iouring",
-            "iouring-unregistered",
-        ];
+        let backends = ["native", "tokio", "iouring", "iouring-unregistered"];
         #[cfg(not(target_os = "linux"))]
-        let backends = ["native", "tokio", "direct"];
+        let backends = ["native", "tokio"];
         for backend in backends {
             for mode in ["ordinary", "monitor"] {
                 for workload in ["read-at", "write-at"] {

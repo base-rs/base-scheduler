@@ -1,6 +1,6 @@
 # File resource reuse benchmark
 
-Compare fresh scheduler-bound file readers and writers with reused handles on Direct, the Tokio adapter, Native readiness, and Native io_uring. The historical mode labels are `ordinary` for a fresh handle per transfer and `monitor` for reuse. This benchmark isolates repeated positioned reads and writes; it does not measure disk throughput or durability.
+Compare fresh scheduler-bound file readers and writers with reused handles on the Tokio adapter, Native readiness, and Native io_uring. The historical mode labels are `ordinary` for a fresh handle per transfer and `monitor` for reuse. This benchmark isolates repeated positioned reads and writes; it does not measure disk throughput or durability.
 
 ## Run
 
