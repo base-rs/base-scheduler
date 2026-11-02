@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fix Native and readiness blocking pools on Apple platforms that could stop running jobs, permanently. There, a condition variable stops waking anyone once one waiter has been passed over for 2^23 newer waits ([ioquatix/macos-pthread-cond-hang](https://github.com/ioquatix/macos-pthread-cond-hang)), which an idle worker in a busy pool can be; the direct scheduler's pool stopped that way ([#83](https://github.com/base-rs/base-scheduler/issues/83)). Idle workers now wait again every second.
 - Fix Tokio adapter socket waits on Windows that could hang although the socket was ready. async-io's IOCP reactor can miss interest registered from another thread ([smol-rs/polling#271](https://github.com/smol-rs/polling/issues/271)); each wait now wakes the reactor after registering interest and retries its syscall at least every 10 seconds.
 
 ## v0.3.1

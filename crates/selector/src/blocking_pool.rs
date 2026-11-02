@@ -10,7 +10,7 @@ use std::future::{Future, poll_fn};
 use std::io;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::pin::pin;
-use std::sync::{Arc, Condvar, Mutex, OnceLock};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard, OnceLock};
 use std::task::Poll;
 use std::thread;
 
@@ -357,7 +357,7 @@ fn work(shared: Arc<Shared>) {
                 if state.closed {
                     return;
                 }
-                state = shared.work.wait(state).unwrap();
+                state = wait(&shared.work, state);
             }
         };
         // Catch abandoned-result and capture destructor panics as well as user execution panics, so capacity is always returned and the worker survives.
@@ -367,6 +367,21 @@ fn work(shared: Arc<Shared>) {
             state.outstanding -= 1;
         }
         shared.capacity.notify(usize::MAX);
+    }
+}
+
+/// How long an idle worker waits before waiting again, on Apple platforms. There, a condition variable stops waking anyone, permanently, once one waiter has been passed over for 2^23 newer waits (<https://github.com/ioquatix/macos-pthread-cond-hang>). A worker that times out waits again with a new sequence number, so it never falls that far behind.
+#[cfg(target_vendor = "apple")]
+const IDLE_WAIT: std::time::Duration = std::time::Duration::from_secs(1);
+
+fn wait<'a>(work: &Condvar, state: MutexGuard<'a, State>) -> MutexGuard<'a, State> {
+    #[cfg(target_vendor = "apple")]
+    {
+        work.wait_timeout(state, IDLE_WAIT).unwrap().0
+    }
+    #[cfg(not(target_vendor = "apple"))]
+    {
+        work.wait(state).unwrap()
     }
 }
 
