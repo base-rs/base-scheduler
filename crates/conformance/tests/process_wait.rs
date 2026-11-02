@@ -101,12 +101,21 @@ impl ProcessWait for BlockingWaiter {
             .lock()
             .unwrap()
             .push(std::thread::spawn(move || {
-                let mut status = 0;
-                // SAFETY: `status` is valid writable storage, and the fixture owns this specific child.
-                let pid = unsafe { libc::waitpid(process, &mut status, 0) };
-                let _ = complete.send((pid, status));
+                let result = loop {
+                    let mut status = 0;
+                    // SAFETY: `status` is valid writable storage, and the fixture owns this specific child.
+                    let pid = unsafe { libc::waitpid(process, &mut status, 0) };
+                    if pid > 0 {
+                        break Ok((pid, status));
+                    }
+                    let error = std::io::Error::last_os_error();
+                    if error.kind() != std::io::ErrorKind::Interrupted {
+                        break Err(error);
+                    }
+                };
+                let _ = complete.send(result);
             }));
-        let (pid, status) = completion.await.unwrap();
+        let (pid, status) = completion.await.unwrap()?;
         Ok(Some(ProcessWaitResult {
             pid: pid as u32,
             status: std::os::unix::process::ExitStatusExt::from_raw(status),
@@ -136,6 +145,25 @@ fn abandoned_blocking_waits_may_reap() {
             &waiter,
             waiter.shutdown(),
         ));
+    });
+}
+
+#[cfg(unix)]
+#[test]
+fn blocking_wait_errors_are_reported() {
+    support::run(|| {
+        let waiter = BlockingWaiter::new();
+        // The test process is never the parent of init, so the wait fails with `ECHILD`.
+        let error = futures_lite::future::block_on(waiter.process_wait(
+            1,
+            ProcessWaitFlags::default(),
+            &Cancellation::never(),
+        ))
+        .unwrap_err();
+        assert!(
+            matches!(error, base_scheduler::OperationError::Io(error) if error.raw_os_error() == Some(libc::ECHILD))
+        );
+        futures_lite::future::block_on(waiter.shutdown());
     });
 }
 

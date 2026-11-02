@@ -1,17 +1,20 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use base_scheduler::{Cancellation, OperationResult};
+use base_scheduler::{Cancellation, Cancelled, OperationResult};
 use base_scheduler_conformance::{SocketIoFixture, SocketIoGuard, socket};
 use futures_channel::oneshot;
 use futures_lite::future::block_on;
 use std::{
+    future::{Future, poll_fn},
     panic::{AssertUnwindSafe, catch_unwind},
+    pin::{Pin, pin},
     sync::{
         Arc, Mutex,
         atomic::{AtomicBool, Ordering},
         mpsc,
     },
+    task::Poll,
     time::Duration,
 };
 
@@ -44,17 +47,26 @@ impl SocketIoGuard for Guard {
 
 type Backend = (oneshot::Sender<()>, mpsc::Receiver<()>, mpsc::Sender<()>);
 
-// A controlled backend: each accepted attempt runs on its own thread, which holds the input at a known boundary until released. The faulty variant leaves the input with the waiter, so abandonment destroys it while access remains.
+#[derive(Clone, Copy, PartialEq)]
+enum Fault {
+    None,
+    // Leave the input with the waiter, so abandonment destroys it while backend access remains.
+    RetainInWaiter,
+    // Let cancellation replace the result of an attempt that has already started.
+    CancelWins,
+}
+
+// A controlled backend: each accepted attempt runs on its own thread, which holds the input at a known boundary until released. Real readiness backends cannot provide this boundary: they perform each attempt synchronously inside the polling future, so holding it would also block the poll that must observe it.
 struct Fixture {
     input: Mutex<Option<Input>>,
     pointer: usize,
     dropped: Arc<AtomicBool>,
     backend: Mutex<Option<Backend>>,
     guard: Mutex<Option<(oneshot::Receiver<()>, Guard)>>,
-    retain_in_waiter: bool,
+    fault: Fault,
 }
 impl Fixture {
-    fn new(retain_in_waiter: bool) -> Self {
+    fn new(fault: Fault) -> Self {
         let dropped = Arc::new(AtomicBool::new(false));
         let input = Input {
             bytes: vec![1, 2, 3],
@@ -75,7 +87,7 @@ impl Fixture {
                     retired: retirement,
                 },
             ))),
-            retain_in_waiter,
+            fault,
         }
     }
 }
@@ -96,12 +108,16 @@ impl SocketIoFixture for Fixture {
         assert_eq!(*bytes, input.bytes.len());
         assert_eq!(input.bytes.as_ptr() as usize, self.pointer);
     }
-    async fn operation(&self, input: Input, _: &Cancellation) -> (OperationResult<usize>, Input) {
+    async fn operation(
+        &self,
+        input: Input,
+        cancellation: &Cancellation,
+    ) -> (OperationResult<usize>, Input) {
         // Require more than the initial poll to submit, exercising lifecycle assertions under delayed admission.
         futures_lite::future::yield_now().await;
         let (started, released, retired) = self.backend.lock().unwrap().take().unwrap();
         let count = input.bytes.len();
-        let (kept, accepted) = if self.retain_in_waiter {
+        let (kept, accepted) = if self.fault != Fault::None {
             (Some(input), None)
         } else {
             (None, Some(input))
@@ -114,8 +130,26 @@ impl SocketIoFixture for Fixture {
             let _ = complete.send(accepted);
             let _ = retired.send(());
         });
-        let accepted = completion.await.unwrap();
-        (Ok(count), kept.or(accepted).unwrap())
+        let mut completion = completion;
+        let mut cancelled = pin!(cancellation.cancelled());
+        let mut observed = false;
+        // These cases cancel only after the attempt has started, when its actual result must win. Observe cancellation first so that rule is exercised even when the result is already available.
+        let accepted = poll_fn(|context| {
+            if !observed && cancelled.as_mut().poll(context).is_ready() {
+                observed = true;
+                if self.fault == Fault::CancelWins {
+                    return Poll::Ready(None);
+                }
+            }
+            Pin::new(&mut completion)
+                .poll(context)
+                .map(|accepted| Some(accepted.unwrap()))
+        })
+        .await;
+        match accepted {
+            Some(accepted) => (Ok(count), kept.or(accepted).unwrap()),
+            None => (Err(Cancelled.into()), kept.unwrap()),
+        }
     }
     async fn start(&self) -> Guard {
         let (start, guard) = self.guard.lock().unwrap().take().unwrap();
@@ -128,7 +162,7 @@ fn run(test: impl AsyncFnOnce(&Fixture) + Send + 'static) {
     let (done, completion) = mpsc::channel();
     std::thread::spawn(move || {
         let _ = done.send(catch_unwind(AssertUnwindSafe(|| {
-            block_on(test(&Fixture::new(false)))
+            block_on(test(&Fixture::new(Fault::None)))
         })));
     });
     if let Err(payload) = completion
@@ -146,9 +180,18 @@ mod lifecycle {
 
 #[test]
 fn rejects_input_destroyed_with_an_abandoned_waiter() {
-    let fixture = Fixture::new(true);
+    let fixture = Fixture::new(Fault::RetainInWaiter);
     let result = catch_unwind(AssertUnwindSafe(|| {
         block_on(socket::abandoned_operation(&fixture))
+    }));
+    assert!(result.is_err(), "conformance accepted an incorrect backend");
+}
+
+#[test]
+fn rejects_cancellation_replacing_a_started_result() {
+    let fixture = Fixture::new(Fault::CancelWins);
+    let result = catch_unwind(AssertUnwindSafe(|| {
+        block_on(socket::completion_wins(&fixture))
     }));
     assert!(result.is_err(), "conformance accepted an incorrect backend");
 }
