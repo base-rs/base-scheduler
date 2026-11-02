@@ -1,6 +1,6 @@
 # Releases
 
-## Unreleased
+## v0.4.0
 
 - **Breaking:** add the required `SocketStreamReader::try_read_into`, which attempts one borrowed read now without waiting or consulting cached readiness. Polling `read_into` once with a no-op waker is not equivalent: Native, readiness and Tokio readers that have established progress wait on cached readiness first, so a single poll can miss input or EOF the kernel has already queued. Implementations of `SocketStreamReader` outside this workspace must add the method; wrappers should forward it.
 - Use Native's own epoll readiness driver on Android, as on Linux, rather than the portable `polling` fallback. Android stream readers therefore follow the Linux readiness rules: without OOB support, a short receive clears readiness and reported urgent data returns `Unsupported`.
