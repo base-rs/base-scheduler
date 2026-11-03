@@ -13,6 +13,7 @@ mod panic;
 #[cfg(feature = "diagnostics")]
 mod rescue_statistics;
 mod selector_operations;
+mod spin_lock;
 mod task_service;
 #[cfg(test)]
 mod test_support;

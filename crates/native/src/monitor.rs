@@ -1,61 +1,60 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-// Stall detection and rescue, described in `design/stall-rescue.md`. A worker that has not reached a turn boundary for `STALL`, while it is neither idle nor closing, is marked stuck. The monitor and idle workers then fire its expired timers from their own threads. Rescue moves wakeups, not timer ownership: keys stay in their original queue.
+// Stall detection and rescue, described in `design/stall-rescue.md`. A stall strands a timer only if the timer becomes due while its worker stays inside one poll or batch, so the monitor sleeps until the earliest published deadline plus `STALL`. A deadline still published that long after it fell due, on a worker that is not sleeping, means the worker is stuck: the monitor and idle workers then fire its expired timers from their own threads. Rescue moves wakeups, not timer ownership: keys stay in their original queue. With no pending deadlines the monitor does not wake at all.
 
 use crate::{
     task_service::Shared,
-    worker::{Stuck, WorkerState},
-    worker_timers,
+    worker::Stuck,
+    worker_timers::{self, NO_DEADLINE},
 };
 use std::{
     sync::{
         Arc, OnceLock, Weak,
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicU64, Ordering},
     },
     task::Waker,
     thread::{self, Thread},
-    time::{Duration, Instant},
+    time::Duration,
 };
 
-/// How long a busy worker's heartbeat must stay unchanged before it is stuck.
-const STALL: Duration = Duration::from_millis(1);
-/// How often the monitor samples workers while any of them is busy. The rescue bound is about `STALL + PERIOD`.
-const PERIOD: Duration = Duration::from_millis(1);
-/// Consecutive samples with every worker idle before the monitor sleeps until a worker leaves idle.
-const DEEP_AFTER: usize = 4;
+/// How long a timer may stay due and uncollected on a worker that is not sleeping before that worker is stuck. Rescue follows the deadline by about this much.
+const STALL: u64 = Duration::from_millis(1).as_nanos() as u64;
+/// The monitor's shortest interval between passes, which bounds its wake rate while deadlines keep falling due on busy workers. It also samples a stuck worker this often, and a deadline less than this much earlier than its plan does not wake it, so rescue can be this much later.
+const PERIOD: u64 = Duration::from_millis(1).as_nanos() as u64;
 
-#[derive(Default)]
+// Keep the monitor's planned deadline, which every lowering registration reads, off cache lines that workers write.
+#[repr(align(128))]
 pub(crate) struct Monitor {
     thread: OnceLock<Thread>,
-    deep: AtomicBool,
+    // The earliest future deadline that the monitor's current sleep covers, in clock nanoseconds. Publishing an earlier deadline wakes it. Zero when rescue is disabled, so nothing does.
+    next: AtomicU64,
     #[cfg(any(test, feature = "diagnostics"))]
     pub(crate) counters: Counters,
 }
 
 impl Monitor {
-    /// Called by a worker after it clears its sleeping flag. Both sides store with `SeqCst` before loading the other's flag, so either the monitor observes this worker awake or this load observes the monitor's deep sleep.
-    pub(crate) fn resume(&self) {
-        if self.deep.load(Ordering::SeqCst) && self.deep.swap(false, Ordering::SeqCst) {
+    pub(crate) fn new(rescue: bool) -> Self {
+        Self {
+            thread: OnceLock::new(),
+            next: AtomicU64::new(if rescue { NO_DEADLINE } else { 0 }),
+            #[cfg(any(test, feature = "diagnostics"))]
+            counters: Counters::default(),
+        }
+    }
+
+    /// Called under a worker's queue lock after publishing `deadline`. The monitor stores its plan before rechecking each queue under its lock, so either it observes this deadline or this load observes its plan.
+    pub(crate) fn observe(&self, deadline: u64) {
+        if deadline.saturating_add(PERIOD) < self.next.load(Ordering::Relaxed) {
             self.unpark();
         }
     }
 
-    /// Interrupt the monitor's current sleep, for closure and deep-sleep exit.
+    /// Interrupt the monitor's current sleep.
     pub(crate) fn unpark(&self) {
         if let Some(thread) = self.thread.get() {
             thread.unpark();
         }
-    }
-
-    // Advertise deep sleep, then confirm that every worker is still idle.
-    fn sleep(&self, shared: &Shared) -> bool {
-        self.deep.store(true, Ordering::SeqCst);
-        if shared.workers.iter().all(WorkerState::is_sleeping) {
-            return true;
-        }
-        self.deep.store(false, Ordering::SeqCst);
-        false
     }
 }
 
@@ -101,17 +100,24 @@ pub(crate) fn assist(shared: &Arc<Shared>, identifier: usize, expired: &mut Vec<
     fired > 0
 }
 
-struct Observation {
+// A worker marked stuck, with its heartbeat when it was marked, so that its next turn boundary clears the mark.
+#[derive(Clone, Copy)]
+struct Marked {
     turns: usize,
-    // The first sample that saw this heartbeat while the worker was busy.
-    since: Option<Instant>,
+}
+
+#[derive(Default)]
+struct Observation {
+    // The published deadline as this pass read it, for the locked recheck.
+    deadline: u64,
+    marked: Option<Marked>,
+    // Completed polls at the previous pass, which tell a long batch from one stuck poll.
     #[cfg(any(test, feature = "diagnostics"))]
     polls: usize,
 }
 
 pub(crate) struct State {
     observations: Vec<Observation>,
-    idle: usize,
     expired: Vec<Waker>,
 }
 
@@ -122,59 +128,99 @@ impl State {
             observations: shared
                 .workers
                 .iter()
-                .map(|worker| Observation {
-                    turns: worker.heartbeat.turns.load(Ordering::Relaxed),
-                    since: None,
-                    #[cfg(any(test, feature = "diagnostics"))]
-                    polls: worker.heartbeat.polls.load(Ordering::Relaxed),
-                })
+                .map(|_| Observation::default())
                 .collect(),
-            idle: 0,
             expired: worker_timers::buffer(),
         }
     }
 
-    /// Observe every worker, mark and rescue stuck ones, and return whether the monitor should sleep until a worker leaves idle.
-    pub(crate) fn sample(&mut self, shared: &Arc<Shared>, now: Instant) -> bool {
-        let mut idle = true;
+    /// Mark and rescue stuck workers, and return when the monitor should next run, or `NO_DEADLINE` to sleep until woken.
+    pub(crate) fn pass(&mut self, shared: &Arc<Shared>, now: u64) -> u64 {
+        let (wake, covered) = self.watch(shared, now);
+        shared.monitor.next.store(covered, Ordering::Relaxed);
+        let wake = self.confirm(wake, shared);
+        if wake == NO_DEADLINE {
+            wake
+        } else {
+            wake.max(now + PERIOD)
+        }
+    }
+
+    // Returns when to run next, and the earliest deadline still to be checked.
+    //
+    // A worker collects its due timers at every turn boundary and refreshes its published deadline, and an idle worker wakes for its own deadline. So a deadline that has been due for `STALL` on a worker that is not sleeping means that worker has not reached a turn boundary since: it is stuck. This needs one monitor wake per such deadline, and none while no deadline is pending.
+    fn watch(&mut self, shared: &Arc<Shared>, now: u64) -> (u64, u64) {
+        let mut wake = NO_DEADLINE;
+        let mut covered = NO_DEADLINE;
         for (identifier, worker) in shared.workers.iter().enumerate() {
             let observation = &mut self.observations[identifier];
+            let deadline = worker.timers.deadline.load(Ordering::Relaxed);
+            observation.deadline = deadline;
             let turns = worker.heartbeat.turns.load(Ordering::Relaxed);
             #[cfg(any(test, feature = "diagnostics"))]
-            let kind = {
-                let polls = worker.heartbeat.polls.load(Ordering::Relaxed);
-                let progressed = polls != observation.polls;
-                observation.polls = polls;
-                if progressed {
-                    Stuck::Batch
-                } else {
-                    Stuck::Poll
+            let progressed = std::mem::replace(
+                &mut observation.polls,
+                worker.heartbeat.polls.load(Ordering::Relaxed),
+            ) != observation.polls;
+            let sleeping = worker.is_sleeping();
+            // A turn boundary, or sleep, ends a stall.
+            if observation
+                .marked
+                .is_some_and(|marked| sleeping || marked.turns != turns)
+            {
+                observation.marked = None;
+                worker.set_stuck(None);
+            }
+            // A worker already known to be stuck needs no grace period.
+            let grace = if observation.marked.is_some() {
+                0
+            } else {
+                STALL
+            };
+            let check = deadline.saturating_add(grace);
+            if check > now || sleeping {
+                if check > now {
+                    covered = covered.min(deadline);
+                    wake = wake.min(check);
                 }
+                if observation.marked.is_some() {
+                    // Keep sampling a stuck worker until it recovers. This costs nothing while no worker is stuck.
+                    wake = wake.min(now + PERIOD);
+                }
+                continue;
+            }
+            #[cfg(any(test, feature = "diagnostics"))]
+            let kind = if progressed {
+                Stuck::Batch
+            } else {
+                Stuck::Poll
             };
             #[cfg(not(any(test, feature = "diagnostics")))]
             let kind = Stuck::Poll;
-            // An idle worker services its own deadline. A closing worker is idle once it has finished.
-            let sleeping = worker.is_sleeping();
-            let unchanged = turns == observation.turns;
-            if sleeping || !unchanged {
-                observation.turns = turns;
-                observation.since = (!sleeping).then_some(now);
-                worker.set_stuck(None);
-                // Deep sleep needs workers that stayed idle since the previous sample. Leaving idle beats the heartbeat, so a worker that alternates quickly between idle and busy keeps the monitor sampling, rather than waking it on every exit from idle.
-                idle &= sleeping && unchanged;
-                continue;
-            }
-            idle = false;
-            let since = *observation.since.get_or_insert(now);
-            if now.duration_since(since) < STALL {
-                continue;
-            }
+            observation.marked.get_or_insert(Marked { turns });
             worker.set_stuck(Some(kind));
             rescue(shared, identifier, kind, &mut self.expired);
+            wake = wake.min(now + PERIOD);
         }
-        self.idle = if idle { self.idle + 1 } else { 0 };
-        self.idle >= DEEP_AFTER && shared.monitor.sleep(shared)
+        (wake, covered)
     }
+
+    // A deadline lowered after the pass read it, but before the plan was stored, may not have woken the monitor. Reading each queue under its lock closes that window: the monitor runs again by that deadline.
+    fn confirm(&self, wake: u64, shared: &Shared) -> u64 {
+        let mut wake = wake;
+        for (identifier, worker) in shared.workers.iter().enumerate() {
+            let published = worker_timers::published(worker);
+            if published < self.observations[identifier].deadline {
+                wake = wake.min(published);
+            }
+        }
+        wake
+    }
+}
+
+// The monitor's sleep before `wake`, or `None` to sleep until woken.
+fn sleep_for(now: u64, wake: u64) -> Option<Duration> {
+    (wake != NO_DEADLINE).then(|| Duration::from_nanos(wake.saturating_sub(now)))
 }
 
 /// The monitor thread. It holds only a weak reference between passes, and exits once closure has finished or the scheduler is gone.
@@ -184,14 +230,14 @@ pub(crate) fn run(shared: Weak<Shared>) {
         let Some(shared) = shared.upgrade().filter(|shared| !shared.finished()) else {
             return;
         };
-        let deep = state
+        let now = worker_timers::clock(&shared);
+        let wake = state
             .get_or_insert_with(|| State::new(&shared))
-            .sample(&shared, Instant::now());
+            .pass(&shared, now);
         drop(shared);
-        if deep {
-            thread::park();
-        } else {
-            thread::park_timeout(PERIOD);
+        match sleep_for(now, wake) {
+            Some(duration) => thread::park_timeout(duration),
+            None => thread::park(),
         }
     }
 }

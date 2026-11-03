@@ -6,7 +6,7 @@ use crate::task_service::Shared;
 use crossbeam_deque::{Injector, Steal, Stealer, Worker};
 use std::cell::RefCell;
 use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU64, AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex, OnceLock, Weak};
+use std::sync::{Arc, OnceLock, Weak};
 use std::thread::{self, Thread};
 use std::{task::Waker, time::Duration};
 
@@ -32,7 +32,7 @@ pub(crate) struct Heartbeat {
 #[repr(align(128))]
 pub(crate) struct Timers {
     // Locked by the owner for its own timer operations and passes, and directly by other threads for registration, update and release. Never held across a waker call or a task poll.
-    pub(crate) queue: Mutex<base_scheduler_timers::local::TimerQueue<Waker>>,
+    pub(crate) queue: crate::spin_lock::SpinLock<base_scheduler_timers::local::TimerQueue<Waker>>,
     // A lower bound of the earliest live deadline in `queue`, in clock nanoseconds since `epoch`. Written only under the queue lock.
     pub(crate) deadline: AtomicU64,
     // The scheduler's construction time, copied here so that timer operations read only this worker's lines.
@@ -61,11 +61,9 @@ impl WorkerState {
         timer_capacity: usize,
         epoch: std::time::Instant,
     ) -> Self {
-        let queue = Mutex::new(base_scheduler_timers::local::TimerQueue::with_capacity(
-            timer_capacity,
-        ));
-        // Some platforms allocate a mutex's system lock on first use. Take it once here, so that timer registration allocates nothing later.
-        drop(queue.lock());
+        let queue = crate::spin_lock::SpinLock::new(
+            base_scheduler_timers::local::TimerQueue::with_capacity(timer_capacity),
+        );
         Self {
             incoming: Injector::new(),
             timers: Timers {
@@ -416,7 +414,6 @@ fn run_loop(
                 );
                 // Leaving idle is a turn boundary: the batch that follows starts a new heartbeat.
                 worker.beat();
-                shared.monitor.resume();
                 runnable
             }
             result => yield_on_retry(result).success(),

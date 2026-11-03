@@ -285,12 +285,15 @@ fn wait_until(condition: impl Fn() -> bool) {
 }
 
 #[test]
-fn a_worker_that_blocks_as_the_monitor_deep_sleeps_is_still_rescued() {
+fn a_worker_that_blocks_while_the_monitor_sleeps_without_deadlines_is_still_rescued() {
     test_support::run(|| {
         let scheduler = scheduler(2);
         let monitor = &scheduler.tasks.shared.monitor;
         for _ in 0..20 {
-            wait_until(|| monitor.deep.load(Ordering::SeqCst));
+            // No deadline is pending, so the monitor sleeps until a registration wakes it.
+            wait_until(|| {
+                monitor.next.load(Ordering::Relaxed) == crate::worker_timers::NO_DEADLINE
+            });
             let probe = Arc::new(Probe::default());
             let released = Arc::new(AtomicBool::new(false));
             let (registered, blocker) = stall_with_timer(

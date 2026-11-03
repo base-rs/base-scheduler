@@ -78,6 +78,26 @@ fn main() {
                 }
             }).unwrap()).unwrap();
         }
+        // Worst case: a worker blocks inside one poll for 200 ms while root sleeps of 10 ms are measured. Registrations alternate between workers, so some land on the blocked one.
+        "stall" => {
+            for _ in 0..iterations {
+                let blocker = scheduler.spawn(async { std::thread::sleep(Duration::from_millis(200)) }).unwrap();
+                std::thread::sleep(Duration::from_millis(5));
+                for _ in 0..8 {
+                    let deadline = Instant::now() + Duration::from_millis(10);
+                    block_on(scheduler.sleep_until(deadline, &never)).unwrap();
+                    lateness.push(Instant::now().duration_since(deadline).as_nanos() as f64);
+                }
+                block_on(blocker).unwrap();
+            }
+        }
+        // 16 tasks per worker yield `iterations` times each, with no timers: the scheduler loop alone.
+        "yield" => {
+            let tasks: Vec<_> = (0..workers * 16).map(|_| scheduler.spawn(async move {
+                for _ in 0..iterations { futures_lite::future::yield_now().await; }
+            }).unwrap()).collect();
+            for task in tasks { block_on(task).unwrap(); }
+        }
         _ => panic!("workload"),
     }
     let elapsed = start.elapsed();
@@ -88,6 +108,6 @@ fn main() {
 fn report(workload: &str, workers: usize, iterations: usize, elapsed: Duration, cpu: f64, lateness: &mut Vec<f64>) {
     lateness.sort_by(|a, b| a.partial_cmp(b).unwrap());
     let q = |p: f64| if lateness.is_empty() { 0.0 } else { lateness[((lateness.len() - 1) as f64 * p) as usize] };
-    println!("{{\"workload\":\"{workload}\",\"workers\":{workers},\"iterations\":{iterations},\"ns_per_op\":{},\"cpu_ns_per_op\":{},\"p50\":{},\"p99\":{}}}",
-        elapsed.as_nanos() as f64 / iterations as f64, cpu * 1e9 / iterations as f64, q(0.5), q(0.99));
+    println!("{{\"workload\":\"{workload}\",\"workers\":{workers},\"iterations\":{iterations},\"ns_per_op\":{},\"cpu_ns_per_op\":{},\"p50\":{},\"p99\":{},\"max\":{}}}",
+        elapsed.as_nanos() as f64 / iterations as f64, cpu * 1e9 / iterations as f64, q(0.5), q(0.99), q(1.0));
 }

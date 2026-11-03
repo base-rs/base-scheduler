@@ -114,7 +114,7 @@ impl Shared {
             admission: Mutex::new(0),
             timer_next: AtomicUsize::new(0),
             rescue,
-            monitor: crate::monitor::Monitor::default(),
+            monitor: crate::monitor::Monitor::new(rescue),
             #[cfg(test)]
             paused: Mutex::new(None),
             workers_remaining: AtomicUsize::new(0),
@@ -141,14 +141,17 @@ impl Shared {
         self.changed.notify(usize::MAX);
     }
 
+    #[inline]
     pub(crate) fn has_runnables(&self) -> bool {
         self.outstanding.load(Ordering::Acquire) & !NOTIFY_IDLE != 0
     }
 
+    #[inline]
     pub(crate) fn is_closed(&self) -> bool {
         self.closed.load(Ordering::Acquire)
     }
 
+    #[inline]
     pub(crate) fn finished(&self) -> bool {
         self.closed.load(Ordering::Acquire)
             && self.remaining.load(Ordering::Acquire) == 0

@@ -19,6 +19,9 @@ impl Wake for Probe {
 
 // Workers that are never started, so only the test collects their timers.
 fn shared(workers: usize, rescue: bool) -> Arc<Shared> {
+    shared_with(workers, rescue)
+}
+fn shared_with(workers: usize, rescue: bool) -> Arc<Shared> {
     let queues: Vec<_> = (0..workers)
         .map(|_| std::array::from_fn(|_| Worker::new_fifo()))
         .collect();
@@ -36,32 +39,69 @@ fn expired_timer(
     worker_timers::register(shared, deadline, Waker::from(Arc::clone(probe))).unwrap()
 }
 
+// Clock values for a pass, relative to the scheduler's epoch.
+fn at(shared: &Shared, offset: Duration) -> u64 {
+    worker_timers::clock(shared) + offset.as_nanos() as u64
+}
+
 #[test]
-fn sampling_marks_classifies_rescues_and_clears_stalled_workers() {
+fn passes_rescue_timers_left_due_for_the_stall_on_busy_workers() {
     let shared = shared(2, true);
     let probe = Arc::new(Probe::default());
-    let start = Instant::now();
     let mut state = State::new(&shared);
+    let start = at(&shared, Duration::ZERO);
 
-    // The first busy observation starts the stall interval.
+    // Without deadlines the monitor sleeps until woken.
+    assert_eq!(state.pass(&shared, start), NO_DEADLINE);
+    assert_eq!(shared.monitor.next.load(Ordering::Relaxed), NO_DEADLINE);
+
+    // A future deadline is covered: the monitor wakes once it has been due for the stall.
+    shared.timer_next.store(1, Ordering::Relaxed);
+    let deadline = worker_timers::now(&shared) + Duration::from_secs(10);
+    let future =
+        worker_timers::register(&shared, deadline, Waker::from(Arc::clone(&probe))).unwrap();
+    let covered = shared.workers[1].timers.deadline.load(Ordering::Relaxed);
+    assert_eq!(state.pass(&shared, start), covered + STALL);
+    assert_eq!(shared.monitor.next.load(Ordering::Relaxed), covered);
+    drop(future);
+
+    // A timer due for less than the stall waits; passes are at least `PERIOD` apart.
     let first = expired_timer(&shared, 1, &probe);
-    assert!(!state.sample(&shared, start));
-    assert_eq!(shared.workers[1].stuck(), None);
+    let due = shared.workers[1].timers.deadline.load(Ordering::Relaxed);
+    assert_eq!(state.pass(&shared, due), due + PERIOD);
     assert_eq!(probe.0.load(Ordering::SeqCst), 0);
-
-    // No poll completed between samples: a stuck poll. Worker 0 is stuck too, but has nothing to rescue.
-    assert!(!state.sample(&shared, start + STALL));
-    assert_eq!(shared.workers[0].stuck(), Some(Stuck::Poll));
+    // Due for the stall without collection: a stuck poll, since no poll completed.
+    assert_eq!(state.pass(&shared, due + STALL), due + STALL + PERIOD);
     assert_eq!(shared.workers[1].stuck(), Some(Stuck::Poll));
     assert_eq!(probe.0.load(Ordering::SeqCst), 1);
 
-    // Polls completed without a turn boundary: a long batch.
+    // A stuck worker keeps being sampled, and a timer due during the stall is rescued without a grace period: polls completed, so a long batch.
+    assert_eq!(
+        state.pass(&shared, due + STALL * 2),
+        due + STALL * 2 + PERIOD
+    );
+    // A future deadline on a stuck worker is checked when it falls due, not `STALL` later.
+    shared.timer_next.store(1, Ordering::Relaxed);
+    let pending = worker_timers::register(
+        &shared,
+        worker_timers::now(&shared) + Duration::from_secs(10),
+        Waker::noop().clone(),
+    )
+    .unwrap();
+    let soon = shared.workers[1].timers.deadline.load(Ordering::Relaxed);
+    assert_eq!(state.pass(&shared, soon - PERIOD * 5), soon - PERIOD * 4);
+    assert_eq!(
+        shared.workers[1].stuck(),
+        Some(Stuck::Poll),
+        "the mark persists while the worker stays inside its poll"
+    );
+    drop(pending);
     let second = expired_timer(&shared, 1, &probe);
     shared.workers[1]
         .heartbeat
         .polls
         .fetch_add(1, Ordering::Relaxed);
-    assert!(!state.sample(&shared, start + STALL * 2));
+    state.pass(&shared, due + STALL * 4);
     assert_eq!(shared.workers[1].stuck(), Some(Stuck::Batch));
     assert_eq!(probe.0.load(Ordering::SeqCst), 2);
     let counters = &shared.monitor.counters;
@@ -69,41 +109,69 @@ fn sampling_marks_classifies_rescues_and_clears_stalled_workers() {
     assert_eq!(counters.long_batches.load(Ordering::Relaxed), 1);
     assert_eq!(counters.timers.load(Ordering::Relaxed), 2);
 
-    // A turn boundary clears the mark and restarts the interval.
+    // A turn boundary clears the mark, and the monitor sleeps again.
     shared.workers[1].beat();
-    assert!(!state.sample(&shared, start + STALL * 3));
+    assert_eq!(state.pass(&shared, due + STALL * 5), NO_DEADLINE);
     assert_eq!(shared.workers[1].stuck(), None);
-    drop((first, second));
+
+    // A sleeping worker services its own due deadline.
+    let third = expired_timer(&shared, 0, &probe);
+    shared.workers[0].set_sleeping(true);
+    assert_eq!(state.pass(&shared, due + STALL * 6), NO_DEADLINE);
+    assert_eq!(shared.workers[0].stuck(), None);
+    // Sleep also ends a stall that was marked.
+    shared.workers[0].set_sleeping(false);
+    state.pass(&shared, due + STALL * 7);
+    assert!(shared.workers[0].stuck().is_some());
+    shared.workers[0].set_sleeping(true);
+    assert_eq!(state.pass(&shared, due + STALL * 8), NO_DEADLINE);
+    assert_eq!(shared.workers[0].stuck(), None);
+    shared.workers[0].set_sleeping(false);
+    drop((first, second, third));
 }
 
 #[test]
-fn every_worker_idle_for_several_samples_enters_deep_sleep_until_one_resumes() {
-    let shared = shared(2, true);
+fn an_earlier_deadline_wakes_the_monitor() {
+    let shared = shared(1, true);
     let mut state = State::new(&shared);
-    let now = Instant::now();
-    for worker in &shared.workers {
-        worker.set_sleeping(true);
-    }
-    for _ in 1..DEEP_AFTER {
-        assert!(!state.sample(&shared, now));
-    }
-    // A worker that left idle and returned between samples restarts the count.
-    shared.workers[1].beat();
-    for _ in 0..DEEP_AFTER {
-        assert!(!state.sample(&shared, now));
-    }
-    assert!(state.sample(&shared, now));
-    assert!(shared.monitor.deep.load(Ordering::SeqCst));
-    // A worker leaving idle clears deep sleep and wakes the monitor once.
-    shared.workers[0].set_sleeping(false);
-    shared.monitor.resume();
-    assert!(!shared.monitor.deep.load(Ordering::SeqCst));
-    shared.monitor.resume();
-    // The unpark token is retained, so this returns at once.
+    let now = at(&shared, Duration::ZERO);
+    assert_eq!(state.pass(&shared, now), NO_DEADLINE);
+    // This thread is the monitor, so a registration earlier than its plan leaves an unpark token and this returns at once.
+    let registration = worker_timers::register(
+        &shared,
+        worker_timers::now(&shared) + Duration::from_secs(10),
+        Waker::noop().clone(),
+    )
+    .unwrap();
     thread::park();
-    // A worker that woke after the sample keeps the monitor awake.
-    assert!(!shared.monitor.sleep(&shared));
-    assert!(!shared.monitor.deep.load(Ordering::SeqCst));
+    drop(registration);
+    assert_eq!(sleep_for(now, now + 5), Some(Duration::from_nanos(5)));
+    assert_eq!(sleep_for(now, NO_DEADLINE), None);
+    // With rescue disabled, no deadline is earlier than the plan.
+    assert_eq!(
+        shared_with(1, false).monitor.next.load(Ordering::Relaxed),
+        0
+    );
+}
+
+#[test]
+fn a_deadline_lowered_during_a_pass_runs_it_again() {
+    let shared = shared(1, true);
+    let mut state = State::new(&shared);
+    let now = at(&shared, Duration::ZERO);
+    assert_eq!(state.pass(&shared, now), NO_DEADLINE);
+    // The registration lowers the queue's deadline below the value this pass read.
+    let registration = worker_timers::register(
+        &shared,
+        worker_timers::now(&shared) + Duration::from_secs(10),
+        Waker::noop().clone(),
+    )
+    .unwrap();
+    let lowered = shared.workers[0].timers.deadline.load(Ordering::Relaxed);
+    assert_eq!(state.confirm(NO_DEADLINE, &shared), lowered);
+    state.pass(&shared, now);
+    assert_eq!(state.confirm(NO_DEADLINE, &shared), NO_DEADLINE);
+    drop(registration);
 }
 
 #[test]
