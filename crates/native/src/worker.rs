@@ -61,12 +61,15 @@ impl WorkerState {
         timer_capacity: usize,
         epoch: std::time::Instant,
     ) -> Self {
+        let queue = Mutex::new(base_scheduler_timers::local::TimerQueue::with_capacity(
+            timer_capacity,
+        ));
+        // Some platforms allocate a mutex's system lock on first use. Take it once here, so that timer registration allocates nothing later.
+        drop(queue.lock());
         Self {
             incoming: Injector::new(),
             timers: Timers {
-                queue: Mutex::new(base_scheduler_timers::local::TimerQueue::with_capacity(
-                    timer_capacity,
-                )),
+                queue,
                 deadline: AtomicU64::new(crate::worker_timers::NO_DEADLINE),
                 epoch,
                 closed: AtomicBool::new(false),
