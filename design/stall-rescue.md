@@ -128,7 +128,7 @@ So locality remains the steady-state design, and its cost must stay within the a
 
 ## Scope
 
-- **Requirement 1** covers the Native executor (`crates/native`): its worker loop, timer queues, idle and park transitions, and shutdown. It also covers the epoll and kqueue readiness drivers (`crates/selector/src/readiness_driver*`), and Native's io_uring composition for timers and runnable tasks.
+- **Requirement 1** covers the Native executor (`crates/native`): its worker loop, timer queues, idle and park transitions, and shutdown. It also covers the epoll readiness driver on Linux and Android, the kqueue readiness driver on macOS, FreeBSD, NetBSD, OpenBSD and DragonFly (`crates/selector/src/readiness_driver*`), and Native's io_uring composition for timers and runnable tasks.
 - **Requirement 2** covers:
   - the `base-scheduler` interface crate and its rustdoc;
   - `context/interface.md`;
@@ -143,7 +143,7 @@ So locality remains the steady-state design, and its cost must stay within the a
   - in-flight io_uring operations (pending the stage 4 decision);
   - running rescued tasks when no worker is idle (rescue still wakes root futures in that case);
   - the Tokio adapter;
-  - progress of the standalone `async-io` fallback;
+  - progress of the standalone `async-io` fallback, which is the only readiness path on Windows, illumos, Solaris and Redox;
   - files, resolution and blocking jobs, which already run on independent pools.
 
 ## Validation
@@ -155,7 +155,7 @@ So locality remains the steady-state design, and its cost must stay within the a
 - **#92's root timer tests.** These are in `crates/native/tests/root_timers.rs`, and all three fail on `main`. Bring them over with their bounds relative to the hold. Set `LATE` to 250 ms rather than 1 s. That is large compared with *T*, so loaded CI runners don't make the test flaky, and it is still far below the multi-second hold. It distinguishes rescue from waiting for the hold without testing *T* itself. *T* is checked by the benchmark lateness measurements, not by tests.
 - **Stolen timer.** A task on worker A registers a sleep and a reusable timer. Another worker, B, then steals the task (force this with a hand-off between tasks), and A blocks. The timer must fire within *T*.
 - **Waker update to a stuck owner.** A reusable timer is registered on A. A blocks, the task is polled on B, and B replaces the timer's waker. The timer must fire within *T* and wake the *new* waker. On `main`, the update would sit in A's inbox, so a rescuer would fire the old waker and the wakeup would be lost.
-- **Stuck readiness.** A root `read_into` on a socket routed to a worker that then blocks. This is #92's scratch reproduction, which took 1.945 s on `main`. Also a socket registered by a task that is stolen before its registering worker blocks. Run both on epoll and kqueue.
+- **Stuck readiness.** A root `read_into` on a socket routed to a worker that then blocks. This is #92's scratch reproduction, which took 1.945 s on `main`. Also a socket registered by a task that is stolen before its registering worker blocks. Run both on epoll, and on kqueue on macOS and FreeBSD.
 - **Runnable tasks.** Tasks queued behind a long poll, in both ready generations and in the remote inbox, run on other workers. This should already pass on `main`; add it so the property is checked.
 - **Stuck preferred worker.** Every worker but A is kept saturated with local work, and A blocks. A rescued waker schedules a task whose preferred worker is A. The task must run without waiting for A or for the other workers to drain their local queues. This covers the [proposed refinement](#runnable-tasks) and is added with it.
 - **No spin on interrupts.** A victim stays stuck with a pending interrupt (an eventfd count, or a re-triggered `EVFILT_USER`) and no registration events. An idle worker's pre-park check must find nothing published, and the idle worker must park rather than loop through `Retry` for the whole stall.
@@ -504,6 +504,8 @@ The interface must not preclude any of the options.
 - An uncontended poll lock taken for each driver turn, with a `try_lock` on zero-timeout turns.
 - One load on idle exit to check for monitor deep sleep, and one load per victim in the pre-park search.
 - Monitor wakes at about 1/*P* (about 1,000 per second at *P* = 1 ms) while any worker is busy, and at most about one wake per deep-sleep entry otherwise.
+- One relaxed load of the preferred worker's stuck mark for each remote wake in `schedule`, for the stuck-preferred-worker refinement.
+- No change on the native epoll and kqueue paths from removing `polling`. The pipe and millisecond-timeout fallbacks run only when an eventfd, timerfd or `EVFILT_USER` is unavailable.
 - Nothing per spawn, and nothing that depends on whether a root timer is pending. This is what distinguishes the design from #92.
 
 **Budgets (decided).** Each workload is compared with its baseline from `main` at the same revision and build settings.
@@ -522,7 +524,7 @@ Any result over budget goes back to the maintainer with its numbers.
 - Monitor wake rate and CPU at each candidate *P* (for example 0.5, 1 and 2 ms), and which CPU it runs on. Report it alongside the workers' CPU, not hidden in process totals.
 - Fixed-rate p99 latency with every core occupied, where the monitor competes with workers.
 - A net-benefit workload with undeclared short blocking, for example tasks that occasionally poll CPU-bound for 5 ms among I/O and timer traffic. Compare p99 and throughput with rescue on and off.
-- Rescue and false-positive counts for every workload.
+- Rescue and false-positive counts for every workload, and rescue counts per registration. [Decision 7](#decisions) revisits migration from the per-registration counts.
 
 Fixed-rate latency is reported separately from throughput and CPU, as [worker progress](worker-progress.md) requires.
 
@@ -543,6 +545,7 @@ Fixed-rate latency is reported separately from throughput and CPU, as [worker pr
 - **Waker code on the monitor thread.** Wakers run on the monitor thread. A foreign executor's slow or panicking waker can delay rescue of other workers, and can delay an idle owner of that poller. Contain panics, and consider capping each rescue pass.
 - **The monitor's own CPU.** At about 1,000 wakes per second it is not free, and on fully loaded machines it competes with workers. It is measured explicitly.
 - **Shutdown.** See [lifetimes](#lifetimes). A rescue must never touch a stopped controller or a closed queue except to drain it.
+- **Untested platforms.** CI runs readiness tests on Linux, macOS and FreeBSD only. NetBSD is build-checked, and OpenBSD and DragonFly are tier 3 targets with at most a build check, so a kqueue difference there, such as a missing `EVFILT_USER`, may surface only from users.
 - **Masking.** Rescue can hide blocking that should be `spawn_blocking`. Consider a diagnostic counter or log for repeated stalls of the same worker.
 
 ## Prior art
