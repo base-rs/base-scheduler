@@ -96,7 +96,7 @@ Tasks are stolen, but timers and registrations stay where they are. A worker stu
 
 ### PR #92
 
-[PR #92](https://github.com/base-rs/base-scheduler/pull/92), which is still open, fixes root timers only. It does so with a shared root queue and a watcher role that is handed off before each batch.
+[PR #92](https://github.com/base-rs/base-scheduler/pull/92), now closed as superseded by this design, fixed root timers only. Its branch, `root-timer-routing`, is kept at `861d9dd`. It does so with a shared root queue and a watcher role that is handed off before each batch.
 
 Its own benchmark for spawning with a root timer pending reports:
 
@@ -152,10 +152,10 @@ So locality remains the steady-state design, and its cost must stay within the a
 
 **Regression tests (Native).** Run each test with 2 and 4 workers. In each, some workers are held by a blocking poll of several seconds and at least one worker is idle. Rescue is on unless the test says otherwise.
 
-- **#92's root timer tests.** These are in `crates/native/tests/root_timers.rs`, and all three fail on `main`. Bring them over with their bounds relative to the hold. Set `LATE` to 250 ms rather than 1 s. That is large compared with *T*, so loaded CI runners don't make the test flaky, and it is still far below the multi-second hold. It distinguishes rescue from waiting for the hold without testing *T* itself. *T* is checked by the benchmark lateness measurements, not by tests.
+- **#92's root timer tests.** These are in [`crates/native/tests/root_timers.rs`](https://github.com/base-rs/base-scheduler/blob/861d9ddff11c8f6d7e2ca9e3949de553553e81fc/crates/native/tests/root_timers.rs) on #92's branch, and all three fail on `main`. Bring them over with their bounds relative to the hold. Set `LATE` to 250 ms rather than 1 s. That is large compared with *T*, so loaded CI runners don't make the test flaky, and it is still far below the multi-second hold. It distinguishes rescue from waiting for the hold without testing *T* itself. *T* is checked by the benchmark lateness measurements, not by tests.
 - **Stolen timer.** A task on worker A registers a sleep and a reusable timer. Another worker, B, then steals the task (force this with a hand-off between tasks), and A blocks. The timer must fire within *T*.
 - **Waker update to a stuck owner.** A reusable timer is registered on A. A blocks, the task is polled on B, and B replaces the timer's waker. The timer must fire within *T* and wake the *new* waker. On `main`, the update would sit in A's inbox, so a rescuer would fire the old waker and the wakeup would be lost.
-- **Stuck readiness.** A root `read_into` on a socket routed to a worker that then blocks. This is #92's scratch reproduction, which took 1.945 s on `main`. Also a socket registered by a task that is stolen before its registering worker blocks. Run both on epoll, and on kqueue on macOS and FreeBSD.
+- **Stuck readiness.** A root `read_into` on a socket routed to a worker that then blocks. This is #92's scratch reproduction, which took 1.945 s on `main`; its source is [recorded on this PR](https://github.com/base-rs/base-scheduler/pull/93#issuecomment-6596074954). Also a socket registered by a task that is stolen before its registering worker blocks. Run both on epoll, and on kqueue on macOS and FreeBSD.
 - **Runnable tasks.** Tasks queued behind a long poll, in both ready generations and in the remote inbox, run on other workers. This should already pass on `main`; add it so the property is checked.
 - **Stuck preferred worker.** Every worker but A is kept saturated with local work, and A blocks. A rescued waker schedules a task whose preferred worker is A. The task must run without waiting for A or for the other workers to drain their local queues. This covers the [proposed refinement](#runnable-tasks) and is added with it.
 - **No spin on interrupts.** A victim stays stuck with a pending interrupt (an eventfd count, or a re-triggered `EVFILT_USER`) and no registration events. An idle worker's pre-park check must find nothing published, and the idle worker must park rather than loop through `Retry` for the whole stall.
@@ -445,9 +445,11 @@ With rescue in place, round-robin placement of root and external registrations d
 
 Parts of #92 to reuse:
 
-- `crates/native/tests/root_timers.rs`, which fails on `main` and should pass under rescue;
+- [`crates/native/tests/root_timers.rs`](https://github.com/base-rs/base-scheduler/blob/861d9ddff11c8f6d7e2ca9e3949de553553e81fc/crates/native/tests/root_timers.rs), which fails on `main` and should pass under rescue, and the root-queue cases in [`worker_timers/tests.rs`](https://github.com/base-rs/base-scheduler/blob/861d9ddff11c8f6d7e2ca9e3949de553553e81fc/crates/native/src/worker_timers/tests.rs) where they still apply;
 - its scratch spawn benchmark with a root timer pending, as a cost check this design must pass;
-- its scratch root-read reproduction, turned into a test;
+- its scratch root-read reproduction, turned into a test.
+
+The two scratch programs were never committed. Their source, with build and run instructions, is [recorded on this PR](https://github.com/base-rs/base-scheduler/pull/93#issuecomment-6596074954).
 - its closure ordering analysis: check closure under the queue lock, and once closure has been observed, drain without trusting the atomic deadline.
 
 ### io_uring
@@ -513,7 +515,7 @@ The interface must not preclude any of the options.
 | Workload | Budget |
 | --- | --- |
 | Echo matrix (above), readiness and io_uring, owned and borrowed | Within noise |
-| #92's spawn benchmark, with and without a pending root timer | Within noise |
+| #92's spawn benchmark ([source](https://github.com/base-rs/base-scheduler/pull/93#issuecomment-6596074954)), `spawn` and `spawn-pending` | Within noise |
 | Idle process CPU over 10 s with no load, and at 1 request per second | Within noise |
 | Timer microbenchmarks: refresh, `sleep yield 64/4`, `reuse yield 64/4`, `expire 128/4`, cycle; worker-local timer diagnostic 1/1/10 µs, 4/1,024/1 ms and 4/1,024/1 ms aligned, with lateness p50 and p99 and process CPU | ≤ ~3% |
 
