@@ -253,18 +253,22 @@ These describe current behaviour and are not contract. When rescue lands, each m
 
 ### Interface changes
 
-Only the selector hooks need one. Here is a possible shape:
+Only the selector hooks need one. It uses static dispatch (decision 6):
 
 ```rust,ignore
 pub trait SelectorWorker {
     // existing methods …
 
-    /// A shareable view through which another thread may make bounded, nonblocking
-    /// progress on this driver's behalf while its owner is busy. `None` declines.
-    fn assistant(&self) -> Option<Arc<dyn SelectorAssist>> { None }
+    /// The view through which another thread may make bounded, nonblocking progress
+    /// on this driver's behalf while its owner is busy.
+    type Assist: SelectorAssist + Send + Sync + 'static;
+
+    /// `None` when this driver instance cannot be rescued. The readiness driver decides
+    /// at runtime, because its native epoll and `polling` compatibility paths share one type.
+    fn assistant(&self) -> Option<Self::Assist>;
 }
 
-pub trait SelectorAssist: Send + Sync {
+pub trait SelectorAssist {
     /// Publish readiness already queued for the owner without waiting, if the owner is
     /// not inside its own turn. No application future is polled. `Busy` means the owner
     /// or another assistant holds the driver; `Retired` means the driver has stopped.
@@ -272,11 +276,14 @@ pub trait SelectorAssist: Send + Sync {
     /// Hint that the owner is stalled, so new external routes may avoid it.
     fn set_stalled(&self, stalled: bool) {}
 }
+
+/// For drivers that can never be rescued: io_uring for now, the non-Unix fallback, and test drivers.
+pub enum NoAssist {}
 ```
 
 `Published(count)` counts registration events published, which is the same as the readiness wakers invoked for them. It excludes interrupt, notification and timerfd records. The pre-park `Retry` is keyed on this count being non-zero, and so is the monitor's view of progress. If interrupt records counted, a stuck victim with a pending interrupt would report progress on every zero-timeout wait. The rescuer leaves the Linux eventfd set and re-triggers `EVFILT_USER`, so such an interrupt stays pending, and an idle worker would spin through `Retry` and `yield_now` for the whole stall.
 
-A provided method that returns `None` keeps existing selectors source-compatible. Dynamic dispatch is acceptable because it is used only when rescuing. The exact shape is open question 6.
+Associated-type defaults are unstable, so each of the four implementers names its type. They are the readiness driver, its fallback, io_uring and the test driver, all in this workspace. Drivers that decline use the uninhabited `NoAssist`, so the compiler knows their rescue path is unreachable. The names are placeholders.
 
 The portable `base-scheduler` crate needs no type or trait change.
 
@@ -470,7 +477,7 @@ Fixed-rate latency is reported separately from throughput and CPU, as [worker pr
 
 ### Lifetimes
 
-- `Shared` holds each worker's `Arc<dyn SelectorAssist>`, obtained when the worker enters its driver.
+- `Shared` holds each worker's `S::Assist` (or `None`), obtained when the worker enters its driver.
 - The monitor holds only a `Weak<Shared>`. It upgrades that reference at the start of each pass and drops it at the end. It exits when the upgrade fails, or when it observes that scheduler closure has finished.
 - Workers that use assistants in the pre-park search are already scoped by `Shared`.
 - Safety does not depend on the monitor exiting before drivers are destroyed. An assistant stays valid after its driver stops: it observes the retired mark under the poll lock and returns `Retired`.
@@ -539,17 +546,12 @@ These are the maintainer's decisions, recorded here and removed from the open qu
 - **Remote timer commands:** they lock the target queue directly.
 - **Regression budgets:** within noise for echo, spawn and idle CPU, and ≤ ~3% for the timer microbenchmarks. Anything over budget goes back to the maintainer with numbers.
 - **io_uring:** option 1 is the interim during the timer stage, then option 2 if it measures cheap. Run the spike before costing option 3.
+- **Selector hook:** static dispatch, through an associated `SelectorWorker::Assist` type and `fn assistant(&self) -> Option<Self::Assist>`, as shown in [interface changes](#interface-changes). This was preferred to a `dyn` hook for compile-time checking: each driver must state whether it can be rescued, and the monitor's `Send + Sync + 'static` bounds are checked against the concrete type. It also matches Native, which is already generic over its selector. The `Option` remains because the readiness driver chooses between native epoll and the `polling` compatibility path at runtime.
 
 ## Open questions
 
-Questions 1–5 were decided and moved to [Decisions](#decisions). The remaining questions keep their original numbers, so earlier references to them stay valid.
+Questions 1–6 were decided and moved to [Decisions](#decisions). The remaining questions keep their original numbers, so earlier references to them stay valid.
 
-6. What shape should the selector assist hook take: a provided `dyn` method or an associated type? What should it be named?
-   - **Why a hook is needed.** `SelectorWorker::turn(&mut self)` means only the owning worker drives its driver, so Native has no permitted way to ask the driver to make progress from another thread.
-   - **A provided method returning `Option<Arc<dyn SelectorAssist>>`.** No existing implementer changes, and a driver that can't be rescued keeps the `None` default. The dynamic call is made only on the rescue path, and there is one `Arc` per worker at setup.
-   - **An associated type.** It gives static dispatch. Associated-type defaults are unstable, though, so every implementer must name a type, including a "none" type for those that decline. All four implementers are in this workspace (the readiness driver, its fallback, io_uring and the test driver), so the break is cheap.
-   - **No hook,** with Native special-casing the readiness driver. This is the least code, but it breaks the selector abstraction.
-   - **Recommendation:** the provided method. The rescue path is cold, so static dispatch buys nothing.
 7. Should repeated rescue trigger registration migration (stage 5)?
    - **The cost of not migrating.** While a worker stays stuck, a socket registered on it keeps its registration there, so every later event on it waits up to *P* for the monitor even though its task now runs elsewhere.
    - **Migrating** means moving the registration, not the task: remove it from the stuck worker's poller and add it to the new worker's.
