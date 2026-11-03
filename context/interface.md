@@ -13,7 +13,7 @@ Tables omit `&self` or `&mut self` and show each asynchronous method's awaited r
 - Owned operations retain buffers and resources until backend access retires, even when a caller drops or forgets its future. Abandonment forfeits recovery of the owner; it cannot free memory still in use.
 - Borrowed socket operations access buffers only synchronously inside a poll. A pending future leaves no independent kernel or worker access to those bytes or I/O vectors.
 - Operation futures and I/O handles are `Send`. Static dispatch and implementation-associated types do not require a boxed future or runtime-selection features. Spawned work and its owned captures are `Send + 'static`.
-- A handle retains its creating scheduler and compatible resource. Its operation methods accept no replacement scheduler. Moving between workers leaves routing and registration migration internal; the scheduler and its drivers must remain alive while operations and cleanup run. No worker or thread is promised for completion, waker invocation or timer expiry. A backend may complete an operation, invoke a waker, fire a timer, drain readiness, cancel, re-route, or migrate in-flight work from any of its threads.
+- A handle retains its creating scheduler and compatible resource. Its operation methods accept no replacement scheduler. Moving between workers leaves routing and registration migration internal; the scheduler and its drivers must remain alive while operations and cleanup run. No worker or thread is promised for completion, waker invocation or timer expiry. A backend may complete an operation, invoke a waker, fire a timer, drain readiness, cancel, re-route, or migrate in-flight work from any thread.
 
 ## Bound socket I/O
 
