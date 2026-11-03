@@ -437,7 +437,7 @@ On `main`, these queues are all stealable while their owner polls:
 
 There is no LIFO or next-task slot (`crates/native/src/worker.rs`, `search`). `schedule` calls `wake_idle`, which wakes any idle worker if the preferred one is busy, and every worker searches all victims before parking. Runnable tasks therefore don't need rescue while any worker is idle, which is the condition requirement 1 sets. Only the task that is stuck in its poll is pinned, which is unavoidable. Stage 2 adds a regression test for this. Any future LIFO slot must stay stealable or be included in rescue.
 
-**Stuck preferred worker (proposed refinement).** A worker steals from other workers only once its own queues are empty (`search`). When every worker but the stuck one is saturated, a task woken into the stuck worker's `incoming` is searched last, behind every other worker's local work, even though the stuck worker cannot run it. This is outside requirement 1, which assumes an idle worker, but it makes rescued tasks wait longest exactly when the scheduler is loaded. The refinement: when `schedule` finds that the task's preferred worker is marked stuck, it treats the task as having no preference. It pushes the task to the current worker's local queue when called on a worker of the same scheduler, and otherwise to the inbox of a worker that is not stuck. This costs one relaxed load of the stuck mark per remote wake. It also removes the extra hop in step 5 of the [overview](#overview) in the common case. It belongs to stage 2, because the monitor's stuck mark arrives there, and it is measured against the same spawn and echo budgets.
+**Stuck preferred worker ([decision 9](#decisions)).** A worker steals from other workers only once its own queues are empty (`search`). When every worker but the stuck one is saturated, a task woken into the stuck worker's `incoming` is searched last, behind every other worker's local work, even though the stuck worker cannot run it. This is outside requirement 1, which assumes an idle worker, but it makes rescued tasks wait longest exactly when the scheduler is loaded. The refinement: when `schedule` finds that the task's preferred worker is marked stuck, it treats the task as having no preference. It pushes the task to the current worker's local queue when called on a worker of the same scheduler, and otherwise to the inbox of a worker that is not stuck. This costs one relaxed load of the stuck mark per remote wake. It also removes the extra hop in step 5 of the [overview](#overview) in the common case. It belongs to stage 2, because the monitor's stuck mark arrives there, and it is measured against the same spawn and echo budgets.
 
 ### Root registrations and PR #92
 
@@ -579,6 +579,13 @@ Fixed-rate latency is reported separately from throughput and CPU, as [worker pr
    - timer rescue, both from the monitor and from the pre-park check.
    - the stuck-preferred-worker refinement in `schedule`.
 
+   It lands after this document merges, as three pull requests ([decision 12](#decisions)):
+   1. lockable timer queues with batch expiry, remote commands that lock the target queue directly, and the published deadline;
+   2. the heartbeat, the monitor with its deep-sleep handshake, the pre-park check and the off switch;
+   3. the stuck-preferred-worker refinement.
+
+   Each updates this document's status as it lands. The measurement harnesses that the budgets need are built inside stage 2, in the first pull request that measures against them, with the baseline taken on `main` using the same harness ([decision 10](#decisions)).
+
    Bring over #92's tests and add every [requirement 1 test](#requirement-1) that concerns timers or scheduling: stolen timer, waker update, runnable tasks, stuck preferred worker, pre-park retry, no idle worker, the io_uring interim, the deep-sleep handshake race, the races and lifecycle cases that apply to timer queues, rescue switched off, and the false-positive counter. The readiness tests (stuck readiness, no spin on interrupts, driver retirement) belong to stage 3. Document the io_uring exclusion as the interim option 1. Update the Native readme's timer and platform descriptions (audit item D; its line saying other edge platforms use `polling` is already stale for Linux and Android), and `context/design.md` (audit item H). Measure against the budgets.
 3. **Readiness.** This stage includes:
    - the selector assist hook;
@@ -612,7 +619,7 @@ These are the maintainer's decisions, recorded here and removed from the open qu
 - **1. *T*:** the target is 2 ms. The split between *S* and *P* is chosen by measurement, starting from about 1 ms each. It is a fixed internal default with no public knob. There is an off switch for diagnostics, benchmarks and deterministic tests.
 - **2. Rescuer:** a dedicated monitor thread, plus a check of victims' expired timers and stuck pollers during the pre-park steal search. The monitor also rescues when no worker is idle; this mainly helps root futures, because of `wake_idle`.
 - **3. Remote timer commands:** they lock the target queue directly.
-- **4. Regression budgets:** within noise for echo, spawn and idle CPU, and ≤ ~3% for the timer microbenchmarks. Anything over budget goes back to the maintainer with numbers.
+- **4. Regression budgets:** within noise for echo, spawn and idle CPU, and ≤ ~3% for the timer microbenchmarks, measured as decision 11 describes. Anything over budget goes back to the maintainer with numbers.
 - **5. io_uring:** option 1 is the interim during the timer stage, then option 2 if it measures cheap. Run the spike before costing option 3.
 - **6. Selector hook:** static dispatch, through an associated `SelectorWorker::Assist` type and `fn assistant(&self) -> Option<Self::Assist>`, as shown in [interface changes](#interface-changes). This was preferred to a `dyn` hook for compile-time checking: each driver must state whether it can be rescued, and the monitor's `Send + Sync + 'static` bounds are checked against the concrete type. It also matches Native, which is already generic over its selector. The `Option` remains because a readiness driver instance can be retired at creation when the platform has no supported edge-triggered poller.
 - **7. Registration migration:** deferred. A registration stays on its worker. Revisit only if the per-registration rescue counts in the measurement plan show that the per-event delay of up to *P* matters during long stalls.
@@ -629,7 +636,21 @@ These are the maintainer's decisions, recorded here and removed from the open qu
     So a rescuer's zero-timeout wait would consume an interrupt meant for the owner, which would then sleep through it. The native drivers avoid this by leaving the eventfd set or re-triggering `EVFILT_USER`.
   - **Alternatives considered.** Re-notifying unconditionally after every rescue pass would probably work, but it adds a syscall per pass and depends on `polling` internals. An upstream change, or a separate notification channel beside `polling`, would keep two drivers to maintain for the rarest configurations. Declining rescue there was the previous recommendation; the maintainer chose removal so that requirement 1 holds on every platform with a worker readiness driver.
   - **Why Linux needs no `polling`.** #58 selected it only when the native driver could not create its eventfd or timerfd. `NativePoller` now covers both failures itself.
+- **9. Stuck preferred worker:** approved for stage 2, as described under [runnable tasks](#runnable-tasks), with its regression test, and with its cost of one relaxed load per remote wake measured against the budgets.
+- **10. Measurement harnesses:** built inside stage 2, because several budgets cannot be checked with the tools in the repository today:
+  - a Native readiness backend for the echo benchmark, starting from `benchmarks/echo/results/turn-interval/echo-native-backend.patch`;
+  - an offered-rate option on the echo client, for fixed-rate latency and the 1 request per second idle-CPU case;
+  - an idle-CPU script for the 10 s no-load measurement;
+  - the worker-local timer diagnostic as a Cargo target in the private benchmark package.
+
+  Each is added in the first stage 2 pull request that measures against it, and its baseline is measured on `main` with the same harness.
+- **11. Noise and host:** budgets are checked on Linux on Aiko, using the CPU pinning and exclusive benchmark lock procedure of the existing echo reports (for example [`benchmarks/echo/double-buffered-ready-performance.md`](../benchmarks/echo/double-buffered-ready-performance.md)). Each case takes 9 paired, randomly ordered runs of `main` and the branch:
+  - "within noise" means the branch's median lies inside `main`'s min–max range for that case;
+  - "≤ ~3%" is the difference of the paired medians.
+
+  macOS results are supplementary and do not decide a budget.
+- **12. Stage 2 organisation:** stage 2 starts once this document merges and lands as the three pull requests listed under [staging](#staging).
 
 ## Open questions
 
-None. Questions 1–8 were decided and are recorded under [Decisions](#decisions), keeping their original numbers so that earlier references stay valid.
+None. Questions 1–8 were decided, and decisions 9–12 settle the questions raised when stage 2 was planned. All are recorded under [Decisions](#decisions); questions 1–8 keep their original numbers so that earlier references stay valid.
