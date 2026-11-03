@@ -156,6 +156,7 @@ So locality remains the steady-state design, and its cost must stay within the a
 - **Waker update to a stuck owner.** A reusable timer is registered on A. A blocks, the task is polled on B, and B replaces the timer's waker. The timer must fire within *T* and wake the *new* waker. On `main`, the update would sit in A's inbox, so a rescuer would fire the old waker and the wakeup would be lost.
 - **Stuck readiness.** A root `read_into` on a socket routed to a worker that then blocks. This is #92's scratch reproduction, which took 1.945 s on `main`. Also a socket registered by a task that is stolen before its registering worker blocks. Run both on epoll and kqueue.
 - **Runnable tasks.** Tasks queued behind a long poll, in both ready generations and in the remote inbox, run on other workers. This should already pass on `main`; add it so the property is checked.
+- **Stuck preferred worker.** Every worker but A is kept saturated with local work, and A blocks. A rescued waker schedules a task whose preferred worker is A. The task must run without waiting for A or for the other workers to drain their local queues. This covers the [proposed refinement](#runnable-tasks) and is added with it.
 - **No spin on interrupts.** A victim stays stuck with a pending interrupt (an eventfd count, or a re-triggered `EVFILT_USER`) and no registration events. An idle worker's pre-park check must find nothing published, and the idle worker must park rather than loop through `Retry` for the whole stall.
 - **Pre-park retry.** Every worker but one is idle, and that one is stuck. A timer on the stuck worker is rescued by an idle worker's pre-park check, and its waker schedules a task whose preferred worker is the rescuing worker. The task must run promptly, and the rescuing worker must not park with `sleeping == false`. Repeat this to exercise the race.
 - **No idle worker.** Every worker is held, a root `block_on` is waiting on a sleep, and the sleep's waker runs within *T*.
@@ -291,6 +292,53 @@ The portable `base-scheduler` crate needs no type or trait change.
 
 This section is not a requirement. It describes the design to implement and measure.
 
+### Overview
+
+The diagram follows one readiness wakeup through a stall. Timer rescue takes the same path, with the victim's timer-queue lock in place of its poll lock. Rescue moves the wakeup, not the task: no thread ever blocks in another worker's poller, and the woken task runs wherever it is scheduled and stolen.
+
+```text
+Task R last ran on worker A and awaits a read on socket sock.
+sock is registered in A's epoll or kqueue.
+
+1. Wait      R polls read(sock), gets WouldBlock and stores its waker in
+             sock's shared state. R is now only a waker; it is in no queue.
+
+2. Stall     A polls another task X, which blocks for seconds. A stops
+             reaching turn boundaries, so its heartbeat stops changing.
+             Data arrives on sock. The kernel queues the event in A's poller,
+             and nobody collects it.
+
+3. Detect    The monitor samples every P and sees A's heartbeat unchanged
+             across S while A is neither idle nor closing. It marks A
+             stuck. (S and P are about 1 ms each, for T = 2 ms.)
+
+4. Collect   A rescuer, either the monitor or worker C in its pre-park
+             check, collects A's queued events:
+                 try_lock(A's poll lock)        held: skip, it is in hand
+                 epoll_wait / kevent on A's poller, zero timeout
+                 publish sock readable and call R's waker
+                 unlock
+             If C fired any waker, its search returns Retry, not Empty.
+
+5. Schedule  R's waker runs schedule(R). With the stuck-preferred
+             refinement (see "Runnable tasks"), R goes to a worker that is
+             not stuck. Without it, R goes to its preferred worker's
+             incoming inbox, which here is A's. wake_idle then wakes a
+             sleeping worker: A is busy, so it skips A.
+
+6. Run       Whichever comes first:
+             a. A returns from X, drains its incoming at the next batch
+                boundary and runs R; or
+             b. an idle worker, often C itself after Retry, searches its
+                victims, steals R from A's incoming and runs it. R's
+                preferred worker becomes that worker.
+
+Latency is about T plus one wake and one steal, rather than the whole
+blocking poll.
+```
+
+Step 6b needs a worker that is idle or runs out of local work. When every other worker is saturated, a task waiting in a stuck worker's inbox is searched last; [runnable tasks](#runnable-tasks) describes the refinement that keeps it out of that inbox.
+
 ### Detection
 
 - **Heartbeat.** Each worker stores a per-worker turn counter on its own cache line, with a relaxed store once per `run_loop` iteration, next to `worker_timers::turn`. A turn boundary is exactly where timers and readiness are serviced, so a counter that stops changing means work there is waiting.
@@ -386,7 +434,9 @@ On `main`, these queues are all stealable while their owner polls:
 - both ready generations, `ready` and `current`, through `WorkerState::stealers`;
 - the remote `incoming` injector.
 
-There is no LIFO or next-task slot (`crates/native/src/worker.rs`, `search`). `schedule` calls `wake_idle`, which wakes any idle worker if the preferred one is busy, and every worker searches all victims before parking. Runnable tasks therefore don't need rescue. Only the task that is stuck in its poll is pinned, which is unavoidable. Stage 2 adds a regression test for this. Any future LIFO slot must stay stealable or be included in rescue.
+There is no LIFO or next-task slot (`crates/native/src/worker.rs`, `search`). `schedule` calls `wake_idle`, which wakes any idle worker if the preferred one is busy, and every worker searches all victims before parking. Runnable tasks therefore don't need rescue while any worker is idle, which is the condition requirement 1 sets. Only the task that is stuck in its poll is pinned, which is unavoidable. Stage 2 adds a regression test for this. Any future LIFO slot must stay stealable or be included in rescue.
+
+**Stuck preferred worker (proposed refinement).** A worker steals from other workers only once its own queues are empty (`search`). When every worker but the stuck one is saturated, a task woken into the stuck worker's `incoming` is searched last, behind every other worker's local work, even though the stuck worker cannot run it. This is outside requirement 1, which assumes an idle worker, but it makes rescued tasks wait longest exactly when the scheduler is loaded. The refinement: when `schedule` finds that the task's preferred worker is marked stuck, it treats the task as having no preference. It pushes the task to the current worker's local queue when called on a worker of the same scheduler, and otherwise to the inbox of a worker that is not stuck. This costs one relaxed load of the stuck mark per remote wake. It also removes the extra hop in step 5 of the [overview](#overview) in the common case. It belongs to stage 2, because the monitor's stuck mark arrives there, and it is measured against the same spawn and echo budgets.
 
 ### Root registrations and PR #92
 
@@ -521,8 +571,9 @@ Fixed-rate latency is reported separately from throughput and CPU, as [worker pr
    - remote commands that lock the target queue directly;
    - the published deadline;
    - timer rescue, both from the monitor and from the pre-park check.
+   - the stuck-preferred-worker refinement in `schedule`.
 
-   Bring over #92's tests and add the stolen-timer, waker-update, no-idle-worker, handshake and runnable-task tests. Document the io_uring exclusion as the interim option 1. Measure against the budgets.
+   Bring over #92's tests and add the stolen-timer, waker-update, no-idle-worker, handshake, runnable-task and stuck-preferred-worker tests. Document the io_uring exclusion as the interim option 1. Measure against the budgets.
 3. **Readiness.** This stage includes:
    - the selector assist hook;
    - the poll lock with `try_lock` on zero-timeout turns;
