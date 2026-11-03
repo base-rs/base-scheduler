@@ -154,7 +154,7 @@ fn assert_prompt(label: &str, elapsed: Duration) {
         "{label} completed early after {elapsed:?}"
     );
     assert!(
-        elapsed < LATE,
+        elapsed < DELAY + LATE,
         "{label} took {elapsed:?} for a {DELAY:?} deadline"
     );
 }

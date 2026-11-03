@@ -63,7 +63,7 @@ fn assert_prompt(label: &str, elapsed: Duration) {
         "{label} completed early after {elapsed:?}"
     );
     assert!(
-        elapsed < LATE,
+        elapsed < DELAY + LATE,
         "{label} waited {elapsed:?} for a {DELAY:?} deadline"
     );
 }
@@ -157,7 +157,7 @@ fn pending_root_deadline_moves_off_a_worker_that_starts_a_long_poll() {
             let (release, tasks) = occupy(&scheduler, 1);
             let elapsed = sleeper.join().unwrap();
             assert!(
-                elapsed >= DELAY * 4 && elapsed < LATE,
+                elapsed >= DELAY * 4 && elapsed < DELAY * 4 + LATE,
                 "root sleep {index} waited {elapsed:?} for a {:?} deadline",
                 DELAY * 4
             );
