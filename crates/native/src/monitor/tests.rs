@@ -87,6 +87,11 @@ fn every_worker_idle_for_several_samples_enters_deep_sleep_until_one_resumes() {
     for _ in 1..DEEP_AFTER {
         assert!(!state.sample(&shared, now));
     }
+    // A worker that left idle and returned between samples restarts the count.
+    shared.workers[1].beat();
+    for _ in 0..DEEP_AFTER {
+        assert!(!state.sample(&shared, now));
+    }
     assert!(state.sample(&shared, now));
     assert!(shared.monitor.deep.load(Ordering::SeqCst));
     // A worker leaving idle clears deep sleep and wakes the monitor once.

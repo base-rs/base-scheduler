@@ -155,11 +155,13 @@ impl State {
             let kind = Stuck::Poll;
             // An idle worker services its own deadline. A closing worker is idle once it has finished.
             let sleeping = worker.is_sleeping();
-            if sleeping || turns != observation.turns {
+            let unchanged = turns == observation.turns;
+            if sleeping || !unchanged {
                 observation.turns = turns;
                 observation.since = (!sleeping).then_some(now);
                 worker.set_stuck(None);
-                idle &= sleeping;
+                // Deep sleep needs workers that stayed idle since the previous sample. Leaving idle beats the heartbeat, so a worker that alternates quickly between idle and busy keeps the monitor sampling, rather than waking it on every exit from idle.
+                idle &= sleeping && unchanged;
                 continue;
             }
             idle = false;
