@@ -150,6 +150,7 @@ So locality remains the steady-state design, and its cost must stay within the a
 - **Waker update to a stuck owner.** A reusable timer is registered on A. A blocks, the task is polled on B, and B replaces the timer's waker. The timer must fire within *T* and wake the *new* waker. On `main`, the update would sit in A's inbox, so a rescuer would fire the old waker and the wakeup would be lost.
 - **Stuck readiness.** A root `read_into` on a socket routed to a worker that then blocks. This is #92's scratch reproduction, which took 1.945 s on `main`. Also a socket registered by a task that is stolen before its registering worker blocks. Run both on epoll and kqueue.
 - **Runnable tasks.** Tasks queued behind a long poll, in both ready generations and in the remote inbox, run on other workers. This should already pass on `main`; add it so the property is checked.
+- **No spin on interrupts.** A victim stays stuck with a pending interrupt (an eventfd count, or a re-triggered `EVFILT_USER`) and no registration events. An idle worker's pre-park check must find nothing published, and the idle worker must park rather than loop through `Retry` for the whole stall.
 - **Pre-park retry.** Every worker but one is idle, and that one is stuck. A timer on the stuck worker is rescued by an idle worker's pre-park check, and its waker schedules a task whose preferred worker is the rescuing worker. The task must run promptly, and the rescuing worker must not park with `sleeping == false`. Repeat this to exercise the race.
 - **No idle worker.** Every worker is held, a root `block_on` is waiting on a sleep, and the sleep's waker runs within *T*.
 - **io_uring.** A test that documents the interim behaviour for an in-flight operation on a stuck ring: it completes after the hold, not within *T*. When stage 4 decides, add a test that new operations are routed away from a stuck ring if option 2 is adopted.
@@ -267,6 +268,8 @@ pub trait SelectorAssist: Send + Sync {
 }
 ```
 
+`Published(count)` counts registration events published, which is the same as the readiness wakers invoked for them. It excludes interrupt, notification and timerfd records. The pre-park `Retry` is keyed on this count being non-zero, and so is the monitor's view of progress. If interrupt records counted, a stuck victim with a pending interrupt would report progress on every zero-timeout wait. The rescuer leaves the Linux eventfd set and re-triggers `EVFILT_USER`, so such an interrupt stays pending, and an idle worker would spin through `Retry` and `yield_now` for the whole stall.
+
 A provided method that returns `None` keeps existing selectors source-compatible. Dynamic dispatch is acceptable because it is used only when rescuing. The exact shape is open question 6.
 
 The portable `base-scheduler` crate needs no type or trait change.
@@ -356,7 +359,8 @@ So dispatch, by either the owner or a rescuer, invokes readiness wakers under th
 
 - `Controller::release` (reclamation) runs only under the poll lock and with an empty batch. This keeps the "retire at a batch boundary" invariant for every collector.
 - `Controller::stop` sets a retired mark (atomic, or under the table lock) and then calls `try_lock` on the poll lock. If that succeeds, `stop` clears the batch and reclaims inline.
-- If the lock is held, the current holder, whether owner or rescuer, checks the mark before it unlocks. It clears its batch and reclaims before it returns or reports `Retired`.
+- If the lock is held, the current holder, whether owner or rescuer, checks the mark before it unlocks. If the mark is set, it clears its batch and reclaims before it returns or reports `Retired`.
+- **Handoff race.** The holder can find the mark clear, then `stop` sets it and its `try_lock` fails, and then the holder unlocks; nobody would reclaim. To close this, the holder reloads the mark with `SeqCst` after it unlocks. `stop` stores the mark with `SeqCst` before its `try_lock`. If the reloaded mark is set, the holder calls `try_lock` again and reclaims if it succeeds. If that `try_lock` fails, the new holder is subject to the same rule. Either `stop`'s `try_lock` or one of these reloads observes the other's side, so some thread always reclaims.
 - Retired records drop their `Waker`s and `Listener`s on whichever thread reclaims them: the stopping thread, the owner, the monitor, or a worker running the pre-park check. Those drops must not assume a particular thread.
 - A rescuer that sees the mark when it acquires the lock reclaims if needed and returns `Retired`.
 
