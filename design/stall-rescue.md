@@ -4,7 +4,7 @@
 
 - **Requirement 2 is active now.** It is the interface's part, and the context wording changes that accompany this document already reflect it.
 - **Requirement 1 is proposed.** Its timer parts (expired timers, remote timer commands, the off switch) take effect when stage 2 lands. Its readiness parts take effect when stage 3 lands. In-flight io_uring operations stay excluded until stage 4 records a decision.
-- **Decisions and open questions.** Decisions the maintainer has already made are recorded as decided. The questions that remain open are listed at the end and are not requirements.
+- **Decisions.** The maintainer has decided every question this document raised. They are recorded under [Decisions](#decisions).
 
 ## Requirement
 
@@ -39,10 +39,12 @@ When no other worker is idle, rescue still invokes wakers. A root future then ma
 
 **Declared blocking.** `Blocking::spawn_blocking` remains the way to declare blocking work up front. Rescue is a fallback for blocking that wasn't declared, not a replacement for `spawn_blocking`, and it does not make blocking inside a task free. A task that blocks still holds its worker's thread and delays everything else that worker would have run.
 
-**Scope of the property.** This is a property of the Native backend's implementation, not part of the portable interface's contract. Two Native selector configurations are excluded:
+**Scope of the property.** This is a property of the Native backend's implementation, not part of the portable interface's contract. Its readiness parts cover every platform where Native has a worker readiness driver: Linux and Android (epoll), and macOS, FreeBSD, NetBSD, OpenBSD and DragonFly (kqueue). After stage 3, every such driver is base-rs code, so a rescuer can leave the owner's interrupts pending (see [decision 8](#decisions)). Two cases are excluded:
 
 - **In-flight io_uring operations.** These are excluded until the [io_uring decision](#io_uring) is made. Stage 2 documents this as the interim, which is option 1.
-- **The `polling` compatibility readiness backend.** It cannot be rescued as designed, because a foreign wait consumes the owner's wake (see open question 8). Timers and runnable tasks are still rescued under both configurations. The property does not apply to the Tokio adapter, which has its own driver model.
+- **Platforms without a worker readiness driver.** These are Windows, illumos, Solaris and Redox. Their socket waits use the standalone `async-io` fallback, which is not worker-owned and so is never stranded behind a worker.
+
+Timers and runnable tasks are still rescued in both cases. The property does not apply to the Tokio adapter, which has its own driver model.
 
 **Preserved contracts.** Rescue must preserve every existing ownership contract:
 
@@ -69,7 +71,7 @@ It must not require, imply or test that a particular worker or thread services a
 
 A backend must still keep each operation bound to its selected scheduler and keep the ownership contracts in requirement 1. Where current backends keep work on its original worker or ring, the documentation must present that as a backend implementation choice, not as a portable guarantee.
 
-The selector hooks in `base-scheduler-selector` are public, but they are not the portable interface. They currently describe a driver as exclusively owned by one worker (`SelectorWorker`, `SelectorDriver::enter`). Requirement 1 needs an optional addition to them, so that another thread can make bounded nonblocking progress for a worker's driver on readiness. Selectors that cannot support it must be able to decline. Those are io_uring under its current flags and the `polling` compatibility backend. The addition is described under [interface changes](#interface-changes) and is not made by this document.
+The selector hooks in `base-scheduler-selector` are public, but they are not the portable interface. They currently describe a driver as exclusively owned by one worker (`SelectorWorker`, `SelectorDriver::enter`). Requirement 1 needs an optional addition to them, so that another thread can make bounded nonblocking progress for a worker's driver on readiness. Selectors that cannot support it must be able to decline. Those are io_uring under its current flags, and readiness drivers retired at creation because the platform has no supported edge-triggered poller. The addition is described under [interface changes](#interface-changes) and is not made by this document.
 
 ## Rationale
 
@@ -139,7 +141,6 @@ So locality remains the steady-state design, and its cost must stay within the a
   - preempting a poll;
   - interrupting a blocking syscall;
   - in-flight io_uring operations (pending the stage 4 decision);
-  - readiness under the `polling` compatibility backend;
   - running rescued tasks when no worker is idle (rescue still wakes root futures in that case);
   - the Tokio adapter;
   - progress of the standalone `async-io` fallback;
@@ -264,8 +265,8 @@ pub trait SelectorWorker {
     /// on this driver's behalf while its owner is busy.
     type Assist: SelectorAssist + Send + Sync + 'static;
 
-    /// `None` when this driver instance cannot be rescued. The readiness driver decides
-    /// at runtime, because its native epoll and `polling` compatibility paths share one type.
+    /// `None` when this driver instance cannot be rescued, such as a readiness driver
+    /// retired at creation because the platform has no supported edge-triggered poller.
     fn assistant(&self) -> Option<Self::Assist>;
 }
 
@@ -425,7 +426,7 @@ So dispatch, by either the owner or a rescuer, invokes readiness wakers under th
 - Retired records drop their `Waker`s and `Listener`s on whichever thread reclaims them: the stopping thread, the owner, the monitor, or a worker running the pre-park check. Those drops must not assume a particular thread.
 - A rescuer that sees the mark when it acquires the lock reclaims if needed and returns `Retired`.
 
-**Locality.** The registration stays on the stuck worker. Each later event for that socket therefore needs rescuing again while the worker remains stuck. Requirement 2 allows a registration to move after repeated rescues, but that is deferred (open question 7).
+**Locality.** The registration stays on the stuck worker. Each later event for that socket therefore needs rescuing again while the worker remains stuck. Requirement 2 allows a registration to move after repeated rescues, but that is deferred ([decision 7](#decisions)).
 
 ### Runnable tasks
 
@@ -579,12 +580,23 @@ Fixed-rate latency is reported separately from throughput and CPU, as [worker pr
    - the poll lock with `try_lock` on zero-timeout turns;
    - the retired mark;
    - epoll and kqueue rescue;
-   - interrupt-record handling;
-   - declining assistance in the `polling` compatibility backend.
+   - interrupt-record handling.
+
+   It starts by removing the readiness driver's direct `polling` dependency, as its own pull request, so that rescue only ever runs against base-rs drivers ([decision 8](#decisions)):
+   - On Linux and Android, `NativePoller` replaces the `Compatible` backend. If it cannot create an eventfd, it interrupts through a nonblocking pipe. If it cannot create a timerfd, it waits with `epoll_pwait`'s millisecond timeout, rounded up so that it never wakes early. Only timeout precision degrades, and only in that fallback.
+   - `kqueue.rs` extends from macOS to FreeBSD, NetBSD, OpenBSD and DragonFly. Each platform's flags and filters are checked against its `kqueue(2)`. Where `EVFILT_USER` is unavailable, which includes NetBSD before 10.0 and possibly OpenBSD, the interrupt falls back to a pipe in the same way.
+   - base-rs types replace `polling::Event`, `PollMode` and `Events`, and the test poller is rebuilt on the native drivers.
+   - Redox loses its worker readiness driver and uses the standalone fallback, as illumos does today.
+
+   Its validation:
+   - fault-injection tests (`epoll/syscalls.rs`) for the pipe and millisecond-timeout fallbacks, with #58's fallback coverage re-run;
+   - CI builds for the FreeBSD and NetBSD targets, and readiness tests run on FreeBSD in a virtual machine;
+   - for OpenBSD and DragonFly, which are tier 3 targets, at least a build check in CI;
+   - `cargo tree -p base-scheduler-selector -i polling` shows `polling` only through `async-io`.
 
    Add the root-read and stolen-task socket tests, and switch `immediate_reads_observe_input_while_the_only_worker_is_busy` to the off switch. Amend [worker progress](worker-progress.md) and [immediate reads](stream-immediate-read.md) (audit items 22 and 23).
 4. **io_uring.** Measure option 2. Run the task-running spike, then cost option 3 if the spike makes it viable. Record the decision, replacing the interim.
-5. **Possibly later.** Move registrations after repeated rescues, if measurements show that locality loss matters (open question 7).
+5. **Possibly later.** Move registrations after repeated rescues, if the per-registration rescue counts show that locality loss matters ([decision 7](#decisions)).
 
 Once stages 2 and 3 have landed, remove the own-thread join deadline in `base-http-fixtures` (see [how it was found](#how-it-was-found)).
 
@@ -597,27 +609,22 @@ These are the maintainer's decisions, recorded here and removed from the open qu
 - **Remote timer commands:** they lock the target queue directly.
 - **Regression budgets:** within noise for echo, spawn and idle CPU, and ≤ ~3% for the timer microbenchmarks. Anything over budget goes back to the maintainer with numbers.
 - **io_uring:** option 1 is the interim during the timer stage, then option 2 if it measures cheap. Run the spike before costing option 3.
-- **Selector hook:** static dispatch, through an associated `SelectorWorker::Assist` type and `fn assistant(&self) -> Option<Self::Assist>`, as shown in [interface changes](#interface-changes). This was preferred to a `dyn` hook for compile-time checking: each driver must state whether it can be rescued, and the monitor's `Send + Sync + 'static` bounds are checked against the concrete type. It also matches Native, which is already generic over its selector. The `Option` remains because the readiness driver chooses between native epoll and the `polling` compatibility path at runtime.
+- **Selector hook:** static dispatch, through an associated `SelectorWorker::Assist` type and `fn assistant(&self) -> Option<Self::Assist>`, as shown in [interface changes](#interface-changes). This was preferred to a `dyn` hook for compile-time checking: each driver must state whether it can be rescued, and the monitor's `Send + Sync + 'static` bounds are checked against the concrete type. It also matches Native, which is already generic over its selector. The `Option` remains because a readiness driver instance can be retired at creation when the platform has no supported edge-triggered poller.
+- **7. Registration migration:** deferred. A registration stays on its worker. Revisit only if the per-registration rescue counts in the measurement plan show that the per-event delay of up to *P* matters during long stalls.
+  - **Why deferring costs little.** Migration moves where a socket's events are collected, not where its task runs. Rescued tasks already run on other workers, and with the stuck-preferred-worker refinement they skip the stuck worker's inbox. The most migration could save is one rescue delay per event, during stalls that are themselves bugs.
+  - **What it would cost.** Moving a live edge-triggered registration between pollers without losing or double-delivering an event already collected, plus two `epoll_ctl` or `kevent` changes per move.
+  - **If it is ever adopted:** move a registration on its next use while its owner is marked stuck. That moves only sockets that are both stranded and active, and costs nothing when no worker is stuck. Moving on every steal is rejected, because it pays the move on ordinary steals unrelated to stalls. After *N* rescues is the remaining alternative. Requirement 2 already permits migration, so no interface change would be needed, and in-flight io_uring operations can't move either way.
+- **8. The `polling` compatibility backend:** removed, not declined. The readiness driver drops its direct `polling` dependency entirely, as described in [stage 3](#staging). `async-io`, and `polling` through it, remain for the standalone socket fallback, process waits and the Tokio adapter on Windows. None of those is worker-owned, so none can be stranded behind a worker.
+  - **Why it could not stay.** A rescuer cannot safely wait on a `polling::Poller`. In polling 3.11.0:
+    - `Poller::wait_impl` swaps `notified` to false after every wait (`src/lib.rs`, around line 761).
+    - The epoll backend clears and re-arms its notifier on every wait, including zero-timeout waits (`src/epoll.rs`, around lines 231–237).
+    - `polling` filters its notifier event out of the results, so a caller can't tell that one was consumed.
+    - A wait that is concurrent with another returns 0 immediately (`src/lib.rs`, around lines 770–774).
+
+    So a rescuer's zero-timeout wait would consume an interrupt meant for the owner, which would then sleep through it. The native drivers avoid this by leaving the eventfd set or re-triggering `EVFILT_USER`.
+  - **Alternatives considered.** Re-notifying unconditionally after every rescue pass would probably work, but it adds a syscall per pass and depends on `polling` internals. An upstream change, or a separate notification channel beside `polling`, would keep two drivers to maintain for the rarest configurations. Declining rescue there was the previous recommendation; the maintainer chose removal so that requirement 1 holds on every platform with a worker readiness driver.
+  - **Why Linux needs no `polling`.** #58 selected it only when the native driver could not create its eventfd or timerfd. `NativePoller` now covers both failures itself.
 
 ## Open questions
 
-Questions 1–6 were decided and moved to [Decisions](#decisions). The remaining questions keep their original numbers, so earlier references to them stay valid.
-
-7. Should repeated rescue trigger registration migration (stage 5)?
-   - **The cost of not migrating.** While a worker stays stuck, a socket registered on it keeps its registration there, so every later event on it waits up to *P* for the monitor even though its task now runs elsewhere.
-   - **Migrating** means moving the registration, not the task: remove it from the stuck worker's poller and add it to the new worker's.
-   - **The options are never, after *N* rescues, or on every steal.**
-     - After *N* rescues fixes long stalls at no cost when nothing stalls, but it must not lose or double-deliver an event that is already collected. The new worker re-checks readiness after the move and accepts a spurious wakeup.
-     - Moving on every steal pays the move on steals unrelated to stalls.
-     - In-flight io_uring operations can't move either way.
-   - **Recommendation:** defer. Decide from the per-registration rescue counts that the measurement plan reports. Requirement 2 already permits migration, so no interface change would be needed later.
-8. Should rescue run on the `polling` compatibility backend? As designed it cannot, so stage 3 declines it there.
-   - **Where this backend runs.** On Linux it is selected only when the native epoll driver cannot create its eventfd or timerfd (`readiness_driver/epoll.rs`, `Poller::new`), for example under descriptor limits or in restricted sandboxes. Non-Unix platforms use a separate fallback driver.
-   - **What declining costs.** Expired timers and runnable tasks are still rescued there, because they are executor state. Only readiness on a stuck worker waits for its owner, as it does today.
-   - **Recommendation:** decline, and keep it out of requirement 1's scope.
-   - **The evidence,** from polling 3.11.0:
-     - `Poller::wait_impl` swaps `notified` to false after every wait (`src/lib.rs`, around lines 751–765).
-     - The epoll backend clears and re-arms its notifier on every wait, including zero-timeout waits (`src/epoll.rs`, around lines 231–237).
-     - A wait that is concurrent with another returns 0 immediately (`src/lib.rs`, around lines 701–702).
-
-     So a rescuer's zero-timeout wait would consume a notification meant for the owner, and its waits would contend with the owner's. Supporting rescue would need changes to `polling`, or a separate notification channel in the compatibility driver.
+None. Questions 1–8 were decided and are recorded under [Decisions](#decisions), keeping their original numbers so that earlier references stay valid.
