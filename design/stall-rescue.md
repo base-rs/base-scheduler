@@ -73,6 +73,12 @@ The selector hooks in `base-scheduler-selector` are public, but they are not the
 
 ## Rationale
 
+### How it was found
+
+The defect showed up while building the spawned server mode of `base-http-fixtures` ([base-rs/base-http#49](https://github.com/base-rs/base-http/pull/49)). That mode bounded its server join with a Native timer registered from the test thread. In the test where a blocking handler occupies the only worker, that timer was routed to the blocked worker and never fired, so the deadline meant to catch a stuck server was itself stuck behind it.
+
+`base-http-fixtures` now runs that join deadline on its own thread. This is documented there as a temporary workaround to remove once rescue lands. Its test-phase and client-teardown deadlines still use the scheduler clock, so they are bounded only while that clock's timers can run.
+
 ### Where work is stranded
 
 Each Native worker owns several pieces of state that are not stolen:
@@ -522,6 +528,8 @@ Fixed-rate latency is reported separately from throughput and CPU, as [worker pr
 4. **io_uring.** Measure option 2. Run the task-running spike, then cost option 3 if the spike makes it viable. Record the decision, replacing the interim.
 5. **Possibly later.** Move registrations after repeated rescues, if measurements show that locality loss matters (open question 7).
 
+Once stages 2 and 3 have landed, remove the own-thread join deadline in `base-http-fixtures` (see [how it was found](#how-it-was-found)).
+
 ## Decisions
 
 These are the maintainer's decisions, recorded here and removed from the open questions:
@@ -537,10 +545,26 @@ These are the maintainer's decisions, recorded here and removed from the open qu
 Questions 1–5 were decided and moved to [Decisions](#decisions). The remaining questions keep their original numbers, so earlier references to them stay valid.
 
 6. What shape should the selector assist hook take: a provided `dyn` method or an associated type? What should it be named?
+   - **Why a hook is needed.** `SelectorWorker::turn(&mut self)` means only the owning worker drives its driver, so Native has no permitted way to ask the driver to make progress from another thread.
+   - **A provided method returning `Option<Arc<dyn SelectorAssist>>`.** No existing implementer changes, and a driver that can't be rescued keeps the `None` default. The dynamic call is made only on the rescue path, and there is one `Arc` per worker at setup.
+   - **An associated type.** It gives static dispatch. Associated-type defaults are unstable, though, so every implementer must name a type, including a "none" type for those that decline. All four implementers are in this workspace (the readiness driver, its fallback, io_uring and the test driver), so the break is cheap.
+   - **No hook,** with Native special-casing the readiness driver. This is the least code, but it breaks the selector abstraction.
+   - **Recommendation:** the provided method. The rescue path is cold, so static dispatch buys nothing.
 7. Should repeated rescue trigger registration migration (stage 5)?
-8. Should rescue run on the `polling` compatibility backend? As designed it cannot, so stage 3 declines it there. With polling 3.11.0:
-   - `Poller::wait_impl` swaps `notified` to false after every wait (`src/lib.rs`, around lines 751–765).
-   - The epoll backend clears and re-arms its notifier on every wait, including zero-timeout waits (`src/epoll.rs`, around lines 231–237).
-   - A wait that is concurrent with another returns 0 immediately (`src/lib.rs`, around lines 701–702).
+   - **The cost of not migrating.** While a worker stays stuck, a socket registered on it keeps its registration there, so every later event on it waits up to *P* for the monitor even though its task now runs elsewhere.
+   - **Migrating** means moving the registration, not the task: remove it from the stuck worker's poller and add it to the new worker's.
+   - **The options are never, after *N* rescues, or on every steal.**
+     - After *N* rescues fixes long stalls at no cost when nothing stalls, but it must not lose or double-deliver an event that is already collected. The new worker re-checks readiness after the move and accepts a spurious wakeup.
+     - Moving on every steal pays the move on steals unrelated to stalls.
+     - In-flight io_uring operations can't move either way.
+   - **Recommendation:** defer. Decide from the per-registration rescue counts that the measurement plan reports. Requirement 2 already permits migration, so no interface change would be needed later.
+8. Should rescue run on the `polling` compatibility backend? As designed it cannot, so stage 3 declines it there.
+   - **Where this backend runs.** On Linux it is selected only when the native epoll driver cannot create its eventfd or timerfd (`readiness_driver/epoll.rs`, `Poller::new`), for example under descriptor limits or in restricted sandboxes. Non-Unix platforms use a separate fallback driver.
+   - **What declining costs.** Expired timers and runnable tasks are still rescued there, because they are executor state. Only readiness on a stuck worker waits for its owner, as it does today.
+   - **Recommendation:** decline, and keep it out of requirement 1's scope.
+   - **The evidence,** from polling 3.11.0:
+     - `Poller::wait_impl` swaps `notified` to false after every wait (`src/lib.rs`, around lines 751–765).
+     - The epoll backend clears and re-arms its notifier on every wait, including zero-timeout waits (`src/epoll.rs`, around lines 231–237).
+     - A wait that is concurrent with another returns 0 immediately (`src/lib.rs`, around lines 701–702).
 
-   So a rescuer's zero-timeout wait would consume a notification meant for the owner, and its waits would contend with the owner's. Supporting rescue would need changes to `polling`, or a separate notification channel in the compatibility driver.
+     So a rescuer's zero-timeout wait would consume a notification meant for the owner, and its waits would contend with the owner's. Supporting rescue would need changes to `polling`, or a separate notification channel in the compatibility driver.
