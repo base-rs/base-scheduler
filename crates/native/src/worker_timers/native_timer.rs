@@ -15,7 +15,7 @@ use std::{
     time::Instant,
 };
 
-/// Experimental timer resource, constructed through `NativeScheduler::timer`. Pending registrations retain their original worker when the waiting task moves.
+/// Experimental timer resource, constructed through `NativeScheduler::timer`. Pending registrations currently stay in their original worker's queue when the waiting task moves; this is Native placement, not an interface guarantee.
 pub struct NativeTimer {
     shared: Arc<Shared>,
     armed: Option<Instant>,

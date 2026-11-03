@@ -1,40 +1,104 @@
 # Stall Rescue
 
-**Status: proposed.** These requirements are not active yet. Requirement 1 applies once the staged implementation below lands. Requirement 2 is the interface's part and is reflected now in the context wording changes that accompany this document. Open questions are listed at the end and are not requirements.
+**Status.** The parts of this document take effect at different times:
+
+- **Requirement 2 is active now.** It is the interface's part, and the context wording changes that accompany this document already reflect it.
+- **Requirement 1 is proposed.** Its timer parts (expired timers, remote timer commands, the off switch) take effect when stage 2 lands. Its readiness parts take effect when stage 3 lands. In-flight io_uring operations stay excluded until stage 4 records a decision.
+- **Decisions and open questions.** Decisions the maintainer has already made are recorded as decided. The questions that remain open are listed at the end and are not requirements.
 
 ## Requirement
 
 ### 1. Stranded ready work progresses while a worker is idle (Native quality of implementation)
 
-In the Native backend, ready work held by a stuck worker must progress within a bound *T* while any other task worker of the same scheduler is idle, without the application doing anything. A stuck worker is one that has not reached a turn boundary (its timer pass and driver turn in `run_loop`) for longer than the detection threshold, and is not idle. Ready work means:
+In the Native backend, ready work held by a stuck worker must progress within a bound *T* while any other task worker of the same scheduler is idle, without the application doing anything.
 
-- **Expired timers** in the stuck worker's queue, including sleeps and reusable timers registered by root futures or other executors and routed there, and registrations made by tasks that were later stolen by other workers.
-- **Readiness events** queued in the stuck worker's epoll or kqueue poller, for sockets registered on that worker by its own tasks, by tasks later stolen, or by root and external callers routed there.
+A **stuck** worker has not reached a turn boundary (its timer pass and driver turn in `run_loop`) for longer than the stall threshold. It is also not idle and not closing.
+
+**Ready work** means:
+
+- **Expired timers in the stuck worker's queue.** This includes sleeps and reusable timers registered by root futures or other executors and routed there. It also includes registrations made by tasks that other workers later stole, with whatever waker was most recently set for each.
+- **Readiness events queued in the stuck worker's epoll or kqueue poller.** This covers sockets registered on that worker by its own tasks, by tasks later stolen, or by root and external callers routed there.
 - **Runnable tasks** in the stuck worker's ready queues and remote inbox.
 
-"Progress" means the waker is invoked and the task becomes runnable and stealable, so an idle worker can poll it (or, for a root future, its `block_on` thread is woken). The poll that is stuck is never preempted. Runnable tasks already satisfy this through stealing, without a bound on detection (see [runnable tasks](#runnable-tasks)).
+**Progress** means the waker is invoked, and the woken task becomes runnable and stealable so that an idle worker can poll it. For a root future, the `block_on` thread is woken instead. The poll that is stuck is never preempted. Runnable tasks already make progress through stealing, with no detection needed (see [runnable tasks](#runnable-tasks)).
 
-*T* is the worst-case delay from work becoming ready to its waker being invoked, assuming the rescuing thread gets scheduled. It is the sum of the stall threshold and the sampling period, plus the bounded rescue work itself. *T* has a documented default and may be configurable through backend options. Its value is an open question; this document does not set a numerical default.
+**The bound T.** *T* is the worst-case delay from work becoming ready to its waker being invoked, assuming the rescuing thread gets scheduled. It is the sum of:
 
-`Blocking::spawn_blocking` remains the way to declare blocking work up front. Rescue is a fallback for blocking that wasn't declared, not a replacement for `spawn_blocking`, and it does not make blocking inside a task free. A task that blocks still holds its worker's thread and delays everything else that worker would have run.
+- the stall threshold *S*;
+- the sampling period *P*;
+- the bounded rescue work itself.
 
-This is a property of the Native backend's implementation. It is not part of the portable interface's contract, and it does not apply to the Tokio adapter, which has its own driver model. In-flight io_uring operations are excluded until the [io_uring decision](#io_uring) is made. Stage 1 must document that exclusion as backend-specific behaviour.
+**Decided:**
 
-Rescue must preserve every existing ownership contract: cancellation, owned-buffer retention through original retirement, the rule that borrowed payloads are accessed only within a poll, registration reclamation at batch boundaries, and graceful shutdown. Rescue must never poll an application future from completion or timer processing ([worker progress](worker-progress.md)). It must call wakers outside every queue, table and poll lock.
+- The target is *T* = 2 ms.
+- The split between *S* and *P* is chosen by measurement. The starting point is *S* ≈ *P* ≈ 1 ms.
+- *T* is a fixed internal default. There is no public tuning knob.
+- Native provides an off switch for diagnostics, benchmarks and deterministic tests. One possible form is a `stall_rescue: bool` in `NativeExecutorOptions` that defaults to on, but the exact form belongs to the implementation.
+
+When no other worker is idle, rescue still invokes wakers. A root future then makes progress, and a rescued task is queued earlier. However, `TaskService::wake_idle` returns early when `idle_workers == 0` (`crates/native/src/task_service.rs`), so the task runs only when some worker next searches for work. The bound applies only while a worker is idle.
+
+**Declared blocking.** `Blocking::spawn_blocking` remains the way to declare blocking work up front. Rescue is a fallback for blocking that wasn't declared, not a replacement for `spawn_blocking`, and it does not make blocking inside a task free. A task that blocks still holds its worker's thread and delays everything else that worker would have run.
+
+**Scope of the property.** This is a property of the Native backend's implementation, not part of the portable interface's contract. Two Native selector configurations are excluded:
+
+- **In-flight io_uring operations.** These are excluded until the [io_uring decision](#io_uring) is made. Stage 2 documents this as the interim, which is option 1.
+- **The `polling` compatibility readiness backend.** It cannot be rescued as designed, because a foreign wait consumes the owner's wake (see open question 8). Timers and runnable tasks are still rescued under both configurations. The property does not apply to the Tokio adapter, which has its own driver model.
+
+**Preserved contracts.** Rescue must preserve every existing ownership contract:
+
+- cancellation;
+- owned-buffer retention through original retirement;
+- the rule that borrowed payloads are accessed only within a poll;
+- registration reclamation at batch boundaries;
+- graceful shutdown.
+
+**Wakers and locks.** Rescue must never poll an application future from completion or timer processing ([worker progress](worker-progress.md)). It must call timer wakers outside every timer-queue lock. Readiness dispatch, whether by the owner or by a rescuer, calls wakers while it holds that poller's poll lock. It never holds a registration table lock or a notification mutex while doing so ([readiness](#readiness) explains why).
 
 ### 2. The interface permits completion, re-routing and rescue on any worker or thread
 
-The portable interface (the `base-scheduler` crate, its rustdoc, `context/interface.md`, the contract sections of `context/design.md`, and the conformance suite) must not require, imply, or test that a particular worker or thread services an operation, registration, timer or waker. A backend may publish completion, invoke a waker, fire a timer, drain readiness, cancel, re-route, or migrate in-flight work from any of its threads. It must still keep each operation bound to its selected scheduler and keep the ownership contracts in requirement 1. Where current backends do keep work on its original worker or ring, the documentation must present that as a backend implementation choice, not as a portable guarantee.
+The portable interface consists of:
 
-The selector hooks in `base-scheduler-selector` are public, but they are not the portable interface. They currently describe a driver as exclusively owned by one worker (`SelectorWorker`, `SelectorDriver::enter`). To implement requirement 1 for readiness, they need an optional addition that lets another thread make bounded nonblocking progress for a worker's driver. Selectors that can't support it (io_uring under its current flags) must be able to decline. This addition is described under [interface changes](#interface-changes) and is not made by this document.
+- the `base-scheduler` crate and its rustdoc;
+- `context/interface.md`;
+- the contract sections of `context/design.md`;
+- the conformance suite.
+
+It must not require, imply or test that a particular worker or thread services an operation, registration, timer or waker. The canonical permission, used in the context documents too, is:
+
+> A backend may complete an operation, invoke a waker, fire a timer, drain readiness, cancel, re-route, or migrate in-flight work from any of its threads.
+
+A backend must still keep each operation bound to its selected scheduler and keep the ownership contracts in requirement 1. Where current backends keep work on its original worker or ring, the documentation must present that as a backend implementation choice, not as a portable guarantee.
+
+The selector hooks in `base-scheduler-selector` are public, but they are not the portable interface. They currently describe a driver as exclusively owned by one worker (`SelectorWorker`, `SelectorDriver::enter`). Requirement 1 needs an optional addition to them, so that another thread can make bounded nonblocking progress for a worker's driver on readiness. Selectors that cannot support it must be able to decline. Those are io_uring under its current flags and the `polling` compatibility backend. The addition is described under [interface changes](#interface-changes) and is not made by this document.
 
 ## Rationale
 
-Native workers each own a timer queue (`base_scheduler_timers::local`, `crates/native/src/worker_timers.rs`, "Keys never migrate"), a readiness poller (`crates/selector/src/readiness_driver.rs`: `DriverGroup::route` assigns external callers round robin, the route lasts for the socket's lifetime, and each worker's table is a `Mutex<Table>`), and, with io_uring, a ring (`crates/iouring/src/io_uring_selector.rs`: `route_ref` and `bind_worker` with `SINGLE_ISSUER | DEFER_TASKRUN`). Tasks are stolen, but timers and registrations are not. A worker stuck in a long poll therefore strands its timers and readiness events while other workers sit idle. On `main`, a 100 ms root sleep took 1.94 s behind a 2 s blocking task, and a root socket read took 1.95 s.
+### Where work is stranded
 
-[PR #92](https://github.com/base-rs/base-scheduler/pull/92) fixed root timers only, with a shared root queue and a watcher role handed off before each batch. Review measured about +15% wall time and +28% CPU on spawning whenever any root timer is pending, which is common: `block_on(main)` holding a timeout is enough. The maintainer parked #92 in favour of a general design, which this document proposes.
+Each Native worker owns several pieces of state that are not stolen:
 
-The maintainer's position:
+- **A timer queue.** See `base_scheduler_timers::local` and `crates/native/src/worker_timers.rs` ("Keys never migrate").
+- **A readiness poller.** In `crates/selector/src/readiness_driver.rs`, `DriverGroup::route` assigns external callers round robin, and a socket keeps its route for its whole lifetime.
+- **An io_uring ring**, when io_uring is in use. In `crates/iouring/src/io_uring_selector.rs`, see `route_ref`, and `bind_worker` with `SINGLE_ISSUER | DEFER_TASKRUN`.
+
+Tasks are stolen, but timers and registrations stay where they are. A worker stuck in a long poll therefore strands its timers and readiness events while other workers sit idle. On `main`, behind a 2 s blocking task:
+
+- a 100 ms root sleep took 1.94 s;
+- a root socket read took 1.95 s.
+
+### PR #92
+
+[PR #92](https://github.com/base-rs/base-scheduler/pull/92), which is still open, fixes root timers only. It does so with a shared root queue and a watcher role that is handed off before each batch.
+
+Its own benchmark for spawning with a root timer pending reports:
+
+- wall time 5,332 → 5,617 ns (+5.3%);
+- CPU 5,646 → 6,568 ns (+16.3%);
+- an earlier run reported about +11% wall and +25% CPU.
+
+A separate local benchmark run while reviewing #92, which is not published, gave about +15% wall and +28% CPU. The cost applies whenever any root timer is pending, which is common: `block_on(main)` holding a timeout is enough. This document proposes a general design that supersedes #92.
+
+### The maintainer's position
 
 > Tasks represent units of work … work stealing/task migration is expensive, so we want to avoid it, but in the case where something blocks (which we can't know ahead of time), it's our only real option to reduce latency, if other workers are not already busy.
 
@@ -46,68 +110,119 @@ On io_uring:
 
 > this would be more of a performance measurement decision. However … we should ensure the interface supports this regardless of the implementation's choices.
 
-So locality remains the steady-state design and its cost must stay close to zero (see [cost](#hot-path-cost-budget)). Rescue acts only after the fact, when a stall has actually happened, and only moves wakeups, not ownership. Ownership may move as well if measurements later justify it. The interface stays silent on placement so either choice remains available.
+So locality remains the steady-state design, and its cost must stay within the agreed [budget](#hot-path-cost-budget). Rescue acts only after the fact, when a stall has actually happened. It moves wakeups, not ownership. Ownership may move as well if measurements later justify it, and the interface says nothing about placement so either choice remains available.
 
-Earlier research constrains the mechanism. A shared timer queue driven by every worker was rejected for its CPU cost: about +35% process CPU with 4 workers and 1,024 timers, from deadline herds and lock contention ([worker-driven timer research](../benchmarks/echo/worker-timers-research.md)). That research recommended keeping "opportunistic assistance separate from idle-timeout ownership so assistance does not recreate the same wakeup herd". The worker-local queue then reduced process CPU by 64–71% compared with the timer-thread baseline ([worker-local timers](../benchmarks/echo/worker-local-timers.md)). That measurement does not isolate the cost of the uncontended mutex it removed. The `sharded` feature of `base-scheduler-timers` already provides worker-owned mutex queues with a `TimerAssist::try_poll` view that collects "while the owner is stalled outside queue operations", which is the shape proposed here.
+### Constraints from earlier research
+
+- **A shared timer queue was rejected for its CPU cost.** When every worker drove one queue, process CPU rose by about 35% with 4 workers and 1,024 timers, because of deadline herds and lock contention ([worker-driven timer research](../benchmarks/echo/worker-timers-research.md)). That research recommended keeping "opportunistic assistance separate from idle-timeout ownership so assistance does not recreate the same wakeup herd".
+- **The worker-local queue was a large improvement.** It reduced process CPU by 64–71% compared with the timer-thread baseline ([worker-local timers](../benchmarks/echo/worker-local-timers.md)). That measurement does not isolate the cost of the uncontended mutex it removed.
+- **The building block already exists.** The `sharded` feature of `base-scheduler-timers` provides worker-owned mutex queues. Its `TimerAssist::try_poll` view collects "while the owner is stalled outside queue operations", which is the shape proposed here.
 
 ## Scope
 
-- **Requirement 1:** the Native executor (`crates/native`): its worker loop, timer queues, idle and park transitions, and shutdown. Its readiness selector drivers (`crates/selector/src/readiness_driver*`: epoll, kqueue and the `polling` compatibility backend). Its io_uring composition, for timers and runnable tasks; in-flight ring operations are governed by the io_uring decision.
-- **Requirement 2:** the `base-scheduler` interface crate and rustdoc, `context/interface.md`, the contract sections of `context/design.md`, `context/io.md`, and `base-scheduler-conformance`. The `base-scheduler-selector` hooks are included as the integration point.
-- **Out of scope:** preempting a poll. Interrupting a blocking syscall. A single long poll on the only worker, where no other worker is available to run the rescued tasks. Root futures still benefit if the rescuer is a dedicated thread. Also out of scope are the Tokio adapter, the standalone `async-io` fallback progress, and files, resolution and blocking jobs, which already run on independent pools.
+- **Requirement 1** covers the Native executor (`crates/native`): its worker loop, timer queues, idle and park transitions, and shutdown. It also covers the epoll and kqueue readiness drivers (`crates/selector/src/readiness_driver*`), and Native's io_uring composition for timers and runnable tasks.
+- **Requirement 2** covers:
+  - the `base-scheduler` interface crate and its rustdoc;
+  - `context/interface.md`;
+  - the contract sections of `context/design.md`;
+  - `context/io.md`;
+  - `base-scheduler-conformance`.
+
+  The `base-scheduler-selector` hooks are included as the integration point.
+- **Out of scope:**
+  - preempting a poll;
+  - interrupting a blocking syscall;
+  - in-flight io_uring operations (pending the stage 4 decision);
+  - readiness under the `polling` compatibility backend;
+  - running rescued tasks when no worker is idle (rescue still wakes root futures in that case);
+  - the Tokio adapter;
+  - progress of the standalone `async-io` fallback;
+  - files, resolution and blocking jobs, which already run on independent pools.
 
 ## Validation
 
 ### Requirement 1
 
-Regression tests (Native), each run with 2 and 4 workers, some workers held by a blocking poll of several seconds and at least one worker idle:
+**Regression tests (Native).** Run each test with 2 and 4 workers. In each, some workers are held by a blocking poll of several seconds and at least one worker is idle. Rescue is on unless the test says otherwise.
 
-- `crates/native/tests/root_timers.rs` from PR #92. All three cases fail on `main`. Keep its bounds relative to the hold, and loosen `LATE` to a multiple of *T* rather than 1 s if *T* is configurable.
-- A sleep and a reusable timer registered by a task on worker A, after which the task is stolen by B (force this with a hand-off between tasks), then A blocks. The timer must fire within *T*.
-- A root `read_into` on a socket routed to a worker that then blocks: the scratch repro from #92, which took 1.945 s on `main`. Also a task-registered socket whose task is stolen before its registering worker blocks. Cover both epoll and kqueue, and the `polling` compatibility backend if rescue is enabled there.
-- Runnable tasks queued behind a long poll, in both ready generations and in the remote inbox, run on other workers. This test should already pass on `main`; add it so the property is checked.
-- io_uring: a test that documents the chosen behaviour for an in-flight operation on a stuck ring. If new operations are routed away from a stuck ring, test that too.
-- Races and lifecycle: the owner returning from its long poll during a rescue; a stress test of repeated short stalls near the threshold; closure and `shutdown()` while a worker is stuck and rescue is active; driver retirement during rescue; and waker code that panics or reenters the scheduler during rescue. Shutdown must not complete while a rescuer still holds a queue or poller, and no record may be reclaimed while a rescuer's event batch can still refer to it.
-- A false-positive counter (test or diagnostic build only). In the named benchmarks below, which contain no long polls, it should report zero rescues at the default *T*. Report any rescues it does record.
+- **#92's root timer tests.** These are in `crates/native/tests/root_timers.rs`, and all three fail on `main`. Bring them over with their bounds relative to the hold, and set `LATE` to a small multiple of *T* (for example 20 ms) rather than 1 s.
+- **Stolen timer.** A task on worker A registers a sleep and a reusable timer. Another worker, B, then steals the task (force this with a hand-off between tasks), and A blocks. The timer must fire within *T*.
+- **Waker update to a stuck owner.** A reusable timer is registered on A. A blocks, the task is polled on B, and B replaces the timer's waker. The timer must fire within *T* and wake the *new* waker. On `main`, the update would sit in A's inbox, so a rescuer would fire the old waker and the wakeup would be lost.
+- **Stuck readiness.** A root `read_into` on a socket routed to a worker that then blocks. This is #92's scratch reproduction, which took 1.945 s on `main`. Also a socket registered by a task that is stolen before its registering worker blocks. Run both on epoll and kqueue.
+- **Runnable tasks.** Tasks queued behind a long poll, in both ready generations and in the remote inbox, run on other workers. This should already pass on `main`; add it so the property is checked.
+- **No idle worker.** Every worker is held, a root `block_on` is waiting on a sleep, and the sleep's waker runs within *T*.
+- **io_uring.** A test that documents the interim behaviour for an in-flight operation on a stuck ring: it completes after the hold, not within *T*. When stage 4 decides, add a test that new operations are routed away from a stuck ring if option 2 is adopted.
+- **Deep-sleep handshake race.** Repeat this many times: all workers go idle, the monitor enters deep sleep, a worker wakes and at once blocks, and a timer on that worker must still be rescued within *T*.
+- **Races and lifecycle:**
+  - the owner returns from its long poll during a rescue;
+  - a stress test of repeated short stalls near the threshold;
+  - closure and `shutdown()` while a worker is stuck and rescue is active;
+  - driver retirement during rescue;
+  - a waker that panics during rescue;
+  - a waker that reenters the scheduler (spawns, registers or deregisters on the same controller) during rescue.
 
-Inspection: no lock is held across a task poll or a waker call. Lock order is poll lock, then table lock, then timer queue, and never the reverse. Rescuers use only `try_lock` on owner state. Interrupt and notification records consumed by a rescuer are restored for the owner. The monitor holds only weak references to scheduler state.
+  Shutdown must not complete while a rescuer still holds a queue or poller. No record may be reclaimed while any batch, the owner's or a rescuer's, can still refer to it.
+- **Rescue switched off.** With rescue switched off, behaviour matches `main`. `immediate_reads_observe_input_while_the_only_worker_is_busy` (`crates/native/tests/worker_readiness.rs`) uses the off switch. Its premise is that the busy worker's driver publishes no readiness, and a monitor would break that premise intermittently.
+- **False-positive counter** (test or diagnostic builds only). In the named benchmarks, which contain no long polls, it should report zero rescues at the default *T*. Report any rescues it does record. Workers that are closing, and workers whose `sleeping` flag was cleared by a remote wake before they left their wait, count as idle and are not counted.
 
-Performance: follow [worker progress validation](worker-progress.md#validation). Keep the baseline revision and build settings, and match task topology, CPU placement and worker counts. Measure fixed-rate latency at equal offered rates separately from unrestricted throughput and process CPU, and report noise. The named workloads are listed under [cost](#hot-path-cost-budget). No numerical regression threshold has been agreed (see open questions).
+**Inspection:**
+
+- No timer-queue, table or notification lock is held across a waker call or a task poll. The poll lock is held across readiness wakers only, and is never held across a task poll.
+- Lock order is poll lock, then table lock, then a direction's notification mutex. The timer-queue lock is separate and never held together with the others.
+- A rescuer uses only `try_lock` on owner state.
+- Interrupt and notification records consumed by a rescuer are restored for the owner.
+- The monitor holds only a weak reference to scheduler state, as described under [lifetimes](#lifetimes).
+
+**Performance.** Follow [worker progress validation](worker-progress.md#validation):
+
+- Keep the baseline revision and build settings, and match task topology, CPU placement and worker counts.
+- Measure fixed-rate latency at equal offered rates separately from unrestricted throughput and process CPU.
+- Report noise.
+
+The workloads and the decided budgets are listed under [cost](#hot-path-cost-budget).
 
 ### Requirement 2
 
-Inspect the interface crate's rustdoc, `context/interface.md`, `context/design.md`, `context/io.md` and the conformance crate for any statement or assertion about which worker or thread services work, using the audit below as the baseline. Check that each remaining statement about original-worker or original-ring retention is explicitly described as a backend choice. Check that type bounds do not tie a future, handle or waker to a thread.
+Inspect the interface crate's rustdoc, `context/interface.md`, `context/design.md`, `context/io.md` and the conformance crate. Look for any statement or assertion about which worker or thread services work, using the audit below as the baseline. Then check:
+
+- that each remaining statement about original-worker or original-ring retention is explicitly described as a backend choice;
+- that type bounds do not tie a future, handle or waker to a thread.
 
 ## Interface audit
 
-This audit covers revision `4c36c8e` (`origin/main`). "Fine" means no change is needed. "Reword" means documentation states or implies affinity as a contract. "Change" means a trait or type must change.
+This audit covers revision `4c36c8e` (`origin/main`). The verdicts mean:
+
+- **Fine:** no change is needed.
+- **Reword:** documentation states or implies affinity as a contract.
+- **Change:** a trait or type must change.
 
 ### Portable interface and contract documents
 
 | # | Item | Location | Verdict | Reason |
 | --- | --- | --- | --- | --- |
-| 1 | Operation futures `+ Send`; I/O handles `Send`; resources `Send + Sync` | `src/*` trait signatures, `context/design.md` "Future and thread bounds" | Fine | `Send` permits polling from any thread. Borrowed futures are not `'static`, which is fine: rescue moves wakeups, not futures. Handles need not be `Sync`, because a rescuer touches only backend-private registration state. |
+| 1 | Operation futures `+ Send`; I/O handles `Send`; resources `Send + Sync` | `src/*` trait signatures; `context/design.md` "Future and thread bounds" | Fine | `Send` permits polling from any thread. Borrowed futures are not `'static`, which is fine: rescue moves wakeups, not futures. Handles need not be `Sync`, because a rescuer touches only backend-private registration state. |
 | 2 | Spawned futures, blocking closures, outputs and handles `Send + 'static` | `src/spawn.rs`, `src/blocking.rs` | Fine | This is what makes stealing possible, and it is required for task migration. |
-| 3 | `Timers::Timer: Send`; "without registering a deadline or selecting a worker" | `src/timers.rs` | Fine | Construction selects no worker; the trait says nothing about where a timer fires. |
+| 3 | `Timers::Timer: Send`; "without registering a deadline or selecting a worker" | `src/timers.rs` | Fine | Construction selects no worker, and the trait says nothing about where a timer fires. |
 | 4 | `Clock` sleep: "Dropping the future releases its timer registration" | `src/clock.rs` | Fine | No owner is named. Release must reach the queue that holds the key, which a lockable queue does directly. |
-| 5 | Waker invocation thread | Interface: none; `Notify` "ordinary thread context"; signals "outside raw signal handlers and backend locks" | Fine, with a clarification added | Nothing promises which thread runs a waker. `context/interface.md` now says so explicitly, so callers don't infer it from current behaviour. |
-| 6 | Operation futures polled from any executor | `context/design.md` "Explicit execution services"; Tokio and io_uring readmes | Fine | It is already permitted and exercised (root futures, other executors). |
-| 7 | "Backend routing may use the current worker…, while an accepted operation retains its original worker or ring through retirement" | `context/design.md` "Explicit execution services" | **Reword (done)** | This is a contract section, and the clause reads as a guarantee. A completion, rescue or migration on another worker would violate it. It now describes the current Native selectors and states that the interface doesn't require it. |
-| 8 | "Moving between workers leaves routing and registration migration internal" | `context/interface.md` conventions; `context/io.md`; `SocketStreamReader` rustdoc; readme | Fine, with an addition | It already leaves placement internal. A sentence now adds that backends may complete, wake, re-route or rescue in-flight work from any of their threads. |
-| 9 | Cancellation of in-flight operations: best effort, retirement before release, success wins concurrent cancellation | `context/design.md` "Operation lifecycle"; `context/interface.md` | Fine | No thread or worker is named. A backend that re-routes must send cancellation to the operation's current owner, which is a backend obligation the interface already implies ("a completion backend must retire the original operation"). |
-| 10 | Owned buffers retained until backend access retires, including after abandonment | same; `IoBuf` contracts | Fine | It doesn't matter which thread observes retirement. Rescue that enters a ring on another thread keeps the same storage. |
-| 11 | Borrowed buffers accessed only synchronously inside a poll | `context/design.md` "Borrowed socket dispatch"; `context/interface.md` | Fine | Readiness rescue publishes readiness only; the payload syscall still happens in the task's own poll, wherever it runs. Rescue must not dispatch borrowed I/O itself. |
-| 12 | `try_read_into` attempt semantics | `src/socket_stream_reader.rs`; [immediate reads](stream-immediate-read.md) | Fine | It bypasses readiness, so it is independent of any worker. See implementation item C for its Native test. |
-| 13 | Registration lifetime: close and drop handles before exclusive close; final alias deregisters synchronously on any thread | `context/interface.md`; `context/design.md` | Fine | This already works from any thread. The batch-boundary reclamation rule must cover rescuer batches too (implementation item B). |
-| 14 | Socket ownership and handles; scheduler-instance affinity | `src/socket_operation.rs`, `src/file_operation.rs`, [socket handle ownership](socket-handle-ownership.md) | Fine | Affinity is to a scheduler instance, not a worker. |
-| 15 | Reusable timer `Registration`: "retained Native registrations keep their original worker, with waker updates and release routed to that worker" | `context/design.md` "Experimental reusable timers" | **Reword (done)** | This is a contract section describing Native's placement. It now says this is Native's current choice, that the key stays in its original queue, and that the interface doesn't say which worker fires it. |
-| 16 | "Timers retain their existing worker-owned registration contract" | `context/design.md` "Directional socket monitor machinery" | **Reword (done)** | Calling worker ownership a "contract" contradicts requirement 2; it is now called placement. |
-| 17 | "io_uring uses one ring per worker; active operations stay with their original ring through retirement" | `context/interface.md` "Backend composition" | **Reword (done)** | It is accurate for io_uring but reads as interface. It is now marked as a backend choice that the portable contract does not require. |
+| 5 | Waker invocation thread | Interface: none. `Notify`: "ordinary thread context". Signals: "outside raw signal handlers and backend locks". | Fine, with a clarification added | Nothing promises which thread runs a waker. `context/interface.md` now says so with the canonical permission. |
+| 6 | Operation futures polled from any executor | `context/design.md` "Explicit execution services"; Tokio and io_uring readmes | Fine | This is already permitted and exercised, by root futures and other executors. |
+| 7 | "Backend routing may use the current worker…, while an accepted operation retains its original worker or ring through retirement" | `context/design.md` "Explicit execution services" | **Reword (done)** | This is a contract section, and the clause reads as a guarantee. It now carries the canonical permission and describes retention as the current Native selectors' choice. |
+| 8 | "Moving between workers leaves routing and registration migration internal" | `context/interface.md` conventions; `context/io.md`; `SocketStreamReader` rustdoc; readme | Fine, with an addition | This already leaves placement internal. The canonical permission is added after it. |
+| 9 | Cancellation of in-flight operations: best effort, retirement before release, success wins over a concurrent cancellation | `context/design.md` "Operation lifecycle"; `context/interface.md` | Fine | No thread or worker is named. A backend that re-routes must send cancellation to the operation's current owner. The interface already implies this: "a completion backend must retire the original operation". |
+| 10 | Owned buffers retained until backend access retires, including after abandonment | Same locations; `IoBuf` contracts | Fine | It doesn't matter which thread observes retirement. |
+| 11 | Borrowed buffers accessed only synchronously inside a poll | `context/design.md` "Borrowed socket dispatch"; `context/interface.md` | Fine | Readiness rescue publishes readiness only. The payload syscall still happens in the task's own poll, wherever it runs. Rescue must not dispatch borrowed I/O itself. |
+| 12 | `try_read_into` attempt semantics | `src/socket_stream_reader.rs`; [immediate reads](stream-immediate-read.md) | Fine | It bypasses readiness, so it doesn't depend on any worker. Its Native validation premise is item 23. |
+| 13 | Registration lifetime: close and drop handles before exclusive close; the final alias deregisters synchronously on any thread | `context/interface.md`; `context/design.md` | Fine | This already works from any thread. The batch-boundary reclamation rule must cover rescuer batches too (item B). |
+| 14 | Socket ownership and handles; scheduler-instance affinity | `src/socket_operation.rs`, `src/file_operation.rs`, [socket handle ownership](socket-handle-ownership.md) | Fine | Affinity is to a scheduler instance, not to a worker. |
+| 15 | Reusable timer `Registration`: "retained Native registrations keep their original worker, with waker updates and release routed to that worker" | `context/design.md` "Experimental reusable timers" | **Reword (done)** | This is a contract section that describes Native's placement. It now says this is Native's current choice and that the interface doesn't say which worker fires a timer. |
+| 16 | "Timers retain their existing worker-owned registration contract" | `context/design.md` "Directional socket monitor machinery" | **Reword (done)** | Calling worker ownership a "contract" contradicts requirement 2. It now says "placement". |
+| 17 | "The executor manages … worker-local timers…; io_uring uses one ring per worker; active operations stay with their original ring through retirement" | `context/interface.md` "Backend composition" | **Reword (done)** | This is accurate for Native and io_uring, but it reads as interface. Both statements are now marked as backend choices. |
 | 18 | `BufferPool`: "worker caches must make returned capacity available to acquisitions on other workers" | `src/buffer_pooling.rs` | Fine | This works against affinity. |
 | 19 | `SocketRecvMessage` "may move between workers" | `src/socket_recv_message.rs` | Fine | |
-| 20 | Conformance suites | `crates/conformance` | Fine | No assertion depends on a worker or thread identity (searched for worker/thread/affinity). The blocking fixture's "workers" are pool threads. |
-| 21 | `SelectorWorker` "owned exclusively by an executor worker"; `turn(&mut self)`; `SelectorDriver::enter` "thread-bound routing" | `crates/selector/src/selector_worker.rs`, `selector_driver.rs`; `context/interface.md` selector table | **Change (described, not made)** | Exclusive ownership of the driver can stay. Another thread can't make progress for it without a new hook (see [interface changes](#interface-changes)). Reword the doc together with that change. |
-| 22 | [Worker progress](worker-progress.md): "the owning worker finishes that snapshot before returning to application polling" | design document | **Reword on adoption** | A rescuer also collects snapshots. On adoption, change it to "the worker or rescuer that collected it". It is left unchanged here because this document is only a proposal. |
+| 20 | Conformance suites | `crates/conformance` | Fine | No assertion depends on worker or thread identity (searched for worker, thread and affinity). The blocking fixture's "workers" are pool threads. |
+| 21 | `SelectorWorker` "owned exclusively by an executor worker"; `turn(&mut self)`; `SelectorDriver::enter` "thread-bound routing" | `crates/selector/src/selector_worker.rs`, `selector_driver.rs`; `context/interface.md` selector table | **Change (described, not made)** | Exclusive ownership of the driver can stay. Without a new hook, though, no other thread can make progress for the driver (see [interface changes](#interface-changes)). Reword this documentation together with that change. |
+| 22 | [Worker progress](worker-progress.md): "the owning worker finishes that snapshot before returning to application polling" | Design document | **Reword when adopted** | A rescuer also collects snapshots. In stage 3, change this to "the worker or rescuer that collected it". |
+| 23 | [Immediate reads](stream-immediate-read.md) validation: "keeps the only worker busy, so its driver cannot publish readiness" | Design document | **Reword when adopted** | With rescue on, the premise holds only for the first *T*. In stage 3, say that the test runs with rescue off. |
 
 No `Send`/`'static` bound, waker contract, cancellation rule or retained-storage rule in the portable interface needs a type change.
 
@@ -117,17 +232,19 @@ These describe current behaviour and are not contract. When rescue lands, each m
 
 | | Statement | Location | Note |
 | --- | --- | --- | --- |
-| A | "An operation keeps its chosen ring through admission, completion, and cancellation, even if its task migrates." | `IoUringSelector::with_workers` rustdoc | This follows from `SINGLE_ISSUER`. It stays true under option 1 or 2. |
-| B | Records "retire at a driver batch boundary"; "Only the sole driver calls" `Controller::stop` | `readiness_driver.rs`; `context/design.md` Native backend | The boundary must count rescuer batches too. `stop` must exclude rescuers. |
-| C | `immediate_reads_observe_input_while_the_only_worker_is_busy`: "its driver publishes no readiness" | `crates/native/tests/worker_readiness.rs` | Its premise holds only without rescue. With a dedicated monitor, even one worker can be rescued after *T*. The test's immediate `poll_once` will probably still pass, but the comment and [immediate reads](stream-immediate-read.md) validation should say "within *T*". |
+| A | "An operation keeps its chosen ring through admission, completion, and cancellation, even if its task migrates." | `IoUringSelector::with_workers` rustdoc | This follows from `SINGLE_ISSUER`. It stays true under options 1 and 2. |
+| B | Records "retire at a driver batch boundary"; "Only the sole driver calls" `Controller::stop` | `readiness_driver.rs`; `context/design.md` Native backend | The boundary must count rescuer batches too, and `stop` must exclude rescuers (see [readiness](#readiness)). |
+| C | `immediate_reads_observe_input_while_the_only_worker_is_busy`: "its driver publishes no readiness" | `crates/native/tests/worker_readiness.rs` | The premise holds only without rescue, so the test uses the off switch. |
 | D | "Each worker owns an unsynchronized timer queue"; "Keys never migrate"; "A full owning timer queue returns `WouldBlock`" | Native readme; `worker_timers.rs`; `NativeExecutorOptions::timer_capacity` | The queue becomes lockable. Keys still don't migrate, and capacity stays per queue (unlike #92's single root queue). |
-| E | "Its first compatible worker owns that registration…; root and external callers select workers round-robin" | `context/design.md` Native backend | Placement stays as it is; under rescue, ownership no longer means that only the owner delivers events. |
-| F | "The owning worker publishes the entire available CQ snapshot before polling any of those tasks"; "Timers and driver turns can both wait behind a long batch or a long individual poll" | `context/design.md` worker ownership; `context/execution.md` | Update both with the implementation: rescue bounds that wait. |
-| G | Fixed-file and passive caches "a stalled original driver can delay their release" | `context/design.md` io_uring ring ownership | This stays true under options 1 and 2. |
+| E | "Its first compatible worker owns that registration…; root and external callers select workers round-robin" | `context/design.md` Native backend | Placement stays the same. Under rescue, ownership no longer means that only the owner delivers events. |
+| F | "The owning worker publishes the entire available CQ snapshot before polling any of those tasks"; "a large batch can delay I/O checks" | `context/design.md` worker ownership | Update both with the implementation, because rescue bounds the delay for readiness and timers. |
+| G | Fixed-file and passive caches: "a stalled original driver can delay their release" | `context/design.md` io_uring ring ownership | This stays true under options 1 and 2. |
+| H | "no dedicated timer thread"; "Each task worker owns a reserved local queue"; "The registration retains its original worker…; waker replacements… update that original queue locally or through its inbox" | `context/design.md` Native clock and timers | This is Native's description, now framed as Native's current choice. On adoption: the monitor is not a timer thread (it owns no queue); "or through its inbox" becomes "or under the queue lock". |
+| I | `NativeTimer` rustdoc: "Pending registrations retain their original worker when the waiting task moves" | `crates/native/src/worker_timers/native_timer.rs` | It now says this is current Native placement and not an interface guarantee (doc comment only). |
 
 ### Interface changes
 
-Only the selector hooks need one. A possible shape:
+Only the selector hooks need one. Here is a possible shape:
 
 ```rust,ignore
 pub trait SelectorWorker {
@@ -140,15 +257,15 @@ pub trait SelectorWorker {
 
 pub trait SelectorAssist: Send + Sync {
     /// Publish readiness already queued for the owner without waiting, if the owner is
-    /// not inside its own turn. Wakers run outside every lock; no application future
-    /// is polled. `Busy` means the owner or another assistant holds the driver.
-    fn try_assist(&self) -> io::Result<Assisted>; // Busy | Idle | Published(count)
+    /// not inside its own turn. No application future is polled. `Busy` means the owner
+    /// or another assistant holds the driver; `Retired` means the driver has stopped.
+    fn try_assist(&self) -> io::Result<Assisted>; // Busy | Retired | Idle | Published(count)
     /// Hint that the owner is stalled, so new external routes may avoid it.
     fn set_stalled(&self, stalled: bool) {}
 }
 ```
 
-A provided method that returns `None` keeps existing selectors source-compatible. Dynamic dispatch is acceptable because it is used only when rescuing. The exact shape is an open question.
+A provided method that returns `None` keeps existing selectors source-compatible. Dynamic dispatch is acceptable because it is used only when rescuing. The exact shape is open question 6.
 
 The portable `base-scheduler` crate needs no type or trait change.
 
@@ -158,115 +275,259 @@ This section is not a requirement. It describes the design to implement and meas
 
 ### Detection
 
-- **Heartbeat.** Each worker stores a per-worker turn counter on its own cache line, with a relaxed store once per `run_loop` iteration, next to `worker_timers::turn`. A turn boundary is exactly where timers and readiness are serviced, so a stalled counter means work there is waiting. A long batch of short tasks counts as stalled too, and rescuing in that case also reduces latency ([execution guide](../context/execution.md): "a large batch can delay I/O checks").
-- **Idle.** The existing `sleeping` flag marks a worker in its idle wait. An idle worker services its own deadline and poller, so it is never treated as stuck.
-- **Published deadline.** Each worker keeps its earliest local deadline in an atomic. Registration publishes a new deadline only if it is earlier than the published one (a load and a compare, and rarely a store), and the timer pass refreshes it. A rescuer reads it to skip lock attempts when nothing has expired. Unlike #92's shared deadline, no worker bounds its idle wait by another worker's deadline, so it cannot cause herds of wakeups.
-- **Monitor.** The recommended monitor is a dedicated thread in the style of Go's sysmon. It samples every period *P* and treats a worker as stuck when its counter is unchanged across observations spanning the threshold *S*, while it is not idle. *T* = *S* + *P*. When it has seen every worker idle for several consecutive periods, the monitor goes into a deep sleep. The worker that leaves idle first wakes it, with one extra load on the idle exit path, which already performs `SeqCst` operations, and a wake only when the monitor is in deep sleep. That limits monitor wakes to about one per deep-sleep entry, which can't happen more often than the all-idle dwell allows. The alternative is a rescuer chosen among idle workers, which avoids a thread but needs a hand-off whenever that worker finds tasks; that is the cost that sank #92. Treat it as the comparison case to measure, not the default.
-- **Threshold trade-offs.** A small *T* gives better worst-case latency but more false positives on long legitimate batches, more `try_lock` contention with owners that are about to return, and more lost locality as rescued tasks are stolen. A large *T* has fewer side effects but strands work for longer. Go uses roughly 10 ms for both its sysmon network poll and its preemption, from memory; this needs verifying. Candidates to measure are 1 ms and 10 ms.
+- **Heartbeat.** Each worker stores a per-worker turn counter on its own cache line, with a relaxed store once per `run_loop` iteration, next to `worker_timers::turn`. A turn boundary is exactly where timers and readiness are serviced, so a counter that stops changing means work there is waiting.
+
+  A long batch of short tasks counts as stalled too. Rescuing in that case also reduces latency, since `context/design.md` notes that "a large batch can delay I/O checks".
+- **Idle and closing.** The existing `sleeping` flag marks a worker in its idle wait, and an idle worker services its own deadline and poller. A remote wake clears `sleeping` before the owner leaves its wait (`NativeWorker::wake`). The shutdown drain also runs with `sleeping == false`. A worker that is closing (`Shared::finished`) is treated as idle. Neither case is counted as a false positive, though a worker woken remotely can still be rescued if it truly fails to return within *S*.
+- **Published deadline.** Each worker keeps its earliest local deadline in an atomic `u64` of clock nanoseconds. Every timer queue mutation now happens under the queue lock, including remote commands (decided, see [timers](#timers)). Whoever holds the lock can therefore refresh it with a plain store after changing the head, with no read-modify-write and no `watchers` mutex.
+
+  `sharded::Publication::lower` takes such a mutex, so it is not reused here. For per-request timeouts the queue oscillates between empty and one timer, so this store happens on most registrations and releases (see [cost](#hot-path-cost-budget)). A rescuer reads the atomic to skip lock attempts when nothing has expired. Unlike #92's shared deadline, no worker bounds its idle wait by another worker's deadline, so it cannot cause herds of wakeups.
+- **Monitor (decided).** A dedicated thread in the style of Go's sysmon:
+  - It samples every period *P*. It treats a worker as stuck when the worker's counter is unchanged across observations spanning *S* and the worker is not idle or closing.
+  - It rescues whether or not any worker is idle. With no idle worker, rescue wakes root futures and queues tasks earlier, as described in requirement 1. If that pass proves costly in measurement, gate it on `idle_workers > 0` or on a pending root waker; checking either costs one load.
+  - Its CPU, and the CPU it runs on, are part of the measurement plan.
+- **Deep-sleep handshake.** The monitor deep-sleeps after it has seen every worker idle for several consecutive periods. The handshake works in two parts:
+  - The monitor stores `deep = true` (`SeqCst`). It then rechecks every worker's `sleeping` flag (`SeqCst`) and parks only if all of them are still set. If any flag is clear, it stores `deep = false` and keeps sampling.
+  - A worker leaving idle already stores `sleeping = false` with `SeqCst` (`worker.rs`, after `park`). It then loads `deep` (`SeqCst`). If `deep` is set, the worker swaps it to `false` and unparks the monitor.
+
+  Both sides use `SeqCst` on a store followed by a load, so at least one side sees the other: the monitor does not park while a worker is active and unseen. The worker's cost is one load on the idle exit path, which already performs `SeqCst` operations, plus a wake only when the monitor is in deep sleep.
+- **Pre-park check (decided).** In the existing steal search before parking, a worker also checks each victim that is not sleeping:
+  - **Timers:** if the victim's published deadline has passed, it `try_lock`s the victim's queue and fires its expired timers, as Go's `stealWork` does.
+  - **Readiness:** it calls `try_assist` on the victim's poller only if the monitor has marked that victim stuck.
+
+  Each check costs one load, so this path adds no syscalls unless a victim is actually stuck. It shortens *T* for whichever worker is about to sleep anyway.
+- **Threshold trade-offs.** A small *T* gives better worst-case latency. It also costs more: more monitor wakes (about 1/*P*, so roughly 1,000 per second at *P* = 1 ms whenever any worker is busy), more false positives on long legitimate batches, more `try_lock` contention with owners about to return, and more lost locality as rescued tasks are stolen. A large *T* has fewer side effects but strands work for longer. The 2 ms target is much tighter than Go's sysmon, which waits about 10 ms before polling the network or preempting.
 
 ### Timers
 
-- Move each worker's `local::TimerQueue<Waker>` from TLS `RefCell` into `WorkerState` behind a mutex, or adopt `sharded::WorkerTimers`. The owner locks it, uncontended, for registration, update, release and its timer pass, and never holds it across a task poll or a waker call.
-- A rescuer calls `try_lock`, pops expired entries into local storage, releases the lock, then calls the wakers. Each waker makes its task runnable in its preferred worker's inbox, and `wake_idle` falls back to any idle worker, which steals it. Keys stay in the original queue, and the slot keeps its capacity until `Release`.
-- Remote commands (`Register`, `Update`, `Release`) currently go through a single-consumer `SegQueue` inbox that only the owner drains. A root `Register` sent to a stuck worker would never be acknowledged. Either have remote callers lock the target queue directly, which also removes the acknowledgement allocation, and interrupt the owner if they published an earlier deadline while it is idle, or have rescuers drain the inbox under the queue lock. The direct lock is simpler. Measure both.
-- Closure is checked under the queue lock. A rescuer that observes closure pops all entries, as the owner does now. Shutdown waits for in-flight rescue waker calls, as it already does for timer callbacks.
+- **Lockable queues.** Move each worker's `local::TimerQueue<Waker>` out of the TLS `RefCell` and into `WorkerState` behind a mutex, or adopt `sharded::WorkerTimers`. The owner locks it, uncontended, for registration, update, release and its timer pass. It never holds the lock across a task poll or a waker call.
+- **Batch expiry.** The current expire loop borrows once per pop (`worker_timers::expire`). Under a mutex, the owner and rescuers instead lock once, pop with a batch pop into a reusable buffer, unlock, and then call the wakers. `local::TimerQueue` needs a batch pop; the heap and sharded queues already have `pop_expired_batch`.
+- **Rescuer.** A rescuer uses `try_lock`, pops expired entries, releases the lock and calls the wakers. Each waker makes its task runnable in its preferred worker's inbox, and `wake_idle` falls back to any idle worker, which steals the task. Keys stay in their original queue, and each slot keeps its capacity until `Release`.
+- **Remote commands (decided).** `Register`, `Update` and `Release` lock the target queue directly. They interrupt the owner only if they published an earlier deadline while it is idle. This replaces the single-consumer `SegQueue` inbox. That inbox would leave a root `Register` unacknowledged behind a stuck owner. It would also leave a waker `Update` undelivered, so a rescuer would fire the stale waker and lose the wakeup. The direct lock also removes the acknowledgement allocation for remote registration.
+- **Closure.** Closure is checked under the queue lock. A rescuer that observes closure pops every entry, as the owner does now. Shutdown waits for in-flight rescue waker calls, as it already does for timer callbacks.
 
 ### Readiness
 
-- Add a per-controller poll lock that owns the driver's `Events` buffer. The owner holds it for its whole `turn`, including an idle `epoll_pwait`/`kevent`; holding it while idle is fine because an idle worker isn't stuck. It releases the lock before returning to tasks. A rescuer `try_lock`s it, waits with a zero timeout, dispatches, clears the buffer, then unlocks. Because waits never overlap on one poller, epoll and kqueue never split one wakeup between two waiters. Concurrent `epoll_wait` on one descriptor is legal in any case.
-- **Edge semantics.** Registrations are persistent `EPOLLET` or `EV_CLEAR` with no oneshot flag, and each event publishes into the registration's shared `Direction` state (generation plus readiness bits) and wakes its listeners. Whoever collects an edge publishes it, so moving collection to a rescuer loses nothing and needs no re-arm. The rescuer must decode events exactly as the owner does, including the macOS byte count and EOF and the Linux EOF and urgent flags.
-- **Interrupts.** Linux's interrupt eventfd is level-triggered, so the rescuer must skip `clear_notification` and leave the counter for the owner. macOS's `EVFILT_USER` is `EV_CLEAR`, so a rescuer that collects it must re-trigger it (`NOTE_TRIGGER`) or set a permit that the owner checks before waiting. Otherwise a wake racing the owner's idle transition would be lost. The timerfd is armed only during the owner's locked wait and is filtered already. The `polling` compatibility backend's notification semantics under a foreign wait need checking; until they are checked, decline assistance there.
-- **Tables and reclamation.** `Mutex<Table>` still guards registration and retirement. Lock order is poll lock, then table lock. `Controller::release` (reclaim) runs only under the poll lock with an empty batch, which keeps the "retire at a batch boundary" invariant for every collector. `stop` acquires the poll lock and marks the controller retired, and rescuers check that mark under the lock.
-- **Locality.** The registration stays on the stuck worker, so each later event for that socket needs rescuing again while the worker remains stuck. Moving a registration after repeated rescues is allowed by requirement 2 and is deferred.
+**Poll lock.** Add a per-controller poll lock that owns the driver's `Events` buffer and the right to wait on the poller.
+
+- **Owner, idle wait.** It acquires the lock before the wait, holding it through an idle `epoll_pwait` or `kevent`. Holding the lock while idle is fine, because an idle worker isn't stuck.
+- **Owner, zero-timeout turns.** For the turns between batches, it uses `try_lock` and skips the turn if a rescuer holds the lock. That rescuer is already publishing the same events.
+- **Release.** The owner releases the lock before it returns to tasks.
+- **Rescuer.** A rescuer uses `try_lock`, waits with a zero timeout, dispatches, clears the buffer and unlocks.
+
+Waits on one poller never overlap. Concurrent `epoll_wait` calls on one descriptor are legal in any case.
+
+**Wakers run under the poll lock (resolution of the waker-locking question).** `DriverState::dispatch` decodes event keys as raw `Registration` pointers (on Linux and macOS). It publishes through `Direction::publish`, which calls `Notification::notify`, and that call invokes wakers inline. The notification's own mutex is released before the wakers run. Every key in the batch stays valid only because `Controller::release` runs after `events.clear()`, at the next batch boundary. If the poll lock were released before dispatch, a concurrent batch boundary could free records that are still being dispatched.
+
+So dispatch, by either the owner or a rescuer, invokes readiness wakers under the poll lock. This is chosen over adding an in-flight batch count that `release` must see as zero, for these reasons:
+
+- **The owner never blocks behind it on a hot path.** Its zero-timeout turns skip with `try_lock`, and only an idle wait blocks. By then the worker has no tasks, and the wakers being run publish tasks that idle workers will pick up.
+- **Contention is bounded** to one batch of waker calls.
+- **It needs no copying.** An in-flight count would require copying events out of the lock-owned buffer and adding an atomic to every owner turn. Its only benefit would be letting a blocked idle wait start a little earlier.
+- **It is the owner's behaviour today.** Wakers already run inside `turn` with the batch alive.
+
+**Reentrancy under the poll lock.** A waker or a dropped waker may reenter the scheduler. Every path it can take must avoid the poll lock:
+
+- **Allowed:**
+  - spawning or scheduling tasks;
+  - interrupting a worker through its driver waker (`poller.notify`, with no poll lock);
+  - registering or deregistering on the same controller (the table lock is taken after the poll lock, which matches the lock order).
+- **Must not block on the poll lock:** `Controller::stop` (see "tables and reclamation" below).
+
+Lock order: poll lock → table lock → a direction's `Notification` mutex. Only the table lock is taken on platforms without pointer tokens, where keys are looked up through the table. Waker panics are contained per waker, as `worker_timers::expire` already does, so no panic poisons the poll lock.
+
+**Edge semantics.** Registrations are persistent `EPOLLET` or `EV_CLEAR`, with no oneshot flag. Each event publishes into the registration's shared `Direction` state (generation plus readiness bits) and wakes its listeners. Whoever collects an edge publishes it, so moving collection to a rescuer loses nothing and needs no re-arm. The rescuer must decode events exactly as the owner does, including:
+
+- the macOS byte count and EOF;
+- the Linux EOF and urgent flags.
+
+**Interrupts.**
+
+- **Linux.** The interrupt eventfd is level-triggered, so the rescuer must skip `clear_notification` and leave the counter for the owner.
+- **macOS.** `EVFILT_USER` is `EV_CLEAR`, so a rescuer that collects it must re-trigger it (`NOTE_TRIGGER`) or set a permit that the owner checks before waiting. Otherwise a wake racing the owner's idle transition would be lost.
+- **Timerfd.** It is armed only during the owner's locked wait, and it is already filtered.
+
+**Tables and reclamation.** `Mutex<Table>` still guards registration and retirement.
+
+- `Controller::release` (reclamation) runs only under the poll lock and with an empty batch. This keeps the "retire at a batch boundary" invariant for every collector.
+- `Controller::stop` sets a retired mark (atomic, or under the table lock) and does not wait for the poll lock.
+- Whoever next holds the poll lock with an empty batch performs the final reclamation.
+- A rescuer that sees the mark returns `Retired` without waiting.
+
+**Locality.** The registration stays on the stuck worker. Each later event for that socket therefore needs rescuing again while the worker remains stuck. Requirement 2 allows a registration to move after repeated rescues, but that is deferred (open question 7).
 
 ### Runnable tasks
 
-On `main`, both ready generations (`ready` and `current`, through `WorkerState::stealers`) and the remote `incoming` injector are stealable while their owner polls. There is no LIFO or next-task slot (`crates/native/src/worker.rs`, `search`). `schedule` calls `wake_idle`, which wakes any idle worker if the preferred one is busy, and every worker searches all victims before parking. Runnable tasks therefore don't need rescue. Only the task that is stuck in its poll is pinned, which is unavoidable. Stage 1 should add a regression test for this. Any future LIFO slot must stay stealable or be included in rescue.
+On `main`, these queues are all stealable while their owner polls:
+
+- both ready generations, `ready` and `current`, through `WorkerState::stealers`;
+- the remote `incoming` injector.
+
+There is no LIFO or next-task slot (`crates/native/src/worker.rs`, `search`). `schedule` calls `wake_idle`, which wakes any idle worker if the preferred one is busy, and every worker searches all victims before parking. Runnable tasks therefore don't need rescue. Only the task that is stuck in its poll is pinned, which is unavoidable. Stage 2 adds a regression test for this. Any future LIFO slot must stay stealable or be included in rescue.
 
 ### Root registrations and PR #92
 
-Under rescue, round-robin placement of root and external registrations does no harm: if the chosen worker stalls, the rescuer fires its timers and drains its poller. #92's shared root queue, watcher role and hand-off are then unnecessary, and so are their per-batch cost with any root timer pending and the reduction of root capacity to a single queue. Rescue covers root sockets and stolen tasks' registrations as well as root timers, which #92 didn't.
+With rescue in place, round-robin placement of root and external registrations does no harm. If the chosen worker stalls, a rescuer fires its timers and drains its poller. That makes #92's shared root queue, watcher role and hand-off unnecessary. It also removes their per-batch cost while any root timer is pending, and #92's reduction of root capacity to a single queue. Rescue also covers root sockets and stolen tasks' registrations, which #92 doesn't. This design is therefore proposed to supersede #92.
 
-Reuse from #92: `crates/native/tests/root_timers.rs`, which fails on `main` and should pass under rescue; its scratch spawn benchmark with a root timer pending, as the cost check this design must pass; the scratch root-read repro, turned into a test; and its closure ordering analysis (check closure under the queue lock, and drain without trusting the atomic deadline once closure has been observed).
+Parts of #92 to reuse:
+
+- `crates/native/tests/root_timers.rs`, which fails on `main` and should pass under rescue;
+- its scratch spawn benchmark with a root timer pending, as a cost check this design must pass;
+- its scratch root-read reproduction, turned into a test;
+- its closure ordering analysis: check closure under the queue lock, and once closure has been observed, drain without trusting the atomic deadline.
 
 ### io_uring
 
-Under `SINGLE_ISSUER | DEFER_TASKRUN` (`bind_worker`), only the owner thread may enter the ring, and deferred completion task work runs only when the owner enters with `GETEVENTS`. In-flight operations on a stuck ring therefore can't be rescued: no other thread can reap them or submit their cancellations. Borrowed waits use ring `PollAdd`, so their readiness is stranded too. Timers and runnable tasks are still rescued, because they are executor state, and fallback operations use the shared `async-io` selector. This is a measurement decision with three options, none of which the interface may preclude:
+**Why in-flight operations can't be rescued.** Under `SINGLE_ISSUER | DEFER_TASKRUN` (`bind_worker`), only the owner thread may enter the ring. Deferred completion task work runs only when the owner enters with `GETEVENTS`. So no other thread can reap a stuck ring's in-flight operations or submit their cancellations. Borrowed waits use ring `PollAdd`, so their readiness is stranded too.
 
-1. **Accept and document it.** In-flight ring operations wait for their owner; `spawn_blocking` is the remedy. New operations from stolen tasks already follow their new worker through TLS routing.
-2. **Route new operations away from a stuck ring.** The monitor sets the stall hint, and `route_ref`'s external round robin and borrowed-wait ring selection skip rings marked stuck. This costs one load per external route. Rebinding an existing persistent monitor still needs the old ring to retire its poll, so it would stall as well. It should stay on the old ring, or be left for the owner to retire later; that needs designing.
-3. **Drop the flags.** Use cooperative or default task running without a single issuer, with SQ, CQ and in-flight state behind a per-ring lock, so a rescuer can submit and reap with `GETEVENTS`. I am unsure whether completions are posted while the owner is CPU-bound or blocked in a syscall under cooperative task running. Task work is queued to the submitting task, and without an IPI it may wait for that task's next kernel transition. Under default task running it may interrupt the owner's syscall. A spike must establish this before the option is costed.
+Timers and runnable tasks are still rescued, because they are executor state, and fallback operations use the shared `async-io` selector.
 
-What to measure:
+**Decided:**
 
-- The echo matrix for owned and borrowed I/O: 1/1/64, 1/32/64, 4/128/64 and 4/128/4096.
-- Fixed-rate latency at equal offered rates.
-- Process CPU, plus ring entries and context switches from `perf stat`, run separately.
-- For each of: the current flags; option 3 without a lock; option 3 with the lock.
-- The latency of an in-flight ring read behind a 2 s poll.
+1. Option 1 is the interim, documented in stage 2.
+2. Option 2 follows if it measures cheap.
+3. Run the spike before costing option 3.
 
-An earlier deferred-task-work screen was mixed, ranging from −1.44% to +2.48% ([single-worker research](../benchmarks/echo/single-worker-research.md)). The cost of dropping the flags may therefore be small, but that needs measuring again on the current executor.
+The interface must not preclude any of the options.
+
+**The options:**
+
+1. **Accept and document it (interim).** In-flight ring operations wait for their owner, and `spawn_blocking` is the remedy. New operations from stolen tasks already follow their new worker through TLS routing.
+2. **Route new operations away from a stuck ring.** The monitor sets the stall hint. `route_ref`'s external round robin and the ring selection for borrowed waits then skip rings marked stuck, at a cost of one load per external route. Rebinding an existing persistent monitor still needs the old ring to retire its poll, so the rebind would stall as well. Such a monitor should stay on the old ring, or be left for the owner to retire later; this needs designing.
+3. **Drop the flags.** Use task running without a single issuer, with SQ, CQ and in-flight state behind a per-ring lock, so that a rescuer can submit and reap with `GETEVENTS`.
+
+   **Kernel semantics (to be verified by the spike).** The following is from memory and unverified:
+   - Completion task work is queued to the submitting task.
+   - Under `COOP_TASKRUN` (`TWA_SIGNAL_NO_IPI`), a CPU-bound owner runs it on its next return to user mode, but an owner asleep in a syscall is not woken to run it.
+   - Default task running (`TWA_SIGNAL`) interrupts the owner's sleeping syscall.
+
+   So option 3 probably needs default task running, or else the rescuer must submit cancellations or reissue operations itself.
+
+   **A ready-made spike.** `bind_worker` already falls back to `COOP_TASKRUN | TASKRUN_FLAG` without `SINGLE_ISSUER` when deferred task running is unavailable. Movable drivers never bind at all, and keep default task running. Those two configurations are a ready-made spike.
+
+**Earlier evidence:**
+
+- A deferred-task-work screen was mixed, ranging from −1.44% to +2.48% ([single-worker research](../benchmarks/echo/single-worker-research.md)).
+- [Tokio parity](../benchmarks/echo/tokio-parity.md) measured a 10.3% regression at 4 workers and 1 connection with deferred task running. That measurement combined it with a loop ordering that was rejected, and the page says the implementation then kept cooperative task work.
+- The current `bind_worker` tries deferred task running first, so that page and the code disagree. Measure the flag sets again on the current executor before choosing.
+
+**What to measure:**
+
+- the echo matrix for owned and borrowed I/O: 1/1/64, 1/32/64, 4/128/64 and 4/128/4096;
+- fixed-rate latency at equal offered rates;
+- process CPU, plus ring entries and context switches from `perf stat`, run separately;
+- each of the above for: the current flags; cooperative task running without a single issuer; default task running; and option 3 with its lock;
+- the latency of an in-flight ring read behind a 2 s poll under each.
 
 ### Hot-path cost budget
 
-Steady-state additions, none of which should change the no-stall paths beyond noise:
+**Steady-state additions:**
 
-- A relaxed heartbeat store per loop iteration.
-- An uncontended lock and unlock in place of a `RefCell` borrow on each timer operation and timer pass.
-- A conditional atomic store when a registration publishes an earlier deadline.
-- A poll lock acquired and released around each driver turn.
-- One load on idle exit to check whether the monitor is in deep sleep.
-- Monitor wakes at 1/*P* while any worker is busy, and at most about one wake per deep-sleep entry otherwise.
-- Nothing per spawn, and nothing that depends on whether a root timer is pending. That is what distinguishes this design from #92.
+- A relaxed heartbeat store on each loop iteration.
+- An uncontended lock and unlock in place of a `RefCell` borrow for each timer operation, and one lock (not one per pop) for each timer pass.
+- A plain store of the published deadline whenever the queue head changes. For per-request timeouts this means most registrations and releases, because the queue oscillates between empty and one timer.
+- For remote timer commands, a lock on the target queue in place of an inbox push and acknowledgement allocation.
+- An uncontended poll lock taken for each driver turn, with a `try_lock` on zero-timeout turns.
+- One load on idle exit to check for monitor deep sleep, and one load per victim in the pre-park search.
+- Monitor wakes at about 1/*P* (about 1,000 per second at *P* = 1 ms) while any worker is busy, and at most about one wake per deep-sleep entry otherwise.
+- Nothing per spawn, and nothing that depends on whether a root timer is pending. This is what distinguishes the design from #92.
 
-Named workloads, each with its baseline from `main` at the same revision and build settings:
+**Budgets (decided).** Each workload is compared with its baseline from `main` at the same revision and build settings.
 
-- The timer benchmark: refresh, `sleep yield 64/4`, `reuse yield 64/4`, `expire 128/4`, cycle.
-- The worker-local timer diagnostic: 1/1/10 µs, 4/1,024/1 ms, and 4/1,024/1 ms aligned, reporting lateness p50/p99 and process CPU.
-- #92's spawn benchmark, with and without a pending root timer.
-- The echo matrix above, on readiness and io_uring.
-- Idle process CPU over 10 s with no load, and with 1 request per second.
+| Workload | Budget |
+| --- | --- |
+| Echo matrix (above), readiness and io_uring, owned and borrowed | Within noise |
+| #92's spawn benchmark, with and without a pending root timer | Within noise |
+| Idle process CPU over 10 s with no load, and at 1 request per second | Within noise |
+| Timer microbenchmarks: refresh, `sleep yield 64/4`, `reuse yield 64/4`, `expire 128/4`, cycle; worker-local timer diagnostic 1/1/10 µs, 4/1,024/1 ms and 4/1,024/1 ms aligned, with lateness p50 and p99 and process CPU | ≤ ~3% |
 
-Report rescue and false-positive counts alongside. Fixed-rate latency is reported separately from throughput and CPU, as [worker progress](worker-progress.md) requires.
+Any result over budget goes back to the maintainer with its numbers.
+
+**Additional measurements (no budget yet; report them):**
+
+- Monitor wake rate and CPU at each candidate *P* (for example 0.5, 1 and 2 ms), and which CPU it runs on. Report it alongside the workers' CPU, not hidden in process totals.
+- Fixed-rate p99 latency with every core occupied, where the monitor competes with workers.
+- A net-benefit workload with undeclared short blocking, for example tasks that occasionally poll CPU-bound for 5 ms among I/O and timer traffic. Compare p99 and throughput with rescue on and off.
+- Rescue and false-positive counts for every workload.
+
+Fixed-rate latency is reported separately from throughput and CPU, as [worker progress](worker-progress.md) requires.
+
+### Lifetimes
+
+- `Shared` holds each worker's `Arc<dyn SelectorAssist>`, obtained when the worker enters its driver.
+- The monitor holds only a `Weak<Shared>`. It upgrades that reference at the start of each pass and drops it at the end. It exits when the upgrade fails, or when it observes that scheduler closure has finished.
+- Workers that use assistants in the pre-park search are already scoped by `Shared`.
+- Safety does not depend on the monitor exiting before drivers are destroyed. An assistant stays valid after its driver stops: it observes the retired mark under the poll lock and returns `Retired`.
+- Shutdown joins the monitor after closure. This is for tidiness, so that no thread outlives the scheduler, and not for memory safety.
 
 ### Risks
 
-- **False positives:** see the threshold trade-offs.
-- **Locality loss.** Rescued tasks are stolen, and they keep paying cross-worker costs while their registrations stay on a stuck worker.
-- **Owner contention.** The owner can block briefly behind a rescuer's critical section. Keep it bounded: expired timers only, and one event batch.
-- **Waker code.** Wakers run on the monitor thread. A foreign executor's slow or panicking waker can delay rescue of other workers. Contain panics, and consider capping each rescue pass.
-- **Shutdown.** The monitor must hold only weak references and exit before drivers are destroyed. Retirement must wait for in-flight rescue passes. A rescue must never touch a stopped controller or a closed queue except to drain it.
+- **False positives.** See the threshold trade-offs. Closing workers, and workers woken remotely but not yet out of their wait, are excluded from the count.
+- **Locality loss.** Rescued tasks are stolen. They keep paying cross-worker costs while their registrations stay on a stuck worker.
+- **Owner contention.** An owner entering an idle wait can block behind one rescuer batch (readiness), or behind a rescuer's expired-timer pop (timers).
+- **Waker code on the monitor thread.** Wakers run on the monitor thread. A foreign executor's slow or panicking waker can delay rescue of other workers, and can delay an idle owner of that poller. Contain panics, and consider capping each rescue pass.
+- **The monitor's own CPU.** At about 1,000 wakes per second it is not free, and on fully loaded machines it competes with workers. It is measured explicitly.
+- **Shutdown.** See [lifetimes](#lifetimes). A rescue must never touch a stopped controller or a closed queue except to drain it.
 - **Masking.** Rescue can hide blocking that should be `spawn_blocking`. Consider a diagnostic counter or log for repeated stalls of the same worker.
 
 ## Prior art
 
-- **Go.** This is from memory of `runtime/proc.go` and `runtime/time.go`; verify the details before relying on them.
-  - Since Go 1.14, timers live in per-P heaps. A P that runs out of work and tries to steal also runs the victim P's expired timers (`stealWork` calling `checkTimers` on the victim), so timers don't wait for their owning P. That is the same idea as the timer rescue here.
-  - The network poller is process-wide rather than per-P. `sysmon`, a dedicated thread with no P, polls it without blocking if nobody has for about 10 ms.
-  - `sysmon` also retakes Ps from threads blocked in syscalls, handing the P with its queues and timers to another thread, and asks goroutines running for more than about 10 ms to be preempted.
-  - It backs off from about 20 µs to 10 ms when there is nothing to do, and sleeps deeply while all Ps are idle.
-  - Go can retake a P because the P (scheduling state) is separate from the M (thread). Native's worker state is similarly separable for queues and timers, but not for an io_uring ring under single issuer.
-- **Tokio** (multi-thread runtime). Again from memory; verify.
-  - The I/O and time drivers are shared. A worker about to park tries to take the driver and parks inside it, while other parking workers wait on a condition variable. A busy or stuck worker doesn't hold the driver, so it doesn't strand I/O or timers, at the cost of a shared driver that every worker uses.
-  - Local run queues are stealable, but I believe the LIFO slot is not, so a task in a stuck worker's LIFO slot waits for that worker.
-  - `block_in_place` hands the worker's core to another thread. That is an explicit form of Go's hand-off, comparable to declaring blocking with `spawn_blocking`.
-  - To my knowledge Tokio has no automatic stall detector.
+### Go
+
+- **Per-P timers.** Since Go 1.14, timers live in per-P heaps. A P that runs out of work and tries to steal also runs the victim P's expired timers (`stealWork` calls `checkTimers` on the victim), so timers don't wait for their owning P. This is the idea behind the pre-park check here.
+- **The network poller and sysmon.** The network poller is process-wide rather than per-P. `sysmon` is a dedicated thread with no P. If nobody has polled the network for about 10 ms, it polls without blocking.
+- **Retaking and preemption.** `sysmon` also retakes Ps from threads blocked in syscalls, handing the P with its queues and timers to another thread. It asks goroutines that have run for more than about 10 ms to be preempted.
+- **Backoff.** When there is nothing to do, `sysmon` backs off from 20 µs to 10 ms, and it sleeps deeply while all Ps are idle.
+- **Relevance to Native.** Go can retake a P because the P (scheduling state) is separate from the M (thread). Native's worker state is similarly separable for queues and timers, but not for an io_uring ring under single issuer.
+
+### Tokio (multi-thread runtime)
+
+- **Shared drivers.** The I/O and time drivers are shared. A worker about to park tries to take the driver and parks inside it, while other parking workers wait on a condition variable. A busy or stuck worker doesn't hold the driver, so it doesn't strand I/O or timers. The cost is a shared driver that every worker uses.
+- **Run queues.** Local run queues are stealable, but the LIFO slot is not, so a task in a stuck worker's LIFO slot waits for that worker.
+- **`block_in_place`.** It hands the worker's core to another thread. That is an explicit form of Go's hand-off, comparable to declaring blocking with `spawn_blocking`.
+- **No stall detection.** Tokio has no automatic stall detector.
 
 ## Staging
 
-1. **This document and the interface wording.** Make the interface wording changes (requirement 2) and record the audit. No code changes.
-2. **Timers.** Add the heartbeat, monitor and lockable timer queues with timer rescue. Bring over #92's tests. Document the io_uring exclusion (option 1). Measure against the cost budget.
-3. **Readiness.** Add the selector assist hook, the poll lock, rescue for epoll and kqueue, and handling of interrupt records. Add the root-read and stolen-task socket tests. Amend [worker progress](worker-progress.md) for rescuer-collected snapshots.
-4. **io_uring.** Measure options 2 and 3, including the spike on whether completions are posted without the owner, and choose among them.
-5. **Possibly later.** Move registrations after repeated rescues, if measurements show that locality loss matters.
+1. **This document and the interface wording.** Make the requirement 2 wording changes and record the audit and decisions. No code changes.
+2. **Timers.** This stage includes:
+   - the heartbeat and the monitor, with its deep-sleep handshake;
+   - the off switch;
+   - lockable timer queues with batch expiry;
+   - remote commands that lock the target queue directly;
+   - the published deadline;
+   - timer rescue, both from the monitor and from the pre-park check.
+
+   Bring over #92's tests and add the stolen-timer, waker-update, no-idle-worker, handshake and runnable-task tests. Document the io_uring exclusion as the interim option 1. Measure against the budgets.
+3. **Readiness.** This stage includes:
+   - the selector assist hook;
+   - the poll lock with `try_lock` on zero-timeout turns;
+   - the retired mark;
+   - epoll and kqueue rescue;
+   - interrupt-record handling;
+   - declining assistance in the `polling` compatibility backend.
+
+   Add the root-read and stolen-task socket tests, and switch `immediate_reads_observe_input_while_the_only_worker_is_busy` to the off switch. Amend [worker progress](worker-progress.md) and [immediate reads](stream-immediate-read.md) (audit items 22 and 23).
+4. **io_uring.** Measure option 2. Run the task-running spike, then cost option 3 if the spike makes it viable. Record the decision, replacing the interim.
+5. **Possibly later.** Move registrations after repeated rescues, if measurements show that locality loss matters (open question 7).
+
+## Decisions
+
+These are the maintainer's decisions, recorded here and removed from the open questions:
+
+- ***T*:** the target is 2 ms. The split between *S* and *P* is chosen by measurement, starting from about 1 ms each. It is a fixed internal default with no public knob. There is an off switch for diagnostics, benchmarks and deterministic tests.
+- **Rescuer:** a dedicated monitor thread, plus a check of victims' expired timers and stuck pollers during the pre-park steal search. The monitor also rescues when no worker is idle; this mainly helps root futures, because of `wake_idle`.
+- **Remote timer commands:** they lock the target queue directly.
+- **Regression budgets:** within noise for echo, spawn and idle CPU, and ≤ ~3% for the timer microbenchmarks. Anything over budget goes back to the maintainer with numbers.
+- **io_uring:** option 1 is the interim during the timer stage, then option 2 if it measures cheap. Run the spike before costing option 3.
 
 ## Open questions
 
-1. What should *T* default to, or *S* and *P* separately, and should it be configurable in `NativeExecutorOptions`? Can rescue be disabled?
-2. Should the rescuer be a dedicated monitor thread (recommended) or an idle worker? With a dedicated thread, should it also rescue when no worker is idle? That still helps root futures, and makes tasks runnable for the next worker to become free.
-3. Should remote timer commands lock the target queue directly, or keep the inbox with rescuers draining it?
-4. What regression budget applies to the named workloads? #92's +15% wall time and +28% CPU on spawning was judged too high, but no threshold has been agreed.
-5. Which io_uring option should be chosen, after measurement?
-6. What shape should the selector assist hook take: a provided `dyn` method or an associated type, and the names?
+6. What shape should the selector assist hook take: a provided `dyn` method or an associated type? What should it be named?
 7. Should repeated rescue trigger registration migration (stage 5)?
-8. Should rescue run on the `polling` compatibility backend, or be declined there?
+8. Should rescue run on the `polling` compatibility backend? As designed it cannot, so stage 3 declines it there. With polling 3.11.0:
+   - `Poller::wait_impl` swaps `notified` to false after every wait (`src/lib.rs`, around lines 751–765).
+   - The epoll backend clears and re-arms its notifier on every wait, including zero-timeout waits (`src/epoll.rs`, around lines 231–237).
+   - A wait that is concurrent with another returns 0 immediately (`src/lib.rs`, around lines 701–702).
+
+   So a rescuer's zero-timeout wait would consume a notification meant for the owner, and its waits would contend with the owner's. Supporting rescue would need changes to `polling`, or a separate notification channel in the compatibility driver.
