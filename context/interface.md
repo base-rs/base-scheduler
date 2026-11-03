@@ -13,7 +13,7 @@ Tables omit `&self` or `&mut self` and show each asynchronous method's awaited r
 - Owned operations retain buffers and resources until backend access retires, even when a caller drops or forgets its future. Abandonment forfeits recovery of the owner; it cannot free memory still in use.
 - Borrowed socket operations access buffers only synchronously inside a poll. A pending future leaves no independent kernel or worker access to those bytes or I/O vectors.
 - Operation futures and I/O handles are `Send`. Static dispatch and implementation-associated types do not require a boxed future or runtime-selection features. Spawned work and its owned captures are `Send + 'static`.
-- A handle retains its creating scheduler and compatible resource. Its operation methods accept no replacement scheduler. Moving between workers leaves routing and registration migration internal; the scheduler and its drivers must remain alive while operations and cleanup run.
+- A handle retains its creating scheduler and compatible resource. Its operation methods accept no replacement scheduler. Moving between workers leaves routing and registration migration internal; the scheduler and its drivers must remain alive while operations and cleanup run. No worker or thread is promised for completion, waker invocation or timer expiry: a backend may complete, wake, re-route or rescue in-flight work from any of its threads.
 
 ## Bound socket I/O
 
@@ -233,7 +233,7 @@ The selector lifecycle hooks below live in `base-scheduler-selector`, not the po
 | `SelectorWorker::close` | `(&mut worker) → ()` | Begin retirement without synchronously waiting. |
 | `SelectorWorker::turn` | `(&mut worker, Option<Duration>) → io::Result<bool>` | Publish a bounded completion batch and wait at most the timeout. Zero is nonblocking; `None` permits indefinite waiting. True means closed and drained. After waking tasks, return so the executor can poll them. |
 
-Drivers publish results and wake tasks; they never poll application futures from completion processing. The executor manages runnable tasks, stealing, worker-local timers, and the timeout passed to `turn`. io_uring uses one ring per worker; active operations stay with their original ring through retirement, while subsequent operations can follow a migrated task.
+Drivers publish results and wake tasks; they never poll application futures from completion processing. The executor manages runnable tasks, stealing, worker-local timers, and the timeout passed to `turn`. io_uring uses one ring per worker; as a backend choice rather than a portable guarantee, active operations stay with their original ring through retirement, while subsequent operations can follow a migrated task.
 
 Constructors, `block_on`, worker counts, `selector()`, concrete admission `close`, and runtime `shutdown` belong to the chosen backend, not a universal scheduler trait. Tokio's adapter borrows an application-owned runtime which must remain alive and driven. Native owns its executor and composes selectors. An application must keep execution services running while awaiting graceful cleanup.
 
