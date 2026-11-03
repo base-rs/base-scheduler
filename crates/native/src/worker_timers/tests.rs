@@ -498,7 +498,7 @@ fn expiry_passes_collect_more_than_one_batch_and_rescuers_skip_a_locked_queue() 
         assert_eq!(probe.0.load(Ordering::SeqCst), count);
         // An empty queue publishes no deadline, so later passes return without reading the clock.
         assert_eq!(
-            shared.workers[0].deadline.load(Ordering::Relaxed),
+            shared.workers[0].timers.deadline.load(Ordering::Relaxed),
             NO_DEADLINE
         );
         assert_eq!(expire(shared, 0, &mut buffer(), true), 0);

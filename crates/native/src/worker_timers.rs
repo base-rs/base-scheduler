@@ -40,36 +40,32 @@ pub(crate) fn buffer() -> Vec<Waker> {
 }
 
 // Clock nanoseconds since the scheduler's epoch. Earlier instants are already due; distant ones clamp below `NO_DEADLINE`.
-fn nanos(shared: &Shared, instant: Instant) -> u64 {
+fn nanos(worker: &WorkerState, instant: Instant) -> u64 {
     instant
-        .saturating_duration_since(shared.epoch)
+        .saturating_duration_since(worker.timers.epoch)
         .as_nanos()
         .min(u128::from(NO_DEADLINE - 1)) as u64
 }
 
 // Nothing panics while a queue is locked: wakers are invoked and dropped only after unlocking.
 fn lock(worker: &WorkerState) -> MutexGuard<'_, TimerQueue<Waker>> {
-    worker.timers.lock().unwrap()
+    worker.timers.queue.lock().unwrap()
 }
 
 // The published deadline is a lower bound of the queue's earliest live deadline. Registration lowers it under the queue lock, and every pass that flushes the queue refreshes it exactly. Release leaves it early, which can only cause a redundant check.
-fn lower(shared: &Shared, worker: &WorkerState, deadline: Instant) -> bool {
-    let deadline = nanos(shared, deadline);
-    let lowered = deadline < worker.deadline.load(Ordering::Relaxed);
+fn lower(worker: &WorkerState, deadline: Instant) -> bool {
+    let deadline = nanos(worker, deadline);
+    let lowered = deadline < worker.timers.deadline.load(Ordering::Relaxed);
     if lowered {
-        worker.deadline.store(deadline, Ordering::Relaxed);
+        worker.timers.deadline.store(deadline, Ordering::Relaxed);
     }
     lowered
 }
 
-fn refresh(
-    shared: &Shared,
-    worker: &WorkerState,
-    queue: &mut TimerQueue<Waker>,
-) -> Option<Instant> {
+fn refresh(worker: &WorkerState, queue: &mut TimerQueue<Waker>) -> Option<Instant> {
     let next = queue.next_deadline();
-    worker.deadline.store(
-        next.map_or(NO_DEADLINE, |deadline| nanos(shared, deadline)),
+    worker.timers.deadline.store(
+        next.map_or(NO_DEADLINE, |deadline| nanos(worker, deadline)),
         Ordering::Relaxed,
     );
     next
@@ -77,12 +73,12 @@ fn refresh(
 
 // The current time if the published deadline has passed. Reading it needs no lock: a stale value delays collection only until the next pass, and an idle owner computes its wait under the lock.
 fn due(shared: &Shared, worker: &WorkerState) -> Option<Instant> {
-    let deadline = worker.deadline.load(Ordering::Relaxed);
+    let deadline = worker.timers.deadline.load(Ordering::Relaxed);
     if deadline == NO_DEADLINE {
         return None;
     }
     let now = now(shared);
-    (deadline <= nanos(shared, now)).then_some(now)
+    (deadline <= nanos(worker, now)).then_some(now)
 }
 
 /// A key in one worker's queue. Keys never migrate; updates and release lock that queue from whichever thread holds the registration.
@@ -121,13 +117,13 @@ pub(crate) fn register(
     let worker = &shared.workers[owner];
     let mut queue = lock(worker);
     // A worker drains its queue under this lock after observing closure, so either that drain removes this registration or this check rejects it.
-    if shared.is_closed() {
+    if worker.timers.closed.load(Ordering::Relaxed) {
         drop(queue);
         crate::panic::discard(waker);
         return Err(closed());
     }
     let result = queue.try_schedule(deadline, waker);
-    let lowered = result.is_ok() && lower(shared, worker, deadline);
+    let lowered = result.is_ok() && lower(worker, deadline);
     drop(queue);
     let key = result.map_err(|waker| {
         crate::panic::discard(waker);
@@ -172,7 +168,7 @@ pub(crate) fn expire(
     let mut fired = 0;
     loop {
         // Once closure is observed, drain without trusting the published deadline.
-        let now = if shared.is_closed() {
+        let now = if worker.timers.closed.load(Ordering::Relaxed) {
             None
         } else {
             let Some(now) = due(shared, worker) else {
@@ -181,7 +177,7 @@ pub(crate) fn expire(
             Some(now)
         };
         let mut queue = if rescue {
-            let Ok(queue) = worker.timers.try_lock() else {
+            let Ok(queue) = worker.timers.queue.try_lock() else {
                 return fired;
             };
             queue
@@ -196,7 +192,7 @@ pub(crate) fn expire(
                 expired.push(waker);
             }
         }
-        refresh(shared, worker, &mut queue);
+        refresh(worker, &mut queue);
         drop(queue);
         let full = expired.len() == expired.capacity();
         fired += expired.len();
@@ -209,10 +205,17 @@ pub(crate) fn expire(
     }
 }
 
+/// Reject later registrations on `owner`'s queue. Closure calls this for every queue before it publishes scheduler closure.
+pub(crate) fn close(shared: &Shared, owner: usize) {
+    let worker = &shared.workers[owner];
+    let _queue = lock(worker);
+    worker.timers.closed.store(true, Ordering::Relaxed);
+}
+
 /// The owner's wait bound, computed under its queue lock after advertising sleep.
 pub(crate) fn timeout(shared: &Arc<Shared>, owner: usize) -> Option<Duration> {
     let worker = &shared.workers[owner];
-    let next = refresh(shared, worker, &mut lock(worker));
+    let next = refresh(worker, &mut lock(worker));
     next.map(|deadline| deadline.saturating_duration_since(now(shared)))
 }
 

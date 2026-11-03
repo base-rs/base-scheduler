@@ -81,7 +81,11 @@ fn remote_wake_retains_the_unpark_token_and_interrupts_the_driver_once() {
 
 fn worker_state() -> WorkerState {
     let queues: [Worker<Runnable>; 2] = std::array::from_fn(|_| Worker::new_fifo());
-    WorkerState::new(queues.each_ref().map(Worker::stealer), 8)
+    WorkerState::new(
+        queues.each_ref().map(Worker::stealer),
+        8,
+        std::time::Instant::now(),
+    )
 }
 
 fn runnable() -> Runnable {

@@ -40,8 +40,6 @@ impl<T> std::ops::Deref for CachePadded<T> {
 pub(crate) struct Shared {
     // Serialize registration with closure and distribute new tasks using a round-robin worker cursor. Task ownership itself needs only a count.
     admission: Mutex<usize>,
-    // The origin of published timer deadlines.
-    pub(crate) epoch: std::time::Instant,
     pub(crate) timer_next: AtomicUsize,
     // Whether stalled workers' timers are rescued; `NativeExecutorOptions::stall_rescue`.
     pub(crate) rescue: bool,
@@ -111,9 +109,9 @@ impl Shared {
         timer_capacity: usize,
         rescue: bool,
     ) -> Self {
+        let epoch = std::time::Instant::now();
         Self {
             admission: Mutex::new(0),
-            epoch: std::time::Instant::now(),
             timer_next: AtomicUsize::new(0),
             rescue,
             monitor: crate::monitor::Monitor::default(),
@@ -123,7 +121,11 @@ impl Shared {
             workers: queues
                 .iter()
                 .map(|queues| {
-                    WorkerState::new(queues.each_ref().map(Worker::stealer), timer_capacity)
+                    WorkerState::new(
+                        queues.each_ref().map(Worker::stealer),
+                        timer_capacity,
+                        epoch,
+                    )
                 })
                 .collect(),
             closed: AtomicBool::new(false),
@@ -271,6 +273,10 @@ impl TaskService {
         Ok(NativeTask(task))
     }
     pub(crate) fn close(&self) {
+        // Close every timer queue first, so that anyone observing scheduler closure also observes its queues closed.
+        for owner in 0..self.shared.workers.len() {
+            crate::worker_timers::close(&self.shared, owner);
+        }
         {
             let _admission = self.shared.admission.lock().unwrap();
             self.shared.closed.store(true, Ordering::Release);

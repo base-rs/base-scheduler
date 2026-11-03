@@ -28,14 +28,24 @@ pub(crate) struct Heartbeat {
     pub(crate) polls: AtomicUsize,
 }
 
-// Keep each worker's flags and published deadline off its neighbours' cache lines.
+/// A worker's timer queue and its published deadline. The owner mutates the queue on every timer operation, so it has its own cache lines, apart from the flags and queues that other workers read and write.
+#[repr(align(128))]
+pub(crate) struct Timers {
+    // Locked by the owner for its own timer operations and passes, and directly by other threads for registration, update and release. Never held across a waker call or a task poll.
+    pub(crate) queue: Mutex<base_scheduler_timers::local::TimerQueue<Waker>>,
+    // A lower bound of the earliest live deadline in `queue`, in clock nanoseconds since `epoch`. Written only under the queue lock.
+    pub(crate) deadline: AtomicU64,
+    // The scheduler's construction time, copied here so that timer operations read only this worker's lines.
+    pub(crate) epoch: std::time::Instant,
+    // Set under the queue lock by closure, before the scheduler publishes it, so registrations need not read shared scheduler state.
+    pub(crate) closed: AtomicBool,
+}
+
+// Keep each worker's flags off its neighbours' cache lines.
 #[repr(align(128))]
 pub(crate) struct WorkerState {
     pub(crate) incoming: Injector<Runnable>,
-    // Locked by the owner for its own timer operations and passes, and directly by other threads for registration, update and release. Never held across a waker call or a task poll.
-    pub(crate) timers: Mutex<base_scheduler_timers::local::TimerQueue<Waker>>,
-    // A lower bound of the earliest live deadline in `timers`, in clock nanoseconds since the scheduler's epoch. Written only under the queue lock.
-    pub(crate) deadline: AtomicU64,
+    pub(crate) timers: Timers,
     pub(crate) heartbeat: Heartbeat,
     // Set by the stall monitor while this worker's heartbeat is stalled: 0, or 1 + `Stuck`.
     stuck: AtomicU8,
@@ -46,13 +56,21 @@ pub(crate) struct WorkerState {
 }
 
 impl WorkerState {
-    pub(crate) fn new(stealers: [Stealer<Runnable>; 2], timer_capacity: usize) -> Self {
+    pub(crate) fn new(
+        stealers: [Stealer<Runnable>; 2],
+        timer_capacity: usize,
+        epoch: std::time::Instant,
+    ) -> Self {
         Self {
             incoming: Injector::new(),
-            timers: Mutex::new(base_scheduler_timers::local::TimerQueue::with_capacity(
-                timer_capacity,
-            )),
-            deadline: AtomicU64::new(crate::worker_timers::NO_DEADLINE),
+            timers: Timers {
+                queue: Mutex::new(base_scheduler_timers::local::TimerQueue::with_capacity(
+                    timer_capacity,
+                )),
+                deadline: AtomicU64::new(crate::worker_timers::NO_DEADLINE),
+                epoch,
+                closed: AtomicBool::new(false),
+            },
             heartbeat: Heartbeat::default(),
             stuck: AtomicU8::new(0),
             stealers,
