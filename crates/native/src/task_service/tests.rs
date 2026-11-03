@@ -639,3 +639,13 @@ fn independently_driven_selectors_also_report_worker_startup_failures() {
         thread::FAIL_AFTER.set(None);
     }
 }
+
+#[test]
+fn a_monitor_outliving_its_scheduler_retires_nothing() {
+    let queues = [std::array::from_fn(|_| Worker::new_fifo())];
+    let shared = Arc::new(Shared::new(&queues, 8, true));
+    let registration = super::MonitorRegistration::new(&shared);
+    assert_eq!(shared.workers_remaining.load(Ordering::Acquire), 1);
+    drop(shared);
+    drop(registration);
+}

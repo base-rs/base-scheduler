@@ -77,6 +77,8 @@ fn root_sleeps_fire_while_a_worker_is_blocked() {
         })
         .unwrap();
         let (release, tasks) = occupy(&scheduler, busy);
+        #[cfg(feature = "diagnostics")]
+        assert_eq!(scheduler.rescue_statistics().timers, 0);
         let never = Cancellation::never();
         // Several sleeps cover every worker a registration could have selected.
         for index in 0..workers * 2 {
@@ -90,6 +92,13 @@ fn root_sleeps_fire_while_a_worker_is_blocked() {
             block_on(scheduler.timer_wait_until(&mut timer, Instant::now() + DELAY, &never))
                 .unwrap();
             assert_prompt(&format!("root timer {index}"), start.elapsed());
+        }
+        // Some registrations landed on a blocked worker and were rescued while it was inside one poll.
+        #[cfg(feature = "diagnostics")]
+        {
+            let statistics = scheduler.rescue_statistics();
+            assert!(statistics.timers > 0, "{statistics:?}");
+            assert!(statistics.stuck_polls > 0, "{statistics:?}");
         }
         drop(release);
         for task in tasks {

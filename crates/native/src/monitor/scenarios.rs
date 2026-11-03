@@ -71,7 +71,8 @@ where
     F: Future + Send + 'static,
     F::Output: Send + 'static,
 {
-    for _ in 0..10_000 {
+    // Idle workers take spawned tasks promptly; the test watchdog bounds this search.
+    loop {
         let shared = Arc::clone(&scheduler.tasks.shared);
         let (started, start) = mpsc::channel();
         let future = body();
@@ -87,7 +88,6 @@ where
         }
         assert!(block_on(task).unwrap().is_none());
     }
-    panic!("no task started on worker {target}");
 }
 
 // A task that reports its waker and the worker it ran on, waits for one wake, then records when and where it resumed.
@@ -181,9 +181,9 @@ fn a_timer_left_on_a_worker_that_blocks_fires_for_its_new_waiter() {
                             .is_pending()
                     );
                     let registered = Instant::now();
-                    if let Some(send) = send.lock().unwrap().take() {
-                        assert!(send.send((registered, wait)).is_ok());
-                    }
+                    // Only the copy that starts on worker 0 runs this body.
+                    let send = send.lock().unwrap().take().unwrap();
+                    assert!(send.send((registered, wait)).is_ok());
                     block(&released);
                 }
             });
