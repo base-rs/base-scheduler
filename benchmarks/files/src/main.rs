@@ -98,6 +98,7 @@ fn execute(args: &[String]) -> serde_json::Value {
                     base_scheduler_native::NativeExecutorOptions {
                         workers,
                         timer_capacity: tasks.max(1024),
+                        ..Default::default()
                     },
                 )
                 .unwrap(),

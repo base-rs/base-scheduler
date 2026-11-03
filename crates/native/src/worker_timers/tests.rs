@@ -5,20 +5,14 @@ use super::*;
 use crate::{NativeOptions, NativeScheduler, test_support};
 use base_scheduler::Spawn;
 use base_scheduler_conformance::ClockFixture;
+use futures_channel::oneshot;
 use futures_lite::future::{block_on, poll_once};
-use std::{
-    sync::mpsc,
-    task::{Context, Wake},
-};
+use std::task::{Context, Wake};
 
+// Collect expired timers from the calling thread, then count what remains.
 fn inspect(shared: &Arc<Shared>, owner: usize) -> usize {
-    if worker::timers(shared, Some(owner), |_, _| ()).is_some() {
-        turn(shared, owner);
-        return worker::timers(shared, Some(owner), |_, timers| timers.len()).unwrap();
-    }
-    let (reply, receive) = mpsc::channel();
-    shared.send_timer(owner, Command::Inspect(reply));
-    receive.recv_timeout(Duration::from_secs(5)).unwrap()
+    expire(shared, owner, &mut buffer(), false);
+    len(shared, owner)
 }
 
 impl ClockFixture for NativeScheduler {
@@ -184,7 +178,7 @@ fn full_capacity_reclaims_cancelled_timers_and_shutdown_rejects_waits() {
 }
 
 #[test]
-fn dropping_unacknowledged_registration_releases_its_slot() {
+fn external_registration_and_release_reach_a_blocked_owner_immediately() {
     test_support::run(|| {
         let scheduler = test_support::scheduler();
         let (gate, started, release) = test_support::Gate::new();
@@ -197,10 +191,12 @@ fn dropping_unacknowledged_registration_releases_its_slot() {
         let never = Cancellation::never();
         let mut sleep = Box::pin(scheduler.sleep(Duration::from_secs(3600), &never));
         assert!(block_on(poll_once(&mut sleep)).is_none());
+        // The owner is still blocked, so neither change can have passed through it.
+        assert_eq!(len(&scheduler.tasks.shared, 0), 1);
         drop(sleep);
+        assert_eq!(len(&scheduler.tasks.shared, 0), 0);
         drop(release);
         block_on(task).unwrap();
-        assert_eq!(scheduler.registrations(), 0);
         block_on(scheduler.shutdown());
     });
 }
@@ -214,9 +210,9 @@ impl Wake for Probe {
 }
 
 #[test]
-fn pending_registration_notifies_replacement_waker() {
+fn external_update_installs_the_replacement_waker_while_the_owner_is_blocked() {
     test_support::run(|| {
-        let scheduler = test_support::scheduler();
+        let scheduler = test_support::scheduler_with_rescue(false);
         let (gate, started, release) = test_support::Gate::new();
         let task = scheduler
             .spawn(async move {
@@ -225,7 +221,7 @@ fn pending_registration_notifies_replacement_waker() {
             .unwrap();
         started.recv_timeout(Duration::from_secs(5)).unwrap();
         let never = Cancellation::never();
-        let mut sleep = Box::pin(scheduler.sleep(Duration::from_secs(3600), &never));
+        let mut sleep = Box::pin(scheduler.sleep(Duration::from_millis(20), &never));
         assert!(
             sleep
                 .as_mut()
@@ -240,19 +236,13 @@ fn pending_registration_notifies_replacement_waker() {
                 .poll(&mut Context::from_waker(&waker))
                 .is_pending()
         );
+        std::thread::sleep(Duration::from_millis(30));
+        // Expiry on any thread observes the update, although the owner never ran.
+        assert_eq!(expire(&scheduler.tasks.shared, 0, &mut buffer(), true), 1);
+        assert_eq!(probe.0.load(Ordering::SeqCst), 1);
         drop(release);
         block_on(task).unwrap();
-        assert_eq!(scheduler.registrations(), 1);
-        assert!(probe.0.load(Ordering::SeqCst) > 0);
-        // Consume acknowledgment and install the replacement on the actual timer.
-        assert!(
-            sleep
-                .as_mut()
-                .poll(&mut Context::from_waker(&waker))
-                .is_pending()
-        );
-        drop(sleep);
-        assert_eq!(scheduler.registrations(), 0);
+        block_on(sleep).unwrap();
         block_on(scheduler.shutdown());
     });
 }
@@ -274,7 +264,7 @@ fn moving_a_sleep_to_another_worker_updates_and_releases_its_original_queue() {
         let owned = Arc::clone(&scheduler);
         let first = scheduler
             .spawn(async move {
-                let owner = worker::timers(&owned.tasks.shared, None, |owner, _| owner).unwrap();
+                let owner = worker::current(&owned.tasks.shared).unwrap();
                 let mut sleep =
                     Box::pin(async move { owned.sleep(Duration::from_secs(3600), &token).await });
                 assert!(
@@ -293,7 +283,7 @@ fn moving_a_sleep_to_another_worker_updates_and_releases_its_original_queue() {
         let owned = Arc::clone(&scheduler);
         let second = scheduler
             .spawn(async move {
-                let current = worker::timers(&owned.tasks.shared, None, |owner, _| owner).unwrap();
+                let current = worker::current(&owned.tasks.shared).unwrap();
                 assert_ne!(current, owner);
                 let probe = Waker::from(Arc::new(Probe::default()));
                 assert!(
@@ -307,7 +297,8 @@ fn moving_a_sleep_to_another_worker_updates_and_releases_its_original_queue() {
                     sleep.await,
                     Err(base_scheduler::OperationError::Cancelled(_))
                 ));
-                assert!(!owned.tasks.shared.workers[owner].timers.is_empty());
+                // Cancellation released the key in the original queue while its owner is still blocked.
+                assert_eq!(len(&owned.tasks.shared, owner), 0);
             })
             .unwrap();
         block_on(second).unwrap();
@@ -399,7 +390,8 @@ fn local_capacity_and_delayed_updates_obey_registration_ownership() {
                 let shared = &owned.tasks.shared;
                 let never = Cancellation::never();
                 let deadline = owned.now() + Duration::from_secs(3600);
-                let capacity = worker::timers(shared, None, |_, timers| timers.capacity()).unwrap();
+                let owner = worker::current(shared).unwrap();
+                let capacity = lock(&shared.workers[owner]).capacity();
                 let mut waits: Vec<_> = (0..capacity)
                     .map(|_| Box::pin(owned.sleep_until(deadline, &never)))
                     .collect();
@@ -416,32 +408,13 @@ fn local_capacity_and_delayed_updates_obey_registration_ownership() {
                 );
                 drop(waits);
                 // A migrated update can arrive after expiry but before the waiter releases its key.
-                let (owner, key) = worker::timers(shared, None, |owner, timers| {
-                    (
-                        owner,
-                        timers
-                            .try_schedule(owned.now(), Waker::noop().clone())
-                            .unwrap(),
-                    )
-                })
-                .unwrap();
-                let registration = registered(shared, owner, Ok(key)).unwrap();
-                expire(shared, owner);
+                let registration = register(shared, owned.now(), Waker::noop().clone()).unwrap();
+                assert_eq!(expire(shared, owner, &mut buffer(), false), 1);
                 let probe = Arc::new(Probe::default());
-                dispatch(
-                    shared,
-                    owner,
-                    Command::Update(key, Waker::from(Arc::clone(&probe))),
-                );
+                registration.update(Waker::from(Arc::clone(&probe)));
                 assert_eq!(probe.0.load(Ordering::SeqCst), 1);
                 drop(registration);
                 assert_eq!(owned.registrations(), 0);
-                // An inbox command published just before idle must prevent an indefinite wait.
-                let (reply, receive) = mpsc::channel();
-                shared.send_timer(owner, Command::Inspect(reply));
-                assert_eq!(timeout(shared, owner), Some(Duration::ZERO));
-                turn(shared, owner);
-                assert_eq!(receive.recv().unwrap(), 0);
             })
             .unwrap();
         block_on(task).unwrap();
@@ -450,29 +423,50 @@ fn local_capacity_and_delayed_updates_obey_registration_ownership() {
 }
 
 #[test]
-fn closure_rejects_queued_registrations_and_notifies_late_updates() {
+fn closure_rejects_registrations_and_notifies_late_updates() {
     test_support::run(|| {
         let scheduler = Arc::new(test_support::scheduler());
-        let owned = Arc::clone(&scheduler);
-        let registration = block_on(
-            scheduler
-                .spawn(async move {
-                    let (owner, result) =
-                        worker::timers(&owned.tasks.shared, None, |owner, timers| {
-                            (
-                                owner,
-                                timers.try_schedule(
-                                    owned.now() + Duration::from_secs(3600),
-                                    Waker::noop().clone(),
-                                ),
-                            )
-                        })
-                        .unwrap();
-                    registered(&owned.tasks.shared, owner, result).unwrap()
-                })
-                .unwrap(),
+        let shared = &scheduler.tasks.shared;
+        let registration = register(
+            shared,
+            scheduler.now() + Duration::from_secs(3600),
+            Waker::noop().clone(),
         )
         .unwrap();
+        scheduler.close();
+        assert_eq!(
+            register(
+                shared,
+                scheduler.now() + Duration::from_secs(3600),
+                Waker::noop().clone()
+            )
+            .err()
+            .unwrap()
+            .kind(),
+            io::ErrorKind::BrokenPipe
+        );
+        block_on(scheduler.shutdown());
+        let probe = Arc::new(Probe::default());
+        registration.update(Waker::from(Arc::clone(&probe)));
+        assert_eq!(probe.0.load(Ordering::SeqCst), 1);
+        drop(registration);
+        assert_eq!(scheduler.registrations(), 0);
+        // The registration helper handles closure between the public precheck and the queue lock.
+        assert_eq!(
+            block_on(wait(shared, scheduler.now() + Duration::from_secs(1)))
+                .unwrap_err()
+                .kind(),
+            io::ErrorKind::BrokenPipe
+        );
+    });
+}
+
+#[test]
+fn expiry_passes_collect_more_than_one_batch_and_rescuers_skip_a_locked_queue() {
+    test_support::run(|| {
+        let scheduler = test_support::scheduler_with_rescue(false);
+        let shared = &scheduler.tasks.shared;
+        // Hold the only worker, so that only this thread collects expired timers.
         let (gate, started, release) = test_support::Gate::new();
         let task = scheduler
             .spawn(async move {
@@ -480,42 +474,46 @@ fn closure_rejects_queued_registrations_and_notifies_late_updates() {
             })
             .unwrap();
         started.recv_timeout(Duration::from_secs(5)).unwrap();
-        let (reply, receive) = oneshot::channel();
-        scheduler.tasks.shared.send_timer(
-            0,
-            Command::Register {
-                deadline: scheduler.now() + Duration::from_secs(3600),
-                waker: Waker::noop().clone(),
-                reply,
-            },
+        let probe = Arc::new(Probe::default());
+        let waker = Waker::from(Arc::clone(&probe));
+        let count = BATCH * 2 + 1;
+        // Every deadline precedes the epoch and publishes as zero, so only the first registration lowers it.
+        let base = scheduler.now();
+        let registrations: Vec<_> = (0..count)
+            .rev()
+            .map(|index| {
+                register(
+                    shared,
+                    base - Duration::from_secs(10) + Duration::from_millis(index as u64),
+                    waker.clone(),
+                )
+                .unwrap()
+            })
+            .collect();
+        {
+            let _held = lock(&shared.workers[0]);
+            assert_eq!(expire(shared, 0, &mut buffer(), true), 0);
+        }
+        assert_eq!(expire(shared, 0, &mut buffer(), true), count);
+        assert_eq!(probe.0.load(Ordering::SeqCst), count);
+        // An empty queue publishes no deadline, so later passes return without reading the clock.
+        assert_eq!(
+            shared.workers[0].deadline.load(Ordering::Relaxed),
+            NO_DEADLINE
         );
+        assert_eq!(expire(shared, 0, &mut buffer(), true), 0);
+        drop(registrations);
+        let distant: Vec<_> = (0..count)
+            .map(|_| register(shared, base + Duration::from_secs(3600), waker.clone()).unwrap())
+            .collect();
+        assert_eq!(expire(shared, 0, &mut buffer(), true), 0);
         scheduler.close();
         drop(release);
         block_on(task).unwrap();
-        assert_eq!(
-            block_on(receive).unwrap().err().unwrap().kind(),
-            io::ErrorKind::BrokenPipe
-        );
         block_on(scheduler.shutdown());
-        let probe = Arc::new(Probe::default());
-        dispatch(
-            &scheduler.tasks.shared,
-            registration.owner,
-            Command::Update(registration.key, Waker::from(Arc::clone(&probe))),
-        );
-        assert_eq!(probe.0.load(Ordering::SeqCst), 1);
-        drop(registration);
-        assert_eq!(scheduler.registrations(), 0);
-        // Registration helper handles closure between the public precheck and admission.
-        assert_eq!(
-            block_on(wait(
-                &scheduler.tasks.shared,
-                scheduler.now() + Duration::from_secs(1)
-            ))
-            .unwrap_err()
-            .kind(),
-            io::ErrorKind::BrokenPipe
-        );
+        assert_eq!(len(shared, 0), 0);
+        assert_eq!(probe.0.load(Ordering::SeqCst), count * 2);
+        drop(distant);
     });
 }
 

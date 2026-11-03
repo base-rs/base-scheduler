@@ -1,7 +1,10 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use super::{WorkerState, finish_idle_search, search_result, take_stolen, yield_on_retry};
+use super::{
+    Stuck, WorkerState, finish_idle_search, retry_after_rescue, search_result, take_stolen,
+    yield_on_retry,
+};
 use crate::task_service::{Runnable, TaskState};
 use crossbeam_deque::{Steal, Worker};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -78,7 +81,7 @@ fn remote_wake_retains_the_unpark_token_and_interrupts_the_driver_once() {
 
 fn worker_state() -> WorkerState {
     let queues: [Worker<Runnable>; 2] = std::array::from_fn(|_| Worker::new_fifo());
-    WorkerState::new(queues.each_ref().map(Worker::stealer))
+    WorkerState::new(queues.each_ref().map(Worker::stealer), 8)
 }
 
 fn runnable() -> Runnable {
@@ -204,7 +207,7 @@ fn batch_search_admits_incoming_tasks_before_local_work() {
     use futures_lite::future::block_on;
     use std::sync::Arc;
     let queues = std::array::from_fn(|_| Worker::new_fifo());
-    let shared = Arc::new(Shared::new(std::slice::from_ref(&queues), 8));
+    let shared = Arc::new(Shared::new(std::slice::from_ref(&queues), 8, false));
     let service = TaskService {
         shared: Arc::clone(&shared),
     };
@@ -214,7 +217,6 @@ fn batch_search_admits_incoming_tasks_before_local_work() {
         scheduler: Arc::downgrade(&shared),
         ready,
         current,
-        timers: base_scheduler_timers::local::TimerQueue::with_capacity(8),
     };
     let task = service.spawn(async {}).unwrap();
     search(&shared, &local, 1).success().unwrap().run();
@@ -240,7 +242,7 @@ fn nested_admission_distributes_tasks_instead_of_inheriting_the_worker() {
     let mut queues = (0..3)
         .map(|_| std::array::from_fn(|_| Worker::new_fifo()))
         .collect::<Vec<_>>();
-    let shared = Arc::new(Shared::new(&queues, 8));
+    let shared = Arc::new(Shared::new(&queues, 8, false));
     let service = TaskService {
         shared: Arc::clone(&shared),
     };
@@ -252,7 +254,6 @@ fn nested_admission_distributes_tasks_instead_of_inheriting_the_worker() {
             scheduler: Arc::downgrade(&shared),
             ready,
             current,
-            timers: base_scheduler_timers::local::TimerQueue::with_capacity(8),
         }));
     });
     let context = WorkerContext;
@@ -292,7 +293,7 @@ fn idle_worker_steals_remote_wakes_when_preferred_worker_is_busy() {
     let mut queues: Vec<[Worker<Runnable>; 2]> = (0..2)
         .map(|_| std::array::from_fn(|_| Worker::new_fifo()))
         .collect();
-    let shared = Arc::new(Shared::new(&queues, 8));
+    let shared = Arc::new(Shared::new(&queues, 8, false));
     let service = TaskService {
         shared: Arc::clone(&shared),
     };
@@ -302,7 +303,6 @@ fn idle_worker_steals_remote_wakes_when_preferred_worker_is_busy() {
         scheduler: Arc::downgrade(&shared),
         ready,
         current,
-        timers: base_scheduler_timers::local::TimerQueue::with_capacity(8),
     };
     let first = service.spawn(async {}).unwrap();
     shared.workers[0].incoming.steal().success().unwrap().run();
@@ -325,7 +325,7 @@ fn idle_worker_can_steal_both_ready_generations() {
     let mut queues: Vec<[Worker<Runnable>; 2]> = (0..2)
         .map(|_| std::array::from_fn(|_| Worker::new_fifo()))
         .collect();
-    let shared = Arc::new(Shared::new(&queues, 8));
+    let shared = Arc::new(Shared::new(&queues, 8, false));
     let service = TaskService {
         shared: Arc::clone(&shared),
     };
@@ -335,7 +335,6 @@ fn idle_worker_can_steal_both_ready_generations() {
         scheduler: Arc::downgrade(&shared),
         ready,
         current,
-        timers: base_scheduler_timers::local::TimerQueue::with_capacity(8),
     };
     for queue in &queues[0] {
         let first = service.spawn(async {}).unwrap();
@@ -375,7 +374,7 @@ fn quiescent_publication(after_recheck: bool) {
     let mut queues = (0..2)
         .map(|_| std::array::from_fn(|_| Worker::new_fifo()))
         .collect::<Vec<_>>();
-    let shared = Arc::new(Shared::new(&queues, 8));
+    let shared = Arc::new(Shared::new(&queues, 8, false));
     let service = TaskService {
         shared: Arc::clone(&shared),
     };
@@ -391,7 +390,6 @@ fn quiescent_publication(after_recheck: bool) {
         scheduler: Arc::downgrade(&shared),
         ready,
         current,
-        timers: base_scheduler_timers::local::TimerQueue::with_capacity(8),
     };
     let published = Arc::new(AtomicBool::new(false));
     let (searching, searched) = mpsc::channel();
@@ -461,7 +459,7 @@ fn quiescent_publication(after_recheck: bool) {
 fn idle_wake_falls_back_when_the_preferred_worker_is_busy() {
     use crate::task_service::Shared;
     let queues = std::array::from_fn::<_, 2, _>(|_| std::array::from_fn(|_| Worker::new_fifo()));
-    let shared = Shared::new(&queues, 8);
+    let shared = Shared::new(&queues, 8, false);
     let idle = &shared.workers[1];
     idle.thread.set(std::thread::current()).unwrap();
     idle.sleeping.store(true, Ordering::SeqCst);
@@ -485,7 +483,7 @@ fn idle_wake_falls_back_when_the_preferred_worker_is_busy() {
 fn idle_wake_prefers_the_requested_sleeping_worker() {
     use crate::task_service::Shared;
     let queues = std::array::from_fn::<_, 2, _>(|_| std::array::from_fn(|_| Worker::new_fifo()));
-    let shared = Shared::new(&queues, 8);
+    let shared = Shared::new(&queues, 8, false);
     for worker in &shared.workers {
         worker.thread.set(std::thread::current()).unwrap();
         worker.sleeping.store(true, Ordering::SeqCst);
@@ -502,4 +500,69 @@ fn idle_wake_prefers_the_requested_sleeping_worker() {
 #[test]
 fn a_nonblocking_turn_without_a_driver_does_not_park() {
     super::drive(&mut None, Some(std::time::Duration::ZERO));
+}
+
+#[test]
+fn a_rescue_turns_an_empty_idle_search_into_a_retry() {
+    assert!(matches!(
+        retry_after_rescue(true, Steal::Empty),
+        Steal::Retry
+    ));
+    assert!(matches!(
+        retry_after_rescue(false, Steal::Empty),
+        Steal::Empty
+    ));
+    assert!(retry_after_rescue(true, Steal::Success(runnable())).is_success());
+}
+
+#[test]
+fn wakes_skip_a_stuck_preferred_worker() {
+    use super::{CURRENT_WORKER, LocalWorker, schedule, unstuck};
+    use crate::task_service::Shared;
+    use std::sync::Arc;
+
+    let mut queues = (0..3)
+        .map(|_| std::array::from_fn(|_| Worker::new_fifo()))
+        .collect::<Vec<_>>();
+    let shared = Arc::new(Shared::new(&queues, 8, true));
+    let preferring = |worker: usize| {
+        let runnable = runnable();
+        runnable.metadata().worker.store(worker, Ordering::Relaxed);
+        runnable
+    };
+
+    // A remote wake goes to the next worker that is not stuck, or stays put if every worker is.
+    shared.workers[1].set_stuck(Some(Stuck::Poll));
+    assert_eq!(unstuck(&shared, 1), 2);
+    schedule(&shared, preferring(1));
+    assert!(shared.workers[1].incoming.is_empty());
+    assert_eq!(shared.workers[2].incoming.len(), 1);
+    shared.workers[2].set_stuck(Some(Stuck::Batch));
+    assert_eq!(unstuck(&shared, 1), 0);
+    for worker in &shared.workers {
+        worker.set_stuck(Some(Stuck::Poll));
+    }
+    assert_eq!(unstuck(&shared, 1), 1);
+    for worker in &shared.workers {
+        worker.set_stuck(None);
+    }
+
+    // On a worker of the same scheduler, a task preferring a stuck worker stays with the current worker.
+    let [ready, current] = queues.remove(0);
+    CURRENT_WORKER.with(|context| {
+        context.replace(Some(LocalWorker {
+            identifier: 0,
+            scheduler: Arc::downgrade(&shared),
+            ready,
+            current,
+        }));
+    });
+    shared.workers[1].set_stuck(Some(Stuck::Poll));
+    schedule(&shared, preferring(1));
+    shared.workers[1].set_stuck(None);
+    // A healthy preferred worker still receives the wake in its inbox.
+    schedule(&shared, preferring(1));
+    let local = CURRENT_WORKER.with(|context| context.take()).unwrap();
+    assert_eq!(local.ready.len(), 1);
+    assert_eq!(shared.workers[1].incoming.len(), 1);
 }

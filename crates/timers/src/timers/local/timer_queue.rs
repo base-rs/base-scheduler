@@ -91,6 +91,13 @@ impl<Value> TimerQueue<Value> {
         self.pop()
     }
 
+    /// Append expired values using only the output vector's spare capacity, and return the number appended.
+    ///
+    /// Neither the output nor queue storage grows, and a full output vector leaves the queue unchanged. Values in a batch have unspecified order, and a capacity-limited batch may leave earlier expired timers queued. Invoke callbacks only after releasing any outer queue lock.
+    pub fn pop_expired_batch(&mut self, now: Instant, output: &mut Vec<Value>) -> usize {
+        self.0.pop_expired_batch(now, output)
+    }
+
     /// Remove the earliest value, including a future deadline, for shutdown.
     pub fn pop(&mut self) -> Option<Value> {
         self.next_deadline()?;

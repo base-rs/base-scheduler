@@ -35,6 +35,7 @@ impl NativeScheduler {
             NativeExecutorOptions {
                 workers: options.workers,
                 timer_capacity: options.timer_capacity,
+                stall_rescue: options.stall_rescue,
             },
         )
     }
@@ -52,7 +53,11 @@ impl<S: Selector> NativeScheduler<S> {
                     "worker count and timer capacity must be nonzero",
                 ));
             }
-            crate::task_service::TaskService::new(options.workers, options.timer_capacity)
+            crate::task_service::TaskService::new(
+                options.workers,
+                options.timer_capacity,
+                options.stall_rescue,
+            )
         })();
         match result {
             Ok(tasks) => Ok(Self { selector, tasks }),
@@ -80,7 +85,11 @@ impl<S: Selector> NativeScheduler<S> {
                 "one driver per nonzero worker and nonzero timer capacity are required",
             ))
         } else {
-            crate::task_service::TaskService::with_drivers(drivers, options.timer_capacity)
+            crate::task_service::TaskService::with_drivers(
+                drivers,
+                options.timer_capacity,
+                options.stall_rescue,
+            )
         };
         match result {
             Ok(tasks) => Ok(Self { selector, tasks }),
@@ -94,6 +103,18 @@ impl<S: Selector> NativeScheduler<S> {
     /// Access the explicitly selected I/O capabilities.
     pub fn selector(&self) -> &S {
         &self.selector
+    }
+
+    /// Stall rescue counts since construction, for benchmarks and investigations. This diagnostic interface is not stable.
+    #[cfg(feature = "diagnostics")]
+    pub fn rescue_statistics(&self) -> crate::RescueStatistics {
+        use std::sync::atomic::Ordering;
+        let counters = &self.tasks.shared.monitor.counters;
+        crate::RescueStatistics {
+            stuck_polls: counters.stuck_polls.load(Ordering::Relaxed),
+            long_batches: counters.long_batches.load(Ordering::Relaxed),
+            timers: counters.timers.load(Ordering::Relaxed),
+        }
     }
 
     /// Number of configured task workers.

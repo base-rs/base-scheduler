@@ -69,3 +69,27 @@ fn full_queue_reclaims_a_cancelled_non_root_heap_entry() {
     assert_eq!(queue.release(replacement), Some(99));
     assert_eq!(queue.pop_expired(now + Duration::from_secs(200)), None);
 }
+
+#[test]
+fn batch_expiry_uses_spare_output_capacity_and_skips_releases() {
+    let now = Instant::now();
+    let mut queue = TimerQueue::with_capacity(8);
+    let keys: Vec<_> = (0..4)
+        .map(|index| queue.try_schedule(now, index).unwrap())
+        .collect();
+    queue
+        .try_schedule(now + Duration::from_secs(1), 99)
+        .unwrap();
+    assert_eq!(queue.release(keys[1]), Some(1));
+    let mut full = Vec::new();
+    assert_eq!(queue.pop_expired_batch(now, &mut full), 0);
+    assert_eq!(queue.len(), 4);
+    let mut output = Vec::with_capacity(2);
+    assert_eq!(queue.pop_expired_batch(now, &mut output), 2);
+    output.reserve(4);
+    assert_eq!(queue.pop_expired_batch(now, &mut output), 1);
+    output.sort_unstable();
+    assert_eq!(output, [0, 2, 3]);
+    assert_eq!(queue.pop_expired_batch(now, &mut output), 0);
+    assert_eq!(queue.len(), 1);
+}

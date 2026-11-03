@@ -1,16 +1,15 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use super::{Command, Registration};
+use super::Registration;
 use crate::worker_timers;
-use crate::{NativeScheduler, Selector, task_service::Shared, worker};
+use crate::{NativeScheduler, Selector, task_service::Shared};
 use base_scheduler::{Cancellation, Clock, OperationResult, Timers};
-use futures_channel::oneshot;
 use std::{
     future::{Future, poll_fn},
     io,
-    pin::{Pin, pin},
-    sync::{Arc, atomic::Ordering},
+    pin::pin,
+    sync::Arc,
     task::{Context, Poll, Waker},
     time::Instant,
 };
@@ -20,13 +19,11 @@ pub struct NativeTimer {
     shared: Arc<Shared>,
     armed: Option<Instant>,
     registration: Option<Registration>,
-    pending: Option<oneshot::Receiver<io::Result<Registration>>>,
     waker: Option<Waker>,
 }
 impl NativeTimer {
     fn disarm(&mut self) {
         self.registration = None;
-        self.pending = None;
         self.armed = None;
         self.waker = None;
     }
@@ -45,46 +42,18 @@ impl NativeTimer {
             self.disarm();
             self.armed = Some(deadline);
         }
-        if self.registration.is_none() && self.pending.is_none() {
-            let mut waker = Some(context.waker().clone());
-            let local = worker::timers(shared, None, |owner, timers| {
-                (owner, timers.try_schedule(deadline, waker.take().unwrap()))
-            });
-            if let Some((owner, result)) = local {
-                self.registration = Some(worker_timers::registered(shared, owner, result)?);
-            } else {
-                let owner =
-                    shared.timer_next.fetch_add(1, Ordering::Relaxed) % shared.workers.len();
-                let (reply, receive) = oneshot::channel();
-                shared.send_timer(
-                    owner,
-                    Command::Register {
-                        deadline,
-                        waker: waker.unwrap(),
-                        reply,
-                    },
-                );
-                self.pending = Some(receive);
-            }
+        if self.registration.is_none() {
+            self.registration = Some(worker_timers::register(
+                shared,
+                deadline,
+                context.waker().clone(),
+            )?);
             self.waker = Some(context.waker().clone());
-        }
-        if let Some(pending) = self.pending.as_mut() {
-            let result = match Pin::new(pending).poll(context) {
-                Poll::Pending => return Poll::Pending,
-                Poll::Ready(result) => result.expect("worker acknowledges timer registration"),
-            };
-            self.pending = None;
-            self.registration = Some(result?);
         }
         if !self.waker.as_ref().unwrap().will_wake(context.waker()) {
             let replacement = context.waker().clone();
             self.waker = Some(replacement.clone());
-            let registration = self.registration.as_ref().unwrap();
-            worker_timers::dispatch(
-                shared,
-                registration.owner,
-                Command::Update(registration.key, replacement),
-            );
+            self.registration.as_ref().unwrap().update(replacement);
         }
         Poll::Pending
     }
@@ -97,7 +66,6 @@ impl<S: Selector> Timers for NativeScheduler<S> {
             shared: Arc::clone(&self.tasks.shared),
             armed: None,
             registration: None,
-            pending: None,
             waker: None,
         }
     }

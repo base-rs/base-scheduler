@@ -54,6 +54,7 @@ let selector = ReadinessSelector::with_options(SelectorOptions {
 let scheduler = NativeScheduler::with_selector(selector, NativeExecutorOptions {
     workers: 2,
     timer_capacity: 128,
+    ..Default::default()
 })?;
 scheduler.block_on(scheduler.shutdown());
 # Ok::<(), std::io::Error>(())
