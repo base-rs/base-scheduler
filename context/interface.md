@@ -233,7 +233,7 @@ The selector lifecycle hooks below live in `base-scheduler-selector`, not the po
 | `SelectorWorker::close` | `(&mut worker) → ()` | Begin retirement without synchronously waiting. |
 | `SelectorWorker::turn` | `(&mut worker, Option<Duration>) → io::Result<bool>` | Publish a bounded completion batch and wait at most the timeout. Zero is nonblocking; `None` permits indefinite waiting. True means closed and drained. After waking tasks, return so the executor can poll them. |
 
-Drivers publish results and wake tasks; they never poll application futures from completion processing. The executor manages runnable tasks, stealing, worker-local timers, and the timeout passed to `turn`. io_uring uses one ring per worker; active operations stay with their original ring through retirement, while subsequent operations can follow a migrated task.
+Drivers publish results and wake tasks; they never poll application futures from completion processing. The executor manages runnable tasks, stealing, worker-local and root timers, and the timeout passed to `turn`. io_uring uses one ring per worker; active operations stay with their original ring through retirement, while subsequent operations can follow a migrated task.
 
 Constructors, `block_on`, worker counts, `selector()`, concrete admission `close`, and runtime `shutdown` belong to the chosen backend, not a universal scheduler trait. Tokio's adapter borrows an application-owned runtime which must remain alive and driven. Native owns its executor and composes selectors. An application must keep execution services running while awaiting graceful cleanup.
 

@@ -12,15 +12,15 @@ Our working principle is to keep ownership local, amortize necessary kernel work
 
 The source of truth is `crates/native/src/worker.rs`:
 
-1. `run_loop` services the worker's timer queue and checks shutdown.
+1. `run_loop` services the worker's timer queue and expired root timers, and checks shutdown.
 2. `search` admits remote runnable work, tries the local ready queue, and then attempts stealing. A contention retry yields rather than parking.
 3. With work available after an earlier task batch, the worker calls its driver with a zero timeout before running the next batch.
 4. `run_ready_batch` freezes the existing ready queue. It polls its first task and the remaining frozen tasks; new wakes enter the next queue. Other workers can steal from both generations. This bounds a batch by membership, not time.
-5. With no work, the worker advertises sleeping, fences, and searches again. Only then does it call the driver with the next timer timeout, or park if no driver remains. Publication and remote wakeup cover work arriving around that check.
+5. With no work, the worker advertises sleeping, fences, and searches again. Only then does it call the driver with the next timer timeout, or park if no driver remains. The timeout includes the earliest root deadline when this worker is the root watcher. A watcher resigns before its next task batch, handing a pending root deadline to another idle worker. Publication and remote wakeup cover work arriving around that check.
 
 These are per-worker boundaries, not global rounds. A completion collected on one worker may wake a task which another worker immediately steals. A local wake does not need an eventfd write to interrupt its own executing worker. An external wake of a sleeping worker uses the interrupt path.
 
-The root of `block_on` is polled on the calling thread. A supervisor containing many connection futures is still one executor task: its inner polls are not individual ready-queue entries. No worker policy can preempt a single long poll. Consequently, a task-count budget alone would not bound the raw benchmark's `FuturesUnordered` supervisor. Timers and driver turns can both wait behind a long batch or a long individual poll.
+The root of `block_on` is polled on the calling thread. A supervisor containing many connection futures is still one executor task: its inner polls are not individual ready-queue entries. No worker policy can preempt a single long poll. Consequently, a task-count budget alone would not bound the raw benchmark's `FuturesUnordered` supervisor. A worker's local timers and driver turns can both wait behind a long batch or a long individual poll on that worker. Root timers wait only while every worker is held, since any worker collects them between batches.
 
 ## Operation stages and ownership
 

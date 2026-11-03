@@ -275,6 +275,8 @@ fn run_loop(
     });
     let mut iteration = 0usize;
     let mut needs_turn = false;
+    // Whether this worker currently bounds its idle wait by the shared root deadline.
+    let mut watching = false;
     loop {
         iteration = iteration.wrapping_add(1);
         crate::worker_timers::turn(&shared, identifier);
@@ -304,7 +306,7 @@ fn run_loop(
                         needs_turn = false;
                         drive(
                             &mut driver,
-                            crate::worker_timers::timeout(&shared, identifier),
+                            crate::worker_timers::timeout(&shared, identifier, &mut watching),
                         )
                     },
                 )
@@ -314,6 +316,8 @@ fn run_loop(
         let Some(runnable) = runnable else {
             continue;
         };
+        // A task poll can block this worker indefinitely. Pass any root deadline to another idle worker first.
+        crate::worker_timers::resign(&shared, &mut watching);
         // Publish completions between ready batches. If the queue emptied, the idle path above already collected them with its actual wait timeout.
         if needs_turn {
             drive(&mut driver, Some(Duration::ZERO));

@@ -31,7 +31,7 @@ pub(crate) struct Shared {
     // Serialize registration with closure and distribute new tasks using a round-robin worker cursor. Task ownership itself needs only a count.
     admission: Mutex<usize>,
     pub(crate) timer_capacity: usize,
-    pub(crate) timer_next: AtomicUsize,
+    pub(crate) root: crate::worker_timers::RootTimers,
     #[cfg(test)]
     pub(crate) paused: Mutex<Option<std::time::Instant>>,
     workers_remaining: AtomicUsize,
@@ -80,7 +80,7 @@ impl Shared {
         Self {
             admission: Mutex::new(0),
             timer_capacity,
-            timer_next: AtomicUsize::new(0),
+            root: crate::worker_timers::RootTimers::new(timer_capacity),
             #[cfg(test)]
             paused: Mutex::new(None),
             workers_remaining: AtomicUsize::new(0),

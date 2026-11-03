@@ -4,29 +4,23 @@
 use crate::{task_service::Shared, worker};
 use base_scheduler::{Cancellation, Clock, OperationResult};
 use base_scheduler_timers::local::TimerKey;
-use futures_channel::oneshot;
 use std::{
     future::{Future, poll_fn},
     io,
     pin::pin,
-    sync::{Arc, atomic::Ordering},
+    sync::Arc,
     task::{Poll, Waker},
     time::{Duration, Instant},
 };
 
 pub(crate) enum Command {
-    Register {
-        deadline: Instant,
-        waker: Waker,
-        reply: oneshot::Sender<io::Result<Registration>>,
-    },
     Update(TimerKey, Waker),
     Release(TimerKey),
     #[cfg(test)]
     Inspect(std::sync::mpsc::Sender<usize>),
 }
 
-fn closed() -> io::Error {
+pub(crate) fn closed() -> io::Error {
     io::Error::new(io::ErrorKind::BrokenPipe, "clock is closed")
 }
 
@@ -40,10 +34,6 @@ pub(crate) fn now(_shared: &Shared) -> Instant {
 
 pub(crate) fn rejected(command: Command) {
     match command {
-        Command::Register { waker, reply, .. } => {
-            crate::panic::discard(waker);
-            crate::panic::contain(|| drop(reply.send(Err(closed()))));
-        }
         // Closure or expiry can overtake an update. Its new context must still be notified.
         Command::Update(_, waker) => crate::panic::contain(|| waker.wake()),
         Command::Release(_) => {}
@@ -54,10 +44,10 @@ pub(crate) fn rejected(command: Command) {
     }
 }
 
-// Keys never migrate. A retained owner makes cancellation/drop safe even when a pending sleep moves to a different executor or outlives scheduler shutdown.
+// Keys never migrate. A retained owner makes cancellation/drop safe even when a pending sleep moves to a different executor or outlives scheduler shutdown. `None` owns a key in the shared root queue.
 pub(crate) struct Registration {
     shared: Arc<Shared>,
-    owner: usize,
+    owner: Option<usize>,
     key: TimerKey,
 }
 impl Drop for Registration {
@@ -66,7 +56,10 @@ impl Drop for Registration {
     }
 }
 
-fn dispatch(shared: &Arc<Shared>, owner: usize, command: Command) {
+pub(crate) fn dispatch(shared: &Arc<Shared>, owner: Option<usize>, command: Command) {
+    let Some(owner) = owner else {
+        return root::dispatch(shared, command);
+    };
     let mut command = Some(command);
     let result = worker::timers(shared, Some(owner), |_, timers| {
         // The owning worker cannot destroy its queue during this borrow. Late remote commands are rejected under admission instead.
@@ -76,7 +69,8 @@ fn dispatch(shared: &Arc<Shared>, owner: usize, command: Command) {
                 Err(replacement) => (Some(replacement), true),
             },
             Command::Release(key) => (timers.release(key), false),
-            _ => unreachable!("only updates and releases use direct dispatch"),
+            #[cfg(test)]
+            Command::Inspect(_) => unreachable!("only updates and releases use direct dispatch"),
         }
     });
     if let Some((waker, wake)) = result {
@@ -90,7 +84,7 @@ fn dispatch(shared: &Arc<Shared>, owner: usize, command: Command) {
     }
 }
 
-fn registered(
+pub(crate) fn registered(
     shared: &Arc<Shared>,
     owner: usize,
     result: Result<TimerKey, Waker>,
@@ -98,7 +92,7 @@ fn registered(
     result
         .map(|key| Registration {
             shared: Arc::clone(shared),
-            owner,
+            owner: Some(owner),
             key,
         })
         .map_err(|waker| {
@@ -107,30 +101,30 @@ fn registered(
         })
 }
 
-async fn wait(shared: &Arc<Shared>, deadline: Instant) -> io::Result<()> {
-    let mut cached = poll_fn(|context| Poll::Ready(context.waker().clone())).await;
-    let mut waker = Some(cached.clone());
+// Register with the current worker's queue, or with the shared root queue from any other thread.
+pub(crate) fn register(
+    shared: &Arc<Shared>,
+    deadline: Instant,
+    waker: Waker,
+) -> io::Result<Registration> {
+    let mut waker = Some(waker);
     let local = worker::timers(shared, None, |owner, timers| {
         (owner, timers.try_schedule(deadline, waker.take().unwrap()))
     });
-    let registration = if let Some((owner, result)) = local {
-        registered(shared, owner, result)?
+    if let Some((owner, result)) = local {
+        registered(shared, owner, result)
     } else {
-        let owner = shared.timer_next.fetch_add(1, Ordering::Relaxed) % shared.workers.len();
-        let (reply, receive) = oneshot::channel();
-        shared.send_timer(
-            owner,
-            Command::Register {
-                deadline,
-                waker: waker.unwrap(),
-                reply,
-            },
-        );
-        // Poll the receiver with every current context. If that context changes while registration is queued, acknowledgement wakes its replacement too.
-        receive
-            .await
-            .expect("worker replies to accepted timer registrations")?
-    };
+        root::register(shared, deadline, waker.unwrap()).map(|key| Registration {
+            shared: Arc::clone(shared),
+            owner: None,
+            key,
+        })
+    }
+}
+
+async fn wait(shared: &Arc<Shared>, deadline: Instant) -> io::Result<()> {
+    let mut cached = poll_fn(|context| Poll::Ready(context.waker().clone())).await;
+    let registration = register(shared, deadline, cached.clone())?;
     poll_fn(|context| {
         if !cached.will_wake(context.waker()) {
             let replacement = context.waker().clone();
@@ -158,29 +152,17 @@ pub(crate) fn turn(shared: &Arc<Shared>, owner: usize) {
             continue;
         }
         match command {
-            Command::Register {
-                deadline,
-                waker,
-                reply,
-            } => {
-                let result = worker::timers(shared, Some(owner), |_, timers| {
-                    timers.try_schedule(deadline, waker)
-                })
-                .unwrap();
-                let result = registered(shared, owner, result);
-                // A canceled receiver drops its new registration here, after releasing the queue borrow. Sending can itself invoke arbitrary waker code.
-                crate::panic::contain(|| drop(reply.send(result)));
-            }
             #[cfg(test)]
             Command::Inspect(reply) => {
                 expire(shared, owner);
                 let len = worker::timers(shared, Some(owner), |_, timers| timers.len()).unwrap();
                 let _ = reply.send(len);
             }
-            command => dispatch(shared, owner, command),
+            command => dispatch(shared, Some(owner), command),
         }
     }
     expire(shared, owner);
+    root::expire(shared);
 }
 
 fn expire(shared: &Arc<Shared>, owner: usize) {
@@ -204,12 +186,12 @@ fn expire(shared: &Arc<Shared>, owner: usize) {
     }
 }
 
-pub(crate) fn timeout(shared: &Arc<Shared>, owner: usize) -> Option<Duration> {
+pub(crate) fn timeout(shared: &Arc<Shared>, owner: usize, watching: &mut bool) -> Option<Duration> {
     // Recheck after publishing sleeping=true: commands that arrived while the worker was active may have needed no interrupt.
     if !shared.workers[owner].timers.is_empty() {
         return Some(Duration::ZERO);
     }
-    worker::timers(shared, Some(owner), |_, timers| {
+    let local = worker::timers(shared, Some(owner), |_, timers| {
         if timers.is_empty() {
             None
         } else {
@@ -218,7 +200,12 @@ pub(crate) fn timeout(shared: &Arc<Shared>, owner: usize) -> Option<Duration> {
                 .map(|deadline| deadline.saturating_duration_since(now(shared)))
         }
     })
-    .unwrap()
+    .unwrap();
+    // Only the watcher bounds its wait by root deadlines.
+    local
+        .into_iter()
+        .chain(root::timeout(shared, owner, watching))
+        .min()
 }
 
 impl<S: crate::Selector> Clock for crate::NativeScheduler<S> {
@@ -256,3 +243,6 @@ mod tests;
 
 mod native_timer;
 pub use native_timer::NativeTimer;
+
+mod root;
+pub(crate) use root::{RootTimers, resign};

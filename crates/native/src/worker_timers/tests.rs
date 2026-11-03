@@ -5,9 +5,10 @@ use super::*;
 use crate::{NativeOptions, NativeScheduler, test_support};
 use base_scheduler::Spawn;
 use base_scheduler_conformance::ClockFixture;
+use futures_channel::oneshot;
 use futures_lite::future::{block_on, poll_once};
 use std::{
-    sync::mpsc,
+    sync::{atomic::Ordering, mpsc},
     task::{Context, Wake},
 };
 
@@ -33,7 +34,8 @@ impl ClockFixture for NativeScheduler {
     fn registrations(&self) -> usize {
         (0..self.worker_count())
             .map(|owner| inspect(&self.tasks.shared, owner))
-            .sum()
+            .sum::<usize>()
+            + root::len(&self.tasks.shared)
     }
 }
 
@@ -125,6 +127,12 @@ fn earlier_external_deadline_interrupts_worker_wait() {
         let mut distant = Box::pin(scheduler.sleep(Duration::from_secs(3600), &never));
         assert!(block_on(poll_once(&mut distant)).is_none());
         assert_eq!(scheduler.registrations(), 1);
+        // Wait until the idle worker bounds its wait by the distant root deadline.
+        let start = Instant::now();
+        while scheduler.tasks.shared.root.watcher().is_none() {
+            assert!(start.elapsed() < Duration::from_secs(5));
+            std::thread::yield_now();
+        }
         let deadline = scheduler.now() + Duration::from_millis(10);
         scheduler
             .block_on(scheduler.sleep_until(deadline, &never))
@@ -184,7 +192,7 @@ fn full_capacity_reclaims_cancelled_timers_and_shutdown_rejects_waits() {
 }
 
 #[test]
-fn dropping_unacknowledged_registration_releases_its_slot() {
+fn root_registration_and_release_do_not_wait_for_a_busy_worker() {
     test_support::run(|| {
         let scheduler = test_support::scheduler();
         let (gate, started, release) = test_support::Gate::new();
@@ -197,10 +205,12 @@ fn dropping_unacknowledged_registration_releases_its_slot() {
         let never = Cancellation::never();
         let mut sleep = Box::pin(scheduler.sleep(Duration::from_secs(3600), &never));
         assert!(block_on(poll_once(&mut sleep)).is_none());
+        // The only worker is blocked, yet the shared queue accepted and now releases the registration.
+        assert_eq!(root::len(&scheduler.tasks.shared), 1);
         drop(sleep);
+        assert_eq!(root::len(&scheduler.tasks.shared), 0);
         drop(release);
         block_on(task).unwrap();
-        assert_eq!(scheduler.registrations(), 0);
         block_on(scheduler.shutdown());
     });
 }
@@ -214,16 +224,9 @@ impl Wake for Probe {
 }
 
 #[test]
-fn pending_registration_notifies_replacement_waker() {
+fn root_waker_replacement_reaches_the_shared_queue() {
     test_support::run(|| {
         let scheduler = test_support::scheduler();
-        let (gate, started, release) = test_support::Gate::new();
-        let task = scheduler
-            .spawn(async move {
-                gate.wait();
-            })
-            .unwrap();
-        started.recv_timeout(Duration::from_secs(5)).unwrap();
         let never = Cancellation::never();
         let mut sleep = Box::pin(scheduler.sleep(Duration::from_secs(3600), &never));
         assert!(
@@ -240,20 +243,13 @@ fn pending_registration_notifies_replacement_waker() {
                 .poll(&mut Context::from_waker(&waker))
                 .is_pending()
         );
-        drop(release);
-        block_on(task).unwrap();
-        assert_eq!(scheduler.registrations(), 1);
-        assert!(probe.0.load(Ordering::SeqCst) > 0);
-        // Consume acknowledgment and install the replacement on the actual timer.
-        assert!(
-            sleep
-                .as_mut()
-                .poll(&mut Context::from_waker(&waker))
-                .is_pending()
-        );
-        drop(sleep);
-        assert_eq!(scheduler.registrations(), 0);
+        // Closure collects the root timer through its replacement waker.
         block_on(scheduler.shutdown());
+        assert_eq!(probe.0.load(Ordering::SeqCst), 1);
+        assert_eq!(
+            block_on(sleep).unwrap_err().kind(),
+            io::ErrorKind::BrokenPipe
+        );
     });
 }
 
@@ -430,7 +426,7 @@ fn local_capacity_and_delayed_updates_obey_registration_ownership() {
                 let probe = Arc::new(Probe::default());
                 dispatch(
                     shared,
-                    owner,
+                    Some(owner),
                     Command::Update(key, Waker::from(Arc::clone(&probe))),
                 );
                 assert_eq!(probe.0.load(Ordering::SeqCst), 1);
@@ -439,7 +435,7 @@ fn local_capacity_and_delayed_updates_obey_registration_ownership() {
                 // An inbox command published just before idle must prevent an indefinite wait.
                 let (reply, receive) = mpsc::channel();
                 shared.send_timer(owner, Command::Inspect(reply));
-                assert_eq!(timeout(shared, owner), Some(Duration::ZERO));
+                assert_eq!(timeout(shared, owner, &mut false), Some(Duration::ZERO));
                 turn(shared, owner);
                 assert_eq!(receive.recv().unwrap(), 0);
             })
@@ -450,7 +446,7 @@ fn local_capacity_and_delayed_updates_obey_registration_ownership() {
 }
 
 #[test]
-fn closure_rejects_queued_registrations_and_notifies_late_updates() {
+fn closure_notifies_late_updates_and_rejects_root_registrations() {
     test_support::run(|| {
         let scheduler = Arc::new(test_support::scheduler());
         let owned = Arc::clone(&scheduler);
@@ -480,22 +476,18 @@ fn closure_rejects_queued_registrations_and_notifies_late_updates() {
             })
             .unwrap();
         started.recv_timeout(Duration::from_secs(5)).unwrap();
-        let (reply, receive) = oneshot::channel();
-        scheduler.tasks.shared.send_timer(
-            0,
-            Command::Register {
-                deadline: scheduler.now() + Duration::from_secs(3600),
-                waker: Waker::noop().clone(),
-                reply,
-            },
-        );
+        // A queued command reaching its worker after closure is rejected instead of applied.
+        let queued = registered(
+            &scheduler.tasks.shared,
+            registration.owner.unwrap(),
+            Ok(registration.key),
+        )
+        .unwrap();
+        drop(queued);
+        assert!(!scheduler.tasks.shared.workers[0].timers.is_empty());
         scheduler.close();
         drop(release);
         block_on(task).unwrap();
-        assert_eq!(
-            block_on(receive).unwrap().err().unwrap().kind(),
-            io::ErrorKind::BrokenPipe
-        );
         block_on(scheduler.shutdown());
         let probe = Arc::new(Probe::default());
         dispatch(
@@ -516,6 +508,15 @@ fn closure_rejects_queued_registrations_and_notifies_late_updates() {
             .kind(),
             io::ErrorKind::BrokenPipe
         );
+        // A registration admitted before closure may not have published its deadline when a closed worker drains.
+        let probe = Arc::new(Probe::default());
+        root::schedule_unpublished(
+            &scheduler.tasks.shared,
+            scheduler.now() + Duration::from_secs(3600),
+            Waker::from(Arc::clone(&probe)),
+        );
+        root::expire(&scheduler.tasks.shared);
+        assert_eq!(probe.0.load(Ordering::SeqCst), 1);
     });
 }
 
@@ -557,5 +558,87 @@ fn shutdown_waits_for_timer_callbacks_and_live_waits_can_outlast_workers() {
             block_on(sleep).unwrap_err().kind(),
             io::ErrorKind::BrokenPipe
         );
+    });
+}
+
+#[test]
+fn root_updates_after_expiry_notify_their_replacement() {
+    test_support::run(|| {
+        let scheduler = test_support::scheduler();
+        let shared = &scheduler.tasks.shared;
+        let key = root::register(shared, scheduler.now(), Waker::noop().clone()).unwrap();
+        root::expire(shared);
+        let probe = Arc::new(Probe::default());
+        root::dispatch(
+            shared,
+            Command::Update(key, Waker::from(Arc::clone(&probe))),
+        );
+        assert_eq!(probe.0.load(Ordering::SeqCst), 1);
+        root::dispatch(shared, Command::Release(key));
+        assert_eq!(root::len(shared), 0);
+        block_on(scheduler.shutdown());
+    });
+}
+
+#[test]
+fn root_watch_is_claimed_once_and_resigned_with_a_hand_off() {
+    test_support::run(|| {
+        let scheduler = NativeScheduler::with_options(NativeOptions {
+            workers: 2,
+            ..Default::default()
+        })
+        .unwrap();
+        let shared = &scheduler.tasks.shared;
+        // Hold both workers in a task poll, so only this test claims and resigns the watch.
+        let gates: Vec<_> = (0..2)
+            .map(|_| {
+                let (gate, started, release) = test_support::Gate::new();
+                let task = scheduler.spawn(async move { gate.wait() }).unwrap();
+                (started, release, task)
+            })
+            .collect();
+        for (started, _, _) in &gates {
+            started.recv_timeout(Duration::from_secs(5)).unwrap();
+        }
+        let (mut first, mut second) = (false, false);
+        // Without root timers nobody claims the watch, and resigning needs no hand-off.
+        assert_eq!(root::timeout(shared, 0, &mut first), None);
+        assert!(!first);
+        root::resign(shared, &mut first);
+        let distant = root::register(
+            shared,
+            scheduler.now() + Duration::from_secs(3600),
+            Waker::noop().clone(),
+        )
+        .unwrap();
+        assert!(root::timeout(shared, 0, &mut first).unwrap() > Duration::from_secs(3000));
+        assert!(first);
+        assert_eq!(shared.root.watcher(), Some(0));
+        // Only one worker watches at a time.
+        assert_eq!(root::timeout(shared, 1, &mut second), None);
+        assert!(!second);
+        root::resign(shared, &mut second);
+        assert_eq!(shared.root.watcher(), Some(0));
+        // An earlier deadline notifies the watcher, falling back to any idle worker when it is awake.
+        let earlier = root::register(
+            shared,
+            scheduler.now() + Duration::from_secs(60),
+            Waker::noop().clone(),
+        )
+        .unwrap();
+        assert!(root::timeout(shared, 0, &mut first).unwrap() <= Duration::from_secs(60));
+        root::resign(shared, &mut first);
+        assert!(!first);
+        assert_eq!(shared.root.watcher(), None);
+        // With timers pending and no watcher, any worker starting a batch repeats the hand-off.
+        root::resign(shared, &mut second);
+        root::dispatch(shared, Command::Release(earlier));
+        root::dispatch(shared, Command::Release(distant));
+        assert_eq!(root::len(shared), 0);
+        for (_, release, task) in gates {
+            drop(release);
+            block_on(task).unwrap();
+        }
+        block_on(scheduler.shutdown());
     });
 }
