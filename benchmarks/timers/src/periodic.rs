@@ -29,6 +29,7 @@ impl Window {
         if !self.aligned {
             return now + self.delay;
         }
+        // Any fixed epoch would do; one second before the window keeps the grid independent of when tasks start.
         let epoch = self.start - Duration::from_secs(1);
         let ticks = now.duration_since(epoch).as_nanos() / self.delay.as_nanos() + 1;
         epoch + self.delay * u32::try_from(ticks).unwrap()
@@ -51,6 +52,7 @@ pub fn execute(args: &[String]) -> serde_json::Value {
     let workers: usize = args.get(1).expect(USAGE).parse().unwrap();
     let tasks: usize = args.get(2).expect(USAGE).parse().unwrap();
     let delay = Duration::from_micros(args.get(3).expect(USAGE).parse().unwrap());
+    assert!(!delay.is_zero(), "DELAY_US must be positive");
     let alignment = args.get(4).map_or("unaligned", String::as_str);
     let aligned = match alignment {
         "unaligned" => false,
@@ -153,8 +155,9 @@ fn run<S: Selector + 'static>(
 async fn expiries<S: Clock>(scheduler: &S, window: &Window) -> Vec<u64> {
     let never = Cancellation::never();
     let window_length = window.end.duration_since(window.start);
-    let mut overshoot =
-        Vec::with_capacity((window_length.as_nanos() / window.delay.as_nanos()) as usize + 1);
+    // Reserve for the window's expiries up front, so that recording rarely allocates, but not unboundedly for very short delays.
+    let expected = (window_length.as_nanos() / window.delay.as_nanos()) as usize + 1;
+    let mut overshoot = Vec::with_capacity(expected.min(1 << 16));
     while Instant::now() < window.end {
         let target = window.target();
         scheduler.sleep_until(target, &never).await.unwrap();

@@ -20,7 +20,8 @@ fn backends_and_alignments_record_expiries_inside_the_window() {
     let backends = ["native"];
     for backend in backends {
         for alignment in ["unaligned", "aligned"] {
-            let record = periodic(&[backend, "2", "4", "1000", alignment, "30", "10"]);
+            // A window several timer ticks long, so that even coarse timers (about 15.6 ms on Windows) record expiries inside it.
+            let record = periodic(&[backend, "2", "4", "1000", alignment, "150", "10"]);
             assert_eq!(record["backend"], backend);
             assert_eq!(record["alignment"], alignment);
             assert_eq!(record["work"], 10);
@@ -43,6 +44,12 @@ fn a_window_shorter_than_the_delay_records_no_expiry() {
 #[should_panic(expected = "unknown alignment")]
 fn an_unknown_alignment_is_rejected() {
     periodic(&["native", "1", "1", "1000", "sideways"]);
+}
+
+#[test]
+#[should_panic(expected = "DELAY_US must be positive")]
+fn a_zero_delay_is_rejected() {
+    periodic(&["native", "1", "1", "0"]);
 }
 
 #[test]

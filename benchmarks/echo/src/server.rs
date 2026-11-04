@@ -43,8 +43,10 @@ fn report_rescues<S: base_scheduler_native::Selector>(
         let _ = scheduler;
         serde_json::Value::Null
     };
-    println!("{}", serde_json::json!({ "rescues": rescues }));
-    io::stdout().flush().expect("report rescues");
+    // Best effort: a reader may have stopped after the address line, and serving has already succeeded.
+    let mut stdout = io::stdout();
+    let _ = writeln!(stdout, "{}", serde_json::json!({ "rescues": rescues }))
+        .and_then(|()| stdout.flush());
 }
 
 async fn tokio_server(listener: TcpListener, connections: usize) {

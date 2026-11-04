@@ -19,7 +19,7 @@ python3 benchmarks/timers/results/rescue-counts/summarize.py counts.jsonl > summ
 | [counts.jsonl](counts.jsonl) | 198 records, one per run, each with the run's full output. Timer records carry `rescues`; echo records carry the server's as `server_rescues`. |
 | [summarize.py](summarize.py) | Generates the summary from the records. |
 | [summary.md](summary.md) | Rescue counts per workload, one value per repeat, and rescued timers as a share of measured expiries. |
-| [context-switches.py](context-switches.py), [context-switches.jsonl](context-switches.jsonl) | Six further unaligned native periodic runs with the same build, `for i in 1 2 3 4 5 6; do flock /tmp/base-scheduler-perf.lock python3 context-switches.py $T/base-scheduler-benchmark-timers periodic native 4 1024 1000 unaligned; done`, each record with its worker threads' involuntary context switches added as `worker_involuntary_switches`. |
+| [context-switches.py](context-switches.py), [context-switches.jsonl](context-switches.jsonl) | Six further unaligned native periodic runs with the same build, `for i in 1 2 3 4 5 6; do flock /tmp/base-scheduler-perf.lock python3 benchmarks/timers/results/rescue-counts/context-switches.py $T/base-scheduler-benchmark-timers periodic native 4 1024 1000 unaligned; done`, each record with its worker threads' involuntary context switches added as `worker_involuntary_switches`. |
 
 ## Result
 
