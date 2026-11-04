@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""A few-minute paired comparison of `main` and a candidate: nominal costs and stalled-worker latency."""
+"""A few-minute paired comparison of `main` and a candidate: nominal costs and stalled-worker latency. Metrics are lower-is-better; requests per second are negated."""
 import importlib.util, json, os, random, statistics, subprocess, sys, types
 
 B = os.environ.get("STALL_RESCUE_BENCH", os.path.dirname(os.path.abspath(__file__)))
@@ -21,6 +21,14 @@ CASES = {
     "cycle iouring 64/4": (lambda b: out([f"{B}/timers-{b}", "iouring", "reuse", "cycle", "64", "800", "4", "1000"]), {"cpu ns/op": lambda d: d["cpu_ns_per_operation"], "late p50 us": lambda d: d["overshoot_p50_ns"] / 1e3, "late p99 us": lambda d: d["overshoot_p99_ns"] / 1e3}),
     "diag iouring 4/1024/1ms": (lambda b: out([f"{B}/diag-{b}/target/release/diag", "iouring", "4", "1024", "1000"]), {"cpu s": lambda d: d["cpu_seconds"], "late p50 us": lambda d: d["lateness_p50_us"], "late p99 us": lambda d: d["lateness_p99_us"]}),
     "diag 4/1024/1ms": (lambda b: out([f"{B}/diag-{b}/target/release/diag", "native", "4", "1024", "1000"]), {"cpu s": lambda d: d["cpu_seconds"], "late p50 us": lambda d: d["lateness_p50_us"], "late p99 us": lambda d: d["lateness_p99_us"]}),
+    "echo native 1/1/64": (lambda b: echo_sample(b, "native", 1, 1, 64, None, 1, 3), {"req/s": lambda d: -d["requests_per_second"], "server cpu us/req": lambda d: d["server_cpu_seconds"] * 1e6 / d["requests"], "p99 us": lambda d: d["rtt_p99_us"]}),
+    "echo native 1/32/64": (lambda b: echo_sample(b, "native", 1, 32, 64, None, 1, 3), {"req/s": lambda d: -d["requests_per_second"], "server cpu us/req": lambda d: d["server_cpu_seconds"] * 1e6 / d["requests"], "p99 us": lambda d: d["rtt_p99_us"]}),
+    "echo native 4/128/64": (lambda b: echo_sample(b, "native", 4, 128, 64, None, 1, 3), {"req/s": lambda d: -d["requests_per_second"], "server cpu us/req": lambda d: d["server_cpu_seconds"] * 1e6 / d["requests"], "p99 us": lambda d: d["rtt_p99_us"]}),
+    "echo native 4/128/4096": (lambda b: echo_sample(b, "native", 4, 128, 4096, None, 1, 3), {"req/s": lambda d: -d["requests_per_second"], "server cpu us/req": lambda d: d["server_cpu_seconds"] * 1e6 / d["requests"], "p99 us": lambda d: d["rtt_p99_us"]}),
+    "echo native-poll 1/1/64": (lambda b: echo_sample(b, "native-poll", 1, 1, 64, None, 1, 3), {"req/s": lambda d: -d["requests_per_second"], "server cpu us/req": lambda d: d["server_cpu_seconds"] * 1e6 / d["requests"], "p99 us": lambda d: d["rtt_p99_us"]}),
+    "echo native-poll 1/32/64": (lambda b: echo_sample(b, "native-poll", 1, 32, 64, None, 1, 3), {"req/s": lambda d: -d["requests_per_second"], "server cpu us/req": lambda d: d["server_cpu_seconds"] * 1e6 / d["requests"], "p99 us": lambda d: d["rtt_p99_us"]}),
+    "echo native-poll 4/128/64": (lambda b: echo_sample(b, "native-poll", 4, 128, 64, None, 1, 3), {"req/s": lambda d: -d["requests_per_second"], "server cpu us/req": lambda d: d["server_cpu_seconds"] * 1e6 / d["requests"], "p99 us": lambda d: d["rtt_p99_us"]}),
+    "echo native-poll 4/128/4096": (lambda b: echo_sample(b, "native-poll", 4, 128, 4096, None, 1, 3), {"req/s": lambda d: -d["requests_per_second"], "server cpu us/req": lambda d: d["server_cpu_seconds"] * 1e6 / d["requests"], "p99 us": lambda d: d["rtt_p99_us"]}),
     "echo 4/128/64 @220k": (lambda b: echo_sample(b, "native", 4, 128, 64, 220_000, 0.5, 2), {"server cpu s": lambda d: d["server_cpu_seconds"], "p99 us": lambda d: d["rtt_p99_us"]}),
     "echo 1/1/64 @35k": (lambda b: echo_sample(b, "native", 1, 1, 64, 35_000, 0.5, 2), {"server cpu s": lambda d: d["server_cpu_seconds"], "p99 us": lambda d: d["rtt_p99_us"]}),
     "echo 1/1/64 @1": (lambda b: echo_sample(b, "native", 1, 1, 64, 1, 0, 3), {"server cpu ms": lambda d: d["server_cpu_seconds"] * 1e3}),
