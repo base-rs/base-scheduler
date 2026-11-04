@@ -33,6 +33,10 @@ CASES = {
     "echo 1/1/64 @35k": (lambda b: echo_sample(b, "native", 1, 1, 64, 35_000, 0.5, 2), {"server cpu s": lambda d: d["server_cpu_seconds"], "p99 us": lambda d: d["rtt_p99_us"]}),
     "echo 1/1/64 @1": (lambda b: echo_sample(b, "native", 1, 1, 64, 1, 0, 3), {"server cpu ms": lambda d: d["server_cpu_seconds"] * 1e3}),
     "pulse 1 Hz": (lambda b: out([f"{B}/rb-{b}/target/release/rb", "pulse", "4", "3"]), {"cpu ms": lambda d: d["cpu_ns_per_op"] * 3 / 1e6}),
+    "spawn": (lambda b: out([f"{B}/rb-{b}/target/release/rb", "spawn", "4", "20000"]), {"ns/op": lambda d: d["ns_per_op"], "cpu ns/op": lambda d: d["cpu_ns_per_op"]}),
+    "spawn pending": (lambda b: out([f"{B}/rb-{b}/target/release/rb", "spawn-pending", "4", "20000"]), {"ns/op": lambda d: d["ns_per_op"], "cpu ns/op": lambda d: d["cpu_ns_per_op"]}),
+    "echo iouring 1/1/64 @1": (lambda b: echo_sample(b, "iouring", 1, 1, 64, 1, 0, 10), {"server cpu ms": lambda d: d["server_cpu_seconds"] * 1e3}),
+    "echo native 1/1/64 @1 10s": (lambda b: echo_sample(b, "native", 1, 1, 64, 1, 0, 10), {"server cpu ms": lambda d: d["server_cpu_seconds"] * 1e3}),
     "stall 2 workers": (lambda b: out([f"{B}/rb-{b}/target/release/rb", "stall", "2", "3"]), {"late p50 ms": lambda d: d["p50"] / 1e6, "late max ms": lambda d: d["max"] / 1e6}),
 }
 

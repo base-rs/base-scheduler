@@ -21,7 +21,7 @@ def diag(build, backend, workers, tasks, delay, aligned):
     return json.loads(subprocess.check_output([f"{BENCH}/diag-{build}/target/release/diag", backend, str(workers), str(tasks), str(delay)], env=env, timeout=120))
 
 def echo_sample(build, backend, workers, connections, size, rate, warmup, seconds):
-    args = types.SimpleNamespace(server_cpus=[0, 1, 2, 3], client_cpus=[4, 5, 6, 7], client_binary=f"{BENCH}/echo-branch", client_workers=4, warmup=warmup, seconds=seconds)
+    args = types.SimpleNamespace(server_cpus=[0, 4, 1, 5], client_cpus=[2, 6, 3, 7], client_binary=f"{BENCH}/echo-branch", client_workers=4, warmup=warmup, seconds=seconds)
     return echo.sample(f"{BENCH}/echo-{build}", backend, workers, connections, size, args, rate)
 
 cases = []
@@ -33,7 +33,7 @@ for backend in ["native", "iouring"]:
     for workers, tasks, delay, aligned in [(1, 1, 10, False), (4, 1024, 1000, False), (4, 1024, 1000, True)]:
         cases.append((f"diag {backend} {workers}/{tasks}/{delay}us{' aligned' if aligned else ''}", lambda b, a=(backend, workers, tasks, delay, aligned): diag(b, *a)))
 for backend in ["native", "native-poll", "iouring", "iouring-poll"]:
-    for (workers, connections, size), rate in [((1, 1, 64), 100_000), ((1, 32, 64), 300_000), ((4, 128, 64), 1_000_000), ((4, 128, 4096), 800_000)]:
+    for (workers, connections, size), rate in [((1, 1, 64), 35_000), ((1, 32, 64), 100_000), ((4, 128, 64), 220_000), ((4, 128, 4096), 190_000)]:
         cases.append((f"echo {backend} {workers}/{connections}/{size}", lambda b, a=(backend, workers, connections, size): echo_sample(b, *a, None, 1, 3)))
         cases.append((f"echo {backend} {workers}/{connections}/{size} @{rate}", lambda b, a=(backend, workers, connections, size, rate): echo_sample(b, *a, 1, 3)))
     cases.append((f"echo {backend} 1/1/64 @1 idle", lambda b, a=(backend,): echo_sample(b, a[0], 1, 1, 64, 1, 0, 10)))

@@ -1,0 +1,72 @@
+## diag-branch/target/release/diag native 4 1024 1000
+  diag: cpu 0.09s voluntary switches 8
+  base-native-tas: cpu 8.41s voluntary switches 41299
+  base-native-mon: cpu 0.05s voluntary switches 3638
+## rb-branch/target/release/rb pulse 4 10
+  rb: cpu 0.00s voluntary switches 3
+  base-native-tas: cpu 0.00s voluntary switches 31
+  base-native-mon: cpu 0.00s voluntary switches 12
+## rb-branch/target/release/rb task-sleep-pending 4 300
+  rb: cpu 0.00s voluntary switches 3
+  base-native-tas: cpu 0.04s voluntary switches 2043
+  base-native-mon: cpu 0.00s voluntary switches 251
+## rb-branch/target/release/rb root-sleep 4 1000
+  rb: cpu 0.03s voluntary switches 963
+  base-native-tas: cpu 0.02s voluntary switches 1940
+  base-native-mon: cpu 0.01s voluntary switches 961
+## timers-branch native sleep cycle 64 200 4 1000
+  timers-branch: cpu 0.00s voluntary switches 3
+  base-native-tas: cpu 0.48s voluntary switches 8238
+  base-native-mon: cpu 0.00s voluntary switches 186
+## timers-branch native sleep yield 64 75000 4 1000
+  timers-branch: cpu 0.00s voluntary switches 2
+  base-native-tas: cpu 2.18s voluntary switches 9
+  base-native-mon: cpu 0.00s voluntary switches 1
+## diag-branch/target/release/diag native 4 1024 1000
+  diag: cpu 0.09s voluntary switches 8
+  base-native-tas: cpu 8.72s voluntary switches 27654
+  base-native-mon: cpu 0.05s voluntary switches 3637
+## rb-branch/target/release/rb pulse 4 10
+  rb: cpu 0.00s voluntary switches 4
+  base-native-tas: cpu 0.00s voluntary switches 27
+  base-native-mon: cpu 0.00s voluntary switches 11
+## rb-branch/target/release/rb task-sleep-pending 4 300
+  rb: cpu 0.00s voluntary switches 3
+  base-native-tas: cpu 0.05s voluntary switches 1626
+  base-native-mon: cpu 0.00s voluntary switches 247
+## rb-branch/target/release/rb root-sleep 4 1000
+  rb: cpu 0.03s voluntary switches 968
+  base-native-tas: cpu 0.03s voluntary switches 1942
+  base-native-mon: cpu 0.00s voluntary switches 964
+## timers-branch native sleep cycle 64 200 4 1000
+  timers-branch: cpu 0.00s voluntary switches 2
+  base-native-tas: cpu 0.37s voluntary switches 4546
+  base-native-mon: cpu 0.00s voluntary switches 184
+## timers-branch native sleep yield 64 75000 4 1000
+  timers-branch: cpu 0.00s voluntary switches 1
+  base-native-tas: cpu 2.17s voluntary switches 3
+  base-native-mon: cpu 0.00s voluntary switches 4
+## diag-branch/target/release/diag native 4 1024 1000
+  diag: cpu 0.08s voluntary switches 10
+  base-native-tas: cpu 8.69s voluntary switches 40747
+  base-native-mon: cpu 0.04s voluntary switches 3647
+## rb-branch/target/release/rb pulse 4 10
+  rb: cpu 0.00s voluntary switches 2
+  base-native-tas: cpu 0.00s voluntary switches 28
+  base-native-mon: cpu 0.00s voluntary switches 16
+## rb-branch/target/release/rb task-sleep-pending 4 300
+  rb: cpu 0.00s voluntary switches 3
+  base-native-tas: cpu 0.06s voluntary switches 1544
+  base-native-mon: cpu 0.00s voluntary switches 246
+## rb-branch/target/release/rb root-sleep 4 1000
+  rb: cpu 0.02s voluntary switches 969
+  base-native-tas: cpu 0.02s voluntary switches 1941
+  base-native-mon: cpu 0.00s voluntary switches 940
+## timers-branch native sleep cycle 64 200 4 1000
+  timers-branch: cpu 0.00s voluntary switches 2
+  base-native-tas: cpu 0.58s voluntary switches 11561
+  base-native-mon: cpu 0.00s voluntary switches 187
+## timers-branch native sleep yield 64 75000 4 1000
+  timers-branch: cpu 0.00s voluntary switches 1
+  base-native-tas: cpu 2.17s voluntary switches 8
+  base-native-mon: cpu 0.00s voluntary switches 2
