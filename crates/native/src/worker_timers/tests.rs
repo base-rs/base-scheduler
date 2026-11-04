@@ -583,12 +583,20 @@ fn inserting_without_lowering_the_published_deadline_is_caught() {
 fn a_closed_queue_with_timers_makes_its_owner_wait_no_longer() {
     let queues = [std::array::from_fn(|_| crossbeam_deque::Worker::new_fifo())];
     let shared = Arc::new(Shared::new(&queues, 8, true));
+    let earlier = register(
+        &shared,
+        now(&shared) + Duration::from_secs(60),
+        Waker::noop().clone(),
+    )
+    .unwrap();
     let pending = register(
         &shared,
         now(&shared) + Duration::from_secs(3600),
         Waker::noop().clone(),
     )
     .unwrap();
+    // Release leaves the earlier deadline published; the idle timeout refreshes it to the later one, which is earlier than the monitor's plan and so wakes it.
+    drop(earlier);
     assert!(timeout(&shared, 0).unwrap() > Duration::from_secs(3000));
     // Closure publishes the remaining timers as due, which also offers them to the stall monitor.
     close(&shared, 0);

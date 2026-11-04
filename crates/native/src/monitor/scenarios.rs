@@ -402,7 +402,11 @@ fn closure_while_the_only_worker_is_stuck_notifies_its_timers_and_shutdown_waits
 
 #[test]
 fn reentrant_and_panicking_wakers_do_not_stop_rescue() {
-    struct Reentrant(Arc<NativeScheduler>, Arc<AtomicUsize>);
+    struct Reentrant(
+        Arc<NativeScheduler>,
+        Arc<AtomicUsize>,
+        Arc<Mutex<Vec<NativeTask<usize>>>>,
+    );
     impl Wake for Reentrant {
         fn wake(self: Arc<Self>) {
             // This runs on a rescuing thread while the owner is stuck, and registers on the same queue.
@@ -413,8 +417,9 @@ fn reentrant_and_panicking_wakers_do_not_stop_rescue() {
                     .poll(&mut Context::from_waker(Waker::noop()))
                     .is_pending()
             );
-            // Spawning from a rescuing thread is allowed too; the task runs on a worker that is not stuck.
-            drop(self.0.spawn(async {}).unwrap());
+            // Spawning from a rescuing thread is allowed too; the task runs once the only worker returns.
+            let spawned = self.0.spawn(async { 42 }).unwrap();
+            self.2.lock().unwrap().push(spawned);
             self.1.fetch_add(1, Ordering::SeqCst);
             panic!("rescued waker panic");
         }
@@ -423,9 +428,11 @@ fn reentrant_and_panicking_wakers_do_not_stop_rescue() {
         let scheduler = scheduler(1);
         let released = Arc::new(AtomicBool::new(false));
         let woken = Arc::new(AtomicUsize::new(0));
+        let spawned = Arc::new(Mutex::new(Vec::new()));
         let waker = Waker::from(Arc::new(Reentrant(
             Arc::clone(&scheduler),
             Arc::clone(&woken),
+            Arc::clone(&spawned),
         )));
         let (_, blocker) =
             stall_with_timer(&scheduler, 0, || sleep(&scheduler, DELAY), waker, &released);
@@ -436,6 +443,9 @@ fn reentrant_and_panicking_wakers_do_not_stop_rescue() {
         assert_prompt("later sleep", start.elapsed());
         released.store(true, Ordering::Release);
         block_on(blocker).unwrap();
+        for task in std::mem::take(&mut *spawned.lock().unwrap()) {
+            assert_eq!(block_on(task).unwrap(), 42);
+        }
         block_on(scheduler.shutdown());
     });
 }
