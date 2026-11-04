@@ -21,7 +21,7 @@ use std::{
 pub(crate) const NO_DEADLINE: u64 = u64::MAX;
 
 /// Wakers collected under one queue lock by an expiry pass.
-const BATCH: usize = 64;
+const BATCH: usize = 256;
 
 pub(crate) fn closed() -> io::Error {
     io::Error::new(io::ErrorKind::BrokenPipe, "clock is closed")
