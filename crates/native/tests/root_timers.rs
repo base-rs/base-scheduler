@@ -110,64 +110,68 @@ fn root_sleeps_fire_while_a_worker_is_blocked() {
 
 #[test]
 fn concurrent_external_sleeps_fire_while_a_worker_is_blocked() {
-    let scheduler = NativeScheduler::with_options(NativeOptions {
-        workers: 2,
-        ..Default::default()
-    })
-    .unwrap();
-    let (release, tasks) = occupy(&scheduler, 1);
-    std::thread::scope(|scope| {
-        let threads: Vec<_> = (0..8)
-            .map(|_| {
-                scope.spawn(|| {
-                    let start = Instant::now();
-                    block_on(scheduler.sleep(DELAY, &Cancellation::never())).unwrap();
-                    start.elapsed()
+    for (workers, busy) in [(2, 1), (4, 3)] {
+        let scheduler = NativeScheduler::with_options(NativeOptions {
+            workers,
+            ..Default::default()
+        })
+        .unwrap();
+        let (release, tasks) = occupy(&scheduler, busy);
+        std::thread::scope(|scope| {
+            let threads: Vec<_> = (0..workers * 4)
+                .map(|_| {
+                    scope.spawn(|| {
+                        let start = Instant::now();
+                        block_on(scheduler.sleep(DELAY, &Cancellation::never())).unwrap();
+                        start.elapsed()
+                    })
                 })
-            })
-            .collect();
-        for (index, thread) in threads.into_iter().enumerate() {
-            assert_prompt(&format!("external sleep {index}"), thread.join().unwrap());
+                .collect();
+            for (index, thread) in threads.into_iter().enumerate() {
+                assert_prompt(&format!("external sleep {index}"), thread.join().unwrap());
+            }
+        });
+        drop(release);
+        for task in tasks {
+            block_on(task).unwrap();
         }
-    });
-    drop(release);
-    for task in tasks {
-        block_on(task).unwrap();
+        block_on(scheduler.shutdown());
     }
-    block_on(scheduler.shutdown());
 }
 
 #[test]
 fn pending_root_deadline_moves_off_a_worker_that_starts_a_long_poll() {
-    let scheduler = NativeScheduler::with_options(NativeOptions {
-        workers: 2,
-        ..Default::default()
-    })
-    .unwrap();
-    // Admission alternates between workers, so either may be watching the deadline when its long poll starts.
-    for index in 0..4 {
-        std::thread::scope(|scope| {
-            let sleeper = scope.spawn(|| {
-                let start = Instant::now();
-                block_on(scheduler.sleep(DELAY * 4, &Cancellation::never())).unwrap();
-                start.elapsed()
+    for (workers, busy) in [(2, 1), (4, 3)] {
+        let scheduler = NativeScheduler::with_options(NativeOptions {
+            workers,
+            ..Default::default()
+        })
+        .unwrap();
+        // Admission rotates between workers, so any of them may be watching the deadline when its long poll starts.
+        for index in 0..workers * 2 {
+            std::thread::scope(|scope| {
+                let sleeper = scope.spawn(|| {
+                    let start = Instant::now();
+                    block_on(scheduler.sleep(DELAY * 4, &Cancellation::never())).unwrap();
+                    start.elapsed()
+                });
+                // Let an idle worker adopt the registered deadline before the poll begins.
+                std::thread::sleep(DELAY);
+                let (release, tasks) = occupy(&scheduler, busy);
+                let elapsed = sleeper.join().unwrap();
+                assert!(
+                    elapsed >= DELAY * 4 && elapsed < DELAY * 4 + LATE,
+                    "root sleep {index} waited {elapsed:?} for a {:?} deadline",
+                    DELAY * 4
+                );
+                drop(release);
+                for task in tasks {
+                    block_on(task).unwrap();
+                }
             });
-            // Let an idle worker adopt the registered deadline before the poll begins.
-            std::thread::sleep(DELAY);
-            let (release, tasks) = occupy(&scheduler, 1);
-            let elapsed = sleeper.join().unwrap();
-            assert!(
-                elapsed >= DELAY * 4 && elapsed < DELAY * 4 + LATE,
-                "root sleep {index} waited {elapsed:?} for a {:?} deadline",
-                DELAY * 4
-            );
-            drop(release);
-            for task in tasks {
-                block_on(task).unwrap();
-            }
-        });
+        }
+        block_on(scheduler.shutdown());
     }
-    block_on(scheduler.shutdown());
 }
 
 #[test]

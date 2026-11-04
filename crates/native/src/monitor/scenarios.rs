@@ -162,46 +162,48 @@ fn assert_prompt(label: &str, elapsed: Duration) {
 #[test]
 fn a_timer_left_on_a_worker_that_blocks_fires_for_its_new_waiter() {
     test_support::run(|| {
-        let scheduler = scheduler(2);
-        for timer in [sleep, reusable] {
-            let released = Arc::new(AtomicBool::new(false));
-            let (send, receive) = futures_channel::oneshot::channel::<(Instant, Sleep)>();
-            let receive = Arc::new(Mutex::new(Some(receive)));
-            let source = Arc::clone(&scheduler);
-            // Register on worker 0, hand the pending wait to another task, then block worker 0.
-            let send = Arc::new(Mutex::new(Some(send)));
-            let blocker = spawn_on(&scheduler, 0, || {
-                let send = Arc::clone(&send);
-                let released = Arc::clone(&released);
-                let mut wait = timer(&source, DELAY);
-                async move {
-                    assert!(
-                        wait.as_mut()
-                            .poll(&mut Context::from_waker(Waker::noop()))
-                            .is_pending()
-                    );
-                    let registered = Instant::now();
-                    // Only the copy that starts on worker 0 runs this body.
-                    let send = send.lock().unwrap().take().unwrap();
-                    assert!(send.send((registered, wait)).is_ok());
-                    block(&released);
-                }
-            });
-            // The new waiter runs on the other worker and updates the registration's waker in worker 0's queue.
-            let waiter = scheduler
-                .spawn(async move {
-                    let receive = receive.lock().unwrap().take().unwrap();
-                    let (registered, wait) = receive.await.unwrap();
-                    wait.await.unwrap();
-                    registered.elapsed()
-                })
-                .unwrap();
-            let elapsed = block_on(waiter).unwrap();
-            assert_prompt("waiter", elapsed);
-            released.store(true, Ordering::Release);
-            block_on(blocker).unwrap();
+        for workers in [2, 4] {
+            let scheduler = scheduler(workers);
+            for timer in [sleep, reusable] {
+                let released = Arc::new(AtomicBool::new(false));
+                let (send, receive) = futures_channel::oneshot::channel::<(Instant, Sleep)>();
+                let receive = Arc::new(Mutex::new(Some(receive)));
+                let source = Arc::clone(&scheduler);
+                // Register on worker 0, hand the pending wait to another task, then block worker 0.
+                let send = Arc::new(Mutex::new(Some(send)));
+                let blocker = spawn_on(&scheduler, 0, || {
+                    let send = Arc::clone(&send);
+                    let released = Arc::clone(&released);
+                    let mut wait = timer(&source, DELAY);
+                    async move {
+                        assert!(
+                            wait.as_mut()
+                                .poll(&mut Context::from_waker(Waker::noop()))
+                                .is_pending()
+                        );
+                        let registered = Instant::now();
+                        // Only the copy that starts on worker 0 runs this body.
+                        let send = send.lock().unwrap().take().unwrap();
+                        assert!(send.send((registered, wait)).is_ok());
+                        block(&released);
+                    }
+                });
+                // The new waiter runs on the other worker and updates the registration's waker in worker 0's queue.
+                let waiter = scheduler
+                    .spawn(async move {
+                        let receive = receive.lock().unwrap().take().unwrap();
+                        let (registered, wait) = receive.await.unwrap();
+                        wait.await.unwrap();
+                        registered.elapsed()
+                    })
+                    .unwrap();
+                let elapsed = block_on(waiter).unwrap();
+                assert_prompt("waiter", elapsed);
+                released.store(true, Ordering::Release);
+                block_on(blocker).unwrap();
+            }
+            block_on(scheduler.shutdown());
         }
-        block_on(scheduler.shutdown());
     });
 }
 
@@ -248,23 +250,25 @@ fn a_rescued_task_avoids_its_stuck_preferred_worker_while_others_are_saturated()
 fn rescue_wakes_a_task_preferring_an_idle_worker_without_losing_it() {
     // The rescuer is either the monitor or the idle worker's pre-park check. The latter schedules into its own queue and must retry rather than park.
     test_support::run(|| {
-        let scheduler = scheduler(2);
-        for _ in 0..20 {
-            let waiter = wait_on(&scheduler, 1);
-            let released = Arc::new(AtomicBool::new(false));
-            let (registered, blocker) = stall_with_timer(
-                &scheduler,
-                0,
-                || sleep(&scheduler, DELAY),
-                waiter.waker,
-                &released,
-            );
-            let (resumed, _) = block_on(waiter.task).unwrap().unwrap();
-            assert_prompt("woken task", resumed - registered);
-            released.store(true, Ordering::Release);
-            block_on(blocker).unwrap();
+        for workers in [2, 4] {
+            let scheduler = scheduler(workers);
+            for _ in 0..20 {
+                let waiter = wait_on(&scheduler, 1);
+                let released = Arc::new(AtomicBool::new(false));
+                let (registered, blocker) = stall_with_timer(
+                    &scheduler,
+                    0,
+                    || sleep(&scheduler, DELAY),
+                    waiter.waker,
+                    &released,
+                );
+                let (resumed, _) = block_on(waiter.task).unwrap().unwrap();
+                assert_prompt("woken task", resumed - registered);
+                released.store(true, Ordering::Release);
+                block_on(blocker).unwrap();
+            }
+            block_on(scheduler.shutdown());
         }
-        block_on(scheduler.shutdown());
     });
 }
 
@@ -287,66 +291,70 @@ fn wait_until(condition: impl Fn() -> bool) {
 #[test]
 fn a_worker_that_blocks_while_the_monitor_sleeps_without_deadlines_is_still_rescued() {
     test_support::run(|| {
-        let scheduler = scheduler(2);
-        let monitor = &scheduler.tasks.shared.monitor;
-        for _ in 0..20 {
-            // No deadline is pending, so the monitor sleeps until a registration wakes it.
-            wait_until(|| {
-                monitor.next.load(Ordering::Relaxed) == crate::worker_timers::NO_DEADLINE
-            });
-            let probe = Arc::new(Probe::default());
-            let released = Arc::new(AtomicBool::new(false));
-            let (registered, blocker) = stall_with_timer(
-                &scheduler,
-                0,
-                || sleep(&scheduler, DELAY),
-                Waker::from(Arc::clone(&probe)),
-                &released,
-            );
-            wait_until(|| probe.0.load(Ordering::SeqCst) > 0);
-            assert_prompt("rescued timer", registered.elapsed());
-            released.store(true, Ordering::Release);
-            block_on(blocker).unwrap();
+        for workers in [2, 4] {
+            let scheduler = scheduler(workers);
+            let monitor = &scheduler.tasks.shared.monitor;
+            for _ in 0..20 {
+                // No deadline is pending, so the monitor sleeps until a registration wakes it.
+                wait_until(|| {
+                    monitor.next.load(Ordering::Relaxed) == crate::worker_timers::NO_DEADLINE
+                });
+                let probe = Arc::new(Probe::default());
+                let released = Arc::new(AtomicBool::new(false));
+                let (registered, blocker) = stall_with_timer(
+                    &scheduler,
+                    0,
+                    || sleep(&scheduler, DELAY),
+                    Waker::from(Arc::clone(&probe)),
+                    &released,
+                );
+                wait_until(|| probe.0.load(Ordering::SeqCst) > 0);
+                assert_prompt("rescued timer", registered.elapsed());
+                released.store(true, Ordering::Release);
+                block_on(blocker).unwrap();
+            }
+            block_on(scheduler.shutdown());
         }
-        block_on(scheduler.shutdown());
     });
 }
 
 #[test]
 fn runnable_tasks_queued_behind_a_long_poll_run_on_another_worker() {
     test_support::run(|| {
-        let scheduler = scheduler(2);
-        let local: Vec<_> = (0..4).map(|_| wait_on(&scheduler, 0)).collect();
-        let remote: Vec<_> = (0..4).map(|_| wait_on(&scheduler, 0)).collect();
-        let released = Arc::new(AtomicBool::new(false));
-        let (send, started) = mpsc::channel();
-        let wakers: Vec<_> = local.iter().map(|waiter| waiter.waker.clone()).collect();
-        // Wake from worker 0 itself, so the tasks enter its local ready queue, then block it.
-        let blocker = spawn_on(&scheduler, 0, || {
-            let wakers = wakers.clone();
-            let send = send.clone();
-            let released = Arc::clone(&released);
-            async move {
-                for waker in wakers {
-                    waker.wake();
+        for workers in [2, 4] {
+            let scheduler = scheduler(workers);
+            let local: Vec<_> = (0..4).map(|_| wait_on(&scheduler, 0)).collect();
+            let remote: Vec<_> = (0..4).map(|_| wait_on(&scheduler, 0)).collect();
+            let released = Arc::new(AtomicBool::new(false));
+            let (send, started) = mpsc::channel();
+            let wakers: Vec<_> = local.iter().map(|waiter| waiter.waker.clone()).collect();
+            // Wake from worker 0 itself, so the tasks enter its local ready queue, then block it.
+            let blocker = spawn_on(&scheduler, 0, || {
+                let wakers = wakers.clone();
+                let send = send.clone();
+                let released = Arc::clone(&released);
+                async move {
+                    for waker in wakers {
+                        waker.wake();
+                    }
+                    send.send(Instant::now()).unwrap();
+                    block(&released);
                 }
-                send.send(Instant::now()).unwrap();
-                block(&released);
+            });
+            let start = started.recv_timeout(HOLD).unwrap();
+            // Remote wakes enter worker 0's inbox, or skip it once worker 0 is marked stuck.
+            for waiter in &remote {
+                waiter.waker.wake_by_ref();
             }
-        });
-        let start = started.recv_timeout(HOLD).unwrap();
-        // Remote wakes enter worker 0's inbox, or skip it once worker 0 is marked stuck.
-        for waiter in &remote {
-            waiter.waker.wake_by_ref();
+            for waiter in local.into_iter().chain(remote) {
+                let (resumed, ran_on) = block_on(waiter.task).unwrap().unwrap();
+                assert!(resumed - start < LATE);
+                assert!(ran_on.is_some_and(|worker| worker != 0), "{ran_on:?}");
+            }
+            released.store(true, Ordering::Release);
+            block_on(blocker).unwrap();
+            block_on(scheduler.shutdown());
         }
-        for waiter in local.into_iter().chain(remote) {
-            let (resumed, ran_on) = block_on(waiter.task).unwrap().unwrap();
-            assert!(resumed - start < LATE);
-            assert_eq!(ran_on, Some(1));
-        }
-        released.store(true, Ordering::Release);
-        block_on(blocker).unwrap();
-        block_on(scheduler.shutdown());
     });
 }
 
@@ -402,6 +410,8 @@ fn reentrant_and_panicking_wakers_do_not_stop_rescue() {
                     .poll(&mut Context::from_waker(Waker::noop()))
                     .is_pending()
             );
+            // Spawning from a rescuing thread is allowed too; the task runs on a worker that is not stuck.
+            drop(self.0.spawn(async {}).unwrap());
             self.1.fetch_add(1, Ordering::SeqCst);
             panic!("rescued waker panic");
         }
@@ -430,32 +440,78 @@ fn reentrant_and_panicking_wakers_do_not_stop_rescue() {
 #[test]
 fn repeated_short_stalls_near_the_threshold_complete() {
     test_support::run(|| {
-        let scheduler = scheduler(2);
-        let tasks: Vec<_> = (0..16)
-            .map(|index| {
-                let scheduler = Arc::clone(&scheduler);
-                scheduler
-                    .clone()
-                    .spawn(async move {
-                        for round in 0..20u64 {
-                            scheduler
-                                .sleep(Duration::from_micros(500), &Cancellation::never())
-                                .await
-                                .unwrap();
-                            // Spin around the stall threshold without yielding.
-                            let spin = Duration::from_micros(500 + (index + round) % 4 * 500);
-                            let start = Instant::now();
-                            while start.elapsed() < spin {
-                                std::hint::spin_loop();
+        for workers in [2, 4] {
+            let scheduler = scheduler(workers);
+            let tasks: Vec<_> = (0..16)
+                .map(|index| {
+                    let scheduler = Arc::clone(&scheduler);
+                    scheduler
+                        .clone()
+                        .spawn(async move {
+                            for round in 0..20u64 {
+                                scheduler
+                                    .sleep(Duration::from_micros(500), &Cancellation::never())
+                                    .await
+                                    .unwrap();
+                                // Spin around the stall threshold without yielding.
+                                let spin = Duration::from_micros(500 + (index + round) % 4 * 500);
+                                let start = Instant::now();
+                                while start.elapsed() < spin {
+                                    std::hint::spin_loop();
+                                }
                             }
-                        }
-                    })
-                    .unwrap()
-            })
-            .collect();
-        for task in tasks {
-            block_on(task).unwrap();
+                        })
+                        .unwrap()
+                })
+                .collect();
+            for task in tasks {
+                block_on(task).unwrap();
+            }
+            block_on(scheduler.shutdown());
         }
+    });
+}
+
+#[test]
+fn an_owner_returning_during_a_rescue_loses_no_timer() {
+    // Worker 0 repeatedly blocks for three stall thresholds: timers falling due early in a block are rescued, and those falling due near its end race the owner's own timer pass when it returns.
+    test_support::run(|| {
+        let scheduler = scheduler(2);
+        let done = Arc::new(AtomicBool::new(false));
+        let stalls = {
+            let done = Arc::clone(&done);
+            spawn_on(&scheduler, 0, move || {
+                let done = Arc::clone(&done);
+                async move {
+                    while !done.load(Ordering::Acquire) {
+                        std::thread::sleep(Duration::from_millis(3));
+                        yield_now().await;
+                    }
+                }
+            })
+        };
+        let never = Cancellation::never();
+        for index in 0..200u64 {
+            // Root registrations alternate between workers, so half land on the stalling one.
+            let delay = Duration::from_micros(500 + index % 7 * 400);
+            let deadline = Instant::now() + delay;
+            block_on(scheduler.sleep(delay, &never)).unwrap();
+            let late = deadline.elapsed();
+            assert!(late < LATE, "sleep {index} was {late:?} late");
+        }
+        done.store(true, Ordering::Release);
+        block_on(stalls).unwrap();
+        assert!(
+            scheduler
+                .tasks
+                .shared
+                .monitor
+                .counters
+                .timers
+                .load(Ordering::Relaxed)
+                > 0,
+            "no timer was rescued, so the race was not exercised"
+        );
         block_on(scheduler.shutdown());
     });
 }
