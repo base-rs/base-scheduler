@@ -50,7 +50,7 @@ pub(crate) struct Shared {
     pub(crate) idle_workers: AtomicUsize,
     // Task-future ownership can retire before its final runnable returns. Shutdown waits for both.
     remaining: AtomicUsize,
-    // Written on every task schedule, by whichever thread wakes the task, and on every runnable retirement, which then reads `closed`. Unpadded, it shared a cache line with `closed` and the other fields here, so that traffic made each retirement's read miss. Padding keeps it off their lines; the remaining fields still share lines with the less frequent spawn and park writes.
+    // Written on every task schedule, by whichever thread wakes the task, and on every runnable retirement, which then reads `closed`. Unpadded, it usually shared a cache line with `closed`, depending on where the allocation started, so that traffic made each retirement's read miss. Padding keeps it off their lines; the remaining fields still share lines with the less frequent spawn and park writes.
     outstanding: CachePadded<AtomicUsize>,
     changed: Event,
 }
