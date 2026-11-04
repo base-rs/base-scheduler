@@ -27,10 +27,10 @@ pub(crate) type Runnable = async_task::Runnable<TaskState>;
 // Arming shares the runnable counter's modification order, so a waiter either sees quiescence or the last runnable sees this bit and notifies it. Keep the bit armed thereafter; drains are cold, and this avoids deregistration races between concurrent or abandoned waiters.
 const NOTIFY_IDLE: usize = 1 << (usize::BITS - 1);
 
-/// A value on its own 128-byte block.
+// Pads a value to its own 128-byte block: one cache line on Apple and other 128-byte-line cores, and an adjacent-line prefetch pair on x86-64.
 #[repr(align(128))]
-pub(crate) struct Isolated<T>(pub(crate) T);
-impl<T> std::ops::Deref for Isolated<T> {
+struct CachePadded<T>(T);
+impl<T> std::ops::Deref for CachePadded<T> {
     type Target = T;
     fn deref(&self) -> &T {
         &self.0
@@ -50,8 +50,8 @@ pub(crate) struct Shared {
     pub(crate) idle_workers: AtomicUsize,
     // Task-future ownership can retire before its final runnable returns. Shutdown waits for both.
     remaining: AtomicUsize,
-    // Every worker writes this on each schedule and retirement. It has its own 128-byte block, the unit Intel's adjacent-line prefetcher shares between cores, so its traffic does not evict read-mostly neighbours such as `closed`.
-    outstanding: Isolated<AtomicUsize>,
+    // Written on every task schedule, by whichever thread wakes the task, and on every runnable retirement, which then reads `closed`. Unpadded, it shared a cache line with `closed` and the other fields here, so that traffic made each retirement's read miss. Padding keeps it off their lines; the remaining fields still share lines with the less frequent spawn and park writes.
+    outstanding: CachePadded<AtomicUsize>,
     changed: Event,
 }
 pub(crate) struct TaskService {
@@ -102,17 +102,15 @@ impl Shared {
             closed: AtomicBool::new(false),
             idle_workers: AtomicUsize::new(0),
             remaining: AtomicUsize::new(0),
-            outstanding: Isolated(AtomicUsize::new(0)),
+            outstanding: CachePadded(AtomicUsize::new(0)),
             changed: Event::new(),
         }
     }
 
-    #[inline]
     pub(crate) fn has_runnables(&self) -> bool {
         self.outstanding.load(Ordering::Acquire) & !NOTIFY_IDLE != 0
     }
 
-    #[inline]
     pub(crate) fn is_closed(&self) -> bool {
         self.closed.load(Ordering::Acquire)
     }
@@ -134,7 +132,6 @@ impl Shared {
         }
     }
 
-    #[inline]
     pub(crate) fn finished(&self) -> bool {
         self.closed.load(Ordering::Acquire)
             && self.remaining.load(Ordering::Acquire) == 0
