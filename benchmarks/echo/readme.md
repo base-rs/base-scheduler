@@ -77,6 +77,9 @@ The runner builds an optimized binary using the checked-in lockfile, then starts
 | `tokio` | Tokio | `TcpStream::read` / `write_all` with borrowed buffers |
 | `tokio-adapter` | Tokio | Bound `read_owned` / `write_owned`, implemented with readiness |
 | `tokio-adapter-poll` | Tokio | Bound borrowed `read_into` / `write`, implemented with readiness |
+| `native` | Native | Bound `read_owned` / `write_owned` on the default readiness selector (Linux) |
+| `native-poll` | Native | Bound borrowed `read_into` / `write` on the default readiness selector (Linux) |
+| `native-monitor` | Native | Alias of `native-poll` |
 | `iouring` | Native | Owned reads submit io_uring `Recv`; ready writes complete synchronously, otherwise submit `Send` |
 | `iouring-poll` | Native | Bound borrowed `read_into` / `write`, using persistent ring readiness |
 | `tokio-adapter-monitor` | Tokio | Alias of `tokio-adapter-poll` |
@@ -89,7 +92,11 @@ The multishot case uses eight 64 KiB payload buffers per connection, plus receiv
 
 The client connects and allocates buffers and histograms before warmup. All connections use one shared measurement window. Each sends one complete payload, waits for its full echo, verifies the bytes, and then sends the next request. Only round trips entirely inside the measurement window are counted. Neither connection setup nor warmup contributes to the reported throughput or latency histogram. One request means one round trip; payload MiB/s counts bytes in one direction, so aggregate TCP payload traffic is twice that figure.
 
-Latency is round-trip latency as seen by this closed-loop client, with three significant digits in the HDR histogram. It includes client scheduling and loopback networking. This is not an open-loop arrival-rate test, does not correct for coordinated omission, and does not measure connection churn or pipelining. The comparison measures these concrete implementations and ownership paths, not just trait-dispatch overhead. A client bottleneck can limit every server; verify client headroom before treating throughput as server capacity. Loopback results do not predict physical-network performance.
+With `--rate N`, the runner passes an offered rate to the client, which paces each connection at an equal share of `N` requests per second, staggered across connections, with at most one request outstanding per connection. A paced request's latency starts at its scheduled send time, so a server that falls behind is charged for the wait. The client sleeps for the coarse part of each interval and yields for the last two milliseconds, because Tokio timers have millisecond resolution. Compare fixed-rate latency and server CPU only at equal offered rates, separately from unrestricted throughput.
+
+On platforms with `wait4`, each sample also records the server process's user and system CPU time over its whole life, including setup, warmup and shutdown.
+
+Without `--rate`, latency is round-trip latency as seen by this closed-loop client, with three significant digits in the HDR histogram. It includes client scheduling and loopback networking. This is not an open-loop arrival-rate test, does not correct for coordinated omission, and does not measure connection churn or pipelining. The comparison measures these concrete implementations and ownership paths, not just trait-dispatch overhead. A client bottleneck can limit every server; verify client headroom before treating throughput as server capacity. Loopback results do not predict physical-network performance.
 
 Raw JSON preserves every repetition, configuration, CPU topology, source revision, toolchain, and load averages. Compare medians and variation across repetitions rather than selecting the fastest run. Keep frequency policy and affinity consistent; the runner does not change machine-wide settings.
 

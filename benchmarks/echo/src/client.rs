@@ -15,12 +15,24 @@ use tokio::{
     sync::{Barrier, watch},
 };
 
+// Tokio timers have millisecond resolution, which would bunch paced requests. Sleep for the coarse part, then yield until the scheduled instant.
+async fn pace(until: Instant) {
+    let coarse = until - Duration::from_millis(2);
+    if coarse > Instant::now() {
+        tokio::time::sleep_until(coarse.into()).await;
+    }
+    while Instant::now() < until {
+        tokio::task::yield_now().await;
+    }
+}
+
 pub(crate) async fn run(
     address: SocketAddr,
     connections: usize,
     bytes: usize,
     warmup: Duration,
     duration: Duration,
+    interval: Option<Duration>,
 ) -> Result<()> {
     let gate = Arc::new(Barrier::new(connections + 1));
     let (schedule, clock) = watch::channel(None::<(Instant, Instant)>);
@@ -47,8 +59,21 @@ pub(crate) async fn run(
                 .expect("coordinator publishes schedule");
             let (measure_start, measure_end) =
                 clock.borrow().expect("coordinator publishes the schedule");
+            // Paced connections start at staggered offsets, so their requests do not arrive together.
+            let mut scheduled = interval.map(|interval| {
+                Instant::now() + interval.mul_f64(index as f64 / connections as f64)
+            });
             loop {
-                let started = Instant::now();
+                // A paced request's latency starts at its scheduled send, including any delay before it could be sent.
+                let started = match scheduled.as_mut().zip(interval) {
+                    Some((scheduled, interval)) => {
+                        pace(*scheduled).await;
+                        let started = *scheduled;
+                        *scheduled += interval;
+                        started
+                    }
+                    None => Instant::now(),
+                };
                 if started >= measure_end {
                     break;
                 }
@@ -90,7 +115,7 @@ pub(crate) async fn run(
     println!(
         "{}",
         serde_json::json!({
-            "connections": connections, "bytes": bytes, "warmup_seconds": warmup.as_secs_f64(), "seconds": duration.as_secs_f64(),
+            "connections": connections, "bytes": bytes, "offered_requests_per_second": interval.map(|interval| connections as f64 / interval.as_secs_f64()), "warmup_seconds": warmup.as_secs_f64(), "seconds": duration.as_secs_f64(),
             "requests": latency.len(), "requests_per_second": latency.len() as f64 / duration.as_secs_f64(),
             "payload_mib_per_second": latency.len() as f64 * bytes as f64 / duration.as_secs_f64() / 1048576.0,
             "rtt_mean_us": latency.mean() / 1000.0, "rtt_p50_us": latency.value_at_quantile(0.50) as f64 / 1000.0,

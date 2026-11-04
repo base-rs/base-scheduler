@@ -16,6 +16,7 @@ import statistics
 import subprocess
 import sys
 import tempfile
+import time
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -36,7 +37,22 @@ def command_output(*args):
     return subprocess.check_output(args, cwd=ROOT, text=True).strip()
 
 
-def sample(binary, backend, workers, connections, size, args):
+def reap(server, timeout):
+    """Wait for the server and return its exit status and resource usage, or None where the platform lacks wait4."""
+    if not hasattr(os, "wait4"):
+        return server.wait(timeout=timeout), None
+    deadline = time.monotonic() + timeout
+    while True:
+        pid, status, usage = os.wait4(server.pid, os.WNOHANG)
+        if pid:
+            server.returncode = os.waitstatus_to_exitcode(status)
+            return server.returncode, usage
+        if time.monotonic() > deadline:
+            raise subprocess.TimeoutExpired(server.args, timeout)
+        time.sleep(0.01)
+
+
+def sample(binary, backend, workers, connections, size, args, rate=None):
     server_cpus = args.server_cpus[:workers] if args.server_cpus else []
     server_command = affinity(server_cpus) + [str(binary), "server", backend, str(workers), str(connections)]
     client_prefix = affinity(args.client_cpus)
@@ -51,13 +67,17 @@ def sample(binary, backend, workers, connections, size, args):
                 raise RuntimeError("server did not become ready within 30 seconds") from None
             if not address:
                 raise RuntimeError("server exited before printing its address")
-            client_command = client_prefix + [str(args.client_binary or binary), "client", address, str(args.client_workers), str(connections), str(size), str(args.warmup), str(args.seconds)]
+            client_command = client_prefix + [str(args.client_binary or binary), "client", address, str(args.client_workers), str(connections), str(size), str(args.warmup), str(args.seconds)] + ([str(rate)] if rate else [])
             result = subprocess.run(client_command, cwd=ROOT, capture_output=True, text=True, timeout=args.warmup + args.seconds + 30, check=True)
-            status = server.wait(timeout=30)
+            status, usage = reap(server, 30)
             if status:
                 raise RuntimeError(f"server exited with status {status}")
             data = json.loads(result.stdout)
-            return dict(data, backend=backend, workers=workers, client_workers=args.client_workers, server_cpus=server_cpus, client_cpus=args.client_cpus)
+            result = dict(data, backend=backend, workers=workers, client_workers=args.client_workers, server_cpus=server_cpus, client_cpus=args.client_cpus)
+            if usage:
+                # Server CPU covers its whole life, including setup, warmup and shutdown.
+                result.update(server_cpu_seconds=usage.ru_utime + usage.ru_stime, server_user_seconds=usage.ru_utime, server_system_seconds=usage.ru_stime)
+            return result
         except Exception as error:
             if isinstance(error, subprocess.CalledProcessError):
                 print(error.stderr, file=sys.stderr)
@@ -82,6 +102,7 @@ def main():
     parser.add_argument("--warmup", type=float, default=1)
     parser.add_argument("--seconds", type=float, default=3)
     parser.add_argument("--repeats", type=int, default=3)
+    parser.add_argument("--rate", type=int, help="offered requests per second across all connections; unrestricted by default")
     parser.add_argument("--server-cpus", type=cpu_list, default=[])
     parser.add_argument("--client-cpus", type=cpu_list, default=[])
     parser.add_argument("--output", type=Path, required=True)
@@ -121,7 +142,7 @@ def main():
             backends = args.backends.copy()
             rng.shuffle(backends)
             for backend in backends:
-                data = sample(binary, backend, workers, connections, size, args)
+                data = sample(binary, backend, workers, connections, size, args, args.rate)
                 report["samples"].append(dict(data, repeat=repeat + 1))
                 args.output.parent.mkdir(parents=True, exist_ok=True)
                 args.output.write_text(json.dumps(report, indent=2) + "\n")

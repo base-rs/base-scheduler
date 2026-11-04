@@ -53,6 +53,9 @@ impl Drop for Process {
     }
 }
 fn smoke(backend: &str) {
+    smoke_with(backend, &[]);
+}
+fn smoke_with(backend: &str, rate: &[&str]) {
     let mut server = Process::new(&["server", backend, "2", "4"]);
     let stdout = server.0.stdout.take().unwrap();
     let (send, recv) = mpsc::channel();
@@ -62,13 +65,23 @@ fn smoke(backend: &str) {
         send.send(line).unwrap();
     });
     let address = recv.recv_timeout(Duration::from_secs(10)).unwrap();
-    let mut client = Process::new(&["client", address.trim(), "2", "4", "4096", "0.03", "0.05"]);
+    let mut client = Process::new(
+        &[
+            &["client", address.trim(), "2", "4", "4096", "0.03", "0.05"],
+            rate,
+        ]
+        .concat(),
+    );
     let output = client.finish(true);
     let stats: serde_json::Value = serde_json::from_str(&output).unwrap();
     assert!(stats["requests"].as_u64().unwrap() > 0);
     assert_eq!(stats["bytes"], 4096);
     assert_eq!(stats["connections"], 4);
     assert!(stats["rtt_p99_us"].as_f64().unwrap() >= stats["rtt_p50_us"].as_f64().unwrap());
+    assert_eq!(
+        stats["offered_requests_per_second"].as_f64(),
+        rate.first().map(|rate| rate.parse().unwrap())
+    );
     server.finish(true);
 }
 #[test]
@@ -82,6 +95,20 @@ fn tokio_adapter() {
 #[test]
 fn tokio_adapter_poll() {
     smoke("tokio-adapter-poll");
+}
+#[cfg(target_os = "linux")]
+#[test]
+fn native_readiness() {
+    smoke("native");
+}
+#[cfg(target_os = "linux")]
+#[test]
+fn native_readiness_poll_at_an_offered_rate() {
+    smoke_with("native-poll", &["400"]);
+}
+#[test]
+fn offered_rate_reports_paced_requests() {
+    smoke_with("tokio", &["400"]);
 }
 #[cfg(target_os = "linux")]
 #[test]
@@ -105,6 +132,7 @@ fn invalid_configuration_fails_before_running_a_workload() {
         vec![],
         vec!["server"],
         vec!["server", "missing", "1", "1"],
+        vec!["client", "127.0.0.1:0"],
         vec!["server", "tokio", "0", "1"],
         vec!["server", "tokio", "invalid", "1"],
         vec!["client", "127.0.0.1:0", "1", "1", "65537", "0", "1"],
@@ -112,6 +140,7 @@ fn invalid_configuration_fails_before_running_a_workload() {
         vec!["client", "127.0.0.1:0", "1", "1", "1", "-1", "1"],
         vec!["client", "127.0.0.1:0", "1", "1", "1", "NaN", "1"],
         vec!["client", "127.0.0.1:0", "1", "1", "1", "0", "1"],
+        vec!["client", "127.0.0.1:0", "1", "1", "1", "0", "1", "0"],
     ] {
         Process::new(&args).finish(false);
     }
