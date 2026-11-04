@@ -10,7 +10,7 @@ Hana: Linux 7.2.14, Intel Xeon E3-1240 v6 (4 cores, 8 threads), `powersave` gove
 | [acceptance.md](acceptance.md) | Its summary from [`scripts/summarize.py`](scripts/summarize.py): the median, minimum and maximum on `main`, the branch median, and a verdict against the budget for that row (≤ ~3% for timer cases; the branch median within `main`'s range for echo, spawn and idle cases, per decision 11). |
 | [stall.md](stall.md) | [`scripts/quick.py`](scripts/quick.py), 9 pairs: a 10 ms root sleep behind a 200 ms stall on a 2-worker scheduler, and a 1 Hz pulse timer. |
 | [spawn-idle.md](spawn-idle.md) | `quick.py`, 21 pairs: spawn, spawn with a root timer pending, and one request per second for 10 s (idle server CPU). |
-| [monitor-threads.txt](monitor-threads.txt) | Per-thread CPU and voluntary context switches for branch timer workloads, 3 runs each, from a `/proc` sampler. A monitor thread's voluntary switches count its wakes. |
+| [monitor-threads.txt](monitor-threads.txt) | Per-thread CPU and voluntary context switches for branch timer workloads, 3 runs each, from [`scripts/threads.py`](scripts/threads.py). A monitor thread's voluntary switches approximate its wakes; `/proc` CPU times resolve to 10 ms, so "< 0.01 s" means below that. |
 
 ## Result
 
@@ -37,8 +37,8 @@ Over budget, for the maintainer's decision (design decision 4):
 
 The verdict for spawn and idle rows is whether the branch median falls within `main`'s range. Several medians moved a lot inside wide ranges:
 
-- **Spawn.** `rb spawn` +6% and `rb spawn-pending` +16% in the acceptance run; +6% and +10% over 21 further pairs ([spawn-idle.md](spawn-idle.md)), with every range spanning about 2×. With 200,000 spawns, user-space instructions differ by +0.7% (`spawn`) and −0.9% (`spawn-pending`), while cycles vary by up to 30% between runs of the same build, so the shifts come from cross-thread wake and park timing rather than added work. This run therefore neither confirms nor refutes the design's claim that spawning does not depend on whether a root timer is pending.
-- **Idle server CPU, one request a second.** Native +103% and io_uring +31% in the acceptance run, but the readiness-poll variants were −47% and −19%. Over 21 further 10-second pairs, native was +51% and io_uring +11%, with ranges of 2.3–7.8 ms on `main` and 2.6–8.5 ms on the branch. The echo server holds no timers, so the monitor should not wake; this was not confirmed per thread.
+- **Spawn.** `rb spawn` +6% and `rb spawn-pending` +16% in the acceptance run; +6% and +10% over 21 further pairs ([spawn-idle.md](spawn-idle.md)), with every range spanning 1.9–2.5×. With 200,000 spawns (`perf stat -e instructions:u,cycles:u rb <workload> 4 200000`, 3 runs per build, not committed), user-space instructions differ by +0.7% (`spawn`) and −0.9% (`spawn-pending`), while cycles vary by up to 30% between runs of the same build, so the shifts come from cross-thread wake and park timing rather than added work. This run therefore neither confirms nor refutes the design's claim that spawning does not depend on whether a root timer is pending.
+- **Idle server CPU, one request a second.** Native +103% and io_uring +31% in the acceptance run, while native-poll was −47% and io_uring-poll −19% (below `main`'s range). Over 21 further 10-second pairs, native was +51% (2.3–7.8 ms on `main`, 2.6–8.5 ms on the branch) and io_uring +11% (2.95–4.36 ms and 2.87–8.71 ms). The echo server holds no timers, so the monitor should not wake; this was not confirmed per thread.
 
 ## Monitor thread
 
@@ -61,4 +61,4 @@ The design asks for further measurements without budgets. These were not taken:
 
 - fixed-rate p99 with every core occupied;
 - a workload with occasional undeclared blocking (the net benefit);
-- rescue counts per workload, including stuck-poll rescues in the named benchmarks, which should be zero. The benchmark binaries do not enable the `diagnostics` feature.
+- rescue counts per workload, including stuck-poll rescues in the named benchmarks, which should be zero. This is also a requirement 1 validation item (the rescue classification counter), so it remains open. The benchmark binaries do not enable the `diagnostics` feature.
