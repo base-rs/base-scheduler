@@ -15,9 +15,9 @@ Monitor backends also accept an `-alternating` suffix. This control holds the la
 ## Build and run
 
 ```sh
-cargo build --release --locked -p base-scheduler-write-benchmark
-target/release/base-scheduler-write-benchmark server iouring-writer 1 1 262144 8 8 65536
-target/release/base-scheduler-write-benchmark client 127.0.0.1:PORT 4 1 262144 8 8 1 3
+cargo build --release --locked -p base-scheduler-benchmark-writes
+target/release/base-scheduler-benchmark-writes server iouring-writer 1 1 262144 8 8 65536
+target/release/base-scheduler-benchmark-writes client 127.0.0.1:PORT 4 1 262144 8 8 1 3
 ```
 
 The server prints its bound address. Arguments after the backend/address are worker count, connection count, bytes per chunk, chunks per response, and generation work per cache line. The server's final argument is requested send-buffer size; the client's final two arguments are warmup and measurement durations in seconds.

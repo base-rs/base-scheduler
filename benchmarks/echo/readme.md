@@ -1,4 +1,4 @@
-# `base-scheduler-echo-benchmark`
+# `base-scheduler-benchmark-echo`
 
 The portable multishot API has been consolidated into pooled receives. Historical results below retain their original meanings and can be reproduced at their recorded commits. Current `multi`/`multi-retain` buffer modes and `iouring-multishot` echo mode use the concrete io_uring constructor. The old portable polling control and `tokio-adapter-multishot` echo mode are retired; use bound readers for current portable comparisons.
 
@@ -111,15 +111,15 @@ Raw JSON preserves every repetition, configuration, CPU topology, source revisio
 To run the binaries directly:
 
 ```sh
-cargo build --release --locked -p base-scheduler-echo-benchmark
+cargo build --release --locked -p base-scheduler-benchmark-echo
 # Prints an address; remains running until the four clients close:
-target/release/base-scheduler-echo-benchmark server iouring 4 4
+target/release/base-scheduler-benchmark-echo server iouring 4 4
 # Substitute the printed address:
-target/release/base-scheduler-echo-benchmark client 127.0.0.1:PORT 4 4 64 1 3
+target/release/base-scheduler-benchmark-echo client 127.0.0.1:PORT 4 4 64 1 3
 ```
 
 Smoke tests exercise each available backend, payload validation, invalid inputs, and empty measurement windows. A controlled socket fixture verifies partial writes, zero-progress errors, and buffer reuse:
 
 ```sh
-cargo test --locked -p base-scheduler-echo-benchmark
+cargo test --locked -p base-scheduler-benchmark-echo
 ```

@@ -9,7 +9,7 @@ use std::{
     time::Duration,
 };
 
-const BINARY: &str = env!("CARGO_BIN_EXE_base-scheduler-write-benchmark");
+const BINARY: &str = env!("CARGO_BIN_EXE_base-scheduler-benchmark-writes");
 
 struct Server(Child);
 

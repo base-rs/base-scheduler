@@ -1,4 +1,4 @@
-# base-scheduler-timer-benchmark
+# base-scheduler-benchmark-timers
 
 An experimental reusable timer inspired by C++ `Async::After`, compared with the existing `Clock::sleep_until` operation. This branch is a prototype, rather than a proposal to replace the clock interface or a released public API.
 
@@ -48,7 +48,7 @@ The one-millisecond expiration rows reflect backend scheduling precision as well
 ## Reproduce
 
 ```sh
-cargo build --release --locked -p base-scheduler-timer-benchmark
+cargo build --release --locked -p base-scheduler-benchmark-timers
 flock /tmp/base-scheduler-perf.lock python3 benchmarks/timers/run.py --output results.jsonl
 python3 benchmarks/timers/summarize.py results.jsonl
 ```
@@ -56,8 +56,8 @@ python3 benchmarks/timers/summarize.py results.jsonl
 A single sample takes backend, mode, workload, tasks, iterations, workers and delay in microseconds:
 
 ```sh
-target/release/base-scheduler-timer-benchmark native reuse yield 64 75000 4 1000
-target/release/base-scheduler-timer-benchmark tokio after alloc 1 100000 1
+target/release/base-scheduler-benchmark-timers native reuse yield 64 75000 4 1000
+target/release/base-scheduler-benchmark-timers tokio after alloc 1 100000 1
 ```
 
 Use `--backends tokio native` on macOS. Process CPU time is available on Unix; the experimental harness reports zero on other systems. Performance results in this report are Linux measurements.

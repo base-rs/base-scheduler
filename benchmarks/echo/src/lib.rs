@@ -7,7 +7,7 @@ mod server;
 use std::{error::Error, time::Duration};
 type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;
 
-const USAGE: &str = "Usage: base-scheduler-echo-benchmark server BACKEND WORKERS CONNECTIONS\n       base-scheduler-echo-benchmark client ADDRESS WORKERS CONNECTIONS BYTES WARMUP_SECONDS MEASURE_SECONDS [RATE]\nBackends: tokio, tokio-adapter, tokio-adapter-poll, tokio-adapter-monitor, native, native-poll, native-monitor, iouring, iouring-poll, iouring-multishot, iouring-monitor (io_uring requires Linux). Server binds 127.0.0.1:0 and prints its address. RATE paces requests per second across all connections and measures latency from each scheduled send; without it, each connection sends its next request on receiving a response.";
+const USAGE: &str = "Usage: base-scheduler-benchmark-echo server BACKEND WORKERS CONNECTIONS\n       base-scheduler-benchmark-echo client ADDRESS WORKERS CONNECTIONS BYTES WARMUP_SECONDS MEASURE_SECONDS [RATE]\nBackends: tokio, tokio-adapter, tokio-adapter-poll, tokio-adapter-monitor, native, native-poll, native-monitor, iouring, iouring-poll, iouring-multishot, iouring-monitor (io_uring requires Linux). Server binds 127.0.0.1:0 and prints its address. RATE paces requests per second across all connections and measures latency from each scheduled send; without it, each connection sends its next request on receiving a response.";
 
 fn positive(value: &str) -> Result<usize> {
     let value = value.parse::<usize>()?;
