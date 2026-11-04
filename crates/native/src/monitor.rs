@@ -43,11 +43,9 @@ impl Monitor {
         }
     }
 
-    /// Called under a worker's queue lock after publishing `deadline`. The monitor stores its plan before rechecking each queue under its lock, so either it observes this deadline or this load observes its plan.
-    pub(crate) fn observe(&self, deadline: u64) {
-        if deadline.saturating_add(PERIOD) < self.next.load(Ordering::Relaxed) {
-            self.unpark();
-        }
+    /// Whether publishing `deadline` must wake the monitor. Called under the worker's queue lock; the caller unparks after unlocking. The monitor stores its plan before rechecking each queue under its lock, so either it observes this deadline or this load observes its plan.
+    pub(crate) fn needs_wake(&self, deadline: u64) -> bool {
+        deadline.saturating_add(PERIOD) < self.next.load(Ordering::Relaxed)
     }
 
     /// Interrupt the monitor's current sleep.
@@ -138,7 +136,7 @@ impl State {
     pub(crate) fn pass(&mut self, shared: &Arc<Shared>, now: u64) -> u64 {
         let (wake, covered) = self.watch(shared, now);
         shared.monitor.next.store(covered, Ordering::Relaxed);
-        let wake = self.confirm(wake, shared);
+        let wake = self.confirm(now, wake, shared);
         if wake == NO_DEADLINE {
             wake
         } else {
@@ -182,6 +180,9 @@ impl State {
                 if check > now {
                     covered = covered.min(deadline);
                     wake = wake.min(check);
+                } else {
+                    // A sleeping worker with an overdue deadline is about to collect it, but it may leave idle straight into a batch that stalls, and its unchanged deadline would never wake the monitor again. Look again until it is collected.
+                    wake = wake.min(now + PERIOD);
                 }
                 if observation.marked.is_some() {
                     // Keep sampling a stuck worker until it recovers. This costs nothing while no worker is stuck.
@@ -205,13 +206,14 @@ impl State {
         (wake, covered)
     }
 
-    // A deadline lowered after the pass read it, but before the plan was stored, may not have woken the monitor. Reading each queue under its lock closes that window: the monitor runs again by that deadline.
-    fn confirm(&self, wake: u64, shared: &Shared) -> u64 {
+    // A deadline changed after the pass read it, but before the plan was stored, may not have woken the monitor: a lower one would have been compared with the old plan, and a raised one replaces a deadline the plan no longer covers. Rereading each queue closes that window: the monitor runs again by the new deadline. A queue whose lock is busy is read again a period later rather than waited for.
+    fn confirm(&self, now: u64, wake: u64, shared: &Shared) -> u64 {
         let mut wake = wake;
         for (identifier, worker) in shared.workers.iter().enumerate() {
-            let published = worker_timers::published(worker);
-            if published < self.observations[identifier].deadline {
-                wake = wake.min(published);
+            match worker_timers::try_published(worker) {
+                Some(published) if published == self.observations[identifier].deadline => {}
+                Some(published) => wake = wake.min(published),
+                None => wake = wake.min(now + PERIOD),
             }
         }
         wake

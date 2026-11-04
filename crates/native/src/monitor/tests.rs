@@ -114,10 +114,13 @@ fn passes_rescue_timers_left_due_for_the_stall_on_busy_workers() {
     assert_eq!(state.pass(&shared, due + STALL * 5), NO_DEADLINE);
     assert_eq!(shared.workers[1].stuck(), None);
 
-    // A sleeping worker services its own due deadline.
+    // A sleeping worker services its own due deadline, but the monitor looks again in case it leaves idle straight into a stall.
     let third = expired_timer(&shared, 0, &probe);
     shared.workers[0].set_sleeping(true);
-    assert_eq!(state.pass(&shared, due + STALL * 6), NO_DEADLINE);
+    assert_eq!(
+        state.pass(&shared, due + STALL * 6),
+        due + STALL * 6 + PERIOD
+    );
     assert_eq!(shared.workers[0].stuck(), None);
     // Sleep also ends a stall that was marked.
     shared.workers[0].set_sleeping(false);
@@ -168,10 +171,38 @@ fn a_deadline_lowered_during_a_pass_runs_it_again() {
     )
     .unwrap();
     let lowered = shared.workers[0].timers.deadline.load(Ordering::Relaxed);
-    assert_eq!(state.confirm(NO_DEADLINE, &shared), lowered);
+    assert_eq!(state.confirm(now, NO_DEADLINE, &shared), lowered);
     state.pass(&shared, now);
-    assert_eq!(state.confirm(NO_DEADLINE, &shared), NO_DEADLINE);
+    assert_eq!(state.confirm(now, NO_DEADLINE, &shared), NO_DEADLINE);
     drop(registration);
+}
+
+#[test]
+fn a_deadline_raised_during_a_pass_runs_it_again() {
+    let shared = shared(1, true);
+    let probe = Arc::new(Probe::default());
+    let mut state = State::new(&shared);
+    let now = at(&shared, Duration::ZERO);
+    // The pass reads an overdue deadline on a sleeping worker, which then leaves idle, collects it and publishes a later one before the plan is stored.
+    let due = expired_timer(&shared, 0, &probe);
+    let later = worker_timers::register(
+        &shared,
+        worker_timers::now(&shared) + Duration::from_secs(10),
+        Waker::noop().clone(),
+    )
+    .unwrap();
+    shared.workers[0].set_sleeping(true);
+    state.pass(&shared, now);
+    shared.workers[0].set_sleeping(false);
+    worker_timers::expire(&shared, 0, &mut worker_timers::buffer(), false);
+    let raised = shared.workers[0].timers.deadline.load(Ordering::Relaxed);
+    assert!(raised > now);
+    assert_eq!(state.confirm(now, NO_DEADLINE, &shared), raised);
+    // A queue whose lock is busy is read again a period later.
+    let held = shared.workers[0].timers.queue.lock();
+    assert_eq!(state.confirm(now, NO_DEADLINE, &shared), now + PERIOD);
+    drop(held);
+    drop((due, later));
 }
 
 #[test]

@@ -53,35 +53,42 @@ fn lock(worker: &WorkerState) -> SpinGuard<'_, TimerQueue<Waker>> {
     worker.timers.queue.lock()
 }
 
-// The published deadline is a lower bound of the queue's earliest live deadline. Registration lowers it under the queue lock, and every pass that flushes the queue refreshes it exactly. Release leaves it early, which can only cause a redundant check. Every change is offered to the stall monitor, which wakes only for a deadline earlier than its plan.
-fn lower(shared: &Shared, worker: &WorkerState, deadline: Instant) -> bool {
+// The published deadline is a lower bound of the queue's earliest live deadline. Registration lowers it under the queue lock, and every pass that flushes the queue refreshes it exactly. Release leaves it early, which can only cause a redundant check. Every change is offered to the stall monitor, which wakes only for a deadline earlier than its plan. Both return whether the monitor needs waking; the caller unparks it after unlocking, keeping the syscall out of the critical section.
+fn lower(shared: &Shared, worker: &WorkerState, deadline: Instant) -> (bool, bool) {
     let deadline = nanos(worker, deadline);
-    let lowered = deadline < worker.timers.deadline.load(Ordering::Relaxed);
-    if lowered {
+    if deadline < worker.timers.deadline.load(Ordering::Relaxed) {
         worker.timers.deadline.store(deadline, Ordering::Relaxed);
-        shared.monitor.observe(deadline);
+        (true, shared.monitor.needs_wake(deadline))
+    } else {
+        (false, false)
     }
-    lowered
 }
 
 fn refresh(
     shared: &Shared,
     worker: &WorkerState,
     queue: &mut TimerQueue<Waker>,
-) -> Option<Instant> {
+) -> (Option<Instant>, bool) {
     let next = queue.next_deadline();
-    let published = next.map_or(NO_DEADLINE, |deadline| nanos(worker, deadline));
+    let closed = worker.timers.closed.load(Ordering::Relaxed);
+    // A closed queue keeps publishing zero while timers remain, so a stuck owner's queue is drained without waiting for their real deadlines.
+    let published = match next {
+        Some(_) if closed => 0,
+        Some(deadline) => nanos(worker, deadline),
+        None => NO_DEADLINE,
+    };
     let previous = worker.timers.deadline.load(Ordering::Relaxed);
     // Stall detection relies on the published deadline never being later than the earliest live deadline. Every insertion lowers it and removals only raise the true earliest, so the exact value can never fall below the bound it replaces. A failure here means a path inserted a timer without lowering the published deadline.
     debug_assert!(
         previous <= published,
         "published deadline {previous} was later than the queue's earliest {published}"
     );
+    let mut wake = false;
     if published != previous {
         worker.timers.deadline.store(published, Ordering::Relaxed);
-        shared.monitor.observe(published);
+        wake = shared.monitor.needs_wake(published);
     }
-    next
+    (next, wake)
 }
 
 /// The current clock in the nanoseconds used for published deadlines.
@@ -89,10 +96,10 @@ pub(crate) fn clock(shared: &Shared) -> u64 {
     nanos(&shared.workers[0], now(shared))
 }
 
-/// A worker's published deadline, read under its queue lock.
-pub(crate) fn published(worker: &WorkerState) -> u64 {
-    let _queue = lock(worker);
-    worker.timers.deadline.load(Ordering::Relaxed)
+/// A worker's published deadline, read under its queue lock, or `None` if the lock is busy.
+pub(crate) fn try_published(worker: &WorkerState) -> Option<u64> {
+    let _queue = worker.timers.queue.try_lock()?;
+    Some(worker.timers.deadline.load(Ordering::Relaxed))
 }
 
 // The current time if the published deadline has passed. Reading it needs no lock: a stale value delays collection only until the next pass, and an idle owner computes its wait under the lock.
@@ -168,8 +175,15 @@ pub(crate) fn register<'a>(
         return Err(closed());
     }
     let result = queue.try_schedule(deadline, waker);
-    let lowered = result.is_ok() && lower(shared, worker, deadline);
+    let (lowered, wake_monitor) = if result.is_ok() {
+        lower(shared, worker, deadline)
+    } else {
+        (false, false)
+    };
     drop(queue);
+    if wake_monitor {
+        shared.monitor.unpark();
+    }
     let key = result.map_err(|waker| {
         crate::panic::discard(waker);
         io::Error::new(io::ErrorKind::WouldBlock, "worker timer queue is full")
@@ -236,8 +250,11 @@ pub(crate) fn expire(
                 expired.push(waker);
             }
         }
-        refresh(shared, worker, &mut queue);
+        let (_, wake_monitor) = refresh(shared, worker, &mut queue);
         drop(queue);
+        if wake_monitor {
+            shared.monitor.unpark();
+        }
         let full = expired.len() == expired.capacity();
         fired += expired.len();
         for waker in expired.drain(..) {
@@ -255,16 +272,30 @@ pub(crate) fn close(shared: &Shared, owner: usize) {
     let queue = lock(worker);
     worker.timers.closed.store(true, Ordering::Relaxed);
     // Closure makes every remaining timer due, so the stall monitor watches a busy owner and drains its queue if it is stuck.
-    if !queue.is_empty() {
+    let wake_monitor = !queue.is_empty() && {
         worker.timers.deadline.store(0, Ordering::Relaxed);
-        shared.monitor.observe(0);
+        shared.monitor.needs_wake(0)
+    };
+    drop(queue);
+    if wake_monitor {
+        shared.monitor.unpark();
     }
 }
 
 /// The owner's wait bound, computed under its queue lock after advertising sleep.
 pub(crate) fn timeout(shared: &Arc<Shared>, owner: usize) -> Option<Duration> {
     let worker = &shared.workers[owner];
-    let next = refresh(shared, worker, &mut lock(worker));
+    let mut queue = lock(worker);
+    let (next, wake_monitor) = refresh(shared, worker, &mut queue);
+    // Closure may have followed this worker's last timer pass; its remaining timers are due now. Closure sets the flag under this lock before waking workers, so either this sees it or that wake sees this worker sleeping.
+    let closed = worker.timers.closed.load(Ordering::Relaxed) && next.is_some();
+    drop(queue);
+    if wake_monitor {
+        shared.monitor.unpark();
+    }
+    if closed {
+        return Some(Duration::ZERO);
+    }
     next.map(|deadline| deadline.saturating_duration_since(now(shared)))
 }
 

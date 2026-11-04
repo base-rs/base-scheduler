@@ -3,6 +3,7 @@
 
 use std::{
     cell::UnsafeCell,
+    marker::PhantomData,
     ops::{Deref, DerefMut},
     sync::atomic::{AtomicBool, Ordering},
 };
@@ -28,7 +29,7 @@ impl<T> SpinLock<T> {
         self.locked
             .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
             .ok()
-            .map(|_| SpinGuard(self))
+            .map(|_| SpinGuard(self, PhantomData))
     }
 
     pub(crate) fn lock(&self) -> SpinGuard<'_, T> {
@@ -48,7 +49,8 @@ impl<T> SpinLock<T> {
     }
 }
 
-pub(crate) struct SpinGuard<'a, T>(&'a SpinLock<T>);
+// The marker makes the guard `Sync` only when `T` is, since sharing a guard shares `&T`.
+pub(crate) struct SpinGuard<'a, T>(&'a SpinLock<T>, PhantomData<&'a mut T>);
 
 impl<T> Deref for SpinGuard<'_, T> {
     type Target = T;
