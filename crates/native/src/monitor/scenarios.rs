@@ -528,3 +528,24 @@ fn an_owner_returning_during_a_rescue_loses_no_timer() {
         block_on(scheduler.shutdown());
     });
 }
+
+#[test]
+fn a_monitor_scheduled_after_closure_still_exits() {
+    // The monitor passes its first check, then waits while the scheduler closes and finishes, so closure's wakes come before its first pass. They must still reach it, or shutdown waits for it forever.
+    test_support::run(|| {
+        for workers in [1, 2] {
+            let gate = Arc::new(std::sync::Barrier::new(2));
+            crate::monitor::START_GATE.set(Some(Arc::clone(&gate)));
+            let scheduler = scheduler(workers);
+            assert!(scheduler.tasks.shared.monitor.registered());
+            gate.wait();
+            block_on(scheduler.spawn(async {}).unwrap()).unwrap();
+            // A joined task's runnable can retire after the join returns. Drained before closure, the scheduler is finished as soon as it closes; drained after, the wait would include the held monitor.
+            block_on(scheduler.tasks.drain());
+            scheduler.close();
+            assert!(scheduler.tasks.shared.finished());
+            gate.wait();
+            block_on(scheduler.shutdown());
+        }
+    });
+}

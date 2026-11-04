@@ -136,6 +136,7 @@ fn passes_rescue_timers_left_due_for_the_stall_on_busy_workers() {
 #[test]
 fn an_earlier_deadline_wakes_the_monitor() {
     let shared = shared(1, true);
+    shared.monitor.register(thread::current());
     let mut state = State::new(&shared);
     let now = at(&shared, Duration::ZERO);
     assert_eq!(state.pass(&shared, now), NO_DEADLINE);

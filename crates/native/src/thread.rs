@@ -8,7 +8,8 @@ thread_local! {
     pub(crate) static FAIL_AFTER: std::cell::Cell<Option<usize>> = const { std::cell::Cell::new(None) };
 }
 
-pub(crate) fn start(name: &str, run: impl FnOnce() + Send + 'static) -> io::Result<()> {
+/// Start a named thread, returning its handle.
+pub(crate) fn start(name: &str, run: impl FnOnce() + Send + 'static) -> io::Result<thread::Thread> {
     #[cfg(test)]
     if let Some(remaining) = FAIL_AFTER.get() {
         FAIL_AFTER.set(remaining.checked_sub(1));
@@ -19,5 +20,5 @@ pub(crate) fn start(name: &str, run: impl FnOnce() + Send + 'static) -> io::Resu
     thread::Builder::new()
         .name(name.into())
         .spawn(run)
-        .map(drop)
+        .map(|handle| handle.thread().clone())
 }
