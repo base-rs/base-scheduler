@@ -81,13 +81,19 @@ fn smoke_with(backend: &str, rate: &[&str]) {
     let rate: Option<u64> = rate.first().map(|rate| rate.parse().unwrap());
     assert_eq!(stats["offered_requests_per_second"].as_u64(), rate);
     if let Some(rate) = rate {
-        // Paced connections send no more than their share of the offered rate within the 0.05 s window, plus one request each at its edge.
+        // Paced connections send no more than the offered rate over warmup and the window, plus one request each at the edge; unpaced ones send thousands.
         let requests = stats["requests"].as_u64().unwrap();
         assert!(
-            requests <= rate / 20 + 4,
+            requests <= rate * 8 / 100 + 4,
             "{requests} paced requests counted"
         );
-        assert!(stats["paced_send_delay_max_us"].as_f64().unwrap() >= 0.0);
+        for field in [
+            "paced_send_delay_p50_us",
+            "paced_send_delay_p99_us",
+            "paced_send_delay_max_us",
+        ] {
+            assert!(stats[field].as_f64().unwrap() >= 0.0, "{field}");
+        }
     } else {
         assert!(stats["paced_send_delay_max_us"].is_null());
     }

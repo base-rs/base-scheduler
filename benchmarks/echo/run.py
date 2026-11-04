@@ -84,7 +84,7 @@ def sample(binary, backend, workers, connections, size, args, rate=None):
                 server_cpu = usage.ru_utime + usage.ru_stime
                 after = resource.getrusage(resource.RUSAGE_CHILDREN)
                 client_cpu = (after.ru_utime + after.ru_stime) - (children.ru_utime + children.ru_stime) - server_cpu
-                result.update(server_cpu_seconds=server_cpu, server_user_seconds=usage.ru_utime, server_system_seconds=usage.ru_stime, client_cpu_seconds=client_cpu)
+                result.update(server_cpu_seconds=server_cpu, server_user_seconds=usage.ru_utime, server_system_seconds=usage.ru_stime, client_cpu_seconds=round(client_cpu, 6))
             return result
         except Exception as error:
             if isinstance(error, subprocess.CalledProcessError):
@@ -123,6 +123,8 @@ def main():
         parser.error("counts and measurement duration must be positive; warmup must be nonnegative")
     if args.rate is not None and args.rate < 1:
         parser.error("the offered rate must be positive")
+    if args.rate is not None and sys.platform == "win32":
+        parser.error("--rate needs timers finer than Windows' default 15.6 ms resolution")
     if args.server_cpus and len(args.server_cpus) < max(args.workers):
         parser.error("provide at least one server CPU per worker")
     if set(args.server_cpus) & set(args.client_cpus):
@@ -156,7 +158,7 @@ def main():
                 report["samples"].append(dict(data, repeat=repeat + 1))
                 args.output.parent.mkdir(parents=True, exist_ok=True)
                 args.output.write_text(json.dumps(report, indent=2) + "\n")
-                print(f"{len(report['samples']):3} {backend:13} workers={workers} conns={connections:3} bytes={size:5}: {data['requests_per_second']:10.0f} req/s  p50={data['rtt_p50_us']:8.2f} us p99={data['rtt_p99_us']:8.2f} us" + (f"  server cpu={data['server_cpu_seconds']:.3f} s" if "server_cpu_seconds" in data else ""), flush=True)
+                print(f"{len(report['samples']):3} {backend:13} workers={workers} conns={connections:3} bytes={size:5}: {data['requests_per_second']:10.0f} req/s  p50={data['rtt_p50_us']:8.2f} us p99={data['rtt_p99_us']:8.2f} us" + (f"  server cpu={data['server_cpu_seconds']:.3f} s" if "server_cpu_seconds" in data else "") + (f"  send delay p99={data['paced_send_delay_p99_us']:.1f} us" if data.get("paced_send_delay_p99_us") is not None else ""), flush=True)
     report["load_average_after"] = os.getloadavg() if hasattr(os, "getloadavg") else None
     args.output.write_text(json.dumps(report, indent=2) + "\n")
     print("\nMedian requests/s across repetitions:")
