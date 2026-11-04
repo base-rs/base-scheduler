@@ -3,7 +3,7 @@
 **Status.** The parts of this document take effect at different times:
 
 - **Requirement 2 is active now.** It is the interface's part, and the context wording changes that accompany this document already reflect it.
-- **Requirement 1's timer parts are implemented** (stage 2, in the same pull request as this document): expired timers, remote timer commands, the off switch and the stuck-preferred refinement. [Implementation notes](#stage-2-implementation-notes) record where the code refined this design. Its readiness parts take effect when stage 3 lands. In-flight io_uring operations stay excluded until stage 4 records a decision.
+- **Requirement 1's timer parts are implemented** (stage 2, in the same pull request as this document): expired timers, remote timer commands, the off switch and the stuck-preferred refinement. The mechanism below describes the implementation; [implementation notes](#stage-2-implementation-notes) record what measurement changed on the way, and [decision 15](#decisions) replaced the periodic sampling originally specified. Two independent pieces were split out: the runnable counter's cache isolation (#94) and the echo benchmark harness (#95). Its readiness parts take effect when stage 3 lands. In-flight io_uring operations stay excluded until stage 4 records a decision.
 - **Decisions.** The maintainer has decided every question this document raised. They are recorded under [Decisions](#decisions).
 
 ## Requirement
@@ -22,16 +22,18 @@ A **stuck** worker has not reached a turn boundary (its timer pass and driver tu
 
 **Progress** means the waker is invoked, and the woken task becomes runnable and stealable so that an idle worker can poll it. For a root future, the `block_on` thread is woken instead. The poll that is stuck is never preempted. Runnable tasks already make progress through stealing, with no detection needed (see [runnable tasks](#runnable-tasks)).
 
-**The bound T.** *T* is the worst-case delay from work becoming ready to its waker being invoked, assuming the rescuing thread gets scheduled. It is the sum of:
+**The bound T.** *T* is the worst-case delay from work becoming ready to its waker being invoked, assuming the rescuing thread gets scheduled. For timers ([decision 15](#decisions)) it is the sum of:
 
-- the stall threshold *S*;
-- the sampling period *P*;
+- the stall threshold *S*, how long a timer may stay due and uncollected on a worker that is not sleeping;
+- up to *P*, the monitor's shortest interval between passes, when its plan is within *P* of the deadline or when it is already sampling a stuck worker;
 - the bounded rescue work itself.
+
+Stage 3 must choose how readiness stalls are detected (see [open questions](#open-questions)).
 
 **Decided:**
 
 - The target is *T* = 2 ms.
-- The split between *S* and *P* is chosen by measurement. The starting point is *S* ≈ *P* ≈ 1 ms.
+- The split between *S* and *P* is chosen by measurement. Both are 1 ms; measured worst-case lateness behind a 200 ms stall is about 1.3 ms.
 - *T* is a fixed internal default. There is no public tuning knob.
 - Native provides an off switch for diagnostics, benchmarks and deterministic tests. One possible form is a `stall_rescue: bool` in `NativeExecutorOptions` that defaults to on, but the exact form belongs to the implementation.
 
@@ -162,7 +164,7 @@ So locality remains the steady-state design, and its cost must stay within the a
 - **Pre-park retry.** Every worker but one is idle, and that one is stuck. A timer on the stuck worker is rescued by an idle worker's pre-park check, and its waker schedules a task whose preferred worker is the rescuing worker. The task must run promptly, and the rescuing worker must not park with `sleeping == false`. Repeat this to exercise the race.
 - **No idle worker.** Every worker is held, a root `block_on` is waiting on a sleep, and the sleep's waker runs within the `LATE` bound.
 - **io_uring.** A test that documents the interim behaviour for an in-flight operation on a stuck ring: it completes after the hold, not within the `LATE` bound. When stage 4 decides, add a test that new operations are routed away from a stuck ring if option 2 is adopted.
-- **Deep-sleep handshake race.** Repeat this many times: all workers go idle, the monitor enters deep sleep, a worker wakes and at once blocks, and a timer on that worker must still be rescued within the `LATE` bound.
+- **Monitor wake race.** Repeat this many times: no deadline is pending, so the monitor sleeps until woken; a worker then registers a timer and at once blocks, and the timer must still be rescued within the `LATE` bound.
 - **Races and lifecycle:**
   - the owner returns from its long poll during a rescue;
   - a stress test of repeated short stalls near the threshold;
@@ -308,13 +310,14 @@ sock is registered in A's epoll or kqueue.
              sock's shared state. R is now only a waker; it is in no queue.
 
 2. Stall     A polls another task X, which blocks for seconds. A stops
-             reaching turn boundaries, so its heartbeat stops changing.
+             reaching turn boundaries.
              Data arrives on sock. The kernel queues the event in A's poller,
              and nobody collects it.
 
-3. Detect    The monitor samples every P and sees A's heartbeat unchanged
-             across S while A is neither idle nor closing. It marks A
-             stuck. (S and P are about 1 ms each, for T = 2 ms.)
+3. Detect    A is marked stuck. For timers, the monitor wakes S after A's
+             earliest deadline and finds it still published while A is not
+             sleeping (decision 15). How stage 3 detects a readiness stall
+             on a worker with no due timer is an open question.
 
 4. Collect   A rescuer, either the monitor or worker C in its pre-park
              check, collects A's queued events:
@@ -345,41 +348,35 @@ Step 6b needs a worker that is idle or runs out of local work. When every other 
 
 ### Detection
 
-- **Heartbeat.** Each worker stores a per-worker turn counter on its own cache line, with a relaxed store once per `run_loop` iteration, next to `worker_timers::turn`, and once more when it leaves idle. A turn boundary is exactly where timers and readiness are serviced, so a counter that stops changing means work there is waiting.
+- **Turn boundaries and the published deadline.** A worker collects its due timers at every turn boundary (`run_loop`'s timer pass) and refreshes its published deadline, and an idle worker wakes for its own deadline. So a deadline still published *S* after it fell due, on a worker that is not sleeping, means the worker has not reached a turn boundary since: it is stuck. Detection needs no sampling of the worker itself.
+- **Published deadline.** Each worker keeps a lower bound of its earliest local deadline in an atomic `u64` of clock nanoseconds since the scheduler's epoch. Every timer queue mutation happens under the queue lock, including remote commands ([timers](#timers)), so whoever holds the lock updates it with plain loads and stores, with no read-modify-write: registration lowers it, and every pass that flushes the queue (expiry, rescue and the idle timeout) refreshes it exactly. Release leaves it early, which can only cause a redundant check, and avoids flushing the batched queue on every release. Detection depends on this value never being later than the queue's earliest live deadline; `worker_timers` asserts it in debug builds whenever it refreshes the value. `sharded::Publication::lower` takes a mutex, so it is not reused here. Unlike #92's shared deadline, no worker bounds its idle wait by another worker's deadline, so it cannot cause herds of wakeups.
+- **Monitor (decided, [decision 15](#decisions)).** A dedicated thread:
+  - It sleeps until the earliest published deadline plus *S*. A pass marks every worker whose deadline has been due for *S* while it is not sleeping, rescues its timers, and then samples it every *P* until it recovers, rescuing timers that fall due during the stall without a further grace period. Passes are at least *P* apart.
+  - With no pending deadline it never wakes. With a timer expiring once a second it wakes about once a second.
+  - It records the earliest deadline its sleep covers. A worker publishing a deadline more than *P* earlier unparks it; a deadline within *P* of the plan is at most *P* late. A pass stores its plan before rereading every published deadline under its queue lock, so a deadline lowered during the pass is never missed. Closing a non-empty queue publishes a deadline of zero, so the monitor drains a stuck owner's queue at shutdown.
+  - It rescues whether or not any worker is idle. With no idle worker, rescue wakes root futures and queues tasks earlier, as described in requirement 1.
+- **Heartbeat.** Each worker stores a turn counter on its own cache line, with a relaxed store once per `run_loop` iteration and once when it leaves idle. Detection does not use it: it clears a worker's stuck mark once the worker reaches a turn boundary, and in diagnostic builds it classifies stalls.
 
-  A long batch of short tasks counts as stalled too ([decision 13](#decisions)). A batch is the frozen generation that `run_ready_batch` drains between two turn boundaries, and it has no length limit, so a batch of many short polls can outlast *S* without any poll misbehaving. Rescuing in that case also reduces latency, since `context/design.md` notes that "a large batch can delay I/O checks". Test and diagnostic builds also count task polls, so that each rescue can be classified as a **stuck poll** (neither counter moved) or a **long batch** (the poll counter moved but the turn counter did not).
-- **Idle and closing.** The existing `sleeping` flag marks a worker in its idle wait, and an idle worker services its own deadline and poller. A remote wake clears `sleeping` before the owner leaves its wait (`WorkerState::wake`). The shutdown drain also runs with `sleeping == false`. A worker that is closing (`Shared::finished`) is treated as idle. Neither case is counted as a false positive, though a worker woken remotely can still be rescued if it truly fails to return within *S*.
-- **Published deadline.** Each worker keeps a lower bound of its earliest local deadline in an atomic `u64` of clock nanoseconds. Every timer queue mutation now happens under the queue lock, including remote commands (decided, see [timers](#timers)). Whoever holds the lock can therefore update it with plain loads and stores, with no read-modify-write and no `watchers` mutex: registration lowers it, and every pass that flushes the queue (expiry, rescue and the idle timeout) refreshes it exactly. Release leaves it early, which can only cause a redundant check, and avoids flushing the batched queue on every release.
-
-  `sharded::Publication::lower` takes such a mutex, so it is not reused here. For per-request timeouts the queue oscillates between empty and one timer, so this store happens on most registrations and releases (see [cost](#hot-path-cost-budget)). A rescuer reads the atomic to skip lock attempts when nothing has expired. Unlike #92's shared deadline, no worker bounds its idle wait by another worker's deadline, so it cannot cause herds of wakeups.
-- **Monitor (decided).** A dedicated thread in the style of Go's sysmon:
-  - It samples every period *P*. It treats a worker as stuck when the worker's counter is unchanged across observations spanning *S* and the worker is not idle or closing.
-  - It rescues whether or not any worker is idle. With no idle worker, rescue wakes root futures and queues tasks earlier, as described in requirement 1. If that pass proves costly in measurement, gate it on `idle_workers > 0` or on a pending root waker; checking either costs one load. For long batches specifically, [decision 13](#decisions) records the gate to add if the saturated echo runs miss their budget.
-  - Its CPU, and the CPU it runs on, are part of the measurement plan.
-- **Deep-sleep handshake.** The monitor deep-sleeps after it has seen every worker idle for several consecutive periods. The handshake works in two parts:
-  - The monitor stores `deep = true` (`SeqCst`). It then rechecks every worker's `sleeping` flag (`SeqCst`) and parks only if all of them are still set. If any flag is clear, it stores `deep = false` and keeps sampling.
-  - A worker leaving idle already stores `sleeping = false` with `SeqCst` (`worker.rs`, after `park`). It then loads `deep` (`SeqCst`). If `deep` is set, the worker swaps it to `false` and unparks the monitor.
-
-  Both sides use `SeqCst` on a store followed by a load, so at least one side sees the other: the monitor does not park while a worker is active and unseen. The worker's cost is one load on the idle exit path, which already performs `SeqCst` operations, plus a wake only when the monitor is in deep sleep.
+  A long batch of short tasks counts as stalled too ([decision 13](#decisions)). A batch is the frozen generation that `run_ready_batch` drains between two turn boundaries, and it has no length limit, so a batch of many short polls can outlast *S* without any poll misbehaving. Rescuing in that case also reduces latency, since `context/design.md` notes that "a large batch can delay I/O checks". Test and diagnostic builds also count task polls, so that each rescue can be classified as a **stuck poll** (no poll completed since the monitor's previous pass) or a **long batch** (polls completed, but no turn boundary).
+- **Idle and closing.** The existing `sleeping` flag marks a worker in its idle wait. A remote wake clears `sleeping` before the owner leaves its wait (`WorkerState::wake`), and the shutdown drain also runs with `sleeping == false`. A worker that is closing is rescued like any other if its queue holds due timers; once closure has finished, the monitor exits.
 - **Pre-park check (decided).** In the existing steal search before parking, a worker also checks each victim that is not sleeping. The search runs after the worker has stored `sleeping = true`. If the check fires any waker, the search returns `Retry` instead of `Empty`: the worker rescans every queue and advertises sleep again before it parks. This retry is required. A woken task can be scheduled back to this same worker. `WorkerState::wake` then clears `sleeping` but skips the unpark on the self-thread path, and the task may land in a queue the search has already passed. Without the retry, the worker would park with `sleeping == false` and later `wake_idle` calls would skip it. Running the check before sleep is advertised was considered and rejected. It would move the check off the path where the worker already scans its victims, and a later steal search would still have to repeat it.
+
   Both checks act only on a victim the monitor has marked stuck ([decision 14](#decisions)), so steady-state behaviour stays as it is on `main`:
   - **Timers:** if the victim is marked stuck and its published deadline has passed, it `try_lock`s the victim's queue and fires its expired timers. Unlike Go's `stealWork`, it does not fire a healthy victim's expired timers, which would move their tasks to the parking worker and make locality loss routine.
   - **Readiness:** if the victim is marked stuck, it calls `try_assist` on the victim's poller.
 
-  Each check costs one load of the stuck mark, so this path adds no clock reads or syscalls unless a victim is actually stuck. It shortens *T* for whichever worker is about to sleep anyway.
-
-  The check runs as its own pass over the victims, after the worker advertises sleep and before its second steal search, so it does not depend on `search`'s `has_runnables()` early return.
-- **Threshold trade-offs.** A small *T* gives better worst-case latency. It also costs more: more monitor wakes (about 1/*P*, so roughly 1,000 per second at *P* = 1 ms whenever any worker is busy), more false positives on long legitimate batches, more `try_lock` contention with owners about to return, and more lost locality as rescued tasks are stolen. A large *T* has fewer side effects but strands work for longer. The 2 ms target is much tighter than Go's sysmon, which waits about 10 ms before polling the network or preempting.
+  Each check costs one load of the stuck mark, so this path adds no clock reads or syscalls unless a victim is actually stuck. It shortens *T* for whichever worker is about to sleep anyway. The check runs as its own pass over the victims, after the worker advertises sleep and before its second steal search, so it does not depend on `search`'s `has_runnables()` early return.
+- **Threshold trade-offs.** A small *S* gives better worst-case latency. It also costs more false positives on long legitimate batches, more `try_lock` contention with owners about to return, and more lost locality as rescued tasks are stolen. The monitor's wake rate depends on how often deadlines fall due, at most 1/*P*, not on *S*. The 1 ms threshold is much tighter than Go's sysmon, which waits about 10 ms before polling the network or preempting.
 
 ### Timers
 
-- **Lockable queues.** Move each worker's `local::TimerQueue<Waker>` out of the TLS `RefCell` and into `WorkerState` behind a mutex, or adopt `sharded::WorkerTimers`. The owner locks it, uncontended, for registration, update, release and its timer pass. It never holds the lock across a task poll or a waker call.
-- **Batch expiry.** The current expire loop borrows once per pop (`worker_timers::expire`). Under a mutex, the owner and rescuers instead lock once, pop with a batch pop into a reusable buffer, unlock, and then call the wakers. `local::TimerQueue` needs a batch pop; the heap and sharded queues already have `pop_expired_batch`.
+- **Lockable queues.** Each worker's `local::TimerQueue<Waker>` moves out of the TLS `RefCell` into `WorkerState`, behind a small spinlock whose unlock is a release store (`crates/native/src/spin_lock.rs`). The owner locks it, uncontended, for registration, update, release and its timer pass. No lock holder runs user code, blocks, or holds it across a task poll or a waker call; a contender spins briefly, then yields. The queue, its published deadline, a copy of the scheduler's epoch and a per-queue closed flag share their own 128-byte block, so timer operations touch no line that other workers write on every schedule.
+- **Batch expiry.** The owner and rescuers lock once, pop up to 256 expired wakers into a reusable buffer with `local::TimerQueue::pop_expired_batch`, unlock, and then call the wakers.
 - **Rescuer.** A rescuer uses `try_lock`, pops expired entries, releases the lock and calls the wakers. Each waker makes its task runnable in its preferred worker's inbox, and `wake_idle` falls back to any idle worker, which steals the task. Keys stay in their original queue, and each slot keeps its capacity until `Release`.
 - **Remote commands (decided).** `Register`, `Update` and `Release` lock the target queue directly. They interrupt the owner only if they published an earlier deadline while it is idle. This replaces the single-consumer `SegQueue` inbox. That inbox would leave a root `Register` unacknowledged behind a stuck owner. It would also leave a waker `Update` undelivered, so a rescuer would fire the stale waker and lose the wakeup. The direct lock also removes the acknowledgement allocation for remote registration.
 
   **Ordering.** The owner stores `sleeping = true` (`SeqCst`) before it locks its queue to compute its wait timeout. A remote command inserts under the queue lock and checks `sleeping` after it unlocks, interrupting through `WorkerState::wake` if it lowered the head. The mutex orders the two, so either the owner's timeout computation sees the new entry or the command sees `sleeping`. This replaces the inbox recheck in `worker_timers::timeout`.
-- **Closure.** Closure is checked under the queue lock. A rescuer that observes closure pops every entry, as the owner does now. Shutdown waits for in-flight rescue waker calls, as it already does for timer callbacks.
+- **Closure.** Closure sets each queue's closed flag under its lock before publishing scheduler closure, so registration checks only the queue it locks. A pass that observes closure pops every entry, whether the owner's or a rescuer's. Shutdown waits for in-flight rescue waker calls, as it already does for timer callbacks: the monitor counts as a worker in `workers_remaining`.
 
 ### Readiness
 
@@ -508,12 +505,13 @@ The interface must not preclude any of the options.
 **Steady-state additions:**
 
 - A relaxed heartbeat store on each loop iteration.
-- An uncontended lock and unlock in place of a `RefCell` borrow for each timer operation, and one lock (not one per pop) for each timer pass.
+- An uncontended spinlock acquire and release in place of a `RefCell` borrow for each timer operation, and one lock per 256 expired timers for each timer pass.
 - A plain store of the published deadline whenever the queue head changes. For per-request timeouts this means most registrations and releases, because the queue oscillates between empty and one timer.
 - For remote timer commands, a lock on the target queue in place of an inbox push and acknowledgement allocation.
 - An uncontended poll lock taken for each driver turn, with a `try_lock` on zero-timeout turns.
-- One load on idle exit to check for monitor deep sleep, and one load per victim in the pre-park search.
-- Monitor wakes at about 1/*P* (about 1,000 per second at *P* = 1 ms) while any worker is busy, and at most about one wake per deep-sleep entry otherwise.
+- One load per victim in the pre-park search.
+- One load of the monitor's plan whenever a queue's published deadline changes, and a monitor wake only when a deadline is more than *P* earlier than its plan.
+- Monitor wakes about once per deadline that falls due, at most 1/*P*, and none while no deadline is pending.
 - One relaxed load of the preferred worker's stuck mark for each remote wake in `schedule`, for the stuck-preferred-worker refinement.
 - No change on the native epoll and kqueue paths from removing `polling`. The pipe and millisecond-timeout fallbacks run only when an eventfd, timerfd or `EVFILT_USER` is unavailable.
 - Nothing per spawn, and nothing that depends on whether a root timer is pending. This is what distinguishes the design from #92.
@@ -531,7 +529,7 @@ Any result over budget goes back to the maintainer with its numbers.
 
 **Additional measurements (no budget yet; report them):**
 
-- Monitor wake rate and CPU at each candidate *P* (for example 0.5, 1 and 2 ms), and which CPU it runs on. Report it alongside the workers' CPU, not hidden in process totals.
+- Monitor wake rate and CPU, reported alongside the workers' CPU, not hidden in process totals.
 - Fixed-rate p99 latency with every core occupied, where the monitor competes with workers.
 - A net-benefit workload with undeclared short blocking, for example tasks that occasionally poll CPU-bound for 5 ms among I/O and timer traffic. Compare p99 and throughput with rescue on and off.
 - Rescue counts for every workload, classified as stuck polls or long batches, with false positives identified, and rescue counts per registration. [Decision 7](#decisions) revisits migration from the per-registration counts.
@@ -553,7 +551,9 @@ Fixed-rate latency is reported separately from throughput and CPU, as [worker pr
 - **Locality loss.** Rescued tasks are stolen. They keep paying cross-worker costs while their registrations stay on a stuck worker.
 - **Owner contention.** An owner entering an idle wait can block behind one rescuer batch (readiness), or behind a rescuer's expired-timer pop (timers).
 - **Waker code on the monitor thread.** Wakers run on the monitor thread. A foreign executor's slow or panicking waker can delay rescue of other workers, and can delay an idle owner of that poller. Contain panics, and consider capping each rescue pass.
-- **The monitor's own CPU.** At about 1,000 wakes per second it is not free, and on fully loaded machines it competes with workers. It is measured explicitly.
+- **The monitor's own CPU.** It wakes about once per deadline that falls due, up to 1,000 times a second when timers fall due continuously, and then competes with workers on fully loaded machines. It is measured explicitly.
+- **The published-deadline invariant.** Detection assumes each queue's published deadline is never later than its earliest live deadline. A later value would delay rescue, and a stale earlier value can mark a worker that has not reached a turn boundary for *S* even though nothing was stranded, which only costs a redundant rescue pass. Debug builds assert the invariant.
+- **Spinning.** The timer-queue spinlock has no fairness. A holder preempted on an oversubscribed machine makes contenders spin and yield until it runs again. Critical sections are short but not constant: a full queue's capacity reclamation, or a 256-entry batch pop.
 - **Shutdown.** See [lifetimes](#lifetimes). A rescue must never touch a stopped controller or a closed queue except to drain it.
 - **Untested platforms.** Once stage 3 adds the planned CI jobs, readiness tests run on Linux, macOS and FreeBSD only; today CI runs Linux, macOS and Windows. NetBSD will be build-checked, and OpenBSD and DragonFly are tier 3 targets with at most a build check, so a kqueue difference there, such as a missing `EVFILT_USER`, may surface only from users.
 - **Masking.** Rescue can hide blocking that should be `spawn_blocking`. Consider a diagnostic counter or log for repeated stalls of the same worker.
@@ -562,17 +562,14 @@ Fixed-rate latency is reported separately from throughput and CPU, as [worker pr
 
 These record where the stage 2 code refines the proposed mechanism.
 
-- **Deadline-driven detection (replaces periodic sampling and deep sleep).** The monitor does not sample on a fixed period. It sleeps until the earliest published deadline plus *S*. A worker collects its due timers at every turn boundary and refreshes its published deadline, and an idle worker wakes for its own deadline, so a deadline still published *S* after it fell due, on a worker that is not sleeping, means the worker has not reached a turn boundary since: it is stuck. The monitor marks it and rescues its timers, then samples it every *P* until its heartbeat changes or it sleeps, rescuing later timers as soon as they are due. Passes are at least *P* apart. With no pending deadline the monitor never wakes; with a timer expiring once a second it wakes about once a second. This answers the requirement that the cost be paid only when a stall could strand something: periodic sampling cost about 1,000 wakes a second whenever any worker was busy, which showed up as +2–5% server CPU in pinned four-worker echo and +40–150% CPU (about 0.1 ms per second) at one request or timer wake per second.
-  - **Waking the monitor.** It records the earliest deadline its sleep covers. Publishing a deadline more than *P* earlier wakes it; a deadline within *P* of the plan can be up to *P* late, which is within the bound. A pass stores its plan before rereading every published deadline under its queue lock, so a deadline lowered during the pass is never missed.
-  - **Closure.** Closing a non-empty queue publishes a deadline of zero, so the monitor drains a stuck owner's queue at shutdown.
-  - **Heartbeat.** It now serves only to clear the stuck mark and, in diagnostic builds, to classify stalls; detection does not depend on it.
-- **Timer queues.** Each `WorkerState` holds its `local::TimerQueue<Waker>` behind a small spinlock whose unlock is a release store (`crates/native/src/spin_lock.rs`); its critical sections run no user code and never block. With `std::sync::Mutex` the one-task `refresh` benchmark was +2.7% against `main`; with the spinlock it is −5%. `local::TimerQueue` gained `pop_expired_batch`. Expiry pops up to 256 wakers per lock into a reusable buffer, then calls them unlocked. Per-lock overhead, not hold time, dominated the 1,024-timer diagnostic: one waker per lock raised its p99 lateness from about 230 to 309 µs, 16 to 257 µs and 64 to 237 µs, while 256 matched `main` (229 µs) with 6% less CPU. Registration from any thread is synchronous, so `NativeTimer` no longer holds a pending acknowledgement, and root registrations allocate nothing.
+- **Detection.** The periodic sampling and deep-sleep handshake originally specified were implemented first and measured: about 1,000 monitor wakes a second whenever any worker was busy, which showed up as +2–5% server CPU in pinned four-worker echo and +40–150% CPU (about 0.1 ms per second) at one request or timer wake per second. A worker alternating between idle and busy every few microseconds also woke the monitor from deep sleep on nearly every exit from idle. The deadline-driven monitor in [detection](#detection) replaced both ([decision 15](#decisions)).
+- **Timer queues.** With `std::sync::Mutex` the one-task `refresh` benchmark was +2.7% against `main`; with the spinlock it is −5%. Per-lock overhead, not hold time, dominated the 1,024-timer diagnostic: one waker per lock raised its p99 lateness from about 230 to 309 µs, 16 to 257 µs and 64 to 237 µs, while 256 matched `main` (229 µs) with 6% less CPU. Registration from any thread is synchronous, so `NativeTimer` no longer holds a pending acknowledgement, and root registrations allocate nothing.
 - **Owner timer pass.** When the published deadline is `NO_DEADLINE` the pass returns without reading the clock or taking the lock, and when it is later than now it returns without the lock.
-- **Timer cache lines.** The queue, its published deadline, a copy of the scheduler's epoch and a per-queue closed flag share a 128-byte-aligned block per worker. Closure sets each queue's flag under its lock before publishing scheduler closure, so registration never reads `Shared`. An early measurement put the queue inline in `WorkerState` and checked `Shared`'s closed flag and epoch on each registration; both share cache lines with state that every worker writes on each schedule, and the 64-task, 4-worker `yield` refresh benchmark ran about 25–90% slower than `main` until they moved.
-- **`Shared::outstanding` isolated.** Every worker updates the runnable counter on each schedule and retirement, and `retire_runnable` then reads `closed`. Adding fields to `Shared` placed `closed` in the same 128-byte block, which Intel's adjacent-line prefetcher moves between cores as a pair; `perf` showed the `closed` load taking a quarter of `run_loop`'s cycles, and task-heavy workloads ran 5–12% slower with identical instruction counts. The counter now has its own 128-byte block. `main` already suffered part of this: the 64-task, 4-worker `yield` benchmark now runs 7–8% faster than `main`.
-- **Classification.** The stuck mark records whether task polls completed since the monitor's previous pass (a long batch) or not (a stuck poll), so that rescues by idle workers are classified too. The per-poll counter exists only with `cfg(test)` or the `diagnostics` feature, which also adds `NativeScheduler::rescue_statistics`.
-- **Monitor lifetime.** The monitor holds a `Weak<Shared>`, upgraded per pass, and parks without a strong reference. It counts in `workers_remaining` through a registration that holds only a weak reference, so `shutdown()` waits for its last rescue. It exits once closure has finished or the upgrade fails. `wake_all` also unparks it.
-- **Parameters.** *S* = *P* = 1 ms, as private constants in `crates/native/src/monitor.rs`. The bound is about *S* after a timer falls due; measured worst-case lateness behind a 200 ms stall is about 1.2–1.5 ms on hana, against 185 ms on `main`.
+- **Timer cache lines.** An early measurement put the queue inline in `WorkerState` and checked `Shared`'s closed flag and epoch on each registration; both share cache lines with state that every worker writes on each schedule, and the 64-task, 4-worker `yield` refresh benchmark ran about 25–90% slower than `main` until they moved.
+- **`Shared::outstanding` isolated (#94).** Every worker updates the runnable counter on each schedule and retirement, and `retire_runnable` then reads `closed`. Adding fields to `Shared` placed `closed` in the same 128-byte block, which Intel's adjacent-line prefetcher moves between cores as a pair; `perf` showed the `closed` load taking a quarter of `run_loop`'s cycles, and task-heavy workloads ran 5–12% slower with identical instruction counts. `main` already suffered part of this, so the fix is its own pull request, and stage 2 is measured against `main` with it.
+- **Classification.** The stuck mark records the classification, so that rescues by idle workers are classified too. The per-poll counter exists only with `cfg(test)` or the `diagnostics` feature, which also adds `NativeScheduler::rescue_statistics`.
+- **Monitor lifetime.** It counts in `workers_remaining` through a registration that holds only a weak reference, so `shutdown()` waits for its last rescue. `wake_all` also unparks it.
+- **Parameters.** *S* = *P* = 1 ms, as private constants in `crates/native/src/monitor.rs`. Measured worst-case lateness behind a 200 ms stall is about 1.2–1.5 ms on hana, against 185 ms on `main`.
 - **Quick benchmark.** `benchmarks/echo/results/stall-rescue/scripts/quick.py` compares builds in about three minutes: timer refresh and yield, the worker-local timer diagnostic, fixed-rate and one-request-per-second echo, a one-hertz timer, and stalled-worker lateness. It was used to iterate on the design; the full budget run remains the acceptance check.
 - **Tests.** #92's tests are in `crates/native/tests/root_timers.rs` with `LATE` = 250 ms, alongside the rescue-off and no-idle-worker cases. Scenarios that place work on particular workers are in `crates/native/src/monitor/scenarios.rs`; the monitor pass, its wake handshake, the pre-park check and the scheduling refinement also have deterministic unit tests.
 
@@ -597,7 +594,7 @@ These record where the stage 2 code refines the proposed mechanism.
 
 1. **This document and the interface wording.** Make the requirement 2 wording changes and record the audit and decisions. No code changes.
 2. **Timers.** This stage includes:
-   - the heartbeat and the monitor, with its deep-sleep handshake;
+   - the heartbeat and the deadline-driven monitor ([decision 15](#decisions));
    - the off switch;
    - lockable timer queues with batch expiry;
    - remote commands that lock the target queue directly;
@@ -605,9 +602,9 @@ These record where the stage 2 code refines the proposed mechanism.
    - timer rescue, both from the monitor and from the pre-park check;
    - the stuck-preferred-worker refinement in `schedule`.
 
-   It lands in the same pull request as this document ([decision 12](#decisions)). The measurement harnesses that the budgets need are built inside stage 2, in the first pull request that measures against them, with the baseline taken on `main` using the same harness ([decision 10](#decisions)).
+   It lands in the same pull request as this document ([decision 12](#decisions)). The echo harness that the budgets need is #95, and its baseline is measured on `main` with the same harness ([decision 10](#decisions)).
 
-   Bring over #92's tests and add every [requirement 1 test](#requirement-1) that concerns timers or scheduling: stolen timer, waker update, runnable tasks, stuck preferred worker, pre-park retry, no idle worker, the io_uring interim, the deep-sleep handshake race, the races and lifecycle cases that apply to timer queues, rescue switched off, and the rescue classification counter. The readiness tests (stuck readiness, no spin on interrupts, driver retirement) belong to stage 3. Document the io_uring exclusion as the interim option 1. Update the Native readme's timer and platform descriptions (audit item D; its line saying other edge platforms use `polling` is already stale for Linux and Android), and `context/design.md` (audit item H). Measure against the budgets.
+   Bring over #92's tests and add every [requirement 1 test](#requirement-1) that concerns timers or scheduling: stolen timer, waker update, runnable tasks, stuck preferred worker, pre-park retry, no idle worker, the io_uring interim, the monitor wake race, the races and lifecycle cases that apply to timer queues, rescue switched off, and the rescue classification counter. The readiness tests (stuck readiness, no spin on interrupts, driver retirement) belong to stage 3. Document the io_uring exclusion as the interim option 1. Update the Native readme's timer and platform descriptions (audit item D; its line saying other edge platforms use `polling` is already stale for Linux and Android), and `context/design.md` (audit item H). Measure against the budgets.
 3. **Readiness.** This stage includes:
    - the selector assist hook;
    - the poll lock with `try_lock` on zero-timeout turns;
@@ -658,24 +655,27 @@ These are the maintainer's decisions, recorded here and removed from the open qu
   - **Alternatives considered.** Re-notifying unconditionally after every rescue pass would probably work, but it adds a syscall per pass and depends on `polling` internals. An upstream change, or a separate notification channel beside `polling`, would keep two drivers to maintain for the rarest configurations. Declining rescue there was the previous recommendation; the maintainer chose removal so that requirement 1 holds on every platform with a worker readiness driver.
   - **Why Linux needs no `polling`.** #58 selected it only when the native driver could not create its eventfd or timerfd. `NativePoller` now covers both failures itself.
 - **9. Stuck preferred worker:** approved for stage 2, as described under [runnable tasks](#runnable-tasks), with its regression test, and with its cost of one relaxed load per remote wake measured against the budgets.
-- **10. Measurement harnesses:** built inside stage 2, because several budgets cannot be checked with the tools in the repository today:
+- **10. Measurement harnesses:** built for stage 2, because several budgets cannot be checked with the tools in the repository today. The echo changes are #95. The worker-local timer diagnostic and #92's spawn benchmark are kept as scripts under `benchmarks/echo/results/stall-rescue/scripts/`, not as Cargo targets, which would need their own tests for workspace coverage; the maintainer has not yet confirmed this deviation. The original list:
   - a Native readiness backend for the echo benchmark, starting from `benchmarks/echo/results/turn-interval/echo-native-backend.patch`;
   - an offered-rate option on the echo client, for fixed-rate latency and the 1 request per second idle-CPU case;
   - an idle-CPU script for the 10 s no-load measurement;
   - the worker-local timer diagnostic as a Cargo target in the private benchmark package.
 
   Each is added in the first stage 2 pull request that measures against it, and its baseline is measured on `main` with the same harness.
-- **11. Noise and host:** budgets are checked on Linux on Aiko, using the CPU pinning and exclusive benchmark lock procedure of the existing echo reports (for example [`benchmarks/echo/double-buffered-ready-performance.md`](../benchmarks/echo/double-buffered-ready-performance.md)). Each case takes 9 paired, randomly ordered runs of `main` and the branch:
+- **11. Noise and host:** budgets are checked on Linux on hana (Xeon E3-1240 v6, 4 cores and 8 threads), which the maintainer chose over Aiko for stability, using the CPU pinning and exclusive benchmark lock procedure of the existing echo reports (for example [`benchmarks/echo/double-buffered-ready-performance.md`](../benchmarks/echo/double-buffered-ready-performance.md)). Each case takes 9 paired, randomly ordered runs of `main` and the branch:
   - "within noise" means the branch's median lies inside `main`'s min–max range for that case;
   - "≤ ~3%" is the difference of the paired medians.
 
   macOS results are supplementary and do not decide a budget.
-- **12. Stage 2 organisation:** stage 2 lands in the same pull request as this document, so that both are reviewed together. This replaces the earlier plan of three pull requests after the document merged.
+- **12. Stage 2 organisation:** stage 2 lands in the same pull request as this document, so that both are reviewed together. This replaces the earlier plan of three pull requests after the document merged. Independent pieces are split out: the runnable counter's cache isolation (#94) and the echo harness (#95).
 - **13. Long batches:** a batch of short polls that outlasts *S* counts as a stall and is rescued, because rescue then bounds timer and readiness latency that the batch would otherwise delay. The release hot path stays at one heartbeat store per loop iteration. Test and diagnostic builds also count task polls, so each rescue is classified as a stuck poll or a long batch, and the validation expectation of zero false positives applies to stuck polls only.
   - **Why rescue helps less under saturation.** When every worker is busy, `wake_idle` returns early, so rescued tasks are only queued sooner, while the monitor competes for CPU and the poll lock. The gain is mainly for root futures and timer wakeups.
   - **Conditional gate.** If the saturated echo runs (4/128/4096) miss their budget, rescue long batches only when `idle_workers > 0`, and always rescue stuck polls. Telling the two apart in release builds then needs the per-poll counter there too: one relaxed store per task poll, on the heartbeat's cache line.
 - **14. Pre-park timer rescue:** gated on the monitor's stuck mark, as readiness is. A pre-park check that fired a healthy victim's expired timers, as Go's `stealWork` does, would move those tasks to the parking worker in steady state, make the owner's timer pass wait behind the rescuer's pop, and add clock reads to the idle path. Rescue stays strictly after the fact, and the monitor already guarantees *T*. Gating on how overdue a timer is (`now − deadline > S`) was considered; it would save at most about one sampling period *P*, at the cost of those clock reads.
+- **15. Detection pays only when a stall could strand work:** the maintainer asked that the cost be paid only under contention or when work has to move, with the goal of eliminating stalled-worker latency without affecting nominal latency, and left the mechanism to measurement. For timers, the monitor now sleeps until a deadline has been due for *S* and checks whether it is still published on a worker that is not sleeping ([detection](#detection)), instead of sampling every *P* while any worker is busy. This replaces the periodic sampling and deep-sleep handshake of decision 2's original form; the dedicated monitor and the pre-park check remain. The measurements that motivated it are in the [implementation notes](#stage-2-implementation-notes).
 
 ## Open questions
 
-None. Questions 1–8 were decided, decisions 9–12 settle the questions raised when stage 2 was planned, and decisions 13 and 14 settle the questions raised in review. All are recorded under [Decisions](#decisions); questions 1–8 keep their original numbers so that earlier references stay valid.
+Questions 1–8 were decided, decisions 9–12 settle the questions raised when stage 2 was planned, decisions 13 and 14 settle the questions raised in review, and decision 15 the detection change from measurement. All are recorded under [Decisions](#decisions); questions 1–8 keep their original numbers so that earlier references stay valid.
+
+- **Stage 3 detection.** Readiness events are not announced in advance, so the deadline-driven monitor cannot see a worker stuck with queued events but no due timer. Candidates, to measure in stage 3: an idle worker's pre-park check compares a victim's heartbeat with the value it saw on its previous check and assists a victim whose heartbeat has not moved for *S*, which costs nothing unless some worker is idle and so fits requirement 1's condition exactly; or the monitor samples only workers with registrations, at *P*, while at least one worker is idle.

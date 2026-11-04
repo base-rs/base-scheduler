@@ -71,7 +71,13 @@ fn refresh(
 ) -> Option<Instant> {
     let next = queue.next_deadline();
     let published = next.map_or(NO_DEADLINE, |deadline| nanos(worker, deadline));
-    if published != worker.timers.deadline.load(Ordering::Relaxed) {
+    let previous = worker.timers.deadline.load(Ordering::Relaxed);
+    // Stall detection relies on the published deadline never being later than the earliest live deadline. Every insertion lowers it and removals only raise the true earliest, so the exact value can never fall below the bound it replaces. A failure here means a path inserted a timer without lowering the published deadline.
+    debug_assert!(
+        previous <= published,
+        "published deadline {previous} was later than the queue's earliest {published}"
+    );
+    if published != previous {
         worker.timers.deadline.store(published, Ordering::Relaxed);
         shared.monitor.observe(published);
     }

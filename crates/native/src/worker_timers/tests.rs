@@ -557,3 +557,24 @@ fn shutdown_waits_for_timer_callbacks_and_live_waits_can_outlast_workers() {
         );
     });
 }
+
+#[cfg(debug_assertions)]
+#[test]
+#[should_panic(expected = "was later than the queue's earliest")]
+fn inserting_without_lowering_the_published_deadline_is_caught() {
+    let queues = [std::array::from_fn(|_| crossbeam_deque::Worker::new_fifo())];
+    let shared = Arc::new(Shared::new(&queues, 8, false));
+    // Publish a later bound, then insert an earlier timer directly, as a faulty registration path would.
+    let later = register(
+        &shared,
+        now(&shared) + Duration::from_secs(20),
+        Waker::noop().clone(),
+    )
+    .unwrap();
+    let _ = lock(&shared.workers[0]).try_schedule(
+        now(&shared) + Duration::from_secs(10),
+        Waker::noop().clone(),
+    );
+    drop(later);
+    timeout(&shared, 0);
+}
