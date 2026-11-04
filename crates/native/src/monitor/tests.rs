@@ -29,11 +29,11 @@ fn shared_with(workers: usize, rescue: bool) -> Arc<Shared> {
 }
 
 // Register an expired timer on `owner`, which external registration selects round robin.
-fn expired_timer(
-    shared: &Arc<Shared>,
+fn expired_timer<'a>(
+    shared: &'a Arc<Shared>,
     owner: usize,
     probe: &Arc<Probe>,
-) -> worker_timers::Registration {
+) -> worker_timers::Registration<'a> {
     shared.timer_next.store(owner, Ordering::Relaxed);
     let deadline = worker_timers::now(shared) - Duration::from_millis(1);
     worker_timers::register(shared, deadline, Waker::from(Arc::clone(probe))).unwrap()

@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use super::Registration;
+use super::Key;
 use crate::worker_timers;
 use crate::{NativeScheduler, Selector, task_service::Shared};
 use base_scheduler::{Cancellation, Clock, OperationResult, Timers};
@@ -18,12 +18,15 @@ use std::{
 pub struct NativeTimer {
     shared: Arc<Shared>,
     armed: Option<Instant>,
-    registration: Option<Registration>,
+    // Released through `shared`, which this resource owns.
+    registration: Option<Key>,
     waker: Option<Waker>,
 }
 impl NativeTimer {
     fn disarm(&mut self) {
-        self.registration = None;
+        if let Some(key) = self.registration.take() {
+            worker_timers::release(&self.shared, key);
+        }
         self.armed = None;
         self.waker = None;
     }
@@ -43,19 +46,22 @@ impl NativeTimer {
             self.armed = Some(deadline);
         }
         if self.registration.is_none() {
-            self.registration = Some(worker_timers::register(
-                shared,
-                deadline,
-                context.waker().clone(),
-            )?);
+            self.registration = Some(
+                worker_timers::register(shared, deadline, context.waker().clone())?.into_key(),
+            );
             self.waker = Some(context.waker().clone());
         }
         if !self.waker.as_ref().unwrap().will_wake(context.waker()) {
             let replacement = context.waker().clone();
             self.waker = Some(replacement.clone());
-            self.registration.as_ref().unwrap().update(replacement);
+            worker_timers::update(&self.shared, self.registration.unwrap(), replacement);
         }
         Poll::Pending
+    }
+}
+impl Drop for NativeTimer {
+    fn drop(&mut self) {
+        self.disarm();
     }
 }
 impl<S: Selector> Timers for NativeScheduler<S> {

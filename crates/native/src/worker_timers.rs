@@ -105,35 +105,56 @@ fn due(shared: &Shared, worker: &WorkerState) -> Option<Instant> {
     (deadline <= nanos(worker, now)).then_some(now)
 }
 
-/// A key in one worker's queue. Keys never migrate; updates and release lock that queue from whichever thread holds the registration.
-pub(crate) struct Registration {
-    shared: Arc<Shared>,
+/// A key in one worker's queue. Keys never migrate; updates and release lock that queue from whichever thread holds the key.
+#[derive(Clone, Copy)]
+pub(crate) struct Key {
     owner: usize,
     key: TimerKey,
 }
-impl Registration {
-    pub(crate) fn update(&self, waker: Waker) {
-        let result = lock(&self.shared.workers[self.owner]).update(self.key, waker);
-        match result {
-            Ok(previous) => crate::panic::discard(previous),
-            // Expiry or closure can overtake an update. Its new context must still be notified.
-            Err(replacement) => crate::panic::contain(|| replacement.wake()),
-        }
+
+pub(crate) fn update(shared: &Shared, key: Key, waker: Waker) {
+    let result = lock(&shared.workers[key.owner]).update(key.key, waker);
+    match result {
+        Ok(previous) => crate::panic::discard(previous),
+        // Expiry or closure can overtake an update. Its new context must still be notified.
+        Err(replacement) => crate::panic::contain(|| replacement.wake()),
     }
 }
-impl Drop for Registration {
+
+pub(crate) fn release(shared: &Shared, key: Key) {
+    let waker = lock(&shared.workers[key.owner]).release(key.key);
+    crate::panic::discard(waker);
+}
+
+/// A key released on drop. It borrows the scheduler rather than cloning its `Arc`: every worker would otherwise update one shared reference count on each registration and release. A sleep future already borrows its scheduler, so the borrow costs nothing.
+pub(crate) struct Registration<'a> {
+    shared: &'a Shared,
+    key: Key,
+}
+impl Registration<'_> {
+    pub(crate) fn update(&self, waker: Waker) {
+        update(self.shared, self.key, waker);
+    }
+
+    /// Keep the key without releasing it, for a holder that owns the scheduler itself.
+    pub(crate) fn into_key(self) -> Key {
+        let key = self.key;
+        std::mem::forget(self);
+        key
+    }
+}
+impl Drop for Registration<'_> {
     fn drop(&mut self) {
-        let waker = lock(&self.shared.workers[self.owner]).release(self.key);
-        crate::panic::discard(waker);
+        release(self.shared, self.key);
     }
 }
 
 /// Register on the current worker's queue, or on a round-robin worker's queue from any other thread.
-pub(crate) fn register(
-    shared: &Arc<Shared>,
+pub(crate) fn register<'a>(
+    shared: &'a Arc<Shared>,
     deadline: Instant,
     waker: Waker,
-) -> io::Result<Registration> {
+) -> io::Result<Registration<'a>> {
     let current = worker::current(shared);
     let owner = current.unwrap_or_else(|| {
         shared.timer_next.fetch_add(1, Ordering::Relaxed) % shared.workers.len()
@@ -158,9 +179,8 @@ pub(crate) fn register(
         worker.wake();
     }
     Ok(Registration {
-        shared: Arc::clone(shared),
-        owner,
-        key,
+        shared,
+        key: Key { owner, key },
     })
 }
 
