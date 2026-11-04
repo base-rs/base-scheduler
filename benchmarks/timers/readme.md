@@ -62,11 +62,11 @@ target/release/base-scheduler-benchmark-timers tokio after alloc 1 100000 1
 
 Use `--backends tokio native` on macOS. Process CPU time is available on Unix; the experimental harness reports zero on other systems. Performance results in this report are Linux measurements.
 
-### Scenarios and the timer diagnostic
+### Scenarios and periodic timers
 
 Two further modes, added for [stall rescue](../../design/stall-rescue.md), measure the Native scheduler. Each prints one JSON record.
 
-`scenario WORKLOAD WORKERS ITERATIONS [UNIT_US]` drives a Native scheduler from the root thread. Every duration is a multiple of the unit, one millisecond by default. Lateness (`p50`, `p99`, `max`) is in nanoseconds.
+`scenario WORKLOAD WORKERS ITERATIONS [UNIT_US]` drives a Native scheduler from the root thread. Every duration is a multiple of the unit, one millisecond by default. Like the timer workloads, its record reports `ns_per_operation`, `cpu_ns_per_operation`, and each measured sleep's overshoot as `overshoot_p50_ns`, `overshoot_p99_ns` and `overshoot_max_ns`.
 
 | Workload | Behavior |
 | --- | --- |
@@ -78,11 +78,11 @@ Two further modes, added for [stall rescue](../../design/stall-rescue.md), measu
 | `stall` | A task blocks its worker inside one poll for 200 units while the root thread measures eight sleeps of 10 units, `ITERATIONS` times. |
 | `yield` | Sixteen tasks per worker yield `ITERATIONS` times each, with no timers. |
 
-`diagnostic BACKEND WORKERS TASKS DELAY_US [unaligned|aligned] [MEASURE_MS] [WORK]` runs `TASKS` tasks that each sleep `DELAY_US` again and again on `native`, or `iouring` on Linux, and reports the lateness percentiles in microseconds of every expiry inside a window of `MEASURE_MS` (3,000 by default) after a warmup of a third of that. `aligned` rounds each deadline up to a multiple of the delay, so that every task's deadlines fall due together; `WORK` adds that many multiply-add steps after each expiry.
+`periodic BACKEND WORKERS TASKS DELAY_US [unaligned|aligned] [MEASURE_MS] [WORK]`, the stall rescue design's worker-local timer diagnostic, runs `TASKS` tasks that each sleep `DELAY_US` again and again on `native`, or `iouring` on Linux, and reports the overshoot of every expiry inside a window of `MEASURE_MS` (3,000 by default) after a warmup of a third of that. `aligned` rounds each deadline up to a multiple of the delay, so that every task's deadlines fall due together; `WORK` adds that many multiply-add steps after each expiry.
 
 ```sh
 target/release/base-scheduler-benchmark-timers scenario stall 2 3
-target/release/base-scheduler-benchmark-timers diagnostic native 4 1024 1000 aligned
+target/release/base-scheduler-benchmark-timers periodic native 4 1024 1000 aligned
 ```
 
 Build with `--features diagnostics` to add the scheduler's stall rescue counts (`rescues`) to every Native record, including the timer workloads above; without it, `rescues` is null. Do not take timing from a diagnostics build.

@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use base_scheduler_benchmark_timers::{Mode, diagnostic, rescues, run, scenario};
+use base_scheduler_benchmark_timers::{Mode, periodic, rescues, run, scenario};
 use std::{sync::Arc, time::Duration};
 
 fn execute(args: &[String]) -> serde_json::Value {
@@ -98,11 +98,11 @@ fn execute(args: &[String]) -> serde_json::Value {
     result
 }
 
-// `scenario` and `diagnostic` select those workloads; any other first argument is the backend of a timer workload.
+// `scenario` and `periodic` select those workloads; any other first argument is the backend of a timer workload.
 fn dispatch(args: &[String]) -> serde_json::Value {
     match args.get(1).map(String::as_str) {
         Some("scenario") => scenario::execute(&args[2..]),
-        Some("diagnostic") => diagnostic::execute(&args[2..]),
+        Some("periodic") => periodic::execute(&args[2..]),
         _ => execute(args),
     }
 }
@@ -149,7 +149,7 @@ mod tests {
         assert_eq!(execute(&[])["mode"], "after");
     }
     #[test]
-    fn dispatch_selects_scenarios_diagnostics_and_timer_workloads() {
+    fn dispatch_selects_scenarios_periodic_timers_and_timer_workloads() {
         let args = |values: &[&str]| {
             values
                 .iter()
@@ -163,7 +163,7 @@ mod tests {
         assert_eq!(
             dispatch(&args(&[
                 "timers",
-                "diagnostic",
+                "periodic",
                 "native",
                 "1",
                 "1",

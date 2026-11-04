@@ -30,8 +30,12 @@ fn every_workload_runs_with_a_short_unit() {
         assert_eq!(record["iterations"], 2);
         assert_eq!(record["unit_us"], 100);
         assert_eq!(record["samples"], samples, "{workload}");
-        assert!(record["ns_per_op"].as_f64().unwrap() > 0.0);
-        assert_eq!(record["p50"].is_null(), samples == 0, "{workload}");
+        assert!(record["ns_per_operation"].as_f64().unwrap() > 0.0);
+        assert_eq!(
+            record["overshoot_p50_ns"].is_null(),
+            samples == 0,
+            "{workload}"
+        );
         assert_eq!(record["rescues"].is_object(), cfg!(feature = "diagnostics"));
     }
 }
@@ -41,7 +45,7 @@ fn a_stalled_worker_does_not_hold_root_sleeps() {
     // At the default unit, one worker blocks for 200 ms while root sleeps of 10 ms are measured; stall rescue keeps each far below the block.
     let record = scenario(&["stall", "2", "1"]);
     assert_eq!(record["unit_us"], 1000);
-    let max = record["max"].as_u64().unwrap();
+    let max = record["overshoot_max_ns"].as_u64().unwrap();
     assert!(max < 100_000_000, "a root sleep was {max} ns late");
     #[cfg(feature = "diagnostics")]
     assert!(

@@ -3,7 +3,7 @@
 
 mod after;
 mod allocation;
-pub mod diagnostic;
+pub mod periodic;
 pub mod scenario;
 pub use after::After;
 

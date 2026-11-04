@@ -14,7 +14,7 @@ use std::{
 
 const USAGE: &str = "scenario WORKLOAD WORKERS ITERATIONS [UNIT_US]";
 
-/// Runs `scenario WORKLOAD WORKERS ITERATIONS [UNIT_US]` and returns its record. Every duration is a multiple of the unit, one millisecond by default: sleeps last one unit, a pulse 1,000 units, and a stall blocks a worker for 200 units while root sleeps of 10 units are measured.
+/// Runs `scenario WORKLOAD WORKERS ITERATIONS [UNIT_US]` and returns its record, with overshoot in nanoseconds. Every duration is a multiple of the unit, one millisecond by default: sleeps last one unit, a pulse 1,000 units, and a stall blocks a worker for 200 units while root sleeps of 10 units are measured.
 pub fn execute(args: &[String]) -> serde_json::Value {
     let workload = args.first().expect(USAGE).as_str();
     let workers: usize = args.get(1).expect(USAGE).parse().unwrap();
@@ -32,28 +32,28 @@ pub fn execute(args: &[String]) -> serde_json::Value {
     std::thread::sleep(unit * 50);
     let cpu_start = cpu_time();
     let start = Instant::now();
-    let mut lateness = run(&scheduler, workload, workers, iterations, unit);
+    let mut overshoot = run(&scheduler, workload, workers, iterations, unit);
     let elapsed = start.elapsed();
     let cpu_seconds = cpu_time() - cpu_start;
     let rescues = rescues(&scheduler);
     block_on(scheduler.shutdown());
-    lateness.sort_unstable();
+    overshoot.sort_unstable();
     serde_json::json!({
         "workload": workload,
         "workers": workers,
         "iterations": iterations,
         "unit_us": unit_us,
-        "ns_per_op": elapsed.as_nanos() as f64 / iterations as f64,
-        "cpu_ns_per_op": cpu_seconds * 1e9 / iterations as f64,
-        "samples": lateness.len(),
-        "p50": quantile(&lateness, 0.5),
-        "p99": quantile(&lateness, 0.99),
-        "max": quantile(&lateness, 1.0),
+        "ns_per_operation": elapsed.as_nanos() as f64 / iterations as f64,
+        "cpu_ns_per_operation": cpu_seconds * 1e9 / iterations as f64,
+        "samples": overshoot.len(),
+        "overshoot_p50_ns": quantile(&overshoot, 0.5),
+        "overshoot_p99_ns": quantile(&overshoot, 0.99),
+        "overshoot_max_ns": quantile(&overshoot, 1.0),
         "rescues": rescues,
     })
 }
 
-// Returns the lateness of each measured sleep in nanoseconds.
+// Returns the overshoot of each measured sleep in nanoseconds.
 fn run(
     scheduler: &Arc<NativeScheduler>,
     workload: &str,
@@ -62,12 +62,12 @@ fn run(
     unit: Duration,
 ) -> Vec<u64> {
     let never = Cancellation::never();
-    let mut lateness = Vec::new();
+    let mut overshoot = Vec::new();
     match workload {
         // The root thread sleeps one unit repeatedly. Root registrations go to each worker in turn.
         "root-sleep" => {
             for _ in 0..iterations {
-                lateness.push(root_sleep(scheduler, unit));
+                overshoot.push(root_sleep(scheduler, unit));
             }
         }
         // The root thread spawns and joins an empty task, optionally with a distant root sleep pending throughout.
@@ -92,19 +92,19 @@ fn run(
                     scheduler
                         .spawn(async move {
                             let never = Cancellation::never();
-                            let mut lateness = Vec::with_capacity(iterations);
+                            let mut overshoot = Vec::with_capacity(iterations);
                             for _ in 0..iterations {
                                 let deadline = task_scheduler.now() + unit;
                                 task_scheduler.sleep_until(deadline, &never).await.unwrap();
-                                lateness.push(since(deadline));
+                                overshoot.push(since(deadline));
                             }
-                            lateness
+                            overshoot
                         })
                         .unwrap()
                 })
                 .collect();
             for task in tasks {
-                lateness.extend(block_on(task).unwrap());
+                overshoot.extend(block_on(task).unwrap());
             }
         }
         // No load: process CPU while every worker is idle for `iterations` units.
@@ -130,7 +130,7 @@ fn run(
                     .unwrap();
                 std::thread::sleep(unit * 5);
                 for _ in 0..8 {
-                    lateness.push(root_sleep(scheduler, unit * 10));
+                    overshoot.push(root_sleep(scheduler, unit * 10));
                 }
                 block_on(blocker).unwrap();
             }
@@ -154,7 +154,7 @@ fn run(
         }
         _ => panic!("unknown workload"),
     }
-    lateness
+    overshoot
 }
 
 fn root_sleep(scheduler: &NativeScheduler, delay: Duration) -> u64 {

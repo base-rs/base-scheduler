@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-//! A diagnostic of worker-local timers: many tasks each sleep for a fixed delay again and again, and the lateness of every expiry inside a measurement window is recorded.
+//! Periodic timers: many tasks each sleep for a fixed delay again and again, and the overshoot of every expiry inside a measurement window is recorded. This is the worker-local timer diagnostic of the stall rescue design.
 
 use crate::{cpu_time, quantile, rescues};
 use base_scheduler::{Cancellation, Clock, Spawn};
@@ -12,7 +12,7 @@ use std::{
 };
 
 const USAGE: &str =
-    "diagnostic BACKEND WORKERS TASKS DELAY_US [unaligned|aligned] [MEASURE_MS] [WORK]";
+    "periodic BACKEND WORKERS TASKS DELAY_US [unaligned|aligned] [MEASURE_MS] [WORK]";
 
 struct Window {
     start: Instant,
@@ -45,7 +45,7 @@ impl Window {
     }
 }
 
-/// Runs `diagnostic BACKEND WORKERS TASKS DELAY_US [unaligned|aligned] [MEASURE_MS] [WORK]` and returns its record. `BACKEND` is `native`, or `iouring` on Linux. The window measures for `MEASURE_MS` (3,000 by default) after a warmup of a third of that.
+/// Runs `periodic BACKEND WORKERS TASKS DELAY_US [unaligned|aligned] [MEASURE_MS] [WORK]` and returns its record, with overshoot in nanoseconds. `BACKEND` is `native`, or `iouring` on Linux. The window measures for `MEASURE_MS` (3,000 by default) after a warmup of a third of that.
 pub fn execute(args: &[String]) -> serde_json::Value {
     let backend = args.first().expect(USAGE).as_str();
     let workers: usize = args.get(1).expect(USAGE).parse().unwrap();
@@ -69,7 +69,7 @@ pub fn execute(args: &[String]) -> serde_json::Value {
     });
     let capacity = tasks * 2 + 256;
     let cpu_start = cpu_time();
-    let (mut lateness, rescues) = match backend {
+    let (mut overshoot, rescues) = match backend {
         "native" => run(
             NativeScheduler::with_options(base_scheduler_native::NativeOptions {
                 workers,
@@ -103,8 +103,7 @@ pub fn execute(args: &[String]) -> serde_json::Value {
         _ => panic!("unknown backend"),
     };
     let cpu_seconds = cpu_time() - cpu_start;
-    lateness.sort_unstable();
-    let microseconds = |value: Option<u64>| value.map(|value| value as f64 / 1e3);
+    overshoot.sort_unstable();
     serde_json::json!({
         "backend": backend,
         "workers": workers,
@@ -113,17 +112,17 @@ pub fn execute(args: &[String]) -> serde_json::Value {
         "alignment": alignment,
         "work": work,
         "seconds": measure.as_secs_f64(),
-        "completed": lateness.len(),
-        "expiries_per_second": lateness.len() as f64 / measure.as_secs_f64(),
-        "lateness_p50_us": microseconds(quantile(&lateness, 0.5)),
-        "lateness_p99_us": microseconds(quantile(&lateness, 0.99)),
-        "lateness_max_us": microseconds(quantile(&lateness, 1.0)),
+        "samples": overshoot.len(),
+        "expiries_per_second": overshoot.len() as f64 / measure.as_secs_f64(),
+        "overshoot_p50_ns": quantile(&overshoot, 0.5),
+        "overshoot_p99_ns": quantile(&overshoot, 0.99),
+        "overshoot_max_ns": quantile(&overshoot, 1.0),
         "cpu_seconds": cpu_seconds,
         "rescues": rescues,
     })
 }
 
-// Runs every task to the end of the window, and returns the lateness of each expiry inside it in nanoseconds, with the rescue counts.
+// Runs every task to the end of the window, and returns the overshoot of each expiry inside it in nanoseconds, with the rescue counts.
 fn run<S: Selector + 'static>(
     scheduler: NativeScheduler<S>,
     tasks: usize,
@@ -139,22 +138,22 @@ fn run<S: Selector + 'static>(
                 .unwrap()
         })
         .collect();
-    let lateness = scheduler.block_on(async {
-        let mut lateness = Vec::new();
+    let overshoot = scheduler.block_on(async {
+        let mut overshoot = Vec::new();
         for handle in handles {
-            lateness.extend(handle.await.unwrap());
+            overshoot.extend(handle.await.unwrap());
         }
-        lateness
+        overshoot
     });
     let rescues = rescues(&scheduler);
     scheduler.block_on(scheduler.shutdown());
-    (lateness, rescues)
+    (overshoot, rescues)
 }
 
 async fn expiries<S: Clock>(scheduler: &S, window: &Window) -> Vec<u64> {
     let never = Cancellation::never();
     let window_length = window.end.duration_since(window.start);
-    let mut lateness =
+    let mut overshoot =
         Vec::with_capacity((window_length.as_nanos() / window.delay.as_nanos()) as usize + 1);
     while Instant::now() < window.end {
         let target = window.target();
@@ -162,11 +161,11 @@ async fn expiries<S: Clock>(scheduler: &S, window: &Window) -> Vec<u64> {
         let now = Instant::now();
         assert!(now >= target, "timer fired early");
         if target >= window.start && now < window.end {
-            lateness.push(now.duration_since(target).as_nanos() as u64);
+            overshoot.push(now.duration_since(target).as_nanos() as u64);
         }
         window.work();
     }
-    lateness
+    overshoot
 }
 
 #[cfg(test)]
