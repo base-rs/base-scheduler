@@ -1,0 +1,7 @@
+$ for i in 1 2 3 4 5 6; do flock /tmp/base-scheduler-perf.lock python3 context-switches.py target-counts/release/base-scheduler-benchmark-timers periodic native 4 1024 1000 unaligned; done
+{"long_batches": 1, "stuck_polls": 4, "timers": 1101} worker involuntary switches 53 p50 us 82.8
+{"long_batches": 1, "stuck_polls": 0, "timers": 256} worker involuntary switches 92 p50 us 89.6
+{"long_batches": 3, "stuck_polls": 0, "timers": 579} worker involuntary switches 65 p50 us 92.9
+{"long_batches": 7, "stuck_polls": 5, "timers": 2194} worker involuntary switches 85 p50 us 82.9
+{"long_batches": 0, "stuck_polls": 1, "timers": 212} worker involuntary switches 88 p50 us 83.6
+{"long_batches": 0, "stuck_polls": 1, "timers": 256} worker involuntary switches 91 p50 us 80.6
