@@ -25,6 +25,30 @@ fn ready(listener: &TcpListener) {
     io::stdout().flush().expect("report listener address");
 }
 
+// A Native server's last line of output, after serving: its stall rescue counts with the `diagnostics` feature, or null without it.
+fn report_rescues<S: base_scheduler_native::Selector>(
+    scheduler: &base_scheduler_native::NativeScheduler<S>,
+) {
+    #[cfg(feature = "diagnostics")]
+    let rescues = {
+        let statistics = scheduler.rescue_statistics();
+        serde_json::json!({
+            "stuck_polls": statistics.stuck_polls,
+            "long_batches": statistics.long_batches,
+            "timers": statistics.timers,
+        })
+    };
+    #[cfg(not(feature = "diagnostics"))]
+    let rescues = {
+        let _ = scheduler;
+        serde_json::Value::Null
+    };
+    // Best effort: a reader may have stopped after the address line, and serving has already succeeded.
+    let mut stdout = io::stdout();
+    let _ = writeln!(stdout, "{}", serde_json::json!({ "rescues": rescues }))
+        .and_then(|()| stdout.flush());
+}
+
 async fn tokio_server(listener: TcpListener, connections: usize) {
     listener
         .set_nonblocking(true)
@@ -269,6 +293,7 @@ pub(crate) fn run(backend: &str, workers: usize, connections: usize) -> Result<(
                 backend == "native-poll",
                 backend == "native-monitor",
             ));
+            report_rescues(&scheduler);
             scheduler.block_on(scheduler.shutdown());
         }
         #[cfg(target_os = "linux")]
@@ -310,6 +335,7 @@ pub(crate) fn run(backend: &str, workers: usize, connections: usize) -> Result<(
                     backend == "iouring-monitor",
                 ));
             }
+            report_rescues(&scheduler);
             scheduler.block_on(scheduler.shutdown());
         }
         _ => return Err("unknown backend (io_uring backends require Linux)".into()),
