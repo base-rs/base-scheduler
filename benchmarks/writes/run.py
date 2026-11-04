@@ -101,7 +101,7 @@ def sample(server_binary, client_binary, backend, case, warmup, seconds, stat_pa
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--binary", default="target/release/base-scheduler-write-benchmark")
+    parser.add_argument("--binary", default="target/release/base-scheduler-benchmark-writes")
     parser.add_argument("--client-binary")
     parser.add_argument("--variant", action="append", default=[], help="LABEL=BACKEND=SERVER_BINARY; use LABEL in --backends to compare isolated implementations")
     parser.add_argument("--perf-stat", type=Path, help="Diagnostic counter directory; instrumented throughput is not a capacity measurement")

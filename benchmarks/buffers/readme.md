@@ -105,7 +105,7 @@ The historical [worker-owned pool experiment](worker-owned.md) connected eagerly
 On Linux with io_uring enabled, from the repository root:
 
 ```sh
-cargo build --release --locked -p base-scheduler-buffer-benchmark
+cargo build --release --locked -p base-scheduler-benchmark-buffers
 python3 benchmarks/buffers/measure.py --repeats 7 --cpus 2-5 \
     --source "$(git rev-parse HEAD)" --output benchmarks/buffers/results/local.jsonl
 python3 benchmarks/buffers/summarize.py benchmarks/buffers/results/local.jsonl

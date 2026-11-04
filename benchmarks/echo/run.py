@@ -131,8 +131,8 @@ def main():
         parser.error("provide at least one server CPU per worker")
     if set(args.server_cpus) & set(args.client_cpus):
         parser.error("server and client CPU sets must be disjoint")
-    binary = ROOT / "target" / "release" / ("base-scheduler-echo-benchmark.exe" if sys.platform == "win32" else "base-scheduler-echo-benchmark")
-    subprocess.run(["cargo", "build", "--release", "--locked", "-p", "base-scheduler-echo-benchmark"], cwd=ROOT, check=True)
+    binary = ROOT / "target" / "release" / ("base-scheduler-benchmark-echo.exe" if sys.platform == "win32" else "base-scheduler-benchmark-echo")
+    subprocess.run(["cargo", "build", "--release", "--locked", "-p", "base-scheduler-benchmark-echo"], cwd=ROOT, check=True)
     report = {
         "created_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "hostname": platform.node(), "platform": platform.platform(),

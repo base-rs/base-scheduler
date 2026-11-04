@@ -1,5 +1,5 @@
 [package]
-name = "base-scheduler-file-benchmark"
+name = "base-scheduler-benchmark-files"
 version = "0.0.0"
 edition = "2024"
 rust-version = "1.87"

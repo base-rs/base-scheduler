@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use base_scheduler_file_benchmark::run;
+use base_scheduler_benchmark_files::run;
 use std::sync::Arc;
 
 fn execute(args: &[String]) -> serde_json::Value {
@@ -68,7 +68,7 @@ fn execute(args: &[String]) -> serde_json::Value {
                 "write-at" => true,
                 _ => panic!("unknown workload"),
             };
-            base_scheduler_file_benchmark::run_migration(
+            base_scheduler_benchmark_files::run_migration(
                 backend == "iouring-migration",
                 monitor,
                 write,

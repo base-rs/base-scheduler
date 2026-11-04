@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use base_scheduler_timer_benchmark::{Mode, run};
+use base_scheduler_benchmark_timers::{Mode, run};
 use std::{sync::Arc, time::Duration};
 
 fn execute(args: &[String]) -> serde_json::Value {
