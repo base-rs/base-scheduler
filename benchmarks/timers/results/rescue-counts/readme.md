@@ -50,7 +50,7 @@ A stuck-poll rescue means that a timer stayed due for more than *S* = 1 ms on a 
 - a worker woken remotely from idle that does not collect its due timers within *S*: it has completed no task poll since the monitor's previous pass, so its rescue is classified as a stuck poll, though the validation exempts it;
 - the classification's comparison with the previous pass, which can be stale, as `RescueStatistics` documents.
 
-[Six further unaligned native runs](context-switches.jsonl), with the same build, recorded 39 to 171 involuntary context switches across the worker threads per run, without an evident relation to the rescues: runs with 39 and 69 switches rescued nothing, another with 69 rescued 211 timers, and runs with 79 and 171 rescued 2,059 and 1,483. These are whole-run totals that are not aligned in time with the rescues, so they do not rule preemption in or out.
+[Six further unaligned native runs](context-switches.jsonl), with the same build, recorded 39 to 171 involuntary context switches across the worker threads per run, without an evident relation to the rescues: runs with 39 and 69 switches rescued nothing, another with 69 rescued 211 timers, and runs with 79 and 171 rescued 2,059 and 1,483. An earlier set of six runs, whose output was kept only as condensed text, was superseded by these and showed the same lack of relation (53 to 92 switches, 212 to 2,194 timers rescued). These are whole-run totals that are not aligned in time with the rescues, so they do not rule preemption in or out.
 
 The rescues are too rare to explain the periodic workload's +26% p50 lateness in the [acceptance run](../../../echo/results/stall-rescue/readme.md).
 
