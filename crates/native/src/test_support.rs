@@ -19,10 +19,15 @@ pub(crate) fn run(test: impl FnOnce() + Send + 'static) {
     }
 }
 pub(crate) fn scheduler() -> crate::NativeScheduler {
+    scheduler_with_rescue(true)
+}
+// Without stall rescue, a test that blocks the only worker controls when its timers are collected.
+pub(crate) fn scheduler_with_rescue(stall_rescue: bool) -> crate::NativeScheduler {
     crate::NativeScheduler::with_options(crate::NativeOptions {
         workers: 1,
         threads: 1,
         capacity: 4,
+        stall_rescue,
         ..Default::default()
     })
     .unwrap()

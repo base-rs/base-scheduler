@@ -1231,6 +1231,7 @@ fn native_workers_use_distinct_rings_without_external_submission_routing() {
             NativeExecutorOptions {
                 workers: 2,
                 timer_capacity: 8,
+                ..Default::default()
             },
         )
         .unwrap(),

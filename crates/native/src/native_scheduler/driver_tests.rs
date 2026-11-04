@@ -127,6 +127,7 @@ fn construct(states: &[Arc<State>]) -> NativeScheduler {
         NativeExecutorOptions {
             workers: states.len(),
             timer_capacity: 8,
+            ..Default::default()
         },
     )
     .unwrap()
@@ -401,14 +402,17 @@ fn invalid_configuration_and_partial_startup_drop_every_driver() {
         NativeExecutorOptions {
             workers: 0,
             timer_capacity: 8,
+            ..Default::default()
         },
         NativeExecutorOptions {
             workers: 2,
             timer_capacity: 8,
+            ..Default::default()
         },
         NativeExecutorOptions {
             workers: 1,
             timer_capacity: 0,
+            ..Default::default()
         },
     ] {
         let state = Arc::new(State::default());
@@ -438,6 +442,7 @@ fn invalid_configuration_and_partial_startup_drop_every_driver() {
             NativeExecutorOptions {
                 workers: 3,
                 timer_capacity: 8,
+                ..Default::default()
             },
         );
         crate::thread::FAIL_AFTER.set(None);
@@ -446,5 +451,23 @@ fn invalid_configuration_and_partial_startup_drop_every_driver() {
         assert!(first.retired.load(Ordering::SeqCst));
         assert_eq!(second.dropped.load(Ordering::SeqCst), 1);
         assert_eq!(third.dropped.load(Ordering::SeqCst), 1);
+    });
+    // Every driven worker starts, but the stall monitor does not.
+    crate::test_support::run(|| {
+        let state = Arc::new(State::default());
+        crate::thread::FAIL_AFTER.set(Some(1));
+        let result = NativeScheduler::with_drivers(
+            ReadinessSelector::new().unwrap(),
+            vec![Driver(Arc::clone(&state))],
+            NativeExecutorOptions {
+                workers: 1,
+                timer_capacity: 8,
+                ..Default::default()
+            },
+        );
+        crate::thread::FAIL_AFTER.set(None);
+        assert!(result.is_err());
+        wait(|| state.dropped.load(Ordering::SeqCst) == 1);
+        assert!(state.retired.load(Ordering::SeqCst));
     });
 }

@@ -12,6 +12,8 @@ pub struct NativeOptions {
     pub capacity: usize,
     /// Reserve at least this many simultaneous timer registrations per worker. Must be nonzero. A full owning queue returns `WouldBlock`; spare capacity on other workers is not borrowed.
     pub timer_capacity: usize,
+    /// Rescue timers stranded behind a stuck worker; see `NativeExecutorOptions::stall_rescue`. Enabled by default.
+    pub stall_rescue: bool,
 }
 impl Default for NativeOptions {
     fn default() -> Self {
@@ -20,6 +22,7 @@ impl Default for NativeOptions {
             threads: 4,
             capacity: 64,
             timer_capacity: 1024,
+            stall_rescue: true,
         }
     }
 }

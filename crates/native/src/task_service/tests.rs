@@ -51,7 +51,7 @@ fn queued_service(workers: usize) -> (TaskService, Vec<[Worker<Runnable>; 2]>) {
         .map(|_| std::array::from_fn(|_| Worker::new_fifo()))
         .collect::<Vec<_>>();
     let service = TaskService {
-        shared: Arc::new(Shared::new(&queues, 8)),
+        shared: Arc::new(Shared::new(&queues, 8, false)),
     };
     (service, queues)
 }
@@ -169,7 +169,7 @@ fn rejected_future_destructors_can_close_admission_again() {
         }
     }
     test_support::run(|| {
-        let service = Arc::new(TaskService::new(1, 8).unwrap());
+        let service = Arc::new(TaskService::new(1, 8, true).unwrap());
         service.close();
         let guard = CloseOnDrop(Arc::clone(&service));
         assert!(matches!(
@@ -632,9 +632,20 @@ mod pinned_tasks {
 
 #[test]
 fn independently_driven_selectors_also_report_worker_startup_failures() {
-    for fail_after in [0, 1] {
+    // The third thread is the stall monitor.
+    for fail_after in [0, 1, 2] {
         thread::FAIL_AFTER.set(Some(fail_after));
-        assert!(TaskService::new(2, 8).is_err());
+        assert!(TaskService::new(2, 8, true).is_err());
         thread::FAIL_AFTER.set(None);
     }
+}
+
+#[test]
+fn a_monitor_outliving_its_scheduler_retires_nothing() {
+    let queues = [std::array::from_fn(|_| Worker::new_fifo())];
+    let shared = Arc::new(Shared::new(&queues, 8, true));
+    let registration = super::MonitorRegistration::new(&shared);
+    assert_eq!(shared.workers_remaining.load(Ordering::Acquire), 1);
+    drop(shared);
+    drop(registration);
 }

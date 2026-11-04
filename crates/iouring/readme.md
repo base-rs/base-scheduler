@@ -21,6 +21,7 @@ let (selector, drivers) = IoUringSelector::with_workers(IoUringOptions::default(
 let scheduler = NativeScheduler::with_drivers(selector, drivers, NativeExecutorOptions {
     workers,
     timer_capacity: 128,
+    ..Default::default()
 })?;
 scheduler.block_on(scheduler.shutdown());
 # }

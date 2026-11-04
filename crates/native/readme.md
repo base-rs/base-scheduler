@@ -2,7 +2,7 @@
 
 A work-stealing executor composed with native I/O selectors for Base's explicit scheduler capabilities. Applications select this implementation; libraries depend only on `base-scheduler`.
 
-Tasks run on worker-local queues with remote inboxes and work stealing. The default `ReadinessSelector` supplies one socket readiness driver per task worker. On macOS, workers own kqueues directly; other edge-capable platforms use `polling`, with independent `async-io` progress retained where edge polling is unavailable. Files, address resolution, and blocking closures use a separate bounded pool; accepted cleanup has an independent pool. Monotonic sleeps use reserved timer storage from `base-scheduler-timers`.
+Tasks run on worker-local queues with remote inboxes and work stealing. The default `ReadinessSelector` supplies one socket readiness driver per task worker. On Linux and Android, workers own epoll instances, and on macOS, kqueues; other edge-capable platforms use `polling`, with independent `async-io` progress retained where edge polling is unavailable. Files, address resolution, and blocking closures use a separate bounded pool; accepted cleanup has an independent pool. Monotonic sleeps use reserved timer storage from `base-scheduler-timers`.
 
 ## Usage
 
@@ -33,9 +33,13 @@ Sockets have no scheduler-instance affinity. Finish outstanding operations befor
 
 ## Worker timers
 
-Each worker owns an unsynchronized timer queue and collects expiries in its event loop. The earliest deadline bounds its interruptible I/O wait, or its thread park when there is no active I/O driver. There is no timer thread. Expired timers wake tasks through their registered wakers, placing runnable tasks into the ordinary queues where they can be stolen. Native never polls application futures during timer collection.
+Each worker owns a timer queue, behind a lock that is uncontended in the steady state, and collects expiries in its event loop. The earliest deadline bounds its interruptible I/O wait, or its thread park when there is no active I/O driver. There is no timer thread. Expired timers wake tasks through their registered wakers, placing runnable tasks into the ordinary queues where they can be stolen. Native never polls application futures during timer collection.
 
-A sleep first polled on a worker registers directly with that worker. Root futures and other executors choose a worker by round robin and send it a registration command. A pending sleep retains its original owner when its future moves; waker changes, cancellation, and drop update that owner's queue. A subsequent sleep can choose the task's new worker. Shutdown wakes pending sleepers and waits for worker timer callbacks and driver retirement.
+A sleep first polled on a worker registers directly with that worker. Root futures and other executors choose a worker by round robin and lock its queue directly. A pending sleep retains its original owner when its future moves; waker changes, cancellation, and drop update that owner's queue. A subsequent sleep can choose the task's new worker. Shutdown wakes pending sleepers and waits for worker timer callbacks and driver retirement.
+
+### Stall rescue
+
+A task that blocks without `spawn_blocking` holds its worker's thread, and would also strand the timers in that worker's queue. With `stall_rescue`, which is enabled by default, a worker is marked stuck once one of its timers has been due for about a millisecond without the worker reaching a turn boundary to collect it. A monitor thread, or another worker about to go idle, then fires its expired timers, and wakes skip its inbox while it stays stuck, so timers fire within about two milliseconds of their deadline while another worker is idle (measured on Linux; Windows thread sleeps are coarser). The blocking task itself still delays everything else that worker would have run, so declare blocking work with `spawn_blocking`. The monitor wakes only when a timer has been due for a millisecond, so it costs nothing without pending timers. Readiness events queued behind a stuck worker are not yet rescued. Disable `stall_rescue` for diagnostics, benchmarks, or tests that depend on a busy worker holding its timers. The `diagnostics` feature adds `NativeScheduler::rescue_statistics`, which counts rescues.
 
 The executor and readiness design come from [Socketry](https://github.com/base-rs/socketry-rust/tree/7a70586d5d37fb640d696d0c03a05b2ee3cbe06b/crates/executor). This adapter follows Base's current ownership, cancellation, and asynchronous shutdown contracts. It does not include Socketry's io_uring backend.
 
@@ -54,6 +58,7 @@ let selector = ReadinessSelector::with_options(SelectorOptions {
 let scheduler = NativeScheduler::with_selector(selector, NativeExecutorOptions {
     workers: 2,
     timer_capacity: 128,
+    ..Default::default()
 })?;
 scheduler.block_on(scheduler.shutdown());
 # Ok::<(), std::io::Error>(())

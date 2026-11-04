@@ -319,7 +319,6 @@ dependencies = [
  "base-scheduler-selector",
  "base-scheduler-timers",
  "crossbeam-deque",
- "crossbeam-queue",
  "event-listener",
  "futures-channel",
  "futures-lite",

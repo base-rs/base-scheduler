@@ -14,7 +14,7 @@ use std::{
     future::Future,
     io,
     sync::{
-        Arc, Mutex,
+        Arc, Mutex, Weak,
         atomic::{AtomicBool, AtomicUsize, Ordering},
     },
 };
@@ -40,8 +40,10 @@ impl<T> std::ops::Deref for CachePadded<T> {
 pub(crate) struct Shared {
     // Serialize registration with closure and distribute new tasks using a round-robin worker cursor. Task ownership itself needs only a count.
     admission: Mutex<usize>,
-    pub(crate) timer_capacity: usize,
     pub(crate) timer_next: AtomicUsize,
+    // Whether stalled workers' timers are rescued; `NativeExecutorOptions::stall_rescue`.
+    pub(crate) rescue: bool,
+    pub(crate) monitor: crate::monitor::Monitor,
     #[cfg(test)]
     pub(crate) paused: Mutex<Option<std::time::Instant>>,
     workers_remaining: AtomicUsize,
@@ -68,8 +70,23 @@ impl WorkerRegistration {
 }
 impl Drop for WorkerRegistration {
     fn drop(&mut self) {
-        self.0.workers_remaining.fetch_sub(1, Ordering::AcqRel);
-        self.0.changed.notify(usize::MAX);
+        self.0.retire_worker();
+    }
+}
+
+// The stall monitor also counts as a worker, so that shutdown waits for its last rescue. It holds only a weak reference.
+struct MonitorRegistration(Weak<Shared>);
+impl MonitorRegistration {
+    fn new(shared: &Arc<Shared>) -> Self {
+        shared.workers_remaining.fetch_add(1, Ordering::AcqRel);
+        Self(Arc::downgrade(shared))
+    }
+}
+impl Drop for MonitorRegistration {
+    fn drop(&mut self) {
+        if let Some(shared) = self.0.upgrade() {
+            shared.retire_worker();
+        }
     }
 }
 
@@ -87,17 +104,29 @@ impl Drop for TaskRegistration {
 }
 
 impl Shared {
-    pub(crate) fn new(queues: &[[Worker<Runnable>; 2]], timer_capacity: usize) -> Self {
+    pub(crate) fn new(
+        queues: &[[Worker<Runnable>; 2]],
+        timer_capacity: usize,
+        rescue: bool,
+    ) -> Self {
+        let epoch = std::time::Instant::now();
         Self {
             admission: Mutex::new(0),
-            timer_capacity,
             timer_next: AtomicUsize::new(0),
+            rescue,
+            monitor: crate::monitor::Monitor::new(rescue),
             #[cfg(test)]
             paused: Mutex::new(None),
             workers_remaining: AtomicUsize::new(0),
             workers: queues
                 .iter()
-                .map(|queues| WorkerState::new(queues.each_ref().map(Worker::stealer)))
+                .map(|queues| {
+                    WorkerState::new(
+                        queues.each_ref().map(Worker::stealer),
+                        timer_capacity,
+                        epoch,
+                    )
+                })
                 .collect(),
             closed: AtomicBool::new(false),
             idle_workers: AtomicUsize::new(0),
@@ -107,31 +136,22 @@ impl Shared {
         }
     }
 
+    fn retire_worker(&self) {
+        self.workers_remaining.fetch_sub(1, Ordering::AcqRel);
+        self.changed.notify(usize::MAX);
+    }
+
+    #[inline]
     pub(crate) fn has_runnables(&self) -> bool {
         self.outstanding.load(Ordering::Acquire) & !NOTIFY_IDLE != 0
     }
 
+    #[inline]
     pub(crate) fn is_closed(&self) -> bool {
         self.closed.load(Ordering::Acquire)
     }
 
-    pub(crate) fn send_timer(&self, owner: usize, command: crate::worker_timers::Command) {
-        let rejected = {
-            let _admission = self.admission.lock().unwrap();
-            if self.is_closed() {
-                Some(command)
-            } else {
-                self.workers[owner].timers.push(command);
-                None
-            }
-        };
-        if let Some(command) = rejected {
-            crate::worker_timers::rejected(command);
-        } else {
-            self.workers[owner].wake();
-        }
-    }
-
+    #[inline]
     pub(crate) fn finished(&self) -> bool {
         self.closed.load(Ordering::Acquire)
             && self.remaining.load(Ordering::Acquire) == 0
@@ -141,6 +161,7 @@ impl Shared {
         for worker in &self.workers {
             worker.wake();
         }
+        self.monitor.unpark();
     }
     pub(crate) fn wake_idle(&self, preferred: usize) {
         std::sync::atomic::fence(Ordering::SeqCst);
@@ -169,12 +190,12 @@ impl Shared {
     }
 }
 impl TaskService {
-    pub(crate) fn new(threads: usize, timer_capacity: usize) -> io::Result<Self> {
+    pub(crate) fn new(threads: usize, timer_capacity: usize, rescue: bool) -> io::Result<Self> {
         let queues: Vec<_> = (0..threads)
             .map(|_| std::array::from_fn(|_| Worker::new_fifo()))
             .collect();
         let service = Self {
-            shared: Arc::new(Shared::new(&queues, timer_capacity)),
+            shared: Arc::new(Shared::new(&queues, timer_capacity, rescue)),
         };
         for (identifier, queue) in queues.into_iter().enumerate() {
             let shared = Arc::clone(&service.shared);
@@ -184,17 +205,19 @@ impl TaskService {
                 worker::run(shared, identifier, queue)
             })?;
         }
+        service.start_monitor()?;
         Ok(service)
     }
     pub(crate) fn with_drivers<D: base_scheduler_selector::SelectorDriver>(
         drivers: Vec<D>,
         timer_capacity: usize,
+        rescue: bool,
     ) -> io::Result<Self> {
         let queues: Vec<_> = (0..drivers.len())
             .map(|_| std::array::from_fn(|_| Worker::new_fifo()))
             .collect();
         let service = Self {
-            shared: Arc::new(Shared::new(&queues, timer_capacity)),
+            shared: Arc::new(Shared::new(&queues, timer_capacity, rescue)),
         };
         for (identifier, (queue, driver)) in queues.into_iter().zip(drivers).enumerate() {
             let shared = Arc::clone(&service.shared);
@@ -204,7 +227,19 @@ impl TaskService {
                 worker::run_driven(shared, identifier, queue, driver)
             })?;
         }
+        service.start_monitor()?;
         Ok(service)
+    }
+    fn start_monitor(&self) -> io::Result<()> {
+        if !self.shared.rescue {
+            return Ok(());
+        }
+        let registration = MonitorRegistration::new(&self.shared);
+        let shared = Arc::downgrade(&self.shared);
+        thread::start("base-native-monitor", move || {
+            let _registration = registration;
+            crate::monitor::run(shared)
+        })
     }
     pub(crate) fn spawn<F>(&self, future: F) -> Result<NativeTask<F::Output>, SpawnError>
     where
@@ -241,6 +276,10 @@ impl TaskService {
         Ok(NativeTask(task))
     }
     pub(crate) fn close(&self) {
+        // Close every timer queue first, so that anyone observing scheduler closure also observes its queues closed.
+        for owner in 0..self.shared.workers.len() {
+            crate::worker_timers::close(&self.shared, owner);
+        }
         {
             let _admission = self.shared.admission.lock().unwrap();
             self.shared.closed.store(true, Ordering::Release);

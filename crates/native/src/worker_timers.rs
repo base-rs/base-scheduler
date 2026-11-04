@@ -1,10 +1,13 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use crate::{task_service::Shared, worker};
+use crate::{
+    spin_lock::SpinGuard,
+    task_service::Shared,
+    worker::{self, WorkerState},
+};
 use base_scheduler::{Cancellation, Clock, OperationResult};
-use base_scheduler_timers::local::TimerKey;
-use futures_channel::oneshot;
+use base_scheduler_timers::local::{TimerKey, TimerQueue};
 use std::{
     future::{Future, poll_fn},
     io,
@@ -14,19 +17,13 @@ use std::{
     time::{Duration, Instant},
 };
 
-pub(crate) enum Command {
-    Register {
-        deadline: Instant,
-        waker: Waker,
-        reply: oneshot::Sender<io::Result<Registration>>,
-    },
-    Update(TimerKey, Waker),
-    Release(TimerKey),
-    #[cfg(test)]
-    Inspect(std::sync::mpsc::Sender<usize>),
-}
+/// Published when a worker's queue holds no live deadline.
+pub(crate) const NO_DEADLINE: u64 = u64::MAX;
 
-fn closed() -> io::Error {
+/// Wakers collected under one queue lock by an expiry pass.
+const BATCH: usize = 256;
+
+pub(crate) fn closed() -> io::Error {
     io::Error::new(io::ErrorKind::BrokenPipe, "clock is closed")
 }
 
@@ -38,187 +35,274 @@ pub(crate) fn now(_shared: &Shared) -> Instant {
     Instant::now()
 }
 
-pub(crate) fn rejected(command: Command) {
-    match command {
-        Command::Register { waker, reply, .. } => {
-            crate::panic::discard(waker);
-            crate::panic::contain(|| drop(reply.send(Err(closed()))));
-        }
-        // Closure or expiry can overtake an update. Its new context must still be notified.
-        Command::Update(_, waker) => crate::panic::contain(|| waker.wake()),
-        Command::Release(_) => {}
-        #[cfg(test)]
-        Command::Inspect(reply) => {
-            let _ = reply.send(0);
-        }
+/// A reusable output buffer for [`expire`]. It must keep spare capacity.
+pub(crate) fn buffer() -> Vec<Waker> {
+    Vec::with_capacity(BATCH)
+}
+
+// Clock nanoseconds since the scheduler's epoch. Earlier instants are already due; distant ones clamp below `NO_DEADLINE`.
+fn nanos(worker: &WorkerState, instant: Instant) -> u64 {
+    instant
+        .saturating_duration_since(worker.timers.epoch)
+        .as_nanos()
+        .min(u128::from(NO_DEADLINE - 1)) as u64
+}
+
+// Nothing panics while a queue is locked: wakers are invoked and dropped only after unlocking.
+fn lock(worker: &WorkerState) -> SpinGuard<'_, TimerQueue<Waker>> {
+    worker.timers.queue.lock()
+}
+
+// The published deadline is a lower bound of the queue's earliest live deadline. Registration lowers it under the queue lock, and every pass that flushes the queue refreshes it exactly. Release leaves it early, which can only cause a redundant check. Every change is offered to the stall monitor, which wakes only for a deadline earlier than its plan. Both return whether the monitor needs waking; the caller unparks it after unlocking, keeping the syscall out of the critical section.
+fn lower(shared: &Shared, worker: &WorkerState, deadline: Instant) -> (bool, bool) {
+    let deadline = nanos(worker, deadline);
+    if deadline < worker.timers.deadline.load(Ordering::Relaxed) {
+        worker.timers.deadline.store(deadline, Ordering::Relaxed);
+        (true, shared.monitor.needs_wake(deadline))
+    } else {
+        (false, false)
     }
 }
 
-// Keys never migrate. A retained owner makes cancellation/drop safe even when a pending sleep moves to a different executor or outlives scheduler shutdown.
-pub(crate) struct Registration {
-    shared: Arc<Shared>,
+fn refresh(
+    shared: &Shared,
+    worker: &WorkerState,
+    queue: &mut TimerQueue<Waker>,
+) -> (Option<Instant>, bool) {
+    let next = queue.next_deadline();
+    let closed = worker.timers.closed.load(Ordering::Relaxed);
+    // A closed queue keeps publishing zero while timers remain, so a stuck owner's queue is drained without waiting for their real deadlines.
+    let published = match next {
+        Some(_) if closed => 0,
+        Some(deadline) => nanos(worker, deadline),
+        None => NO_DEADLINE,
+    };
+    let previous = worker.timers.deadline.load(Ordering::Relaxed);
+    // Stall detection relies on the published deadline never being later than the earliest live deadline. Every insertion lowers it and removals only raise the true earliest, so the exact value can never fall below the bound it replaces. A failure here means a path inserted a timer without lowering the published deadline.
+    debug_assert!(
+        previous <= published,
+        "published deadline {previous} was later than the queue's earliest {published}"
+    );
+    let mut wake = false;
+    if published != previous {
+        worker.timers.deadline.store(published, Ordering::Relaxed);
+        wake = shared.monitor.needs_wake(published);
+    }
+    (next, wake)
+}
+
+/// The current clock in the nanoseconds used for published deadlines.
+pub(crate) fn clock(shared: &Shared) -> u64 {
+    nanos(&shared.workers[0], now(shared))
+}
+
+/// A worker's published deadline, read under its queue lock, or `None` if the lock is busy.
+pub(crate) fn try_published(worker: &WorkerState) -> Option<u64> {
+    let _queue = worker.timers.queue.try_lock()?;
+    Some(worker.timers.deadline.load(Ordering::Relaxed))
+}
+
+// The current time if the published deadline has passed. Reading it needs no lock: a stale value delays collection only until the next pass, and an idle owner computes its wait under the lock.
+fn due(shared: &Shared, worker: &WorkerState) -> Option<Instant> {
+    let deadline = worker.timers.deadline.load(Ordering::Relaxed);
+    if deadline == NO_DEADLINE {
+        return None;
+    }
+    let now = now(shared);
+    (deadline <= nanos(worker, now)).then_some(now)
+}
+
+/// A key in one worker's queue. Keys never migrate; updates and release lock that queue from whichever thread holds the key.
+#[derive(Clone, Copy)]
+pub(crate) struct Key {
     owner: usize,
     key: TimerKey,
 }
-impl Drop for Registration {
+
+pub(crate) fn update(shared: &Shared, key: Key, waker: Waker) {
+    let result = lock(&shared.workers[key.owner]).update(key.key, waker);
+    match result {
+        Ok(previous) => crate::panic::discard(previous),
+        // Expiry or closure can overtake an update. Its new context must still be notified.
+        Err(replacement) => crate::panic::contain(|| replacement.wake()),
+    }
+}
+
+pub(crate) fn release(shared: &Shared, key: Key) {
+    let waker = lock(&shared.workers[key.owner]).release(key.key);
+    crate::panic::discard(waker);
+}
+
+/// A key released on drop. It borrows the scheduler rather than cloning its `Arc`: every worker would otherwise update one shared reference count on each registration and release. A sleep future already borrows its scheduler, so the borrow costs nothing.
+pub(crate) struct Registration<'a> {
+    shared: &'a Shared,
+    key: Key,
+}
+impl Registration<'_> {
+    pub(crate) fn update(&self, waker: Waker) {
+        update(self.shared, self.key, waker);
+    }
+
+    /// Keep the key without releasing it, for a holder that owns the scheduler itself.
+    pub(crate) fn into_key(self) -> Key {
+        let key = self.key;
+        std::mem::forget(self);
+        key
+    }
+}
+impl Drop for Registration<'_> {
     fn drop(&mut self) {
-        dispatch(&self.shared, self.owner, Command::Release(self.key));
+        release(self.shared, self.key);
     }
 }
 
-fn dispatch(shared: &Arc<Shared>, owner: usize, command: Command) {
-    let mut command = Some(command);
-    let result = worker::timers(shared, Some(owner), |_, timers| {
-        // The owning worker cannot destroy its queue during this borrow. Late remote commands are rejected under admission instead.
-        match command.take().unwrap() {
-            Command::Update(key, waker) => match timers.update(key, waker) {
-                Ok(previous) => (Some(previous), false),
-                Err(replacement) => (Some(replacement), true),
-            },
-            Command::Release(key) => (timers.release(key), false),
-            _ => unreachable!("only updates and releases use direct dispatch"),
-        }
+/// Register on the current worker's queue, or on a round-robin worker's queue from any other thread.
+pub(crate) fn register<'a>(
+    shared: &'a Arc<Shared>,
+    deadline: Instant,
+    waker: Waker,
+) -> io::Result<Registration<'a>> {
+    let current = worker::current(shared);
+    let owner = current.unwrap_or_else(|| {
+        shared.timer_next.fetch_add(1, Ordering::Relaxed) % shared.workers.len()
     });
-    if let Some((waker, wake)) = result {
-        if wake {
-            crate::panic::contain(|| waker.unwrap().wake());
-        } else {
-            crate::panic::discard(waker);
-        }
-    } else {
-        shared.send_timer(owner, command.unwrap());
+    let worker = &shared.workers[owner];
+    let mut queue = lock(worker);
+    // A worker drains its queue under this lock after observing closure, so either that drain removes this registration or this check rejects it.
+    if worker.timers.closed.load(Ordering::Relaxed) {
+        drop(queue);
+        crate::panic::discard(waker);
+        return Err(closed());
     }
-}
-
-fn registered(
-    shared: &Arc<Shared>,
-    owner: usize,
-    result: Result<TimerKey, Waker>,
-) -> io::Result<Registration> {
-    result
-        .map(|key| Registration {
-            shared: Arc::clone(shared),
-            owner,
-            key,
-        })
-        .map_err(|waker| {
-            crate::panic::discard(waker);
-            io::Error::new(io::ErrorKind::WouldBlock, "worker timer queue is full")
-        })
+    let result = queue.try_schedule(deadline, waker);
+    let (lowered, wake_monitor) = if result.is_ok() {
+        lower(shared, worker, deadline)
+    } else {
+        (false, false)
+    };
+    drop(queue);
+    if wake_monitor {
+        shared.monitor.unpark();
+    }
+    let key = result.map_err(|waker| {
+        crate::panic::discard(waker);
+        io::Error::new(io::ErrorKind::WouldBlock, "worker timer queue is full")
+    })?;
+    // An idle owner advertises sleep before computing its wait under the queue lock, so either it observed this deadline or this wake observes it sleeping.
+    if lowered && current != Some(owner) {
+        worker.wake();
+    }
+    Ok(Registration {
+        shared,
+        key: Key { owner, key },
+    })
 }
 
 async fn wait(shared: &Arc<Shared>, deadline: Instant) -> io::Result<()> {
     let mut cached = poll_fn(|context| Poll::Ready(context.waker().clone())).await;
-    let mut waker = Some(cached.clone());
-    let local = worker::timers(shared, None, |owner, timers| {
-        (owner, timers.try_schedule(deadline, waker.take().unwrap()))
-    });
-    let registration = if let Some((owner, result)) = local {
-        registered(shared, owner, result)?
-    } else {
-        let owner = shared.timer_next.fetch_add(1, Ordering::Relaxed) % shared.workers.len();
-        let (reply, receive) = oneshot::channel();
-        shared.send_timer(
-            owner,
-            Command::Register {
-                deadline,
-                waker: waker.unwrap(),
-                reply,
-            },
-        );
-        // Poll the receiver with every current context. If that context changes while registration is queued, acknowledgement wakes its replacement too.
-        receive
-            .await
-            .expect("worker replies to accepted timer registrations")?
-    };
+    let registration = register(shared, deadline, cached.clone())?;
     poll_fn(|context| {
         if !cached.will_wake(context.waker()) {
             let replacement = context.waker().clone();
             let previous = std::mem::replace(&mut cached, replacement.clone());
             crate::panic::discard(previous);
-            dispatch(
-                shared,
-                registration.owner,
-                Command::Update(registration.key, replacement),
-            );
+            registration.update(replacement);
         }
         Poll::Pending
     })
     .await
 }
 
-pub(crate) fn turn(shared: &Arc<Shared>, owner: usize) {
-    let incoming = &shared.workers[owner].timers;
-    // A snapshot prevents concurrent producers from extending this turn indefinitely.
-    for _ in 0..incoming.len() {
-        // This worker is the only consumer; producers can only add to the snapshot.
-        let command = incoming.pop().expect("snapshot commands have one consumer");
-        if shared.is_closed() {
-            rejected(command);
-            continue;
-        }
-        match command {
-            Command::Register {
-                deadline,
-                waker,
-                reply,
-            } => {
-                let result = worker::timers(shared, Some(owner), |_, timers| {
-                    timers.try_schedule(deadline, waker)
-                })
-                .unwrap();
-                let result = registered(shared, owner, result);
-                // A canceled receiver drops its new registration here, after releasing the queue borrow. Sending can itself invoke arbitrary waker code.
-                crate::panic::contain(|| drop(reply.send(result)));
-            }
-            #[cfg(test)]
-            Command::Inspect(reply) => {
-                expire(shared, owner);
-                let len = worker::timers(shared, Some(owner), |_, timers| timers.len()).unwrap();
-                let _ = reply.send(len);
-            }
-            command => dispatch(shared, owner, command),
-        }
-    }
-    expire(shared, owner);
-}
-
-fn expire(shared: &Arc<Shared>, owner: usize) {
-    // Empty queues avoid clock reads and heap flushes on the ordinary I/O path.
-    if worker::timers(shared, Some(owner), |_, timers| timers.is_empty()).unwrap() {
-        return;
-    }
-    let now = now(shared);
+/// Invoke the wakers of `owner`'s expired timers, or of every timer once the scheduler is closed, and return how many were invoked.
+///
+/// The owner waits for its queue lock. A rescuer (`rescue`) skips a queue that is locked, because its holder is already making progress. Wakers run after the lock is released.
+pub(crate) fn expire(
+    shared: &Arc<Shared>,
+    owner: usize,
+    expired: &mut Vec<Waker>,
+    rescue: bool,
+) -> usize {
+    let worker = &shared.workers[owner];
+    let mut fired = 0;
     loop {
-        let wake = worker::timers(shared, Some(owner), |_, timers| {
-            if shared.is_closed() {
-                timers.pop()
-            } else {
-                timers.pop_expired(now)
-            }
-        })
-        .unwrap();
-        let Some(wake) = wake else { break };
-        // Remove the timer first, release the queue borrow, then publish the runnable through its registered waker.
-        crate::panic::contain(|| wake.wake());
-    }
-}
-
-pub(crate) fn timeout(shared: &Arc<Shared>, owner: usize) -> Option<Duration> {
-    // Recheck after publishing sleeping=true: commands that arrived while the worker was active may have needed no interrupt.
-    if !shared.workers[owner].timers.is_empty() {
-        return Some(Duration::ZERO);
-    }
-    worker::timers(shared, Some(owner), |_, timers| {
-        if timers.is_empty() {
+        // Once closure is observed, drain without trusting the published deadline.
+        let now = if worker.timers.closed.load(Ordering::Relaxed) {
             None
         } else {
-            timers
-                .next_deadline()
-                .map(|deadline| deadline.saturating_duration_since(now(shared)))
+            let Some(now) = due(shared, worker) else {
+                return fired;
+            };
+            Some(now)
+        };
+        let mut queue = if rescue {
+            let Some(queue) = worker.timers.queue.try_lock() else {
+                return fired;
+            };
+            queue
+        } else {
+            lock(worker)
+        };
+        if let Some(now) = now {
+            queue.pop_expired_batch(now, expired);
+        } else {
+            for _ in expired.len()..expired.capacity() {
+                let Some(waker) = queue.pop() else { break };
+                expired.push(waker);
+            }
         }
-    })
-    .unwrap()
+        let (_, wake_monitor) = refresh(shared, worker, &mut queue);
+        drop(queue);
+        if wake_monitor {
+            shared.monitor.unpark();
+        }
+        let full = expired.len() == expired.capacity();
+        fired += expired.len();
+        for waker in expired.drain(..) {
+            crate::panic::contain(|| waker.wake());
+        }
+        if !full {
+            return fired;
+        }
+    }
+}
+
+/// Reject later registrations on `owner`'s queue. Closure calls this for every queue before it publishes scheduler closure.
+pub(crate) fn close(shared: &Shared, owner: usize) {
+    let worker = &shared.workers[owner];
+    let queue = lock(worker);
+    worker.timers.closed.store(true, Ordering::Relaxed);
+    // Closure makes every remaining timer due, so the stall monitor watches a busy owner and drains its queue if it is stuck.
+    let wake_monitor = !queue.is_empty() && {
+        worker.timers.deadline.store(0, Ordering::Relaxed);
+        shared.monitor.needs_wake(0)
+    };
+    drop(queue);
+    if wake_monitor {
+        shared.monitor.unpark();
+    }
+}
+
+/// The owner's wait bound, computed under its queue lock after advertising sleep.
+pub(crate) fn timeout(shared: &Arc<Shared>, owner: usize) -> Option<Duration> {
+    let worker = &shared.workers[owner];
+    let mut queue = lock(worker);
+    let (next, wake_monitor) = refresh(shared, worker, &mut queue);
+    // Closure may have followed this worker's last timer pass; its remaining timers are due now. Closure sets the flag under this lock before waking workers, so either this sees it or that wake sees this worker sleeping.
+    let closed = worker.timers.closed.load(Ordering::Relaxed) && next.is_some();
+    drop(queue);
+    if wake_monitor {
+        shared.monitor.unpark();
+    }
+    if closed {
+        return Some(Duration::ZERO);
+    }
+    next.map(|deadline| deadline.saturating_duration_since(now(shared)))
+}
+
+/// Live registrations in `owner`'s queue.
+#[cfg(test)]
+pub(crate) fn len(shared: &Shared, owner: usize) -> usize {
+    lock(&shared.workers[owner]).len()
 }
 
 impl<S: crate::Selector> Clock for crate::NativeScheduler<S> {
