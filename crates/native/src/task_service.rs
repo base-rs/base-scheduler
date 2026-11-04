@@ -236,10 +236,17 @@ impl TaskService {
         }
         let registration = MonitorRegistration::new(&self.shared);
         let shared = Arc::downgrade(&self.shared);
-        thread::start("base-native-monitor", move || {
+        #[cfg(test)]
+        let gate = crate::monitor::START_GATE.take();
+        let monitor = thread::start("base-native-monitor", move || {
             let _registration = registration;
+            #[cfg(test)]
+            crate::monitor::START_GATE.set(gate);
             crate::monitor::run(shared)
-        })
+        })?;
+        // Register the monitor's handle before the scheduler is returned, since nothing can close it or register a timer before then. If the monitor registered itself, it could be scheduled after closure and its final wake, which would find no handle; it would then park with nothing left to wake it, and shutdown would wait for it forever.
+        self.shared.monitor.register(monitor);
+        Ok(())
     }
     pub(crate) fn spawn<F>(&self, future: F) -> Result<NativeTask<F::Output>, SpawnError>
     where

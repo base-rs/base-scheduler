@@ -49,6 +49,16 @@ impl Monitor {
     }
 
     /// Interrupt the monitor's current sleep.
+    /// Record the monitor thread's handle, through which it is unparked.
+    pub(crate) fn register(&self, thread: Thread) {
+        let _ = self.thread.set(thread);
+    }
+
+    #[cfg(test)]
+    pub(crate) fn registered(&self) -> bool {
+        self.thread.get().is_some()
+    }
+
     pub(crate) fn unpark(&self) {
         if let Some(thread) = self.thread.get() {
             thread.unpark();
@@ -121,7 +131,6 @@ pub(crate) struct State {
 
 impl State {
     pub(crate) fn new(shared: &Shared) -> Self {
-        let _ = shared.monitor.thread.set(thread::current());
         Self {
             observations: shared
                 .workers
@@ -225,6 +234,12 @@ fn sleep_for(now: u64, wake: u64) -> Option<Duration> {
     (wake != NO_DEADLINE).then(|| Duration::from_nanos(wake.saturating_sub(now)))
 }
 
+// Holds the monitor after its first check until a test has run past it, at two rendezvous on the barrier. Set on the thread that creates a scheduler, which carries it to that scheduler's monitor.
+#[cfg(test)]
+thread_local! {
+    pub(crate) static START_GATE: std::cell::Cell<Option<Arc<std::sync::Barrier>>> = const { std::cell::Cell::new(None) };
+}
+
 /// The monitor thread. It holds only a weak reference between passes, and exits once closure has finished or the scheduler is gone.
 pub(crate) fn run(shared: Weak<Shared>) {
     let mut state = None;
@@ -232,6 +247,11 @@ pub(crate) fn run(shared: Weak<Shared>) {
         let Some(shared) = shared.upgrade().filter(|shared| !shared.finished()) else {
             return;
         };
+        #[cfg(test)]
+        if let Some(gate) = START_GATE.take() {
+            gate.wait();
+            gate.wait();
+        }
         let now = worker_timers::clock(&shared);
         let wake = state
             .get_or_insert_with(|| State::new(&shared))
