@@ -125,6 +125,8 @@ def main():
         parser.error("the offered rate must be positive")
     if args.rate is not None and sys.platform == "win32":
         parser.error("--rate needs timers finer than Windows' default 15.6 ms resolution")
+    if args.rate is not None and args.client_cpus and len(args.client_cpus) <= args.client_workers:
+        print("warning: paced client workers spin before each send; give the client more CPUs than --client-workers, or preemption adds milliseconds to latency tails", file=sys.stderr)
     if args.server_cpus and len(args.server_cpus) < max(args.workers):
         parser.error("provide at least one server CPU per worker")
     if set(args.server_cpus) & set(args.client_cpus):

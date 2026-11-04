@@ -75,7 +75,7 @@ pub(crate) async fn run(
             let mut scheduled =
                 interval.map(|interval| base + interval.mul_f64(index as f64 / connections as f64));
             // How long each counted paced request waited past its scheduled send: near zero unless the server or client fell behind.
-            let mut send_delay = histogram();
+            let mut send_delay = interval.map(|_| histogram());
             loop {
                 // A paced request's latency starts at its scheduled send, including any delay before it could be sent.
                 let started = match scheduled.as_mut().zip(interval) {
@@ -107,7 +107,7 @@ pub(crate) async fn run(
                 }
                 // Count round trips sent and completed inside the shared measurement window; warmup and boundary-crossing requests are excluded. A paced request is counted by when it was actually sent, so an overloaded server's backlog still counts, with its queueing delay in the latency.
                 if sent >= measure_start && completed <= measure_end {
-                    if interval.is_some() {
+                    if let Some(send_delay) = send_delay.as_mut() {
                         send_delay.saturating_record((sent - started).as_nanos().max(1) as u64);
                     }
                     latency.saturating_record((completed - started).as_nanos().max(1) as u64);
@@ -126,9 +126,11 @@ pub(crate) async fn run(
     for task in tasks {
         let (connection, connection_delay) = task.await.expect("client task failed")?;
         latency.add(connection).expect("matching histogram bounds");
-        send_delay
-            .add(connection_delay)
-            .expect("matching histogram bounds");
+        if let Some(connection_delay) = connection_delay {
+            send_delay
+                .add(connection_delay)
+                .expect("matching histogram bounds");
+        }
     }
     let delay =
         |quantile: f64| rate.map(|_| send_delay.value_at_quantile(quantile) as f64 / 1000.0);

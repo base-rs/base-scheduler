@@ -94,7 +94,13 @@ The client connects and allocates buffers and histograms before warmup. All conn
 
 With `--rate N`, the runner passes an offered rate to the client, which paces each connection at an equal share of `N` requests per second, staggered across connections from a shared start, with at most one request outstanding per connection. So the offered rate can reach at most the connection count divided by the round-trip time. A paced request's latency starts at its scheduled send time, so a server that falls behind is charged for the wait, and a request is counted by when it was actually sent. The client stops at the end of the measurement window. Above the server's capacity, `requests_per_second` reports what the server completed, below `offered_requests_per_second`, and the send delay, how long counted requests waited past their scheduled send (`paced_send_delay_p50_us`, `_p99_us` and `_max_us`), grows towards the backlog. It stays small while the server and client keep up; a large p50 below capacity means the client could not send on time. Compare fixed-rate latency and server CPU only at equal offered rates, separately from unrestricted throughput.
 
-Tokio timers can wake about 2 ms after their deadline, so the client sleeps until 3 ms before each scheduled send and yields until it. That keeps a client worker busy for up to 3 ms per paced request: at a per-connection interval near or below that, every client worker runs continuously. Pin the client to CPUs apart from the server's (`--client-cpus`), and check `client_cpu_seconds`. On Windows, timers resolve to about 15.6 ms, so `run.py` rejects `--rate` there.
+Tokio timers can wake about 2 ms after their deadline, so the client sleeps until 3 ms before each scheduled send and yields until it. That keeps a client worker busy for up to 3 ms per paced request: at a per-connection interval near or below that, every client worker runs continuously. Pin the client to CPUs apart from the server's, and give it more CPUs than client workers, or preemption of the spinning workers adds a millisecond or more to latency tails, on the response side as well as the send side, where the send-delay fields cannot show it. For example:
+
+```sh
+python3 benchmarks/echo/run.py --rate 100000 --server-cpus 0-3 --client-workers 2 --client-cpus 4-7 --output /tmp/echo-rate.json
+```
+
+Check `client_cpu_seconds` too. On Windows, timers resolve to about 15.6 ms, so `run.py` rejects `--rate` there.
 
 On platforms with `wait4`, each sample also records the server and client processes' CPU time over their whole lives, including setup, warmup and shutdown: `server_cpu_seconds` (with `server_user_seconds` and `server_system_seconds`) and `client_cpu_seconds`.
 
