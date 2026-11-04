@@ -16,6 +16,10 @@ import statistics
 import subprocess
 import sys
 import tempfile
+try:
+    import resource
+except ImportError:  # Windows
+    resource = None
 import time
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -67,16 +71,20 @@ def sample(binary, backend, workers, connections, size, args, rate=None):
                 raise RuntimeError("server did not become ready within 30 seconds") from None
             if not address:
                 raise RuntimeError("server exited before printing its address")
-            client_command = client_prefix + [str(args.client_binary or binary), "client", address, str(args.client_workers), str(connections), str(size), str(args.warmup), str(args.seconds)] + ([str(rate)] if rate else [])
-            result = subprocess.run(client_command, cwd=ROOT, capture_output=True, text=True, timeout=args.warmup + args.seconds + 30, check=True)
+            client_command = client_prefix + [str(args.client_binary or binary), "client", address, str(args.client_workers), str(connections), str(size), str(args.warmup), str(args.seconds)] + ([str(rate)] if rate is not None else [])
+            children = resource.getrusage(resource.RUSAGE_CHILDREN) if resource else None
+            client = subprocess.run(client_command, cwd=ROOT, capture_output=True, text=True, timeout=args.warmup + args.seconds + 30, check=True)
             status, usage = reap(server, 30)
             if status:
                 raise RuntimeError(f"server exited with status {status}")
-            data = json.loads(result.stdout)
+            data = json.loads(client.stdout)
             result = dict(data, backend=backend, workers=workers, client_workers=args.client_workers, server_cpus=server_cpus, client_cpus=args.client_cpus)
             if usage:
-                # Server CPU covers its whole life, including setup, warmup and shutdown.
-                result.update(server_cpu_seconds=usage.ru_utime + usage.ru_stime, server_user_seconds=usage.ru_utime, server_system_seconds=usage.ru_stime)
+                # Server and client CPU cover each process's whole life, including setup, warmup and shutdown. Both processes were reaped since `children` was read, so the client's share is the remainder.
+                server_cpu = usage.ru_utime + usage.ru_stime
+                after = resource.getrusage(resource.RUSAGE_CHILDREN)
+                client_cpu = (after.ru_utime + after.ru_stime) - (children.ru_utime + children.ru_stime) - server_cpu
+                result.update(server_cpu_seconds=server_cpu, server_user_seconds=usage.ru_utime, server_system_seconds=usage.ru_stime, client_cpu_seconds=client_cpu)
             return result
         except Exception as error:
             if isinstance(error, subprocess.CalledProcessError):
@@ -113,6 +121,8 @@ def main():
             parser.error("client binary must exist")
     if min(args.workers + args.connections + args.bytes + [args.client_workers, args.repeats]) < 1 or args.warmup < 0 or args.seconds <= 0:
         parser.error("counts and measurement duration must be positive; warmup must be nonnegative")
+    if args.rate is not None and args.rate < 1:
+        parser.error("the offered rate must be positive")
     if args.server_cpus and len(args.server_cpus) < max(args.workers):
         parser.error("provide at least one server CPU per worker")
     if set(args.server_cpus) & set(args.client_cpus):
@@ -146,7 +156,7 @@ def main():
                 report["samples"].append(dict(data, repeat=repeat + 1))
                 args.output.parent.mkdir(parents=True, exist_ok=True)
                 args.output.write_text(json.dumps(report, indent=2) + "\n")
-                print(f"{len(report['samples']):3} {backend:13} workers={workers} conns={connections:3} bytes={size:5}: {data['requests_per_second']:10.0f} req/s  p50={data['rtt_p50_us']:8.2f} us p99={data['rtt_p99_us']:8.2f} us", flush=True)
+                print(f"{len(report['samples']):3} {backend:13} workers={workers} conns={connections:3} bytes={size:5}: {data['requests_per_second']:10.0f} req/s  p50={data['rtt_p50_us']:8.2f} us p99={data['rtt_p99_us']:8.2f} us" + (f"  server cpu={data['server_cpu_seconds']:.3f} s" if "server_cpu_seconds" in data else ""), flush=True)
     report["load_average_after"] = os.getloadavg() if hasattr(os, "getloadavg") else None
     args.output.write_text(json.dumps(report, indent=2) + "\n")
     print("\nMedian requests/s across repetitions:")

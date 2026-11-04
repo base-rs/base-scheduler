@@ -252,13 +252,11 @@ pub(crate) fn run(backend: &str, workers: usize, connections: usize) -> Result<(
             ));
             runtime.block_on(scheduler.shutdown());
         }
-        #[cfg(target_os = "linux")]
         "native" | "native-poll" | "native-monitor" => {
             use base_scheduler_native::{NativeOptions, NativeScheduler};
             let scheduler = Arc::new(
                 NativeScheduler::with_options(NativeOptions {
                     workers,
-                    capacity: connections.max(256),
                     ..Default::default()
                 })
                 .expect("Native runtime setup"),
@@ -314,7 +312,7 @@ pub(crate) fn run(backend: &str, workers: usize, connections: usize) -> Result<(
             }
             scheduler.block_on(scheduler.shutdown());
         }
-        _ => return Err("unknown backend (iouring requires Linux)".into()),
+        _ => return Err("unknown backend (io_uring backends require Linux)".into()),
     }
     Ok(())
 }

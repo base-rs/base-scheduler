@@ -78,10 +78,19 @@ fn smoke_with(backend: &str, rate: &[&str]) {
     assert_eq!(stats["bytes"], 4096);
     assert_eq!(stats["connections"], 4);
     assert!(stats["rtt_p99_us"].as_f64().unwrap() >= stats["rtt_p50_us"].as_f64().unwrap());
-    assert_eq!(
-        stats["offered_requests_per_second"].as_f64(),
-        rate.first().map(|rate| rate.parse().unwrap())
-    );
+    let rate: Option<u64> = rate.first().map(|rate| rate.parse().unwrap());
+    assert_eq!(stats["offered_requests_per_second"].as_u64(), rate);
+    if let Some(rate) = rate {
+        // Paced connections send no more than their share of the offered rate within the 0.05 s window, plus one request each at its edge.
+        let requests = stats["requests"].as_u64().unwrap();
+        assert!(
+            requests <= rate / 20 + 4,
+            "{requests} paced requests counted"
+        );
+        assert!(stats["paced_send_delay_max_us"].as_f64().unwrap() >= 0.0);
+    } else {
+        assert!(stats["paced_send_delay_max_us"].is_null());
+    }
     server.finish(true);
 }
 #[test]
@@ -96,15 +105,17 @@ fn tokio_adapter() {
 fn tokio_adapter_poll() {
     smoke("tokio-adapter-poll");
 }
-#[cfg(target_os = "linux")]
 #[test]
 fn native_readiness() {
     smoke("native");
 }
-#[cfg(target_os = "linux")]
 #[test]
 fn native_readiness_poll_at_an_offered_rate() {
     smoke_with("native-poll", &["400"]);
+}
+#[test]
+fn native_readiness_monitor_alias() {
+    smoke("native-monitor");
 }
 #[test]
 fn offered_rate_reports_paced_requests() {
@@ -141,6 +152,17 @@ fn invalid_configuration_fails_before_running_a_workload() {
         vec!["client", "127.0.0.1:0", "1", "1", "1", "NaN", "1"],
         vec!["client", "127.0.0.1:0", "1", "1", "1", "0", "1"],
         vec!["client", "127.0.0.1:0", "1", "1", "1", "0", "1", "0"],
+        // Pacing would need an interval shorter than a nanosecond.
+        vec![
+            "client",
+            "127.0.0.1:0",
+            "1",
+            "1",
+            "1",
+            "0",
+            "1",
+            "4000000000",
+        ],
     ] {
         Process::new(&args).finish(false);
     }

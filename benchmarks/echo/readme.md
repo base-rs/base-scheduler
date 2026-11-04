@@ -66,7 +66,7 @@ Build and run the comparison on Linux:
 python3 benchmarks/echo/run.py --server-cpus 0-3 --client-cpus 4-7 --output /tmp/echo-results.json
 ```
 
-Check `lscpu -e=CPU,CORE,SOCKET,NODE,CACHE` first: those CPU numbers must refer to separate physical cores, preferably sharing one last-level cache. The runner uses the first `workers` entries from the server CPU set. CPU affinity is optional; omit both options on platforms without `taskset`. io_uring requires Linux; use `--backends tokio tokio-adapter tokio-adapter-poll` elsewhere.
+Check `lscpu -e=CPU,CORE,SOCKET,NODE,CACHE` first: those CPU numbers must refer to separate physical cores, preferably sharing one last-level cache. The runner uses the first `workers` entries from the server CPU set. CPU affinity is optional; omit both options on platforms without `taskset`. The io_uring backends require Linux; use `--backends tokio tokio-adapter tokio-adapter-poll native native-poll` elsewhere.
 
 The default matrix compares 1 and 4 server workers, 1 and 32 connections, and 64-byte and 4 KiB payloads. Each case runs three times with a one-second warmup and three-second measurement. Case and backend order are shuffled with a fixed seed. Adjust `--workers`, `--connections`, `--bytes`, `--repeats`, `--warmup`, and `--seconds` for longer or different workloads. The client has four Tokio workers by default (`--client-workers`).
 
@@ -77,8 +77,8 @@ The runner builds an optimized binary using the checked-in lockfile, then starts
 | `tokio` | Tokio | `TcpStream::read` / `write_all` with borrowed buffers |
 | `tokio-adapter` | Tokio | Bound `read_owned` / `write_owned`, implemented with readiness |
 | `tokio-adapter-poll` | Tokio | Bound borrowed `read_into` / `write`, implemented with readiness |
-| `native` | Native | Bound `read_owned` / `write_owned` on the default readiness selector (Linux) |
-| `native-poll` | Native | Bound borrowed `read_into` / `write` on the default readiness selector (Linux) |
+| `native` | Native | Bound `read_owned` / `write_owned` on the default readiness selector |
+| `native-poll` | Native | Bound borrowed `read_into` / `write` on the default readiness selector |
 | `native-monitor` | Native | Alias of `native-poll` |
 | `iouring` | Native | Owned reads submit io_uring `Recv`; ready writes complete synchronously, otherwise submit `Send` |
 | `iouring-poll` | Native | Bound borrowed `read_into` / `write`, using persistent ring readiness |
@@ -92,9 +92,11 @@ The multishot case uses eight 64 KiB payload buffers per connection, plus receiv
 
 The client connects and allocates buffers and histograms before warmup. All connections use one shared measurement window. Each sends one complete payload, waits for its full echo, verifies the bytes, and then sends the next request. Only round trips entirely inside the measurement window are counted. Neither connection setup nor warmup contributes to the reported throughput or latency histogram. One request means one round trip; payload MiB/s counts bytes in one direction, so aggregate TCP payload traffic is twice that figure.
 
-With `--rate N`, the runner passes an offered rate to the client, which paces each connection at an equal share of `N` requests per second, staggered across connections, with at most one request outstanding per connection. A paced request's latency starts at its scheduled send time, so a server that falls behind is charged for the wait. The client sleeps for the coarse part of each interval and yields for the last two milliseconds, because Tokio timers have millisecond resolution. Compare fixed-rate latency and server CPU only at equal offered rates, separately from unrestricted throughput.
+With `--rate N`, the runner passes an offered rate to the client, which paces each connection at an equal share of `N` requests per second, staggered across connections from a shared start, with at most one request outstanding per connection. So the offered rate can reach at most the connection count divided by the round-trip time. A paced request's latency starts at its scheduled send time, so a server that falls behind is charged for the wait, and a request is counted by when it was actually sent. The client stops at the end of the measurement window. Above the server's capacity, `requests_per_second` reports what the server completed, below `offered_requests_per_second`, and `paced_send_delay_max_us`, the longest a counted request waited past its scheduled send, grows towards the backlog; it stays small while the server keeps up. Compare fixed-rate latency and server CPU only at equal offered rates, separately from unrestricted throughput.
 
-On platforms with `wait4`, each sample also records the server process's user and system CPU time over its whole life, including setup, warmup and shutdown.
+Tokio timers fire on the first millisecond tick after their deadline, so the client sleeps until about 1.25 ms before each scheduled send and yields until it. That keeps a client worker busy for about 1.25 ms per paced request: at a per-connection interval near or below that, every client worker runs continuously. Pin the client to CPUs apart from the server's (`--client-cpus`), and check `client_cpu_seconds`.
+
+On platforms with `wait4`, each sample also records the server and client processes' CPU time over their whole lives, including setup, warmup and shutdown: `server_cpu_seconds` (with `server_user_seconds` and `server_system_seconds`) and `client_cpu_seconds`.
 
 Without `--rate`, latency is round-trip latency as seen by this closed-loop client, with three significant digits in the HDR histogram. It includes client scheduling and loopback networking. This is not an open-loop arrival-rate test, does not correct for coordinated omission, and does not measure connection churn or pipelining. The comparison measures these concrete implementations and ownership paths, not just trait-dispatch overhead. A client bottleneck can limit every server; verify client headroom before treating throughput as server capacity. Loopback results do not predict physical-network performance.
 

@@ -43,21 +43,14 @@ pub fn run(args: &[String]) -> Result<()> {
             if bytes > 65536 || duration.is_zero() {
                 return Err("use 1..=65536 bytes and a positive measurement duration".into());
             }
-            // Each connection sends at an equal share of the offered rate.
-            let interval = args
-                .get(8)
-                .map(|rate| {
-                    positive(rate)
-                        .map(|rate| Duration::from_secs_f64(connections as f64 / rate as f64))
-                })
-                .transpose()?;
+            let rate = args.get(8).map(|rate| positive(rate)).transpose()?;
             runtime(positive(&args[3])?).block_on(client::run(
                 args[2].parse()?,
                 connections,
                 bytes,
                 warmup,
                 duration,
-                interval,
+                rate,
             ))
         }
         _ => Err(USAGE.into()),
