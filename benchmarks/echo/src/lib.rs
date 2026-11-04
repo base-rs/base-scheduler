@@ -7,7 +7,7 @@ mod server;
 use std::{error::Error, time::Duration};
 type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;
 
-const USAGE: &str = "Usage: base-scheduler-echo-benchmark server BACKEND WORKERS CONNECTIONS\n       base-scheduler-echo-benchmark client ADDRESS WORKERS CONNECTIONS BYTES WARMUP_SECONDS MEASURE_SECONDS\nBackends: tokio, tokio-adapter, tokio-adapter-poll, tokio-adapter-monitor, iouring, iouring-poll, iouring-multishot, iouring-monitor (io_uring requires Linux). Server binds 127.0.0.1:0 and prints its address.";
+const USAGE: &str = "Usage: base-scheduler-echo-benchmark server BACKEND WORKERS CONNECTIONS\n       base-scheduler-echo-benchmark client ADDRESS WORKERS CONNECTIONS BYTES WARMUP_SECONDS MEASURE_SECONDS [RATE]\nBackends: tokio, tokio-adapter, tokio-adapter-poll, tokio-adapter-monitor, native, native-poll, native-monitor, iouring, iouring-poll, iouring-multishot, iouring-monitor (io_uring requires Linux). Server binds 127.0.0.1:0 and prints its address. RATE paces requests per second across all connections and measures latency from each scheduled send; without it, each connection sends its next request on receiving a response.";
 
 fn positive(value: &str) -> Result<usize> {
     let value = value.parse::<usize>()?;
@@ -35,19 +35,22 @@ pub fn run(args: &[String]) -> Result<()> {
         Some("server") if args.len() == 5 => {
             server::run(&args[2], positive(&args[3])?, positive(&args[4])?)
         }
-        Some("client") if args.len() == 8 => {
+        Some("client") if matches!(args.len(), 8 | 9) => {
+            let connections = positive(&args[4])?;
             let bytes = positive(&args[5])?;
             let warmup = seconds(&args[6])?;
             let duration = seconds(&args[7])?;
             if bytes > 65536 || duration.is_zero() {
                 return Err("use 1..=65536 bytes and a positive measurement duration".into());
             }
+            let rate = args.get(8).map(|rate| positive(rate)).transpose()?;
             runtime(positive(&args[3])?).block_on(client::run(
                 args[2].parse()?,
-                positive(&args[4])?,
+                connections,
                 bytes,
                 warmup,
                 duration,
+                rate,
             ))
         }
         _ => Err(USAGE.into()),

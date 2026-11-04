@@ -252,6 +252,25 @@ pub(crate) fn run(backend: &str, workers: usize, connections: usize) -> Result<(
             ));
             runtime.block_on(scheduler.shutdown());
         }
+        "native" | "native-poll" | "native-monitor" => {
+            use base_scheduler_native::{NativeOptions, NativeScheduler};
+            let scheduler = Arc::new(
+                NativeScheduler::with_options(NativeOptions {
+                    workers,
+                    ..Default::default()
+                })
+                .expect("Native runtime setup"),
+            );
+            ready(&listener);
+            scheduler.block_on(scheduler_server(
+                Arc::clone(&scheduler),
+                listener,
+                connections,
+                backend == "native-poll",
+                backend == "native-monitor",
+            ));
+            scheduler.block_on(scheduler.shutdown());
+        }
         #[cfg(target_os = "linux")]
         "iouring" | "iouring-poll" | "iouring-multishot" | "iouring-monitor" => {
             use base_scheduler_iouring::{IoUringOptions, IoUringSelector};
@@ -293,7 +312,7 @@ pub(crate) fn run(backend: &str, workers: usize, connections: usize) -> Result<(
             }
             scheduler.block_on(scheduler.shutdown());
         }
-        _ => return Err("unknown backend (iouring requires Linux)".into()),
+        _ => return Err("unknown backend (io_uring backends require Linux)".into()),
     }
     Ok(())
 }
