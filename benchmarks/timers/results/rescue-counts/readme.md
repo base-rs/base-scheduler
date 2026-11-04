@@ -19,7 +19,7 @@ python3 benchmarks/timers/results/rescue-counts/summarize.py counts.jsonl > summ
 | [counts.jsonl](counts.jsonl) | 198 records, one per run, each with the run's full output. Timer records carry `rescues`; echo records carry the server's as `server_rescues`. |
 | [summarize.py](summarize.py) | Generates the summary from the records. |
 | [summary.md](summary.md) | Rescue counts per workload, one value per repeat, and rescued timers as a share of measured expiries. |
-| [context-switches.py](context-switches.py), [context-switches.jsonl](context-switches.jsonl) | Six further unaligned native periodic runs (`periodic native 4 1024 1000 unaligned`), each record with its worker threads' involuntary context switches added as `worker_involuntary_switches`. |
+| [context-switches.py](context-switches.py), [context-switches.jsonl](context-switches.jsonl) | Six further unaligned native periodic runs with the same build, `for i in 1 2 3 4 5 6; do flock /tmp/base-scheduler-perf.lock python3 context-switches.py $T/base-scheduler-benchmark-timers periodic native 4 1024 1000 unaligned; done`, each record with its worker threads' involuntary context switches added as `worker_involuntary_switches`. |
 
 ## Result
 
@@ -39,7 +39,7 @@ Numbers below are from [summary.md](summary.md).
 
   The single-task, 10 µs periodic workload recorded none. Rescued timers were at most 0.061% of a run's measured expiries (1,743 of 2,838,325). That share is an upper bound: rescues are counted over the whole run, including the warmup, and expiries only inside the measurement window.
 
-None of these workloads blocks inside a poll. By the design's [validation](../../../../design/stall-rescue.md#validation) and decision 13, their stuck-poll rescues are false positives: in the periodic workload, and in the single `task-sleep` and `reuse expire` runs. Long-batch rescues are an expected effect of load. The expectation of zero stuck-poll rescues therefore holds for the echo matrix, spawning, idle, pulse and root sleeps, but not for the periodic workload or those two runs.
+None of these workloads blocks inside a poll. By the design's [validation](../../../../design/stall-rescue.md#validation) and decision 13, their stuck-poll rescues count as false positives unless one of the validation's exemptions explains them: a worker woken remotely, or a closing worker, that does not collect its due timers within *S*. This applies to the periodic workload and to the single `task-sleep` and `reuse expire` runs. Long-batch rescues are an expected effect of load. The expectation of zero stuck-poll rescues therefore holds for the echo matrix, spawning, idle, pulse and root sleeps, but not, without such an explanation, for the periodic workload or those two runs.
 
 ## Cause: not determined
 
@@ -47,9 +47,10 @@ A stuck-poll rescue means that a timer stayed due for more than *S* = 1 ms on a 
 
 - the worker thread was descheduled for more than *S*;
 - the worker was in its timer pass or driver turn, where no task poll completes, for more than *S*;
+- a worker woken remotely from idle that does not collect its due timers within *S*: it has completed no task poll since the monitor's previous pass, so its rescue is classified as a stuck poll, though the validation exempts it;
 - the classification's comparison with the previous pass, which can be stale, as `RescueStatistics` documents.
 
-[Six further unaligned native runs](context-switches.jsonl) recorded 39 to 171 involuntary context switches across the worker threads per run, without an evident relation to the rescues: runs with 39 and 69 switches rescued nothing, and runs with 79 and 171 rescued 2,059 and 1,483 timers. These are whole-run totals that are not aligned in time with the rescues, so they do not rule preemption in or out.
+[Six further unaligned native runs](context-switches.jsonl), with the same build, recorded 39 to 171 involuntary context switches across the worker threads per run, without an evident relation to the rescues: runs with 39 and 69 switches rescued nothing, another with 69 rescued 211 timers, and runs with 79 and 171 rescued 2,059 and 1,483. These are whole-run totals that are not aligned in time with the rescues, so they do not rule preemption in or out.
 
 The rescues are too rare to explain the periodic workload's +26% p50 lateness in the [acceptance run](../../../echo/results/stall-rescue/readme.md).
 
