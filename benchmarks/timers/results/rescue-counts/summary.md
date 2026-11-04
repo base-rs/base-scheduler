@@ -66,3 +66,22 @@
 | timers native sleep expire 128/4 | 3 | 0 / 0 / 0 | 0 / 0 / 0 | 0 / 0 / 0 |
 | timers native sleep refresh 1/1 | 3 | 0 / 0 / 0 | 0 / 0 / 0 | 0 / 0 / 0 |
 | timers native sleep yield 64/4 | 3 | 0 / 0 / 0 | 0 / 0 / 0 | 0 / 0 / 0 |
+
+Rescued timers as a share of measured expiries, per run, for workloads that count expiries:
+
+| Workload | Expiries | Timers rescued | Share |
+| --- | --- | --- | --- |
+| periodic iouring 4/1024/1000us aligned | 3,070,439 | 801 | 0.026% |
+| periodic iouring 4/1024/1000us unaligned | 2,875,724 | 519 | 0.018% |
+| periodic iouring 4/1024/1000us unaligned | 2,931,233 | 192 | 0.007% |
+| periodic native 4/1024/1000us aligned | 3,062,289 | 1,120 | 0.037% |
+| periodic native 4/1024/1000us aligned | 3,068,889 | 299 | 0.010% |
+| periodic native 4/1024/1000us aligned | 3,064,361 | 1,256 | 0.041% |
+| periodic native 4/1024/1000us unaligned | 2,838,325 | 1,743 | 0.061% |
+| periodic native 4/1024/1000us unaligned | 2,826,322 | 262 | 0.009% |
+| scenario stall | 24 | 12 | 50.000% |
+| scenario stall | 24 | 12 | 50.000% |
+| scenario stall | 24 | 12 | 50.000% |
+| scenario task-sleep | 4,800 | 10 | 0.208% |
+
+18 of 30 such runs rescued no timers.

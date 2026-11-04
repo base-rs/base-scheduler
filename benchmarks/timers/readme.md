@@ -93,6 +93,8 @@ The initial eager-replacement experiment is recorded at `5ff562f`; [its retained
 
 The final backend-deferral implementation was measured at `9a63e72` in the experimental checkout and incorporated here in `b417fa3`. Subsequent commits add test coverage and documentation, rename the capability to `Timers`, and move owner binding into `scheduler.timer()`. The measurements describe the earlier first-wait-binding implementation; the current source retains its queue and rearming policy. [Raw final samples](results/backend-deferral.jsonl) and the [full paired summary](results/backend-deferral.md) preserve all workloads and repeat ranges.
 
+The stall rescue counts of every stage 2 acceptance workload, measured with the `scenario` and `periodic` modes and `diagnostics` builds, are in [results/rescue-counts](results/rescue-counts/readme.md).
+
 ### Refreshing an idle timeout
 
 One task/one worker; medians in wall-clock nanoseconds per refresh attempt. The percentage is the median of each repeat's paired cost reduction, rather than a percentage of unrelated medians.
