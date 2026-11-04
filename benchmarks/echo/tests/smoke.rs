@@ -60,9 +60,14 @@ fn smoke_with(backend: &str, rate: &[&str]) {
     let stdout = server.0.stdout.take().unwrap();
     let (send, recv) = mpsc::channel();
     std::thread::spawn(move || {
+        let mut stdout = BufReader::new(stdout);
         let mut line = String::new();
-        BufReader::new(stdout).read_line(&mut line).unwrap();
+        stdout.read_line(&mut line).unwrap();
         send.send(line).unwrap();
+        // Keep reading, so the server can report after serving.
+        let mut rest = String::new();
+        stdout.read_to_string(&mut rest).unwrap();
+        send.send(rest).unwrap();
     });
     let address = recv.recv_timeout(Duration::from_secs(10)).unwrap();
     let mut client = Process::new(
@@ -98,6 +103,21 @@ fn smoke_with(backend: &str, rate: &[&str]) {
         assert!(stats["paced_send_delay_max_us"].is_null());
     }
     server.finish(true);
+    let rest = recv.recv_timeout(Duration::from_secs(10)).unwrap();
+    // Native servers end by reporting their rescue counts.
+    let rescues = rest
+        .lines()
+        .last()
+        .map(|line| serde_json::from_str::<serde_json::Value>(line).unwrap()["rescues"].clone());
+    let native = backend.starts_with("native") || backend.starts_with("iouring");
+    assert_eq!(rescues.is_some(), native, "{rest}");
+    if let Some(rescues) = rescues {
+        assert_eq!(
+            rescues.is_object(),
+            cfg!(feature = "diagnostics"),
+            "{rescues}"
+        );
+    }
 }
 #[test]
 fn pure_tokio() {

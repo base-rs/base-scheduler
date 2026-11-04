@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use base_scheduler_benchmark_timers::{Mode, run};
+use base_scheduler_benchmark_timers::{Mode, diagnostic, rescues, run, scenario};
 use std::{sync::Arc, time::Duration};
 
 fn execute(args: &[String]) -> serde_json::Value {
@@ -45,7 +45,7 @@ fn execute(args: &[String]) -> serde_json::Value {
                 )
                 .unwrap(),
             );
-            let result = scheduler.block_on(run(
+            let mut result = scheduler.block_on(run(
                 scheduler.clone(),
                 mode,
                 workload.clone(),
@@ -53,6 +53,7 @@ fn execute(args: &[String]) -> serde_json::Value {
                 iterations,
                 delay,
             ));
+            result["rescues"] = rescues(&scheduler);
             scheduler.block_on(scheduler.shutdown());
             result
         }
@@ -73,7 +74,7 @@ fn execute(args: &[String]) -> serde_json::Value {
                 )
                 .unwrap(),
             );
-            let result = scheduler.block_on(run(
+            let mut result = scheduler.block_on(run(
                 scheduler.clone(),
                 mode,
                 workload.clone(),
@@ -81,6 +82,7 @@ fn execute(args: &[String]) -> serde_json::Value {
                 iterations,
                 delay,
             ));
+            result["rescues"] = rescues(&scheduler);
             scheduler.block_on(scheduler.shutdown());
             result
         }
@@ -96,8 +98,17 @@ fn execute(args: &[String]) -> serde_json::Value {
     result
 }
 
+// `scenario` and `diagnostic` select those workloads; any other first argument is the backend of a timer workload.
+fn dispatch(args: &[String]) -> serde_json::Value {
+    match args.get(1).map(String::as_str) {
+        Some("scenario") => scenario::execute(&args[2..]),
+        Some("diagnostic") => diagnostic::execute(&args[2..]),
+        _ => execute(args),
+    }
+}
+
 fn main() {
-    println!("{}", execute(&std::env::args().collect::<Vec<_>>()));
+    println!("{}", dispatch(&std::env::args().collect::<Vec<_>>()));
 }
 
 #[cfg(test)]
@@ -136,6 +147,36 @@ mod tests {
             }
         }
         assert_eq!(execute(&[])["mode"], "after");
+    }
+    #[test]
+    fn dispatch_selects_scenarios_diagnostics_and_timer_workloads() {
+        let args = |values: &[&str]| {
+            values
+                .iter()
+                .map(|value| value.to_string())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(
+            dispatch(&args(&["timers", "scenario", "spawn", "1", "2", "100"]))["workload"],
+            "spawn"
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "timers",
+                "diagnostic",
+                "native",
+                "1",
+                "1",
+                "1000",
+                "unaligned",
+                "3"
+            ]))["backend"],
+            "native"
+        );
+        assert_eq!(
+            dispatch(&args(&["timers", "native", "sleep", "refresh", "1", "2"]))["workload"],
+            "refresh"
+        );
     }
     #[test]
     #[should_panic(expected = "unknown backend")]

@@ -3,6 +3,8 @@
 
 mod after;
 mod allocation;
+pub mod diagnostic;
+pub mod scenario;
 pub use after::After;
 
 use base_scheduler::{Cancellation, Spawn, Timers};
@@ -173,18 +175,41 @@ pub async fn run<S: Timers + Spawn + Send + Sync + 'static>(
     let elapsed = start.elapsed().as_secs_f64();
     let cpu_seconds = cpu_time() - cpu_start;
     overshoot.sort_unstable();
-    let percentile = |p: f64| {
-        overshoot
-            .get(((overshoot.len().saturating_sub(1) as f64) * p) as usize)
-            .copied()
-    };
-    serde_json::json!({"seconds": elapsed, "refresh_expirations": refresh_expirations, "cpu_seconds": cpu_seconds, "cpu_ns_per_operation": cpu_seconds * 1e9 / operations as f64, "operations": operations, "ops_per_second": operations as f64 / elapsed, "ns_per_operation": elapsed * 1e9 / operations as f64, "overshoot_p50_ns": percentile(0.5), "overshoot_p99_ns": percentile(0.99)})
+    serde_json::json!({"seconds": elapsed, "refresh_expirations": refresh_expirations, "cpu_seconds": cpu_seconds, "cpu_ns_per_operation": cpu_seconds * 1e9 / operations as f64, "operations": operations, "ops_per_second": operations as f64 / elapsed, "ns_per_operation": elapsed * 1e9 / operations as f64, "overshoot_p50_ns": quantile(&overshoot, 0.5), "overshoot_p99_ns": quantile(&overshoot, 0.99)})
+}
+
+/// The value at quantile `p` of sorted `values`, or `None` when there are none.
+pub fn quantile(values: &[u64], p: f64) -> Option<u64> {
+    values
+        .get(((values.len().saturating_sub(1) as f64) * p) as usize)
+        .copied()
+}
+
+/// A Native scheduler's stall rescue counts for a run's record: an object with the `diagnostics` feature, and null without it.
+pub fn rescues<S: base_scheduler_native::Selector>(
+    scheduler: &base_scheduler_native::NativeScheduler<S>,
+) -> serde_json::Value {
+    #[cfg(feature = "diagnostics")]
+    {
+        let statistics = scheduler.rescue_statistics();
+        serde_json::json!({
+            "stuck_polls": statistics.stuck_polls,
+            "long_batches": statistics.long_batches,
+            "timers": statistics.timers,
+        })
+    }
+    #[cfg(not(feature = "diagnostics"))]
+    {
+        let _ = scheduler;
+        serde_json::Value::Null
+    }
 }
 
 #[cfg(test)]
 mod tests;
 
-fn cpu_time() -> f64 {
+/// Process CPU time in seconds, user and system, or zero where it is unavailable.
+pub fn cpu_time() -> f64 {
     #[cfg(unix)]
     {
         let mut usage = std::mem::MaybeUninit::<libc::rusage>::uninit();

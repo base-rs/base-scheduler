@@ -5,6 +5,10 @@ edition = "2024"
 rust-version = "1.87"
 publish = false
 
+[features]
+# Report the server's stall rescue counts for Native backends, through `base-scheduler-native`'s `diagnostics` feature. Build timed variants without it.
+diagnostics = ["base-scheduler-native/diagnostics"]
+
 [dependencies]
 base-scheduler = { path = "../.." }
 base-scheduler-tokio = { path = "../../crates/tokio" }

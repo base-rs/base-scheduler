@@ -104,6 +104,8 @@ Check `client_cpu_seconds` too. On Windows, timers resolve to about 15.6 ms, so 
 
 On platforms with `wait4`, each sample also records the server and client processes' CPU time over their whole lives, including setup, warmup and shutdown: `server_cpu_seconds` (with `server_user_seconds` and `server_system_seconds`) and `client_cpu_seconds`.
 
+A Native server prints a final line with its stall rescue counts after serving. They are null unless the binary was built with `--features diagnostics`, in which case `run.py` records them as `server_rescues`. Do not take timing from a diagnostics build.
+
 Without `--rate`, latency is round-trip latency as seen by this closed-loop client, with three significant digits in the HDR histogram. It includes client scheduling and loopback networking. This is not an open-loop arrival-rate test, does not correct for coordinated omission, and does not measure connection churn or pipelining. The comparison measures these concrete implementations and ownership paths, not just trait-dispatch overhead. A client bottleneck can limit every server; verify client headroom before treating throughput as server capacity. Loopback results do not predict physical-network performance.
 
 Raw JSON preserves every repetition, configuration, CPU topology, source revision, toolchain, and load averages. Compare medians and variation across repetitions rather than selecting the fastest run. Keep frequency policy and affinity consistent; the runner does not change machine-wide settings.

@@ -79,6 +79,11 @@ def sample(binary, backend, workers, connections, size, args, rate=None):
                 raise RuntimeError(f"server exited with status {status}")
             data = json.loads(client.stdout)
             result = dict(data, backend=backend, workers=workers, client_workers=args.client_workers, server_cpus=server_cpus, client_cpus=args.client_cpus)
+            # A Native server's last line reports its stall rescue counts, which are null unless it was built with the `diagnostics` feature.
+            for line in server.stdout.read().splitlines():
+                rescues = json.loads(line).get("rescues")
+                if rescues is not None:
+                    result.update(server_rescues=rescues)
             if usage:
                 # Server and client CPU cover each process's whole life, including setup, warmup and shutdown. Both processes were reaped since `children` was read, so the client's share is the remainder.
                 server_cpu = usage.ru_utime + usage.ru_stime
