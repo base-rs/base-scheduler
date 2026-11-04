@@ -540,6 +540,8 @@ fn a_monitor_scheduled_after_closure_still_exits() {
             assert!(scheduler.tasks.shared.monitor.registered());
             gate.wait();
             block_on(scheduler.spawn(async {}).unwrap()).unwrap();
+            // A joined task's runnable can retire after the join returns. Drained before closure, the scheduler is finished as soon as it closes; drained after, the wait would include the held monitor.
+            block_on(scheduler.tasks.drain());
             scheduler.close();
             assert!(scheduler.tasks.shared.finished());
             gate.wait();

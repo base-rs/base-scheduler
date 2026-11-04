@@ -231,13 +231,14 @@ impl TaskService {
         Ok(service)
     }
     fn start_monitor(&self) -> io::Result<()> {
+        // A test's gate applies only to the next scheduler built on its thread.
+        #[cfg(test)]
+        let gate = crate::monitor::START_GATE.take();
         if !self.shared.rescue {
             return Ok(());
         }
         let registration = MonitorRegistration::new(&self.shared);
         let shared = Arc::downgrade(&self.shared);
-        #[cfg(test)]
-        let gate = crate::monitor::START_GATE.take();
         let monitor = thread::start("base-native-monitor", move || {
             let _registration = registration;
             #[cfg(test)]

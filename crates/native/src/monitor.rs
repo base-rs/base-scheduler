@@ -48,7 +48,6 @@ impl Monitor {
         deadline.saturating_add(PERIOD) < self.next.load(Ordering::Relaxed)
     }
 
-    /// Interrupt the monitor's current sleep.
     /// Record the monitor thread's handle, through which it is unparked.
     pub(crate) fn register(&self, thread: Thread) {
         let _ = self.thread.set(thread);
@@ -59,6 +58,7 @@ impl Monitor {
         self.thread.get().is_some()
     }
 
+    /// Interrupt the monitor's current sleep.
     pub(crate) fn unpark(&self) {
         if let Some(thread) = self.thread.get() {
             thread.unpark();
