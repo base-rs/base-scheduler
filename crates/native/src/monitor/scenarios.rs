@@ -134,13 +134,15 @@ fn stall_with_timer(
         let send = send.clone();
         let released = Arc::clone(released);
         async move {
+            // The sleep fixes its deadline when first polled, so take the start time before that.
+            let registered = Instant::now();
             assert!(
                 timer
                     .as_mut()
                     .poll(&mut Context::from_waker(&waker))
                     .is_pending()
             );
-            send.send(Instant::now()).unwrap();
+            send.send(registered).unwrap();
             block(&released);
             drop(timer);
         }
@@ -176,12 +178,13 @@ fn a_timer_left_on_a_worker_that_blocks_fires_for_its_new_waiter() {
                     let released = Arc::clone(&released);
                     let mut wait = timer(&source, DELAY);
                     async move {
+                        // The wait fixes its deadline when first polled, so take the start time before that.
+                        let registered = Instant::now();
                         assert!(
                             wait.as_mut()
                                 .poll(&mut Context::from_waker(Waker::noop()))
                                 .is_pending()
                         );
-                        let registered = Instant::now();
                         // Only the copy that starts on worker 0 runs this body.
                         let send = send.lock().unwrap().take().unwrap();
                         assert!(send.send((registered, wait)).is_ok());
