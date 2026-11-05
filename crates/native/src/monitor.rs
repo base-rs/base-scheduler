@@ -72,7 +72,7 @@ impl Monitor {
 pub(crate) struct Counters {
     pub(crate) stuck_polls: std::sync::atomic::AtomicUsize,
     pub(crate) long_batches: std::sync::atomic::AtomicUsize,
-    pub(crate) woken: std::sync::atomic::AtomicUsize,
+    pub(crate) leaving_idle: std::sync::atomic::AtomicUsize,
     pub(crate) timers: std::sync::atomic::AtomicUsize,
 }
 
@@ -82,7 +82,7 @@ impl Counters {
         match kind {
             Stuck::Poll | Stuck::Unclassified => &self.stuck_polls,
             Stuck::Batch => &self.long_batches,
-            Stuck::Woken => &self.woken,
+            Stuck::LeavingIdle => &self.leaving_idle,
         }
     }
 }
@@ -242,11 +242,11 @@ impl State {
                 }
                 continue;
             }
-            // A newly marked worker still in idle code was woken and has not resumed; any other is classified at the next pass.
+            // A newly marked worker in idle code is leaving idle: woken and not yet running, or finishing its pre-park checks. Any other is classified at the next pass.
             #[cfg(any(test, feature = "diagnostics"))]
             let kind = match worker.stuck() {
                 Some(kind) => kind,
-                None if worker.heartbeat.idle.load(Ordering::Relaxed) => Stuck::Woken,
+                None if worker.heartbeat.idle.load(Ordering::Relaxed) => Stuck::LeavingIdle,
                 None => {
                     observation.polls = polls;
                     Stuck::Unclassified

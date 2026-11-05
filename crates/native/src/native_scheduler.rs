@@ -113,7 +113,7 @@ impl<S: Selector> NativeScheduler<S> {
         crate::RescueStatistics {
             stuck_polls: counters.stuck_polls.load(Ordering::Relaxed),
             long_batches: counters.long_batches.load(Ordering::Relaxed),
-            woken: counters.woken.load(Ordering::Relaxed),
+            leaving_idle: counters.leaving_idle.load(Ordering::Relaxed),
             timers: counters.timers.load(Ordering::Relaxed),
         }
     }

@@ -10,7 +10,7 @@ use std::sync::{Arc, OnceLock, Weak};
 use std::thread::{self, Thread};
 use std::{task::Waker, time::Duration};
 
-/// How a stuck worker was observed. Release builds record every mark as `Poll`; test and diagnostic builds classify it: a worker still in idle code after a wake is `Woken`, and any other starts `Unclassified` until the monitor's next pass tells a `Batch` that completed a task poll from a `Poll` that did not.
+/// How a stuck worker was observed. Release builds record every mark as `Poll`; test and diagnostic builds classify it: a worker in idle code that is no longer sleeping is `LeavingIdle`, and any other starts `Unclassified` until the monitor's next pass tells a `Batch` that completed a task poll from a `Poll` that did not.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Stuck {
     Poll,
@@ -19,7 +19,7 @@ pub(crate) enum Stuck {
     #[cfg_attr(not(any(test, feature = "diagnostics")), allow(dead_code))]
     Unclassified,
     #[cfg_attr(not(any(test, feature = "diagnostics")), allow(dead_code))]
-    Woken,
+    LeavingIdle,
 }
 
 /// Written by the owner at each turn boundary and read by the stall monitor. It has its own cache line, so the owner's stores do not disturb workers reading its queues and flags.
@@ -30,7 +30,7 @@ pub(crate) struct Heartbeat {
     // Completed task polls, which tell a long batch from a single stuck poll.
     #[cfg(any(test, feature = "diagnostics"))]
     pub(crate) polls: AtomicUsize,
-    // Set while the owner is in its idle path, from before it advertises sleeping until it resumes, so that a woken worker that has not yet resumed is recognised.
+    // Set while the owner is in its idle path, from before it advertises sleeping until it resumes, so that a marked worker leaving idle is recognised.
     #[cfg(any(test, feature = "diagnostics"))]
     pub(crate) idle: AtomicBool,
 }
@@ -108,7 +108,7 @@ impl WorkerState {
             1 => Some(Stuck::Poll),
             2 => Some(Stuck::Batch),
             3 => Some(Stuck::Unclassified),
-            _ => Some(Stuck::Woken),
+            _ => Some(Stuck::LeavingIdle),
         }
     }
 
@@ -119,7 +119,7 @@ impl WorkerState {
             Some(Stuck::Poll) => 1,
             Some(Stuck::Batch) => 2,
             Some(Stuck::Unclassified) => 3,
-            Some(Stuck::Woken) => 4,
+            Some(Stuck::LeavingIdle) => 4,
         };
         if self.stuck.load(Ordering::Relaxed) != value {
             self.stuck.store(value, Ordering::Relaxed);

@@ -35,7 +35,7 @@ fn report_rescues<S: base_scheduler_native::Selector>(
         serde_json::json!({
             "stuck_polls": statistics.stuck_polls,
             "long_batches": statistics.long_batches,
-            "woken": statistics.woken,
+            "leaving_idle": statistics.leaving_idle,
             "timers": statistics.timers,
         })
     };

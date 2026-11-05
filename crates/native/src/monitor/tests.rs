@@ -169,7 +169,7 @@ fn rescues_are_classified_by_what_the_worker_was_doing() {
     assert_eq!(shared.workers[1].stuck(), None);
     assert_eq!(count(&counters.long_batches), 2);
 
-    // A worker still in idle code after a wake has not resumed: a woken worker, classified at once.
+    // A worker in idle code that is no longer sleeping is leaving idle, classified at once.
     shared.workers[0]
         .heartbeat
         .idle
@@ -177,8 +177,8 @@ fn rescues_are_classified_by_what_the_worker_was_doing() {
     let third = expired_timer(&shared, 0, &probe);
     let due = shared.workers[0].timers.deadline.load(Ordering::Relaxed);
     state.pass(&shared, due + STALL);
-    assert_eq!(shared.workers[0].stuck(), Some(Stuck::Woken));
-    assert_eq!(count(&counters.woken), 1);
+    assert_eq!(shared.workers[0].stuck(), Some(Stuck::LeavingIdle));
+    assert_eq!(count(&counters.leaving_idle), 1);
     shared.workers[0]
         .heartbeat
         .idle
