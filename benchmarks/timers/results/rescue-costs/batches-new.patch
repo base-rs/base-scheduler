@@ -1,0 +1,51 @@
+diff --git a/crates/native/src/lib.rs b/crates/native/src/lib.rs
+index 94e2bff..aceb672 100644
+--- a/crates/native/src/lib.rs
++++ b/crates/native/src/lib.rs
+@@ -35,3 +35,5 @@ pub use native_task::NativeTask;
+ pub use rescue_statistics::RescueStatistics;
+ 
+ pub use worker_timers::NativeTimer;
++
++pub use worker_timers::timer_batch_histogram;
+diff --git a/crates/native/src/worker_timers.rs b/crates/native/src/worker_timers.rs
+index 8574b8e..dd37251 100644
+--- a/crates/native/src/worker_timers.rs
++++ b/crates/native/src/worker_timers.rs
+@@ -221,6 +221,19 @@ pub(crate) fn expire(
+     owner: usize,
+     expired: &mut Vec<Waker>,
+     rescue: bool,
++) -> usize {
++    let fired = expire_pass(shared, owner, expired, rescue);
++    if !rescue {
++        record_batch(fired);
++    }
++    fired
++}
++
++fn expire_pass(
++    shared: &Arc<Shared>,
++    owner: usize,
++    expired: &mut Vec<Waker>,
++    rescue: bool,
+ ) -> usize {
+     let worker = &shared.workers[owner];
+     let mut fired = 0;
+@@ -340,3 +353,16 @@ mod tests;
+ 
+ mod native_timer;
+ pub use native_timer::NativeTimer;
++
++// Experiment: timers fired per expiry pass, in log2 buckets (bucket b counts passes firing [2^(b-1), 2^b) timers).
++static TIMER_BATCHES: [std::sync::atomic::AtomicU64; 16] = [const { std::sync::atomic::AtomicU64::new(0) }; 16];
++pub(crate) fn record_batch(fired: usize) {
++    if fired > 0 {
++        let bucket = (usize::BITS - fired.leading_zeros()) as usize;
++        TIMER_BATCHES[bucket.min(15)].fetch_add(1, std::sync::atomic::Ordering::Relaxed);
++    }
++}
++/// Experiment: the histogram of timers fired per expiry pass.
++pub fn timer_batch_histogram() -> Vec<u64> {
++    TIMER_BATCHES.iter().map(|count| count.load(std::sync::atomic::Ordering::Relaxed)).collect()
++}

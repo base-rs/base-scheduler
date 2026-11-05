@@ -1,0 +1,22 @@
+--- a/crates/native/src/native_executor_options.rs
++++ b/crates/native/src/native_executor_options.rs
+@@ -17,7 +17,7 @@
+         Self {
+             workers: std::thread::available_parallelism().map_or(1, usize::from),
+             timer_capacity: 1024,
+-            stall_rescue: true,
++            stall_rescue: false,
+         }
+     }
+ }
+--- a/crates/native/src/native_options.rs
++++ b/crates/native/src/native_options.rs
+@@ -22,7 +22,7 @@
+             threads: 4,
+             capacity: 64,
+             timer_capacity: 1024,
+-            stall_rescue: true,
++            stall_rescue: false,
+         }
+     }
+ }

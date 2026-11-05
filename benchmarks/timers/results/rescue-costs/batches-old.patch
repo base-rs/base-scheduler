@@ -1,0 +1,51 @@
+diff --git a/crates/native/src/lib.rs b/crates/native/src/lib.rs
+index 5249f49..674817e 100644
+--- a/crates/native/src/lib.rs
++++ b/crates/native/src/lib.rs
+@@ -29,3 +29,5 @@ pub use native_scheduler::NativeScheduler;
+ pub use native_task::NativeTask;
+ 
+ pub use worker_timers::NativeTimer;
++
++pub use worker_timers::timer_batch_histogram;
+diff --git a/crates/native/src/worker_timers.rs b/crates/native/src/worker_timers.rs
+index fde2493..3cc6015 100644
+--- a/crates/native/src/worker_timers.rs
++++ b/crates/native/src/worker_timers.rs
+@@ -189,6 +189,7 @@ fn expire(shared: &Arc<Shared>, owner: usize) {
+         return;
+     }
+     let now = now(shared);
++    let mut fired = 0;
+     loop {
+         let wake = worker::timers(shared, Some(owner), |_, timers| {
+             if shared.is_closed() {
+@@ -199,9 +200,11 @@ fn expire(shared: &Arc<Shared>, owner: usize) {
+         })
+         .unwrap();
+         let Some(wake) = wake else { break };
++        fired += 1;
+         // Remove the timer first, release the queue borrow, then publish the runnable through its registered waker.
+         crate::panic::contain(|| wake.wake());
+     }
++    record_batch(fired);
+ }
+ 
+ pub(crate) fn timeout(shared: &Arc<Shared>, owner: usize) -> Option<Duration> {
+@@ -256,3 +259,16 @@ mod tests;
+ 
+ mod native_timer;
+ pub use native_timer::NativeTimer;
++
++// Experiment: timers fired per expiry pass, in log2 buckets (bucket b counts passes firing [2^(b-1), 2^b) timers).
++static TIMER_BATCHES: [std::sync::atomic::AtomicU64; 16] = [const { std::sync::atomic::AtomicU64::new(0) }; 16];
++pub(crate) fn record_batch(fired: usize) {
++    if fired > 0 {
++        let bucket = (usize::BITS - fired.leading_zeros()) as usize;
++        TIMER_BATCHES[bucket.min(15)].fetch_add(1, std::sync::atomic::Ordering::Relaxed);
++    }
++}
++/// Experiment: the histogram of timers fired per expiry pass.
++pub fn timer_batch_histogram() -> Vec<u64> {
++    TIMER_BATCHES.iter().map(|count| count.load(std::sync::atomic::Ordering::Relaxed)).collect()
++}
