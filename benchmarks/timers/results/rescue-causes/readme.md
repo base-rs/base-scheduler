@@ -49,7 +49,7 @@ Numbers below are from [summary.md](summary.md).
 
 Today's label called 40 of the 92 marks stuck polls: 28 workers leaving idle and 12 long batches. All 196 rescues that fired a timer were logged, matching `RescueStatistics` exactly: 67 by the monitor and 129 by idle workers' pre-park checks.
 
-This does not show that no poll was stuck for longer than a period. Eleven of the 37 marks classified at the clear lasted more than 5 ms. In the longest, the monitor and the workers were starved together: one pass marked all four workers, and the next came 25 ms later. A poll stuck during such a stretch, followed by completed polls before the clear, counts as a long batch. The stuck-poll class is therefore a lower bound.
+This does not show that no poll was stuck for longer than a period. Eleven of the 37 marks classified at the clear lasted more than 5 ms. In the longest, the monitor and the workers were starved together: one pass marked all four workers, and the next came 25 ms later. A poll stuck during such a stretch, followed by completed polls before the clear, counts as a long batch, so stuck polls can be undercounted.
 
 **Most workers leaving idle were waiting for a CPU.** Over the 50 marks, the median worker was marked for 1,963 µs, ran for 843 µs, and accrued 2,202 µs of run-queue delay.
 - **Waiting (40 marks):** the run-queue delay was at least half the mark. The longest marks, up to 38 ms, show the threads were runnable but not run. What occupied the CPUs then was not recorded: it could have been other load on the host, or a cgroup CPU limit.
