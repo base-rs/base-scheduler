@@ -8,7 +8,7 @@ Three builds were compared:
 - **on:** `793cbbf`, `main` with stall rescue and before decision 16's classification, which changes only diagnostics builds;
 - **off:** `793cbbf` with [off.patch](off.patch), which makes `stall_rescue` default to off. It keeps the rest of the change, including the lockable timer queues and published deadlines, but starts no monitor.
 
-The periodic diagnostic and pulse are the stall rescue scripts from the acceptance run, `timer-diagnostic.rs` and `rb.rs` in [`stall-rescue/scripts`](../../../echo/results/stall-rescue/scripts/). Each was built as its own package against each tree, from [harness/diag.Cargo.toml](harness/diag.Cargo.toml) and [harness/rb.Cargo.toml](harness/rb.Cargo.toml) with `TREE` replaced by the tree's path, and with the lockfiles in [harness](harness/).
+The periodic diagnostic and pulse are the stall rescue scripts from the acceptance run, `timer-diagnostic.rs` and `rb.rs` in [`stall-rescue/scripts`](../../../echo/results/stall-rescue/scripts/). Each was built as its own package against each tree, from [harness/diag.Cargo.toml](harness/diag.Cargo.toml) and [harness/rb.Cargo.toml](harness/rb.Cargo.toml) with `TREE` replaced by the tree's path, with the lockfiles in [harness](harness/): `diag-before.Cargo.lock` and `rb-before.Cargo.lock` for the before tree, whose native crate also depends on `crossbeam-queue` and `futures-channel`, and `diag.Cargo.lock` and `rb.Cargo.lock` for the on and off trees.
 
 Hana: Linux 7.2.14, Intel Xeon E3-1240 v6 (4 cores, 8 threads), `powersave` governor, rustc 1.99.1, release builds, unpinned unless stated. Every run held `/tmp/base-scheduler-perf.lock`, and nothing else of ours ran on the host. The drivers take build names `m2` (before), `now` (on) and `nowoff` (off), and find binaries in `diag-{build}/target/release/diag` and `rb-{build}/target/release/rb`. `costs.py` and `oversub.py` look beside the script, and `batches-record.py` looks in the current directory.
 
@@ -36,13 +36,13 @@ Numbers below are from [summary.md](summary.md).
 
 The instrumented builds suggest one mechanism. At 4 workers, the same expiries arrived in fewer, larger passes: 176,501 per run against 228,402 (ranges 143,622–199,877 and 188,244–267,726). Each timer then waits behind more neighbours. One explanation is that cheaper registration makes tasks re-arm in tighter bursts, since each task's next deadline is set when it runs, but other changes to the timer pass could also change how often a pass finds timers due. Neither was isolated, and the off build was not instrumented. At 8 workers, pass counts overlapped completely (223,606–704,034 against 397,355–659,018), so batching does not explain the rise there.
 
-**The monitor's own cost is a few percent of CPU on io_uring, and none on the readiness selector.** Paired by repeat, with stall rescue on against off:
+**The monitor's own cost is a few percent of CPU on io_uring, and not consistent on the readiness selector.** Paired by repeat, with stall rescue on against off:
 - **io_uring, unaligned:** process CPU +5.0% and worker CPU +4.1%, with on higher in 12 of 15 repeats. This is the case where deadlines fall due continuously and the monitor wakes about 3,450 times per run. Total CPU was still below before stall rescue.
 - **io_uring, aligned:** process CPU +2.7% and worker CPU +2.9% (11 and 10 of 15).
-- **Readiness selector:** within ±2%, with on higher in 6 to 9 of 15 repeats.
+- **Readiness selector:** from −1% to +2%, with on higher in 6 to 9 of 15 repeats.
 - **The monitor thread itself:** about 0.01 s of CPU per run on io_uring and 0.05 s on the readiness selector, at 10 ms resolution.
 - **Pulse:** process CPU was 0.53 ms per run on, 0.39 ms off and 0.42 ms before, about 0.1 ms for the monitor's 5 wakes per run.
-- **Lateness:** p50 was not higher with the monitor on. The median per-repeat change was −7.0% on io_uring unaligned (on higher in 7 of 15), −10.5% on io_uring aligned (3 of 15), and +1 to +3% on the readiness selector (8 and 10 of 15). p99 was within 3% between on and off in every periodic case.
+- **Lateness:** p50 was not consistently higher with the monitor on. The median per-repeat change was −7.0% on io_uring unaligned (on higher in 7 of 15), −10.5% on io_uring aligned (3 of 15), and +1 to +3% on the readiness selector (8 and 10 of 15). p99 was within 3% between on and off in every periodic case.
 
 **Oversubscription did not make rescues costly.**
 - **8 workers beside four busy-loop processes:** rescued timers rose to 0.31–0.54% of expiries. p50 changed by 1–4% and CPU by about 1%. p99 ranges overlapped widely, for example 413–772 µs before, 429–617 µs on and 307–757 µs off on the readiness selector, so no p99 difference is claimed.
