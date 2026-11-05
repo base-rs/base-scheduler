@@ -28,7 +28,7 @@ Scheduler counters over each mark: CPU time (`run`), run-queue delay (`delay`), 
 
 ### Workers leaving idle
 
-50 of these marks have a logged clear. Over each mark, the median worker was marked for 1963 µs, ran for 843 µs and accrued 2202 µs of run-queue delay. In 40 of them the run-queue delay was at least half the mark, and in 8 it was under 50 µs: those workers were running, in their pre-park checks. Run-queue delay is credited when a thread reaches a CPU, so it includes waiting that began before the mark; in 22 marks it exceeds the mark itself.
+50 of these marks have a logged clear. Over each mark, the median worker was marked for 1963 µs, ran for 843 µs and accrued 2202 µs of run-queue delay. In 40 of them the run-queue delay was at least half the mark, and in 8 it was under 50 µs: those workers were probably running, in their pre-park checks or just resumed. Run-queue delay is credited when a thread reaches a CPU, so it includes waiting that began before the mark; in 22 marks it exceeds the mark itself.
 
 ## Rescues
 

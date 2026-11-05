@@ -53,7 +53,8 @@ This does not show that no poll was stuck for longer than a period. Eleven of th
 
 **Most workers leaving idle were waiting for a CPU.** Over the 50 marks, the median worker was marked for 1,963 µs, ran for 843 µs, and accrued 2,202 µs of run-queue delay.
 - **Waiting (40 marks):** the run-queue delay was at least half the mark. The longest marks, up to 38 ms, show the threads were runnable but not run. What occupied the CPUs then was not recorded: it could have been other load on the host, or a cgroup CPU limit.
-- **Running (8 marks):** run-queue delay was under 50 µs. Those workers were running their pre-park checks, where a rescue can schedule a task onto the rescuing worker itself and clear its sleeping flag.
+- **Running (8 marks):** run-queue delay was under 50 µs. Those workers were probably running: in their pre-park checks, where a rescue can schedule a task onto the rescuing worker itself and clear its sleeping flag, or just resumed and not yet past their next phase marker.
+- **In between (2 marks):** some run-queue delay, but less than half the mark.
 - **The comparison is approximate:** run-queue delay is credited when a thread reaches a CPU, so it includes waiting that began before the mark, and in 22 marks it exceeds the mark itself.
 
 **No wake is lost, and Native's wake latency is in the same range as a plain thread's and Tokio's.**

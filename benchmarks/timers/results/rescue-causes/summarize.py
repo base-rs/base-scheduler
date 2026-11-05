@@ -69,7 +69,7 @@ if woken:
     queued = sum(1 for _, clear in woken if clear["delay_ns"] >= clear["marked_ns"] / 2)
     running = sum(1 for _, clear in woken if clear["delay_ns"] < 50_000)
     over = sum(1 for _, clear in woken if clear["delay_ns"] > clear["marked_ns"])
-    print(f"{len(woken)} of these marks have a logged clear. Over each mark, the median worker was marked for {median('marked_ns'):.0f} µs, ran for {median('run_ns'):.0f} µs and accrued {median('delay_ns'):.0f} µs of run-queue delay. In {queued} of them the run-queue delay was at least half the mark, and in {running} it was under 50 µs: those workers were running, in their pre-park checks. Run-queue delay is credited when a thread reaches a CPU, so it includes waiting that began before the mark; in {over} marks it exceeds the mark itself.")
+    print(f"{len(woken)} of these marks have a logged clear. Over each mark, the median worker was marked for {median('marked_ns'):.0f} µs, ran for {median('run_ns'):.0f} µs and accrued {median('delay_ns'):.0f} µs of run-queue delay. In {queued} of them the run-queue delay was at least half the mark, and in {running} it was under 50 µs: those workers were probably running, in their pre-park checks or just resumed. Run-queue delay is credited when a thread reaches a CPU, so it includes waiting that began before the mark; in {over} marks it exceeds the mark itself.")
 print("\n## Rescues\n")
 logged = collections.Counter(); counted = collections.Counter()
 for run in runs:
