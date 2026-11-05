@@ -214,7 +214,7 @@ impl State {
                 observation.marked = None;
                 worker.set_stuck(None);
             }
-            // At least a period after marking, completed polls tell a long batch from a stuck poll. An earlier pass, after an unpark, leaves the worker unclassified, so that stuck polls stay a lower bound.
+            // At least a period after marking, completed polls tell a long batch from a stuck poll. An earlier pass, after an unpark, leaves the worker unclassified, so that it cannot count a stuck poll.
             #[cfg(any(test, feature = "diagnostics"))]
             if observation.marked.is_some()
                 && worker.stuck() == Some(Stuck::Unclassified)
