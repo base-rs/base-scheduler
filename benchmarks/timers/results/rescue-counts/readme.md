@@ -54,6 +54,8 @@ A stuck-poll rescue means that a timer stayed due for more than *S* = 1 ms on a 
 
 The rescues are too rare to explain the periodic workload's +26% p50 lateness in the [acceptance run](../../../echo/results/stall-rescue/readme.md).
 
+Later measurement, in [rescue-causes](../rescue-causes/readme.md), found that none of these rescues was a worker stuck inside a poll: the marked workers had been woken and were waiting for a CPU, or were in batches that kept completing polls.
+
 ## Not measured
 
 - Rescue counts per registration, which decision 7 would use to revisit migrating registrations. `RescueStatistics` counts rescues and rescued timers only, so this needs a new diagnostic.

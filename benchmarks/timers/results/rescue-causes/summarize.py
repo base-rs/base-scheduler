@@ -1,59 +1,86 @@
 #!/usr/bin/env python3
-"""Summarize the stall rescue cause experiment as Markdown: each stuck mark's worker phase, the slow wake-to-resume latencies, and the lost-wake test."""
+"""Summarize the stall rescue cause experiment as Markdown: every stuck mark and rescue, the proposed classification, and the wake latency test."""
 import collections, json, pathlib, sys
 
 directory = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else pathlib.Path(__file__).parent)
-load = lambda name: [json.loads(line) for line in open(directory / name)]
+runs = [json.loads(line) for line in open(directory / "events.jsonl")]
 
-print("## Stuck marks by worker phase\n")
-print("Both periodic runs, 24 runs each: `phases.jsonl` (marks only) and `wakes.jsonl` (marks and wake latencies).\n")
-marks = [event | {"case": run["case"]} for name in ["phases.jsonl", "wakes.jsonl"] for run in load(name) for event in run["events"] if event["event"] == "mark"]
-counts = collections.Counter((mark["phase"], mark["kind"]) for mark in marks)
-print("| Phase when marked | Marks | Labelled stuck poll | Labelled long batch |")
+def pairs(run):
+    # Each mark with the clear that ends it, if the run logged one.
+    open_marks, out = {}, []
+    for event in run["events"]:
+        if event["event"] == "mark":
+            open_marks[event["worker"]] = event
+        elif event["event"] == "clear" and event["worker"] in open_marks:
+            out.append((open_marks.pop(event["worker"]), event))
+    out.extend((mark, None) for mark in open_marks.values())
+    return out
+
+def classify(mark, clear):
+    # The proposed classification: a woken worker still in idle code is exempt; otherwise poll progress by the next pass, or by the clear, separates a long batch from a stuck poll.
+    if mark["phase"] == "idle":
+        return "woken, not yet running"
+    if clear is None:
+        return "unknown (no clear logged)"
+    if clear["progressed_next"] is True or (clear["progressed_next"] is None and clear["polls"] > 0):
+        return "long batch or turn"
+    if mark["phase"] != "tasks":
+        return f"no progress, in {mark['phase']}"
+    return "stuck poll"
+
+marks = [(run["case"], mark, clear) for run in runs for mark, clear in pairs(run)]
+print(f"## Stuck marks\n\n{len(runs)} runs of the periodic workload (`events.jsonl`), {len(marks)} marks. The phase is read when the monitor marks the worker, before it rescues anything.\n")
+print("| Phase | Marks | Labelled stuck poll | Labelled long batch |")
 print("| --- | --- | --- | --- |")
+phases = collections.Counter((mark["phase"], mark["kind"]) for _, mark, _ in marks)
 for phase in ["idle", "tasks", "driver", "search", "timers"]:
-    poll, batch = counts[(phase, "poll")], counts[(phase, "batch")]
+    poll, batch = phases[(phase, "poll")], phases[(phase, "batch")]
     if poll + batch:
         print(f"| {phase} | {poll + batch} | {poll} | {batch} |")
-print(f"| all | {len(marks)} | {sum(v for (_, k), v in counts.items() if k == 'poll')} | {sum(v for (_, k), v in counts.items() if k == 'batch')} |")
-just_entered = sum(1 for mark in marks if mark["phase"] in ("tasks", "driver") and mark["phase_ns"] == 0)
-long_tasks = sum(1 for mark in marks if mark["phase"] == "tasks" and mark["phase_ns"] > 1_000_000)
-print(f"\nOf the marks in the tasks or driver phase, {just_entered} had entered it after the monitor read the clock (time in phase 0), and {long_tasks} had been running tasks for more than 1 ms.")
-long_marks = [run_event for name in ["phases.jsonl", "wakes.jsonl"] for run in load(name) for run_event in run["events"] if run_event["event"] == "clear" and run_event["marked_ns"] > 10_000_000]
-for clear in long_marks:
-    print(f"\nA mark lasting {clear['marked_ns'] / 1e6:.1f} ms: the worker ran for {clear['run_ns'] / clear['marked_ns'] * 100:.1f}% of it, with {clear['involuntary']} involuntary switches.", end="")
-print("\n")
+print(f"| all | {len(marks)} | {sum(v for (_, k), v in phases.items() if k == 'poll')} | {sum(v for (_, k), v in phases.items() if k == 'batch')} |\n")
 
-print("## Slow wakes in the periodic workload\n")
-print("From `wakes.jsonl`. A slow wake took more than 250 µs from another thread's wake to the worker leaving idle. The missed-wake signature is a wake more than 200 µs before the worker's own idle timeout, followed by a resume within 100 µs of that timeout.\n")
-print("| Backend, deadlines | Wakes | Slow | Missed-wake signature | Late after both |")
-print("| --- | --- | --- | --- | --- |")
-totals = collections.Counter(); slow = collections.Counter(); signature = collections.Counter(); late = collections.Counter()
-for run in load("wakes.jsonl"):
-    words = run["case"].split()
-    key = f"{words[1]}, {words[3]}"
+print("### Proposed classification\n")
+print("| Class | Marks | Labelled stuck poll today |")
+print("| --- | --- | --- |")
+classes = collections.Counter(); labelled = collections.Counter()
+for _, mark, clear in marks:
+    c = classify(mark, clear); classes[c] += 1; labelled[c] += mark["kind"] == "poll"
+for c, n in classes.most_common():
+    print(f"| {c} | {n} | {labelled[c]} |")
+
+print("\n### Marks without poll progress\n")
+print("Scheduler counters over each mark: CPU time (`run`), run-queue delay (`delay`), and voluntary and involuntary switches.\n")
+print("| Case | Phase | Marked µs | Run µs | Delay µs | Voluntary | Involuntary |")
+print("| --- | --- | --- | --- | --- | --- | --- |")
+for case, mark, clear in marks:
+    if clear and classify(mark, clear) not in ("woken, not yet running", "long batch or turn"):
+        print(f"| {case[9:]} | {mark['phase']} | {clear['marked_ns'] / 1e3:.0f} | {clear['run_ns'] / 1e3:.0f} | {clear['delay_ns'] / 1e3:.0f} | {clear['voluntary']} | {clear['involuntary']} |")
+
+print("\n### Woken workers not yet running\n")
+woken = [(mark, clear) for _, mark, clear in marks if mark["phase"] == "idle" and clear]
+if woken:
+    import statistics
+    median = lambda key: statistics.median(clear[key] for _, clear in woken) / 1e3
+    queued = sum(1 for _, clear in woken if clear["delay_ns"] >= clear["marked_ns"] / 2)
+    print(f"{len(woken)} of these marks have a logged clear. Over each mark, the median worker was marked for {median('marked_ns'):.0f} µs, ran for {median('run_ns'):.0f} µs and waited in the run queue for {median('delay_ns'):.0f} µs. In {queued} of them the run-queue delay was at least half the mark: the woken thread was waiting for a CPU.")
+print("\n## Rescues\n")
+logged = collections.Counter(); counted = collections.Counter()
+for run in runs:
     for event in run["events"]:
-        if event["event"] == "wake_summary":
-            totals[key] += event["wakes"]
-        elif event["event"] == "slow_wake":
-            slow[key] += 1
-            after = event["resumed_minus_timeout_ns"]
-            if after is None:
-                continue
-            timeout = event["idle_ns"] - after
-            if event["woken_after_ns"] < timeout - 200_000:
-                if abs(after) <= 100_000:
-                    signature[key] += 1
-                else:
-                    late[key] += 1
-for key in sorted(totals):
-    print(f"| {key} | {totals[key]:,} | {slow[key]} ({slow[key] / totals[key] * 100:.3f}%) | {signature[key]} | {late[key]} |")
-print(f"| all | {sum(totals.values()):,} | {sum(slow.values())} ({sum(slow.values()) / sum(totals.values()) * 100:.3f}%) | {sum(signature.values())} | {sum(late.values())} |\n")
+        if event["event"] == "rescue":
+            logged[(event["by"], event["kind"])] += 1
+    rescues = run["record"]["rescues"]
+    counted["poll"] += rescues["stuck_polls"]; counted["batch"] += rescues["long_batches"]
+print(f"Every rescue that fired a timer is logged: {sum(logged.values())} logged against {counted['poll'] + counted['batch']} counted by `RescueStatistics`.\n")
+print("| Rescuer | Labelled stuck poll | Labelled long batch |")
+print("| --- | --- | --- |")
+for by in ["monitor", "worker"]:
+    print(f"| {by} | {logged[(by, 'poll')]} | {logged[(by, 'batch')]} |")
 
-print("## Lost-wake test\n")
-print("From `wake-latency.jsonl`: `wake_latency BACKEND WORKERS 20000`, a task woken from another thread on an idle worker with no timers pending, so a missed wake would wait indefinitely.\n")
-print("| Host | Backend | Workers | Wakes | Lost (over 2 s) | Over 10 ms | Over 1 ms | p50 µs | p99 µs | Max µs |")
+print("\n## Wake latency\n")
+print("From `wake-latency.jsonl`: `wake_latency BACKEND WORKERS 20000 MODE`. `thread` is a plain thread woken with `park` and `unpark`, with no scheduler. `sleep` waits 50 to 500 µs before each wake; `spin` busy-waits 0 to 30 µs, so wakes race the worker's transition to idle. A lost wake would hang the program, so every completed run lost none.\n")
+print("| Host | Mode | Backend | Workers | Over 1 ms | Over 10 ms | p50 µs | p99 µs | p99.9 µs | Max µs |")
 print("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |")
-for line in load("wake-latency.jsonl"):
+for line in map(json.loads, open(directory / "wake-latency.jsonl")):
     r = line["record"]
-    print(f"| {line['condition']} | {r['backend']} | {r['workers']} | {r['wakes']:,} | {r['lost_over_2s']} | {r['over_10ms']} | {r['over_1ms']} | {r['p50_us']:.1f} | {r['p99_us']:.1f} | {r['max_us']:.0f} |")
+    print(f"| {line['condition']} | {r['mode']} | {r['backend']} | {r['workers']} | {r['over_1ms']} | {r['over_10ms']} | {r['p50_us']:.1f} | {r['p99_us']:.1f} | {r['p999_us']:.0f} | {r['max_us']:.0f} |")
