@@ -78,6 +78,7 @@ pub(crate) struct Counters {
 
 #[cfg(any(test, feature = "diagnostics"))]
 impl Counters {
+    // `rescue` holds unclassified rescues and `classify` is never given `Unclassified`, so that arm is unreachable; it shares the stuck-poll counter only to keep the match exhaustive.
     fn class(&self, kind: Stuck) -> &std::sync::atomic::AtomicUsize {
         match kind {
             Stuck::Poll | Stuck::Unclassified => &self.stuck_polls,
