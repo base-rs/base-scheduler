@@ -148,6 +148,9 @@ fn rescues_are_classified_by_what_the_worker_was_doing() {
     let due = shared.workers[1].timers.deadline.load(Ordering::Relaxed);
     state.pass(&shared, due + STALL);
     assert_eq!(shared.workers[1].stuck(), Some(Stuck::Unclassified));
+    // A pass less than a period after the mark, after an unpark, leaves it unclassified even though no poll has completed yet.
+    state.pass(&shared, due + STALL + PERIOD / 2);
+    assert_eq!(shared.workers[1].stuck(), Some(Stuck::Unclassified));
     shared.workers[1]
         .heartbeat
         .polls
