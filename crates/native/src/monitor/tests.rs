@@ -70,17 +70,18 @@ fn passes_rescue_timers_left_due_for_the_stall_on_busy_workers() {
     let due = shared.workers[1].timers.deadline.load(Ordering::Relaxed);
     assert_eq!(state.pass(&shared, due), due + PERIOD);
     assert_eq!(probe.0.load(Ordering::SeqCst), 0);
-    // Due for the stall without collection: a stuck poll, since no poll completed.
+    // Due for the stall without collection: marked, and classified at the next pass.
     assert_eq!(state.pass(&shared, due + STALL), due + STALL + PERIOD);
-    assert_eq!(shared.workers[1].stuck(), Some(Stuck::Poll));
+    assert_eq!(shared.workers[1].stuck(), Some(Stuck::Unclassified));
     assert_eq!(probe.0.load(Ordering::SeqCst), 1);
 
-    // A stuck worker keeps being sampled, and a timer due during the stall is rescued without a grace period: polls completed, so a long batch.
+    // A stuck worker keeps being sampled. No poll completed since it was marked, so it is in a stuck poll.
     assert_eq!(
         state.pass(&shared, due + STALL * 2),
         due + STALL * 2 + PERIOD
     );
-    // A future deadline on a stuck worker is checked when it falls due, not `STALL` later.
+    assert_eq!(shared.workers[1].stuck(), Some(Stuck::Poll));
+    // A future deadline on a stuck worker is checked when it falls due, not `STALL` later, and a timer due during the stall is rescued without a grace period.
     shared.timer_next.store(1, Ordering::Relaxed);
     let pending = worker_timers::register(
         &shared,
@@ -102,11 +103,12 @@ fn passes_rescue_timers_left_due_for_the_stall_on_busy_workers() {
         .polls
         .fetch_add(1, Ordering::Relaxed);
     state.pass(&shared, due + STALL * 4);
-    assert_eq!(shared.workers[1].stuck(), Some(Stuck::Batch));
+    // A mark keeps its class: polls completing later do not turn a stuck poll into a long batch.
+    assert_eq!(shared.workers[1].stuck(), Some(Stuck::Poll));
     assert_eq!(probe.0.load(Ordering::SeqCst), 2);
     let counters = &shared.monitor.counters;
-    assert_eq!(counters.stuck_polls.load(Ordering::Relaxed), 1);
-    assert_eq!(counters.long_batches.load(Ordering::Relaxed), 1);
+    assert_eq!(counters.stuck_polls.load(Ordering::Relaxed), 2);
+    assert_eq!(counters.long_batches.load(Ordering::Relaxed), 0);
     assert_eq!(counters.timers.load(Ordering::Relaxed), 2);
 
     // A turn boundary clears the mark, and the monitor sleeps again.
@@ -131,6 +133,83 @@ fn passes_rescue_timers_left_due_for_the_stall_on_busy_workers() {
     assert_eq!(shared.workers[0].stuck(), None);
     shared.workers[0].set_sleeping(false);
     drop((first, second, third));
+}
+
+#[test]
+fn rescues_are_classified_by_what_the_worker_was_doing() {
+    let shared = shared(2, true);
+    let probe = Arc::new(Probe::default());
+    let mut state = State::new(&shared);
+    let counters = &shared.monitor.counters;
+    let count = |counter: &std::sync::atomic::AtomicUsize| counter.load(Ordering::Relaxed);
+
+    // A worker that completes a poll within a period of being marked is in a long batch, and its first rescue counts as one.
+    let first = expired_timer(&shared, 1, &probe);
+    let due = shared.workers[1].timers.deadline.load(Ordering::Relaxed);
+    state.pass(&shared, due + STALL);
+    assert_eq!(shared.workers[1].stuck(), Some(Stuck::Unclassified));
+    // A pass less than a period after the mark, after an unpark, leaves it unclassified even though no poll has completed yet.
+    state.pass(&shared, due + STALL + PERIOD / 2);
+    assert_eq!(shared.workers[1].stuck(), Some(Stuck::Unclassified));
+    shared.workers[1]
+        .heartbeat
+        .polls
+        .fetch_add(1, Ordering::Relaxed);
+    state.pass(&shared, due + STALL + PERIOD);
+    assert_eq!(shared.workers[1].stuck(), Some(Stuck::Batch));
+    assert_eq!(count(&counters.long_batches), 1);
+    shared.workers[1].beat();
+    state.pass(&shared, due + STALL + PERIOD * 2);
+    assert_eq!(shared.workers[1].stuck(), None);
+
+    // One that reaches a turn boundary before it is classified was making progress too.
+    let second = expired_timer(&shared, 1, &probe);
+    let due = shared.workers[1].timers.deadline.load(Ordering::Relaxed);
+    state.pass(&shared, due + STALL);
+    assert_eq!(shared.workers[1].stuck(), Some(Stuck::Unclassified));
+    shared.workers[1].beat();
+    state.pass(&shared, due + STALL + PERIOD);
+    assert_eq!(shared.workers[1].stuck(), None);
+    assert_eq!(count(&counters.long_batches), 2);
+
+    // A worker in idle code that is no longer sleeping is leaving idle, classified at once.
+    shared.workers[0]
+        .heartbeat
+        .idle
+        .store(true, Ordering::Relaxed);
+    let third = expired_timer(&shared, 0, &probe);
+    let due = shared.workers[0].timers.deadline.load(Ordering::Relaxed);
+    state.pass(&shared, due + STALL);
+    assert_eq!(shared.workers[0].stuck(), Some(Stuck::LeavingIdle));
+    assert_eq!(count(&counters.leaving_idle), 1);
+    shared.workers[0]
+        .heartbeat
+        .idle
+        .store(false, Ordering::Relaxed);
+    shared.workers[0].beat();
+    state.pass(&shared, due + STALL + PERIOD);
+    assert_eq!(shared.workers[0].stuck(), None);
+
+    // An idle worker's rescue of an unclassified victim waits for the victim's class.
+    let fourth = expired_timer(&shared, 1, &probe);
+    let due = shared.workers[1].timers.deadline.load(Ordering::Relaxed);
+    state.pass(&shared, due + STALL);
+    let fifth = expired_timer(&shared, 1, &probe);
+    assert!(assist(&shared, 0, &mut worker_timers::buffer()));
+    assert_eq!(
+        shared.workers[1]
+            .unclassified_rescues
+            .load(Ordering::Relaxed),
+        2
+    );
+    assert_eq!(count(&counters.stuck_polls), 0);
+    state.pass(&shared, due + STALL + PERIOD);
+    assert_eq!(shared.workers[1].stuck(), Some(Stuck::Poll));
+    assert_eq!(count(&counters.stuck_polls), 2);
+    assert_eq!(count(&counters.timers), 5);
+    shared.workers[1].beat();
+    state.pass(&shared, due + STALL + PERIOD * 2);
+    drop((first, second, third, fourth, fifth));
 }
 
 #[test]
