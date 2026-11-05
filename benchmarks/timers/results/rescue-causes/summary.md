@@ -14,8 +14,10 @@
 
 | Class | Marks | Labelled stuck poll today |
 | --- | --- | --- |
-| woken, not yet running | 50 | 28 |
+| leaving idle | 50 | 28 |
 | long batch or turn | 42 | 12 |
+
+Of the 42 long batches or turns, 5 were sampled at a later monitor pass while still marked; the other 37 cleared first and are classified by the polls completed by the clear, 11 of them after more than 5 ms.
 
 ### Marks without poll progress
 
@@ -24,9 +26,9 @@ Scheduler counters over each mark: CPU time (`run`), run-queue delay (`delay`), 
 | Case | Phase | Marked µs | Run µs | Delay µs | Voluntary | Involuntary |
 | --- | --- | --- | --- | --- | --- | --- |
 
-### Woken workers not yet running
+### Workers leaving idle
 
-50 of these marks have a logged clear. Over each mark, the median worker was marked for 1963 µs, ran for 843 µs and waited in the run queue for 2202 µs. In 40 of them the run-queue delay was at least half the mark: the woken thread was waiting for a CPU.
+50 of these marks have a logged clear. Over each mark, the median worker was marked for 1963 µs, ran for 843 µs and accrued 2202 µs of run-queue delay. In 40 of them the run-queue delay was at least half the mark, and in 8 it was under 50 µs: those workers were running, in their pre-park checks. Run-queue delay is credited when a thread reaches a CPU, so it includes waiting that began before the mark; in 22 marks it exceeds the mark itself.
 
 ## Rescues
 

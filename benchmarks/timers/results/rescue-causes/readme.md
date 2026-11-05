@@ -3,7 +3,7 @@
 These results explain the stuck-poll rescues that [rescue-counts](../rescue-counts/readme.md) recorded in workloads without long polls. They were listed as an open question in [stall rescue](../../../../design/stall-rescue.md), now decision 16. They answer three questions:
 
 - what each worker was doing when the monitor marked it stuck;
-- why woken workers were slow to resume;
+- why workers leaving idle were slow to resume;
 - whether waking an idle worker ever fails to interrupt its wait.
 
 The instrumentation is an experiment, not merged. [experiment.patch](experiment.patch) applies to `main` at `793cbbf`. With the `diagnostics` feature, it logs one JSON line per event to the file named by `BASE_NATIVE_RESCUE_LOG`:
@@ -41,25 +41,32 @@ The wake test uses the build without `diagnostics`, since its latencies are timi
 
 Numbers below are from [summary.md](summary.md).
 
-**No marked worker was stuck inside a poll.** The 48 runs recorded 92 marks:
+**Every marked worker was leaving idle or had completed task polls by the time its mark cleared.** The 48 runs recorded 92 marks:
 
-- **Woken, not yet running (50 marks):** the worker was in idle code after a wake from another thread. The validation exempts this case.
-- **Long batch or turn (42 marks):** task polls completed by the monitor's next pass, a millisecond later, or by the time the mark cleared. The worker was progressing.
-- **No progress (none):** no mark had a worker that went a full period without completing a poll, which is what a stuck poll means.
+- **Leaving idle (50 marks):** the worker was in idle code and no longer sleeping. The validation exempts this case.
+- **Long batch or turn (42 marks):** task polls had completed by the monitor's next pass while the worker was still marked (5 marks), or by the time the mark cleared (37 marks).
+- **No progress (none):** no mark cleared without the worker completing a poll.
 
-Today's label called 40 of the 92 marks stuck polls: 28 woken workers and 12 long batches. All 196 rescues that fired a timer were logged, matching `RescueStatistics` exactly: 67 by the monitor and 129 by idle workers' pre-park checks.
+Today's label called 40 of the 92 marks stuck polls: 28 workers leaving idle and 12 long batches. All 196 rescues that fired a timer were logged, matching `RescueStatistics` exactly: 67 by the monitor and 129 by idle workers' pre-park checks.
 
-**Woken workers were waiting for a CPU.** Over the 50 woken marks, the median worker was marked for 1,963 µs, ran for 843 µs, and spent 2,202 µs in the run queue. In 40 of them, the run-queue delay was at least half the mark. The longest marks, up to 38 ms, are almost entirely run-queue delay: the thread had been woken and was runnable, but no CPU ran it.
+This does not show that no poll was stuck for longer than a period. Eleven of the 37 marks classified at the clear lasted more than 5 ms. In the longest, the monitor and the workers were starved together: one pass marked all four workers, and the next came 25 ms later. A poll stuck during such a stretch, followed by completed polls before the clear, counts as a long batch. The stuck-poll class is therefore a lower bound.
 
-**No wake is lost, and Native wakes as fast as a plain thread.** None of the 560,000 wakes was lost, in either mode, on an idle host or beside three busy-loop processes. A lost wake would hang the program, so every completed run lost none. Spin mode busy-waits 0 to 30 µs before each wake, so many wakes race the worker's transition to idle.
+**Most workers leaving idle were waiting for a CPU.** Over the 50 marks, the median worker was marked for 1,963 µs, ran for 843 µs, and accrued 2,202 µs of run-queue delay.
+- **Waiting (40 marks):** the run-queue delay was at least half the mark. The longest marks, up to 38 ms, show the threads were runnable but not run. What occupied the CPUs then was not recorded: it could have been other load on the host, or a cgroup CPU limit.
+- **Running (8 marks):** run-queue delay was under 50 µs. Those workers were running their pre-park checks, where a rescue can schedule a task onto the rescuing worker itself and clear its sleeping flag.
+- **The comparison is approximate:** run-queue delay is credited when a thread reaches a CPU, so it includes waiting that began before the mark, and in 22 marks it exceeds the mark itself.
 
-- **Medians:** every backend, including the plain thread, has median latency within a few microseconds of the others in each condition.
-- **Idle host, sleep mode:** medians of 64 to 85 µs, except about 32 µs on io_uring. Cores enter deep sleep states under `powersave` while nothing runs.
-- **Busy host, or spin mode:** medians of 3 to 8 µs.
+**No wake is lost, and Native's wake latency is in the same range as a plain thread's and Tokio's.**
+- **Lost wakes:** none of the 560,000 wakes was lost, in either mode, on an idle host or beside three busy-loop processes. A lost wake would hang the program, so every completed run lost none.
+- **Spin mode:** it busy-waits 0 to 30 µs before each wake, intended to land many wakes during the worker's transition to idle; how many did was not counted.
+- **Medians:**
+  - On an idle host in sleep mode, 64 µs for the plain thread, 74 to 85 µs for Tokio and Native's readiness selector, and about 32 µs on io_uring. Cores enter deep sleep states under `powersave` while nothing runs.
+  - On a busy host, or in spin mode, 3 to 8 µs for every backend.
 - **Tail:** wakes over 1 ms are rare, at most 2 in 20,000 per run. They occur in Tokio and the plain thread as well as Native.
 
 ## Limits
 
-- One host, one workload. The periodic workload collects about 256 timers per worker per millisecond, so long batches are frequent.
+- One host, one workload: the 1,024-timer periodic diagnostic, which collects about 256 timers per worker per millisecond, so long batches are frequent. The single stuck-poll rescues in other workloads in [rescue-counts](../rescue-counts/readme.md) were not instrumented.
 - The instrumentation reads the clock at every phase change, which may change how often rescues happen.
-- What occupied the CPUs during the longest run-queue delays was not recorded.
+- What occupied the CPUs during the longest run-queue delays was not recorded. `cpu.stat`'s `nr_throttled` would show a cgroup CPU limit.
+- The wake test records no process CPU time.

@@ -17,9 +17,9 @@ def pairs(run):
     return out
 
 def classify(mark, clear):
-    # The proposed classification: a woken worker still in idle code is exempt; otherwise poll progress by the next pass, or by the clear, separates a long batch from a stuck poll.
+    # The proposed classification: a worker in idle code that is no longer sleeping is leaving idle, which is exempt; otherwise poll progress by the next pass, or by the clear, separates a long batch from a stuck poll.
     if mark["phase"] == "idle":
-        return "woken, not yet running"
+        return "leaving idle"
     if clear is None:
         return "unknown (no clear logged)"
     if clear["progressed_next"] is True or (clear["progressed_next"] is None and clear["polls"] > 0):
@@ -48,21 +48,28 @@ for _, mark, clear in marks:
 for c, n in classes.most_common():
     print(f"| {c} | {n} | {labelled[c]} |")
 
+progressing = [clear for _, mark, clear in marks if clear and classify(mark, clear) == "long batch or turn"]
+sampled = sum(1 for clear in progressing if clear["progressed_next"] is not None)
+long_marks = sum(1 for clear in progressing if clear["progressed_next"] is None and clear["marked_ns"] > 5_000_000)
+print(f"\nOf the {len(progressing)} long batches or turns, {sampled} were sampled at a later monitor pass while still marked; the other {len(progressing) - sampled} cleared first and are classified by the polls completed by the clear, {long_marks} of them after more than 5 ms.")
+
 print("\n### Marks without poll progress\n")
 print("Scheduler counters over each mark: CPU time (`run`), run-queue delay (`delay`), and voluntary and involuntary switches.\n")
 print("| Case | Phase | Marked µs | Run µs | Delay µs | Voluntary | Involuntary |")
 print("| --- | --- | --- | --- | --- | --- | --- |")
 for case, mark, clear in marks:
-    if clear and classify(mark, clear) not in ("woken, not yet running", "long batch or turn"):
+    if clear and classify(mark, clear) not in ("leaving idle", "long batch or turn"):
         print(f"| {case[9:]} | {mark['phase']} | {clear['marked_ns'] / 1e3:.0f} | {clear['run_ns'] / 1e3:.0f} | {clear['delay_ns'] / 1e3:.0f} | {clear['voluntary']} | {clear['involuntary']} |")
 
-print("\n### Woken workers not yet running\n")
+print("\n### Workers leaving idle\n")
 woken = [(mark, clear) for _, mark, clear in marks if mark["phase"] == "idle" and clear]
 if woken:
     import statistics
     median = lambda key: statistics.median(clear[key] for _, clear in woken) / 1e3
     queued = sum(1 for _, clear in woken if clear["delay_ns"] >= clear["marked_ns"] / 2)
-    print(f"{len(woken)} of these marks have a logged clear. Over each mark, the median worker was marked for {median('marked_ns'):.0f} µs, ran for {median('run_ns'):.0f} µs and waited in the run queue for {median('delay_ns'):.0f} µs. In {queued} of them the run-queue delay was at least half the mark: the woken thread was waiting for a CPU.")
+    running = sum(1 for _, clear in woken if clear["delay_ns"] < 50_000)
+    over = sum(1 for _, clear in woken if clear["delay_ns"] > clear["marked_ns"])
+    print(f"{len(woken)} of these marks have a logged clear. Over each mark, the median worker was marked for {median('marked_ns'):.0f} µs, ran for {median('run_ns'):.0f} µs and accrued {median('delay_ns'):.0f} µs of run-queue delay. In {queued} of them the run-queue delay was at least half the mark, and in {running} it was under 50 µs: those workers were running, in their pre-park checks. Run-queue delay is credited when a thread reaches a CPU, so it includes waiting that began before the mark; in {over} marks it exceeds the mark itself.")
 print("\n## Rescues\n")
 logged = collections.Counter(); counted = collections.Counter()
 for run in runs:
