@@ -29,6 +29,36 @@ From `costs.jsonl`: 15 repeats, builds in random order within each. Worker CPU a
 | periodic native 4/1024/1000us aligned | worker sleeps | 1.899e+04 (1.88e+04–1.93e+04) | 1.896e+04 (1.86e+04–1.92e+04) | 1.901e+04 (1.85e+04–1.91e+04) | -0.2% | +0.1% |
 | periodic native 4/1024/1000us aligned | monitor wakes | 0 (0–0) | 3224 (3.02e+03–3.33e+03) | 0 (0–0) | n/a | n/a |
 
+### On against off, paired by repeat
+
+Each repeat ran all three builds back to back, so differences within a repeat share its conditions. The change is the median of the per-repeat changes from off to on.
+
+| Case | Metric | Median change, on vs off | Repeats with on higher |
+| --- | --- | --- | --- |
+| periodic iouring 4/1024/1000us | p50 lateness | -7.0% | 7 of 15 |
+| periodic iouring 4/1024/1000us | process CPU | +5.0% | 12 of 15 |
+| periodic iouring 4/1024/1000us | worker CPU | +4.1% | 12 of 15 |
+| periodic iouring 4/1024/1000us aligned | p50 lateness | -10.5% | 3 of 15 |
+| periodic iouring 4/1024/1000us aligned | process CPU | +2.7% | 11 of 15 |
+| periodic iouring 4/1024/1000us aligned | worker CPU | +2.9% | 10 of 15 |
+| periodic native 4/1024/1000us | p50 lateness | +2.6% | 10 of 15 |
+| periodic native 4/1024/1000us | process CPU | -0.2% | 7 of 15 |
+| periodic native 4/1024/1000us | worker CPU | -1.0% | 6 of 15 |
+| periodic native 4/1024/1000us aligned | p50 lateness | +1.0% | 8 of 15 |
+| periodic native 4/1024/1000us aligned | process CPU | +2.2% | 9 of 15 |
+| periodic native 4/1024/1000us aligned | worker CPU | +1.9% | 9 of 15 |
+
+P50 lateness against `main` before stall rescue, paired by repeat:
+
+| Case | Median change, on vs before | Repeats with on higher | Median change, off vs before | Repeats with off higher |
+| --- | --- | --- | --- | --- |
+| periodic iouring 4/1024/1000us | +12.7% | 9 of 15 | +10.2% | 9 of 15 |
+| periodic iouring 4/1024/1000us aligned | -12.0% | 2 of 15 | -5.6% | 5 of 15 |
+| periodic native 4/1024/1000us | +19.5% | 14 of 15 | +25.8% | 14 of 15 |
+| periodic native 4/1024/1000us aligned | -4.4% | 6 of 15 | -0.6% | 7 of 15 |
+
+The monitor thread's own CPU, median per run with stall rescue on (10 ms resolution): periodic iouring 4/1024/1000us: 0.01 s; periodic iouring 4/1024/1000us aligned: 0.01 s; periodic native 4/1024/1000us: 0.05 s; periodic native 4/1024/1000us aligned: 0.05 s.
+
 ## Pulse
 
 A task woken by a timer once a second, 3 times per run.
@@ -78,9 +108,9 @@ Rescues in a `diagnostics` build, 3 runs per condition (stuck polls / long batch
 
 From `batches.jsonl`: the readiness selector's periodic diagnostic with builds instrumented by `batches-old.patch` (before) and `batches-new.patch` (on); 9 repeats. Bucket *b* counts expiry passes that fired from 2^(b−1) to 2^b − 1 timers; the values are means per run.
 
-| Workers | Build | p50 lateness µs | Passes per run | 16–31 | 32–63 | 64–127 | 128–255 |
+| Workers | Build | p50 lateness µs (range) | Passes per run (range) | 16–31 | 32–63 | 64–127 | 128–255 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 4 | before | 76.0 | 228,402 | 51,069 | 27,998 | 4,061 | 196 |
-| 4 | on | 91.3 | 176,501 | 41,247 | 35,074 | 6,588 | 385 |
-| 8 | before | 21.9 | 489,595 | 38,475 | 8,952 | 4,694 | 1,548 |
-| 8 | on | 30.0 | 464,859 | 28,316 | 9,728 | 4,348 | 2,065 |
+| 4 | before | 76.0 (69.4–85.1) | 228,402 (188,244–267,726) | 51,069 | 27,998 | 4,061 | 196 |
+| 4 | on | 91.3 (84.0–103.7) | 176,501 (143,622–199,877) | 41,247 | 35,074 | 6,588 | 385 |
+| 8 | before | 21.9 (16.7–32.5) | 489,595 (397,355–659,018) | 38,475 | 8,952 | 4,694 | 1,548 |
+| 8 | on | 30.0 (23.8–34.2) | 464,859 (223,606–704,034) | 28,316 | 9,728 | 4,348 | 2,065 |

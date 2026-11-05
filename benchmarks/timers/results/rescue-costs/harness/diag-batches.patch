@@ -1,0 +1,9 @@
+--- a/timer-diagnostic.rs
++++ b/timer-diagnostic.rs
+@@ -82,5 +82,5 @@
+         }
+         _ => panic!("unknown backend"),
+     };
+-    println!("{}", serde_json::json!({"backend":args[1], "workers":workers, "tasks":count, "delay_us":delay.as_micros(), "seconds":3, "completed":samples.len(), "expiries_per_second":samples.len() as f64/3.0, "lateness_p50_us":samples.value_at_quantile(0.5) as f64/1000.0, "lateness_p99_us":samples.value_at_quantile(0.99) as f64/1000.0, "lateness_max_us":samples.max() as f64/1000.0, "cpu_seconds": cpu() - cpu_start}));
++    println!("{}", serde_json::json!({"backend":args[1], "workers":workers, "tasks":count, "delay_us":delay.as_micros(), "seconds":3, "completed":samples.len(), "expiries_per_second":samples.len() as f64/3.0, "lateness_p50_us":samples.value_at_quantile(0.5) as f64/1000.0, "lateness_p99_us":samples.value_at_quantile(0.99) as f64/1000.0, "lateness_max_us":samples.max() as f64/1000.0, "cpu_seconds": cpu() - cpu_start, "batches": base_scheduler_native::timer_batch_histogram()}));
+ }

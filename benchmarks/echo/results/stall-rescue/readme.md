@@ -66,3 +66,5 @@ The design asks for further measurements without budgets. These were not taken:
 - rescue counts per workload, including stuck-poll rescues in the named benchmarks, which should be zero. This is also a requirement 1 validation item (the rescue classification counter), so it remains open. The benchmark binaries do not enable the `diagnostics` feature.
 
 Rescue counts were measured later, in [`benchmarks/timers/results/rescue-counts`](../../../timers/results/rescue-counts/readme.md).
+
+The cost of the monitor itself, separated from the rest of the change with a build that has stall rescue switched off, was measured later in [`benchmarks/timers/results/rescue-costs`](../../../timers/results/rescue-costs/readme.md).
