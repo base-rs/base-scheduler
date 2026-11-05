@@ -145,7 +145,9 @@ struct Observation {
     // The published deadline as this pass read it, for the locked recheck.
     deadline: u64,
     marked: Option<Marked>,
-    // Completed polls when the worker was marked: by the next pass, a long batch has completed more, and a stuck poll has not.
+    // When the worker was marked, and its completed polls then: a period later, a long batch has completed more, and a stuck poll has not.
+    #[cfg(any(test, feature = "diagnostics"))]
+    marked_at: u64,
     #[cfg(any(test, feature = "diagnostics"))]
     polls: usize,
 }
@@ -211,9 +213,12 @@ impl State {
                 observation.marked = None;
                 worker.set_stuck(None);
             }
-            // At least a period after marking, completed polls tell a long batch from a stuck poll.
+            // At least a period after marking, completed polls tell a long batch from a stuck poll. An earlier pass, after an unpark, leaves the worker unclassified, so that stuck polls stay a lower bound.
             #[cfg(any(test, feature = "diagnostics"))]
-            if observation.marked.is_some() && worker.stuck() == Some(Stuck::Unclassified) {
+            if observation.marked.is_some()
+                && worker.stuck() == Some(Stuck::Unclassified)
+                && now >= observation.marked_at + PERIOD
+            {
                 let kind = if polls == observation.polls {
                     Stuck::Poll
                 } else {
@@ -248,6 +253,7 @@ impl State {
                 Some(kind) => kind,
                 None if worker.heartbeat.idle.load(Ordering::Relaxed) => Stuck::LeavingIdle,
                 None => {
+                    observation.marked_at = now;
                     observation.polls = polls;
                     Stuck::Unclassified
                 }
