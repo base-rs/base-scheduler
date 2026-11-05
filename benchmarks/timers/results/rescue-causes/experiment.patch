@@ -1,0 +1,498 @@
+diff --git a/benchmarks/timers/src/bin/wake_latency.rs b/benchmarks/timers/src/bin/wake_latency.rs
+new file mode 100644
+index 0000000..e39e030
+--- /dev/null
++++ b/benchmarks/timers/src/bin/wake_latency.rs
+@@ -0,0 +1,206 @@
++// Experiment: how long a task woken from another thread takes to run on an idle Native worker with no timers pending.
++// Usage: wake_latency BACKEND WORKERS WAKES [sleep|spin]
++// `sleep` (the default) waits 50 to 500 µs before each wake, so the worker has almost always parked; `spin` busy-waits 0 to 30 µs, so many wakes race the worker's transition to idle.
++use base_scheduler::Spawn;
++use std::{
++    future::Future,
++    pin::Pin,
++    sync::{
++        Arc, Mutex,
++        atomic::{AtomicBool, Ordering},
++        mpsc,
++    },
++    task::{Context, Poll, Waker},
++    time::{Duration, Instant},
++};
++
++#[derive(Default)]
++struct Slot {
++    waker: Mutex<Option<Waker>>,
++    fired: AtomicBool,
++}
++
++struct Wait<'a>(&'a Slot);
++impl Future for Wait<'_> {
++    type Output = ();
++    fn poll(self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<()> {
++        let mut waker = self.0.waker.lock().unwrap();
++        if self.0.fired.swap(false, Ordering::AcqRel) {
++            return Poll::Ready(());
++        }
++        *waker = Some(context.waker().clone());
++        Poll::Pending
++    }
++}
++
++fn run<S: Spawn>(scheduler: &S, wakes: usize, spin: bool) -> serde_json::Value {
++    let slot = Arc::new(Slot::default());
++    let (resumed, receive) = mpsc::channel::<Instant>();
++    let task_slot = Arc::clone(&slot);
++    let task = scheduler
++        .spawn(async move {
++            for _ in 0..wakes {
++                Wait(&task_slot).await;
++                let _ = resumed.send(Instant::now());
++            }
++        })
++        .unwrap();
++    let mut latencies = Vec::with_capacity(wakes);
++    let mut lost = 0;
++    let mut seed = 0x9e3779b97f4a7c15u64;
++    for _ in 0..wakes {
++        // Wait until the task has parked its waker, then long enough for its worker to go idle.
++        while slot.waker.lock().unwrap().is_none() {
++            std::thread::yield_now();
++        }
++        seed ^= seed << 13;
++        seed ^= seed >> 7;
++        seed ^= seed << 17;
++        if spin {
++            let until = Instant::now() + Duration::from_micros(seed % 31);
++            while Instant::now() < until {
++                std::hint::spin_loop();
++            }
++        } else {
++            std::thread::sleep(Duration::from_micros(50 + seed % 450));
++        }
++        let waker = slot.waker.lock().unwrap().take().unwrap();
++        slot.fired.store(true, Ordering::Release);
++        let woken = Instant::now();
++        waker.wake();
++        match receive.recv_timeout(Duration::from_secs(2)) {
++            Ok(at) => latencies.push(at.saturating_duration_since(woken).as_nanos() as u64),
++            Err(_) => {
++                lost += 1;
++                // Let the run continue once the task does resume.
++                let at = receive.recv().unwrap();
++                latencies.push(at.saturating_duration_since(woken).as_nanos() as u64);
++            }
++        }
++    }
++    futures_lite::future::block_on(task).unwrap();
++    latencies.sort_unstable();
++    let q = |p: f64| latencies[((latencies.len() - 1) as f64 * p) as usize];
++    serde_json::json!({
++        "wakes": wakes,
++        "mode": if spin { "spin" } else { "sleep" },
++        "lost_over_2s": lost,
++        "over_1ms": latencies.iter().filter(|&&l| l > 1_000_000).count(),
++        "over_10ms": latencies.iter().filter(|&&l| l > 10_000_000).count(),
++        "p50_us": q(0.5) as f64 / 1e3,
++        "p99_us": q(0.99) as f64 / 1e3,
++        "p999_us": q(0.999) as f64 / 1e3,
++        "max_us": q(1.0) as f64 / 1e3,
++    })
++}
++
++fn main() {
++    let args: Vec<String> = std::env::args().collect();
++    let backend = args[1].as_str();
++    let workers: usize = args[2].parse().unwrap();
++    let wakes: usize = args[3].parse().unwrap();
++    let spin = match args.get(4).map_or("sleep", String::as_str) {
++        "sleep" => false,
++        "spin" => true,
++        _ => panic!("unknown mode"),
++    };
++    let mut record = match backend {
++        "native" => {
++            let scheduler = base_scheduler_native::NativeScheduler::with_options(
++                base_scheduler_native::NativeOptions {
++                    workers,
++                    ..Default::default()
++                },
++            )
++            .unwrap();
++            let record = run(&scheduler, wakes, spin);
++            futures_lite::future::block_on(scheduler.shutdown());
++            record
++        }
++        "iouring" => {
++            let (selector, drivers) =
++                base_scheduler_iouring::IoUringSelector::with_workers(Default::default(), workers)
++                    .unwrap();
++            let scheduler = base_scheduler_native::NativeScheduler::with_drivers(
++                selector,
++                drivers,
++                base_scheduler_native::NativeExecutorOptions {
++                    workers,
++                    ..Default::default()
++                },
++            )
++            .unwrap();
++            let record = run(&scheduler, wakes, spin);
++            futures_lite::future::block_on(scheduler.shutdown());
++            record
++        }
++        "tokio" => {
++            let runtime = tokio::runtime::Builder::new_multi_thread()
++                .worker_threads(workers)
++                .enable_all()
++                .build()
++                .unwrap();
++            let scheduler = base_scheduler_tokio::TokioScheduler::new(runtime.handle().clone());
++            let record = run(&scheduler, wakes, spin);
++            drop(runtime);
++            record
++        }
++        // A plain thread parked between wakes, with no scheduler: the operating system's own wake latency.
++        "thread" => thread_baseline(wakes, spin),
++        _ => panic!("unknown backend"),
++    };
++    record["backend"] = backend.into();
++    record["workers"] = workers.into();
++    println!("{record}");
++}
++
++fn thread_baseline(wakes: usize, spin: bool) -> serde_json::Value {
++    let fired = Arc::new(AtomicBool::new(false));
++    let (resumed, receive) = mpsc::channel::<Instant>();
++    let waiter = {
++        let fired = Arc::clone(&fired);
++        std::thread::spawn(move || {
++            for _ in 0..wakes {
++                while !fired.swap(false, Ordering::AcqRel) {
++                    std::thread::park();
++                }
++                let _ = resumed.send(Instant::now());
++            }
++        })
++    };
++    let thread = waiter.thread().clone();
++    let mut latencies = Vec::with_capacity(wakes);
++    let mut seed = 0x9e3779b97f4a7c15u64;
++    for _ in 0..wakes {
++        seed ^= seed << 13;
++        seed ^= seed >> 7;
++        seed ^= seed << 17;
++        if spin {
++            let until = Instant::now() + Duration::from_micros(seed % 31);
++            while Instant::now() < until {
++                std::hint::spin_loop();
++            }
++        } else {
++            std::thread::sleep(Duration::from_micros(50 + seed % 450));
++        }
++        fired.store(true, Ordering::Release);
++        let woken = Instant::now();
++        thread.unpark();
++        let at = receive.recv().unwrap();
++        latencies.push(at.saturating_duration_since(woken).as_nanos() as u64);
++    }
++    waiter.join().unwrap();
++    latencies.sort_unstable();
++    let q = |p: f64| latencies[((latencies.len() - 1) as f64 * p) as usize];
++    serde_json::json!({
++        "wakes": wakes,
++        "mode": if spin { "spin" } else { "sleep" },
++        "lost_over_2s": 0,
++        "over_1ms": latencies.iter().filter(|&&l| l > 1_000_000).count(),
++        "over_10ms": latencies.iter().filter(|&&l| l > 10_000_000).count(),
++        "p50_us": q(0.5) as f64 / 1e3,
++        "p99_us": q(0.99) as f64 / 1e3,
++        "p999_us": q(0.999) as f64 / 1e3,
++        "max_us": q(1.0) as f64 / 1e3,
++    })
++}
+diff --git a/crates/native/src/monitor.rs b/crates/native/src/monitor.rs
+index 6d84442..2b4f325 100644
+--- a/crates/native/src/monitor.rs
++++ b/crates/native/src/monitor.rs
+@@ -77,7 +77,19 @@ pub(crate) struct Counters {
+ 
+ /// Fire a stuck worker's expired timers from another thread, and return the number of wakers invoked.
+ fn rescue(shared: &Arc<Shared>, victim: usize, _kind: Stuck, expired: &mut Vec<Waker>) -> usize {
++    #[cfg(feature = "diagnostics")]
++    let phase = shared.workers[victim].heartbeat.phase.load(Ordering::Relaxed);
+     let fired = worker_timers::expire(shared, victim, expired, true);
++    #[cfg(feature = "diagnostics")]
++    if fired > 0 {
++        log(&format!(
++            "{{\"event\":\"rescue\",\"worker\":{victim},\"at\":{},\"by\":\"{}\",\"kind\":\"{}\",\"phase\":\"{}\",\"fired\":{fired}}}",
++            worker_timers::clock(shared),
++            if std::thread::current().name() == Some("base-native-monitor") { "monitor" } else { "worker" },
++            if matches!(_kind, Stuck::Poll) { "poll" } else { "batch" },
++            crate::worker::PHASES[phase as usize],
++        ));
++    }
+     #[cfg(any(test, feature = "diagnostics"))]
+     if fired > 0 {
+         let counters = &shared.monitor.counters;
+@@ -122,6 +134,54 @@ struct Observation {
+     // Completed polls at the previous pass, which tell a long batch from one stuck poll.
+     #[cfg(any(test, feature = "diagnostics"))]
+     polls: usize,
++    // Experiment: when the current mark began, the victim's scheduler counters and completed polls then, and whether polls had advanced by the next pass.
++    #[cfg(feature = "diagnostics")]
++    marked_at: u64,
++    #[cfg(feature = "diagnostics")]
++    sched_at: Sched,
++    #[cfg(feature = "diagnostics")]
++    polls_at_mark: usize,
++    #[cfg(feature = "diagnostics")]
++    progressed_next: Option<bool>,
++}
++
++// Experiment: a log of stuck marks, one JSON line each, written to the file named by `BASE_NATIVE_RESCUE_LOG`.
++#[cfg(feature = "diagnostics")]
++pub(crate) fn log(line: &str) {
++    use std::io::Write;
++    static LOG: std::sync::OnceLock<Option<std::sync::Mutex<std::fs::File>>> = std::sync::OnceLock::new();
++    let log = LOG.get_or_init(|| {
++        let path = std::env::var_os("BASE_NATIVE_RESCUE_LOG")?;
++        std::fs::OpenOptions::new().create(true).append(true).open(path).ok().map(std::sync::Mutex::new)
++    });
++    if let Some(file) = log {
++        let _ = writeln!(file.lock().unwrap(), "{line}");
++    }
++}
++
++// Experiment: a thread's CPU time and run-queue delay in nanoseconds, from `/proc/self/task/{tid}/schedstat` (kept with `CONFIG_SCHED_INFO`), and its voluntary and involuntary context switches, from `.../sched`.
++#[cfg(feature = "diagnostics")]
++#[derive(Default, Clone, Copy)]
++struct Sched {
++    run: u64,
++    delay: u64,
++    voluntary: u64,
++    involuntary: u64,
++}
++#[cfg(feature = "diagnostics")]
++fn sched(tid: i32) -> Sched {
++    let schedstat = std::fs::read_to_string(format!("/proc/self/task/{tid}/schedstat")).unwrap_or_default();
++    let mut fields = schedstat.split_whitespace().map(|value| value.parse().unwrap_or(0));
++    let (run, delay) = (fields.next().unwrap_or(0), fields.next().unwrap_or(0));
++    let stat = std::fs::read_to_string(format!("/proc/self/task/{tid}/sched")).unwrap_or_default();
++    let field = |name: &str| {
++        stat.lines()
++            .find(|line| line.starts_with(name))
++            .and_then(|line| line.split(':').nth(1))
++            .and_then(|value| value.trim().parse().ok())
++            .unwrap_or(0)
++    };
++    Sched { run, delay, voluntary: field("nr_voluntary_switches"), involuntary: field("nr_involuntary_switches") }
+ }
+ 
+ pub(crate) struct State {
+@@ -175,6 +235,22 @@ impl State {
+                 .marked
+                 .is_some_and(|marked| sleeping || marked.turns != turns)
+             {
++                #[cfg(feature = "diagnostics")]
++                {
++                    let stat = sched(worker.heartbeat.tid.load(Ordering::Relaxed));
++                    let start = observation.sched_at;
++                    log(&format!(
++                        "{{\"event\":\"clear\",\"worker\":{identifier},\"at\":{now},\"marked_ns\":{},\"run_ns\":{},\"delay_ns\":{},\"voluntary\":{},\"involuntary\":{},\"polls\":{},\"progressed_next\":{},\"sleeping\":{sleeping}}}",
++                        now - observation.marked_at,
++                        stat.run.saturating_sub(start.run),
++                        stat.delay.saturating_sub(start.delay),
++                        stat.voluntary.saturating_sub(start.voluntary),
++                        stat.involuntary.saturating_sub(start.involuntary),
++                        worker.heartbeat.polls.load(Ordering::Relaxed).wrapping_sub(observation.polls_at_mark),
++                        observation.progressed_next.map_or("null", |progressed| if progressed { "true" } else { "false" }),
++                    ));
++                    observation.progressed_next = None;
++                }
+                 observation.marked = None;
+                 worker.set_stuck(None);
+             }
+@@ -207,8 +283,33 @@ impl State {
+             };
+             #[cfg(not(any(test, feature = "diagnostics")))]
+             let kind = Stuck::Poll;
++            #[cfg(feature = "diagnostics")]
++            let first = observation.marked.is_none();
++            #[cfg(feature = "diagnostics")]
++            let (phase, phase_since, polls_now) = {
++                let heartbeat = &worker.heartbeat;
++                (heartbeat.phase.load(Ordering::Relaxed), heartbeat.phase_since.load(Ordering::Relaxed), heartbeat.polls.load(Ordering::Relaxed))
++            };
++            #[cfg(feature = "diagnostics")]
++            if !first && observation.progressed_next.is_none() {
++                observation.progressed_next = Some(polls_now != observation.polls_at_mark);
++            }
+             observation.marked.get_or_insert(Marked { turns });
+             worker.set_stuck(Some(kind));
++            #[cfg(feature = "diagnostics")]
++            if first {
++                observation.marked_at = now;
++                observation.polls_at_mark = polls_now;
++                observation.progressed_next = None;
++                observation.sched_at = sched(worker.heartbeat.tid.load(Ordering::Relaxed));
++                log(&format!(
++                    "{{\"event\":\"mark\",\"worker\":{identifier},\"at\":{now},\"kind\":\"{}\",\"phase\":\"{}\",\"phase_ns\":{},\"overdue_ns\":{},\"sleeping\":{sleeping}}}",
++                    if matches!(kind, Stuck::Poll) { "poll" } else { "batch" },
++                    crate::worker::PHASES[phase as usize],
++                    now.saturating_sub(phase_since),
++                    now.saturating_sub(deadline),
++                ));
++            }
+             rescue(shared, identifier, kind, &mut self.expired);
+             wake = wake.min(now + PERIOD);
+         }
+diff --git a/crates/native/src/worker.rs b/crates/native/src/worker.rs
+index 4161c5d..eb51f88 100644
+--- a/crates/native/src/worker.rs
++++ b/crates/native/src/worker.rs
+@@ -26,8 +26,32 @@ pub(crate) struct Heartbeat {
+     // Completed task polls, which tell a long batch from a single stuck poll.
+     #[cfg(any(test, feature = "diagnostics"))]
+     pub(crate) polls: AtomicUsize,
++    // Experiment: the owner's current phase, when it began in clock nanoseconds, and its Linux thread identifier.
++    #[cfg(feature = "diagnostics")]
++    pub(crate) phase: std::sync::atomic::AtomicU8,
++    #[cfg(feature = "diagnostics")]
++    pub(crate) phase_since: AtomicU64,
++    #[cfg(feature = "diagnostics")]
++    pub(crate) tid: std::sync::atomic::AtomicI32,
++    // Experiment: when another thread last woke this worker from idle, in clock nanoseconds, or zero.
++    #[cfg(feature = "diagnostics")]
++    pub(crate) woken_at: AtomicU64,
+ }
+ 
++#[cfg(feature = "diagnostics")]
++pub(crate) const PHASES: [&str; 6] = ["none", "timers", "search", "idle", "driver", "tasks"];
++
++#[cfg(feature = "diagnostics")]
++#[inline(always)]
++fn phase(shared: &Shared, identifier: usize, phase: u8) {
++    let heartbeat = &shared.workers[identifier].heartbeat;
++    heartbeat.phase_since.store(crate::worker_timers::clock(shared), Ordering::Relaxed);
++    heartbeat.phase.store(phase, Ordering::Relaxed);
++}
++#[cfg(not(feature = "diagnostics"))]
++#[inline(always)]
++fn phase(_: &Shared, _: usize, _: u8) {}
++
+ /// A worker's timer queue and its published deadline. The owner mutates the queue on every timer operation, so it has its own cache lines, apart from the flags and queues that other workers read and write.
+ #[repr(align(128))]
+ pub(crate) struct Timers {
+@@ -127,6 +151,11 @@ impl WorkerState {
+                 .expect("sleeping worker has registered its thread");
+             // A completion published by this worker makes its driver turn return. Interrupt only another thread; a self-notification would leave a stale permit for the next idle turn.
+             if target.id() != thread::current().id() {
++                #[cfg(feature = "diagnostics")]
++                self.heartbeat.woken_at.store(
++                    (self.timers.epoch.elapsed().as_nanos() as u64).max(1),
++                    Ordering::Relaxed,
++                );
+                 target.unpark();
+                 if let Some(waker) = self.driver_waker.get() {
+                     waker.wake_by_ref();
+@@ -374,13 +403,29 @@ fn run_loop(
+             current,
+         }))
+     });
++    #[cfg(all(feature = "diagnostics", target_os = "linux"))]
++    worker
++        .heartbeat
++        .tid
++        // `/proc/thread-self` links to `{pid}/task/{tid}`.
++        .store(
++            std::fs::read_link("/proc/thread-self")
++                .ok()
++                .and_then(|link| link.file_name()?.to_str()?.parse().ok())
++                .unwrap_or(0),
++            Ordering::Relaxed,
++        );
+     let mut expired = crate::worker_timers::buffer();
+     let mut iteration = 0usize;
+     let mut needs_turn = false;
++    #[cfg(feature = "diagnostics")]
++    let (mut wakes, mut slow_wakes) = (0u64, 0u64);
+     loop {
+         iteration = iteration.wrapping_add(1);
+         worker.beat();
++        phase(&shared, identifier, 1);
+         crate::worker_timers::expire(&shared, identifier, &mut expired, false);
++        phase(&shared, identifier, 2);
+         if shared.finished() {
+             // Closure may have followed the open timer pass above. Notify local waiters before retiring this worker, even when no task futures remain.
+             crate::worker_timers::expire(&shared, identifier, &mut expired, false);
+@@ -393,6 +438,11 @@ fn run_loop(
+         }
+         let runnable = match find_work(&shared, iteration) {
+             Steal::Empty => {
++                phase(&shared, identifier, 3);
++                #[cfg(feature = "diagnostics")]
++                let idle_at = crate::worker_timers::clock(&shared);
++                #[cfg(feature = "diagnostics")]
++                let mut planned = None;
+                 worker.sleeping.store(true, Ordering::SeqCst);
+                 shared.idle_workers.fetch_add(1, Ordering::SeqCst);
+                 // Pair with the enqueuer's fence: either this search observes its queued work, or the enqueuer observes an idle worker.
+@@ -406,14 +456,36 @@ fn run_loop(
+                     || !shared.finished(),
+                     || {
+                         needs_turn = false;
+-                        drive(
+-                            &mut driver,
+-                            crate::worker_timers::timeout(&shared, identifier),
+-                        )
++                        let timeout = crate::worker_timers::timeout(&shared, identifier);
++                        #[cfg(feature = "diagnostics")]
++                        {
++                            planned = timeout.map(|timeout| {
++                                crate::worker_timers::clock(&shared) + timeout.as_nanos() as u64
++                            });
++                        }
++                        drive(&mut driver, timeout)
+                     },
+                 );
+                 // Leaving idle is a turn boundary: the batch that follows starts a new heartbeat.
+                 worker.beat();
++                #[cfg(feature = "diagnostics")]
++                {
++                    let resumed = crate::worker_timers::clock(&shared);
++                    let woken = worker.heartbeat.woken_at.swap(0, Ordering::Relaxed);
++                    if woken != 0 && woken >= idle_at {
++                        wakes += 1;
++                        let latency = resumed.saturating_sub(woken);
++                        if latency > 250_000 {
++                            slow_wakes += 1;
++                            crate::monitor::log(&format!(
++                                "{{\"event\":\"slow_wake\",\"worker\":{identifier},\"at\":{resumed},\"latency_ns\":{latency},\"idle_ns\":{},\"woken_after_ns\":{},\"resumed_minus_timeout_ns\":{}}}",
++                                resumed - idle_at,
++                                woken - idle_at,
++                                planned.map_or("null".to_string(), |planned| (resumed as i64 - planned as i64).to_string()),
++                            ));
++                        }
++                    }
++                }
+                 runnable
+             }
+             result => yield_on_retry(result).success(),
+@@ -423,11 +495,17 @@ fn run_loop(
+         };
+         // Publish completions between ready batches. If the queue emptied, the idle path above already collected them with its actual wait timeout.
+         if needs_turn {
++            phase(&shared, identifier, 4);
+             drive(&mut driver, Some(Duration::ZERO));
+         }
++        phase(&shared, identifier, 5);
+         run_ready_batch(&shared, runnable);
+         needs_turn = true;
+     }
++    #[cfg(feature = "diagnostics")]
++    crate::monitor::log(&format!(
++        "{{\"event\":\"wake_summary\",\"worker\":{identifier},\"wakes\":{wakes},\"slow_wakes\":{slow_wakes}}}"
++    ));
+     CURRENT_WORKER.with(|current| current.take());
+ }
+ 
