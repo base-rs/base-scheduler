@@ -10,12 +10,16 @@ use std::sync::{Arc, OnceLock, Weak};
 use std::thread::{self, Thread};
 use std::{task::Waker, time::Duration};
 
-/// How a stuck worker was observed: inside one poll, or making progress through a long batch.
+/// How a stuck worker was observed. Release builds record every mark as `Poll`; test and diagnostic builds classify it: a worker still in idle code after a wake is `Woken`, and any other starts `Unclassified` until the monitor's next pass tells a `Batch` that completed a task poll from a `Poll` that did not.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Stuck {
     Poll,
     #[cfg_attr(not(any(test, feature = "diagnostics")), allow(dead_code))]
     Batch,
+    #[cfg_attr(not(any(test, feature = "diagnostics")), allow(dead_code))]
+    Unclassified,
+    #[cfg_attr(not(any(test, feature = "diagnostics")), allow(dead_code))]
+    Woken,
 }
 
 /// Written by the owner at each turn boundary and read by the stall monitor. It has its own cache line, so the owner's stores do not disturb workers reading its queues and flags.
@@ -26,6 +30,9 @@ pub(crate) struct Heartbeat {
     // Completed task polls, which tell a long batch from a single stuck poll.
     #[cfg(any(test, feature = "diagnostics"))]
     pub(crate) polls: AtomicUsize,
+    // Set while the owner is in its idle path, from before it advertises sleeping until it resumes, so that a woken worker that has not yet resumed is recognised.
+    #[cfg(any(test, feature = "diagnostics"))]
+    pub(crate) idle: AtomicBool,
 }
 
 /// A worker's timer queue and its published deadline. The owner mutates the queue on every timer operation, so it has its own cache lines, apart from the flags and queues that other workers read and write.
@@ -49,6 +56,9 @@ pub(crate) struct WorkerState {
     pub(crate) heartbeat: Heartbeat,
     // Set by the stall monitor while this worker's heartbeat is stalled: 0, or 1 + `Stuck`.
     stuck: AtomicU8,
+    // Rescues of this worker while its mark is unclassified, counted under the class the monitor later assigns.
+    #[cfg(any(test, feature = "diagnostics"))]
+    pub(crate) unclassified_rescues: AtomicUsize,
     stealers: [Stealer<Runnable>; 2],
     sleeping: AtomicBool,
     thread: OnceLock<Thread>,
@@ -74,6 +84,8 @@ impl WorkerState {
             },
             heartbeat: Heartbeat::default(),
             stuck: AtomicU8::new(0),
+            #[cfg(any(test, feature = "diagnostics"))]
+            unclassified_rescues: AtomicUsize::new(0),
             stealers,
             sleeping: AtomicBool::new(false),
             thread: OnceLock::new(),
@@ -94,7 +106,9 @@ impl WorkerState {
         match self.stuck.load(Ordering::Relaxed) {
             0 => None,
             1 => Some(Stuck::Poll),
-            _ => Some(Stuck::Batch),
+            2 => Some(Stuck::Batch),
+            3 => Some(Stuck::Unclassified),
+            _ => Some(Stuck::Woken),
         }
     }
 
@@ -104,6 +118,8 @@ impl WorkerState {
             None => 0,
             Some(Stuck::Poll) => 1,
             Some(Stuck::Batch) => 2,
+            Some(Stuck::Unclassified) => 3,
+            Some(Stuck::Woken) => 4,
         };
         if self.stuck.load(Ordering::Relaxed) != value {
             self.stuck.store(value, Ordering::Relaxed);
@@ -393,6 +409,8 @@ fn run_loop(
         }
         let runnable = match find_work(&shared, iteration) {
             Steal::Empty => {
+                #[cfg(any(test, feature = "diagnostics"))]
+                worker.heartbeat.idle.store(true, Ordering::Relaxed);
                 worker.sleeping.store(true, Ordering::SeqCst);
                 shared.idle_workers.fetch_add(1, Ordering::SeqCst);
                 // Pair with the enqueuer's fence: either this search observes its queued work, or the enqueuer observes an idle worker.
@@ -414,6 +432,8 @@ fn run_loop(
                 );
                 // Leaving idle is a turn boundary: the batch that follows starts a new heartbeat.
                 worker.beat();
+                #[cfg(any(test, feature = "diagnostics"))]
+                worker.heartbeat.idle.store(false, Ordering::Relaxed);
                 runnable
             }
             result => yield_on_retry(result).success(),

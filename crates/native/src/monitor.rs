@@ -72,7 +72,32 @@ impl Monitor {
 pub(crate) struct Counters {
     pub(crate) stuck_polls: std::sync::atomic::AtomicUsize,
     pub(crate) long_batches: std::sync::atomic::AtomicUsize,
+    pub(crate) woken: std::sync::atomic::AtomicUsize,
     pub(crate) timers: std::sync::atomic::AtomicUsize,
+}
+
+#[cfg(any(test, feature = "diagnostics"))]
+impl Counters {
+    fn class(&self, kind: Stuck) -> &std::sync::atomic::AtomicUsize {
+        match kind {
+            Stuck::Poll | Stuck::Unclassified => &self.stuck_polls,
+            Stuck::Batch => &self.long_batches,
+            Stuck::Woken => &self.woken,
+        }
+    }
+}
+
+// Give a marked worker its class, and count the rescues made while it was unclassified under that class.
+#[cfg(any(test, feature = "diagnostics"))]
+fn classify(shared: &Shared, victim: usize, kind: Stuck) {
+    let worker = &shared.workers[victim];
+    worker.set_stuck(Some(kind));
+    let rescues = worker.unclassified_rescues.swap(0, Ordering::Relaxed);
+    shared
+        .monitor
+        .counters
+        .class(kind)
+        .fetch_add(rescues, Ordering::Relaxed);
 }
 
 /// Fire a stuck worker's expired timers from another thread, and return the number of wakers invoked.
@@ -81,9 +106,10 @@ fn rescue(shared: &Arc<Shared>, victim: usize, _kind: Stuck, expired: &mut Vec<W
     #[cfg(any(test, feature = "diagnostics"))]
     if fired > 0 {
         let counters = &shared.monitor.counters;
-        match _kind {
-            Stuck::Poll => &counters.stuck_polls,
-            Stuck::Batch => &counters.long_batches,
+        if _kind == Stuck::Unclassified {
+            &shared.workers[victim].unclassified_rescues
+        } else {
+            counters.class(_kind)
         }
         .fetch_add(1, Ordering::Relaxed);
         counters.timers.fetch_add(fired, Ordering::Relaxed);
@@ -119,7 +145,7 @@ struct Observation {
     // The published deadline as this pass read it, for the locked recheck.
     deadline: u64,
     marked: Option<Marked>,
-    // Completed polls at the previous pass, which tell a long batch from one stuck poll.
+    // Completed polls when the worker was marked: by the next pass, a long batch has completed more, and a stuck poll has not.
     #[cfg(any(test, feature = "diagnostics"))]
     polls: usize,
 }
@@ -165,18 +191,35 @@ impl State {
             observation.deadline = deadline;
             let turns = worker.heartbeat.turns.load(Ordering::Relaxed);
             #[cfg(any(test, feature = "diagnostics"))]
-            let progressed = std::mem::replace(
-                &mut observation.polls,
-                worker.heartbeat.polls.load(Ordering::Relaxed),
-            ) != observation.polls;
+            let polls = worker.heartbeat.polls.load(Ordering::Relaxed);
             let sleeping = worker.is_sleeping();
             // A turn boundary, or sleep, ends a stall.
             if observation
                 .marked
                 .is_some_and(|marked| sleeping || marked.turns != turns)
             {
+                // A worker that reached a turn boundary before it was classified was making progress.
+                #[cfg(any(test, feature = "diagnostics"))]
+                classify(
+                    shared,
+                    identifier,
+                    match worker.stuck() {
+                        Some(Stuck::Unclassified) | None => Stuck::Batch,
+                        Some(kind) => kind,
+                    },
+                );
                 observation.marked = None;
                 worker.set_stuck(None);
+            }
+            // At least a period after marking, completed polls tell a long batch from a stuck poll.
+            #[cfg(any(test, feature = "diagnostics"))]
+            if observation.marked.is_some() && worker.stuck() == Some(Stuck::Unclassified) {
+                let kind = if polls == observation.polls {
+                    Stuck::Poll
+                } else {
+                    Stuck::Batch
+                };
+                classify(shared, identifier, kind);
             }
             // A worker already known to be stuck needs no grace period.
             let grace = if observation.marked.is_some() {
@@ -199,11 +242,15 @@ impl State {
                 }
                 continue;
             }
+            // A newly marked worker still in idle code was woken and has not resumed; any other is classified at the next pass.
             #[cfg(any(test, feature = "diagnostics"))]
-            let kind = if progressed {
-                Stuck::Batch
-            } else {
-                Stuck::Poll
+            let kind = match worker.stuck() {
+                Some(kind) => kind,
+                None if worker.heartbeat.idle.load(Ordering::Relaxed) => Stuck::Woken,
+                None => {
+                    observation.polls = polls;
+                    Stuck::Unclassified
+                }
             };
             #[cfg(not(any(test, feature = "diagnostics")))]
             let kind = Stuck::Poll;
