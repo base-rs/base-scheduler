@@ -313,3 +313,36 @@ fn blocked_writes_report_failed_registration_and_closure_during_the_first_wait()
         }
     }
 }
+
+#[test]
+fn owned_writes_use_the_bound_registration_and_return_their_buffer_when_cancelled() {
+    let (selector, _worker, socket, _peer) = setup();
+    let Some(group) = selector.readiness.as_ref() else {
+        return;
+    };
+    let never = Cancellation::never();
+    let mut writer = ReadinessSocketStreamWriter::<Vec<u8>>::new(&selector, &socket).unwrap();
+    // A ready owned write needs no registration, like a borrowed one.
+    let (result, buffer) = block_on(writer.write_owned(vec![1; 16], &never));
+    assert_eq!(result.unwrap(), 16);
+    assert_eq!(buffer.len(), 16);
+    assert!(writer.registration.is_none());
+    // Fill the send buffer, since the peer never reads, until an owned write must wait.
+    let cancellation = Cancellation::new();
+    for _ in 0..10_000 {
+        let mut writing = Box::pin(writer.write_owned(vec![2; 1 << 16], &cancellation));
+        if block_on(poll_once(&mut writing)).is_none() {
+            cancellation.cancel();
+            let (result, buffer) = block_on(writing);
+            assert!(matches!(result, Err(OperationError::Cancelled(_))));
+            assert!(buffer.len() == 1 << 16 && buffer.iter().all(|&byte| byte == 2));
+            // The wait registered the writer itself, on the socket's shared registration.
+            assert!(Arc::ptr_eq(
+                writer.registration.as_ref().unwrap(),
+                &socket.registrations.existing(group).unwrap()
+            ));
+            return;
+        }
+    }
+    panic!("the send buffer never filled");
+}

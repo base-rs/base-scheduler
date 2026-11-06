@@ -265,9 +265,17 @@ impl<B: IoBuf> SocketStreamWriter for ReadinessSocketStreamWriter<'_, B> {
                 return (Err(error), buffer);
             }
         }
-        self.scheduler
-            .socket_write(&self.socket, buffer, cancellation)
+        // A direct owned write completes synchronously within readiness, like a
+        // borrowed write, so it shares the bound path and cached registration.
+        // This future retains the owner, which every outcome returns.
+        let result = {
+            let bytes = buffer.as_ref();
+            self.write_with(cancellation, |socket| {
+                socket_io::send_poll(socket, bytes, SocketSendFlags::default())
+            })
             .await
+        };
+        (result, buffer)
     }
     async fn submit(
         &mut self,

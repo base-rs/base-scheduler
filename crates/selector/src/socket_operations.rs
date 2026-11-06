@@ -235,6 +235,9 @@ impl SocketAccept for ReadinessSelector {
     }
 }
 
+// Bound stream readers and writers perform owned scalar I/O on their cached
+// registrations. These generic operations remain for driver tests.
+#[cfg(test)]
 impl ReadinessSelector {
     pub(crate) async fn socket_read<B: IoBufMut>(
         &self,
@@ -253,6 +256,8 @@ impl ReadinessSelector {
     }
 }
 
+// Only the epoll driver tests issue generic owned writes.
+#[cfg(all(test, any(target_os = "linux", target_os = "android")))]
 impl ReadinessSelector {
     pub(crate) async fn socket_write<B: IoBuf>(
         &self,

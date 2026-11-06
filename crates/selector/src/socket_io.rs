@@ -87,12 +87,14 @@ pub(crate) fn close(socket: Socket) -> io::Result<()> {
     result_count(result as isize).map(drop)
 }
 
+#[cfg(test)]
 pub(crate) fn recv(socket: &Socket, bytes: &mut [u8]) -> io::Result<usize> {
     // SAFETY: The exclusive initialized byte range lives through this synchronous call. Socket::recv only writes initialized bytes and never extends the range.
     let bytes = unsafe { std::slice::from_raw_parts_mut(bytes.as_mut_ptr().cast(), bytes.len()) };
     socket.recv(bytes)
 }
 
+#[cfg(all(test, any(target_os = "linux", target_os = "android")))]
 pub(crate) fn send(socket: &Socket, bytes: &[u8]) -> io::Result<usize> {
     socket.send_with_flags(bytes, send_flags(SocketSendFlags::default()))
 }
