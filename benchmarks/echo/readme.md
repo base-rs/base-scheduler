@@ -79,6 +79,7 @@ The runner builds an optimized binary using the checked-in lockfile, then starts
 | `tokio` | Tokio | `TcpStream::read` / `write_all` with borrowed buffers |
 | `tokio-adapter` | Tokio | Bound `read_owned` / `write_owned`, implemented with readiness |
 | `tokio-adapter-poll` | Tokio | Bound borrowed `read_into` / `write`, implemented with readiness |
+| `tokio-adapter-vectored`, `tokio-adapter-owned-vectored`, `tokio-adapter-pooled` | Tokio | The `native-vectored`, `native-owned-vectored` and `native-pooled` payload calls on the Tokio adapter |
 | `native` | Native | Bound `read_owned` / `write_owned` on the default readiness selector (epoll or kqueue; on Windows, its portable fallback reactor) |
 | `native-poll` | Native | Bound borrowed `read_into` / `write` on the default readiness selector |
 | `native-monitor` | Native | Alias of `native-poll` |
@@ -87,6 +88,7 @@ The runner builds an optimized binary using the checked-in lockfile, then starts
 | `native-pooled` | Native | Bound pooled `read` (chunks leased from the reader's default pool of two 64 KiB slots) / borrowed `write` |
 | `iouring` | Native | Owned reads submit io_uring `Recv`; ready writes complete synchronously, otherwise submit `Send` |
 | `iouring-poll` | Native | Bound borrowed `read_into` / `write`, using persistent ring readiness |
+| `iouring-vectored`, `iouring-owned-vectored`, `iouring-pooled` | Native | The `native-vectored`, `native-owned-vectored` and `native-pooled` payload calls on io_uring. Borrowed and pooled reads use persistent ring readiness; owned vectored reads submit `RecvMsg` |
 | `tokio-adapter-monitor` | Tokio | Alias of `tokio-adapter-poll` |
 | `iouring-monitor` | Native | Alias of `iouring-poll` |
 | `iouring-multishot` | Native | Persistent `socket_recvmsg_multishot` with provided-buffer leases; borrowed sends |
