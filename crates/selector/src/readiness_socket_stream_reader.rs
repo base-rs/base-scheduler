@@ -388,7 +388,7 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for ReadinessSocketStreamReader
 
     async fn read_owned<B: base_scheduler::IoBufMut>(
         &mut self,
-        buffer: B,
+        mut buffer: B,
         cancellation: &Cancellation,
     ) -> base_scheduler::BufferResult<B> {
         if let Err(error) = self.check_open() {
@@ -397,10 +397,17 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for ReadinessSocketStreamReader
         if self.eof || buffer.as_ref().is_empty() {
             return (cancellation.check().map(|()| 0).map_err(Into::into), buffer);
         }
-        let (result, buffer) = self
-            .scheduler
-            .socket_read(&self.socket, buffer, cancellation)
-            .await;
+        // Readiness completes every receive synchronously, so the owned range
+        // can share the bound scalar path: its cached registration, readiness
+        // before a syscall once established, and short-read clearing. This
+        // future retains the owner, which every outcome returns.
+        let result = {
+            let bytes = buffer.as_mut();
+            self.read_with(bytes.len(), cancellation, |socket| {
+                socket_io::recv_poll(socket, bytes, SocketRecvFlags::default())
+            })
+            .await
+        };
         if matches!(result, Ok(0)) {
             self.eof = true;
         }

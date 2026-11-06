@@ -140,6 +140,54 @@ fn short_reads_wait_without_a_syscall_and_full_reads_keep_ready() {
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 #[test]
+fn owned_reads_share_the_bound_registration_and_return_their_buffer() {
+    let (selector, mut worker, socket, mut peer) = setup();
+    if selector.readiness.is_none() {
+        return;
+    }
+    let never = Cancellation::never();
+    let mut reader = ReadinessSocketStreamReader::<false>::new(&selector, &socket).unwrap();
+    // The first owned wait registers the reader itself.
+    let mut reading = Box::pin(reader.read_owned(vec![0; 8], &never));
+    assert!(block_on(poll_once(&mut reading)).is_none());
+    peer.write_all(b"x").unwrap();
+    let (result, buffer) = drive(reading, &mut worker);
+    assert_eq!(result.unwrap(), 1);
+    assert_eq!(buffer[0], b'x');
+    assert!(reader.established);
+    // A short owned read clears its observation, so the next one waits
+    // without a receive, as a borrowed read does.
+    let registration = Arc::clone(reader.registration.as_ref().unwrap());
+    assert_eq!(registration.direction(Interest::Readable).snapshot() & 1, 0);
+
+    // A cancelled wait returns the owner untouched.
+    let cancellation = Cancellation::new();
+    let mut reading = Box::pin(reader.read_owned(vec![0x5a; 4], &cancellation));
+    assert!(block_on(poll_once(&mut reading)).is_none());
+    cancellation.cancel();
+    let (result, buffer) = block_on(reading);
+    assert!(matches!(
+        result,
+        Err(base_scheduler::OperationError::Cancelled(_))
+    ));
+    assert_eq!(buffer, [0x5a; 4]);
+
+    peer.write_all(b"abc").unwrap();
+    let (result, buffer) = drive(reader.read_owned(vec![0; 8], &never), &mut worker);
+    assert_eq!(result.unwrap(), 3);
+    assert_eq!(&buffer[..3], b"abc");
+    assert!(Arc::ptr_eq(
+        reader.registration.as_ref().unwrap(),
+        &registration
+    ));
+    peer.shutdown(std::net::Shutdown::Write).unwrap();
+    let (result, _) = drive(reader.read_owned(vec![0; 8], &never), &mut worker);
+    assert_eq!(result.unwrap(), 0);
+    assert!(reader.eof);
+}
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[test]
 fn a_readability_event_during_a_short_read_is_not_erased() {
     let (selector, mut worker, socket, mut peer) = setup();
     if selector.readiness.is_none() {
