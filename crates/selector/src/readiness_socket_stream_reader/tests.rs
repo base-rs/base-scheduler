@@ -188,6 +188,28 @@ fn owned_reads_share_the_bound_registration_and_return_their_buffer() {
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 #[test]
+fn a_fresh_readers_waiting_message_receive_registers_the_reader() {
+    let (selector, _worker, socket, _peer) = setup();
+    let Some(group) = selector.readiness.as_ref() else {
+        return;
+    };
+    let never = Cancellation::never();
+    let mut reader = ReadinessSocketStreamReader::<false>::new(&selector, &socket).unwrap();
+    {
+        let mut bytes = [0; 8];
+        let mut vectors = [IoSliceMut::new(&mut bytes)];
+        let mut reading = pin!(reader.read_vectored(&mut vectors, &never));
+        assert!(block_on(poll_once(reading.as_mut())).is_none());
+    }
+    // The wait registered the reader itself, on the socket's shared registration, so later message receives reuse it.
+    assert!(Arc::ptr_eq(
+        reader.registration.as_ref().unwrap(),
+        &socket.registrations.existing(group).unwrap()
+    ));
+}
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[test]
 fn message_receives_share_the_registration_but_reach_the_socket_first_and_keep_readiness() {
     let (selector, mut worker, socket, mut peer) = setup();
     if selector.readiness.is_none() {
@@ -195,18 +217,6 @@ fn message_receives_share_the_registration_but_reach_the_socket_first_and_keep_r
     }
     let never = Cancellation::never();
     let mut reader = ReadinessSocketStreamReader::<false>::new(&selector, &socket).unwrap();
-    // A fresh reader's first message receive that must wait registers the reader itself.
-    {
-        let mut bytes = [0; 8];
-        let mut vectors = [IoSliceMut::new(&mut bytes)];
-        let mut reading = pin!(reader.read_vectored(&mut vectors, &never));
-        assert!(block_on(poll_once(reading.as_mut())).is_none());
-    }
-    let group = selector.readiness.as_ref().unwrap();
-    assert!(Arc::ptr_eq(
-        reader.registration.as_ref().unwrap(),
-        &socket.registrations.existing(group).unwrap()
-    ));
     prime(&mut reader, &mut peer, &mut worker);
     let registration = reader.registration.as_ref().unwrap().clone();
     let direction = registration.direction(Interest::Readable);
