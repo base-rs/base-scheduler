@@ -75,9 +75,22 @@ fn established_read<'a>(
     Ok(socket.established_read())
 }
 
-/// Whether a scalar receive of `count` into `length` bytes proves the queue drained, under the reader's OOB policy.
+/// Whether a scalar receive of `count` into `length` bytes proves the queue drained, under the reader's OOB policy. Only Linux and Android clear readiness on that proof.
+#[cfg(any(target_os = "linux", target_os = "android"))]
 pub(crate) fn short(count: usize, length: usize, support_oob: bool) -> bool {
     !support_oob && 0 < count && count < length
+}
+
+// The drain predicate for an established scalar read; only Linux and Android build one that can clear readiness.
+#[cfg(unix)]
+fn drain_predicate<const SUPPORT_OOB: bool>(length: usize) -> impl Fn(&usize) -> bool + Send {
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    return move |&count: &usize| short(count, length, SUPPORT_OOB);
+    #[cfg(not(any(target_os = "linux", target_os = "android")))]
+    {
+        let _ = length;
+        |_: &usize| false
+    }
 }
 
 impl<const SUPPORT_OOB: bool> SocketStreamReader for TokioSocketStreamReader<'_, SUPPORT_OOB> {
@@ -155,7 +168,7 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for TokioSocketStreamReader<'_,
                     |socket| {
                         crate::socket_io::recv_poll(socket, buffer, SocketRecvFlags::default())
                     },
-                    |&count| short(count, length, SUPPORT_OOB),
+                    drain_predicate::<SUPPORT_OOB>(length),
                 )
                 .await?;
             if count == 0 {
@@ -287,7 +300,7 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for TokioSocketStreamReader<'_,
                 let result = read
                     .read(
                         |socket| crate::socket_io::recv(socket, buffer.as_mut()),
-                        |&count| short(count, length, SUPPORT_OOB),
+                        drain_predicate::<SUPPORT_OOB>(length),
                     )
                     .await;
                 if matches!(result, Ok(0)) {

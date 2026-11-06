@@ -46,15 +46,23 @@ impl TokioScheduler {
         drain_short: bool,
         mut operation: impl FnMut(&Socket, &mut Input) -> io::Result<usize> + Send,
     ) -> (OperationResult<usize>, Input) {
+        // Only Linux and Android honour a drain predicate; elsewhere none is built.
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        let drained = move |&count: &usize| {
+            crate::tokio_socket_stream_reader::short(count, length, !drain_short)
+        };
+        #[cfg(not(any(target_os = "linux", target_os = "android")))]
+        let drained = {
+            let _ = drain_short;
+            |_: &usize| false
+        };
         let result = self
             .socket_result(socket, cancellation, || {
                 socket.io_with(
                     Interest::Readable,
                     |socket| operation(socket, &mut input),
                     length > 0,
-                    move |&count| {
-                        crate::tokio_socket_stream_reader::short(count, length, !drain_short)
-                    },
+                    drained,
                 )
             })
             .await;
