@@ -2,23 +2,36 @@
 // Copyright, 2026, by Samuel Williams.
 
 #[cfg(target_os = "linux")]
-use base_scheduler::{SocketRecvFlags, SocketRecvMessage};
+use base_scheduler::SocketRecvMessage;
 
 use crate::Result;
 use base_scheduler::{
-    BufferPooling, Cancellation, IoBuf, SocketAccept, SocketRegistration, SocketSetOption,
-    SocketStreamReader, SocketStreamReading, SocketStreamWriter, SocketStreamWriting, Spawn,
-    TcpNoDelay,
+    BufferPooling, Cancellation, IoBuf, SocketAccept, SocketRecvFlags, SocketRegistration,
+    SocketSendFlags, SocketSetOption, SocketStreamReader, SocketStreamReading, SocketStreamWriter,
+    SocketStreamWriting, Spawn, TcpNoDelay,
 };
 use base_scheduler_tokio::TokioScheduler;
 use std::{
-    io::{self, Write},
+    io::{self, IoSlice, IoSliceMut, Write},
     net::TcpListener,
+    ops::Range,
     sync::Arc,
 };
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 const BUFFER_SIZE: usize = 65536;
+// Vectored modes scatter each read across two halves of the same total storage.
+const HALF: usize = BUFFER_SIZE / 2;
+
+// Which stream calls a scheduler's echo loop uses for its payload.
+#[derive(Clone, Copy)]
+enum Payload {
+    Owned,
+    Borrowed,
+    Vectored,
+    OwnedVectored,
+    Pooled,
+}
 
 fn ready(listener: &TcpListener) {
     println!("{}", listener.local_addr().expect("listener address"));
@@ -150,6 +163,125 @@ where
     }
 }
 
+// Each read returns a chunk leased from the reader's default pool of two
+// 64 KiB slots; the echo borrows it and drops it before the next read.
+async fn echo_pooled<S>(scheduler: &S, socket: S::Socket)
+where
+    S: SocketStreamReading + SocketStreamWriting,
+    S::Socket: 'static,
+{
+    let never = Cancellation::never();
+    let mut reader = scheduler
+        .socket_stream_reader(&socket)
+        .expect("stream reader");
+    let mut writer = scheduler
+        .socket_stream_writer(&socket)
+        .expect("stream writer");
+    while let Some(chunk) = reader.read(&never).await.expect("pooled read") {
+        let mut bytes = chunk.as_ref();
+        while !bytes.is_empty() {
+            let written = writer.write(bytes, &never).await.expect("stream write");
+            assert!(written != 0, "stream write made zero progress");
+            bytes = &bytes[written..];
+        }
+    }
+}
+
+// The unsent part of `sent..count` in each half of the connection buffer, as
+// ranges of the whole buffer. Either may be empty.
+fn unsent_halves(sent: usize, count: usize) -> (Range<usize>, Range<usize>) {
+    (
+        sent.min(HALF)..count.min(HALF),
+        sent.max(HALF)..count.max(HALF),
+    )
+}
+
+async fn echo_vectored<S>(scheduler: &S, socket: S::Socket)
+where
+    S: SocketStreamReading + SocketStreamWriting,
+    S::Socket: 'static,
+{
+    let never = Cancellation::never();
+    let mut reader = scheduler
+        .socket_stream_reader(&socket)
+        .expect("stream reader");
+    let mut writer = scheduler
+        .socket_stream_writer(&socket)
+        .expect("stream writer");
+    let mut buffer = vec![0; BUFFER_SIZE];
+    loop {
+        let count = {
+            let (head, tail) = buffer.split_at_mut(HALF);
+            reader
+                .read_vectored(&mut [IoSliceMut::new(head), IoSliceMut::new(tail)], &never)
+                .await
+                .expect("vectored read")
+        };
+        if count == 0 {
+            return;
+        }
+        let mut sent = 0;
+        while sent < count {
+            let (head, tail) = unsent_halves(sent, count);
+            let written = writer
+                .write_vectored(
+                    &[IoSlice::new(&buffer[head]), IoSlice::new(&buffer[tail])],
+                    &never,
+                )
+                .await
+                .expect("vectored write");
+            assert!(written != 0, "vectored write made zero progress");
+            sent += written;
+        }
+    }
+}
+
+// Owned arrays carry no prepared I/O vectors, as an application passing
+// plain buffers would.
+async fn echo_owned_vectored<S>(scheduler: &S, socket: S::Socket)
+where
+    S: SocketStreamReading + SocketStreamWriting,
+    S::Socket: 'static,
+{
+    let never = Cancellation::never();
+    let mut reader = scheduler
+        .socket_stream_reader(&socket)
+        .expect("stream reader");
+    let mut writer = scheduler
+        .socket_stream_writer(&socket)
+        .expect("stream writer");
+    let mut buffers = [vec![0; HALF], vec![0; HALF]];
+    loop {
+        let (result, returned) = reader
+            .read_owned_vectored(buffers, SocketRecvFlags::default(), &never)
+            .await;
+        buffers = returned;
+        let count = result.expect("owned vectored read").bytes;
+        if count == 0 {
+            return;
+        }
+        let mut sent = 0;
+        while sent < count {
+            let (head, tail) = unsent_halves(sent, count);
+            let [first, second] = buffers;
+            let (result, [first, second]) = writer
+                .write_owned_vectored(
+                    [
+                        first.slice(head),
+                        second.slice(tail.start - HALF..tail.end - HALF),
+                    ],
+                    SocketSendFlags::default(),
+                    &never,
+                )
+                .await;
+            buffers = [first.into_inner(), second.into_inner()];
+            let written = result.expect("owned vectored write");
+            assert!(written != 0, "owned vectored write made zero progress");
+            sent += written;
+        }
+    }
+}
+
 #[cfg(target_os = "linux")]
 async fn multishot_server(
     scheduler: Arc<base_scheduler_native::NativeScheduler<base_scheduler_iouring::IoUringSelector>>,
@@ -212,8 +344,7 @@ async fn scheduler_server<S>(
     scheduler: Arc<S>,
     listener: TcpListener,
     connections: usize,
-    poll: bool,
-    monitors: bool,
+    payload: Payload,
 ) where
     S: SocketRegistration
         + SocketAccept
@@ -242,12 +373,20 @@ async fn scheduler_server<S>(
             .await
             .expect("TCP_NODELAY");
         let shared = Arc::clone(&scheduler);
-        let task = if monitors {
-            scheduler.spawn(async move { echo_monitor(shared.as_ref(), socket).await })
-        } else if poll {
-            scheduler.spawn(async move { echo_poll(shared.as_ref(), socket).await })
-        } else {
-            scheduler.spawn(async move { echo(shared.as_ref(), socket).await })
+        let task = match payload {
+            Payload::Owned => scheduler.spawn(async move { echo(shared.as_ref(), socket).await }),
+            Payload::Borrowed => {
+                scheduler.spawn(async move { echo_poll(shared.as_ref(), socket).await })
+            }
+            Payload::Vectored => {
+                scheduler.spawn(async move { echo_vectored(shared.as_ref(), socket).await })
+            }
+            Payload::OwnedVectored => {
+                scheduler.spawn(async move { echo_owned_vectored(shared.as_ref(), socket).await })
+            }
+            Payload::Pooled => {
+                scheduler.spawn(async move { echo_pooled(shared.as_ref(), socket).await })
+            }
         };
         tasks.push(task.expect("spawn echo task"));
     }
@@ -272,12 +411,20 @@ pub(crate) fn run(backend: &str, workers: usize, connections: usize) -> Result<(
                 Arc::clone(&scheduler),
                 listener,
                 connections,
-                backend == "tokio-adapter-poll",
-                backend == "tokio-adapter-monitor",
+                if backend == "tokio-adapter" {
+                    Payload::Owned
+                } else {
+                    Payload::Borrowed
+                },
             ));
             runtime.block_on(scheduler.shutdown());
         }
-        "native" | "native-poll" | "native-monitor" => {
+        "native"
+        | "native-poll"
+        | "native-monitor"
+        | "native-vectored"
+        | "native-owned-vectored"
+        | "native-pooled" => {
             use base_scheduler_native::{NativeOptions, NativeScheduler};
             let scheduler = Arc::new(
                 NativeScheduler::with_options(NativeOptions {
@@ -291,8 +438,13 @@ pub(crate) fn run(backend: &str, workers: usize, connections: usize) -> Result<(
                 Arc::clone(&scheduler),
                 listener,
                 connections,
-                backend == "native-poll",
-                backend == "native-monitor",
+                match backend {
+                    "native" => Payload::Owned,
+                    "native-vectored" => Payload::Vectored,
+                    "native-owned-vectored" => Payload::OwnedVectored,
+                    "native-pooled" => Payload::Pooled,
+                    _ => Payload::Borrowed,
+                },
             ));
             report_rescues(&scheduler);
             scheduler.block_on(scheduler.shutdown());
@@ -332,8 +484,11 @@ pub(crate) fn run(backend: &str, workers: usize, connections: usize) -> Result<(
                     Arc::clone(&scheduler),
                     listener,
                     connections,
-                    backend == "iouring-poll",
-                    backend == "iouring-monitor",
+                    if backend == "iouring" {
+                        Payload::Owned
+                    } else {
+                        Payload::Borrowed
+                    },
                 ));
             }
             report_rescues(&scheduler);

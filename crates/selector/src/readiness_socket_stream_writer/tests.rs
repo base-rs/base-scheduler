@@ -346,3 +346,46 @@ fn owned_writes_use_the_bound_registration_and_return_their_buffer_when_cancelle
     }
     panic!("the send buffer never filled");
 }
+
+#[test]
+fn owned_vectored_writes_use_the_bound_registration_and_return_their_buffers_when_cancelled() {
+    let (selector, _worker, socket, mut peer) = setup();
+    let Some(group) = selector.readiness.as_ref() else {
+        return;
+    };
+    let never = Cancellation::never();
+    let flags = SocketSendFlags::default();
+    let mut writer = ReadinessSocketStreamWriter::<Vec<u8>>::new(&selector, &socket).unwrap();
+    // A ready owned sequence needs no registration, like a borrowed one.
+    let (result, buffers) =
+        block_on(writer.write_owned_vectored([b"head".to_vec(), b"body".to_vec()], flags, &never));
+    assert_eq!(result.unwrap(), 8);
+    assert_eq!(buffers, [b"head".to_vec(), b"body".to_vec()]);
+    assert!(writer.registration.is_none());
+    let mut received = [0; 8];
+    peer.read_exact(&mut received).unwrap();
+    assert_eq!(&received, b"headbody");
+    // Fill the send buffer, since the peer stops reading, until a write must wait.
+    let cancellation = Cancellation::new();
+    for _ in 0..10_000 {
+        let mut writing = Box::pin(writer.write_owned_vectored(
+            [vec![2; 1 << 15], vec![3; 1 << 15]],
+            flags,
+            &cancellation,
+        ));
+        if block_on(poll_once(&mut writing)).is_none() {
+            cancellation.cancel();
+            let (result, [first, second]) = block_on(writing);
+            assert!(matches!(result, Err(OperationError::Cancelled(_))));
+            assert!(first.len() == 1 << 15 && first.iter().all(|&byte| byte == 2));
+            assert!(second.len() == 1 << 15 && second.iter().all(|&byte| byte == 3));
+            // The wait registered the writer itself, on the socket's shared registration.
+            assert!(Arc::ptr_eq(
+                writer.registration.as_ref().unwrap(),
+                &socket.registrations.existing(group).unwrap()
+            ));
+            return;
+        }
+    }
+    panic!("the send buffer never filled");
+}

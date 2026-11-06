@@ -238,19 +238,20 @@ impl<B: IoBuf> SocketStreamWriter for ReadinessSocketStreamWriter<'_, B> {
                 return (Err(error), buffers);
             }
         }
-        let (result, message) = self
-            .scheduler
-            .socket_sendmsg(
-                &self.socket,
-                crate::SocketMessage {
-                    buffers,
-                    address: None,
-                },
-                flags,
-                cancellation,
-            )
-            .await;
-        (result, message.buffers)
+        // Every send completes synchronously within readiness, so the owned
+        // sequence shares the bound path and cached registration like a
+        // borrowed vectored write. This future retains the owner, which every
+        // outcome returns.
+        let mut buffers = buffers;
+        let result = {
+            let mut vectors = socket_io::IoVectors::new();
+            let buffers = &mut buffers;
+            self.write_with(cancellation, move |socket| {
+                vectors.send(socket, &*buffers, None, flags)
+            })
+            .await
+        };
+        (result, buffers)
     }
     async fn write_owned<Owned: base_scheduler::IoBuf>(
         &mut self,

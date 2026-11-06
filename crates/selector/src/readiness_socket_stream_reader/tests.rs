@@ -93,7 +93,7 @@ fn short_reads_wait_without_a_syscall_and_full_reads_keep_ready() {
     let calls = AtomicUsize::new(0);
     let mut buffer = [0; 4];
     {
-        let mut reading = Box::pin(reader.read_with(buffer.len(), &never, |socket| {
+        let mut reading = Box::pin(reader.read_with::<true>(buffer.len(), &never, |socket| {
             calls.fetch_add(1, Ordering::Relaxed);
             socket_io::recv_poll(socket, &mut buffer, SocketRecvFlags::default())
         }));
@@ -111,7 +111,7 @@ fn short_reads_wait_without_a_syscall_and_full_reads_keep_ready() {
     // A full read does not prove exhaustion. One WouldBlock clears the hint.
     let calls = AtomicUsize::new(0);
     {
-        let mut reading = Box::pin(reader.read_with(buffer.len(), &never, |socket| {
+        let mut reading = Box::pin(reader.read_with::<true>(buffer.len(), &never, |socket| {
             calls.fetch_add(1, Ordering::Relaxed);
             socket_io::recv_poll(socket, &mut buffer, SocketRecvFlags::default())
         }));
@@ -188,6 +188,171 @@ fn owned_reads_share_the_bound_registration_and_return_their_buffer() {
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 #[test]
+fn a_fresh_readers_waiting_message_receive_registers_the_reader() {
+    let (selector, _worker, socket, _peer) = setup();
+    let Some(group) = selector.readiness.as_ref() else {
+        return;
+    };
+    let never = Cancellation::never();
+    let mut reader = ReadinessSocketStreamReader::<false>::new(&selector, &socket).unwrap();
+    {
+        let mut bytes = [0; 8];
+        let mut vectors = [IoSliceMut::new(&mut bytes)];
+        let mut reading = pin!(reader.read_vectored(&mut vectors, &never));
+        assert!(block_on(poll_once(reading.as_mut())).is_none());
+    }
+    // The wait registered the reader itself, on the socket's shared registration, so later message receives reuse it.
+    assert!(Arc::ptr_eq(
+        reader.registration.as_ref().unwrap(),
+        &socket.registrations.existing(group).unwrap()
+    ));
+}
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[test]
+fn message_receives_share_the_registration_but_reach_the_socket_first_and_keep_readiness() {
+    let (selector, mut worker, socket, mut peer) = setup();
+    if selector.readiness.is_none() {
+        return;
+    }
+    let never = Cancellation::never();
+    let mut reader = ReadinessSocketStreamReader::<false>::new(&selector, &socket).unwrap();
+    prime(&mut reader, &mut peer, &mut worker);
+    let registration = reader.registration.as_ref().unwrap().clone();
+    let direction = registration.direction(Interest::Readable);
+    assert_eq!(direction.snapshot() & 1, 0);
+    // Without a driver turn readiness stays clear. An established scalar read
+    // would wait on it; a vectored receive still reaches the socket first.
+    peer.write_all(b"abc").unwrap();
+    let mut bytes = [0; 8];
+    {
+        let mut vectors = [IoSliceMut::new(&mut bytes)];
+        let mut reading = pin!(reader.read_vectored(&mut vectors, &never));
+        assert_eq!(block_on(poll_once(reading.as_mut())).unwrap().unwrap(), 3);
+    }
+    assert_eq!(&bytes[..3], b"abc");
+    // A short message receive retains observed readiness until WouldBlock.
+    peer.write_all(b"defg").unwrap();
+    let deadline = Instant::now() + Duration::from_secs(3);
+    while direction.snapshot() & 1 == 0 {
+        assert!(Instant::now() < deadline, "readability was not delivered");
+        worker.turn(Some(Duration::from_millis(10))).unwrap();
+    }
+    let result = block_on(reader.read_vectored_with_flags(
+        &mut [IoSliceMut::new(&mut bytes)],
+        SocketRecvFlags::default(),
+        &never,
+    ))
+    .unwrap();
+    assert_eq!(result.bytes, 4);
+    assert_eq!(&bytes[..4], b"defg");
+    assert_ne!(direction.snapshot() & 1, 0);
+    {
+        let mut vectors = [IoSliceMut::new(&mut bytes)];
+        let mut reading = pin!(reader.read_vectored(&mut vectors, &never));
+        assert!(block_on(poll_once(reading.as_mut())).is_none());
+    }
+    assert_eq!(direction.snapshot() & 1, 0);
+
+    // A cancelled owned wait returns the sequence untouched.
+    let cancellation = Cancellation::new();
+    let mut reading = Box::pin(reader.read_owned_vectored(
+        [vec![0x5a; 2], vec![0x5a; 4]],
+        SocketRecvFlags::default(),
+        &cancellation,
+    ));
+    assert!(block_on(poll_once(&mut reading)).is_none());
+    cancellation.cancel();
+    let (result, buffers) = block_on(reading);
+    assert!(matches!(
+        result,
+        Err(base_scheduler::OperationError::Cancelled(_))
+    ));
+    assert_eq!(buffers, [vec![0x5a; 2], vec![0x5a; 4]]);
+    peer.write_all(b"xyz").unwrap();
+    let (result, buffers) = drive(
+        reader.read_owned_vectored([vec![0; 2], vec![0; 4]], SocketRecvFlags::default(), &never),
+        &mut worker,
+    );
+    assert_eq!(result.unwrap().bytes, 3);
+    assert_eq!(buffers, [b"xy".to_vec(), b"z\0\0\0".to_vec()]);
+    assert!(Arc::ptr_eq(
+        reader.registration.as_ref().unwrap(),
+        &registration
+    ));
+    peer.shutdown(std::net::Shutdown::Write).unwrap();
+    assert_eq!(
+        drive(
+            reader.read_vectored(&mut [IoSliceMut::new(&mut bytes)], &never),
+            &mut worker
+        )
+        .unwrap(),
+        0
+    );
+    assert!(reader.eof);
+}
+
+#[cfg(unix)]
+#[test]
+fn pooled_reads_release_their_buffer_while_waiting_on_the_bound_registration() {
+    let (selector, mut worker, socket, mut peer) = setup();
+    let Some(group) = selector.readiness.clone() else {
+        return;
+    };
+    let never = Cancellation::never();
+    let pool = selector.buffer_pool(BufferPoolOptions::new(1, 8)).unwrap();
+    let mut reader = ReadinessSocketStreamReader::<false>::new(&selector, &socket)
+        .unwrap()
+        .with_pool(pool.clone());
+    {
+        let mut reading = pin!(reader.read(&never));
+        assert!(block_on(poll_once(reading.as_mut())).is_none());
+        // The only slot is free while the read waits.
+        drop(block_on(poll_once(pool.acquire(&never))).unwrap().unwrap());
+        peer.write_all(b"one").unwrap();
+        let chunk = drive(reading, &mut worker).unwrap().unwrap();
+        assert_eq!(chunk.as_ref(), b"one");
+    }
+    assert!(Arc::ptr_eq(
+        reader.registration.as_ref().unwrap(),
+        &socket.registrations.existing(&group).unwrap()
+    ));
+    // A short pooled receive retains readiness, so a cancelled wait first
+    // reaches the socket and clears it.
+    let registration = reader.registration.clone().unwrap();
+    let direction = registration.direction(Interest::Readable);
+    assert_ne!(direction.snapshot() & 1, 0);
+    let cancellation = Cancellation::new();
+    {
+        let mut reading = pin!(reader.read(&cancellation));
+        assert!(block_on(poll_once(reading.as_mut())).is_none());
+        assert_eq!(direction.snapshot() & 1, 0);
+        cancellation.cancel();
+        assert!(matches!(
+            block_on(reading),
+            Err(base_scheduler::OperationError::Cancelled(_))
+        ));
+    }
+    // Cancellation also ends a wait for a pooled slot.
+    let lease = block_on(pool.acquire(&never)).unwrap();
+    let cancellation = Cancellation::new();
+    {
+        let mut reading = pin!(reader.read(&cancellation));
+        assert!(block_on(poll_once(reading.as_mut())).is_none());
+        cancellation.cancel();
+        assert!(matches!(
+            block_on(reading),
+            Err(base_scheduler::OperationError::Cancelled(_))
+        ));
+    }
+    drop(lease);
+    peer.shutdown(std::net::Shutdown::Write).unwrap();
+    assert!(drive(reader.read(&never), &mut worker).unwrap().is_none());
+    assert!(reader.eof);
+}
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[test]
 fn a_readability_event_during_a_short_read_is_not_erased() {
     let (selector, mut worker, socket, mut peer) = setup();
     if selector.readiness.is_none() {
@@ -205,7 +370,7 @@ fn a_readability_event_during_a_short_read_is_not_erased() {
         worker.turn(Some(Duration::from_millis(10))).unwrap();
     }
     let mut buffer = [0; 8];
-    let count = block_on(reader.read_with(buffer.len(), &never, |socket| {
+    let count = block_on(reader.read_with::<true>(buffer.len(), &never, |socket| {
         let result = socket_io::recv_poll(socket, &mut buffer, SocketRecvFlags::default());
         // Model delivery of the new edge between recv and its readiness clear.
         peer.write_all(b"b").unwrap();
@@ -253,7 +418,7 @@ fn cancellation_shutdown_and_immediate_errors_preserve_stream_state() {
         .direction(Interest::Readable)
         .publish();
     assert_eq!(
-        block_on(reader.read_with(8, &Cancellation::never(), |_| Err(
+        block_on(reader.read_with::<true>(8, &Cancellation::never(), |_| Err(
             io::ErrorKind::PermissionDenied.into()
         )))
         .unwrap_err()
@@ -279,7 +444,7 @@ fn cancellation_shutdown_and_immediate_errors_preserve_stream_state() {
     let direction = registration.direction(Interest::Readable);
     let mut calls = 0;
     {
-        let mut reading = Box::pin(reader.read_with(8, &never, |_| {
+        let mut reading = Box::pin(reader.read_with::<true>(8, &never, |_| {
             calls += 1;
             Ok(3)
         }));
@@ -295,7 +460,7 @@ fn cancellation_shutdown_and_immediate_errors_preserve_stream_state() {
         racing.direction(Interest::Readable).publish();
     })));
     assert_eq!(
-        block_on(poll_once(reader.read_with(8, &never, |_| Ok(2))))
+        block_on(poll_once(reader.read_with::<true>(8, &never, |_| Ok(2))))
             .unwrap()
             .unwrap(),
         2
@@ -319,7 +484,7 @@ fn cancellation_shutdown_and_immediate_errors_preserve_stream_state() {
     let (selector, _worker, socket, _peer) = setup();
     let mut reader = ReadinessSocketStreamReader::<false>::new(&selector, &socket).unwrap();
     // Closure between the initial attempt and lazy registration is propagated.
-    let error = block_on(reader.read_with(8, &never, |_| {
+    let error = block_on(reader.read_with::<true>(8, &never, |_| {
         selector.close();
         Err(io::ErrorKind::WouldBlock.into())
     }))
@@ -497,6 +662,48 @@ fn compile_time_options_preserve_the_pool_eof_and_closed_state() {
             .unwrap_err()
             .kind(),
         io::ErrorKind::BrokenPipe
+    );
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn default_message_receives_keep_reading_across_an_observed_urgent_mark() {
+    let (selector, mut worker, socket, mut peer) = setup();
+    if selector.readiness.is_none() {
+        return;
+    }
+    let never = Cancellation::never();
+    let mut reader = ReadinessSocketStreamReader::<false>::new(&selector, &socket).unwrap();
+    prime(&mut reader, &mut peer, &mut worker);
+    let direction = reader
+        .registration
+        .as_ref()
+        .unwrap()
+        .direction(Interest::Readable);
+    peer.write_all(b"before").unwrap();
+    socket2::SockRef::from(&peer)
+        .send_with_flags(b"!", libc::MSG_OOB)
+        .unwrap();
+    let deadline = Instant::now() + Duration::from_secs(3);
+    while direction.snapshot() & 4 == 0 {
+        assert!(
+            Instant::now() < deadline,
+            "the urgent condition was not delivered"
+        );
+        worker.turn(Some(Duration::from_millis(10))).unwrap();
+    }
+    // Vectored receives keep their conservative behavior: no rejection.
+    let mut bytes = [0; 64];
+    assert_eq!(
+        block_on(reader.read_vectored(&mut [IoSliceMut::new(&mut bytes)], &never)).unwrap(),
+        6
+    );
+    assert_eq!(&bytes[..6], b"before");
+    assert_eq!(
+        block_on(reader.read_into(&mut bytes, &never))
+            .unwrap_err()
+            .kind(),
+        io::ErrorKind::Unsupported
     );
 }
 
