@@ -18,30 +18,51 @@ impl TokioScheduler {
     pub(crate) async fn socket_operation<Input: Send, Output: Send>(
         &self,
         socket: &TokioSocket,
-        input: Input,
-        cancellation: &Cancellation,
-        interest: Interest,
-        operation: impl FnMut(&Socket, &mut Input) -> io::Result<Output> + Send,
-    ) -> (OperationResult<Output>, Input) {
-        self.socket_operation_with(socket, input, cancellation, interest, operation, false)
-            .await
-    }
-
-    async fn socket_operation_with<Input: Send, Output: Send>(
-        &self,
-        socket: &TokioSocket,
         mut input: Input,
         cancellation: &Cancellation,
         interest: Interest,
         mut operation: impl FnMut(&Socket, &mut Input) -> io::Result<Output> + Send,
-        read_nonempty: bool,
     ) -> (OperationResult<Output>, Input) {
         let result = self
             .socket_result(socket, cancellation, || {
                 socket.io_with(
                     interest,
                     |socket| operation(socket, &mut input),
-                    read_nonempty,
+                    false,
+                    |_| false,
+                )
+            })
+            .await;
+        (result, input)
+    }
+
+    /// A scalar receive of `length` bytes. Nonempty reads on an established stream may wait on cached readiness first; with `drain_short`, a positive short count clears that readiness (see `TokioSocket::io_with`).
+    async fn socket_receive<Input: Send>(
+        &self,
+        socket: &TokioSocket,
+        mut input: Input,
+        cancellation: &Cancellation,
+        length: usize,
+        drain_short: bool,
+        mut operation: impl FnMut(&Socket, &mut Input) -> io::Result<usize> + Send,
+    ) -> (OperationResult<usize>, Input) {
+        // Only Linux and Android honour a drain predicate; elsewhere none is built.
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        let drained = move |&count: &usize| {
+            crate::tokio_socket_stream_reader::short(count, length, !drain_short)
+        };
+        #[cfg(not(any(target_os = "linux", target_os = "android")))]
+        let drained = {
+            let _ = drain_short;
+            |_: &usize| false
+        };
+        let result = self
+            .socket_result(socket, cancellation, || {
+                socket.io_with(
+                    Interest::Readable,
+                    |socket| operation(socket, &mut input),
+                    length > 0,
+                    drained,
                 )
             })
             .await;
@@ -189,20 +210,34 @@ impl SocketAccept for TokioScheduler {
 }
 
 impl TokioScheduler {
+    // Production owned reads come from stream readers, which select their OOB policy.
+    #[cfg(test)]
     pub(crate) async fn socket_read<B: IoBufMut>(
+        &self,
+        socket: &TokioSocket,
+        buffer: B,
+        cancellation: &Cancellation,
+    ) -> BufferResult<B> {
+        self.socket_read_with(socket, buffer, cancellation, false)
+            .await
+    }
+
+    /// `drain_short` is only for OOB-disabled stream readers: a positive short receive clears the readiness it was attempted on.
+    pub(crate) async fn socket_read_with<B: IoBufMut>(
         &self,
         socket: &TokioSocket,
         mut buffer: B,
         cancellation: &Cancellation,
+        drain_short: bool,
     ) -> BufferResult<B> {
         let length = buffer.as_mut().len();
-        self.socket_operation_with(
+        self.socket_receive(
             socket,
             buffer,
             cancellation,
-            Interest::Readable,
+            length,
+            drain_short,
             |socket, buffer| socket_io::recv(socket, buffer.as_mut()),
-            length > 0,
         )
         .await
     }
@@ -234,14 +269,27 @@ impl TokioScheduler {
         flags: SocketRecvFlags,
         cancellation: &Cancellation,
     ) -> OperationResult<usize> {
+        self.socket_recv_poll_with(socket, buffer, flags, cancellation, false)
+            .await
+    }
+
+    /// `drain_short` is only for OOB-disabled stream readers: a positive short receive clears the readiness it was attempted on.
+    pub(crate) async fn socket_recv_poll_with(
+        &self,
+        socket: &TokioSocket,
+        buffer: &mut [u8],
+        flags: SocketRecvFlags,
+        cancellation: &Cancellation,
+        drain_short: bool,
+    ) -> OperationResult<usize> {
         let length = buffer.len();
-        self.socket_operation_with(
+        self.socket_receive(
             socket,
             buffer,
             cancellation,
-            Interest::Readable,
+            length,
+            drain_short,
             |socket, buffer| socket_io::recv_poll(socket, buffer, flags),
-            length > 0,
         )
         .await
         .0

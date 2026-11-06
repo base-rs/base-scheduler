@@ -40,6 +40,34 @@ impl RegisteredSocket {
         &self.socket
     }
 
+    /// Record a readiness-driven syscall's success. `try_io` already cleared readiness on `WouldBlock`.
+    fn completed<Output>(
+        &self,
+        ready: &mut tokio::io::unix::AsyncFdReadyGuard<'_, Arc<socket2::Socket>>,
+        result: &io::Result<Output>,
+        mark_connected: bool,
+        drained: &impl Fn(&Output) -> bool,
+    ) {
+        let Ok(output) = result else {
+            return;
+        };
+        if mark_connected {
+            self.connected_stream.store(true, Ordering::Relaxed);
+        }
+        // A short TCP receive empties the queue unless it stopped at an urgent mark. Linux reports urgent data as priority readiness, which this registration requests and never clears, so a socket that has received urgent data keeps draining through `WouldBlock`; priority interest also reports read closure, which likewise keeps readiness. Tokio's tick check ignores this clear if a newer event was recorded after `ready` was observed, and an edge for input arriving after the receive is still delivered, so no notification is lost; closed readiness survives the clear.
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        if drained(output)
+            && ready
+                .get_ref()
+                .try_io(tokio::io::Interest::PRIORITY, |_| Ok(()))
+                .is_err()
+        {
+            ready.clear_ready();
+        }
+        #[cfg(not(any(target_os = "linux", target_os = "android")))]
+        let _ = (ready, output, drained);
+    }
+
     fn into_inner(self) -> socket2::Socket {
         drop(self.registration);
         Arc::try_unwrap(self.socket).expect("socket registration releases its private socket owner")
@@ -49,9 +77,18 @@ impl RegisteredSocket {
         self.registration
             .get_or_try_init(|| async {
                 let _scope = self.runtime.enter();
+                let interest = tokio::io::Interest::READABLE | tokio::io::Interest::WRITABLE;
+                // Priority readiness reports TCP urgent data, which stops an ordinary receive short at its mark; OOB-disabled stream reads keep their readiness while it is reported, rather than treating that short count as drained.
+                #[cfg(any(target_os = "linux", target_os = "android"))]
+                let interest = interest | tokio::io::Interest::PRIORITY;
                 // SAFETY: Both this wrapper and the registration own the same socket. No operation can close or replace its descriptor while registered, including if the wrapper or a pending future is forgotten.
-                unsafe { tokio::io::unix::AsyncFd::register(Arc::clone(&self.socket)) }
-                    .map_err(io::Error::from)
+                unsafe {
+                    tokio::io::unix::AsyncFd::register_with_interest(
+                        Arc::clone(&self.socket),
+                        interest,
+                    )
+                }
+                .map_err(io::Error::from)
             })
             .await
     }
@@ -64,6 +101,82 @@ struct PollWaiter<'a>(&'a AtomicBool);
 impl Drop for PollWaiter<'_> {
     fn drop(&mut self) {
         self.0.store(false, Ordering::Release);
+    }
+}
+
+/// A held lightweight read reservation on an established stream; see `TokioSocket::established_read`.
+#[cfg(unix)]
+pub(crate) struct EstablishedRead<'a> {
+    inner: &'a RegisteredSocket,
+    registration: &'a tokio::io::unix::AsyncFd<Arc<socket2::Socket>>,
+    waiter: PollWaiter<'a>,
+}
+
+#[cfg(unix)]
+impl<'a> EstablishedRead<'a> {
+    /// Attempt `operation` on cached readiness first, retrying it after each wake. `drained` is as for `TokioSocket::io_with`.
+    pub(crate) fn read<Output, Operation, Drained>(
+        self,
+        operation: Operation,
+        drained: Drained,
+    ) -> ReadyIo<'a, Operation, Drained>
+    where
+        Operation: FnMut(&socket2::Socket) -> io::Result<Output>,
+        Drained: Fn(&Output) -> bool,
+    {
+        ReadyIo {
+            inner: self.inner,
+            registration: self.registration,
+            readable: true,
+            operation,
+            mark_connected: false,
+            drained,
+            _waiter: self.waiter,
+        }
+    }
+}
+
+/// The reserved-waiter readiness loop: one compact future, so a pending operation retains only borrows, its closure and the reservation.
+#[cfg(unix)]
+pub(crate) struct ReadyIo<'a, Operation, Drained> {
+    inner: &'a RegisteredSocket,
+    registration: &'a tokio::io::unix::AsyncFd<Arc<socket2::Socket>>,
+    readable: bool,
+    operation: Operation,
+    mark_connected: bool,
+    drained: Drained,
+    _waiter: PollWaiter<'a>,
+}
+
+// No field is structurally pinned: the closure is only called through `&mut`.
+#[cfg(unix)]
+impl<Operation, Drained> Unpin for ReadyIo<'_, Operation, Drained> {}
+
+#[cfg(unix)]
+impl<Output, Operation, Drained> std::future::Future for ReadyIo<'_, Operation, Drained>
+where
+    Operation: FnMut(&socket2::Socket) -> io::Result<Output>,
+    Drained: Fn(&Output) -> bool,
+{
+    type Output = io::Result<Output>;
+
+    fn poll(
+        self: std::pin::Pin<&mut Self>,
+        context: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Self::Output> {
+        let this = self.get_mut();
+        loop {
+            let mut ready = std::task::ready!(if this.readable {
+                this.registration.poll_read_ready(context)
+            } else {
+                this.registration.poll_write_ready(context)
+            })?;
+            if let Ok(result) = ready.try_io(|_| (this.operation)(this.inner.get_ref())) {
+                this.inner
+                    .completed(&mut ready, &result, this.mark_connected, &this.drained);
+                return std::task::Poll::Ready(result);
+            }
+        }
     }
 }
 
@@ -182,14 +295,16 @@ impl TokioSocket {
     where
         Operation: FnMut(&socket2::Socket) -> io::Result<Output> + Send,
     {
-        self.io_with(interest, operation, false).await
+        self.io_with(interest, operation, false, |_| false).await
     }
 
+    /// `drained` reports whether a successful result proves the receive queue was empty when the syscall returned, so readiness observed before a readiness-first attempt can be cleared without a further syscall returning `WouldBlock`. Only OOB-disabled scalar stream reads pass a predicate other than `|_| false`; Linux and Android honour it unless urgent data or closure has been reported.
     pub(super) async fn io_with<Output, Operation>(
         &self,
         interest: Interest,
         mut operation: Operation,
         read_nonempty: bool,
+        drained: impl Fn(&Output) -> bool + Send,
     ) -> io::Result<Output>
     where
         Operation: FnMut(&socket2::Socket) -> io::Result<Output> + Send,
@@ -214,12 +329,13 @@ impl TokioSocket {
         }
         #[cfg(unix)]
         {
-            self.ready_io(interest, operation, mark_connected).await
+            self.ready_io(interest, operation, mark_connected, drained)
+                .await
         }
 
         #[cfg(windows)]
         {
-            let _ = read_nonempty;
+            let _ = (read_nonempty, drained);
             // A readiness registration error ends the operation in place of the next syscall.
             let mut ready = Ok(());
             loop {
@@ -239,13 +355,14 @@ impl TokioSocket {
         #[cfg(unix)]
         if self.inner.registration.get().is_some() {
             // A registered socket already has advisory readiness state. Waiting on it needs no extra poll(2) probe before or after Tokio wakes us.
-            return self.ready_io(interest, |_| Ok(()), false).await;
+            return self.ready_io(interest, |_| Ok(()), false, |_| false).await;
         }
         // Preserve syscall-first handling of unregistered sockets, including unconnected streams whose hangup must not become permanently cached readiness.
         self.io_with(
             interest,
             |socket| crate::socket_io::wait(socket, interest),
             false,
+            |_| false,
         )
         .await
     }
@@ -256,6 +373,7 @@ impl TokioSocket {
         interest: Interest,
         mut operation: Operation,
         mark_connected: bool,
+        drained: impl Fn(&Output) -> bool + Send,
     ) -> io::Result<Output>
     where
         Operation: FnMut(&socket2::Socket) -> io::Result<Output> + Send,
@@ -282,30 +400,50 @@ impl TokioSocket {
             loop {
                 let mut ready = registration.ready(interest).await?;
                 if let Ok(result) = ready.try_io(|_| operation(self.inner.get_ref())) {
-                    if mark_connected && result.is_ok() {
-                        self.inner.connected_stream.store(true, Ordering::Relaxed);
-                    }
+                    self.inner
+                        .completed(&mut ready, &result, mark_connected, &drained);
                     return result;
                 }
             }
         }
-        let _waiter = PollWaiter(waiting);
-        std::future::poll_fn(|context| {
-            loop {
-                let mut ready = std::task::ready!(if interest == tokio::io::Interest::READABLE {
-                    registration.poll_read_ready(context)
-                } else {
-                    registration.poll_write_ready(context)
-                })?;
-                if let Ok(result) = ready.try_io(|_| operation(self.inner.get_ref())) {
-                    if mark_connected && result.is_ok() {
-                        self.inner.connected_stream.store(true, Ordering::Relaxed);
-                    }
-                    return std::task::Poll::Ready(result);
-                }
-            }
-        })
+        ReadyIo {
+            inner: &self.inner,
+            registration,
+            readable: interest == tokio::io::Interest::READABLE,
+            operation,
+            mark_connected,
+            drained,
+            _waiter: PollWaiter(waiting),
+        }
         .await
+    }
+
+    /// Reserve the lightweight read waiter for a nonempty read on a known-connected stream with an existing registration, the state in which `io_with` waits on cached readiness first. Returns `None` when the generic path must decide, including while another operation holds the reservation.
+    #[cfg(unix)]
+    pub(super) fn established_read(&self) -> Option<EstablishedRead<'_>> {
+        if !self.inner.connected_stream.load(Ordering::Relaxed) {
+            return None;
+        }
+        let registration = self.inner.registration.get()?;
+        self.inner
+            .read_waiting
+            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+            .ok()?;
+        Some(EstablishedRead {
+            inner: &self.inner,
+            registration,
+            waiter: PollWaiter(&self.inner.read_waiting),
+        })
+    }
+
+    /// Wait for writability after a direct syscall returned `WouldBlock`, as `io_with` does after its own first attempt.
+    #[cfg(unix)]
+    pub(super) async fn write_after_would_block<Output>(
+        &self,
+        operation: impl FnMut(&socket2::Socket) -> io::Result<Output> + Send,
+    ) -> io::Result<Output> {
+        self.ready_io(Interest::Writable, operation, false, |_| false)
+            .await
     }
 
     pub fn local_addr(&self) -> io::Result<SocketAddr> {

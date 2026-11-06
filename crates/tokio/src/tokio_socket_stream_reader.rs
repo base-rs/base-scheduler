@@ -15,7 +15,9 @@ use std::{
 };
 
 /// Scheduler-bound stream reader; registration remains private to this backend.
-pub(crate) struct TokioSocketStreamReader<'a> {
+///
+/// With OOB support disabled (the default), scalar reads on Linux and Android clear their observed readiness after a positive short receive unless urgent data or closure was reported, as Tokio's own streams do; enabled support retains readiness until `WouldBlock`. Pooled reads keep the conservative policy for both settings.
+pub(crate) struct TokioSocketStreamReader<'a, const SUPPORT_OOB: bool = false> {
     scheduler: &'a TokioScheduler,
     socket: TokioSocket,
     pool: Option<base_scheduler::HeapBufferPool>,
@@ -23,7 +25,7 @@ pub(crate) struct TokioSocketStreamReader<'a> {
     closed: bool,
 }
 
-impl<'a> TokioSocketStreamReader<'a> {
+impl<'a, const SUPPORT_OOB: bool> TokioSocketStreamReader<'a, SUPPORT_OOB> {
     /// Construct the default backend composition without submitting payload I/O. Applications normally use the scheduler factory.
     pub(crate) fn new(scheduler: &'a TokioScheduler, socket: &TokioSocket) -> io::Result<Self> {
         if scheduler.socket_type(socket)? != base_scheduler::SocketType::Stream {
@@ -59,8 +61,50 @@ impl<'a> TokioSocketStreamReader<'a> {
     }
 }
 
-impl SocketStreamReader for TokioSocketStreamReader<'_> {
+/// Never-cancelled reads on an established stream wait in one compact future instead of the generic cancellable operation; there is no listener to register, and the scheduler checks happen here instead. Other reads return `None` and take the generic path.
+#[cfg(unix)]
+fn established_read<'a>(
+    scheduler: &TokioScheduler,
+    socket: &'a TokioSocket,
+    cancellation: &Cancellation,
+) -> OperationResult<Option<crate::tokio_socket::EstablishedRead<'a>>> {
+    if !cancellation.is_never() {
+        return Ok(None);
+    }
+    scheduler.check_socket(socket)?;
+    Ok(socket.established_read())
+}
+
+/// Whether a scalar receive of `count` into `length` bytes proves the queue drained, under the reader's OOB policy. Only Linux and Android clear readiness on that proof.
+#[cfg(any(target_os = "linux", target_os = "android"))]
+pub(crate) fn short(count: usize, length: usize, support_oob: bool) -> bool {
+    !support_oob && 0 < count && count < length
+}
+
+// The drain predicate for an established scalar read; only Linux and Android build one that can clear readiness.
+#[cfg(unix)]
+fn drain_predicate<const SUPPORT_OOB: bool>(length: usize) -> impl Fn(&usize) -> bool + Send {
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    return move |&count: &usize| short(count, length, SUPPORT_OOB);
+    #[cfg(not(any(target_os = "linux", target_os = "android")))]
+    {
+        let _ = length;
+        |_: &usize| false
+    }
+}
+
+impl<const SUPPORT_OOB: bool> SocketStreamReader for TokioSocketStreamReader<'_, SUPPORT_OOB> {
     type Buffer = <base_scheduler::HeapBufferPool as BufferPool>::Buffer;
+
+    fn with_oob_support<const OOB: bool>(self) -> impl SocketStreamReader<Buffer = Self::Buffer> {
+        TokioSocketStreamReader::<OOB> {
+            scheduler: self.scheduler,
+            socket: self.socket,
+            pool: self.pool,
+            eof: self.eof,
+            closed: self.closed,
+        }
+    }
 
     async fn read(&mut self, cancellation: &Cancellation) -> OperationResult<Option<Self::Buffer>> {
         cancellation.check()?;
@@ -116,13 +160,30 @@ impl SocketStreamReader for TokioSocketStreamReader<'_> {
             cancellation.check()?;
             return Ok(0);
         }
+        #[cfg(unix)]
+        if let Some(read) = established_read(self.scheduler, &self.socket, cancellation)? {
+            let length = buffer.len();
+            let count = read
+                .read(
+                    |socket| {
+                        crate::socket_io::recv_poll(socket, buffer, SocketRecvFlags::default())
+                    },
+                    drain_predicate::<SUPPORT_OOB>(length),
+                )
+                .await?;
+            if count == 0 {
+                self.eof = true;
+            }
+            return Ok(count);
+        }
         let count = self
             .scheduler
-            .socket_recv_poll(
+            .socket_recv_poll_with(
                 &self.socket,
                 buffer,
                 SocketRecvFlags::default(),
                 cancellation,
+                !SUPPORT_OOB,
             )
             .await?;
         if count == 0 {
@@ -230,9 +291,28 @@ impl SocketStreamReader for TokioSocketStreamReader<'_> {
         if let Err(error) = cancellation.check() {
             return (Err(error.into()), buffer);
         }
+        #[cfg(unix)]
+        match established_read(self.scheduler, &self.socket, cancellation) {
+            Err(error) => return (Err(error), buffer),
+            Ok(Some(read)) => {
+                let mut buffer = buffer;
+                let length = buffer.as_mut().len();
+                let result = read
+                    .read(
+                        |socket| crate::socket_io::recv(socket, buffer.as_mut()),
+                        drain_predicate::<SUPPORT_OOB>(length),
+                    )
+                    .await;
+                if matches!(result, Ok(0)) {
+                    self.eof = true;
+                }
+                return (result.map_err(Into::into), buffer);
+            }
+            Ok(None) => (),
+        }
         let (result, buffer) = self
             .scheduler
-            .socket_read(&self.socket, buffer, cancellation)
+            .socket_read_with(&self.socket, buffer, cancellation, !SUPPORT_OOB)
             .await;
         if matches!(result, Ok(0)) {
             self.eof = true;
