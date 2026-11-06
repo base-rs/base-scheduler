@@ -94,7 +94,7 @@ pub(crate) fn recv(socket: &Socket, bytes: &mut [u8]) -> io::Result<usize> {
     socket.recv(bytes)
 }
 
-#[cfg(test)]
+#[cfg(all(test, any(target_os = "linux", target_os = "android")))]
 pub(crate) fn send(socket: &Socket, bytes: &[u8]) -> io::Result<usize> {
     socket.send_with_flags(bytes, send_flags(SocketSendFlags::default()))
 }
