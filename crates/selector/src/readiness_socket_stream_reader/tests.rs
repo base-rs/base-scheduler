@@ -224,6 +224,16 @@ fn message_receives_share_the_registration_but_reach_the_socket_first_and_keep_r
     // Without a driver turn readiness stays clear. An established scalar read
     // would wait on it; a vectored receive still reaches the socket first.
     peer.write_all(b"abc").unwrap();
+    // Loopback delivery can lag the peer's write (macOS); wait until the bytes are queued without consuming them.
+    let deadline = Instant::now() + Duration::from_secs(3);
+    let mut probe = [std::mem::MaybeUninit::<u8>::uninit(); 8];
+    while !matches!(socket.get_ref().peek(&mut probe), Ok(3)) {
+        assert!(
+            Instant::now() < deadline,
+            "the peer's bytes were not queued"
+        );
+        std::thread::sleep(Duration::from_millis(1));
+    }
     let mut bytes = [0; 8];
     {
         let mut vectors = [IoSliceMut::new(&mut bytes)];
