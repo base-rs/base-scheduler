@@ -1,6 +1,6 @@
 # One receive rule for every stream receive
 
-Every stream receive which consumes input now follows the scalar read rule on each backend: once a reader has received data it waits on cached readiness before its syscall, a short receive clears readiness when OOB support is disabled, and Linux epoll and io_uring reject reported urgent data. Before this change, `read_vectored`, `read_vectored_with_flags`, `read_into_with_flags`, `read_owned_vectored` and pooled `read` made a syscall first on every call and kept readiness until `WouldBlock`, so an echo request cost one extra receive returning `WouldBlock`. Peeks keep that conservative behavior. See the [urgent-data policy](../../../../design/socket-stream-oob.md).
+Every stream receive which consumes input now follows one receive rule on each backend: once a reader has received data it waits on cached readiness before its syscall, a short receive clears readiness when OOB support is disabled, and Linux epoll and io_uring's readiness-driven receives reject reported urgent data. Before this change, `read_vectored`, `read_vectored_with_flags`, `read_into_with_flags`, `read_owned_vectored` and pooled `read` made a syscall first on every call and kept readiness until `WouldBlock`, so an echo request cost one extra receive returning `WouldBlock`. Peeks keep that conservative behavior. See the [urgent-data policy](../../../../design/socket-stream-oob.md).
 
 ## Comparison
 
@@ -46,11 +46,32 @@ The scalar backends, whose receive rule was already the target, stay within the 
 
 `tokio-adapter` with one worker used about 2% more CPU per request in both runs, within the layout control in run 2 but not in run 1. Counting its server's user-space work with `perf stat` on Hana (five interleaved samples each) found the same instructions per request as the base (2,102 against 2,096; the layout copy 2,085) and user cycles within the layout copy's (4,412 against 4,440; base 4,245), so the remaining difference is build layout rather than added work.
 
+## Review revision
+
+The review revision waits before taking a slot in the Tokio adapter's pooled reads too, lets selector peeks wait on the reader's registration, records EOF the same way on every backend, and expands one macro for each Tokio adapter read. [Run 3](quick-3.jsonl) repeats the comparison against the same base:
+
+| Case | Backend | req/s | CPU/req | Layout req/s, CPU/req |
+| --- | --- | ---: | ---: | ---: |
+| 1w | native-vectored / owned-vectored / pooled | +13.6% / +14.8% / +14.2% (5/5) | −16.2% / −16.3% / −16.5% (5/5) | within ±1.8% |
+| 1w | iouring-vectored / pooled | +11.1% / +15.7% (5/5) | −14.2% / −17.9% (5/5) | within ±1.1% |
+| 1w | tokio-adapter-vectored / owned-vectored / pooled | +31.5% / +32.5% / +12.7% (5/5) | −30.8% / −30.7% / −15.2% (5/5) | +7.7%, −7.4% for vectored; else within ±2.4% |
+| 4w | native-vectored / owned-vectored / pooled | +2.9% / +2.7% (5/5) / +3.3% (4/5) | −7.1% / −5.6% / −6.2% (5/5) | within ±1.8% |
+| 4w | iouring-vectored / pooled | +3.1% / +3.8% (5/5) | −7.3% / −7.2% (5/5) | within ±1.0% |
+| 4w | tokio-adapter-vectored / owned-vectored / pooled | +10.3% (5/5) / +14.6% / +3.5% (4/5) | −19.3% / −20.3% / −9.5% (5/5) | within ±2.2% |
+| 1w | native / native-poll | +2.5% (5/5) / +0.1% (3/5) | −2.4% (5/5) / −0.4% (3/5) | within ±1.1% |
+| 1w | iouring / iouring-poll | +0.9% (3/5) / −1.2% (2/5) | −0.4% (3/5) / +1.4% (2/5) | −0.7%, +0.9%; −1.3%, +1.3% |
+| 1w | tokio-adapter / tokio-adapter-poll | −0.4% (2/5) / +0.1% (3/5) | −0.3% / −0.0% (3/5) | −1.3%, +1.1%; +0.1%, −0.1% |
+| 4w | native / native-poll | −1.1% (2/5) / +0.1% (3/5) | −0.7% (5/5) / −0.5% (3/5) | within ±1.4% |
+| 4w | iouring / iouring-poll | +1.0% (3/5) / +0.1% (3/5) | −0.9% (4/5) / +0.3% (1/5) | within ±2.0% |
+| 4w | tokio-adapter / tokio-adapter-poll | −0.7% (2/5) / +2.0% (5/5) | +0.5% (2/5) / +0.3% (2/5) | within ±2.3% |
+
+[Run 4](quick-4.jsonl) compares the revision with the previous revision directly. The Tokio adapter paths and native-poll changed by at most 2.4% in either direction, within the layout control except `tokio-adapter-owned-vectored` with one worker (−1.8% requests per second, +1.4% CPU per request, 0/5; layout −0.9%, +1.0%). `perf stat` on Hana found the same user instructions per request for it (3,434 against 3,440) with more user cycles (6,727 against 6,432; layout copy 6,473), so the difference is build layout. The pooled wait-first read executes 16% fewer user instructions per request (3,026 against 3,615) but saves only about 2% of user cycles and no measurable time; it is kept because it never measured slower and makes the pooled read follow the rule on every backend.
+
 ## Rejected variants
 
 Instructions per echo request in the server, counted with `perf stat -e instructions:u` on a development machine, one worker, median of three to five interleaved samples. Each change is from the base measured in the same run:
 
-| Variant | Backend | Variant | Adopted form |
+| Variant | Backend | Variant's instructions | Adopted form's |
 | --- | --- | ---: | ---: |
 | Selector receive loop with a runtime flag distinguishing peeks | native-poll | 1,856 (+1.3%) | 1,839 (+0.0%) |
 | Tokio adapter: one shared async helper awaiting either the established or the generic read | tokio-adapter-poll | 2,347 (+1.0%) | 2,327 (−0.0%) |

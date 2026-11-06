@@ -321,40 +321,6 @@ impl IoUringSelector {
     pub(crate) async fn socket_monitor_close(&self, monitor: &mut Storage) -> io::Result<()> {
         self.monitor_close(monitor).await
     }
-    // Stream readers receive through `socket_stream_receive`; this generic
-    // operation remains for monitor tests.
-    #[cfg(test)]
-    pub(crate) async fn socket_monitor_recv_poll(
-        &self,
-        monitor: &mut Storage,
-        buffer: &mut [u8],
-        flags: SocketRecvFlags,
-        cancellation: &Cancellation,
-    ) -> OperationResult<usize> {
-        self.monitor_io(monitor, Interest::Readable, cancellation, |socket| {
-            syscall("monitor-recv", || {
-                crate::retained_socket::recv(socket, buffer, flags)
-            })
-        })
-        .await
-    }
-    pub(crate) async fn socket_stream_recv_poll<const SUPPORT_OOB: bool>(
-        &self,
-        monitor: &mut Storage,
-        probe: &mut bool,
-        buffer: &mut [u8],
-        cancellation: &Cancellation,
-    ) -> OperationResult<usize> {
-        let capacity = buffer.len();
-        self.socket_stream_receive::<SUPPORT_OOB>(
-            monitor,
-            probe,
-            capacity,
-            cancellation,
-            |socket| crate::retained_socket::recv(socket, buffer, SocketRecvFlags::default()),
-        )
-        .await
-    }
     // Whether a stream reader would wait before its next receive: the
     // previous one drained the queue, no notification has arrived since, and
     // no isolated urgent notification awaits rejection.

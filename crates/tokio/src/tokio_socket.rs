@@ -418,6 +418,18 @@ impl TokioSocket {
         .await
     }
 
+    /// Whether nonempty stream reads wait on cached readiness first: the stream has completed a read and has a registration. A pooled read then waits before taking a slot.
+    #[cfg(unix)]
+    pub(super) fn read_established(&self) -> bool {
+        self.inner.connected_stream.load(Ordering::Relaxed)
+            && self.inner.registration.get().is_some()
+    }
+    /// Windows readiness has no cached state to wait on first.
+    #[cfg(windows)]
+    pub(super) fn read_established(&self) -> bool {
+        false
+    }
+
     /// Reserve the lightweight read waiter for a nonempty read on a known-connected stream with an existing registration, the state in which `io_with` waits on cached readiness first. Returns `None` when the generic path must decide, including while another operation holds the reservation.
     #[cfg(unix)]
     pub(super) fn established_read(&self) -> Option<EstablishedRead<'_>> {

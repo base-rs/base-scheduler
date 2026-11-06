@@ -156,7 +156,7 @@ fn stream_peeks_leave_input_for_consuming_receives_and_return_owners() {
             .await;
         assert!(result.is_err());
         assert_eq!(buffers, [vec![0x5a; 8]]);
-        // A peek of nothing at the peer's shutdown is EOF.
+        // A peek of nothing at the peer's shutdown leaves EOF to consuming receives.
         scheduler
             .socket_shutdown(&sender, Shutdown::Write)
             .await

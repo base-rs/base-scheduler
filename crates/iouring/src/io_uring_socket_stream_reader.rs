@@ -82,13 +82,6 @@ impl<'a, const SUPPORT_OOB: bool> IoUringSocketStreamReader<'a, SUPPORT_OOB> {
     }
 }
 
-const EMPTY: SocketRecvResult = SocketRecvResult {
-    bytes: 0,
-    address: None,
-    truncated: false,
-    control_truncated: false,
-};
-
 impl<const SUPPORT_OOB: bool> SocketStreamReader for IoUringSocketStreamReader<'_, SUPPORT_OOB> {
     type Buffer = <IoUringBufferPool as BufferPool>::Buffer;
 
@@ -134,11 +127,18 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for IoUringSocketStreamReader<'
             }
             let mut buffer = pool.acquire(cancellation).await?;
             let result = {
-                let mut reading = pin!(self.scheduler.socket_stream_recv_poll::<SUPPORT_OOB>(
+                let bytes = buffer.as_mut();
+                let capacity = bytes.len();
+                let mut reading = pin!(self.scheduler.socket_stream_receive::<SUPPORT_OOB>(
                     &mut self.monitor,
                     &mut self.probe,
-                    buffer.as_mut(),
-                    cancellation
+                    capacity,
+                    cancellation,
+                    |socket| crate::retained_socket::recv(
+                        socket,
+                        bytes,
+                        SocketRecvFlags::default()
+                    ),
                 ));
                 poll_fn(|context| Poll::Ready(reading.as_mut().poll(context))).await
             };
@@ -171,13 +171,15 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for IoUringSocketStreamReader<'
             cancellation.check()?;
             return Ok(0);
         }
+        let capacity = buffer.len();
         let count = self
             .scheduler
-            .socket_stream_recv_poll::<SUPPORT_OOB>(
+            .socket_stream_receive::<SUPPORT_OOB>(
                 &mut self.monitor,
                 &mut self.probe,
-                buffer,
+                capacity,
                 cancellation,
+                |socket| crate::retained_socket::recv(socket, buffer, SocketRecvFlags::default()),
             )
             .await?;
         if count == 0 {
@@ -242,7 +244,7 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for IoUringSocketStreamReader<'
         self.operations.check_idle()?;
         if self.eof || buffers.iter().all(|buffer| buffer.is_empty()) {
             cancellation.check()?;
-            return Ok(EMPTY);
+            return Ok(SocketRecvResult::default());
         }
         // A peek consumes nothing, so it reaches the socket first and keeps
         // readiness until `WouldBlock`.
@@ -252,9 +254,10 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for IoUringSocketStreamReader<'
                 .socket_monitor_recvmsg_poll(&mut self.monitor, buffers, flags, cancellation)
                 .await;
         }
-        let mut received = EMPTY;
+        let mut received = SocketRecvResult::default();
         let capacity = buffers.iter().map(|buffer| buffer.len()).sum();
-        self.scheduler
+        let count = self
+            .scheduler
             .socket_stream_receive::<SUPPORT_OOB>(
                 &mut self.monitor,
                 &mut self.probe,
@@ -265,8 +268,9 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for IoUringSocketStreamReader<'
                     Ok(received.bytes)
                 },
             )
-            .await
-            .map(|_| received)
+            .await?;
+        self.eof |= count == 0;
+        Ok(received)
     }
     async fn read_owned_vectored<Buffers: base_scheduler::IoBufSequenceMut>(
         &mut self,
@@ -281,7 +285,7 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for IoUringSocketStreamReader<'
             return (Err(error.into()), buffers);
         }
         if self.eof || (0..buffers.buffer_count()).all(|index| buffers.buffer(index).is_empty()) {
-            return (Ok(EMPTY), buffers);
+            return (Ok(SocketRecvResult::default()), buffers);
         }
         let buffers = match self.operations.begin(buffers) {
             Ok(buffers) => buffers,
@@ -291,6 +295,8 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for IoUringSocketStreamReader<'
             .scheduler
             .socket_recvmsg(self.monitor.socket(), buffers, flags, cancellation)
             .await;
+        // A consuming receive of nothing is EOF; a peek consumes nothing.
+        self.eof |= !flags.peek && matches!(&result, Ok(result) if result.bytes == 0);
         (result, buffers.into_inner())
     }
     async fn read_owned<B: base_scheduler::IoBufMut>(

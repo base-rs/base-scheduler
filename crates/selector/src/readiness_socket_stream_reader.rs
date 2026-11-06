@@ -78,7 +78,7 @@ impl<'a, const SUPPORT_OOB: bool> ReadinessSocketStreamReader<'a, SUPPORT_OOB> {
     // syscall, a short receive into `capacity` bytes may clear readiness, and
     // disabled OOB support rejects reported urgent data. A peek consumes
     // nothing, so neither its count nor a wait proves anything about the
-    // queue; peeks use the scheduler's syscall-first operations instead.
+    // queue; peeks use `peek_with` instead.
     #[cfg(unix)]
     async fn read_with(
         &mut self,
@@ -163,6 +163,40 @@ impl<'a, const SUPPORT_OOB: bool> ReadinessSocketStreamReader<'a, SUPPORT_OOB> {
             .await
     }
 
+    // A peek reaches the socket first, keeps readiness after any count and
+    // clears only the observation preceding `WouldBlock`, without rejecting
+    // urgent data. A reader which has registered waits on its own
+    // registration; otherwise the scheduler's operation registers the socket.
+    async fn peek_with<T: Send>(
+        &self,
+        cancellation: &Cancellation,
+        receive: impl FnMut(&socket2::Socket) -> io::Result<T> + Send,
+    ) -> OperationResult<T> {
+        #[cfg(unix)]
+        if let (Some(group), Some(registration)) = (&self.scheduler.readiness, &self.registration) {
+            let mut receive = receive;
+            let direction = registration.direction(Interest::Readable);
+            let socket = self.socket.get_ref();
+            let peek = async {
+                loop {
+                    let observed = direction.snapshot();
+                    match receive(socket) {
+                        Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                            direction.clear(observed);
+                            direction.wait(group).await?;
+                        }
+                        result => return result,
+                    }
+                }
+            };
+            return self.scheduler.cancellable(cancellation, peek).await;
+        }
+        let peek = self
+            .scheduler
+            .socket_io(&self.socket, Interest::Readable, receive);
+        self.scheduler.cancellable(cancellation, peek).await
+    }
+
     // One immediate receive for the `try_` reads: no wait and no readiness.
     fn try_read_with(
         &mut self,
@@ -216,13 +250,6 @@ impl<'a, const SUPPORT_OOB: bool> ReadinessSocketStreamReader<'a, SUPPORT_OOB> {
             .await
     }
 }
-
-const EMPTY: SocketRecvResult = SocketRecvResult {
-    bytes: 0,
-    address: None,
-    truncated: false,
-    control_truncated: false,
-};
 
 // Linux and Android epoll report urgent data, which a reader without OOB
 // support rejects instead of reading short at its mark.
@@ -420,23 +447,26 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for ReadinessSocketStreamReader
         self.check_open()?;
         if self.eof || buffers.iter().all(|buffer| buffer.is_empty()) {
             cancellation.check()?;
-            return Ok(EMPTY);
+            return Ok(SocketRecvResult::default());
         }
         if flags.peek {
             return self
-                .scheduler
-                .socket_recvmsg_poll(&self.socket, buffers, flags, cancellation)
+                .peek_with(cancellation, |socket| {
+                    socket_io::recvmsg_poll(socket, buffers, flags)
+                })
                 .await;
         }
         // The receive keeps its full result here and reports only its count.
-        let mut received = EMPTY;
+        let mut received = SocketRecvResult::default();
         let capacity = buffers.iter().map(|buffer| buffer.len()).sum();
-        self.read_with(capacity, cancellation, |socket| {
-            received = socket_io::recvmsg_poll(socket, buffers, flags)?;
-            Ok(received.bytes)
-        })
-        .await
-        .map(|_| received)
+        let count = self
+            .read_with(capacity, cancellation, |socket| {
+                received = socket_io::recvmsg_poll(socket, buffers, flags)?;
+                Ok(received.bytes)
+            })
+            .await?;
+        self.eof |= count == 0;
+        Ok(received)
     }
 
     async fn read_owned_vectored<Buffers: base_scheduler::IoBufSequenceMut>(
@@ -453,17 +483,20 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for ReadinessSocketStreamReader
             return (Err(error.into()), buffers);
         }
         if self.eof || (0..buffers.buffer_count()).all(|index| buffers.buffer(index).is_empty()) {
-            return (Ok(EMPTY), buffers);
+            return (Ok(SocketRecvResult::default()), buffers);
         }
         if flags.peek {
-            return self
-                .scheduler
-                .socket_recvmsg(&self.socket, buffers, flags, cancellation)
+            let mut vectors = socket_io::IoVectors::new();
+            let result = self
+                .peek_with(cancellation, |socket| {
+                    vectors.recv(socket, &mut buffers, flags)
+                })
                 .await;
+            return (result, buffers);
         }
         // Like `read_owned`, every receive completes synchronously within this
         // future, which retains the owner and returns it with every outcome.
-        let mut received = EMPTY;
+        let mut received = SocketRecvResult::default();
         let capacity = (0..buffers.buffer_count())
             .map(|index| buffers.buffer(index).len())
             .sum();
@@ -476,6 +509,7 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for ReadinessSocketStreamReader
             })
             .await
         };
+        self.eof |= matches!(result, Ok(0));
         (result.map(|_| received), buffers)
     }
 

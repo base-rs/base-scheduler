@@ -318,6 +318,19 @@ fn every_consuming_receive_waits_on_readiness_and_clears_it_after_a_short_read()
     assert!(reader.eof);
 }
 
+// Wait until `count` bytes are queued on the socket without consuming them or
+// touching the reader's readiness. Loopback delivery can trail a peer write,
+// notably on macOS, so a syscall-first assertion must not race it.
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+fn await_queued(socket: &NativeSocket, count: usize) {
+    let deadline = Instant::now() + Duration::from_secs(3);
+    let mut bytes = [std::mem::MaybeUninit::<u8>::uninit(); 64];
+    while !matches!(socket.get_ref().peek(&mut bytes), Ok(queued) if queued >= count) {
+        assert!(Instant::now() < deadline, "input was not delivered");
+        std::thread::sleep(Duration::from_millis(1));
+    }
+}
+
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 #[test]
 fn peeks_reach_the_socket_first_and_keep_readiness() {
@@ -332,9 +345,22 @@ fn peeks_reach_the_socket_first_and_keep_readiness() {
     let registration = reader.registration.as_ref().unwrap().clone();
     let direction = registration.direction(Interest::Readable);
     assert_eq!(direction.snapshot() & 1, 0);
-    // An established peek still reaches the socket while readiness is clear.
-    peer.write_all(b"ab").unwrap();
     let mut bytes = [0; 8];
+    // A peek with nothing queued waits on the reader's registration.
+    {
+        let mut peeking = pin!(reader.read_into_with_flags(&mut bytes, peek, &never));
+        assert!(block_on(poll_once(peeking.as_mut())).is_none());
+        peer.write_all(b"ab").unwrap();
+        assert_eq!(drive(peeking, &mut worker).unwrap(), 2);
+    }
+    // A short peek consumed nothing, so it keeps observed readiness.
+    assert_ne!(direction.snapshot() & 1, 0);
+    assert_eq!(block_on(reader.read_into(&mut bytes, &never)).unwrap(), 2);
+    assert_eq!(&bytes[..2], b"ab");
+    assert_eq!(direction.snapshot() & 1, 0);
+    // An established peek still reaches the socket while readiness is clear.
+    peer.write_all(b"cd").unwrap();
+    await_queued(&socket, 2);
     {
         let mut vectors = [IoSliceMut::new(&mut bytes)];
         let mut peeking = pin!(reader.read_vectored_with_flags(&mut vectors, peek, &never));
@@ -348,17 +374,82 @@ fn peeks_reach_the_socket_first_and_keep_readiness() {
     }
     let (result, buffers) = block_on(reader.read_owned_vectored([vec![0; 8]], peek, &never));
     assert_eq!(result.unwrap().bytes, 2);
-    assert_eq!(&buffers[0][..2], b"ab");
-    // A short peek consumed nothing, so it keeps observed readiness.
-    await_readable(direction, &mut worker);
+    assert_eq!(&buffers[0][..2], b"cd");
+    assert_eq!(direction.snapshot() & 1, 0);
     assert_eq!(
-        block_on(reader.read_into_with_flags(&mut bytes, peek, &never)).unwrap(),
+        drive(reader.read_into(&mut bytes, &never), &mut worker).unwrap(),
         2
     );
-    assert_ne!(direction.snapshot() & 1, 0);
-    assert_eq!(block_on(reader.read_into(&mut bytes, &never)).unwrap(), 2);
-    assert_eq!(&bytes[..2], b"ab");
-    assert_eq!(direction.snapshot() & 1, 0);
+    // A peek of nothing at the peer's shutdown leaves EOF to the consuming
+    // receive, which records it.
+    peer.shutdown(std::net::Shutdown::Write).unwrap();
+    assert_eq!(
+        drive(
+            reader.read_into_with_flags(&mut bytes, peek, &never),
+            &mut worker
+        )
+        .unwrap(),
+        0
+    );
+    assert!(!reader.eof);
+    let (result, _) = block_on(reader.read_owned_vectored([vec![0; 8]], peek, &never));
+    assert_eq!(result.unwrap().bytes, 0);
+    assert!(!reader.eof);
+    // The consuming receive waits for the driver to publish the EOF the peek
+    // already saw.
+    assert_eq!(
+        drive(
+            reader.read_vectored_with_flags(
+                &mut [IoSliceMut::new(&mut bytes)],
+                SocketRecvFlags::default(),
+                &never
+            ),
+            &mut worker
+        )
+        .unwrap()
+        .bytes,
+        0
+    );
+    assert!(reader.eof);
+}
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[test]
+fn a_waiting_peek_observes_driver_closure() {
+    let (selector, mut worker, socket, mut peer) = setup();
+    if selector.readiness.is_none() {
+        return;
+    }
+    let never = Cancellation::never();
+    let mut reader = ReadinessSocketStreamReader::<false>::new(&selector, &socket).unwrap();
+    prime(&mut reader, &mut peer, &mut worker);
+    let mut bytes = [0; 8];
+    let mut peeking =
+        Box::pin(reader.read_into_with_flags(&mut bytes, SocketRecvFlags { peek: true }, &never));
+    assert!(block_on(poll_once(&mut peeking)).is_none());
+    selector.close();
+    assert_eq!(
+        block_on(peeking).unwrap_err().kind(),
+        io::ErrorKind::BrokenPipe
+    );
+}
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[test]
+fn owned_vectored_receives_record_eof() {
+    let (selector, mut worker, socket, peer) = setup();
+    if selector.readiness.is_none() {
+        return;
+    }
+    let never = Cancellation::never();
+    let mut reader = ReadinessSocketStreamReader::<false>::new(&selector, &socket).unwrap();
+    peer.shutdown(std::net::Shutdown::Write).unwrap();
+    let (result, _) = drive(
+        reader.read_owned_vectored([vec![0; 8]], SocketRecvFlags::default(), &never),
+        &mut worker,
+    );
+    assert_eq!(result.unwrap().bytes, 0);
+    assert!(reader.eof);
 }
 
 #[cfg(unix)]

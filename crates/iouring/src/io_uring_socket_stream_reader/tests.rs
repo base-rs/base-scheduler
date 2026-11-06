@@ -249,6 +249,7 @@ fn every_consuming_receive_waits_on_readiness_and_clears_it_after_a_short_read()
     // observed readiness.
     let peek = SocketRecvFlags { peek: true };
     peer.write_all(b"ab").unwrap();
+    await_queued(&socket, 2);
     assert_eq!(
         block_on(poll_once(
             reader.read_into_with_flags(&mut bytes, peek, &never)
@@ -266,17 +267,65 @@ fn every_consuming_receive_waits_on_readiness_and_clears_it_after_a_short_read()
     assert_eq!(block_on(reader.read_into(&mut bytes, &never)).unwrap(), 2);
     assert_eq!(&bytes[..2], b"ab");
     assert!(drained(&reader));
+    // Peeks of nothing at the peer's shutdown leave EOF to consuming
+    // receives, which record it.
     peer.shutdown(std::net::Shutdown::Write).unwrap();
     assert_eq!(
         drive(
-            reader.read_vectored(&mut [IoSliceMut::new(&mut bytes)], &never),
+            reader.read_into_with_flags(&mut bytes, peek, &never),
             &mut worker
         )
         .unwrap(),
         0
     );
+    let (result, _) = drive(
+        reader.read_owned_vectored([vec![0; 8]], peek, &never),
+        &mut worker,
+    );
+    assert_eq!(result.unwrap().bytes, 0);
+    assert!(!reader.eof);
+    assert_eq!(
+        drive(
+            reader.read_vectored_with_flags(
+                &mut [IoSliceMut::new(&mut bytes)],
+                SocketRecvFlags::default(),
+                &never
+            ),
+            &mut worker
+        )
+        .unwrap()
+        .bytes,
+        0
+    );
     assert!(reader.eof);
     drive(reader.close(), &mut worker).unwrap();
+}
+
+#[test]
+fn owned_vectored_receives_record_eof() {
+    let (selector, mut worker, socket, peer) = setup();
+    let never = Cancellation::never();
+    let mut reader = IoUringSocketStreamReader::<false>::new(&selector, &socket).unwrap();
+    peer.shutdown(std::net::Shutdown::Write).unwrap();
+    let (result, _) = drive(
+        reader.read_owned_vectored([vec![0; 8]], SocketRecvFlags::default(), &never),
+        &mut worker,
+    );
+    assert_eq!(result.unwrap().bytes, 0);
+    assert!(reader.eof);
+    drive(reader.close(), &mut worker).unwrap();
+}
+
+// Wait until `count` bytes are queued without consuming them or touching the
+// reader's readiness, so a syscall-first assertion cannot race delivery.
+fn await_queued(socket: &NativeSocket, count: usize) {
+    let socket = socket.retain_socket();
+    let deadline = Instant::now() + Duration::from_secs(3);
+    let mut bytes = [std::mem::MaybeUninit::<u8>::uninit(); 64];
+    while !matches!(socket.get_ref().peek(&mut bytes), Ok(queued) if queued >= count) {
+        assert!(Instant::now() < deadline, "input was not delivered");
+        std::thread::sleep(Duration::from_millis(1));
+    }
 }
 
 #[test]
