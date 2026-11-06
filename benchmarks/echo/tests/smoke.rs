@@ -140,6 +140,18 @@ fn native_readiness_poll_at_an_offered_rate() {
     smoke_with("native-poll", &["400"]);
 }
 #[test]
+fn native_readiness_vectored() {
+    smoke("native-vectored");
+}
+#[test]
+fn native_readiness_owned_vectored() {
+    smoke("native-owned-vectored");
+}
+#[test]
+fn native_readiness_pooled() {
+    smoke("native-pooled");
+}
+#[test]
 fn native_readiness_monitor_alias() {
     smoke("native-monitor");
 }

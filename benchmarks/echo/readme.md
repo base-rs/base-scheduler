@@ -82,6 +82,9 @@ The runner builds an optimized binary using the checked-in lockfile, then starts
 | `native` | Native | Bound `read_owned` / `write_owned` on the default readiness selector (epoll or kqueue; on Windows, its portable fallback reactor) |
 | `native-poll` | Native | Bound borrowed `read_into` / `write` on the default readiness selector |
 | `native-monitor` | Native | Alias of `native-poll` |
+| `native-vectored` | Native | Bound borrowed `read_vectored` / `write_vectored` on the default readiness selector, scattering each read across two 32 KiB halves |
+| `native-owned-vectored` | Native | Bound `read_owned_vectored` / `write_owned_vectored` with an owned two-buffer array (two 32 KiB halves, no prepared I/O vectors) and default flags |
+| `native-pooled` | Native | Bound pooled `read` (chunks leased from the reader's default pool of two 64 KiB slots) / borrowed `write` |
 | `iouring` | Native | Owned reads submit io_uring `Recv`; ready writes complete synchronously, otherwise submit `Send` |
 | `iouring-poll` | Native | Bound borrowed `read_into` / `write`, using persistent ring readiness |
 | `tokio-adapter-monitor` | Tokio | Alias of `tokio-adapter-poll` |
