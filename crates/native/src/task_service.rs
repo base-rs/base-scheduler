@@ -259,7 +259,7 @@ impl TaskService {
             drop(admission);
             return Err(SpawnError::SchedulerClosed);
         }
-        // Choose placement before the first poll can attach persistent I/O state. Later wakes follow the task's last polling worker, and idle workers can still steal it.
+        // Choose placement before the first poll can attach persistent I/O state. Later wakes follow the task's last polling worker, except that a worker's driver turn keeps the tasks it wakes, and idle workers can still steal it.
         let worker = *admission;
         *admission = (worker + 1) % self.shared.workers.len();
         // Publish ownership while admission is locked, before close can let the workers exit.

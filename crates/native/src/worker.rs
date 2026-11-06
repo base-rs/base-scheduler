@@ -4,7 +4,7 @@
 use crate::task_service::Runnable;
 use crate::task_service::Shared;
 use crossbeam_deque::{Injector, Steal, Stealer, Worker};
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, OnceLock, Weak};
 use std::thread::{self, Thread};
@@ -164,6 +164,8 @@ struct LocalWorker {
 
 thread_local! {
     static CURRENT_WORKER: RefCell<Option<LocalWorker>> = const { RefCell::new(None) };
+    // Set while this thread's driver turn dispatches events, so that `schedule` can tell a wake by this worker's own I/O state from a wake by a task or another thread.
+    static DRIVING: Cell<bool> = const { Cell::new(false) };
 }
 
 pub(crate) fn is_worker() -> bool {
@@ -191,9 +193,11 @@ pub(crate) fn schedule(shared: &Arc<Shared>, runnable: Runnable) {
     let remote = CURRENT_WORKER.with(|current| {
         let current = current.borrow();
         if let Some(worker) = current.as_ref() {
-            // A stuck preferred worker cannot run the task, so a worker of the same scheduler keeps it instead.
+            // A worker of the same scheduler keeps the task when it is the preferred worker, or when the preferred worker is stuck and cannot run it. It also keeps a task woken by its own driver turn: the registration or ring operation that woke the task belongs to this worker, so after a steal, routing to the last poller would make every later event of that task a remote push, and often a wake, until it was stolen back.
             if std::ptr::eq(worker.scheduler.as_ptr(), Arc::as_ptr(shared))
-                && (preferred == worker.identifier || shared.workers[preferred].stuck().is_some())
+                && (preferred == worker.identifier
+                    || DRIVING.get()
+                    || shared.workers[preferred].stuck().is_some())
             {
                 preferred = worker.identifier;
                 worker.ready.push(runnable);
@@ -340,7 +344,11 @@ fn drive(
     timeout: Option<Duration>,
 ) {
     if let Some(active) = driver.as_mut() {
-        if !matches!(active.turn(timeout), Ok(false)) {
+        // A panicking turn ends this worker's thread, and its flag with it.
+        DRIVING.set(true);
+        let result = active.turn(timeout);
+        DRIVING.set(false);
+        if !matches!(result, Ok(false)) {
             *driver = None;
         }
     } else {

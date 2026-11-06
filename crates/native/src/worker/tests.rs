@@ -570,3 +570,64 @@ fn wakes_skip_a_stuck_preferred_worker() {
     assert_eq!(local.ready.len(), 1);
     assert_eq!(shared.workers[1].incoming.len(), 1);
 }
+
+#[test]
+fn driver_turn_wakes_stay_on_the_dispatching_worker() {
+    use super::{CURRENT_WORKER, DRIVING, LocalWorker, schedule};
+    use crate::task_service::Shared;
+    use std::{sync::Arc, time::Duration};
+
+    let mut queues = (0..2)
+        .map(|_| std::array::from_fn(|_| Worker::new_fifo()))
+        .collect::<Vec<_>>();
+    let shared = Arc::new(Shared::new(&queues, 8, false));
+    let preferring = |worker: usize| {
+        let runnable = runnable();
+        runnable.metadata().worker.store(worker, Ordering::Relaxed);
+        runnable
+    };
+    let [ready, current] = queues.remove(0);
+    CURRENT_WORKER.with(|context| {
+        context.replace(Some(LocalWorker {
+            identifier: 0,
+            scheduler: Arc::downgrade(&shared),
+            ready,
+            current,
+        }));
+    });
+
+    // A wake published by this worker's driver turn stays here, next to the registration that produced it.
+    DRIVING.set(true);
+    schedule(&shared, preferring(1));
+    DRIVING.set(false);
+    // A wake from a task poll still follows the task's last polling worker.
+    schedule(&shared, preferring(1));
+
+    // `drive` marks the turn itself: a wake published by the driver's turn stays here, and the flag is clear again afterwards.
+    struct Dispatching<'a>(&'a Arc<Shared>, Option<Runnable>);
+    impl base_scheduler_selector::SelectorWorker for Dispatching<'_> {
+        fn waker(&self) -> std::task::Waker {
+            std::task::Waker::noop().clone()
+        }
+        fn close(&mut self) {}
+        fn turn(&mut self, _timeout: Option<Duration>) -> std::io::Result<bool> {
+            schedule(self.0, self.1.take().expect("one turn"));
+            Ok(false)
+        }
+    }
+    let mut dispatching = Dispatching(&shared, Some(preferring(1)));
+    let mut driver: Option<&mut dyn base_scheduler_selector::SelectorWorker> =
+        Some(&mut dispatching);
+    super::drive(&mut driver, Some(Duration::ZERO));
+    assert!(driver.is_some());
+    assert!(!DRIVING.get());
+    let local = CURRENT_WORKER.with(|context| context.take()).unwrap();
+    assert_eq!(local.ready.len(), 2);
+    assert_eq!(shared.workers[1].incoming.len(), 1);
+
+    // Without a worker on the thread, the flag alone does not keep the task.
+    DRIVING.set(true);
+    schedule(&shared, preferring(1));
+    DRIVING.set(false);
+    assert_eq!(shared.workers[1].incoming.len(), 2);
+}
