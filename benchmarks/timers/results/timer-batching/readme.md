@@ -11,7 +11,7 @@ Hana: Intel Xeon E3-1240 v6 (4 cores, 8 threads), `powersave` governor, TSC cloc
 
 The diagnostic is `timer-diagnostic.rs` from the [stall rescue scripts](../../../echo/results/stall-rescue/scripts/), built as its own package against each tree from [diag.Cargo.toml](../rescue-costs/harness/diag.Cargo.toml). [scripts/run.py](scripts/run.py) runs every build in random order within each round, 9 rounds; a build named `name=BINARY@WORK@spread` runs with `CORE_TIMER_WORK=WORK` and, with `spread`, `CORE_TIMER_SPREAD=1`. [scripts/pairs.py](scripts/pairs.py) and [scripts/show.py](scripts/show.py) print the tables. Changes are the median of per-round changes, with the number of rounds lower than the base in brackets. The `quick` directory holds the records of the shared `quick.py` comparisons, whose layout control is a copy of the base tree at another path.
 
-## The regression is the diagnostic's feedback
+## The regression is mostly the diagnostic's feedback
 
 **The rework made each expiry cheaper, and in this diagnostic cheaper expiries raise p50.** Each task's next deadline is the time it ran plus 1 ms, so deadlines that fire in one pass re-arm within that pass's run time, and clusters of deadlines merge and do not split. The cheaper each task's turn, the tighter a cluster stays, so each timer waits behind more neighbours. With the deep idle states, a worker that sleeps between clusters also wakes late.
 
@@ -26,11 +26,11 @@ The [work sweep](work-sweep.jsonl) runs one build, main, with `CORE_TIMER_WORK` 
 | 400 | 24.8 (7.8–38.3) | 340 | 9.39 | 576,000 |
 | before, 0 | 56.5 (47.1–71.9) | 224 | 10.13 | 314,000 |
 
-Adding 50 iterations per task gave main the p50 of before. CPU stayed within 5%, and passes rose: the same expiries arrived in more, smaller passes. At 8 workers p50 fell from 19.4 µs at no work to 8.0 µs at 400. Pass counts come from the crate probe in [scripts/probe.rs](scripts/probe.rs), applied by [scripts/instrument.py](scripts/instrument.py) and printed by [scripts/diag-count.rs](scripts/diag-count.rs). [crate-probe-and-order.jsonl](crate-probe-and-order.jsonl) shows that the probe does not change p50: before 74.4 and main 85.5 µs with it, against 68.7 and 89.4 µs without.
+Adding 50 iterations per task gave main the p50 of before. CPU stayed within 5%, and passes rose: the same expiries arrived in more, smaller passes. At 8 workers p50 fell from 19.4 µs at no work to 8.0 µs at 400, but CPU rose there too, by 17% at 50 iterations and 101% at 400. The sweep shows that per-task cost moves this diagnostic's p50; it does not measure how much cheaper the rework made each expiry, so it supports the explanation rather than proving that it accounts for the whole difference. Pass counts come from the crate probe in [scripts/probe.rs](scripts/probe.rs), applied by [scripts/instrument.py](scripts/instrument.py) and printed by [scripts/diag-count.rs](scripts/diag-count.rs). The probe itself changes p50 somewhat: in [crate-probe-and-order.jsonl](crate-probe-and-order.jsonl), before was 74.4 and main 85.5 µs with it, against 68.7 and 89.4 µs without, so it narrowed the 4-worker gap from about 31% to 14%. The sweep's trend is within one probed build, so this does not affect it, but its comparison with before is approximate.
 
 The diagnostic is very sensitive to per-task cost. A harness that recorded more per task ([scripts/diag-probe.rs](scripts/diag-probe.rs), [probe-harness.jsonl](probe-harness.jsonl)) brought both builds to about 40 µs at 4 workers, and the difference between them disappeared.
 
-**Pass order and batch size are not the cause.** [variants-and-spread.jsonl](variants-and-spread.jsonl) compares main with expiry variants from [scripts/variant.py](scripts/variant.py):
+**At 4 workers, pass order and batch size are not distinguishable from build-to-build noise; at 8 workers the old pass recovered the gap.** [variants-and-spread.jsonl](variants-and-spread.jsonl) compares main with expiry variants from [scripts/variant.py](scripts/variant.py):
 
 | Variant against main | p50, 4 workers | p99 | CPU | p50, 8 workers |
 | --- | ---: | ---: | ---: | ---: |
@@ -39,9 +39,9 @@ The diagnostic is very sensitive to per-task cost. A harness that recorded more 
 | `inter`: the old pass, one pop and wake at a time | −4.7% (6/9) | +6.1% | +6.8% | −34.0% (7/9) |
 | `batch32`: 32 wakers per lock hold | −12.1% (9/9) | +12.5% | +1.8% | −28.5% (8/9) |
 
-Each variant adds a little cost per expiry. Each lowers p50 and raises CPU, as the work sweep does. [layout.jsonl](layout.jsonl) found that identical source at another path changes this diagnostic's p50 by +12.6% at 4 workers (4 of 9 rounds lower; one copy run had a p50 of 18 µs). Differences of this size between separately built trees are therefore not attributed to the variants.
+In this run each variant lowers p50 and raises CPU, as the work sweep does. [layout.jsonl](layout.jsonl) found that identical source at another path changes this diagnostic's p50 by +12.6% at 4 workers (4 of 9 rounds lower; one copy run had a p50 of 18 µs), so 4-worker differences of this size between separately built trees are not attributed to the variants, although `batch32` was lower in 9 of 9 rounds. At 8 workers, `inter`, the old pass, matched before in this run (−34.0% against −33.9%) and recovered more than the gap in [crate-probe-and-order.jsonl](crate-probe-and-order.jsonl) (−27.9%, 9/9, against before's −16.7%), so the old pass may account for part of the 8-worker difference. That run also measured `seq` and `inter` at 4 workers (`inter` −0.5%, 5/9) and found `seq` at 8 workers with p50 +7.4% and CPU −28%, so the variants do not all trade p50 for CPU in the same way.
 
-**At 8 workers, low lateness goes with many small passes.** Across main's runs, p50 was about 10 µs with about 400,000 worker sleeps and about 27 µs with about 100,000, at any CPU time from 4.8 to 18 s. That is, p50 depends on how far deadlines have merged in a run, and that state also drives the run-to-run bimodality.
+**At 8 workers, low lateness goes with many worker sleeps.** Across main's runs, p50 tracks worker sleeps closely (Spearman's ρ −0.80 in [work-sweep.jsonl](work-sweep.jsonl) and −0.92 in [probe-harness.jsonl](probe-harness.jsonl)) and fired passes less closely (−0.40 and −0.62): about 10 µs with about 400,000 sleeps, and 27 µs in the one run with about 100,000, at CPU times from 4.8 to 18 s ([probe-harness.jsonl](probe-harness.jsonl)). The inference, not measured directly, is that p50 depends on how far deadlines have merged in a run, and that this state drives the run-to-run bimodality. [rescue-costs](../rescue-costs/readme.md) found that 8-worker pass counts did not separate the builds; that is consistent, since here too passes track p50 only loosely.
 
 ## A diagnostic without the feedback
 
@@ -56,7 +56,7 @@ Each variant adds a little cost per expiry. Each lowers p50 and raises CPU, as t
 | 8 | main | 4.691 (4.67–4.71) | 44.1 | 27.34 |
 | 8 | copy | 4.683 (4.67–4.74) | 45.4 | 27.22 |
 
-The layout control changed p50 by −0.1% and +0.1%, against +12.6% and +1.8% in the default mode. Main's p50 is higher than before by 4.3% at 4 workers and 5.5% at 8 workers, in 9 of 9 rounds, with 1.5–3% less CPU; [deferral-spread-iouring.jsonl](deferral-spread-iouring.jsonl) found 2.9% and 5.7% on io_uring. That is a regression of about 0.14 to 0.28 µs per expiry, which this mode resolves and the default mode cannot. The spread mode keeps workers busier (14 s of CPU at 4 workers against 9 s), so it does not replace the default mode's sparse wakes.
+The layout control changed p50 by −0.1% and +0.1% here, against +12.6% and +1.8% in the default mode; in the other spread-mode runs it stayed within 1%. Main's p50 is higher than before by 4.5% at 4 workers and 5.8% at 8 workers (no round lower), with 1.5–3% less CPU; [deferral-spread-iouring.jsonl](deferral-spread-iouring.jsonl) found 3.0% and 6.1% on io_uring. That is p50 lateness 0.14 to 0.28 µs later, which this mode resolves and the default mode cannot. The spread mode keeps workers busier (14 s of CPU at 4 workers against 9 s), so it does not replace the default mode's sparse wakes.
 
 ## Deferring an expiry pass's idle wakes
 
@@ -86,13 +86,15 @@ Spread diagnostic, change from main ([deferral-spread-native.jsonl](deferral-spr
 
 At a steady load the change removes 14–41% of CPU. At 4 workers on the readiness selector it raises p50 by 0.14 µs and p99 from about 11 to 16 µs. The likely reason, not measured, is that neighbours woken by the old wakes were awake or in shallow idle states when their own timers fell due.
 
-**Not adopted.** The change trades the unaligned diagnostic's p50, whose regression is mostly that diagnostic's own feedback, for a higher p99 at a steady load on 4 workers (+49.5% on the readiness selector, +15.5% on io_uring) and 4–31% more io_uring CPU in the unaligned diagnostic. Neither mode stands for real applications, so the evidence does not favour it. A narrower version, keeping the idle wake for a single-timer pass that came straight out of an idle wake, was not tried.
+**Not adopted.** For: the unaligned diagnostic's p50 falls by 14–45%, steady-load CPU by 14–41%, and 8-worker p99 falls in both modes (−50% to −87% in the unaligned diagnostic, −55% to −61% at a steady load). Against: at a steady load on 4 workers p99 rises (+49.5% on the readiness selector, +15.5% on io_uring), and io_uring CPU rises in the unaligned diagnostic (19–31% at 8 workers; at 4 workers +7.9% in one run and +4.2%, higher in only 5 of 9 rounds, in the other). The unaligned diagnostic's p50 regression is mostly that diagnostic's own feedback, and neither mode stands for real applications, so the evidence does not clearly favour the change. A narrower version, keeping the idle wake for a single-timer pass that came straight out of an idle wake, was not tried.
 
-TCP echo with borrowed buffers on the readiness selector, 4 workers, was unchanged ([quick](quick/echo-timer-batching-1-20261106-220354.jsonl)): throughput +0.6% and +0.8% at 256 and 32 connections, against +1.0% and −0.3% for the layout control.
+TCP echo with borrowed buffers on the readiness selector, 4 workers, was unchanged ([quick](quick/echo-timer-batching-1-20261106-220354.jsonl)): throughput +0.6% and +0.8% at 256 and 32 connections, against −0.3% and +1.0% for the layout control.
 
 ## Limits
 
 - One host, with deep idle states. Lateness in both modes depends on wake latency from idle, which differs between hosts.
 - CPU at 8 workers in the default mode varies from 4.5 to 18 s within one build, so its changes there are not attributed.
 - The work sweep varies the task's cost, not the timer operations' cost, and the old build's per-expiry costs (a shared reference count per registration, command queue checks) were not measured one by one. A build that restored the shared reference count (`mainarc` in [probe-harness.jsonl](probe-harness.jsonl)) was measured only with the heavier probe harness, where neither build regressed.
-- The spread mode is in this record's script, not in the stall rescue scripts or `quick.py`'s harness.
+- The spread mode is in this record's script ([scripts/diag-spread.rs](scripts/diag-spread.rs)), not in the timer benchmark package; the hand-built harness sources here should become a `periodic` mode of `benchmarks/timers` in a follow-up.
+- Rows do not record `CORE_TIMER_WORK`, `CORE_TIMER_SPREAD` or the binary; only the build name encodes them. `run.py` was run under `flock /tmp/base-scheduler-perf.lock`, which it does not take itself. Runs used 9 rounds.
+- The first quick record ([timers-main-20261106-200604.jsonl](quick/timers-main-20261106-200604.jsonl), main against before) predates `quick.py`'s layout control and has none. The quick records compare `trees/main` (`140cc25`) with `trees/timers-before` (`7b158df`) or `trees/timer-batching-1` (`140cc25` with [deferral.patch](deferral.patch)); `quick.py` itself is not in this repository.
