@@ -474,7 +474,7 @@ The interface must not preclude any of the options.
 **The options:**
 
 1. **Accept and document it (interim).** In-flight ring operations wait for their owner, and `spawn_blocking` is the remedy. New operations from stolen tasks already follow their new worker through TLS routing.
-2. **Route new operations away from a stuck ring.** The monitor sets the stall hint. `route_ref`'s external round robin and the ring selection for borrowed waits then skip rings marked stuck, at a cost of one load per external route. Rebinding an existing persistent monitor still needs the old ring to retire its poll, so the rebind would stall as well. Such a monitor should stay on the old ring, or be left for the owner to retire later; this needs designing.
+2. **Route new operations away from a stuck ring.** The monitor sets the stall hint. `route_ref`'s external round robin and the ring selection for borrowed waits then skip rings marked stuck, at a cost of one load per external route. An existing persistent monitor stays on the old ring until its poll retires, so its events would still wait for the stuck owner; moving it would need the old ring to retire its poll, which would stall as well. This needs designing.
 3. **Drop the flags.** Use task running without a single issuer, with SQ, CQ and in-flight state behind a per-ring lock, so that a rescuer can submit and reap with `GETEVENTS`.
 
    **Kernel semantics (to be verified by the spike).** The following is from memory and unverified:
