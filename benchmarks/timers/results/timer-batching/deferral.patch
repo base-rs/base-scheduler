@@ -1,0 +1,124 @@
+diff --git a/crates/native/src/worker.rs b/crates/native/src/worker.rs
+index 32d1e0d..8043cee 100644
+--- a/crates/native/src/worker.rs
++++ b/crates/native/src/worker.rs
+@@ -4,7 +4,7 @@
+ use crate::task_service::Runnable;
+ use crate::task_service::Shared;
+ use crossbeam_deque::{Injector, Steal, Stealer, Worker};
+-use std::cell::RefCell;
++use std::cell::{Cell, RefCell};
+ use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU64, AtomicUsize, Ordering};
+ use std::sync::{Arc, OnceLock, Weak};
+ use std::thread::{self, Thread};
+@@ -164,6 +164,23 @@ struct LocalWorker {
+ 
+ thread_local! {
+     static CURRENT_WORKER: RefCell<Option<LocalWorker>> = const { RefCell::new(None) };
++    // Set while a worker invokes the wakers of its own expiry pass.
++    static DEFERRING_IDLE_WAKES: Cell<bool> = const { Cell::new(false) };
++}
++
++/// Invoke an owner's expired wakers without waking an idle worker for each task they push to this worker's queue.
++///
++/// Those wakes are not needed for progress: the owner is running, and it searches its own queue before it can advertise sleep. They exist so that idle workers can share a batch, and `run_ready_batch` already wakes one when the batch it starts holds more than one task. Waking per timer instead put an interrupt of a sleeping neighbour on the path of a lone expiry, ahead of the task it was due to run, and woke up to every idle neighbour for one pass.
++pub(crate) fn deferring_idle_wakes(wake: impl FnOnce()) {
++    struct Reset;
++    impl Drop for Reset {
++        fn drop(&mut self) {
++            DEFERRING_IDLE_WAKES.with(|deferring| deferring.set(false));
++        }
++    }
++    DEFERRING_IDLE_WAKES.with(|deferring| deferring.set(true));
++    let _reset = Reset;
++    wake();
+ }
+ 
+ pub(crate) fn is_worker() -> bool {
+@@ -208,8 +225,8 @@ pub(crate) fn schedule(shared: &Arc<Shared>, runnable: Runnable) {
+             preferred = unstuck(shared, preferred);
+         }
+         shared.workers[preferred].incoming.push(runnable);
+-    } else if shared.workers.len() == 1 {
+-        // The sole worker is already executing this callback and will observe its local queue before waiting again.
++    } else if shared.workers.len() == 1 || DEFERRING_IDLE_WAKES.with(Cell::get) {
++        // The sole worker is already executing this callback and will observe its local queue before waiting again. An owner's expiry pass leaves sharing to the ready batch that runs the tasks it pushed.
+         return;
+     }
+     // Publication precedes the sleeping flag exchange. A worker publishes its sleeping flag before rechecking queues, so a racing wake is retained.
+diff --git a/crates/native/src/worker/tests.rs b/crates/native/src/worker/tests.rs
+index 6ef1bf0..e4fe558 100644
+--- a/crates/native/src/worker/tests.rs
++++ b/crates/native/src/worker/tests.rs
+@@ -570,3 +570,40 @@ fn wakes_skip_a_stuck_preferred_worker() {
+     assert_eq!(local.ready.len(), 1);
+     assert_eq!(shared.workers[1].incoming.len(), 1);
+ }
++
++#[test]
++fn an_owners_expiry_pass_leaves_idle_wakes_to_its_ready_batch() {
++    use super::{CURRENT_WORKER, LocalWorker, deferring_idle_wakes, schedule};
++    use crate::task_service::Shared;
++    use std::sync::Arc;
++
++    let mut queues = (0..2)
++        .map(|_| std::array::from_fn(|_| Worker::new_fifo()))
++        .collect::<Vec<_>>();
++    let shared = Arc::new(Shared::new(&queues, 8, false));
++    let idle = &shared.workers[1];
++    idle.thread.set(std::thread::current()).unwrap();
++    idle.sleeping.store(true, Ordering::SeqCst);
++    shared.idle_workers.store(1, Ordering::SeqCst);
++    let [ready, current] = queues.remove(0);
++    CURRENT_WORKER.with(|context| {
++        context.replace(Some(LocalWorker {
++            identifier: 0,
++            scheduler: Arc::downgrade(&shared),
++            ready,
++            current,
++        }));
++    });
++
++    // The owner keeps the tasks its pass wakes, without interrupting the sleeping worker.
++    deferring_idle_wakes(|| {
++        schedule(&shared, runnable());
++        schedule(&shared, runnable());
++    });
++    assert!(idle.sleeping.load(Ordering::SeqCst));
++    // Other wakes still offer the work to an idle worker.
++    schedule(&shared, runnable());
++    assert!(!idle.sleeping.load(Ordering::SeqCst));
++    let local = CURRENT_WORKER.with(|context| context.take()).unwrap();
++    assert_eq!(local.ready.len(), 3);
++}
+diff --git a/crates/native/src/worker_timers.rs b/crates/native/src/worker_timers.rs
+index 8574b8e..c478b0a 100644
+--- a/crates/native/src/worker_timers.rs
++++ b/crates/native/src/worker_timers.rs
+@@ -257,8 +257,11 @@ pub(crate) fn expire(
+         }
+         let full = expired.len() == expired.capacity();
+         fired += expired.len();
+-        for waker in expired.drain(..) {
+-            crate::panic::contain(|| waker.wake());
++        // Only the owner's own pass defers: a rescue runs on the monitor, whose pushes are remote, or on a worker that has already advertised sleep.
++        if rescue {
++            invoke(expired);
++        } else {
++            worker::deferring_idle_wakes(|| invoke(expired));
+         }
+         if !full {
+             return fired;
+@@ -266,6 +269,12 @@ pub(crate) fn expire(
+     }
+ }
+ 
++fn invoke(expired: &mut Vec<Waker>) {
++    for waker in expired.drain(..) {
++        crate::panic::contain(|| waker.wake());
++    }
++}
++
+ /// Reject later registrations on `owner`'s queue. Closure calls this for every queue before it publishes scheduler closure.
+ pub(crate) fn close(shared: &Shared, owner: usize) {
+     let worker = &shared.workers[owner];
