@@ -1053,7 +1053,7 @@ fn one_shot_compatibility_waits_rearm_after_each_terminal_completion() {
 }
 
 #[test]
-fn a_later_wait_rebinds_to_its_new_workers_ring_after_retirement() {
+fn a_later_wait_on_another_worker_keeps_the_active_poll_on_its_ring() {
     let (selector, mut drivers) = IoUringSelector::with_workers(options(), 2).unwrap();
     let (socket, mut peer) = sockets(&selector);
     let reader = selector.socket_monitor(&socket, Interest::Readable);
@@ -1090,16 +1090,20 @@ fn a_later_wait_rebinds_to_its_new_workers_ring_after_retirement() {
             let never = Cancellation::never();
             let mut waiting = Box::pin(selector.socket_monitor_wait(&mut reader, &never));
             assert!(waiting.as_mut().poll(&mut context).is_pending());
-            until(&mut worker, || {
-                if let Poll::Ready(result) = waiting.as_mut().poll(&mut context) {
-                    panic!("unexpected completion: {result:?}");
-                }
+            // Neither retired nor rebound: the first ring's poll delivers this worker's notification.
+            for _ in 0..3 {
+                worker.turn(Some(Duration::ZERO)).unwrap();
+                assert!(waiting.as_mut().poll(&mut context).is_pending());
                 let status = inspect.registration().status.lock().unwrap();
-                status
-                    .binding
-                    .as_ref()
-                    .is_some_and(|binding| binding.matches(&selector.controllers[1]))
-            });
+                assert!(status.pending && !status.retiring);
+                assert!(
+                    status
+                        .binding
+                        .as_ref()
+                        .unwrap()
+                        .matches(&selector.controllers[0])
+                );
+            }
             peer.write_all(b"x").unwrap();
             drive(&mut worker, &mut context, waiting.as_mut()).unwrap();
             drop(waiting);

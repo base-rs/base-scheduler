@@ -153,7 +153,7 @@ impl IoUringSelector {
         cancellation.check()?;
         self.check_monitor(state)?;
         let mut wait = Wait::new(state.registration());
-        // Choose a route once for this wait. A suspended future can move without moving its active registration. The next wait may retire and rebind it after a worker change.
+        // Choose a route once for this wait. It is used only if the monitor has no active poll; an active poll stays on its ring, even after the task moves.
         let controller = self.route_ref();
         let mut cancelled = pin!(cancellation.cancelled());
         poll_fn(|context| {
@@ -167,6 +167,8 @@ impl IoUringSelector {
     }
 
     // The exclusive resource borrow serializes waits. Record the generation under the publication lock so abandonment can release its cached waker without penalizing normal notification-driven completion.
+    //
+    // A pending persistent poll stays on the ring that issued it, even when this wait runs on another worker. Its notification may wake the waker from any thread, and the driver-local wake rule then returns the task to that ring's worker. Rebinding instead cost a remote cancellation, an eventfd write, a cross-worker wake from the old ring and a new poll on each migration: with two or more workers, HTTP connections stolen between workers rebound on 30-49% of requests. `controller` is used only when no poll is active, that is, for the first wait or after a poll has retired.
     fn poll_monitor_wait(
         &self,
         monitor: &Storage,
@@ -177,7 +179,7 @@ impl IoUringSelector {
         let state = monitor.as_ref();
         let registration = state.registration();
         let replacement = context.waker().clone();
-        let (previous, submission, retirement) = {
+        let (previous, submission) = {
             let mut status = registration.status.lock().unwrap();
             if !status.retiring {
                 if let Some(error) = status.error.take() {
@@ -188,18 +190,7 @@ impl IoUringSelector {
                 }
             }
             let mut submission = None;
-            let mut retirement = None;
-            if status.pending {
-                if !status.retiring && !status.binding.as_ref().unwrap().matches(controller) {
-                    status.retiring = true;
-                    let binding = status.binding.as_ref().unwrap();
-                    retirement = Some((
-                        Arc::clone(&binding.controller),
-                        binding.state.token,
-                        binding.state.generation,
-                    ));
-                }
-            } else {
+            if !status.pending {
                 let generation = controller.next_identifier()?;
                 status.binding = Some(RingBinding::new(
                     controller,
@@ -217,12 +208,9 @@ impl IoUringSelector {
                 ));
             }
             wait.generation = Some(registration.readiness.load(Ordering::Acquire));
-            (status.waker.replace(replacement), submission, retirement)
+            (status.waker.replace(replacement), submission)
         };
         discard(previous);
-        if let Some((controller, token, generation)) = retirement {
-            discard(controller.send(Command::MonitorCancel(token, generation)));
-        }
         // Rejection drops the submission, publishes BrokenPipe and releases backend retention.
         if let Some(submission) = submission {
             discard(controller.send(Command::MonitorSubmit(submission)));
