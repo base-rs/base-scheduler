@@ -1088,12 +1088,22 @@ fn a_later_wait_on_another_worker_keeps_the_active_poll_on_its_ring() {
             let mut reader = receive.recv_timeout(Duration::from_secs(10)).unwrap();
             let inspect = reader.retained();
             let never = Cancellation::never();
+            // Count wakes, so the test sees the first ring's notification reach this wait rather than a later poll finding readiness.
+            struct CountWake(AtomicUsize);
+            impl std::task::Wake for CountWake {
+                fn wake(self: Arc<Self>) {
+                    self.0.fetch_add(1, Ordering::SeqCst);
+                }
+            }
+            let wakes = Arc::new(CountWake(AtomicUsize::new(0)));
+            let counted = std::task::Waker::from(Arc::clone(&wakes));
+            let mut counting = Context::from_waker(&counted);
             let mut waiting = Box::pin(selector.socket_monitor_wait(&mut reader, &never));
-            assert!(waiting.as_mut().poll(&mut context).is_pending());
+            assert!(waiting.as_mut().poll(&mut counting).is_pending());
             // Neither retired nor rebound: the first ring's poll delivers this worker's notification.
             for _ in 0..3 {
                 worker.turn(Some(Duration::ZERO)).unwrap();
-                assert!(waiting.as_mut().poll(&mut context).is_pending());
+                assert!(waiting.as_mut().poll(&mut counting).is_pending());
                 let status = inspect.registration().status.lock().unwrap();
                 assert!(status.pending && !status.retiring);
                 assert!(
@@ -1105,8 +1115,89 @@ fn a_later_wait_on_another_worker_keeps_the_active_poll_on_its_ring() {
                 );
             }
             peer.write_all(b"x").unwrap();
-            drive(&mut worker, &mut context, waiting.as_mut()).unwrap();
+            // Only the first ring, turned by the other thread, can deliver the notification; this thread waits without polling or turning.
+            let deadline = std::time::Instant::now() + Duration::from_secs(10);
+            while wakes.0.load(Ordering::SeqCst) == 0 {
+                assert!(
+                    std::time::Instant::now() < deadline,
+                    "the first ring's notification did not wake the wait"
+                );
+                std::thread::sleep(Duration::from_millis(1));
+            }
+            assert!(matches!(
+                waiting.as_mut().poll(&mut counting),
+                Poll::Ready(Ok(()))
+            ));
             drop(waiting);
+            let mut close = pin!(selector.socket_monitor_close(&mut reader));
+            drive(&mut worker, &mut context, close.as_mut()).unwrap();
+            finished.store(true, Ordering::Release);
+        });
+    });
+}
+
+#[test]
+fn a_wait_after_its_poll_ends_registers_on_the_current_workers_ring() {
+    let (selector, mut drivers) = IoUringSelector::with_workers(options(), 2).unwrap();
+    let (socket, mut peer) = sockets(&selector);
+    let reader = selector.socket_monitor(&socket, Interest::Readable);
+    // One-shot polls end after each event, as on kernels without multishot polls.
+    reader
+        .registration()
+        .multishot
+        .store(false, Ordering::Relaxed);
+    let second_driver = drivers.pop().unwrap();
+    let first_driver = drivers.pop().unwrap();
+    let (handoff, receive) = mpsc::channel();
+    let finished = AtomicBool::new(false);
+    std::thread::scope(|scope| {
+        let selector = &selector;
+        let finished = &finished;
+        let peer = &mut peer;
+        scope.spawn(move || {
+            let mut worker = first_driver.enter();
+            let wake = worker.waker();
+            let mut context = Context::from_waker(&wake);
+            let never = Cancellation::never();
+            let mut reader = reader;
+            let inspect = reader.retained();
+            let mut wait = Box::pin(selector.socket_monitor_wait(&mut reader, &never));
+            assert!(wait.as_mut().poll(&mut context).is_pending());
+            peer.write_all(b"x").unwrap();
+            drive(&mut worker, &mut context, wait.as_mut()).unwrap();
+            drop(wait);
+            until(&mut worker, || {
+                !inspect.registration().status.lock().unwrap().pending
+            });
+            let registration = inspect.registration();
+            registration.clear_readiness(registration.readiness.load(Ordering::Acquire));
+            assert!(handoff.send(reader).is_ok());
+            let deadline = std::time::Instant::now() + Duration::from_secs(10);
+            while !finished.load(Ordering::Acquire) {
+                assert!(std::time::Instant::now() < deadline);
+                worker.turn(Some(Duration::from_millis(1))).unwrap();
+            }
+        });
+        scope.spawn(move || {
+            let mut worker = second_driver.enter();
+            let wake = worker.waker();
+            let mut context = Context::from_waker(&wake);
+            let mut reader = receive.recv_timeout(Duration::from_secs(10)).unwrap();
+            let inspect = reader.retained();
+            let never = Cancellation::never();
+            {
+                let mut waiting = Box::pin(selector.socket_monitor_wait(&mut reader, &never));
+                let _ = waiting.as_mut().poll(&mut context);
+                // The previous poll ended, so this wait's new poll uses the current worker's ring.
+                let status = inspect.registration().status.lock().unwrap();
+                assert!(
+                    status
+                        .binding
+                        .as_ref()
+                        .unwrap()
+                        .matches(&selector.controllers[1])
+                );
+            }
             let mut close = pin!(selector.socket_monitor_close(&mut reader));
             drive(&mut worker, &mut context, close.as_mut()).unwrap();
             finished.store(true, Ordering::Release);

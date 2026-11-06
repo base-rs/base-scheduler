@@ -181,13 +181,12 @@ impl IoUringSelector {
         let replacement = context.waker().clone();
         let (previous, submission) = {
             let mut status = registration.status.lock().unwrap();
-            if !status.retiring {
-                if let Some(error) = status.error.take() {
-                    return Poll::Ready(Err(error.into()));
-                }
-                if registration.is_ready() {
-                    return Poll::Ready(Ok(()));
-                }
+            // Only closure and dropping the storage retire a poll, and a wait holds the storage exclusively after checking closure, so it never observes a retiring poll.
+            if let Some(error) = status.error.take() {
+                return Poll::Ready(Err(error.into()));
+            }
+            if registration.is_ready() {
+                return Poll::Ready(Ok(()));
             }
             let mut submission = None;
             if !status.pending {
