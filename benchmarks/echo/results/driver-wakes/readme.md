@@ -59,6 +59,19 @@ So the extra idle-worker wakes in hypothesis 1 were not the cost: most steals co
 
 Native-poll CPU per request falls by 1.6–3.1% in both runs, beyond the layout control in every case. Throughput changes are within layout noise, except owned Native at 256 connections in run 2. io_uring does not change. Raw Tokio measured 7.32–7.33 µs per request at 256 connections and 8.41–8.60 at 32, so most of the gap remains.
 
+[Run 3](quick-4w-3.jsonl) repeats the comparison on `cd51eee`, after #104 made owned readiness reads and writes take the borrowed path, against this change rebased onto it:
+
+| Case | Backend | CPU µs/req main → change | Change (better) | Layout | Requests/s change | Layout |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| 4w 32c | native-poll | 9.511 → 9.201 | −3.3% (5/5) | −0.6% (3/5) | +0.8% (4/5) | −2.8% (1/5) |
+| 4w 32c | native | 9.494 → 9.301 | −2.4% (5/5) | +0.5% (2/5) | −0.6% (2/5) | −1.9% (1/5) |
+| 4w 32c | iouring | 9.688 → 9.764 | +0.7% (1/5) | +0.1% (2/5) | +2.1% (4/5) | +1.6% (3/5) |
+| 4w 256c | native-poll | 8.531 → 8.323 | −2.1% (5/5) | +0.7% (2/5) | +0.4% (4/5) | −0.6% (1/5) |
+| 4w 256c | native | 8.57 → 8.432 | −1.8% (5/5) | +0.2% (2/5) | +1.0% (3/5) | +0.2% (3/5) |
+| 4w 256c | iouring | 8.29 → 8.156 | −1.5% (4/5) | −0.1% (3/5) | +1.0% (3/5) | +0.1% (3/5) |
+
+Borrowed and owned readiness CPU per request fall by 1.8–3.3% in every round, with the layout control within 0.7%. io_uring's −1.5% at 256 connections was not seen in the earlier runs and is not claimed. Raw Tokio measured 7.27 µs per request at 256 connections.
+
 [One worker](quick-1w.jsonl), where routing cannot change, as a cross-check: every CPU and throughput change is within ±1.1%, and the layout control varies by up to 2.7%.
 
 ## Correctness
