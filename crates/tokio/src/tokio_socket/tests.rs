@@ -1177,11 +1177,23 @@ fn uncancellable_writes_wait_after_would_block() {
                             .set_linger(Some(Duration::ZERO))
                             .unwrap();
                         drop(peer);
+                        // The reset can first empty the send buffer and let the waiting write complete (macOS); it surfaces on a later write.
+                        let mut result = writing.as_mut().await;
+                        drop(writing);
+                        for _ in 0..64 {
+                            if !matches!(result, Ok(count) if count > 0) {
+                                break;
+                            }
+                            result = if owned {
+                                writer.write_owned(chunk.clone(), &never).await.0
+                            } else {
+                                writer.write(&chunk, &never).await
+                            };
+                        }
                         assert_io_error(
-                            writing.as_mut().await,
+                            result,
                             &[io::ErrorKind::BrokenPipe, io::ErrorKind::ConnectionReset],
                         );
-                        drop(writing);
                         drop(writer);
                         scheduler.socket_close(socket).await.unwrap();
                     } else {
