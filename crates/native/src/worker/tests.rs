@@ -575,7 +575,7 @@ fn wakes_skip_a_stuck_preferred_worker() {
 fn driver_turn_wakes_stay_on_the_dispatching_worker() {
     use super::{CURRENT_WORKER, DRIVING, LocalWorker, schedule};
     use crate::task_service::Shared;
-    use std::sync::Arc;
+    use std::{sync::Arc, time::Duration};
 
     let mut queues = (0..2)
         .map(|_| std::array::from_fn(|_| Worker::new_fifo()))
@@ -602,11 +602,30 @@ fn driver_turn_wakes_stay_on_the_dispatching_worker() {
     DRIVING.set(false);
     // A wake from a task poll still follows the task's last polling worker.
     schedule(&shared, preferring(1));
+
+    // `drive` marks the turn itself: a wake published by the driver's turn stays here, and the flag is clear again afterwards.
+    struct Dispatching<'a>(&'a Arc<Shared>, Option<Runnable>);
+    impl base_scheduler_selector::SelectorWorker for Dispatching<'_> {
+        fn waker(&self) -> std::task::Waker {
+            std::task::Waker::noop().clone()
+        }
+        fn close(&mut self) {}
+        fn turn(&mut self, _timeout: Option<Duration>) -> std::io::Result<bool> {
+            schedule(self.0, self.1.take().expect("one turn"));
+            Ok(false)
+        }
+    }
+    let mut dispatching = Dispatching(&shared, Some(preferring(1)));
+    let mut driver: Option<&mut dyn base_scheduler_selector::SelectorWorker> =
+        Some(&mut dispatching);
+    super::drive(&mut driver, Some(Duration::ZERO));
+    assert!(driver.is_some());
+    assert!(!DRIVING.get());
     let local = CURRENT_WORKER.with(|context| context.take()).unwrap();
-    assert_eq!(local.ready.len(), 1);
+    assert_eq!(local.ready.len(), 2);
     assert_eq!(shared.workers[1].incoming.len(), 1);
 
-    // Without a worker of this scheduler on the thread, the flag alone does not keep the task.
+    // Without a worker on the thread, the flag alone does not keep the task.
     DRIVING.set(true);
     schedule(&shared, preferring(1));
     DRIVING.set(false);
