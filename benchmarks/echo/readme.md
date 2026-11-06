@@ -8,6 +8,8 @@ The [private I/O boundary comparison](results/private-io/readme.md) checks borro
 
 The [idle-search comparison](results/idle-search/readme.md) measures skipping Native victim searches when no outstanding runnable work exists, including a disabled-stealing baseline, uneven-load latency, and user-space versus kernel costs.
 
+The [driver wake comparison](results/driver-wakes/readme.md) counts task migrations, remote schedules, wakes and steals with four workers, and keeps tasks woken by a worker's own driver turn on that worker.
+
 The [completion-cost follow-up](results/worker-completions/readme.md) profiles the remaining busy single-worker gap, compares Tokio read policies, and measures rejected ring-policy and completion-collection refinements.
 
 The [turn-spacing comparison](results/turn-interval/readme.md) records rejected attempts to space readiness worker driver turns, including a one-FIFO counted batch, against real HTTP servers at one and two workers.

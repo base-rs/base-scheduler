@@ -1,0 +1,393 @@
+diff --git a/benchmarks/echo/src/server.rs b/benchmarks/echo/src/server.rs
+index bcf95b3..473b102 100644
+--- a/benchmarks/echo/src/server.rs
++++ b/benchmarks/echo/src/server.rs
+@@ -37,6 +37,7 @@ fn report_rescues<S: base_scheduler_native::Selector>(
+             "long_batches": statistics.long_batches,
+             "leaving_idle": statistics.leaving_idle,
+             "timers": statistics.timers,
++            "work": base_scheduler_native::work_counters::snapshot().into_iter().collect::<std::collections::BTreeMap<_, _>>(),
+         })
+     };
+     #[cfg(not(feature = "diagnostics"))]
+diff --git a/crates/native/src/lib.rs b/crates/native/src/lib.rs
+index 94e2bff..519af63 100644
+--- a/crates/native/src/lib.rs
++++ b/crates/native/src/lib.rs
+@@ -20,6 +20,9 @@ mod test_support;
+ mod thread;
+ mod worker;
+ mod worker_timers;
++#[cfg(feature = "diagnostics")]
++#[doc(hidden)]
++pub mod work_counters;
+ 
+ #[cfg(unix)]
+ pub use base_scheduler_selector::NativeSubscription;
+diff --git a/crates/native/src/task_service.rs b/crates/native/src/task_service.rs
+index be7f5ad..e963cbf 100644
+--- a/crates/native/src/task_service.rs
++++ b/crates/native/src/task_service.rs
+@@ -21,6 +21,8 @@ use std::{
+ 
+ pub(crate) struct TaskState {
+     pub(crate) worker: AtomicUsize,
++    #[cfg(feature = "diagnostics")]
++    pub(crate) polled: AtomicBool,
+ }
+ pub(crate) type Runnable = async_task::Runnable<TaskState>;
+ 
+@@ -163,21 +165,24 @@ impl Shared {
+         }
+         self.monitor.unpark();
+     }
+-    pub(crate) fn wake_idle(&self, preferred: usize) {
++    pub(crate) fn wake_idle(&self, preferred: usize) -> bool {
+         std::sync::atomic::fence(Ordering::SeqCst);
+         if self.idle_workers.load(Ordering::SeqCst) == 0 {
+-            return;
++            #[cfg(feature = "diagnostics")]
++            crate::work_counters::count(crate::work_counters::WAKE_IDLE_NONE_IDLE);
++            return false;
+         }
+         if let Some(worker) = self.workers.get(preferred) {
+             if worker.wake() {
+-                return;
++                return true;
+             }
+         }
+         for worker in &self.workers {
+             if worker.wake() {
+-                return;
++                return true;
+             }
+         }
++        false
+     }
+     pub(crate) fn retire_runnable(&self) {
+         if self.outstanding.fetch_sub(1, Ordering::AcqRel) == (NOTIFY_IDLE | 1) {
+@@ -271,6 +276,8 @@ impl TaskService {
+         let (runnable, task) = async_task::Builder::new()
+             .metadata(TaskState {
+                 worker: AtomicUsize::new(worker),
++                #[cfg(feature = "diagnostics")]
++                polled: AtomicBool::new(false),
+             })
+             .spawn(
+                 move |_| TaskFuture::new(future, registration),
+diff --git a/crates/native/src/work_counters.rs b/crates/native/src/work_counters.rs
+new file mode 100644
+index 0000000..2025793
+--- /dev/null
++++ b/crates/native/src/work_counters.rs
+@@ -0,0 +1,93 @@
++// Temporary work-distribution diagnostics. Not for merging.
++
++use std::cell::Cell;
++use std::sync::atomic::{AtomicU64, Ordering};
++
++pub const NAMES: [&str; 16] = [
++    "polls",
++    "migrations",
++    "schedule_local",
++    "schedule_remote_worker",
++    "schedule_remote_external",
++    "wake_idle_batch",
++    "wake_idle_schedule",
++    "wake_idle_none_idle",
++    "wakes_batch",
++    "wakes_schedule",
++    "idle_entries",
++    "idle_recheck_found",
++    "parks",
++    "steal_ready",
++    "steal_incoming",
++    "batches",
++];
++
++#[repr(align(128))]
++struct Slot([AtomicU64; 16]);
++
++const SLOTS: usize = 17;
++static COUNTERS: [Slot; SLOTS] = [const { Slot([const { AtomicU64::new(0) }; 16]) }; SLOTS];
++
++thread_local! {
++    static INDEX: Cell<usize> = const { Cell::new(SLOTS - 1) };
++}
++
++pub fn enter(identifier: usize) {
++    INDEX.with(|index| index.set(identifier.min(SLOTS - 2)));
++}
++
++#[inline]
++pub fn count(counter: usize) {
++    count_shared(counter);
++}
++
++#[inline]
++pub fn count_shared(counter: usize) {
++    let index = INDEX.with(Cell::get);
++    COUNTERS[index].0[counter].fetch_add(1, Ordering::Relaxed);
++}
++
++pub fn snapshot() -> Vec<(&'static str, u64)> {
++    NAMES
++        .iter()
++        .enumerate()
++        .map(|(i, name)| {
++            (
++                *name,
++                COUNTERS
++                    .iter()
++                    .map(|slot| slot.0[i].load(Ordering::Relaxed))
++                    .sum(),
++            )
++        })
++        .collect()
++}
++
++pub const POLLS: usize = 0;
++pub const MIGRATIONS: usize = 1;
++pub const SCHEDULE_LOCAL: usize = 2;
++pub const SCHEDULE_REMOTE_WORKER: usize = 3;
++pub const SCHEDULE_REMOTE_EXTERNAL: usize = 4;
++pub const WAKE_IDLE_BATCH: usize = 5;
++pub const WAKE_IDLE_SCHEDULE: usize = 6;
++pub const WAKE_IDLE_NONE_IDLE: usize = 7;
++pub const WAKES_BATCH: usize = 8;
++pub const WAKES_SCHEDULE: usize = 9;
++pub const IDLE_ENTRIES: usize = 10;
++pub const IDLE_RECHECK_FOUND: usize = 11;
++pub const PARKS: usize = 12;
++pub const STEAL_READY: usize = 13;
++pub const STEAL_INCOMING: usize = 14;
++pub const BATCHES: usize = 15;
++
++pub static POLICY: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(usize::MAX);
++#[inline]
++pub fn policy() -> usize {
++    let value = POLICY.load(Ordering::Relaxed);
++    if value != usize::MAX {
++        return value;
++    }
++    let value = std::env::var("BASE_WD_POLICY").ok().and_then(|v| v.parse().ok()).unwrap_or(0);
++    POLICY.store(value, Ordering::Relaxed);
++    value
++}
+diff --git a/crates/native/src/worker.rs b/crates/native/src/worker.rs
+index 32d1e0d..894933c 100644
+--- a/crates/native/src/worker.rs
++++ b/crates/native/src/worker.rs
+@@ -193,13 +193,22 @@ pub(crate) fn schedule(shared: &Arc<Shared>, runnable: Runnable) {
+         if let Some(worker) = current.as_ref() {
+             // A stuck preferred worker cannot run the task, so a worker of the same scheduler keeps it instead.
+             if std::ptr::eq(worker.scheduler.as_ptr(), Arc::as_ptr(shared))
+-                && (preferred == worker.identifier || shared.workers[preferred].stuck().is_some())
++                && (preferred == worker.identifier
++                    || shared.workers[preferred].stuck().is_some()
++                    || policy_follow(runnable.metadata()))
+             {
+                 preferred = worker.identifier;
+                 worker.ready.push(runnable);
++                #[cfg(feature = "diagnostics")]
++{ crate::work_counters::count(crate::work_counters::SCHEDULE_LOCAL); }
+                 return None;
+             }
++            #[cfg(feature = "diagnostics")]
++{ crate::work_counters::count(crate::work_counters::SCHEDULE_REMOTE_WORKER); }
++            return Some(runnable);
+         }
++        #[cfg(feature = "diagnostics")]
++{ crate::work_counters::count(crate::work_counters::SCHEDULE_REMOTE_EXTERNAL); }
+         Some(runnable)
+     });
+     if let Some(runnable) = remote {
+@@ -208,12 +217,39 @@ pub(crate) fn schedule(shared: &Arc<Shared>, runnable: Runnable) {
+             preferred = unstuck(shared, preferred);
+         }
+         shared.workers[preferred].incoming.push(runnable);
+-    } else if shared.workers.len() == 1 {
++    } else if shared.workers.len() == 1 || policy_quiet() {
+         // The sole worker is already executing this callback and will observe its local queue before waiting again.
+         return;
+     }
+     // Publication precedes the sleeping flag exchange. A worker publishes its sleeping flag before rechecking queues, so a racing wake is retained.
+-    shared.wake_idle(preferred);
++    #[cfg(feature = "diagnostics")]
++{ crate::work_counters::count(crate::work_counters::WAKE_IDLE_SCHEDULE); }
++    let _woke = shared.wake_idle(preferred);
++    #[cfg(feature = "diagnostics")]
++    if _woke { crate::work_counters::count(crate::work_counters::WAKES_SCHEDULE); }
++}
++
++#[cfg(feature = "diagnostics")]
++thread_local! {
++    static DRIVING: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
++}
++#[cfg(feature = "diagnostics")]
++fn policy_follow(state: &crate::task_service::TaskState) -> bool {
++    let policy = crate::work_counters::policy();
++    (policy & 1 != 0 || (policy & 16 != 0 && DRIVING.with(std::cell::Cell::get)))
++        && state.polled.load(Ordering::Relaxed)
++}
++#[cfg(not(feature = "diagnostics"))]
++fn policy_follow(_: &crate::task_service::TaskState) -> bool {
++    false
++}
++#[cfg(feature = "diagnostics")]
++fn policy_quiet() -> bool {
++    crate::work_counters::policy() & 2 != 0
++}
++#[cfg(not(feature = "diagnostics"))]
++fn policy_quiet() -> bool {
++    false
+ }
+ 
+ // The next worker after `preferred` that is not stuck, or `preferred` if every worker is.
+@@ -239,6 +275,30 @@ fn search(shared: &Shared, local: &LocalWorker, iteration: usize) -> Steal<Runna
+     if shared.workers.len() == 1 || !shared.has_runnables() {
+         return search_result(retry);
+     }
++    #[cfg(feature = "diagnostics")]
++    let _searching = {
++        struct Guard(bool);
++        impl Drop for Guard {
++            fn drop(&mut self) {
++                if self.0 {
++                    SEARCHING.fetch_sub(1, Ordering::SeqCst);
++                }
++            }
++        }
++        if crate::work_counters::policy() & 8 != 0 {
++            if 2 * SEARCHING.fetch_add(1, Ordering::SeqCst) >= shared.workers.len() {
++                SEARCHING.fetch_sub(1, Ordering::SeqCst);
++                return search_result(retry);
++            }
++            Guard(true)
++        } else {
++            Guard(false)
++        }
++    };
++    #[cfg(feature = "diagnostics")]
++    let minimum = if crate::work_counters::policy() & 4 != 0 { 2 } else { 1 };
++    #[cfg(not(feature = "diagnostics"))]
++    let minimum = 1;
+     // Only steal after exhausting this worker's own work. Rotate the first victim so idle workers do not always contend on worker zero.
+     for offset in 0..shared.workers.len() {
+         let victim = local
+@@ -252,23 +312,36 @@ fn search(shared: &Shared, local: &LocalWorker, iteration: usize) -> Steal<Runna
+         let worker = &shared.workers[victim];
+         // Both generations remain stealable while their owner swaps their roles.
+         for stealer in &worker.stealers {
++            if minimum > 1 && stealer.len() < minimum {
++                continue;
++            }
+             if let Some(runnable) =
+                 take_stolen(stealer.steal_batch_and_pop(&local.ready), &mut retry)
+             {
++                #[cfg(feature = "diagnostics")]
++{ crate::work_counters::count(crate::work_counters::STEAL_READY); }
+                 return Steal::Success(runnable);
+             }
+         }
+         // Remote wakes remain stealable while the previous worker is busy.
++        if minimum > 1 && worker.incoming.len() < minimum {
++            continue;
++        }
+         if let Some(runnable) = take_stolen(
+             worker.incoming.steal_batch_and_pop(&local.ready),
+             &mut retry,
+         ) {
++            #[cfg(feature = "diagnostics")]
++{ crate::work_counters::count(crate::work_counters::STEAL_INCOMING); }
+             return Steal::Success(runnable);
+         }
+     }
+     search_result(retry)
+ }
+ 
++#[cfg(feature = "diagnostics")]
++static SEARCHING: AtomicUsize = AtomicUsize::new(0);
++
+ fn search_result(retry: bool) -> Steal<Runnable> {
+     if retry { Steal::Retry } else { Steal::Empty }
+ }
+@@ -340,7 +413,12 @@ fn drive(
+     timeout: Option<Duration>,
+ ) {
+     if let Some(active) = driver.as_mut() {
+-        if !matches!(active.turn(timeout), Ok(false)) {
++        #[cfg(feature = "diagnostics")]
++        DRIVING.with(|driving| driving.set(true));
++        let result = active.turn(timeout);
++        #[cfg(feature = "diagnostics")]
++        DRIVING.with(|driving| driving.set(false));
++        if !matches!(result, Ok(false)) {
+             *driver = None;
+         }
+     } else {
+@@ -382,6 +460,8 @@ fn run_loop(
+         .thread
+         .set(thread::current())
+         .expect("worker thread registered once");
++    #[cfg(feature = "diagnostics")]
++    crate::work_counters::enter(identifier);
+     CURRENT_WORKER.with(|context| {
+         context.replace(Some(LocalWorker {
+             identifier,
+@@ -409,6 +489,8 @@ fn run_loop(
+         }
+         let runnable = match find_work(&shared, iteration) {
+             Steal::Empty => {
++                #[cfg(feature = "diagnostics")]
++{ crate::work_counters::count(crate::work_counters::IDLE_ENTRIES); }
+                 #[cfg(any(test, feature = "diagnostics"))]
+                 worker.heartbeat.idle.store(true, Ordering::Relaxed);
+                 worker.sleeping.store(true, Ordering::SeqCst);
+@@ -423,6 +505,8 @@ fn run_loop(
+                     retry_after_rescue(rescued, find_work(&shared, iteration)),
+                     || !shared.finished(),
+                     || {
++                        #[cfg(feature = "diagnostics")]
++{ crate::work_counters::count(crate::work_counters::PARKS); }
+                         needs_turn = false;
+                         drive(
+                             &mut driver,
+@@ -430,6 +514,8 @@ fn run_loop(
+                         )
+                     },
+                 );
++                #[cfg(feature = "diagnostics")]
++                if runnable.is_some() { crate::work_counters::count(crate::work_counters::IDLE_RECHECK_FOUND); }
+                 // Leaving idle is a turn boundary: the batch that follows starts a new heartbeat.
+                 worker.beat();
+                 #[cfg(any(test, feature = "diagnostics"))]
+@@ -460,12 +546,27 @@ fn run_ready_batch(shared: &Shared, first: Runnable) {
+         std::mem::swap(&mut local.ready, &mut local.current);
+         (local.identifier, !local.current.is_empty())
+     });
++    #[cfg(feature = "diagnostics")]
++{ crate::work_counters::count(crate::work_counters::BATCHES); }
+     if has_more {
+-        shared.wake_idle(usize::MAX);
++        #[cfg(feature = "diagnostics")]
++{ crate::work_counters::count(crate::work_counters::WAKE_IDLE_BATCH); }
++        let _woke = shared.wake_idle(usize::MAX);
++        #[cfg(feature = "diagnostics")]
++        if _woke { crate::work_counters::count(crate::work_counters::WAKES_BATCH); }
+     }
+     let mut runnable = Some(first);
+     while let Some(task) = runnable {
++        #[cfg(feature = "diagnostics")]
++        {
++            crate::work_counters::count(crate::work_counters::POLLS);
++            if task.metadata().worker.load(Ordering::Relaxed) != identifier {
++                crate::work_counters::count(crate::work_counters::MIGRATIONS);
++            }
++        }
+         task.metadata().worker.store(identifier, Ordering::Relaxed);
++        #[cfg(feature = "diagnostics")]
++        task.metadata().polled.store(true, Ordering::Relaxed);
+         // Contain task-machinery panics as well as the guarded future's panics.
+         crate::panic::contain(|| {
+             task.run();
