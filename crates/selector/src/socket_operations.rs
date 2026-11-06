@@ -276,6 +276,9 @@ impl ReadinessSelector {
     }
 }
 
+// Bound stream readers receive pooled chunks on their cached registrations.
+// This generic receive remains for driver tests.
+#[cfg(test)]
 impl ReadinessSelector {
     pub(crate) async fn socket_recv_poll(
         &self,
