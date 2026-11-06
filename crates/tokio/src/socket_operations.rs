@@ -52,7 +52,9 @@ impl TokioScheduler {
                     Interest::Readable,
                     |socket| operation(socket, &mut input),
                     length > 0,
-                    move |&count| drain_short && 0 < count && count < length,
+                    move |&count| {
+                        crate::tokio_socket_stream_reader::short(count, length, !drain_short)
+                    },
                 )
             })
             .await;

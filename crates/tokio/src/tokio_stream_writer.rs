@@ -44,6 +44,23 @@ impl TokioScheduler {
     }
 }
 
+impl<B> TokioStreamWriter<'_, B> {
+    /// A never-cancelled send has no listener to register, so it skips the generic cancellable operation: the same scheduler checks, then the syscall first and a readiness wait only after `WouldBlock`.
+    #[cfg(unix)]
+    async fn send_uncancellable(
+        &self,
+        mut send: impl FnMut(&socket2::Socket) -> io::Result<usize> + Send,
+    ) -> OperationResult<usize> {
+        self.scheduler.check_socket(&self.socket)?;
+        match send(self.socket.get_ref()) {
+            Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                Ok(self.socket.write_after_would_block(send).await?)
+            }
+            result => Ok(result?),
+        }
+    }
+}
+
 impl<B: IoBuf> SocketStreamWriter for TokioStreamWriter<'_, B> {
     type Buffer = B;
 
@@ -55,6 +72,14 @@ impl<B: IoBuf> SocketStreamWriter for TokioStreamWriter<'_, B> {
         self.state.check_open()?;
         if self.state.is_pending() {
             self.state.flush(cancellation).await?;
+        }
+        #[cfg(unix)]
+        if cancellation.is_never() {
+            return self
+                .send_uncancellable(|socket| {
+                    socket_io::send_poll(socket, buffer, SocketSendFlags::default())
+                })
+                .await;
         }
         self.scheduler
             .socket_send_poll(
@@ -133,6 +158,14 @@ impl<B: IoBuf> SocketStreamWriter for TokioStreamWriter<'_, B> {
         }
         if let Err(error) = cancellation.check() {
             return (Err(error.into()), buffer);
+        }
+        #[cfg(unix)]
+        if cancellation.is_never() {
+            let bytes = buffer.as_ref();
+            let result = self
+                .send_uncancellable(|socket| socket_io::send(socket, bytes))
+                .await;
+            return (result, buffer);
         }
         let (result, buffer) = self
             .scheduler

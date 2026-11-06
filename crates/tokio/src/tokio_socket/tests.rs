@@ -775,11 +775,18 @@ async fn short_read_keeps_readiness(
     use futures_lite::future::poll_once;
     use std::io::Write;
     let never = Cancellation::never();
+    let registration = socket.inner.registration.get().unwrap();
+    // Nothing is queued, so drop any readiness an earlier read kept; otherwise the wait below could return before the reactor records this write, whose newer event would then correctly survive the read's clear.
+    assert!(
+        registration
+            .try_io(tokio::io::Interest::READABLE, |_| Err::<(), _>(
+                io::ErrorKind::WouldBlock.into()
+            ))
+            .is_err()
+    );
     peer.write_all(&[byte]).unwrap();
     // Wait until the reactor has published the edge, so the read is attempted on that observation.
-    if let Some(registration) = socket.inner.registration.get() {
-        drop(registration.readable().await.unwrap());
-    }
+    drop(registration.readable().await.unwrap());
     let (count, received) = if owned {
         let (result, buffer) = reader.read_owned(vec![0; 8], &never).await;
         (result.unwrap(), buffer[0])
@@ -1009,4 +1016,189 @@ fn urgent_tcp_boundary_keeps_trailing_bytes_readable_without_oob_support() {
     drop(reader);
     block_on(scheduler.socket_close(socket)).unwrap();
     block_on(scheduler.shutdown());
+}
+
+#[cfg(unix)]
+fn assert_io_error<T: std::fmt::Debug>(
+    result: base_scheduler::OperationResult<T>,
+    expected: &[io::ErrorKind],
+) {
+    match result {
+        Err(base_scheduler::OperationError::Io(error)) => {
+            assert!(expected.contains(&error.kind()), "unexpected {error:?}")
+        }
+        other => panic!("expected one of {expected:?}, got {other:?}"),
+    }
+}
+
+// Reach the state in which never-cancelled reads take the compact path: registered, then established by a successful read.
+#[cfg(unix)]
+async fn establish(
+    reader: &mut impl base_scheduler::SocketStreamReader,
+    peer: &mut std::net::TcpStream,
+) {
+    use base_scheduler::*;
+    use futures_lite::future::poll_once;
+    use std::io::Write;
+    let never = Cancellation::never();
+    let mut buffer = [0; 8];
+    let mut pending = Box::pin(reader.read_into(&mut buffer, &never));
+    assert!(poll_once(&mut pending).await.is_none());
+    drop(pending);
+    peer.write_all(b"a").unwrap();
+    assert_eq!(reader.read_into(&mut buffer, &never).await.unwrap(), 1);
+}
+
+#[cfg(unix)]
+#[test]
+fn uncancellable_bound_operations_recheck_scheduler_admission() {
+    use base_scheduler::*;
+    use futures_lite::future::block_on;
+    use std::io::Read;
+    crate::test_support::run(|| {
+        block_on(async {
+            let scheduler = crate::test_support::scheduler();
+            let never = Cancellation::never();
+            let (native, mut peer) = tcp_pair();
+            let socket = TokioSocket::new(&scheduler.runtime, native.into()).unwrap();
+            let mut reader = scheduler.socket_stream_reader(&socket).unwrap();
+            let mut writer = scheduler.socket_stream_writer(&socket).unwrap();
+            establish(&mut reader, &mut peer).await;
+            // A cancellable owned write keeps the generic operation.
+            let (result, _) = writer
+                .write_owned(b"c".to_vec(), &Cancellation::new())
+                .await;
+            assert_eq!(result.unwrap(), 1);
+            let mut byte = [0];
+            peer.read_exact(&mut byte).unwrap();
+            assert_eq!(&byte, b"c");
+            scheduler.close();
+            let mut buffer = [0; 8];
+            let closed = &[io::ErrorKind::BrokenPipe];
+            assert_io_error(reader.read_into(&mut buffer, &never).await, closed);
+            let (result, buffer) = reader.read_owned(vec![0; 8], &never).await;
+            assert_io_error(result, closed);
+            assert_eq!(buffer.len(), 8);
+            assert_io_error(writer.write(b"x", &never).await, closed);
+            let (result, _) = writer.write_owned(b"x".to_vec(), &never).await;
+            assert_io_error(result, closed);
+            drop((reader, writer, socket));
+            scheduler.shutdown().await;
+        });
+    });
+}
+
+#[cfg(unix)]
+#[test]
+fn uncancellable_established_reads_report_eof_and_errors() {
+    use base_scheduler::*;
+    use futures_lite::future::block_on;
+    use std::io::Write;
+    crate::test_support::run(|| {
+        block_on(async {
+            let scheduler = crate::test_support::scheduler();
+            let never = Cancellation::never();
+            for owned in [false, true] {
+                for reset in [false, true] {
+                    let (native, mut peer) = tcp_pair();
+                    let socket = TokioSocket::new(&scheduler.runtime, native.into()).unwrap();
+                    let mut reader = scheduler.socket_stream_reader(&socket).unwrap();
+                    establish(&mut reader, &mut peer).await;
+                    assert!(socket.established_read().is_some());
+                    peer.write_all(b"b").unwrap();
+                    if reset {
+                        socket2::SockRef::from(&peer)
+                            .set_linger(Some(Duration::ZERO))
+                            .unwrap();
+                    } else {
+                        peer.shutdown(std::net::Shutdown::Write).unwrap();
+                    }
+                    let mut buffer = [0; 8];
+                    assert_eq!(reader.read_into(&mut buffer, &never).await.unwrap(), 1);
+                    if reset {
+                        drop(peer);
+                    }
+                    let result = if owned {
+                        reader.read_owned(vec![0; 8], &never).await.0
+                    } else {
+                        reader.read_into(&mut buffer, &never).await
+                    };
+                    if reset {
+                        assert_io_error(result, &[io::ErrorKind::ConnectionReset]);
+                    } else {
+                        assert_eq!(result.unwrap(), 0);
+                        // EOF is retained without another syscall or wait.
+                        assert_eq!(reader.read_into(&mut buffer, &never).await.unwrap(), 0);
+                    }
+                    drop(reader);
+                    scheduler.socket_close(socket).await.unwrap();
+                }
+            }
+            scheduler.shutdown().await;
+        });
+    });
+}
+
+#[cfg(unix)]
+#[test]
+fn uncancellable_writes_wait_after_would_block() {
+    use base_scheduler::*;
+    use futures_lite::future::{block_on, poll_once};
+    use std::io::Read;
+    crate::test_support::run(|| {
+        block_on(async {
+            let scheduler = crate::test_support::scheduler();
+            let never = Cancellation::never();
+            let chunk = vec![0; 64 * 1024];
+            for owned in [false, true] {
+                for reset in [false, true] {
+                    let (native, peer) = tcp_pair();
+                    socket2::SockRef::from(&native)
+                        .set_send_buffer_size(4096)
+                        .unwrap();
+                    let socket = TokioSocket::new(&scheduler.runtime, native.into()).unwrap();
+                    let mut writer = scheduler.socket_stream_writer(&socket).unwrap();
+                    // Fill both socket buffers until a write must wait for writability.
+                    let mut writing = loop {
+                        let mut writing = Box::pin(async {
+                            if owned {
+                                writer.write_owned(chunk.clone(), &never).await.0
+                            } else {
+                                writer.write(&chunk, &never).await
+                            }
+                        });
+                        match poll_once(&mut writing).await {
+                            Some(result) => assert!(result.unwrap() > 0),
+                            None => break writing,
+                        }
+                    };
+                    if reset {
+                        socket2::SockRef::from(&peer)
+                            .set_linger(Some(Duration::ZERO))
+                            .unwrap();
+                        drop(peer);
+                        assert_io_error(
+                            writing.as_mut().await,
+                            &[io::ErrorKind::BrokenPipe, io::ErrorKind::ConnectionReset],
+                        );
+                        drop(writing);
+                        drop(writer);
+                        scheduler.socket_close(socket).await.unwrap();
+                    } else {
+                        let mut peer = peer;
+                        let draining = std::thread::spawn(move || {
+                            let mut sink = Vec::new();
+                            peer.read_to_end(&mut sink).unwrap()
+                        });
+                        assert!(writing.as_mut().await.unwrap() > 0);
+                        drop(writing);
+                        drop(writer);
+                        scheduler.socket_close(socket).await.unwrap();
+                        assert!(draining.join().unwrap() > 0);
+                    }
+                }
+            }
+            scheduler.shutdown().await;
+        });
+    });
 }
