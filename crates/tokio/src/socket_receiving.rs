@@ -16,7 +16,7 @@ impl SocketStreamReading for TokioScheduler {
         + 'scheduler
         + use<'scheduler>,
     > {
-        TokioSocketStreamReader::new(self, socket)
+        TokioSocketStreamReader::<false>::new(self, socket)
     }
     fn socket_stream_reader_with_pool<'scheduler>(
         &'scheduler self,
@@ -27,7 +27,7 @@ impl SocketStreamReading for TokioScheduler {
         + 'scheduler
         + use<'scheduler>,
     > {
-        TokioSocketStreamReader::new(self, socket).map(|reader| reader.with_pool(pool))
+        TokioSocketStreamReader::<false>::new(self, socket).map(|reader| reader.with_pool(pool))
     }
 }
 impl SocketPacketReading for TokioScheduler {

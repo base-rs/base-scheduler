@@ -15,7 +15,9 @@ use std::{
 };
 
 /// Scheduler-bound stream reader; registration remains private to this backend.
-pub(crate) struct TokioSocketStreamReader<'a> {
+///
+/// With OOB support disabled (the default), scalar reads on Linux and Android clear their observed readiness after a positive short receive unless urgent data or closure was reported, as Tokio's own streams do; enabled support retains readiness until `WouldBlock`. Pooled reads keep the conservative policy for both settings.
+pub(crate) struct TokioSocketStreamReader<'a, const SUPPORT_OOB: bool = false> {
     scheduler: &'a TokioScheduler,
     socket: TokioSocket,
     pool: Option<base_scheduler::HeapBufferPool>,
@@ -23,7 +25,7 @@ pub(crate) struct TokioSocketStreamReader<'a> {
     closed: bool,
 }
 
-impl<'a> TokioSocketStreamReader<'a> {
+impl<'a, const SUPPORT_OOB: bool> TokioSocketStreamReader<'a, SUPPORT_OOB> {
     /// Construct the default backend composition without submitting payload I/O. Applications normally use the scheduler factory.
     pub(crate) fn new(scheduler: &'a TokioScheduler, socket: &TokioSocket) -> io::Result<Self> {
         if scheduler.socket_type(socket)? != base_scheduler::SocketType::Stream {
@@ -59,8 +61,18 @@ impl<'a> TokioSocketStreamReader<'a> {
     }
 }
 
-impl SocketStreamReader for TokioSocketStreamReader<'_> {
+impl<const SUPPORT_OOB: bool> SocketStreamReader for TokioSocketStreamReader<'_, SUPPORT_OOB> {
     type Buffer = <base_scheduler::HeapBufferPool as BufferPool>::Buffer;
+
+    fn with_oob_support<const OOB: bool>(self) -> impl SocketStreamReader<Buffer = Self::Buffer> {
+        TokioSocketStreamReader::<OOB> {
+            scheduler: self.scheduler,
+            socket: self.socket,
+            pool: self.pool,
+            eof: self.eof,
+            closed: self.closed,
+        }
+    }
 
     async fn read(&mut self, cancellation: &Cancellation) -> OperationResult<Option<Self::Buffer>> {
         cancellation.check()?;
@@ -118,11 +130,12 @@ impl SocketStreamReader for TokioSocketStreamReader<'_> {
         }
         let count = self
             .scheduler
-            .socket_recv_poll(
+            .socket_recv_poll_with(
                 &self.socket,
                 buffer,
                 SocketRecvFlags::default(),
                 cancellation,
+                !SUPPORT_OOB,
             )
             .await?;
         if count == 0 {
@@ -232,7 +245,7 @@ impl SocketStreamReader for TokioSocketStreamReader<'_> {
         }
         let (result, buffer) = self
             .scheduler
-            .socket_read(&self.socket, buffer, cancellation)
+            .socket_read_with(&self.socket, buffer, cancellation, !SUPPORT_OOB)
             .await;
         if matches!(result, Ok(0)) {
             self.eof = true;

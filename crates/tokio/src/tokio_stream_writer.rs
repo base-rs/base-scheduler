@@ -232,7 +232,12 @@ async fn write_remaining<B: IoBuf>(
         cancellation.check()?;
         stopping.check()?;
         let bytes = &buffer.as_ref()[offset..];
-        let operation = socket.io_with(Interest::Writable, |socket| send(socket, bytes), false);
+        let operation = socket.io_with(
+            Interest::Writable,
+            |socket| send(socket, bytes),
+            false,
+            |_| false,
+        );
         let mut operation = pin!(operation);
         let count = poll_fn(|context| {
             if let Poll::Ready(result) = operation.as_mut().poll(context) {

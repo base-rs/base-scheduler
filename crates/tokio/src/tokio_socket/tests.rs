@@ -418,6 +418,7 @@ fn established_stream_reads_only_retry_stale_readiness_once() {
                             crate::socket_io::recv(socket, &mut buffer)
                         },
                         true,
+                        |_| false,
                     ));
                     assert!(poll_once(&mut next).await.is_none());
                     drop(next);
@@ -757,6 +758,255 @@ fn urgent_tcp_boundary_keeps_trailing_bytes_readable() {
     );
     let count = result.unwrap().unwrap();
     assert_eq!(&buffer[..count], b"after");
+    block_on(scheduler.socket_close(socket)).unwrap();
+    block_on(scheduler.shutdown());
+}
+
+// Whether readiness observed by a short stream read survives it, for a borrowed or owned read through `reader`.
+#[cfg(target_os = "linux")]
+async fn short_read_keeps_readiness(
+    reader: &mut impl base_scheduler::SocketStreamReader,
+    socket: &TokioSocket,
+    peer: &mut std::net::TcpStream,
+    owned: bool,
+    byte: u8,
+) -> bool {
+    use base_scheduler::*;
+    use futures_lite::future::poll_once;
+    use std::io::Write;
+    let never = Cancellation::never();
+    peer.write_all(&[byte]).unwrap();
+    // Wait until the reactor has published the edge, so the read is attempted on that observation.
+    if let Some(registration) = socket.inner.registration.get() {
+        drop(registration.readable().await.unwrap());
+    }
+    let (count, received) = if owned {
+        let (result, buffer) = reader.read_owned(vec![0; 8], &never).await;
+        (result.unwrap(), buffer[0])
+    } else {
+        let mut buffer = [0; 8];
+        (
+            reader.read_into(&mut buffer, &never).await.unwrap(),
+            buffer[0],
+        )
+    };
+    assert_eq!((count, received), (1, byte));
+    poll_once(socket.inner.registration.get().unwrap().readable())
+        .await
+        .is_some()
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn short_stream_reads_clear_readiness_only_without_oob_support() {
+    use base_scheduler::*;
+    use futures_lite::future::{block_on, poll_once};
+    use std::io::Write;
+    crate::test_support::run(|| {
+        block_on(async {
+            let scheduler = crate::test_support::scheduler();
+            let never = Cancellation::never();
+            for oob in [false, true] {
+                for owned in [false, true] {
+                    let (native, mut peer) = tcp_pair();
+                    let socket = TokioSocket::new(&scheduler.runtime, native.into()).unwrap();
+                    let reader = scheduler.socket_stream_reader(&socket).unwrap();
+                    let mut first = [0; 8];
+                    // The first read registers after `WouldBlock`; the second waits on cached readiness first.
+                    let (cleared, steady) = if oob {
+                        let mut reader = reader.with_oob_support::<true>();
+                        let mut pending = Box::pin(reader.read_into(&mut first, &never));
+                        assert!(poll_once(&mut pending).await.is_none());
+                        drop(pending);
+                        (
+                            !short_read_keeps_readiness(
+                                &mut reader,
+                                &socket,
+                                &mut peer,
+                                owned,
+                                b'x',
+                            )
+                            .await,
+                            !short_read_keeps_readiness(
+                                &mut reader,
+                                &socket,
+                                &mut peer,
+                                owned,
+                                b'y',
+                            )
+                            .await,
+                        )
+                    } else {
+                        let mut reader = reader;
+                        let mut pending = Box::pin(reader.read_into(&mut first, &never));
+                        assert!(poll_once(&mut pending).await.is_none());
+                        drop(pending);
+                        (
+                            !short_read_keeps_readiness(
+                                &mut reader,
+                                &socket,
+                                &mut peer,
+                                owned,
+                                b'x',
+                            )
+                            .await,
+                            !short_read_keeps_readiness(
+                                &mut reader,
+                                &socket,
+                                &mut peer,
+                                owned,
+                                b'y',
+                            )
+                            .await,
+                        )
+                    };
+                    // The first successful read establishes the stream through a syscall-first attempt, so only later reads have an observation to clear.
+                    assert_eq!((cleared, steady), (false, !oob), "oob {oob}, owned {owned}");
+                    // A full read leaves bytes queued, so it keeps readiness under either policy.
+                    peer.write_all(b"abc").unwrap();
+                    let mut reader = scheduler.socket_stream_reader(&socket).unwrap();
+                    let registration = socket.inner.registration.get().unwrap();
+                    drop(registration.readable().await.unwrap());
+                    let mut buffer = [0; 2];
+                    assert_eq!(reader.read_into(&mut buffer, &never).await.unwrap(), 2);
+                    assert!(poll_once(registration.readable()).await.is_some());
+                    assert_eq!(reader.read_into(&mut buffer, &never).await.unwrap(), 1);
+                    assert_eq!(&buffer[..1], b"c");
+                    drop(reader);
+                    scheduler.socket_close(socket).await.unwrap();
+                }
+            }
+            scheduler.shutdown().await;
+        });
+    });
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn a_readability_event_during_a_short_read_is_not_erased() {
+    use base_scheduler::*;
+    use futures_lite::future::{block_on, poll_once};
+    use std::io::Write;
+    crate::test_support::run(|| {
+        block_on(async {
+            let scheduler = crate::test_support::scheduler();
+            let never = Cancellation::never();
+            let (native, mut peer) = tcp_pair();
+            let socket = TokioSocket::new(&scheduler.runtime, native.into()).unwrap();
+            let mut buffer = [0; 8];
+            let mut reader = scheduler.socket_stream_reader(&socket).unwrap();
+            let mut pending = Box::pin(reader.read_into(&mut buffer, &never));
+            assert!(poll_once(&mut pending).await.is_none());
+            drop(pending);
+            peer.write_all(b"x").unwrap();
+            assert_eq!(reader.read_into(&mut buffer, &never).await.unwrap(), 1);
+            peer.write_all(b"y").unwrap();
+            let registration = socket.inner.registration.get().unwrap();
+            drop(registration.readable().await.unwrap());
+            let mut attempts = 0;
+            // More input arrives after the short receive and before its clear; a multi-thread worker's reactor records it as a newer event meanwhile.
+            let count = socket
+                .io_with(
+                    Interest::Readable,
+                    |socket| {
+                        attempts += 1;
+                        let result = crate::socket_io::recv(socket, &mut buffer);
+                        if attempts == 1 {
+                            peer.write_all(b"z").unwrap();
+                            std::thread::sleep(Duration::from_millis(50));
+                        }
+                        result
+                    },
+                    true,
+                    |&count| 0 < count && count < 8,
+                )
+                .await
+                .unwrap();
+            assert_eq!((count, buffer[0]), (1, b'y'));
+            let next = scheduler.socket_recv_poll_with(
+                &socket,
+                &mut buffer,
+                SocketRecvFlags::default(),
+                &never,
+                true,
+            );
+            let count = scheduler
+                .runtime
+                .block_on(async { tokio::time::timeout(Duration::from_secs(5), next).await });
+            assert_eq!(
+                count
+                    .expect("a newer readability event was erased")
+                    .unwrap(),
+                1
+            );
+            assert_eq!(buffer[0], b'z');
+            drop(reader);
+            scheduler.socket_close(socket).await.unwrap();
+            scheduler.shutdown().await;
+        });
+    });
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn urgent_tcp_boundary_keeps_trailing_bytes_readable_without_oob_support() {
+    use base_scheduler::*;
+    use futures_lite::future::block_on;
+    use std::io::Write;
+    let runtime = runtime();
+    let scheduler = crate::TokioScheduler::with_options(
+        runtime.handle().clone(),
+        crate::TokioOptions {
+            threads: 1,
+            capacity: 4,
+        },
+    )
+    .unwrap();
+    let never = Cancellation::never();
+    let (native, mut peer) = tcp_pair();
+    let socket = TokioSocket::new(runtime.handle(), native.into()).unwrap();
+    let registration = block_on(socket.inner.registration()).unwrap();
+    // The default reader clears readiness after ordinary short reads.
+    let mut reader = scheduler.socket_stream_reader(&socket).unwrap();
+    let mut buffer = [0; 64];
+    peer.write_all(b"seed").unwrap();
+    assert_eq!(block_on(reader.read_into(&mut buffer, &never)).unwrap(), 4);
+    peer.write_all(b"after-seed").unwrap();
+    runtime.block_on(async {
+        registration.readable().await.unwrap().retain_ready();
+    });
+    assert_eq!(
+        runtime
+            .block_on(reader.read_into(&mut buffer, &never))
+            .unwrap(),
+        10
+    );
+    peer.write_all(b"before").unwrap();
+    let peer_socket = socket2::SockRef::from(&peer);
+    assert_eq!(peer_socket.send_with_flags(b"!", libc::MSG_OOB).unwrap(), 1);
+    peer.write_all(b"after").unwrap();
+    // Let every loopback segment arrive before the current-thread reactor captures its edge.
+    std::thread::sleep(Duration::from_millis(10));
+    runtime.block_on(async {
+        registration.readable().await.unwrap().retain_ready();
+    });
+    let count = runtime
+        .block_on(reader.read_into(&mut buffer, &never))
+        .unwrap();
+    assert_eq!(&buffer[..count], b"before");
+    let result = runtime.block_on(async {
+        tokio::time::timeout(
+            Duration::from_millis(100),
+            reader.read_into(&mut buffer, &never),
+        )
+        .await
+    });
+    // The short read stopped at the urgent mark; reported priority readiness keeps the trailing bytes reachable without another peer write.
+    let count = result
+        .expect("trailing normal TCP bytes stalled after a short read at an urgent mark")
+        .unwrap();
+    assert_eq!(&buffer[..count], b"after");
+    drop(reader);
     block_on(scheduler.socket_close(socket)).unwrap();
     block_on(scheduler.shutdown());
 }
