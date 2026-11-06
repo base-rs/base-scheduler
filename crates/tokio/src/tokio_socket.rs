@@ -298,7 +298,7 @@ impl TokioSocket {
         self.io_with(interest, operation, false, |_| false).await
     }
 
-    /// `drained` reports whether a successful result proves the receive queue was empty when the syscall returned, so readiness observed before a readiness-first attempt can be cleared without a further syscall returning `WouldBlock`. Only OOB-disabled scalar stream reads pass a predicate other than `|_| false`; Linux and Android honour it unless urgent data or closure has been reported.
+    /// `drained` reports whether a successful result proves the receive queue was empty when the syscall returned, so readiness observed before a readiness-first attempt can be cleared without a further syscall returning `WouldBlock`. Only OOB-disabled consuming stream receives pass a predicate other than `|_| false`; Linux and Android honour it unless urgent data or closure has been reported.
     pub(super) async fn io_with<Output, Operation>(
         &self,
         interest: Interest,

@@ -110,6 +110,67 @@ fn default_stream_pool_and_eof_are_consistent_across_read_forms() {
 }
 
 #[test]
+fn stream_peeks_leave_input_for_consuming_receives_and_return_owners() {
+    run(async |scheduler| {
+        let never = Cancellation::never();
+        let cancelled = Cancellation::new();
+        cancelled.cancel();
+        let peek = SocketRecvFlags { peek: true };
+        let (sender, socket) =
+            base_scheduler_conformance::socket::stream_pair(scheduler, SocketDomain::Ipv4).await;
+        let mut reader = scheduler.socket_stream_reader(&socket).unwrap();
+        let mut writer = scheduler.socket_stream_writer(&sender).unwrap();
+        assert_eq!(writer.write(b"abc", &never).await.unwrap(), 3);
+        let mut bytes = [0; 8];
+        assert!(
+            reader
+                .read_into_with_flags(&mut bytes, peek, &cancelled)
+                .await
+                .is_err()
+        );
+        let (result, buffers) = reader
+            .read_owned_vectored([vec![0x5a; 8]], peek, &cancelled)
+            .await;
+        assert!(result.is_err());
+        assert_eq!(buffers, [vec![0x5a; 8]]);
+        assert_eq!(
+            reader
+                .read_into_with_flags(&mut bytes, peek, &never)
+                .await
+                .unwrap(),
+            3
+        );
+        let (result, buffers) = reader
+            .read_owned_vectored([vec![0; 1], vec![0; 2]], peek, &never)
+            .await;
+        assert_eq!(result.unwrap().bytes, 3);
+        assert_eq!(buffers, [b"a".to_vec(), b"bc".to_vec()]);
+        let (result, buffers) = reader
+            .read_owned_vectored([vec![0; 1], vec![0; 7]], SocketRecvFlags::default(), &never)
+            .await;
+        assert_eq!(result.unwrap().bytes, 3);
+        assert_eq!(&buffers[1][..2], b"bc");
+        // A consuming owned receive returns its owner when cancelled.
+        let (result, buffers) = reader
+            .read_owned_vectored([vec![0x5a; 8]], SocketRecvFlags::default(), &cancelled)
+            .await;
+        assert!(result.is_err());
+        assert_eq!(buffers, [vec![0x5a; 8]]);
+        // A peek of nothing at the peer's shutdown is EOF.
+        scheduler
+            .socket_shutdown(&sender, Shutdown::Write)
+            .await
+            .unwrap();
+        let (result, _) = reader.read_owned_vectored([vec![0; 8]], peek, &never).await;
+        assert_eq!(result.unwrap().bytes, 0);
+        assert_eq!(reader.read_into(&mut bytes, &never).await.unwrap(), 0);
+        drop((reader, writer));
+        scheduler.socket_close(socket).await.unwrap();
+        scheduler.socket_close(sender).await.unwrap();
+    });
+}
+
+#[test]
 fn default_packet_pool_and_closed_lanes_preserve_message_boundaries() {
     run(async |scheduler| {
         let never = Cancellation::never();

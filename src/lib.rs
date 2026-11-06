@@ -11,7 +11,7 @@
 //!
 //! | Factory | Handle | Operations |
 //! | --- | --- | --- |
-//! | [`SocketStreamReading`] | [`SocketStreamReader`] | `read` returns an owned chunk; `read_into` and `read_vectored` use borrowed parser storage; `try_read_into` reads now without waiting, for probing idle connections. |
+//! | [`SocketStreamReading`] | [`SocketStreamReader`] | `read` returns an owned chunk; `read_into` and `read_vectored` use borrowed parser storage; `try_read_into` and `try_read_vectored` read now without waiting, for probing idle connections. |
 //! | [`SocketStreamWriting`] | [`SocketStreamWriter`] | `write` and `write_vectored` make borrowed transfers; `submit` accepts owned output that progresses independently, and `flush` waits for all accepted bytes. |
 //! | [`SocketPacketReading`] | [`SocketPacketReader`] | `read` returns an owned message with source metadata; borrowed forms fill caller storage and report truncation. |
 //! | [`SocketPacketWriting`] | [`SocketPacketWriter`] | Send one packet from borrowed scalar/vector storage or an owned buffer, with an optional destination. |

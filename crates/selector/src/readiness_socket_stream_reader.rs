@@ -73,14 +73,14 @@ impl<'a, const SUPPORT_OOB: bool> ReadinessSocketStreamReader<'a, SUPPORT_OOB> {
         }
     }
 
-    // Scalar consuming stream reads (`SCALAR`) may use readiness before their
-    // syscall once established, clear readiness after a short read, and reject
-    // urgent data when support is disabled. Vectored, flagged and pooled
-    // receives share the cached registration but retain their conservative
-    // contract: a syscall first on every call, and readiness retained until
-    // `WouldBlock`.
+    // Every stream receive which consumes input follows one rule, whatever its
+    // shape: once established it waits on cached readiness before its
+    // syscall, a short receive into `capacity` bytes may clear readiness, and
+    // disabled OOB support rejects reported urgent data. A peek consumes
+    // nothing, so neither its count nor a wait proves anything about the
+    // queue; peeks use the scheduler's syscall-first operations instead.
     #[cfg(unix)]
-    async fn read_with<const SCALAR: bool>(
+    async fn read_with(
         &mut self,
         capacity: usize,
         cancellation: &Cancellation,
@@ -94,17 +94,17 @@ impl<'a, const SUPPORT_OOB: bool> ReadinessSocketStreamReader<'a, SUPPORT_OOB> {
             &self.registration,
         ) {
             self.scheduler.check_open()?;
-            let result = Receive::<_, SUPPORT_OOB, SCALAR> {
+            let result = Receive::<_, SUPPORT_OOB> {
                 group,
                 direction: registration.direction(Interest::Readable),
                 socket: self.socket.get_ref(),
                 receive,
                 capacity,
-                probe: !SCALAR || !self.established,
+                probe: !self.established,
                 listener: None,
             }
             .await;
-            if SCALAR && matches!(result, Ok(count) if count != 0) {
+            if matches!(result, Ok(count) if count != 0) {
                 self.established = true;
             }
             return result.map_err(Into::into);
@@ -115,7 +115,7 @@ impl<'a, const SUPPORT_OOB: bool> ReadinessSocketStreamReader<'a, SUPPORT_OOB> {
                 let Some(group) = &self.scheduler.readiness else {
                     return self.socket.io(Interest::Readable, receive).await;
                 };
-                let mut probe = !SCALAR || !self.established;
+                let mut probe = !self.established;
                 if self.registration.is_none() {
                     // Preserve immediate errors and retry across registration.
                     let result = receive(self.socket.get_ref());
@@ -129,7 +129,7 @@ impl<'a, const SUPPORT_OOB: bool> ReadinessSocketStreamReader<'a, SUPPORT_OOB> {
                     );
                     probe = true;
                 }
-                Receive::<_, SUPPORT_OOB, SCALAR> {
+                Receive::<_, SUPPORT_OOB> {
                     group,
                     direction: self
                         .registration
@@ -146,13 +146,13 @@ impl<'a, const SUPPORT_OOB: bool> ReadinessSocketStreamReader<'a, SUPPORT_OOB> {
             });
             scheduler.cancellable(cancellation, operation).await
         };
-        if SCALAR && matches!(result, Ok(count) if count != 0) {
+        if matches!(result, Ok(count) if count != 0) {
             self.established = true;
         }
         result
     }
     #[cfg(not(unix))]
-    async fn read_with<const SCALAR: bool>(
+    async fn read_with(
         &mut self,
         _capacity: usize,
         cancellation: &Cancellation,
@@ -161,6 +161,40 @@ impl<'a, const SUPPORT_OOB: bool> ReadinessSocketStreamReader<'a, SUPPORT_OOB> {
         self.scheduler
             .cancellable(cancellation, self.socket.io(Interest::Readable, receive))
             .await
+    }
+
+    // One immediate receive for the `try_` reads: no wait and no readiness.
+    fn try_read_with(
+        &mut self,
+        empty: bool,
+        receive: impl FnOnce(&socket2::Socket) -> io::Result<usize>,
+    ) -> io::Result<usize> {
+        self.check_open()?;
+        if self.eof || empty {
+            return Ok(0);
+        }
+        let count = receive(self.socket.get_ref())?;
+        if count == 0 {
+            self.eof = true;
+        }
+        Ok(count)
+    }
+
+    // Whether a pooled read should wait before taking a slot: an established
+    // reader whose cached readiness is clear would wait before its syscall
+    // anyway, so it need not hold storage meanwhile. Reported urgent data
+    // skips the wait, so a reader without OOB support rejects it now.
+    #[cfg(unix)]
+    fn wait_first(&self) -> bool {
+        let Some(registration) = self.registration.as_ref().filter(|_| self.established) else {
+            return false;
+        };
+        let observed = registration.direction(Interest::Readable).snapshot();
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        if rejects_urgent::<SUPPORT_OOB>(observed) {
+            return false;
+        }
+        observed & 1 == 0
     }
 
     // Wait for readability after a pooled receive returned its buffer. A
@@ -190,10 +224,17 @@ const EMPTY: SocketRecvResult = SocketRecvResult {
     control_truncated: false,
 };
 
+// Linux and Android epoll report urgent data, which a reader without OOB
+// support rejects instead of reading short at its mark.
+#[cfg(any(target_os = "linux", target_os = "android"))]
+fn rejects_urgent<const SUPPORT_OOB: bool>(observed: usize) -> bool {
+    !SUPPORT_OOB && observed & 4 != 0
+}
+
 // The registered receive loop. Between polls it retains only the borrowed
 // socket state and a pending wait's listener.
 #[cfg(unix)]
-struct Receive<'a, F, const SUPPORT_OOB: bool, const SCALAR: bool> {
+struct Receive<'a, F, const SUPPORT_OOB: bool> {
     group: &'a crate::readiness_driver::DriverGroup,
     direction: &'a crate::readiness_driver::Direction,
     socket: &'a socket2::Socket,
@@ -203,7 +244,7 @@ struct Receive<'a, F, const SUPPORT_OOB: bool, const SCALAR: bool> {
     listener: Option<crate::readiness_driver::Listener<'a>>,
 }
 #[cfg(unix)]
-impl<F, const SUPPORT_OOB: bool, const SCALAR: bool> Future for Receive<'_, F, SUPPORT_OOB, SCALAR>
+impl<F, const SUPPORT_OOB: bool> Future for Receive<'_, F, SUPPORT_OOB>
 where
     F: FnMut(&socket2::Socket) -> io::Result<usize> + Unpin,
 {
@@ -213,7 +254,7 @@ where
         loop {
             let observed = this.direction.snapshot();
             #[cfg(any(target_os = "linux", target_os = "android"))]
-            if SCALAR && !SUPPORT_OOB && observed & 4 != 0 {
+            if rejects_urgent::<SUPPORT_OOB>(observed) {
                 return Poll::Ready(Err(io::Error::new(
                     io::ErrorKind::Unsupported,
                     "TCP urgent data is not supported by this reader",
@@ -233,14 +274,9 @@ where
             match (this.receive)(this.socket) {
                 Ok(count) => {
                     // The backend and OOB policy determine when a short
-                    // scalar receive is sufficient to clear this generation.
-                    if SCALAR {
-                        this.direction.clear_after_read::<SUPPORT_OOB>(
-                            observed,
-                            count,
-                            this.capacity,
-                        );
-                    }
+                    // receive is sufficient to clear this generation.
+                    this.direction
+                        .clear_after_read::<SUPPORT_OOB>(observed, count, this.capacity);
                     return Poll::Ready(Ok(count));
                 }
                 Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
@@ -281,6 +317,10 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for ReadinessSocketStreamReader
             );
         }
         loop {
+            #[cfg(unix)]
+            if self.wait_first() {
+                self.wait_readable(cancellation).await?;
+            }
             // The lease does not borrow the pool, so the receive can borrow the reader.
             let mut buffer = self
                 .pool
@@ -290,7 +330,8 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for ReadinessSocketStreamReader
                 .await?;
             let result = {
                 let bytes = buffer.as_mut();
-                let mut reading = pin!(self.read_with::<false>(0, cancellation, |socket| {
+                let capacity = bytes.len();
+                let mut reading = pin!(self.read_with(capacity, cancellation, |socket| {
                     socket_io::recv_poll(socket, bytes, SocketRecvFlags::default())
                 }));
                 poll_fn(|context| Poll::Ready(reading.as_mut().poll(context))).await
@@ -322,7 +363,7 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for ReadinessSocketStreamReader
             return Ok(0);
         }
         let count = self
-            .read_with::<true>(buffer.len(), cancellation, |socket| {
+            .read_with(buffer.len(), cancellation, |socket| {
                 socket_io::recv_poll(socket, buffer, SocketRecvFlags::default())
             })
             .await?;
@@ -333,16 +374,18 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for ReadinessSocketStreamReader
     }
 
     fn try_read_into(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
-        self.check_open()?;
-        if self.eof || buffer.is_empty() {
-            return Ok(0);
-        }
-        let count =
-            socket_io::recv_poll(self.socket.get_ref(), buffer, SocketRecvFlags::default())?;
-        if count == 0 {
-            self.eof = true;
-        }
-        Ok(count)
+        let empty = buffer.is_empty();
+        self.try_read_with(empty, |socket| {
+            socket_io::recv_poll(socket, buffer, SocketRecvFlags::default())
+        })
+    }
+
+    fn try_read_vectored(&mut self, buffers: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
+        let empty = buffers.iter().all(|buffer| buffer.is_empty());
+        self.try_read_with(empty, |socket| {
+            socket_io::recvmsg_poll(socket, buffers, SocketRecvFlags::default())
+                .map(|result| result.bytes)
+        })
     }
 
     async fn read_vectored(
@@ -355,8 +398,9 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for ReadinessSocketStreamReader
             cancellation.check()?;
             return Ok(0);
         }
+        let capacity = buffers.iter().map(|buffer| buffer.len()).sum();
         let count = self
-            .read_with::<false>(0, cancellation, |socket| {
+            .read_with(capacity, cancellation, |socket| {
                 socket_io::recvmsg_poll(socket, buffers, SocketRecvFlags::default())
                     .map(|result| result.bytes)
             })
@@ -378,9 +422,16 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for ReadinessSocketStreamReader
             cancellation.check()?;
             return Ok(EMPTY);
         }
+        if flags.peek {
+            return self
+                .scheduler
+                .socket_recvmsg_poll(&self.socket, buffers, flags, cancellation)
+                .await;
+        }
         // The receive keeps its full result here and reports only its count.
         let mut received = EMPTY;
-        self.read_with::<false>(0, cancellation, |socket| {
+        let capacity = buffers.iter().map(|buffer| buffer.len()).sum();
+        self.read_with(capacity, cancellation, |socket| {
             received = socket_io::recvmsg_poll(socket, buffers, flags)?;
             Ok(received.bytes)
         })
@@ -404,13 +455,22 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for ReadinessSocketStreamReader
         if self.eof || (0..buffers.buffer_count()).all(|index| buffers.buffer(index).is_empty()) {
             return (Ok(EMPTY), buffers);
         }
+        if flags.peek {
+            return self
+                .scheduler
+                .socket_recvmsg(&self.socket, buffers, flags, cancellation)
+                .await;
+        }
         // Like `read_owned`, every receive completes synchronously within this
         // future, which retains the owner and returns it with every outcome.
         let mut received = EMPTY;
+        let capacity = (0..buffers.buffer_count())
+            .map(|index| buffers.buffer(index).len())
+            .sum();
         let result = {
             let mut vectors = socket_io::IoVectors::new();
             let (buffers, received) = (&mut buffers, &mut received);
-            self.read_with::<false>(0, cancellation, move |socket| {
+            self.read_with(capacity, cancellation, move |socket| {
                 *received = vectors.recv(socket, buffers, flags)?;
                 Ok(received.bytes)
             })
@@ -431,12 +491,11 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for ReadinessSocketStreamReader
             return (cancellation.check().map(|()| 0).map_err(Into::into), buffer);
         }
         // Readiness completes every receive synchronously, so the owned range
-        // can share the bound scalar path: its cached registration, readiness
-        // before a syscall once established, and short-read clearing. This
-        // future retains the owner, which every outcome returns.
+        // shares the borrowed path. This future retains the owner, which
+        // every outcome returns.
         let result = {
             let bytes = buffer.as_mut();
-            self.read_with::<true>(bytes.len(), cancellation, |socket| {
+            self.read_with(bytes.len(), cancellation, |socket| {
                 socket_io::recv_poll(socket, bytes, SocketRecvFlags::default())
             })
             .await

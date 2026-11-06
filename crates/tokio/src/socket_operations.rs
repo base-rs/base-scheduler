@@ -36,16 +36,15 @@ impl TokioScheduler {
         (result, input)
     }
 
-    /// A scalar receive of `length` bytes. Nonempty reads on an established stream may wait on cached readiness first; with `drain_short`, a positive short count clears that readiness (see `TokioSocket::io_with`).
-    async fn socket_receive<Input: Send>(
+    /// A consuming stream receive of at most `length` bytes. Nonempty reads on an established stream may wait on cached readiness first; with `drain_short`, a positive short count clears that readiness (see `TokioSocket::io_with`).
+    pub(crate) async fn socket_receive(
         &self,
         socket: &TokioSocket,
-        mut input: Input,
         cancellation: &Cancellation,
         length: usize,
         drain_short: bool,
-        mut operation: impl FnMut(&Socket, &mut Input) -> io::Result<usize> + Send,
-    ) -> (OperationResult<usize>, Input) {
+        operation: impl FnMut(&Socket) -> io::Result<usize> + Send,
+    ) -> OperationResult<usize> {
         // Only Linux and Android honour a drain predicate; elsewhere none is built.
         #[cfg(any(target_os = "linux", target_os = "android"))]
         let drained = move |&count: &usize| {
@@ -56,17 +55,10 @@ impl TokioScheduler {
             let _ = drain_short;
             |_: &usize| false
         };
-        let result = self
-            .socket_result(socket, cancellation, || {
-                socket.io_with(
-                    Interest::Readable,
-                    |socket| operation(socket, &mut input),
-                    length > 0,
-                    drained,
-                )
-            })
-            .await;
-        (result, input)
+        self.socket_result(socket, cancellation, || {
+            socket.io_with(Interest::Readable, operation, length > 0, drained)
+        })
+        .await
     }
 
     async fn socket_result<Output: Send, Operation>(
@@ -223,6 +215,7 @@ impl TokioScheduler {
     }
 
     /// `drain_short` is only for OOB-disabled stream readers: a positive short receive clears the readiness it was attempted on.
+    #[cfg(test)]
     pub(crate) async fn socket_read_with<B: IoBufMut>(
         &self,
         socket: &TokioSocket,
@@ -231,15 +224,12 @@ impl TokioScheduler {
         drain_short: bool,
     ) -> BufferResult<B> {
         let length = buffer.as_mut().len();
-        self.socket_receive(
-            socket,
-            buffer,
-            cancellation,
-            length,
-            drain_short,
-            |socket, buffer| socket_io::recv(socket, buffer.as_mut()),
-        )
-        .await
+        let result = self
+            .socket_receive(socket, cancellation, length, drain_short, |socket| {
+                socket_io::recv(socket, buffer.as_mut())
+            })
+            .await;
+        (result, buffer)
     }
 }
 
@@ -261,6 +251,8 @@ impl TokioScheduler {
     }
 }
 
+// Stream readers receive through `socket_receive`; these remain for socket tests.
+#[cfg(test)]
 impl TokioScheduler {
     pub(crate) async fn socket_recv_poll(
         &self,
@@ -283,16 +275,10 @@ impl TokioScheduler {
         drain_short: bool,
     ) -> OperationResult<usize> {
         let length = buffer.len();
-        self.socket_receive(
-            socket,
-            buffer,
-            cancellation,
-            length,
-            drain_short,
-            |socket, buffer| socket_io::recv_poll(socket, buffer, flags),
-        )
+        self.socket_receive(socket, cancellation, length, drain_short, |socket| {
+            socket_io::recv_poll(socket, buffer, flags)
+        })
         .await
-        .0
     }
 }
 

@@ -51,6 +51,14 @@ pub trait SocketStreamReader: Send {
     /// Attempt one borrowed read now, without waiting, registering interest, or consulting cached readiness. Unlike polling [`read_into`](Self::read_into) once, this always reaches the transport, so it observes input, EOF or errors the operating system has already queued. Zero with nonempty storage is EOF; `WouldBlock` means no input is available now, including while an abandoned owned operation still retains the handle. An empty destination completes with zero after checking that the handle is open, without establishing EOF. It checks only this reader's handle, not whether the scheduler is closed, and does not detect urgent data. Wrappers must forward this to their inner reader rather than polling a read.
     fn try_read_into(&mut self, buffer: &mut [u8]) -> io::Result<usize>;
 
+    /// Attempt one borrowed scatter read now, with [`try_read_into`](Self::try_read_into)'s contract: it never waits, registers interest or consults cached readiness, unlike polling [`read_vectored`](Self::read_vectored) once. Entirely empty storage completes with zero after checking that the handle is open. The default passes the first nonempty range to `try_read_into`, a valid if possibly shorter scatter read; backends fill every range in one transfer.
+    fn try_read_vectored(&mut self, buffers: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
+        match buffers.iter_mut().find(|buffer| !buffer.is_empty()) {
+            Some(buffer) => self.try_read_into(buffer),
+            None => self.try_read_into(&mut []),
+        }
+    }
+
     /// Scatter a single read across borrowed ranges without allocating an I/O-vector array or copying payloads. Entirely empty storage follows `read_into`'s zero-capacity behavior.
     fn read_vectored(
         &mut self,

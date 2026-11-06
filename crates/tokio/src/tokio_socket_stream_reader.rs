@@ -5,7 +5,7 @@ use crate::Interest;
 use crate::{TokioScheduler, TokioSocket};
 use base_scheduler::{
     BufferPool, BufferPoolOptions, BufferPooling, Cancellation, OperationResult, SocketRecvFlags,
-    SocketStreamReader,
+    SocketRecvResult, SocketStreamReader,
 };
 use std::{
     future::{Future, poll_fn},
@@ -16,7 +16,7 @@ use std::{
 
 /// Scheduler-bound stream reader; registration remains private to this backend.
 ///
-/// With OOB support disabled (the default), scalar reads on Linux and Android clear their observed readiness after a positive short receive unless urgent data or closure was reported, as Tokio's own streams do; enabled support retains readiness until `WouldBlock`. Pooled reads keep the conservative policy for both settings.
+/// With OOB support disabled (the default), every receive which consumes input, whatever its shape, clears its observed readiness on Linux and Android after a positive short receive unless urgent data or closure was reported, as Tokio's own streams do; enabled support retains readiness until `WouldBlock`. Peeks consume nothing, so they reach the socket first and keep readiness until `WouldBlock`.
 pub(crate) struct TokioSocketStreamReader<'a, const SUPPORT_OOB: bool = false> {
     scheduler: &'a TokioScheduler,
     socket: TokioSocket,
@@ -59,7 +59,46 @@ impl<'a, const SUPPORT_OOB: bool> TokioSocketStreamReader<'a, SUPPORT_OOB> {
             Ok(())
         }
     }
+
+    // Every receive which consumes input, of at most `capacity` bytes, by
+    // `receive`: on an established stream it waits on cached readiness first,
+    // and a short count can clear that readiness under the reader's OOB
+    // policy. Each read awaits the never-cancelled compact path from
+    // `established_read` itself before this generic path: awaiting both inside
+    // one shared async helper added a future layer which cost 1-3% more
+    // instructions per scalar echo request.
+    fn receive<'s>(
+        &'s self,
+        capacity: usize,
+        cancellation: &'s Cancellation,
+        receive: impl FnMut(&socket2::Socket) -> io::Result<usize> + Send + 's,
+    ) -> impl Future<Output = OperationResult<usize>> + Send + 's {
+        self.scheduler
+            .socket_receive(&self.socket, cancellation, capacity, !SUPPORT_OOB, receive)
+    }
+
+    // One immediate receive for the `try_` reads: no wait and no readiness.
+    fn try_read_with(
+        &mut self,
+        empty: bool,
+        receive: impl FnOnce(&socket2::Socket) -> io::Result<usize>,
+    ) -> io::Result<usize> {
+        self.check_open()?;
+        if self.eof || empty {
+            return Ok(0);
+        }
+        let count = receive(self.socket.get_ref())?;
+        self.eof |= count == 0;
+        Ok(count)
+    }
 }
+
+const EMPTY: SocketRecvResult = SocketRecvResult {
+    bytes: 0,
+    address: None,
+    truncated: false,
+    control_truncated: false,
+};
 
 /// Never-cancelled reads on an established stream wait in one compact future instead of the generic cancellable operation; there is no listener to register, and the scheduler checks happen here instead. Other reads return `None` and take the generic path.
 #[cfg(unix)]
@@ -75,13 +114,13 @@ fn established_read<'a>(
     Ok(socket.established_read())
 }
 
-/// Whether a scalar receive of `count` into `length` bytes proves the queue drained, under the reader's OOB policy. Only Linux and Android clear readiness on that proof.
+/// Whether a consuming receive of `count` into `length` bytes proves the queue drained, under the reader's OOB policy. Only Linux and Android clear readiness on that proof.
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub(crate) fn short(count: usize, length: usize, support_oob: bool) -> bool {
     !support_oob && 0 < count && count < length
 }
 
-// The drain predicate for an established scalar read; only Linux and Android build one that can clear readiness.
+// The drain predicate for an established consuming read; only Linux and Android build one that can clear readiness.
 #[cfg(unix)]
 fn drain_predicate<const SUPPORT_OOB: bool>(length: usize) -> impl Fn(&usize) -> bool + Send {
     #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -124,12 +163,23 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for TokioSocketStreamReader<'_,
         loop {
             let mut buffer = pool.acquire(cancellation).await?;
             let result = {
-                let mut reading = pin!(self.scheduler.socket_recv_poll(
-                    &self.socket,
-                    buffer.as_mut(),
-                    SocketRecvFlags::default(),
-                    cancellation
-                ));
+                let bytes = buffer.as_mut();
+                let capacity = bytes.len();
+                let mut receive = |socket: &socket2::Socket| {
+                    crate::socket_io::recv_poll(socket, bytes, SocketRecvFlags::default())
+                };
+                let mut reading = pin!(async {
+                    #[cfg(unix)]
+                    if let Some(read) =
+                        established_read(self.scheduler, &self.socket, cancellation)?
+                    {
+                        return read
+                            .read(&mut receive, drain_predicate::<SUPPORT_OOB>(capacity))
+                            .await
+                            .map_err(Into::into);
+                    }
+                    self.receive(capacity, cancellation, &mut receive).await
+                });
                 poll_fn(|context| Poll::Ready(reading.as_mut().poll(context))).await
             };
             match result {
@@ -160,49 +210,36 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for TokioSocketStreamReader<'_,
             cancellation.check()?;
             return Ok(0);
         }
+        let capacity = buffer.len();
+        let mut receive = |socket: &socket2::Socket| {
+            crate::socket_io::recv_poll(socket, buffer, SocketRecvFlags::default())
+        };
         #[cfg(unix)]
         if let Some(read) = established_read(self.scheduler, &self.socket, cancellation)? {
-            let length = buffer.len();
             let count = read
-                .read(
-                    |socket| {
-                        crate::socket_io::recv_poll(socket, buffer, SocketRecvFlags::default())
-                    },
-                    drain_predicate::<SUPPORT_OOB>(length),
-                )
+                .read(&mut receive, drain_predicate::<SUPPORT_OOB>(capacity))
                 .await?;
-            if count == 0 {
-                self.eof = true;
-            }
+            self.eof |= count == 0;
             return Ok(count);
         }
-        let count = self
-            .scheduler
-            .socket_recv_poll_with(
-                &self.socket,
-                buffer,
-                SocketRecvFlags::default(),
-                cancellation,
-                !SUPPORT_OOB,
-            )
-            .await?;
-        if count == 0 {
-            self.eof = true;
-        }
+        let count = self.receive(capacity, cancellation, &mut receive).await?;
+        self.eof |= count == 0;
         Ok(count)
     }
 
     fn try_read_into(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
-        self.check_open()?;
-        if self.eof || buffer.is_empty() {
-            return Ok(0);
-        }
-        let count =
-            crate::socket_io::recv_poll(self.socket.get_ref(), buffer, SocketRecvFlags::default())?;
-        if count == 0 {
-            self.eof = true;
-        }
-        Ok(count)
+        let empty = buffer.is_empty();
+        self.try_read_with(empty, |socket| {
+            crate::socket_io::recv_poll(socket, buffer, SocketRecvFlags::default())
+        })
+    }
+
+    fn try_read_vectored(&mut self, buffers: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
+        let empty = buffers.iter().all(|buffer| buffer.is_empty());
+        self.try_read_with(empty, |socket| {
+            crate::socket_io::recvmsg_poll(socket, buffers, SocketRecvFlags::default())
+                .map(|result| result.bytes)
+        })
     }
 
     async fn read_vectored(
@@ -224,21 +261,35 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for TokioSocketStreamReader<'_,
         self.check_open()?;
         if self.eof || buffers.iter().all(|buffer| buffer.is_empty()) {
             cancellation.check()?;
-            return Ok(base_scheduler::SocketRecvResult {
-                bytes: 0,
-                address: None,
-                truncated: false,
-                control_truncated: false,
-            });
+            return Ok(EMPTY);
         }
-        let result = self
-            .scheduler
-            .socket_recvmsg_poll(&self.socket, buffers, flags, cancellation)
-            .await?;
-        if result.bytes == 0 {
-            self.eof = true;
+        // A peek consumes nothing, so it reaches the socket first and keeps
+        // readiness until `WouldBlock`.
+        if flags.peek {
+            let result = self
+                .scheduler
+                .socket_recvmsg_poll(&self.socket, buffers, flags, cancellation)
+                .await?;
+            self.eof |= result.bytes == 0;
+            return Ok(result);
         }
-        Ok(result)
+        let mut received = EMPTY;
+        let capacity = buffers.iter().map(|buffer| buffer.len()).sum();
+        let mut receive = |socket: &socket2::Socket| {
+            received = crate::socket_io::recvmsg_poll(socket, buffers, flags)?;
+            Ok(received.bytes)
+        };
+        #[cfg(unix)]
+        if let Some(read) = established_read(self.scheduler, &self.socket, cancellation)? {
+            let count = read
+                .read(&mut receive, drain_predicate::<SUPPORT_OOB>(capacity))
+                .await?;
+            self.eof |= count == 0;
+            return Ok(received);
+        }
+        let count = self.receive(capacity, cancellation, &mut receive).await?;
+        self.eof |= count == 0;
+        Ok(received)
     }
 
     async fn read_owned_vectored<Buffers: base_scheduler::IoBufSequenceMut>(
@@ -267,14 +318,41 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for TokioSocketStreamReader<'_,
         if let Err(error) = cancellation.check() {
             return (Err(error.into()), buffers);
         }
-        let (result, buffers) = self
-            .scheduler
-            .socket_recvmsg(&self.socket, buffers, flags, cancellation)
-            .await;
-        if matches!(&result, Ok(result) if result.bytes == 0) {
-            self.eof = true;
+        if flags.peek {
+            let (result, buffers) = self
+                .scheduler
+                .socket_recvmsg(&self.socket, buffers, flags, cancellation)
+                .await;
+            self.eof |= matches!(&result, Ok(result) if result.bytes == 0);
+            return (result, buffers);
         }
-        (result, buffers)
+        let mut buffers = buffers;
+        let mut received = EMPTY;
+        let mut vectors = crate::socket_io::IoVectors::new();
+        let capacity = (0..buffers.buffer_count())
+            .map(|index| buffers.buffer(index).len())
+            .sum();
+        let mut receive = |socket: &socket2::Socket| {
+            received = vectors.recv(socket, &mut buffers, flags)?;
+            Ok(received.bytes)
+        };
+        #[cfg(unix)]
+        match established_read(self.scheduler, &self.socket, cancellation) {
+            Err(error) => return (Err(error), buffers),
+            Ok(Some(read)) => {
+                let result = read
+                    .read(&mut receive, drain_predicate::<SUPPORT_OOB>(capacity))
+                    .await
+                    .inspect(|&count| self.eof |= count == 0);
+                return (result.map(|_| received).map_err(Into::into), buffers);
+            }
+            Ok(None) => (),
+        }
+        let result = self
+            .receive(capacity, cancellation, &mut receive)
+            .await
+            .inspect(|&count| self.eof |= count == 0);
+        (result.map(|_| received), buffers)
     }
 
     async fn read_owned<B: base_scheduler::IoBufMut>(
@@ -291,32 +369,26 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for TokioSocketStreamReader<'_,
         if let Err(error) = cancellation.check() {
             return (Err(error.into()), buffer);
         }
+        let mut buffer = buffer;
+        let capacity = buffer.as_ref().len();
+        let mut receive =
+            |socket: &socket2::Socket| crate::socket_io::recv(socket, buffer.as_mut());
         #[cfg(unix)]
         match established_read(self.scheduler, &self.socket, cancellation) {
             Err(error) => return (Err(error), buffer),
             Ok(Some(read)) => {
-                let mut buffer = buffer;
-                let length = buffer.as_mut().len();
                 let result = read
-                    .read(
-                        |socket| crate::socket_io::recv(socket, buffer.as_mut()),
-                        drain_predicate::<SUPPORT_OOB>(length),
-                    )
-                    .await;
-                if matches!(result, Ok(0)) {
-                    self.eof = true;
-                }
+                    .read(&mut receive, drain_predicate::<SUPPORT_OOB>(capacity))
+                    .await
+                    .inspect(|&count| self.eof |= count == 0);
                 return (result.map_err(Into::into), buffer);
             }
             Ok(None) => (),
         }
-        let (result, buffer) = self
-            .scheduler
-            .socket_read_with(&self.socket, buffer, cancellation, !SUPPORT_OOB)
-            .await;
-        if matches!(result, Ok(0)) {
-            self.eof = true;
-        }
+        let result = self
+            .receive(capacity, cancellation, &mut receive)
+            .await
+            .inspect(|&count| self.eof |= count == 0);
         (result, buffer)
     }
 

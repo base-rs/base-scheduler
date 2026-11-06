@@ -91,6 +91,15 @@ fn stream_input_preserves_peek_and_owned_ranges_and_rejects_closed_calls() {
             4
         );
         assert_eq!(&bytes, b"peek");
+        let (result, buffers) = reader
+            .read_owned_vectored(
+                [vec![0; 2], vec![0; 2]],
+                SocketRecvFlags { peek: true },
+                &never,
+            )
+            .await;
+        assert_eq!(result.unwrap().bytes, 4);
+        assert_eq!(buffers, [b"pe".to_vec(), b"ek".to_vec()]);
         assert_eq!(
             reader
                 .read_vectored(&mut [IoSliceMut::new(&mut bytes)], &never)
