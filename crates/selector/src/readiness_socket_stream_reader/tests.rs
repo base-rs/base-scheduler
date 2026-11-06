@@ -499,3 +499,27 @@ fn compile_time_options_preserve_the_pool_eof_and_closed_state() {
         io::ErrorKind::BrokenPipe
     );
 }
+
+#[cfg(target_os = "linux")]
+#[test]
+fn default_owned_reads_reject_urgent_data_like_borrowed_reads() {
+    let (selector, mut worker, socket, mut peer) = setup();
+    if selector.readiness.is_none() {
+        return;
+    }
+    let never = Cancellation::never();
+    let mut reader = ReadinessSocketStreamReader::<false>::new(&selector, &socket).unwrap();
+    let mut reading = Box::pin(reader.read_owned(vec![0; 64], &never));
+    assert!(block_on(poll_once(&mut reading)).is_none());
+    peer.write_all(b"x").unwrap();
+    assert_eq!(drive(reading, &mut worker).0.unwrap(), 1);
+    peer.write_all(b"before").unwrap();
+    socket2::SockRef::from(&peer)
+        .send_with_flags(b"!", libc::MSG_OOB)
+        .unwrap();
+    std::thread::sleep(Duration::from_millis(10));
+    // The owner comes back with the rejection.
+    let (result, buffer) = drive(reader.read_owned(vec![0x5a; 64], &never), &mut worker);
+    assert_eq!(result.unwrap_err().kind(), io::ErrorKind::Unsupported);
+    assert_eq!(buffer.len(), 64);
+}
