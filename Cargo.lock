@@ -87,9 +87,9 @@ dependencies = [
 
 [[package]]
 name = "bake-cargo"
-version = "0.6.1"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c2d64760a8e3796d74d222fc92484259e6baebc36fbf5f36809d9b1ecc3f8d0f"
+checksum = "a30601d7033294f30c6fe49c0195e81465a46c87be4205ef367bb5f1c19288d8"
 dependencies = [
  "bake",
  "bake-license",
@@ -104,9 +104,9 @@ dependencies = [
 
 [[package]]
 name = "bake-license"
-version = "0.2.5"
+version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6b873096492b2786ea7c0dd8ccc588b5919a052a13db753a5098950eb5e5e83e"
+checksum = "e35b8a1c3070a67c626000ea8b1793d0170d5d0bd2fdb976b0c4e067bbe023b8"
 dependencies = [
  "bake",
  "base-markdown",
@@ -185,9 +185,9 @@ dependencies = [
 
 [[package]]
 name = "base-project"
-version = "0.1.6"
+version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a632ae85dc123e469d25ae8bce039317e401ed77883d921dd1a33b79d1017eb0"
+checksum = "17105821bc688644e3193269a7e2c005a53f44b16981094e0771f802f8eb1e1e"
 dependencies = [
  "bake",
  "bake-agent-context",
@@ -527,7 +527,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1023,7 +1023,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1253,7 +1253,7 @@ dependencies = [
  "getrandom 0.4.3",
  "once_cell",
  "rustix",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
