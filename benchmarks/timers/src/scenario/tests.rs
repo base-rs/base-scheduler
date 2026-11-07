@@ -2,60 +2,72 @@
 // Copyright, 2026, by Samuel Williams.
 
 use super::*;
+use crate::test_support::TestSource;
+use base_benchmark::Measurement;
 
-fn scenario(values: &[&str]) -> serde_json::Value {
-    execute(
-        &values
-            .iter()
-            .map(|value| value.to_string())
-            .collect::<Vec<_>>(),
-    )
+fn options(workload: ScenarioWorkload, iterations: usize, unit_us: u64) -> ScenarioOptions {
+    ScenarioOptions {
+        workload,
+        workers: 2,
+        iterations,
+        unit: Duration::from_micros(unit_us),
+    }
 }
 
 #[test]
 fn every_workload_runs_with_a_short_unit() {
-    for (workload, samples) in [
-        ("root-sleep", 2),
-        ("spawn", 0),
-        ("spawn-pending", 0),
-        ("task-sleep", 2 * 2 * 4),
-        ("task-sleep-pending", 2 * 2 * 4),
-        ("idle", 0),
-        ("pulse", 0),
-        ("stall", 2 * 8),
-        ("yield", 0),
-    ] {
-        let record = scenario(&[workload, "2", "2", "100"]);
-        assert_eq!(record["workload"], workload);
-        assert_eq!(record["iterations"], 2);
-        assert_eq!(record["unit_us"], 100);
-        assert_eq!(record["samples"], samples, "{workload}");
-        assert!(record["ns_per_operation"].as_f64().unwrap() > 0.0);
-        assert_eq!(
-            record["overshoot_p50_ns"].is_null(),
-            samples == 0,
-            "{workload}"
+    for workload in ScenarioWorkload::ALL {
+        let sample = measure(&options(*workload, 2, 100), TestSource::default()).unwrap();
+        assert_eq!(sample.operations, 2);
+        assert!(sample.metric("wall_time").is_some());
+        let sleeps = matches!(
+            workload,
+            ScenarioWorkload::RootSleep
+                | ScenarioWorkload::TaskSleep
+                | ScenarioWorkload::TaskSleepPending
+                | ScenarioWorkload::Stall
         );
-        assert_eq!(record["rescues"].is_object(), cfg!(feature = "diagnostics"));
+        assert_eq!(
+            sample.metric("overshoot_p50").is_some(),
+            sleeps,
+            "{workload:?}"
+        );
+        assert_eq!(
+            sample.metric("rescued_timers").is_some(),
+            cfg!(feature = "diagnostics")
+        );
     }
 }
 
 #[test]
 fn a_stalled_worker_does_not_hold_root_sleeps() {
     // At the default unit, one worker blocks for 200 ms while root sleeps of 10 ms are measured; stall rescue keeps each far below the block.
-    let record = scenario(&["stall", "2", "1"]);
-    assert_eq!(record["unit_us"], 1000);
-    let max = record["overshoot_max_ns"].as_u64().unwrap();
-    assert!(max < 100_000_000, "a root sleep was {max} ns late");
+    let sample = measure(
+        &options(ScenarioWorkload::Stall, 1, 1000),
+        TestSource::default(),
+    )
+    .unwrap();
+    assert!(
+        matches!(
+            sample.metric("overshoot_max").unwrap().measurement,
+            Measurement::Mean { value } if value < 100_000_000.0
+        ),
+        "a root sleep was too late: {sample:?}"
+    );
     #[cfg(feature = "diagnostics")]
     assert!(
-        record["rescues"]["timers"].as_u64().unwrap() > 0,
-        "{record}"
+        matches!(
+            sample.metric("rescued_timers").unwrap().measurement,
+            Measurement::Total { value } if value > 0
+        ),
+        "{sample:?}"
     );
 }
 
 #[test]
-#[should_panic(expected = "unknown workload")]
-fn an_unknown_workload_is_rejected() {
-    scenario(&["unknown", "1", "1", "100"]);
+fn a_failed_measurement_still_shuts_the_scheduler_down() {
+    for source in [TestSource::failing(), TestSource::failing_after(1)] {
+        let error = measure(&options(ScenarioWorkload::Spawn, 1, 10), source).unwrap_err();
+        assert!(error.to_string().contains("no resource usage"));
+    }
 }

@@ -2,6 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::{After, Mode};
+use base_benchmark::{Metric, Sample, Unit};
 use base_scheduler::{Cancellation, Timers};
 use std::{
     future::{Future, poll_fn},
@@ -14,7 +15,8 @@ fn pending(future: impl Future, context: &mut Context<'_>) {
     assert!(pin!(future).as_mut().poll(context).is_pending());
 }
 
-pub async fn measure<S: Timers>(scheduler: &S, mode: Mode, iterations: usize) -> serde_json::Value {
+/// Count the allocations on the calling worker during `iterations` warmed refreshes. Background-thread allocations and setup are excluded.
+pub async fn measure<S: Timers>(scheduler: &S, mode: Mode, iterations: usize) -> Sample {
     let token = Cancellation::new();
     let mut timer = scheduler.timer();
     let mut after = After::new(scheduler.timer());
@@ -40,5 +42,10 @@ pub async fn measure<S: Timers>(scheduler: &S, mode: Mode, iterations: usize) ->
             step();
         }
     });
-    serde_json::json!({"allocations": measured.count_total, "allocated_bytes": measured.bytes_total, "operations": iterations, "timer_bytes": std::mem::size_of::<S::Timer>(), "after_bytes": std::mem::size_of::<After<S::Timer>>(), "count_scope": "calling worker only; background-thread allocations excluded"})
+    let size = |name, bytes: usize| Metric::mean(name, Unit::Bytes, bytes as f64);
+    Sample::new(iterations as u64)
+        .with(Metric::total("allocations", Unit::Count, measured.count_total).lower_is_better())
+        .with(Metric::total("allocated_bytes", Unit::Bytes, measured.bytes_total).lower_is_better())
+        .with(size("timer_size", std::mem::size_of::<S::Timer>()))
+        .with(size("after_size", std::mem::size_of::<After<S::Timer>>()))
 }

@@ -4,7 +4,7 @@ These results check the rescue classification counter in [stall rescue](../../..
 
 The binaries were built from commit `f59cba4`: the scheduler code of `main` at `0b4c540` (stall rescue, #93) with this pull request's harness, identical to its commit `37e9206`. They predate the monitor startup fix (`fc987a6`, #97), which changes no counting. Timing from these builds is not a measurement.
 
-Hana: Linux 7.2.14, Intel Xeon E3-1240 v6 (4 cores, 8 threads), `powersave` governor, rustc 1.99.1, release builds. The echo server ran on CPUs 0, 4, 1 and 5 and the client on 2, 6, 3 and 7; the timer benchmark's runs were not pinned. Every run held `/tmp/base-scheduler-perf.lock`, and nothing else ran on the host.
+Hana: Linux 7.2.14, Intel Xeon E3-1240 v6 (4 cores, 8 threads), `powersave` governor, rustc 1.99.1, release builds. The echo server ran on CPUs 0, 4, 1 and 5 and the client on 2, 6, 3 and 7; the timer benchmark's runs were not pinned. Every run held `/tmp/base-scheduler-perf.lock`, and nothing else ran on the host. These commands use the timer benchmark's positional command line of the time; it now takes `--name value` options and writes `base-benchmark` records, as [its readme](../../readme.md) describes.
 
 ```sh
 cargo build --release --locked -p base-scheduler-benchmark-timers -p base-scheduler-benchmark-echo --features base-scheduler-benchmark-timers/diagnostics,base-scheduler-benchmark-echo/diagnostics --target-dir ../target-counts

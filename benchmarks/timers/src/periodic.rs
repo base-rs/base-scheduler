@@ -3,16 +3,16 @@
 
 //! Periodic timers: many tasks each sleep for a fixed delay again and again, and the overshoot of every expiry inside a measurement window is recorded. This is the worker-local timer diagnostic of the stall rescue design.
 
-use crate::{cpu_time, quantile, rescues};
+use crate::options::{Alignment, NativeBackend, PeriodicOptions};
+use crate::{with_overshoot, with_rescues};
+use base_benchmark::{Interval, ResourceSource, Sample};
 use base_scheduler::{Cancellation, Clock, Spawn};
 use base_scheduler_native::{NativeScheduler, Selector};
 use std::{
+    io,
     sync::Arc,
     time::{Duration, Instant},
 };
-
-const USAGE: &str =
-    "periodic BACKEND WORKERS TASKS DELAY_US [unaligned|aligned] [MEASURE_MS] [WORK]";
 
 struct Window {
     start: Instant,
@@ -46,90 +46,62 @@ impl Window {
     }
 }
 
-/// Runs `periodic BACKEND WORKERS TASKS DELAY_US [unaligned|aligned] [MEASURE_MS] [WORK]` and returns its record, with overshoot in nanoseconds. `BACKEND` is `native`, or `iouring` on Linux. The window measures for `MEASURE_MS` (3,000 by default) after a warmup of a third of that.
-pub fn execute(args: &[String]) -> serde_json::Value {
-    let backend = args.first().expect(USAGE).as_str();
-    let workers: usize = args.get(1).expect(USAGE).parse().unwrap();
-    let tasks: usize = args.get(2).expect(USAGE).parse().unwrap();
-    let delay = Duration::from_micros(args.get(3).expect(USAGE).parse().unwrap());
-    assert!(!delay.is_zero(), "DELAY_US must be positive");
-    let alignment = args.get(4).map_or("unaligned", String::as_str);
-    let aligned = match alignment {
-        "unaligned" => false,
-        "aligned" => true,
-        _ => panic!("unknown alignment"),
-    };
-    let measure = Duration::from_millis(args.get(5).map_or(3000, |value| value.parse().unwrap()));
-    let work: u64 = args.get(6).map_or(0, |value| value.parse().unwrap());
-    let start = Instant::now() + measure / 3;
+/// Measure the window: its CPU time and wall time, with every expiry inside it as one operation and the overshoot of each. The window follows a warmup of a third of its length.
+pub fn measure<R: ResourceSource>(options: &PeriodicOptions, source: R) -> io::Result<Sample> {
+    let start = Instant::now() + options.measure / 3;
     let window = Arc::new(Window {
         start,
-        end: start + measure,
-        delay,
-        aligned,
-        work,
+        end: start + options.measure,
+        delay: options.delay,
+        aligned: options.alignment == Alignment::Aligned,
+        work: options.work,
     });
-    let capacity = tasks * 2 + 256;
-    let cpu_start = cpu_time();
-    let (mut overshoot, rescues) = match backend {
-        "native" => run(
+    let capacity = options.tasks * 2 + 256;
+    match options.backend {
+        NativeBackend::Native => run(
             NativeScheduler::with_options(base_scheduler_native::NativeOptions {
-                workers,
+                workers: options.workers,
                 timer_capacity: capacity,
                 ..Default::default()
             })
             .unwrap(),
-            tasks,
+            options.tasks,
             window,
+            source,
         ),
         #[cfg(target_os = "linux")]
-        "iouring" => {
-            let (selector, drivers) =
-                base_scheduler_iouring::IoUringSelector::with_workers(Default::default(), workers)
-                    .unwrap();
+        NativeBackend::IoUring => {
+            let (selector, drivers) = base_scheduler_iouring::IoUringSelector::with_workers(
+                Default::default(),
+                options.workers,
+            )
+            .unwrap();
             run(
                 NativeScheduler::with_drivers(
                     selector,
                     drivers,
                     base_scheduler_native::NativeExecutorOptions {
-                        workers,
+                        workers: options.workers,
                         timer_capacity: capacity,
                         ..Default::default()
                     },
                 )
                 .unwrap(),
-                tasks,
+                options.tasks,
                 window,
+                source,
             )
         }
-        _ => panic!("unknown backend"),
-    };
-    let cpu_seconds = cpu_time() - cpu_start;
-    overshoot.sort_unstable();
-    serde_json::json!({
-        "backend": backend,
-        "workers": workers,
-        "tasks": tasks,
-        "delay_us": delay.as_micros() as u64,
-        "alignment": alignment,
-        "work": work,
-        "seconds": measure.as_secs_f64(),
-        "samples": overshoot.len(),
-        "expiries_per_second": overshoot.len() as f64 / measure.as_secs_f64(),
-        "overshoot_p50_ns": quantile(&overshoot, 0.5),
-        "overshoot_p99_ns": quantile(&overshoot, 0.99),
-        "overshoot_max_ns": quantile(&overshoot, 1.0),
-        "cpu_seconds": cpu_seconds,
-        "rescues": rescues,
-    })
+    }
 }
 
-// Runs every task to the end of the window, and returns the overshoot of each expiry inside it in nanoseconds, with the rescue counts.
-fn run<S: Selector + 'static>(
+// Runs every task to the end of the window while the root thread, which runs no tasks, measures the window.
+fn run<S: Selector + 'static, R: ResourceSource>(
     scheduler: NativeScheduler<S>,
     tasks: usize,
     window: Arc<Window>,
-) -> (Vec<u64>, serde_json::Value) {
+    source: R,
+) -> io::Result<Sample> {
     let scheduler = Arc::new(scheduler);
     let handles: Vec<_> = (0..tasks)
         .map(|_| {
@@ -140,6 +112,7 @@ fn run<S: Selector + 'static>(
                 .unwrap()
         })
         .collect();
+    let sample = measure_window(&window, source);
     let overshoot = scheduler.block_on(async {
         let mut overshoot = Vec::new();
         for handle in handles {
@@ -147,9 +120,25 @@ fn run<S: Selector + 'static>(
         }
         overshoot
     });
-    let rescues = rescues(&scheduler);
+    let sample = sample.and_then(|mut sample| {
+        if overshoot.is_empty() {
+            return Err(io::Error::other(
+                "no timer expired inside the measurement window",
+            ));
+        }
+        sample.operations = overshoot.len() as u64;
+        Ok(with_rescues(with_overshoot(sample, overshoot), &scheduler))
+    });
     scheduler.block_on(scheduler.shutdown());
-    (overshoot, rescues)
+    sample
+}
+
+// The resource usage between the window's start and end. Its operations are the window's expiries, counted once the tasks finish.
+fn measure_window<R: ResourceSource>(window: &Window, source: R) -> io::Result<Sample> {
+    std::thread::sleep(window.start.saturating_duration_since(Instant::now()));
+    let interval = Interval::start_with(source)?;
+    std::thread::sleep(window.end.saturating_duration_since(Instant::now()));
+    interval.finish(1)
 }
 
 async fn expiries<S: Clock>(scheduler: &S, window: &Window) -> Vec<u64> {

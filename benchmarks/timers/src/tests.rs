@@ -2,6 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use super::*;
+use crate::test_support::TestSource;
 use base_scheduler::{Clock, OperationError};
 
 async fn semantics<S: Timers>(scheduler: &S) {
@@ -381,11 +382,201 @@ fn benchmark_counts_immediate_expirations() {
         .unwrap();
     let scheduler = base_scheduler_tokio::TokioScheduler::new(runtime.handle().clone());
     for mode in [Mode::Sleep, Mode::Reuse, Mode::After] {
-        let (operations, overshoot, expired) =
-            runtime.block_on(workload(&scheduler, mode, "cycle", 2, Duration::ZERO));
+        let (operations, overshoot, expired) = runtime.block_on(workload(
+            &scheduler,
+            mode,
+            TimerWorkload::Cycle,
+            2,
+            Duration::ZERO,
+        ));
         assert_eq!(operations, 66);
         assert_eq!(overshoot.len(), 2);
         assert_eq!(expired, 64);
     }
     runtime.block_on(scheduler.shutdown());
+}
+
+fn record(arguments: &[&str]) -> serde_json::Value {
+    let benchmark = Benchmark::parse(arguments.iter().map(|value| value.to_string())).unwrap();
+    let mut out = Vec::new();
+    measure(&benchmark, TestSource::default())
+        .unwrap()
+        .emit(&mut out)
+        .unwrap();
+    serde_json::from_slice(&out).unwrap()
+}
+
+fn metric<'a>(record: &'a serde_json::Value, name: &str) -> Option<&'a serde_json::Value> {
+    record["samples"][0]["metrics"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|metric| metric["name"] == name)
+}
+
+#[test]
+fn every_backend_mode_and_timer_workload_records_its_operations() {
+    for backend in Backend::ALL {
+        for mode in Mode::ALL {
+            for workload in TimerWorkload::ALL {
+                let arguments = [
+                    "--backend",
+                    backend.name(),
+                    "--mode",
+                    mode.name(),
+                    "--workload",
+                    workload.name(),
+                    "--tasks",
+                    "2",
+                    "--iterations",
+                    "2",
+                    "--workers",
+                    "1",
+                    "--delay-us",
+                    "100",
+                ];
+                let record = record(&arguments);
+                let context = format!("{arguments:?}: {record}");
+                assert_eq!(record["workload"], WORKLOAD);
+                assert_eq!(record["parameters"]["backend"], backend.name(), "{context}");
+                assert_eq!(record["parameters"]["mode"], mode.name(), "{context}");
+                let operations = record["samples"][0]["operations"].as_u64().unwrap();
+                #[cfg(feature = "allocations")]
+                if *workload == TimerWorkload::Alloc {
+                    assert_eq!(operations, 2, "{context}");
+                    assert!(metric(&record, "allocations").is_some(), "{context}");
+                    assert!(metric(&record, "timer_size").is_some(), "{context}");
+                    continue;
+                }
+                let per_task = if *workload == TimerWorkload::Cycle {
+                    66
+                } else {
+                    2
+                };
+                assert_eq!(operations, 2 * per_task, "{context}");
+                assert!(metric(&record, "wall_time").is_some(), "{context}");
+                assert!(
+                    metric(&record, "refresh_expirations").is_some(),
+                    "{context}"
+                );
+                let expiring = matches!(workload, TimerWorkload::Expire | TimerWorkload::Cycle);
+                assert_eq!(
+                    metric(&record, "overshoot_p99").is_some(),
+                    expiring,
+                    "{context}"
+                );
+                let rescues = *backend != Backend::Tokio && cfg!(feature = "diagnostics");
+                assert_eq!(
+                    metric(&record, "rescued_timers").is_some(),
+                    rescues,
+                    "{context}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn every_family_measures_into_a_record() {
+    let scenario = record(&["--workload", "spawn", "--iterations", "3"]);
+    assert_eq!(scenario["parameters"]["workload"], "spawn");
+    assert_eq!(scenario["samples"][0]["operations"], 3);
+    let periodic = record(&[
+        "--workload",
+        "periodic",
+        "--workers",
+        "1",
+        "--tasks",
+        "2",
+        "--measure-ms",
+        "60",
+    ]);
+    assert_eq!(periodic["parameters"]["workload"], "periodic");
+    assert!(metric(&periodic, "overshoot_p50").is_some());
+}
+
+#[test]
+fn overshoot_reports_order_statistics_of_the_expiries() {
+    let sample = with_overshoot(Sample::new(1), Vec::new());
+    assert!(sample.metrics.is_empty());
+    let sample = with_overshoot(Sample::new(1), (1..=100).rev().collect());
+    let values: Vec<_> = sample
+        .metrics
+        .iter()
+        .map(|metric| (metric.name.as_str(), metric.measurement.clone()))
+        .collect();
+    let mean = |value| base_benchmark::Measurement::Mean { value };
+    assert_eq!(
+        values,
+        [
+            ("overshoot_p50", mean(50.0)),
+            ("overshoot_p99", mean(99.0)),
+            ("overshoot_max", mean(100.0)),
+        ]
+    );
+}
+
+#[test]
+fn commands_write_one_record_or_fail_with_a_message() {
+    let arguments = |values: &[&str]| {
+        values
+            .iter()
+            .map(|value| value.to_string())
+            .collect::<Vec<_>>()
+    };
+    let mut out = Vec::new();
+    let mut errors = Vec::new();
+    let status = command_with(
+        arguments(&["--iterations", "3"]),
+        TestSource::default(),
+        &mut out,
+        &mut errors,
+    );
+    assert_eq!(status, ExitCode::SUCCESS);
+    assert!(errors.is_empty());
+    let record: serde_json::Value = serde_json::from_slice(&out).unwrap();
+    assert_eq!(record["samples"][0]["operations"], 3);
+
+    for (values, source, message) in [
+        (
+            arguments(&["--tasks", "0"]),
+            TestSource::default(),
+            "--tasks must be positive",
+        ),
+        (
+            arguments(&["--backend", "tokio"]),
+            TestSource::failing(),
+            "no resource usage",
+        ),
+        (arguments(&[]), TestSource::failing(), "no resource usage"),
+        (
+            arguments(&[]),
+            TestSource::failing_after(1),
+            "no resource usage",
+        ),
+    ] {
+        let mut out = Vec::new();
+        let mut errors = Vec::new();
+        assert_eq!(
+            command_with(values, source, &mut out, &mut errors),
+            ExitCode::FAILURE
+        );
+        assert!(out.is_empty());
+        let errors = String::from_utf8(errors).unwrap();
+        assert!(
+            errors.starts_with("base-scheduler-benchmark-timers: "),
+            "{errors}"
+        );
+        assert!(errors.contains(message), "{errors}");
+    }
+    #[cfg(target_os = "linux")]
+    assert_eq!(
+        command_with(
+            arguments(&["--backend", "iouring"]),
+            TestSource::failing(),
+            &mut Vec::new(),
+            &mut Vec::new()
+        ),
+        ExitCode::FAILURE
+    );
 }
