@@ -181,9 +181,9 @@ dependencies = [
 
 [[package]]
 name = "base-benchmark"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "59a5aace7f16963c710b1a522ebcbe91e77809c9fcb5620b6c7e7a7e968d0991"
+checksum = "7291613db3cdd9e9280a0054e913157abf92cc654c765794822f5ce41eae2c06"
 dependencies = [
  "nix",
  "serde",
@@ -597,7 +597,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1115,7 +1115,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1356,7 +1356,7 @@ dependencies = [
  "getrandom 0.4.3",
  "once_cell",
  "rustix",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
