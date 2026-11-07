@@ -60,7 +60,7 @@ The root-thread scenarios drive a Native scheduler from the root thread. Every d
 
 ## Running
 
-Each process measures one workload and writes one [`base-benchmark`](https://github.com/base-rs/base-benchmark) record to stdout. Options are written `--name value`; each applies only to the workloads that use it, and any other is an error:
+Each process measures one workload and writes one [`base-benchmark`](https://github.com/base-rs/base-benchmark) record to stdout. Options are written `--name value`. Each family of workloads accepts only its own options, and an unknown option, or one of another family, is an error:
 
 | Option | Workloads | Default |
 | --- | --- | --- |
@@ -81,16 +81,16 @@ target/release/base-scheduler-benchmark-timers --workload stall --workers 2 --it
 target/release/base-scheduler-benchmark-timers --workload periodic --workers 4 --alignment aligned
 ```
 
-Each record repeats every parameter, and reports for its measured operations `wall_time`, `cpu_time`, `user_cpu_time`, `system_cpu_time` and both context-switch counts; summaries divide them by operations. The timer workloads measure from the first task's admission to the last join, and also report `refresh_expirations`. A scenario measures its iterations after the workers have gone idle. `periodic` measures its window from the root thread, which runs no tasks. Workloads with actual expiries add `overshoot_p50`, `overshoot_p99` and `overshoot_max` in nanoseconds: order statistics of every measured expiry, which summaries report as they are. `alloc` reports `allocations` and `allocated_bytes`, with the sizes of the timer resource and the `After` wrapper. Process resource usage comes from `getrusage`, so on other systems than Unix every measurement fails.
+Each record repeats every parameter, and reports for its measured operations `wall_time`, `cpu_time`, `user_cpu_time`, `system_cpu_time` and both context-switch counts; summaries divide them by operations. The timer workloads measure from the first task's admission to the last join, and also report `refresh_expirations`. A scenario measures its iterations after the workers have gone idle. `periodic` measures its window from the root thread, which runs no tasks. `expire`, `cycle`, `root-sleep`, `task-sleep`, `task-sleep-pending`, `stall` and `periodic` measure how late each expiry is, and add `overshoot_p50`, `overshoot_p99` and `overshoot_max` in nanoseconds: order statistics of every measured expiry, which summaries report as they are. `alloc` reports `allocations` and `allocated_bytes`, with the sizes of the timer resource and the `After` wrapper as `timer_size` and `after_size`. Process resource usage comes from `getrusage`, so on other systems than Unix every measurement fails.
 
-Two features add counts at a cost to timing, so take timing from a build without them. Each record lists them in its `features` parameter, so a campaign cannot compare a build with them to one without.
+Two features add counts at a cost to timing, so take timing from a build without them. Each record lists them in its `features` parameter, so the runner rejects a campaign whose artifacts differ in them. Preparation builds every tree with the same features, so take a diagnostic build's records directly from the binary.
 
 - `allocations` enables the `alloc` workload. It replaces the global allocator with a counting one, which slows every allocation.
 - `diagnostics` adds the Native scheduler's stall rescue counts (`rescues_stuck_polls`, `rescues_long_batches`, `rescues_leaving_idle`, `rescued_timers`) to every Native record. They cover the whole process, so summaries never divide them by operations.
 
 ### Comparing builds
 
-[`Cargo.toml`](Cargo.toml) declares scenarios under `[package.metadata.base-benchmark]`. The timer scenarios compare the Tokio adapter, Native, and Native over io_uring in each round, with Tokio as the baseline of the backend comparison. The root-thread scenarios measure Native alone, and the `periodic` and `periodic-aligned` scenarios compare Native and io_uring with 4 workers and 1,024 tasks. Run `cargo bake benchmark:list` for every scenario's resolved arguments, and `cargo bake benchmark:smoke` to run each once with tiny arguments.
+[`Cargo.toml`](Cargo.toml) declares scenarios under `[package.metadata.base-benchmark]`. The timer scenarios compare the Tokio adapter, Native, and Native over io_uring in each round, with Tokio as the baseline of the backend comparison. They use the reusable timer (`reuse`), except `refresh-sleep`, `expire` and `expire-contended`, which use fresh sleeps; other modes and configurations run directly with the binary. The root-thread scenarios measure Native alone, and the `periodic` and `periodic-aligned` scenarios compare Native and io_uring with 4 workers and 1,024 tasks. Run `cargo bake benchmark:list` for every scenario's resolved arguments, and `cargo bake benchmark:smoke` to run each once with tiny arguments.
 
 To compare revisions, check each out (for example with `git worktree add`), then prepare them, baseline first, and run a scenario:
 

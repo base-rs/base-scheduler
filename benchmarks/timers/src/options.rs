@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-//! The binary's options, written `--name value`. `--workload` selects one of three families of workloads, and each family accepts only the options that change its work.
+//! The binary's options, written `--name value`. `--workload` selects one of three families of workloads, and each family accepts only its own options.
 
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
@@ -251,6 +251,21 @@ fn timer_workload(name: &str) -> io::Result<TimerWorkload> {
     name.parse()
 }
 
+// Every option of any family.
+const OPTIONS: &[&str] = &[
+    "workload",
+    "backend",
+    "mode",
+    "tasks",
+    "iterations",
+    "workers",
+    "delay-us",
+    "unit-us",
+    "alignment",
+    "measure-ms",
+    "work",
+];
+
 // Options by name, removed as each family takes the ones it uses, so that any left over are reported.
 struct Arguments(BTreeMap<String, String>);
 
@@ -296,6 +311,9 @@ impl Arguments {
 
     fn finish(self, workload: &str) -> io::Result<()> {
         match self.0.into_keys().next() {
+            Some(name) if !OPTIONS.contains(&name.as_str()) => {
+                Err(invalid(format!("unknown option --{name}")))
+            }
             Some(name) => Err(invalid(format!(
                 "--{name} does not apply to the {workload} workload"
             ))),

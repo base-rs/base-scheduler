@@ -49,6 +49,9 @@ fn invalid_options_fail_without_a_record() {
     assert!(!output.status.success());
     assert!(output.stdout.is_empty());
     assert!(String::from_utf8_lossy(&output.stderr).contains("missing value for --bad"));
+    let output = Command::new(BINARY).args(["--bad", "1"]).output().unwrap();
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("unknown option --bad"));
 }
 
 /// The shared runner accepts this workload's records for every declared scenario and variant.

@@ -151,6 +151,7 @@ fn malformed_and_inapplicable_options_are_errors() {
         error(&["refresh"]),
         "expected --name value, found \"refresh\""
     );
+    assert_eq!(error(&["--bogus", "1"]), "unknown option --bogus");
     assert_eq!(error(&["--tasks"]), "missing value for --tasks");
     assert_eq!(
         error(&["--tasks", "1", "--tasks", "2"]),
