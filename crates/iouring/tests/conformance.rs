@@ -407,6 +407,7 @@ macro_rules! socket_suites {
                 $run(async move |fixture| {
                     base_scheduler_conformance::socket_receiving::stream_eof(&fixture.scheduler).await;
                     base_scheduler_conformance::socket_receiving::stream_try_read(&fixture.scheduler).await;
+                    base_scheduler_conformance::socket_receiving::stream_try_read_vectored_spans_ranges(&fixture.scheduler).await;
                 });
             }
             mod scalar { use super::*; base_scheduler_conformance::socket_tests!(run: streams); }
