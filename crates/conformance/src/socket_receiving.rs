@@ -281,10 +281,13 @@ where
     };
     // A scatter read may stop short of filling every range, as the trait's default does; the remainder stays queued in order. An empty remainder reads zero without establishing EOF.
     assert!((1..=3).contains(&count));
+    // The remainder is already queued, so one read returns it.
     let mut rest = [0; 2];
-    let remaining = &mut rest[..3 - count];
     assert_eq!(
-        reader.read_into(remaining, &never).await.unwrap(),
+        reader
+            .read_into(&mut rest[..3 - count], &never)
+            .await
+            .unwrap(),
         3 - count
     );
     let received = [&head[..], &tail[..]].concat();
@@ -318,6 +321,38 @@ where
             .kind(),
         std::io::ErrorKind::BrokenPipe
     );
+    drop((reader, writer));
+    scheduler.socket_close(socket).await.unwrap();
+    scheduler.socket_close(sender).await.unwrap();
+}
+
+/// A stronger expectation than [`stream_try_read`]'s, which this workspace's backends meet: one immediate vectored attempt passes every range to a single transfer, so input already queued spans them. The trait's default reads only the first nonempty range, so backends relying on it should not run this case.
+pub async fn stream_try_read_vectored_spans_ranges<S>(scheduler: &S)
+where
+    S: SocketOpen
+        + SocketBind
+        + SocketListen
+        + SocketConnect
+        + SocketAccept
+        + SocketLocalAddress
+        + SocketPeerAddress
+        + SocketClose
+        + SocketStreamWriting
+        + SocketStreamReading,
+    S::Socket: 'static,
+{
+    let never = Cancellation::never();
+    let (sender, socket) = stream_pair(scheduler, SocketDomain::Ipv4).await;
+    let mut reader = scheduler.socket_stream_reader(&socket).unwrap();
+    let mut writer = scheduler.socket_stream_writer(&sender).unwrap();
+    assert_eq!(writer.write(b"def", &never).await.unwrap(), 3);
+    let (mut head, mut tail) = ([0; 1], [0; 2]);
+    let count = {
+        let mut vectors = [IoSliceMut::new(&mut head), IoSliceMut::new(&mut tail)];
+        attempt(|| reader.try_read_vectored(&mut vectors), DELIVERY).unwrap()
+    };
+    assert_eq!(count, 3);
+    assert_eq!((head, tail), (*b"d", *b"ef"));
     drop((reader, writer));
     scheduler.socket_close(socket).await.unwrap();
     scheduler.socket_close(sender).await.unwrap();

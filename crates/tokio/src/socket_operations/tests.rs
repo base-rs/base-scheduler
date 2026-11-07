@@ -824,6 +824,10 @@ fn pooled_receivers_preserve_messages_and_stream_eof() {
             base_scheduler_conformance::socket_receiving::messages(&scheduler).await;
             base_scheduler_conformance::socket_receiving::stream_eof(&scheduler).await;
             base_scheduler_conformance::socket_receiving::stream_try_read(&scheduler).await;
+            base_scheduler_conformance::socket_receiving::stream_try_read_vectored_spans_ranges(
+                &scheduler,
+            )
+            .await;
             scheduler.shutdown().await;
         });
     });
