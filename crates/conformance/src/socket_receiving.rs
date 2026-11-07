@@ -212,7 +212,7 @@ where
     scheduler.socket_close(sender).await.unwrap();
 }
 
-/// Immediate reads, scalar and vectored, reach the transport without waiting: they report no input as `WouldBlock`, then queued input and EOF after an established read, whatever readiness the backend has cached. Backends fill every vectored range in one transfer.
+/// Immediate reads, scalar and vectored, reach the transport without waiting: they report no input as `WouldBlock`, then queued input and EOF after an established read, whatever readiness the backend has cached. A vectored attempt may fill fewer than all of its ranges, as `std::io::Read::read_vectored` may.
 pub async fn stream_try_read<S>(scheduler: &S)
 where
     S: SocketOpen
@@ -279,8 +279,16 @@ where
         let mut vectors = [IoSliceMut::new(&mut head), IoSliceMut::new(&mut tail)];
         attempt(|| reader.try_read_vectored(&mut vectors), DELIVERY).unwrap()
     };
-    assert_eq!(count, 3);
-    assert_eq!((head, tail), (*b"d", *b"ef"));
+    // A scatter read may stop short of filling every range, as the trait's default does; the remainder stays queued in order. An empty remainder reads zero without establishing EOF.
+    assert!((1..=3).contains(&count));
+    let mut rest = [0; 2];
+    let remaining = &mut rest[..3 - count];
+    assert_eq!(
+        reader.read_into(remaining, &never).await.unwrap(),
+        3 - count
+    );
+    let received = [&head[..], &tail[..]].concat();
+    assert_eq!([&received[..count], &rest[..3 - count]].concat(), b"def");
     writer.close().await.unwrap();
     scheduler
         .socket_shutdown(&sender, Shutdown::Write)
