@@ -1,3 +1,6 @@
+// Released under the MIT License.
+// Copyright, 2026, by Samuel Williams.
+
 use std::{hint::black_box, time::{Duration, Instant}};
 macro_rules! measure {
     ($queue:expr, $release:expr, $workload:expr) => {{

@@ -1,3 +1,6 @@
+// Released under the MIT License.
+// Copyright, 2026, by Samuel Williams.
+
 //! Diagnostic periodic-timer workload. Both server variants compile this exact file.
 use base_scheduler::{Cancellation, Clock, Spawn};
 use hdrhistogram::Histogram;

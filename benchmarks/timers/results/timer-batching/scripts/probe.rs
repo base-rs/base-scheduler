@@ -1,3 +1,6 @@
+// Released under the MIT License.
+// Copyright, 2026, by Samuel Williams.
+
 // Experiment: per-thread record of the latest expiry pass, read by the diagnostic.
 use std::cell::Cell;
 use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
