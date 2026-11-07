@@ -1,3 +1,6 @@
+// Released under the MIT License.
+// Copyright, 2026, by Samuel Williams.
+
 use base_scheduler::{Cancellation, Clock, Spawn};
 use base_scheduler_native::{NativeOptions, NativeScheduler};
 use futures_lite::future::{block_on, poll_once};
