@@ -5,7 +5,7 @@ use crate::Interest;
 use crate::{IoUringBufferPool, IoUringSelector, MonitorStorage};
 use base_scheduler::{
     BufferPool, BufferPoolOptions, BufferPooling, Cancellation, OperationResult, ReceiveBuffer,
-    SocketRecvFlags, SocketStreamReader,
+    SocketRecvFlags, SocketRecvResult, SocketStreamReader,
 };
 use base_scheduler_selector::NativeSocket;
 use std::{
@@ -62,6 +62,24 @@ impl<'a, const SUPPORT_OOB: bool> IoUringSocketStreamReader<'a, SUPPORT_OOB> {
             Ok(())
         }
     }
+
+    // One immediate receive for the `try_` reads: no wait and no readiness.
+    fn try_read_with(
+        &mut self,
+        empty: bool,
+        receive: impl FnOnce(&crate::io_uring_selector::RegisteredSocket) -> io::Result<usize>,
+    ) -> io::Result<usize> {
+        self.check_open()?;
+        self.operations.check_idle()?;
+        if self.eof || empty {
+            return Ok(0);
+        }
+        let count = receive(self.monitor.as_ref().socket())?;
+        if count == 0 {
+            self.eof = true;
+        }
+        Ok(count)
+    }
 }
 
 impl<const SUPPORT_OOB: bool> SocketStreamReader for IoUringSocketStreamReader<'_, SUPPORT_OOB> {
@@ -97,13 +115,30 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for IoUringSocketStreamReader<'
             .as_ref()
             .expect("owned reads initialize their pool");
         loop {
+            // A drained stream would wait before its receive anyway; wait
+            // without holding a slot.
+            if self
+                .scheduler
+                .socket_stream_drained(&self.monitor, self.probe)
+            {
+                self.scheduler
+                    .socket_monitor_wait(&mut self.monitor, cancellation)
+                    .await?;
+            }
             let mut buffer = pool.acquire(cancellation).await?;
             let result = {
-                let mut reading = pin!(self.scheduler.socket_monitor_recv_poll(
+                let bytes = buffer.as_mut();
+                let capacity = bytes.len();
+                let mut reading = pin!(self.scheduler.socket_stream_receive::<SUPPORT_OOB>(
                     &mut self.monitor,
-                    buffer.as_mut(),
-                    SocketRecvFlags::default(),
-                    cancellation
+                    &mut self.probe,
+                    capacity,
+                    cancellation,
+                    |socket| crate::retained_socket::recv(
+                        socket,
+                        bytes,
+                        SocketRecvFlags::default()
+                    ),
                 ));
                 poll_fn(|context| Poll::Ready(reading.as_mut().poll(context))).await
             };
@@ -136,13 +171,15 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for IoUringSocketStreamReader<'
             cancellation.check()?;
             return Ok(0);
         }
+        let capacity = buffer.len();
         let count = self
             .scheduler
-            .socket_stream_recv_poll::<SUPPORT_OOB>(
+            .socket_stream_receive::<SUPPORT_OOB>(
                 &mut self.monitor,
                 &mut self.probe,
-                buffer,
+                capacity,
                 cancellation,
+                |socket| crate::retained_socket::recv(socket, buffer, SocketRecvFlags::default()),
             )
             .await?;
         if count == 0 {
@@ -152,20 +189,18 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for IoUringSocketStreamReader<'
     }
 
     fn try_read_into(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
-        self.check_open()?;
-        self.operations.check_idle()?;
-        if self.eof || buffer.is_empty() {
-            return Ok(0);
-        }
-        let count = crate::retained_socket::recv(
-            self.monitor.as_ref().socket(),
-            buffer,
-            SocketRecvFlags::default(),
-        )?;
-        if count == 0 {
-            self.eof = true;
-        }
-        Ok(count)
+        let empty = buffer.is_empty();
+        self.try_read_with(empty, |socket| {
+            crate::retained_socket::recv(socket, buffer, SocketRecvFlags::default())
+        })
+    }
+
+    fn try_read_vectored(&mut self, buffers: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
+        let empty = buffers.iter().all(|buffer| buffer.is_empty());
+        self.try_read_with(empty, |socket| {
+            crate::retained_socket::recvmsg(socket, buffers, SocketRecvFlags::default())
+                .map(|result| result.bytes)
+        })
     }
 
     async fn read_vectored(
@@ -179,19 +214,24 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for IoUringSocketStreamReader<'
             cancellation.check()?;
             return Ok(0);
         }
-        let result = self
+        let capacity = buffers.iter().map(|buffer| buffer.len()).sum();
+        let count = self
             .scheduler
-            .socket_monitor_recvmsg_poll(
+            .socket_stream_receive::<SUPPORT_OOB>(
                 &mut self.monitor,
-                buffers,
-                SocketRecvFlags::default(),
+                &mut self.probe,
+                capacity,
                 cancellation,
+                |socket| {
+                    crate::retained_socket::recvmsg(socket, buffers, SocketRecvFlags::default())
+                        .map(|result| result.bytes)
+                },
             )
             .await?;
-        if result.bytes == 0 {
+        if count == 0 {
             self.eof = true;
         }
-        Ok(result.bytes)
+        Ok(count)
     }
 
     async fn read_vectored_with_flags(
@@ -204,16 +244,33 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for IoUringSocketStreamReader<'
         self.operations.check_idle()?;
         if self.eof || buffers.iter().all(|buffer| buffer.is_empty()) {
             cancellation.check()?;
-            return Ok(base_scheduler::SocketRecvResult {
-                bytes: 0,
-                address: None,
-                truncated: false,
-                control_truncated: false,
-            });
+            return Ok(SocketRecvResult::default());
         }
-        self.scheduler
-            .socket_monitor_recvmsg_poll(&mut self.monitor, buffers, flags, cancellation)
-            .await
+        // A peek consumes nothing, so it reaches the socket first and keeps
+        // readiness until `WouldBlock`.
+        if flags.peek {
+            return self
+                .scheduler
+                .socket_monitor_recvmsg_poll(&mut self.monitor, buffers, flags, cancellation)
+                .await;
+        }
+        let mut received = SocketRecvResult::default();
+        let capacity = buffers.iter().map(|buffer| buffer.len()).sum();
+        let count = self
+            .scheduler
+            .socket_stream_receive::<SUPPORT_OOB>(
+                &mut self.monitor,
+                &mut self.probe,
+                capacity,
+                cancellation,
+                |socket| {
+                    received = crate::retained_socket::recvmsg(socket, buffers, flags)?;
+                    Ok(received.bytes)
+                },
+            )
+            .await?;
+        self.eof |= count == 0;
+        Ok(received)
     }
     async fn read_owned_vectored<Buffers: base_scheduler::IoBufSequenceMut>(
         &mut self,
@@ -228,15 +285,7 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for IoUringSocketStreamReader<'
             return (Err(error.into()), buffers);
         }
         if self.eof || (0..buffers.buffer_count()).all(|index| buffers.buffer(index).is_empty()) {
-            return (
-                Ok(base_scheduler::SocketRecvResult {
-                    bytes: 0,
-                    address: None,
-                    truncated: false,
-                    control_truncated: false,
-                }),
-                buffers,
-            );
+            return (Ok(SocketRecvResult::default()), buffers);
         }
         let buffers = match self.operations.begin(buffers) {
             Ok(buffers) => buffers,
@@ -246,6 +295,8 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for IoUringSocketStreamReader<'
             .scheduler
             .socket_recvmsg(self.monitor.socket(), buffers, flags, cancellation)
             .await;
+        // A consuming receive of nothing is EOF; a peek consumes nothing.
+        self.eof |= !flags.peek && matches!(&result, Ok(result) if result.bytes == 0);
         (result, buffers.into_inner())
     }
     async fn read_owned<B: base_scheduler::IoBufMut>(

@@ -395,15 +395,29 @@ async fn scheduler_server<S>(
     }
 }
 
+// The payload calls selected by a scheduler backend's suffix, shared by the
+// Tokio adapter, Native readiness and io_uring backends.
+fn payload(suffix: &str) -> Option<Payload> {
+    match suffix {
+        "" => Some(Payload::Owned),
+        "-poll" | "-monitor" => Some(Payload::Borrowed),
+        "-vectored" => Some(Payload::Vectored),
+        "-owned-vectored" => Some(Payload::OwnedVectored),
+        "-pooled" => Some(Payload::Pooled),
+        _ => None,
+    }
+}
+
 pub(crate) fn run(backend: &str, workers: usize, connections: usize) -> Result<()> {
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind echo listener");
+    let selected = |prefix: &str| backend.strip_prefix(prefix).and_then(payload);
     match backend {
         "tokio" => {
             let runtime = crate::runtime(workers);
             ready(&listener);
             runtime.block_on(tokio_server(listener, connections));
         }
-        "tokio-adapter" | "tokio-adapter-poll" | "tokio-adapter-monitor" => {
+        _ if selected("tokio-adapter").is_some() => {
             let runtime = crate::runtime(workers);
             let scheduler = Arc::new(TokioScheduler::new(runtime.handle().clone()));
             ready(&listener);
@@ -411,20 +425,11 @@ pub(crate) fn run(backend: &str, workers: usize, connections: usize) -> Result<(
                 Arc::clone(&scheduler),
                 listener,
                 connections,
-                if backend == "tokio-adapter" {
-                    Payload::Owned
-                } else {
-                    Payload::Borrowed
-                },
+                selected("tokio-adapter").expect("matched payload"),
             ));
             runtime.block_on(scheduler.shutdown());
         }
-        "native"
-        | "native-poll"
-        | "native-monitor"
-        | "native-vectored"
-        | "native-owned-vectored"
-        | "native-pooled" => {
+        _ if selected("native").is_some() => {
             use base_scheduler_native::{NativeOptions, NativeScheduler};
             let scheduler = Arc::new(
                 NativeScheduler::with_options(NativeOptions {
@@ -438,19 +443,13 @@ pub(crate) fn run(backend: &str, workers: usize, connections: usize) -> Result<(
                 Arc::clone(&scheduler),
                 listener,
                 connections,
-                match backend {
-                    "native" => Payload::Owned,
-                    "native-vectored" => Payload::Vectored,
-                    "native-owned-vectored" => Payload::OwnedVectored,
-                    "native-pooled" => Payload::Pooled,
-                    _ => Payload::Borrowed,
-                },
+                selected("native").expect("matched payload"),
             ));
             report_rescues(&scheduler);
             scheduler.block_on(scheduler.shutdown());
         }
         #[cfg(target_os = "linux")]
-        "iouring" | "iouring-poll" | "iouring-multishot" | "iouring-monitor" => {
+        _ if backend == "iouring-multishot" || selected("iouring").is_some() => {
             use base_scheduler_iouring::{IoUringOptions, IoUringSelector};
             use base_scheduler_native::{NativeExecutorOptions, NativeScheduler};
             let (selector, drivers) = IoUringSelector::with_workers(
@@ -484,11 +483,7 @@ pub(crate) fn run(backend: &str, workers: usize, connections: usize) -> Result<(
                     Arc::clone(&scheduler),
                     listener,
                     connections,
-                    if backend == "iouring" {
-                        Payload::Owned
-                    } else {
-                        Payload::Borrowed
-                    },
+                    selected("iouring").expect("matched payload"),
                 ));
             }
             report_rescues(&scheduler);

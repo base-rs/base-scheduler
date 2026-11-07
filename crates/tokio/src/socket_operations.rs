@@ -36,16 +36,15 @@ impl TokioScheduler {
         (result, input)
     }
 
-    /// A scalar receive of `length` bytes. Nonempty reads on an established stream may wait on cached readiness first; with `drain_short`, a positive short count clears that readiness (see `TokioSocket::io_with`).
-    async fn socket_receive<Input: Send>(
+    /// A consuming stream receive of at most `length` bytes. Nonempty reads on an established stream may wait on cached readiness first; with `drain_short`, a positive short count clears that readiness (see `TokioSocket::io_with`).
+    pub(crate) async fn socket_receive(
         &self,
         socket: &TokioSocket,
-        mut input: Input,
         cancellation: &Cancellation,
         length: usize,
         drain_short: bool,
-        mut operation: impl FnMut(&Socket, &mut Input) -> io::Result<usize> + Send,
-    ) -> (OperationResult<usize>, Input) {
+        operation: impl FnMut(&Socket) -> io::Result<usize> + Send,
+    ) -> OperationResult<usize> {
         // Only Linux and Android honour a drain predicate; elsewhere none is built.
         #[cfg(any(target_os = "linux", target_os = "android"))]
         let drained = move |&count: &usize| {
@@ -56,17 +55,10 @@ impl TokioScheduler {
             let _ = drain_short;
             |_: &usize| false
         };
-        let result = self
-            .socket_result(socket, cancellation, || {
-                socket.io_with(
-                    Interest::Readable,
-                    |socket| operation(socket, &mut input),
-                    length > 0,
-                    drained,
-                )
-            })
-            .await;
-        (result, input)
+        self.socket_result(socket, cancellation, || {
+            socket.io_with(Interest::Readable, operation, length > 0, drained)
+        })
+        .await
     }
 
     async fn socket_result<Output: Send, Operation>(
@@ -210,40 +202,6 @@ impl SocketAccept for TokioScheduler {
 }
 
 impl TokioScheduler {
-    // Production owned reads come from stream readers, which select their OOB policy.
-    #[cfg(test)]
-    pub(crate) async fn socket_read<B: IoBufMut>(
-        &self,
-        socket: &TokioSocket,
-        buffer: B,
-        cancellation: &Cancellation,
-    ) -> BufferResult<B> {
-        self.socket_read_with(socket, buffer, cancellation, false)
-            .await
-    }
-
-    /// `drain_short` is only for OOB-disabled stream readers: a positive short receive clears the readiness it was attempted on.
-    pub(crate) async fn socket_read_with<B: IoBufMut>(
-        &self,
-        socket: &TokioSocket,
-        mut buffer: B,
-        cancellation: &Cancellation,
-        drain_short: bool,
-    ) -> BufferResult<B> {
-        let length = buffer.as_mut().len();
-        self.socket_receive(
-            socket,
-            buffer,
-            cancellation,
-            length,
-            drain_short,
-            |socket, buffer| socket_io::recv(socket, buffer.as_mut()),
-        )
-        .await
-    }
-}
-
-impl TokioScheduler {
     pub(crate) async fn socket_write<B: IoBuf>(
         &self,
         socket: &TokioSocket,
@@ -258,41 +216,6 @@ impl TokioScheduler {
             |socket, buffer| socket_io::send(socket, buffer.as_ref()),
         )
         .await
-    }
-}
-
-impl TokioScheduler {
-    pub(crate) async fn socket_recv_poll(
-        &self,
-        socket: &TokioSocket,
-        buffer: &mut [u8],
-        flags: SocketRecvFlags,
-        cancellation: &Cancellation,
-    ) -> OperationResult<usize> {
-        self.socket_recv_poll_with(socket, buffer, flags, cancellation, false)
-            .await
-    }
-
-    /// `drain_short` is only for OOB-disabled stream readers: a positive short receive clears the readiness it was attempted on.
-    pub(crate) async fn socket_recv_poll_with(
-        &self,
-        socket: &TokioSocket,
-        buffer: &mut [u8],
-        flags: SocketRecvFlags,
-        cancellation: &Cancellation,
-        drain_short: bool,
-    ) -> OperationResult<usize> {
-        let length = buffer.len();
-        self.socket_receive(
-            socket,
-            buffer,
-            cancellation,
-            length,
-            drain_short,
-            |socket, buffer| socket_io::recv_poll(socket, buffer, flags),
-        )
-        .await
-        .0
     }
 }
 

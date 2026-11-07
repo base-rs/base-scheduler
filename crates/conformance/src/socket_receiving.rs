@@ -5,7 +5,7 @@
 use crate::socket::stream_pair;
 use base_scheduler::*;
 use futures_lite::future::poll_once;
-use std::{net::Shutdown, pin::pin};
+use std::{io::IoSliceMut, net::Shutdown, pin::pin};
 
 /// Idle readers release capacity so another connection can use the same pool.
 pub async fn demand_driven<S>(scheduler: &S, sender: &S::Socket, socket: &S::Socket)
@@ -212,7 +212,7 @@ where
     scheduler.socket_close(sender).await.unwrap();
 }
 
-/// Immediate reads reach the transport without waiting: they report no input as `WouldBlock`, then queued input and EOF after an established read, whatever readiness the backend has cached.
+/// Immediate reads, scalar and vectored, reach the transport without waiting: they report no input as `WouldBlock`, then queued input and EOF after an established read, whatever readiness the backend has cached. Backends fill every vectored range in one transfer.
 pub async fn stream_try_read<S>(scheduler: &S)
 where
     S: SocketOpen
@@ -234,9 +234,22 @@ where
     let mut writer = scheduler.socket_stream_writer(&sender).unwrap();
     let mut data = [0; 4];
     assert_eq!(reader.try_read_into(&mut []).unwrap(), 0);
+    assert_eq!(
+        reader
+            .try_read_vectored(&mut [IoSliceMut::new(&mut [])])
+            .unwrap(),
+        0
+    );
     let quiet = std::time::Duration::from_millis(5);
     assert_eq!(
         attempt(|| reader.try_read_into(&mut data), quiet)
+            .unwrap_err()
+            .kind(),
+        std::io::ErrorKind::WouldBlock
+    );
+    assert_eq!(
+        reader
+            .try_read_vectored(&mut [IoSliceMut::new(&mut data)])
             .unwrap_err()
             .kind(),
         std::io::ErrorKind::WouldBlock
@@ -250,6 +263,24 @@ where
         1
     );
     assert_eq!(data[0], b'b');
+    // A vectored read establishes the reader too; an immediate vectored read
+    // then reaches queued input across its ranges.
+    assert_eq!(writer.write(b"c", &never).await.unwrap(), 1);
+    assert_eq!(
+        reader
+            .read_vectored(&mut [IoSliceMut::new(&mut data)], &never)
+            .await
+            .unwrap(),
+        1
+    );
+    assert_eq!(writer.write(b"def", &never).await.unwrap(), 3);
+    let (mut head, mut tail) = ([0; 1], [0; 2]);
+    let count = {
+        let mut vectors = [IoSliceMut::new(&mut head), IoSliceMut::new(&mut tail)];
+        attempt(|| reader.try_read_vectored(&mut vectors), DELIVERY).unwrap()
+    };
+    assert_eq!(count, 3);
+    assert_eq!((head, tail), (*b"d", *b"ef"));
     writer.close().await.unwrap();
     scheduler
         .socket_shutdown(&sender, Shutdown::Write)
@@ -260,10 +291,23 @@ where
         0
     );
     assert_eq!(reader.try_read_into(&mut data).unwrap(), 0);
+    assert_eq!(
+        reader
+            .try_read_vectored(&mut [IoSliceMut::new(&mut data)])
+            .unwrap(),
+        0
+    );
     assert_eq!(reader.read_into(&mut data, &never).await.unwrap(), 0);
     reader.close().await.unwrap();
     assert_eq!(
         reader.try_read_into(&mut data).unwrap_err().kind(),
+        std::io::ErrorKind::BrokenPipe
+    );
+    assert_eq!(
+        reader
+            .try_read_vectored(&mut [IoSliceMut::new(&mut data)])
+            .unwrap_err()
+            .kind(),
         std::io::ErrorKind::BrokenPipe
     );
     drop((reader, writer));

@@ -321,33 +321,34 @@ impl IoUringSelector {
     pub(crate) async fn socket_monitor_close(&self, monitor: &mut Storage) -> io::Result<()> {
         self.monitor_close(monitor).await
     }
-    pub(crate) async fn socket_monitor_recv_poll(
-        &self,
-        monitor: &mut Storage,
-        buffer: &mut [u8],
-        flags: SocketRecvFlags,
-        cancellation: &Cancellation,
-    ) -> OperationResult<usize> {
-        self.monitor_io(monitor, Interest::Readable, cancellation, |socket| {
-            syscall("monitor-recv", || {
-                crate::retained_socket::recv(socket, buffer, flags)
-            })
-        })
-        .await
+    // Whether a stream reader would wait before its next receive: the
+    // previous one drained the queue, no notification has arrived since, and
+    // no isolated urgent notification awaits rejection.
+    pub(crate) fn socket_stream_drained(&self, monitor: &Storage, probe: bool) -> bool {
+        let registration = monitor.as_ref().registration();
+        !probe
+            && registration.readiness.load(Ordering::Acquire) & URGENT == 0
+            && !registration.is_ready()
     }
-    // Ordinary scalar reads can wait after draining a stream. Flagged/message
-    // receives retain their syscall-first semantics, as does OOB-enabled input:
-    // an urgent mark can stop a short read while normal data remains queued.
-    pub(crate) async fn socket_stream_recv_poll<const SUPPORT_OOB: bool>(
+    // Every stream receive which consumes input, whatever its shape, can wait
+    // after draining a stream: `receive` fills at most `capacity` bytes, and a
+    // short count clears the readiness it observed. OOB-enabled input retains
+    // syscall-first retries: an urgent mark can stop a short read while normal
+    // data remains queued. Peeks consume nothing and use the generic monitor
+    // operations instead.
+    pub(crate) async fn socket_stream_receive<const SUPPORT_OOB: bool>(
         &self,
         monitor: &mut Storage,
         probe: &mut bool,
-        buffer: &mut [u8],
+        capacity: usize,
         cancellation: &Cancellation,
+        mut receive: impl FnMut(&RegisteredSocket) -> io::Result<usize> + Send,
     ) -> OperationResult<usize> {
         if SUPPORT_OOB {
             return self
-                .socket_monitor_recv_poll(monitor, buffer, SocketRecvFlags::default(), cancellation)
+                .monitor_io(monitor, Interest::Readable, cancellation, |socket| {
+                    syscall("monitor-recv", || receive(socket))
+                })
                 .await;
         }
         let state = monitor.as_ref();
@@ -368,15 +369,9 @@ impl IoUringSelector {
                     .into()));
                 }
                 if *probe || registration.is_ready() {
-                    match syscall("monitor-recv", || {
-                        crate::retained_socket::recv(
-                            state.socket(),
-                            buffer,
-                            SocketRecvFlags::default(),
-                        )
-                    }) {
+                    match syscall("monitor-recv", || receive(state.socket())) {
                         Ok(count) => {
-                            *probe = count == buffer.len() || observed & READ_CLOSED != 0;
+                            *probe = count == capacity || observed & READ_CLOSED != 0;
                             if count != 0 && !*probe {
                                 registration.clear_readiness(observed);
                             }

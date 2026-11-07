@@ -1,6 +1,8 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
+use crate::{TokioScheduler, TokioSocket};
+use base_scheduler::{BufferResult, Cancellation, IoBufMut, OperationResult, SocketRecvFlags};
 use std::{
     panic::{AssertUnwindSafe, catch_unwind},
     sync::mpsc,
@@ -75,4 +77,62 @@ impl Gate {
 #[test]
 fn watchdog_propagates_assertion_panics() {
     assert!(catch_unwind(|| run(|| panic!("test assertion"))).is_err());
+}
+
+// Stream readers receive through `socket_receive`, selecting their OOB policy.
+// These scalar receives exercise it directly.
+impl TokioScheduler {
+    pub(crate) async fn socket_read<B: IoBufMut>(
+        &self,
+        socket: &TokioSocket,
+        buffer: B,
+        cancellation: &Cancellation,
+    ) -> BufferResult<B> {
+        self.socket_read_with(socket, buffer, cancellation, false)
+            .await
+    }
+
+    /// `drain_short` is only for OOB-disabled stream readers: a positive short receive clears the readiness it was attempted on.
+    pub(crate) async fn socket_read_with<B: IoBufMut>(
+        &self,
+        socket: &TokioSocket,
+        mut buffer: B,
+        cancellation: &Cancellation,
+        drain_short: bool,
+    ) -> BufferResult<B> {
+        let length = buffer.as_mut().len();
+        let result = self
+            .socket_receive(socket, cancellation, length, drain_short, |socket| {
+                crate::socket_io::recv(socket, buffer.as_mut())
+            })
+            .await;
+        (result, buffer)
+    }
+
+    pub(crate) async fn socket_recv_poll(
+        &self,
+        socket: &TokioSocket,
+        buffer: &mut [u8],
+        flags: SocketRecvFlags,
+        cancellation: &Cancellation,
+    ) -> OperationResult<usize> {
+        self.socket_recv_poll_with(socket, buffer, flags, cancellation, false)
+            .await
+    }
+
+    /// `drain_short` is only for OOB-disabled stream readers: a positive short receive clears the readiness it was attempted on.
+    pub(crate) async fn socket_recv_poll_with(
+        &self,
+        socket: &TokioSocket,
+        buffer: &mut [u8],
+        flags: SocketRecvFlags,
+        cancellation: &Cancellation,
+        drain_short: bool,
+    ) -> OperationResult<usize> {
+        let length = buffer.len();
+        self.socket_receive(socket, cancellation, length, drain_short, |socket| {
+            crate::socket_io::recv_poll(socket, buffer, flags)
+        })
+        .await
+    }
 }

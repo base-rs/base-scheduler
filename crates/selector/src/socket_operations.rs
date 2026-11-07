@@ -35,7 +35,7 @@ impl ReadinessSelector {
         (result, input)
     }
     #[cfg(unix)]
-    async fn socket_io<T>(
+    pub(crate) async fn socket_io<T>(
         &self,
         socket: &NativeSocket,
         interest: Interest,
@@ -72,7 +72,7 @@ impl ReadinessSelector {
     }
 
     #[cfg(not(unix))]
-    async fn socket_io<T>(
+    pub(crate) async fn socket_io<T>(
         &self,
         socket: &NativeSocket,
         interest: Interest,

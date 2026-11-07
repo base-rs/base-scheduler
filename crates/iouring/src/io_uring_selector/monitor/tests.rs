@@ -23,6 +23,42 @@ fn sockets(selector: &IoUringSelector) -> (NativeSocket, TcpStream) {
     )
 }
 
+// Stream readers receive through `socket_stream_receive`. These scalar
+// receives exercise the generic monitor operation and the stream policy.
+impl IoUringSelector {
+    pub(crate) async fn socket_monitor_recv_poll(
+        &self,
+        monitor: &mut Storage,
+        buffer: &mut [u8],
+        flags: SocketRecvFlags,
+        cancellation: &Cancellation,
+    ) -> OperationResult<usize> {
+        self.monitor_io(monitor, Interest::Readable, cancellation, |socket| {
+            syscall("monitor-recv", || {
+                crate::retained_socket::recv(socket, buffer, flags)
+            })
+        })
+        .await
+    }
+    pub(crate) async fn socket_stream_recv_poll<const SUPPORT_OOB: bool>(
+        &self,
+        monitor: &mut Storage,
+        probe: &mut bool,
+        buffer: &mut [u8],
+        cancellation: &Cancellation,
+    ) -> OperationResult<usize> {
+        let capacity = buffer.len();
+        self.socket_stream_receive::<SUPPORT_OOB>(
+            monitor,
+            probe,
+            capacity,
+            cancellation,
+            |socket| crate::retained_socket::recv(socket, buffer, SocketRecvFlags::default()),
+        )
+        .await
+    }
+}
+
 fn options() -> IoUringOptions {
     IoUringOptions {
         entries: 8,

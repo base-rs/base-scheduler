@@ -194,8 +194,11 @@ impl SocketStreamReader for Stream {
             .await?
             .bytes)
     }
-    fn try_read_into(&mut self, _: &mut [u8]) -> io::Result<usize> {
-        Err(io::ErrorKind::Unsupported.into())
+    fn try_read_into(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+        let count = buffer.len().min(self.bytes.len());
+        buffer[..count].copy_from_slice(&self.bytes[..count]);
+        self.bytes = &self.bytes[count..];
+        Ok(count)
     }
     async fn read_vectored(
         &mut self,
@@ -456,6 +459,30 @@ fn socket_defaults_preserve_owners_and_forward_flags_and_addresses() {
             .with_oob_support::<false>();
         assert_eq!(reader.read_into(&mut buffer, &never).await.unwrap(), 1);
         assert_eq!(buffer[0], b'c');
+        // An immediate vectored read defaults to the first nonempty range.
+        let mut reader = Stream {
+            bytes: b"xyz",
+            peek: false,
+        };
+        let (mut empty, mut head, mut tail) = ([0; 0], [0; 2], [0; 2]);
+        assert_eq!(
+            reader
+                .try_read_vectored(&mut [
+                    IoSliceMut::new(&mut empty),
+                    IoSliceMut::new(&mut head),
+                    IoSliceMut::new(&mut tail),
+                ])
+                .unwrap(),
+            2
+        );
+        assert_eq!((head, tail), (*b"xy", [0; 2]));
+        assert_eq!(
+            reader
+                .try_read_vectored(&mut [IoSliceMut::new(&mut empty)])
+                .unwrap(),
+            0
+        );
+        assert_eq!(reader.bytes, b"z");
         let mut writer = StreamWriter {
             bytes: Vec::new(),
             dont_route: false,

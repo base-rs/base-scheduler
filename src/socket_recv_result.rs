@@ -3,8 +3,8 @@
 
 use crate::SocketAddress;
 
-/// Metadata from one receive. Only `bytes` bytes, spread across the buffers in order, were written; their initialized lengths remain unchanged.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Metadata from one receive. Only `bytes` bytes, spread across the buffers in order, were written; their initialized lengths remain unchanged. The default is an empty receive: no bytes, no address and no truncation.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct SocketRecvResult {
     /// The number of bytes written into the supplied buffers.
     pub bytes: usize,

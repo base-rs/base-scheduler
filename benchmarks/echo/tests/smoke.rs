@@ -152,6 +152,18 @@ fn native_readiness_pooled() {
     smoke("native-pooled");
 }
 #[test]
+fn tokio_adapter_vectored() {
+    smoke("tokio-adapter-vectored");
+}
+#[test]
+fn tokio_adapter_owned_vectored() {
+    smoke("tokio-adapter-owned-vectored");
+}
+#[test]
+fn tokio_adapter_pooled() {
+    smoke("tokio-adapter-pooled");
+}
+#[test]
 fn native_readiness_monitor_alias() {
     smoke("native-monitor");
 }
@@ -171,6 +183,21 @@ fn native_iouring_poll() {
 }
 #[cfg(target_os = "linux")]
 #[test]
+fn native_iouring_vectored() {
+    smoke("iouring-vectored");
+}
+#[cfg(target_os = "linux")]
+#[test]
+fn native_iouring_owned_vectored() {
+    smoke("iouring-owned-vectored");
+}
+#[cfg(target_os = "linux")]
+#[test]
+fn native_iouring_pooled() {
+    smoke("iouring-pooled");
+}
+#[cfg(target_os = "linux")]
+#[test]
 fn native_iouring_multishot() {
     smoke("iouring-multishot");
 }
@@ -181,6 +208,7 @@ fn invalid_configuration_fails_before_running_a_workload() {
         vec![],
         vec!["server"],
         vec!["server", "missing", "1", "1"],
+        vec!["server", "native-missing", "1", "1"],
         vec!["client", "127.0.0.1:0"],
         vec!["server", "tokio", "0", "1"],
         vec!["server", "tokio", "invalid", "1"],

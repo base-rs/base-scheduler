@@ -298,7 +298,7 @@ impl TokioSocket {
         self.io_with(interest, operation, false, |_| false).await
     }
 
-    /// `drained` reports whether a successful result proves the receive queue was empty when the syscall returned, so readiness observed before a readiness-first attempt can be cleared without a further syscall returning `WouldBlock`. Only OOB-disabled scalar stream reads pass a predicate other than `|_| false`; Linux and Android honour it unless urgent data or closure has been reported.
+    /// `drained` reports whether a successful result proves the receive queue was empty when the syscall returned, so readiness observed before a readiness-first attempt can be cleared without a further syscall returning `WouldBlock`. Only OOB-disabled consuming stream receives pass a predicate other than `|_| false`; Linux and Android honour it unless urgent data or closure has been reported.
     pub(super) async fn io_with<Output, Operation>(
         &self,
         interest: Interest,
@@ -416,6 +416,18 @@ impl TokioSocket {
             _waiter: PollWaiter(waiting),
         }
         .await
+    }
+
+    /// Whether nonempty stream reads wait on cached readiness first: the stream has completed a read and has a registration. A pooled read then waits before taking a slot.
+    #[cfg(unix)]
+    pub(super) fn read_established(&self) -> bool {
+        self.inner.connected_stream.load(Ordering::Relaxed)
+            && self.inner.registration.get().is_some()
+    }
+    /// Windows readiness has no cached state to wait on first.
+    #[cfg(windows)]
+    pub(super) fn read_established(&self) -> bool {
+        false
     }
 
     /// Reserve the lightweight read waiter for a nonempty read on a known-connected stream with an existing registration, the state in which `io_with` waits on cached readiness first. Returns `None` when the generic path must decide, including while another operation holds the reservation.

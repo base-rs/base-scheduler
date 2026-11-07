@@ -762,13 +762,37 @@ fn urgent_tcp_boundary_keeps_trailing_bytes_readable() {
     block_on(scheduler.shutdown());
 }
 
-// Whether readiness observed by a short stream read survives it, for a borrowed or owned read through `reader`.
+// The receive shapes a stream reader offers; `Peek` is the only one which consumes nothing.
+#[cfg(target_os = "linux")]
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum Shape {
+    Borrowed,
+    Owned,
+    Vectored,
+    Flagged,
+    OwnedVectored,
+    Pooled,
+    Peek,
+}
+
+#[cfg(target_os = "linux")]
+const SHAPES: [Shape; 7] = [
+    Shape::Borrowed,
+    Shape::Owned,
+    Shape::Vectored,
+    Shape::Flagged,
+    Shape::OwnedVectored,
+    Shape::Pooled,
+    Shape::Peek,
+];
+
+// Whether readiness observed by a short stream read survives it, for a read of `shape` through `reader`. A peeked byte is consumed afterwards.
 #[cfg(target_os = "linux")]
 async fn short_read_keeps_readiness(
     reader: &mut impl base_scheduler::SocketStreamReader,
     socket: &TokioSocket,
     peer: &mut std::net::TcpStream,
-    owned: bool,
+    shape: Shape,
     byte: u8,
 ) -> bool {
     use base_scheduler::*;
@@ -787,25 +811,61 @@ async fn short_read_keeps_readiness(
     peer.write_all(&[byte]).unwrap();
     // Wait until the reactor has published the edge, so the read is attempted on that observation.
     drop(registration.readable().await.unwrap());
-    let (count, received) = if owned {
-        let (result, buffer) = reader.read_owned(vec![0; 8], &never).await;
-        (result.unwrap(), buffer[0])
-    } else {
-        let mut buffer = [0; 8];
-        (
+    let mut buffer = [0; 8];
+    let (count, received) = match shape {
+        Shape::Borrowed => (
             reader.read_into(&mut buffer, &never).await.unwrap(),
             buffer[0],
-        )
+        ),
+        Shape::Owned => {
+            let (result, buffer) = reader.read_owned(vec![0; 8], &never).await;
+            (result.unwrap(), buffer[0])
+        }
+        Shape::Vectored => (
+            reader
+                .read_vectored(&mut [std::io::IoSliceMut::new(&mut buffer)], &never)
+                .await
+                .unwrap(),
+            buffer[0],
+        ),
+        Shape::Flagged => (
+            reader
+                .read_into_with_flags(&mut buffer, SocketRecvFlags::default(), &never)
+                .await
+                .unwrap(),
+            buffer[0],
+        ),
+        Shape::OwnedVectored => {
+            let (result, buffers) = reader
+                .read_owned_vectored([vec![0; 4], vec![0; 4]], SocketRecvFlags::default(), &never)
+                .await;
+            (result.unwrap().bytes, buffers[0][0])
+        }
+        Shape::Pooled => {
+            let chunk = reader.read(&never).await.unwrap().unwrap();
+            (chunk.as_ref().len(), chunk.as_ref()[0])
+        }
+        Shape::Peek => (
+            reader
+                .read_into_with_flags(&mut buffer, SocketRecvFlags { peek: true }, &never)
+                .await
+                .unwrap(),
+            buffer[0],
+        ),
     };
     assert_eq!((count, received), (1, byte));
-    poll_once(socket.inner.registration.get().unwrap().readable())
+    let kept = poll_once(socket.inner.registration.get().unwrap().readable())
         .await
-        .is_some()
+        .is_some();
+    if shape == Shape::Peek {
+        assert_eq!(reader.try_read_into(&mut buffer).unwrap(), 1);
+    }
+    kept
 }
 
 #[cfg(target_os = "linux")]
 #[test]
-fn short_stream_reads_clear_readiness_only_without_oob_support() {
+fn short_consuming_stream_reads_clear_readiness_only_without_oob_support() {
     use base_scheduler::*;
     use futures_lite::future::{block_on, poll_once};
     use std::io::Write;
@@ -814,7 +874,7 @@ fn short_stream_reads_clear_readiness_only_without_oob_support() {
             let scheduler = crate::test_support::scheduler();
             let never = Cancellation::never();
             for oob in [false, true] {
-                for owned in [false, true] {
+                for shape in SHAPES {
                     let (native, mut peer) = tcp_pair();
                     let socket = TokioSocket::new(&scheduler.runtime, native.into()).unwrap();
                     let reader = scheduler.socket_stream_reader(&socket).unwrap();
@@ -830,7 +890,7 @@ fn short_stream_reads_clear_readiness_only_without_oob_support() {
                                 &mut reader,
                                 &socket,
                                 &mut peer,
-                                owned,
+                                shape,
                                 b'x',
                             )
                             .await,
@@ -838,7 +898,7 @@ fn short_stream_reads_clear_readiness_only_without_oob_support() {
                                 &mut reader,
                                 &socket,
                                 &mut peer,
-                                owned,
+                                shape,
                                 b'y',
                             )
                             .await,
@@ -853,7 +913,7 @@ fn short_stream_reads_clear_readiness_only_without_oob_support() {
                                 &mut reader,
                                 &socket,
                                 &mut peer,
-                                owned,
+                                shape,
                                 b'x',
                             )
                             .await,
@@ -861,14 +921,18 @@ fn short_stream_reads_clear_readiness_only_without_oob_support() {
                                 &mut reader,
                                 &socket,
                                 &mut peer,
-                                owned,
+                                shape,
                                 b'y',
                             )
                             .await,
                         )
                     };
-                    // The first successful read establishes the stream through a syscall-first attempt, so only later reads have an observation to clear.
-                    assert_eq!((cleared, steady), (false, !oob), "oob {oob}, owned {owned}");
+                    // The first successful read establishes the stream through a syscall-first attempt, so only later reads have an observation to clear. A peek consumes nothing, so it never clears.
+                    assert_eq!(
+                        (cleared, steady),
+                        (false, !oob && shape != Shape::Peek),
+                        "oob {oob}, {shape:?}"
+                    );
                     // A full read leaves bytes queued, so it keeps readiness under either policy.
                     peer.write_all(b"abc").unwrap();
                     let mut reader = scheduler.socket_stream_reader(&socket).unwrap();
@@ -1064,6 +1128,12 @@ fn uncancellable_bound_operations_recheck_scheduler_admission() {
             let mut reader = scheduler.socket_stream_reader(&socket).unwrap();
             let mut writer = scheduler.socket_stream_writer(&socket).unwrap();
             establish(&mut reader, &mut peer).await;
+            // Initialize the pooled reader's storage before closing.
+            {
+                use std::io::Write;
+                peer.write_all(b"p").unwrap();
+            }
+            assert_eq!(reader.read(&never).await.unwrap().unwrap().as_ref(), b"p");
             // A cancellable owned write keeps the generic operation.
             let (result, _) = writer
                 .write_owned(b"c".to_vec(), &Cancellation::new())
@@ -1079,6 +1149,18 @@ fn uncancellable_bound_operations_recheck_scheduler_admission() {
             let (result, buffer) = reader.read_owned(vec![0; 8], &never).await;
             assert_io_error(result, closed);
             assert_eq!(buffer.len(), 8);
+            assert_io_error(
+                reader
+                    .read_vectored(&mut [std::io::IoSliceMut::new(&mut buffer.clone())], &never)
+                    .await,
+                closed,
+            );
+            let (result, buffers) = reader
+                .read_owned_vectored([vec![0; 8]], SocketRecvFlags::default(), &never)
+                .await;
+            assert_io_error(result, closed);
+            assert_eq!(buffers, [vec![0; 8]]);
+            assert_io_error(reader.read(&never).await, closed);
             assert_io_error(writer.write(b"x", &never).await, closed);
             let (result, _) = writer.write_owned(b"x".to_vec(), &never).await;
             assert_io_error(result, closed);
@@ -1098,7 +1180,8 @@ fn uncancellable_established_reads_report_eof_and_errors() {
         block_on(async {
             let scheduler = crate::test_support::scheduler();
             let never = Cancellation::never();
-            for owned in [false, true] {
+            // Borrowed, owned, vectored, owned vectored and pooled reads.
+            for shape in 0..5 {
                 for reset in [false, true] {
                     let (native, mut peer) = tcp_pair();
                     let socket = TokioSocket::new(&scheduler.runtime, native.into()).unwrap();
@@ -1118,10 +1201,23 @@ fn uncancellable_established_reads_report_eof_and_errors() {
                     if reset {
                         drop(peer);
                     }
-                    let result = if owned {
-                        reader.read_owned(vec![0; 8], &never).await.0
-                    } else {
-                        reader.read_into(&mut buffer, &never).await
+                    let result = match shape {
+                        0 => reader.read_into(&mut buffer, &never).await,
+                        1 => reader.read_owned(vec![0; 8], &never).await.0,
+                        2 => {
+                            reader
+                                .read_vectored(&mut [std::io::IoSliceMut::new(&mut buffer)], &never)
+                                .await
+                        }
+                        3 => reader
+                            .read_owned_vectored([vec![0; 8]], SocketRecvFlags::default(), &never)
+                            .await
+                            .0
+                            .map(|result| result.bytes),
+                        _ => reader
+                            .read(&never)
+                            .await
+                            .map(|chunk| chunk.map_or(0, |chunk| chunk.as_ref().len())),
                     };
                     if reset {
                         assert_io_error(result, &[io::ErrorKind::ConnectionReset]);
