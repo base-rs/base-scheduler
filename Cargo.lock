@@ -203,7 +203,7 @@ dependencies = [
 
 [[package]]
 name = "base-scheduler"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "allocation-counter",
  "event-listener",
@@ -297,7 +297,7 @@ dependencies = [
 
 [[package]]
 name = "base-scheduler-conformance"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "base-scheduler",
  "futures-channel",
@@ -321,7 +321,7 @@ dependencies = [
 
 [[package]]
 name = "base-scheduler-iouring"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "allocation-counter",
  "async-io",
@@ -341,7 +341,7 @@ dependencies = [
 
 [[package]]
 name = "base-scheduler-native"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "allocation-counter",
  "async-task",
@@ -361,7 +361,7 @@ dependencies = [
 
 [[package]]
 name = "base-scheduler-selector"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "allocation-counter",
  "async-io",
@@ -380,7 +380,7 @@ dependencies = [
 
 [[package]]
 name = "base-scheduler-timers"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "crossbeam-queue",
  "loom",
@@ -388,7 +388,7 @@ dependencies = [
 
 [[package]]
 name = "base-scheduler-tokio"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "allocation-counter",
  "async-io",
