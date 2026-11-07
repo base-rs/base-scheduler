@@ -1,0 +1,12 @@
+# Contributions made before this repository existed, which its Git history cannot show. `cargo bake license:update` counts each like a commit: one naming a `path` adds to that file's copyright header, and every entry adds to `license.md`.
+
+# The timer queue in `crates/timers/src/timers.rs` is derived from IO::Event::PriorityHeap. These are the first contributions of each author to it, from io-event's `.contributors.yaml`.
+[[contribution]]
+path = "crates/timers/src/timers.rs"
+time = 2021-02-12T12:19:44+01:00
+author = { name = "Wander Hillen", email = "wjw.hillen@gmail.com" }
+
+[[contribution]]
+path = "crates/timers/src/timers.rs"
+time = 2021-02-13T18:44:46+13:00
+author = { name = "Samuel Williams", email = "samuel.williams@oriontransfer.co.nz" }
