@@ -24,70 +24,94 @@ Native uses its existing reserved worker-local queue, with no timer thread. Regi
 
 All timer and cancellation objects are ordinary owned Rust state. No borrowed application pointer is retained by a worker. No timer API requires a caller to prevent future abandonment, or silently obtains its scheduler from TLS.
 
-## Workloads and methodology
-
-Measurements use Aiko: AMD Ryzen 9 9950X3D, 32 logical CPUs, Linux 7.2.6-arch2-1, Rust 1.99.0, LLVM 23.1.1, and locked Tokio 1.53.3. Builds use Cargo's optimized release profile, without added LTO or target-CPU flags. CPU frequency scaling remains `powersave`, with boost enabled; processes are not CPU-pinned. Runs are serialized with `/tmp/base-scheduler-perf.lock`. No builds or tests run concurrently with the measured processes.
-
-Each repeat shuffles backend/workload pairs and runs their three modes consecutively in shuffled order. No separate machine or cross-network traffic is involved. The initial matrix retains the last six of seven repeats, excluding the first following a harness restart. The backend-deferral variant has five repeats. Each process constructs its runtime outside the timed region, then measures task admission, task work and joins. The reported `ns/op` is elapsed wall time divided by completed operation attempts across all tasks. For multiple workers it is aggregate throughput, not individual operation latency. Process CPU time is recorded separately, including timer threads. Small percentage differences should be treated cautiously, especially for Direct's contended mutex and timer-wheel-bound workloads.
+## Workloads
 
 All modes use a real, initialized `Cancellation::new()` token. The only difference is timer lifetime and rearming policy.
 
 | Workload | Behavior |
 | --- | --- |
-| `refresh` | One task polls and drops three million waits, refreshing a deadline 30 seconds ahead. This isolates the hot registration path and does not represent application request throughput. |
-| `yield`, one task/worker | 1.5 million refreshes, yielding to the executor after each, so the worker processes its timer queue between refreshes. |
-| `yield`, 64 tasks/four workers | 75,000 refreshes per task, yielding after each, permitting task migration and contention. |
-| `fixed` | Three million poll/drop attempts for the same distant deadline, separating reuse from deadline movement. |
-| `earlier` | Three million attempts with successively earlier distant deadlines. Postponement cannot avoid replacement. |
-| `expire` | Repeated one-millisecond waits actually complete: 300 per task with one task/worker, or 200 per task with 128 tasks/four workers. Record expiry overshoot as well as CPU cost. |
-| `cycle` | 64 tasks/four workers each execute 200 cycles of 32 refresh/yield attempts followed by an actual one-millisecond expiration. The harness records a refresh which expires during its poll as successful progress. |
-| `alloc` | Warm the current worker and resource for 2,048 refreshes, then count allocations during 100,000 attempts on that worker. Background-thread allocations and setup are excluded. |
+| `refresh` | Each task polls and drops a wait per iteration, refreshing a deadline 30 seconds ahead. This isolates the hot registration path and does not represent application request throughput. |
+| `yield` | Like `refresh`, yielding to the executor after each attempt, so the worker processes its timer queue between refreshes. With several tasks and workers, tasks can migrate and contend. |
+| `fixed` | Poll/drop attempts for the same distant deadline, separating reuse from deadline movement. |
+| `earlier`, `earlier-yield` | Attempts with successively earlier distant deadlines, without and with a yield. Postponement cannot avoid replacement. |
+| `expire` | Waits of `--delay-us` that actually complete. Record expiry overshoot as well as CPU cost. |
+| `cycle` | Each iteration is 32 refresh/yield attempts followed by an actual expiration of `--delay-us`. A refresh which expires during its poll counts as successful progress. |
+| `alloc` | Warm the current worker and resource for 2,048 refreshes, then count allocations during the iterations on that worker. Background-thread allocations and setup are excluded. Needs the `allocations` feature. |
 
-The one-millisecond expiration rows reflect backend scheduling precision as well as work. Tokio documents [millisecond timer granularity](https://docs.rs/tokio/latest/tokio/time/fn.sleep.html). Its observed wait length must not be interpreted as proportional timer-registration overhead. Absolute throughput from those rows is not a matched-precision backend race.
-
-## Reproduce
-
-```sh
-cargo build --release --locked -p base-scheduler-benchmark-timers
-flock /tmp/base-scheduler-perf.lock python3 benchmarks/timers/run.py --output results.jsonl
-python3 benchmarks/timers/summarize.py results.jsonl
-```
-
-A single sample takes backend, mode, workload, tasks, iterations, workers and delay in microseconds:
-
-```sh
-target/release/base-scheduler-benchmark-timers native reuse yield 64 75000 4 1000
-target/release/base-scheduler-benchmark-timers tokio after alloc 1 100000 1
-```
-
-Use `--backends tokio native` on macOS. Process CPU time is available on Unix; the experimental harness reports zero on other systems. Performance results in this report are Linux measurements.
+The expiration workloads reflect backend scheduling precision as well as work. Tokio documents [millisecond timer granularity](https://docs.rs/tokio/latest/tokio/time/fn.sleep.html). Its observed wait length must not be interpreted as proportional timer-registration overhead. Absolute throughput from those workloads is not a matched-precision backend race.
 
 ### Scenarios and periodic timers
 
-Two further modes, added for [stall rescue](../../design/stall-rescue.md), measure the Native scheduler. Each prints one JSON record.
+Two further families of workloads, added for [stall rescue](../../design/stall-rescue.md), measure the Native scheduler.
 
-`scenario WORKLOAD WORKERS ITERATIONS [UNIT_US]` drives a Native scheduler from the root thread. Every duration is a multiple of the unit, one millisecond by default. Like the timer workloads, its record reports `ns_per_operation`, `cpu_ns_per_operation`, and each measured sleep's overshoot as `overshoot_p50_ns`, `overshoot_p99_ns` and `overshoot_max_ns`.
+The root-thread scenarios drive a Native scheduler from the root thread. Every duration is a multiple of `--unit-us`, one millisecond by default.
 
 | Workload | Behavior |
 | --- | --- |
-| `root-sleep` | The root thread sleeps one unit, `ITERATIONS` times. Root registrations go to each worker in turn. |
-| `spawn`, `spawn-pending` | The root thread spawns and joins an empty task, `ITERATIONS` times; `spawn-pending` keeps a distant root sleep pending throughout. |
-| `task-sleep`, `task-sleep-pending` | Four tasks per worker each sleep one unit, `ITERATIONS` times, optionally with a distant root sleep pending. |
-| `idle` | No load for `ITERATIONS` units, for idle CPU. |
-| `pulse` | A task woken by a timer every 1,000 units, `ITERATIONS` times. |
-| `stall` | A task blocks its worker inside one poll for 200 units while the root thread measures eight sleeps of 10 units, `ITERATIONS` times. |
-| `yield` | Sixteen tasks per worker yield `ITERATIONS` times each, with no timers. |
+| `root-sleep` | The root thread sleeps one unit per iteration. Root registrations go to each worker in turn. |
+| `spawn`, `spawn-pending` | The root thread spawns and joins an empty task per iteration; `spawn-pending` keeps a distant root sleep pending throughout. |
+| `task-sleep`, `task-sleep-pending` | Four tasks per worker each sleep one unit per iteration, optionally with a distant root sleep pending. |
+| `idle` | No load for one unit per iteration, for idle CPU. |
+| `pulse` | A task woken by a timer every 1,000 units, once per iteration. |
+| `stall` | A task blocks its worker inside one poll for 200 units while the root thread measures eight sleeps of 10 units, once per iteration. |
+| `task-yield` | Sixteen tasks per worker yield once per iteration each, with no timers. |
 
-`periodic BACKEND WORKERS TASKS DELAY_US [unaligned|aligned] [MEASURE_MS] [WORK]`, the stall rescue design's worker-local timer diagnostic, runs `TASKS` tasks that each sleep `DELAY_US` again and again on `native`, or `iouring` on Linux, and reports the overshoot of every expiry inside a window of `MEASURE_MS` (3,000 by default) after a warmup of a third of that. `aligned` rounds each deadline up to a multiple of the delay, so that every task's deadlines fall due together; `WORK` adds that many multiply-add steps after each expiry.
+`periodic`, the stall rescue design's worker-local timer diagnostic, runs `--tasks` tasks that each sleep `--delay-us` again and again, on `native`, or `iouring` on Linux. It measures a window of `--measure-ms` after a warmup of a third of that, and each expiry inside the window is one operation. `--alignment aligned` rounds each deadline up to a multiple of the delay, so that every task's deadlines fall due together; `--work` adds that many multiply-add steps after each expiry.
+
+## Running
+
+Each process measures one workload and writes one [`base-benchmark`](https://github.com/base-rs/base-benchmark) record to stdout. Options are written `--name value`; each applies only to the workloads that use it, and any other is an error:
+
+| Option | Workloads | Default |
+| --- | --- | --- |
+| `--workload` | all | `refresh` |
+| `--backend` | timer workloads: `tokio`, `native`, or `iouring` on Linux; `periodic`: `native` or `iouring` | `native` |
+| `--mode` | timer workloads: `sleep`, `reuse` or `after` | `after` |
+| `--tasks` | timer workloads; `periodic` | 1; 1,024 for `periodic` |
+| `--iterations` | timer workloads, per task; scenarios | 100,000; 100 for scenarios |
+| `--workers` | all | 1; 4 for `periodic` |
+| `--delay-us` | timer workloads, which accept zero; `periodic` | 1,000 |
+| `--unit-us` | scenarios | 1,000 |
+| `--alignment`, `--measure-ms`, `--work` | `periodic` | `unaligned`, 3,000, 0 |
 
 ```sh
-target/release/base-scheduler-benchmark-timers scenario stall 2 3
-target/release/base-scheduler-benchmark-timers periodic native 4 1024 1000 aligned
+cargo build --release --locked -p base-scheduler-benchmark-timers
+target/release/base-scheduler-benchmark-timers --workload yield --backend native --mode reuse --tasks 64 --workers 4 --iterations 75000
+target/release/base-scheduler-benchmark-timers --workload stall --workers 2 --iterations 3
+target/release/base-scheduler-benchmark-timers --workload periodic --workers 4 --alignment aligned
 ```
 
-Build with `--features diagnostics` to add the scheduler's stall rescue counts (`rescues`) to every Native record, including the timer workloads above; without it, `rescues` is null. Do not take timing from a diagnostics build.
+Each record repeats every parameter, and reports for its measured operations `wall_time`, `cpu_time`, `user_cpu_time`, `system_cpu_time` and both context-switch counts; summaries divide them by operations. The timer workloads measure from the first task's admission to the last join, and also report `refresh_expirations`. A scenario measures its iterations after the workers have gone idle. `periodic` measures its window from the root thread, which runs no tasks. Workloads with actual expiries add `overshoot_p50`, `overshoot_p99` and `overshoot_max` in nanoseconds: order statistics of every measured expiry, which summaries report as they are. `alloc` reports `allocations` and `allocated_bytes`, with the sizes of the timer resource and the `After` wrapper. Process resource usage comes from `getrusage`, so on other systems than Unix every measurement fails.
+
+Two features add counts at a cost to timing, so take timing from a build without them. Each record lists them in its `features` parameter, so a campaign cannot compare a build with them to one without.
+
+- `allocations` enables the `alloc` workload. It replaces the global allocator with a counting one, which slows every allocation.
+- `diagnostics` adds the Native scheduler's stall rescue counts (`rescues_stuck_polls`, `rescues_long_batches`, `rescues_leaving_idle`, `rescued_timers`) to every Native record. They cover the whole process, so summaries never divide them by operations.
+
+### Comparing builds
+
+[`Cargo.toml`](Cargo.toml) declares scenarios under `[package.metadata.base-benchmark]`. The timer scenarios compare the Tokio adapter, Native, and Native over io_uring in each round, with Tokio as the baseline of the backend comparison. The root-thread scenarios measure Native alone, and the `periodic` and `periodic-aligned` scenarios compare Native and io_uring with 4 workers and 1,024 tasks. Run `cargo bake benchmark:list` for every scenario's resolved arguments, and `cargo bake benchmark:smoke` to run each once with tiny arguments.
+
+To compare revisions, check each out (for example with `git worktree add`), then prepare them, baseline first, and run a scenario:
+
+```sh
+cargo bake benchmark:prepare --tree main=../main --tree candidate=.
+cargo bake benchmark:run periodic --artifacts target/base-benchmark/prepared-TIME/artifacts.json --cpus 2-5 --rounds 10
+```
+
+Preparation builds every tree with the same profile and a layout replica: the baseline rebuilt at another path, whose differences from the baseline show how much build layout alone moves a result. Rounds run every artifact and variant in a seeded random order under a host-wide lock, and the report compares each with the baseline, warning when a change is within the replica's range. Screening runs are triage; `--mode recorded` adds the prerequisites for acceptance evidence. See the [base-benchmark usage guide](https://github.com/base-rs/base-benchmark/blob/main/context/usage.md) for every option. Scenario arguments come from the current workspace, so every tree must contain this harness; revisions before it used `run.py` and positional arguments. On a measuring host without Bake, the `base-benchmark` command, installed with `cargo install base-benchmark --root DIR`, offers the same operations, with `--manifest-path` and `--package base-scheduler-benchmark-timers`.
+
+Keep a reviewed campaign's directory under `results/<topic>/`, with an [investigation record](https://github.com/base-rs/base-benchmark/blob/main/templates/investigation.md).
 
 ## Results
+
+These results were measured with the earlier harness: `run.py`, which ran the timer matrix with positional arguments in shuffled, paired order, and `summarize.py`. Both remain in this repository's history before the move to `base-benchmark`.
+
+Measurements use Aiko: AMD Ryzen 9 9950X3D, 32 logical CPUs, Linux 7.2.6-arch2-1, Rust 1.99.0, LLVM 23.1.1, and locked Tokio 1.53.3. Builds use Cargo's optimized release profile, without added LTO or target-CPU flags. CPU frequency scaling remains `powersave`, with boost enabled; processes are not CPU-pinned. Runs are serialized with `/tmp/base-scheduler-perf.lock`. No builds or tests run concurrently with the measured processes. The harness linked the counting allocator into every build, so these timings include its cost.
+
+Each repeat shuffles backend/workload pairs and runs their three modes consecutively in shuffled order. The initial matrix retains the last six of seven repeats, excluding the first following a harness restart. The backend-deferral variant has five repeats. Each process constructs its runtime outside the timed region, then measures task admission, task work and joins. The reported `ns/op` is elapsed wall time divided by completed operation attempts across all tasks. For multiple workers it is aggregate throughput, not individual operation latency. Process CPU time is recorded separately, including timer threads. Small percentage differences should be treated cautiously, especially for Direct's contended mutex and timer-wheel-bound workloads.
+
+The matrix ran `refresh`, `fixed` and `earlier` with three million attempts on one task and worker, `yield` with 1.5 million on one, and 75,000 per task with 64 tasks on four workers, `expire` with 300 one-millisecond waits on one task, and 200 per task with 128 tasks on four workers, and `cycle` with 200 cycles per task with 64 tasks on four workers. `alloc` counted 100,000 attempts.
 
 The initial eager-replacement experiment is recorded at `5ff562f`; [its retained samples](results/initial-policy.jsonl) and [full summary](results/initial-policy.md) separate resource reuse from the portable `After` wrapper. Native's eager resource reuse alone did little for continually changing deadlines and was slower for the one-task yield case. Keeping the earlier wake was the useful optimization.
 

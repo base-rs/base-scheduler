@@ -1,35 +1,129 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
+//! Timer and scheduler workloads for base-scheduler. Each process measures one workload and writes one [`base_benchmark`] record.
+
 mod after;
+#[cfg(feature = "allocations")]
 mod allocation;
+pub mod options;
 pub mod periodic;
 pub mod scenario;
 pub use after::After;
+pub use options::{Backend, Benchmark, Mode, TimerOptions, TimerWorkload};
 
+use base_benchmark::{
+    CurrentProcess, Interval, Metric, ProcessRecord, ResourceSource, Sample, Unit,
+};
 use base_scheduler::{Cancellation, Spawn, Timers};
 use std::{
     future::{Future, poll_fn},
     hint::black_box,
+    io::{self, Write},
     pin::pin,
+    process::ExitCode,
     sync::Arc,
     task::Poll,
-    time::{Duration, Instant},
+    time::Duration,
 };
 
-#[derive(Clone, Copy, Debug)]
-pub enum Mode {
-    Sleep,
-    Reuse,
-    After,
+/// The workload identity in every record.
+pub const WORKLOAD: &str = "base-scheduler/timers";
+
+/// Parse `arguments`, measure the workload, and write its record to `out`. Errors go to `errors`, and fail without a record.
+pub fn command(
+    arguments: impl IntoIterator<Item = String>,
+    out: &mut impl Write,
+    errors: &mut impl Write,
+) -> ExitCode {
+    command_with(arguments, CurrentProcess, out, errors)
 }
-impl Mode {
-    pub fn parse(mode: &str) -> Self {
-        match mode {
-            "sleep" => Self::Sleep,
-            "reuse" => Self::Reuse,
-            "after" => Self::After,
-            _ => panic!("unknown mode"),
+
+/// [`command`], measuring resource usage with `source`.
+pub fn command_with<R: ResourceSource>(
+    arguments: impl IntoIterator<Item = String>,
+    source: R,
+    out: &mut impl Write,
+    errors: &mut impl Write,
+) -> ExitCode {
+    match Benchmark::parse(arguments)
+        .and_then(|benchmark| measure(&benchmark, source))
+        .and_then(|record| record.emit(out))
+    {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => {
+            let _ = writeln!(errors, "base-scheduler-benchmark-timers: {error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+/// Measure `benchmark`, with resource usage from `source`.
+pub fn measure<R: ResourceSource>(benchmark: &Benchmark, source: R) -> io::Result<ProcessRecord> {
+    let sample = match benchmark {
+        Benchmark::Timer(options) => measure_timers(options, source),
+        Benchmark::Scenario(options) => scenario::measure(options, source),
+        Benchmark::Periodic(options) => periodic::measure(options, source),
+    }?;
+    Ok(ProcessRecord::new(WORKLOAD, benchmark.parameters()).with_sample(sample))
+}
+
+fn measure_timers<R: ResourceSource>(options: &TimerOptions, source: R) -> io::Result<Sample> {
+    match options.backend {
+        Backend::Tokio => {
+            let runtime = tokio::runtime::Builder::new_multi_thread()
+                .worker_threads(options.workers)
+                .enable_all()
+                .build()
+                .unwrap();
+            let scheduler = Arc::new(base_scheduler_tokio::TokioScheduler::new(
+                runtime.handle().clone(),
+            ));
+            let sample = runtime.block_on(run(scheduler.clone(), options, source));
+            runtime.block_on(scheduler.shutdown());
+            sample
+        }
+        Backend::Native => {
+            let scheduler = Arc::new(
+                base_scheduler_native::NativeScheduler::with_options(
+                    base_scheduler_native::NativeOptions {
+                        workers: options.workers,
+                        timer_capacity: options.tasks.max(1024),
+                        ..Default::default()
+                    },
+                )
+                .unwrap(),
+            );
+            let sample = scheduler
+                .block_on(run(scheduler.clone(), options, source))
+                .map(|sample| with_rescues(sample, &scheduler));
+            scheduler.block_on(scheduler.shutdown());
+            sample
+        }
+        #[cfg(target_os = "linux")]
+        Backend::IoUring => {
+            let (selector, drivers) = base_scheduler_iouring::IoUringSelector::with_workers(
+                Default::default(),
+                options.workers,
+            )
+            .unwrap();
+            let scheduler = Arc::new(
+                base_scheduler_native::NativeScheduler::with_drivers(
+                    selector,
+                    drivers,
+                    base_scheduler_native::NativeExecutorOptions {
+                        workers: options.workers,
+                        timer_capacity: options.tasks.max(1024),
+                        ..Default::default()
+                    },
+                )
+                .unwrap(),
+            );
+            let sample = scheduler
+                .block_on(run(scheduler.clone(), options, source))
+                .map(|sample| with_rescues(sample, &scheduler));
+            scheduler.block_on(scheduler.shutdown());
+            sample
         }
     }
 }
@@ -46,37 +140,34 @@ pub async fn pending_once(future: impl Future) {
     .await;
 }
 
+/// One task's share of a timer workload: its completed operation attempts, the overshoot of each actual expiry in nanoseconds, and how many refreshes expired while being polled.
 pub async fn workload<S: Timers>(
     scheduler: &S,
     mode: Mode,
-    workload: &str,
+    workload: TimerWorkload,
     iterations: usize,
     delay: Duration,
 ) -> (usize, Vec<u64>, usize) {
+    use TimerWorkload::*;
     let never = Cancellation::new();
     let mut timer = scheduler.timer();
     let mut after = After::new(scheduler.timer());
     let mut overshoot = Vec::new();
     let mut refresh_expirations = 0;
-    if workload == "expire" || workload == "cycle" {
+    let expiring = matches!(workload, Expire | Cycle);
+    if expiring {
         overshoot.reserve(iterations);
     }
     let fixed = scheduler.now() + Duration::from_secs(60);
     for iteration in 0..iterations {
         // Thirty seconds prevents accidental expiry in the refresh microbenchmarks. A changing deadline models refreshing a connection idle timeout.
-        let deadline = if workload == "fixed" {
-            fixed
-        } else if workload.starts_with("earlier") {
-            fixed - Duration::from_nanos(iteration as u64)
-        } else {
-            scheduler.now()
-                + if workload == "expire" || workload == "cycle" {
-                    delay
-                } else {
-                    Duration::from_secs(30)
-                }
+        let deadline = match workload {
+            Fixed => fixed,
+            Earlier | EarlierYield => fixed - Duration::from_nanos(iteration as u64),
+            _ if expiring => scheduler.now() + delay,
+            _ => scheduler.now() + Duration::from_secs(30),
         };
-        if workload == "expire" {
+        if workload == Expire {
             match mode {
                 Mode::Sleep => scheduler.sleep_until(deadline, &never).await.unwrap(),
                 Mode::Reuse => scheduler
@@ -92,9 +183,9 @@ pub async fn workload<S: Timers>(
                     .as_nanos() as u64,
             );
         } else {
-            let count = if workload == "cycle" { 32 } else { 1 };
+            let count = if workload == Cycle { 32 } else { 1 };
             for _ in 0..count {
-                let refreshed = if workload == "cycle" {
+                let refreshed = if workload == Cycle {
                     scheduler.now() + delay
                 } else {
                     deadline
@@ -107,11 +198,11 @@ pub async fn workload<S: Timers>(
                     Mode::After => probe(after.wait(scheduler, refreshed, &never)).await,
                 };
                 refresh_expirations += usize::from(expired);
-                if !matches!(workload, "refresh" | "fixed" | "earlier") {
+                if matches!(workload, EarlierYield | Yield | Cycle) {
                     futures_lite::future::yield_now().await;
                 }
             }
-            if workload == "cycle" {
+            if workload == Cycle {
                 let last = scheduler.now() + delay;
                 match mode {
                     Mode::Sleep => scheduler.sleep_until(last, &never).await.unwrap(),
@@ -127,39 +218,43 @@ pub async fn workload<S: Timers>(
         black_box(iteration);
     }
     (
-        iterations * if workload == "cycle" { 33 } else { 1 },
+        iterations * if workload == Cycle { 33 } else { 1 },
         overshoot,
         refresh_expirations,
     )
 }
 
-pub async fn run<S: Timers + Spawn + Send + Sync + 'static>(
-    scheduler: Arc<S>,
-    mode: Mode,
-    workload_name: String,
-    tasks: usize,
-    iterations: usize,
-    delay: Duration,
-) -> serde_json::Value {
-    if workload_name == "alloc" {
+/// Run a timer workload in `options.tasks` tasks, measuring from their admission to their last join.
+pub async fn run<S, R>(scheduler: Arc<S>, options: &TimerOptions, source: R) -> io::Result<Sample>
+where
+    S: Timers + Spawn + Send + Sync + 'static,
+    R: ResourceSource,
+{
+    let TimerOptions {
+        workload: workload_name,
+        mode,
+        iterations,
+        delay,
+        ..
+    } = *options;
+    #[cfg(feature = "allocations")]
+    if workload_name == TimerWorkload::Alloc {
         let instance = scheduler.clone();
-        return scheduler
+        return Ok(scheduler
             .spawn(async move { allocation::measure(&*instance, mode, iterations).await })
             .unwrap()
             .await
-            .unwrap();
+            .unwrap());
     }
-    let cpu_start = cpu_time();
-    let start = Instant::now();
+    let interval = Interval::start_with(source)?;
     let mut handles = Vec::new();
-    for _ in 0..tasks {
+    for _ in 0..options.tasks {
         let instance = scheduler.clone();
-        let workload_name = workload_name.clone();
         handles.push(
             scheduler
-                .spawn(async move {
-                    workload(&*instance, mode, &workload_name, iterations, delay).await
-                })
+                .spawn(
+                    async move { workload(&*instance, mode, workload_name, iterations, delay).await },
+                )
                 .unwrap(),
         );
     }
@@ -172,61 +267,58 @@ pub async fn run<S: Timers + Spawn + Send + Sync + 'static>(
         refresh_expirations += expired;
         overshoot.extend(values);
     }
-    let elapsed = start.elapsed().as_secs_f64();
-    let cpu_seconds = cpu_time() - cpu_start;
+    let sample = interval.finish(operations as u64)?.with(Metric::total(
+        "refresh_expirations",
+        Unit::Count,
+        refresh_expirations as u64,
+    ));
+    Ok(with_overshoot(sample, overshoot))
+}
+
+/// Add the 50th and 99th percentiles and the maximum of `overshoot`, in nanoseconds, when there is any.
+///
+/// They are order statistics of the measured expiries rather than means, but like means they are reported as they are rather than divided by operations.
+pub fn with_overshoot(sample: Sample, mut overshoot: Vec<u64>) -> Sample {
     overshoot.sort_unstable();
-    serde_json::json!({"seconds": elapsed, "refresh_expirations": refresh_expirations, "cpu_seconds": cpu_seconds, "cpu_ns_per_operation": cpu_seconds * 1e9 / operations as f64, "operations": operations, "ops_per_second": operations as f64 / elapsed, "ns_per_operation": elapsed * 1e9 / operations as f64, "overshoot_p50_ns": quantile(&overshoot, 0.5), "overshoot_p99_ns": quantile(&overshoot, 0.99)})
+    [
+        ("overshoot_p50", 0.5),
+        ("overshoot_p99", 0.99),
+        ("overshoot_max", 1.0),
+    ]
+    .into_iter()
+    .filter_map(|(name, quantile)| {
+        let index = ((overshoot.len().checked_sub(1)?) as f64 * quantile) as usize;
+        Some(Metric::mean(name, Unit::Nanoseconds, overshoot[index] as f64).lower_is_better())
+    })
+    .fold(sample, Sample::with)
 }
 
-/// The value at quantile `p` of sorted `values`, or `None` when there are none.
-pub fn quantile(values: &[u64], p: f64) -> Option<u64> {
-    values
-        .get(((values.len().saturating_sub(1) as f64) * p) as usize)
-        .copied()
-}
-
-/// A Native scheduler's stall rescue counts for a run's record: an object with the `diagnostics` feature, and null without it.
-pub fn rescues<S: base_scheduler_native::Selector>(
+/// Add a Native scheduler's stall rescue counts with the `diagnostics` feature. They cover the scheduler's whole life, not only the measured operations.
+pub fn with_rescues<S: base_scheduler_native::Selector>(
+    sample: Sample,
     scheduler: &base_scheduler_native::NativeScheduler<S>,
-) -> serde_json::Value {
+) -> Sample {
     #[cfg(feature = "diagnostics")]
     {
         let statistics = scheduler.rescue_statistics();
-        serde_json::json!({
-            "stuck_polls": statistics.stuck_polls,
-            "long_batches": statistics.long_batches,
-            "leaving_idle": statistics.leaving_idle,
-            "timers": statistics.timers,
+        [
+            ("rescues_stuck_polls", statistics.stuck_polls),
+            ("rescues_long_batches", statistics.long_batches),
+            ("rescues_leaving_idle", statistics.leaving_idle),
+            ("rescued_timers", statistics.timers),
+        ]
+        .into_iter()
+        .fold(sample, |sample, (name, count)| {
+            sample.with(
+                Metric::total(name, Unit::Count, count as u64)
+                    .with_phase(base_benchmark::Phase::Process),
+            )
         })
     }
     #[cfg(not(feature = "diagnostics"))]
     {
         let _ = scheduler;
-        serde_json::Value::Null
-    }
-}
-
-#[cfg(test)]
-mod tests;
-
-/// Process CPU time in seconds, user and system, or zero where it is unavailable.
-pub fn cpu_time() -> f64 {
-    #[cfg(unix)]
-    {
-        let mut usage = std::mem::MaybeUninit::<libc::rusage>::uninit();
-        // SAFETY: getrusage initializes the output on success; the pointer refers to writable storage of the required size.
-        assert_eq!(
-            unsafe { libc::getrusage(libc::RUSAGE_SELF, usage.as_mut_ptr()) },
-            0
-        );
-        // SAFETY: The successful getrusage call initialized this value.
-        let usage = unsafe { usage.assume_init() };
-        (usage.ru_utime.tv_sec + usage.ru_stime.tv_sec) as f64
-            + (usage.ru_utime.tv_usec + usage.ru_stime.tv_usec) as f64 / 1e6
-    }
-    #[cfg(not(unix))]
-    {
-        0.0
+        sample
     }
 }
 
@@ -243,3 +335,9 @@ async fn probe(future: impl Future<Output = base_scheduler::OperationResult<()>>
     })
     .await
 }
+
+#[cfg(test)]
+mod test_support;
+
+#[cfg(test)]
+mod tests;

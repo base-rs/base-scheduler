@@ -2,58 +2,65 @@
 // Copyright, 2026, by Samuel Williams.
 
 use super::*;
+use crate::test_support::TestSource;
 
-fn periodic(values: &[&str]) -> serde_json::Value {
-    execute(
-        &values
-            .iter()
-            .map(|value| value.to_string())
-            .collect::<Vec<_>>(),
-    )
+fn options(
+    backend: NativeBackend,
+    alignment: Alignment,
+    delay_us: u64,
+    measure_ms: u64,
+) -> PeriodicOptions {
+    PeriodicOptions {
+        backend,
+        workers: 2,
+        tasks: 4,
+        delay: Duration::from_micros(delay_us),
+        alignment,
+        measure: Duration::from_millis(measure_ms),
+        work: 10,
+    }
 }
 
 #[test]
-fn backends_and_alignments_record_expiries_inside_the_window() {
-    #[cfg(target_os = "linux")]
-    let backends = ["native", "iouring"];
-    #[cfg(not(target_os = "linux"))]
-    let backends = ["native"];
-    for backend in backends {
-        for alignment in ["unaligned", "aligned"] {
+fn backends_and_alignments_count_expiries_inside_the_window() {
+    for backend in NativeBackend::ALL {
+        for alignment in Alignment::ALL {
             // A window several timer ticks long, so that even coarse timers (about 15.6 ms on Windows) record expiries inside it.
-            let record = periodic(&[backend, "2", "4", "1000", alignment, "150", "10"]);
-            assert_eq!(record["backend"], backend);
-            assert_eq!(record["alignment"], alignment);
-            assert_eq!(record["work"], 10);
-            assert!(record["samples"].as_u64().unwrap() > 0, "{record}");
-            assert!(record["overshoot_p50_ns"].is_number());
-            assert_eq!(record["rescues"].is_object(), cfg!(feature = "diagnostics"));
+            let sample = measure(
+                &options(*backend, *alignment, 1000, 150),
+                TestSource::default(),
+            )
+            .unwrap();
+            assert!(sample.operations > 0);
+            assert!(sample.metric("overshoot_p50").is_some());
+            assert!(sample.metric("cpu_time").is_some());
+            assert_eq!(
+                sample.metric("rescued_timers").is_some(),
+                cfg!(feature = "diagnostics")
+            );
         }
     }
 }
 
 #[test]
-fn a_window_shorter_than_the_delay_records_no_expiry() {
-    let record = periodic(&["native", "1", "1", "5000", "unaligned", "1"]);
-    assert_eq!(record["samples"], 0);
-    assert!(record["overshoot_p50_ns"].is_null());
-    assert_eq!(record["work"], 0);
+fn a_window_without_an_expiry_is_an_error() {
+    let error = measure(
+        &options(NativeBackend::Native, Alignment::Unaligned, 5000, 1),
+        TestSource::default(),
+    )
+    .unwrap_err();
+    assert_eq!(
+        error.to_string(),
+        "no timer expired inside the measurement window"
+    );
 }
 
 #[test]
-#[should_panic(expected = "unknown alignment")]
-fn an_unknown_alignment_is_rejected() {
-    periodic(&["native", "1", "1", "1000", "sideways"]);
-}
-
-#[test]
-#[should_panic(expected = "DELAY_US must be positive")]
-fn a_zero_delay_is_rejected() {
-    periodic(&["native", "1", "1", "0"]);
-}
-
-#[test]
-#[should_panic(expected = "unknown backend")]
-fn an_unknown_backend_is_rejected() {
-    periodic(&["unknown", "1", "1", "1000", "unaligned", "1"]);
+fn a_failed_measurement_still_runs_the_tasks_to_the_end_of_the_window() {
+    let error = measure(
+        &options(NativeBackend::Native, Alignment::Unaligned, 1000, 20),
+        TestSource::failing(),
+    )
+    .unwrap_err();
+    assert!(error.to_string().contains("no resource usage"));
 }

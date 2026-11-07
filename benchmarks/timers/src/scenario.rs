@@ -3,60 +3,48 @@
 
 //! Native scheduler scenarios driven from the root thread: root and task sleeps, spawning with and without a pending root timer, idle and pulse CPU, and timers behind a stalled worker.
 
-use crate::{cpu_time, quantile, rescues};
+use crate::options::{ScenarioOptions, ScenarioWorkload};
+use crate::{with_overshoot, with_rescues};
+use base_benchmark::{Interval, ResourceSource, Sample};
 use base_scheduler::{Cancellation, Clock, Spawn};
 use base_scheduler_native::{NativeOptions, NativeScheduler};
 use futures_lite::future::{block_on, poll_once, yield_now};
 use std::{
+    io,
     sync::Arc,
     time::{Duration, Instant},
 };
 
-const USAGE: &str = "scenario WORKLOAD WORKERS ITERATIONS [UNIT_US]";
-
-/// Runs `scenario WORKLOAD WORKERS ITERATIONS [UNIT_US]` and returns its record, with overshoot in nanoseconds. Every duration is a multiple of the unit, one millisecond by default: sleeps last one unit, a pulse 1,000 units, and a stall blocks a worker for 200 units while root sleeps of 10 units are measured.
-pub fn execute(args: &[String]) -> serde_json::Value {
-    let workload = args.first().expect(USAGE).as_str();
-    let workers: usize = args.get(1).expect(USAGE).parse().unwrap();
-    let iterations: usize = args.get(2).expect(USAGE).parse().unwrap();
-    let unit_us: u64 = args.get(3).map_or(1000, |unit| unit.parse().unwrap());
-    let unit = Duration::from_micros(unit_us);
+/// Measure a scenario over its iterations, with the overshoot of each measured sleep. Every duration is a multiple of the unit: sleeps last one unit, a pulse 1,000 units, and a stall blocks a worker for 200 units while root sleeps of 10 units are measured.
+pub fn measure<R: ResourceSource>(options: &ScenarioOptions, source: R) -> io::Result<Sample> {
     let scheduler = Arc::new(
         NativeScheduler::with_options(NativeOptions {
-            workers,
+            workers: options.workers,
             ..Default::default()
         })
         .unwrap(),
     );
     // Let the workers start and go idle before measuring.
-    std::thread::sleep(unit * 50);
-    let cpu_start = cpu_time();
-    let start = Instant::now();
-    let mut overshoot = run(&scheduler, workload, workers, iterations, unit);
-    let elapsed = start.elapsed();
-    let cpu_seconds = cpu_time() - cpu_start;
-    let rescues = rescues(&scheduler);
+    std::thread::sleep(options.unit * 50);
+    let sample = Interval::start_with(source).and_then(|interval| {
+        let overshoot = run(
+            &scheduler,
+            options.workload,
+            options.workers,
+            options.iterations,
+            options.unit,
+        );
+        let sample = interval.finish(options.iterations as u64)?;
+        Ok(with_rescues(with_overshoot(sample, overshoot), &scheduler))
+    });
     block_on(scheduler.shutdown());
-    overshoot.sort_unstable();
-    serde_json::json!({
-        "workload": workload,
-        "workers": workers,
-        "iterations": iterations,
-        "unit_us": unit_us,
-        "ns_per_operation": elapsed.as_nanos() as f64 / iterations as f64,
-        "cpu_ns_per_operation": cpu_seconds * 1e9 / iterations as f64,
-        "samples": overshoot.len(),
-        "overshoot_p50_ns": quantile(&overshoot, 0.5),
-        "overshoot_p99_ns": quantile(&overshoot, 0.99),
-        "overshoot_max_ns": quantile(&overshoot, 1.0),
-        "rescues": rescues,
-    })
+    sample
 }
 
 // Returns the overshoot of each measured sleep in nanoseconds.
 fn run(
     scheduler: &Arc<NativeScheduler>,
-    workload: &str,
+    workload: ScenarioWorkload,
     workers: usize,
     iterations: usize,
     unit: Duration,
@@ -65,15 +53,15 @@ fn run(
     let mut overshoot = Vec::new();
     match workload {
         // The root thread sleeps one unit repeatedly. Root registrations go to each worker in turn.
-        "root-sleep" => {
+        ScenarioWorkload::RootSleep => {
             for _ in 0..iterations {
                 overshoot.push(root_sleep(scheduler, unit));
             }
         }
         // The root thread spawns and joins an empty task, optionally with a distant root sleep pending throughout.
-        "spawn" | "spawn-pending" => {
+        ScenarioWorkload::Spawn | ScenarioWorkload::SpawnPending => {
             let mut pending = Box::pin(scheduler.sleep(Duration::from_secs(3600), &never));
-            if workload == "spawn-pending" {
+            if workload == ScenarioWorkload::SpawnPending {
                 assert!(block_on(poll_once(&mut pending)).is_none());
             }
             for _ in 0..iterations {
@@ -81,9 +69,9 @@ fn run(
             }
         }
         // Four tasks per worker each sleep one unit `iterations` times, optionally with a distant root sleep pending throughout.
-        "task-sleep" | "task-sleep-pending" => {
+        ScenarioWorkload::TaskSleep | ScenarioWorkload::TaskSleepPending => {
             let mut pending = Box::pin(scheduler.sleep(Duration::from_secs(3600), &never));
-            if workload == "task-sleep-pending" {
+            if workload == ScenarioWorkload::TaskSleepPending {
                 assert!(block_on(poll_once(&mut pending)).is_none());
             }
             let tasks: Vec<_> = (0..workers * 4)
@@ -108,9 +96,9 @@ fn run(
             }
         }
         // No load: process CPU while every worker is idle for `iterations` units.
-        "idle" => std::thread::sleep(unit * u32::try_from(iterations).unwrap()),
+        ScenarioWorkload::Idle => std::thread::sleep(unit * u32::try_from(iterations).unwrap()),
         // A task woken by a timer every 1,000 units, `iterations` times: one wake a second by default.
-        "pulse" => {
+        ScenarioWorkload::Pulse => {
             let task_scheduler = Arc::clone(scheduler);
             let pulse = scheduler
                 .spawn(async move {
@@ -123,7 +111,7 @@ fn run(
             block_on(pulse).unwrap();
         }
         // A task blocks its worker inside one poll for 200 units while the root thread measures eight sleeps of 10 units. Root registrations go to each worker in turn, so some land on the blocked one.
-        "stall" => {
+        ScenarioWorkload::Stall => {
             for _ in 0..iterations {
                 let blocker = scheduler
                     .spawn(async move { std::thread::sleep(unit * 200) })
@@ -136,7 +124,7 @@ fn run(
             }
         }
         // Sixteen tasks per worker yield `iterations` times each, with no timers: the scheduler loop alone.
-        "yield" => {
+        ScenarioWorkload::TaskYield => {
             let tasks: Vec<_> = (0..workers * 16)
                 .map(|_| {
                     scheduler
@@ -152,7 +140,6 @@ fn run(
                 block_on(task).unwrap();
             }
         }
-        _ => panic!("unknown workload"),
     }
     overshoot
 }

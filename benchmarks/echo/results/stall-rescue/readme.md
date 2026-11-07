@@ -12,7 +12,7 @@ Hana: Linux 7.2.14, Intel Xeon E3-1240 v6 (4 cores, 8 threads), `powersave` gove
 | [spawn-idle.md](spawn-idle.md) | `quick.py`, 21 pairs: spawn, spawn with a root timer pending, and one request per second for 10 s (idle server CPU). |
 | [monitor-threads.txt](monitor-threads.txt) | Per-thread CPU and voluntary context switches for branch timer workloads, 3 runs each, from [`scripts/threads.py`](scripts/threads.py). A monitor thread's voluntary switches approximate its wakes; `/proc` CPU times resolve to 10 ms, so "< 0.01 s" means below that. |
 
-The Rust sources in [`scripts/`](scripts/) are as run. The same workloads are now the `scenario` and `periodic` modes of `base-scheduler-benchmark-timers`, whose `diagnostics` feature reports rescue counts.
+The Rust sources in [`scripts/`](scripts/) are as run. The same workloads are now the root-thread scenarios and the `periodic` workload of [`base-scheduler-benchmark-timers`](../../../timers/readme.md), whose `diagnostics` feature reports rescue counts.
 
 ## Result
 

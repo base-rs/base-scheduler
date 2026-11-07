@@ -14,7 +14,7 @@ The instrumentation is an experiment, not merged. [experiment.patch](experiment.
 
 The patch also adds `wake_latency`. It parks a task on an idle worker with no timers pending, so a missed wake would wait indefinitely, then wakes it from another thread. `thread` runs the same loop with a plain thread and `park`/`unpark`, and `tokio` under Tokio's runtime, as baselines.
 
-Hana: Linux 7.2.14, Intel Xeon E3-1240 v6 (4 cores, 8 threads), `powersave` governor, `CONFIG_HZ=1000`, rustc 1.99.1, release builds, unpinned. Every run held `/tmp/base-scheduler-perf.lock`, and nothing else of ours ran on the host.
+Hana: Linux 7.2.14, Intel Xeon E3-1240 v6 (4 cores, 8 threads), `powersave` governor, `CONFIG_HZ=1000`, rustc 1.99.1, release builds, unpinned. Every run held `/tmp/base-scheduler-perf.lock`, and nothing else of ours ran on the host. These commands use the timer benchmark's positional command line of the time; it now takes `--name value` options and writes `base-benchmark` records, as [its readme](../../readme.md) describes.
 
 ```sh
 git apply benchmarks/timers/results/rescue-causes/experiment.patch
