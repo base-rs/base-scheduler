@@ -189,7 +189,7 @@ const WINDOWS_READY_BOUND: std::time::Duration = std::time::Duration::from_secs(
 
 /// Wait for readiness after a `WouldBlock` syscall; like `Async::read_with`, the caller optimistically retries the syscall after any wake.
 ///
-/// polling's IOCP backend can leave interest registered from a non-reactor thread queued while the reactor thread blocks without a timeout (smol-rs/polling#271), so a ready socket is never reported. Inserting a timer after registering interest notifies the reactor, which then submits the queued poll before waiting again. Remove this once a polling release includes the fix (smol-rs/polling#272).
+/// polling's IOCP backend can leave interest registered from a non-reactor thread queued while the reactor thread blocks without a timeout (smol-rs/polling#271), so a ready socket is never reported. Inserting a timer after registering interest notifies the reactor, which then submits the queued poll before waiting again. The selector's `NativeSocket` works around the same race; remove both once a polling release includes the fix (smol-rs/polling#272).
 #[cfg(windows)]
 async fn windows_ready(ready: impl std::future::Future<Output = io::Result<()>>) -> io::Result<()> {
     use std::{

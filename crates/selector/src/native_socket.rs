@@ -108,6 +108,39 @@ impl std::os::windows::io::AsSocket for Descriptor {
     }
 }
 
+// Wait for the portable reactor to report readiness. Unix reactors observe interest registered from any thread.
+#[cfg(unix)]
+async fn reported(ready: impl std::future::Future<Output = io::Result<()>>) -> io::Result<()> {
+    ready.await
+}
+
+// How far ahead the timer which carries a reactor notification is set. Its expiry only polls the wait again, which renews it, so it need never fire.
+#[cfg(windows)]
+const NOTIFICATION_TIMER: std::time::Duration = std::time::Duration::from_secs(3600);
+
+// Wait for the portable reactor to report readiness, notifying it after each poll that leaves the wait registered.
+//
+// polling's IOCP backend can leave interest registered from a thread other than async-io's reactor thread queued while the reactor thread blocks without a timeout (smol-rs/polling#271), so a ready socket is never reported. Inserting an async-io timer notifies the reactor, which then submits the queued poll before waiting again. async-io registers interest again when a wait is polled after an event from the reactor turn it registered during, so every pending poll notifies, not only the first. The wait still completes only when the reactor reports readiness, so unrelated wakes do not retry the operation. The Tokio adapter works around the same race; remove both once a polling release includes the fix (smol-rs/polling#272).
+#[cfg(windows)]
+async fn reported(ready: impl std::future::Future<Output = io::Result<()>>) -> io::Result<()> {
+    use std::{
+        future::Future,
+        pin::{Pin, pin},
+    };
+    let mut ready = pin!(ready);
+    let mut notification = None;
+    std::future::poll_fn(|context| {
+        let result = ready.as_mut().poll(context);
+        if result.is_pending() {
+            // Replacing the timer removes the previous one; inserting this one notifies the reactor after the registration above.
+            let timer = notification.insert(async_io::Timer::after(NOTIFICATION_TIMER));
+            let _ = Pin::new(timer).poll(context);
+        }
+        result
+    })
+    .await
+}
+
 /// An owned nonblocking socket with lazily retained readiness registrations.
 ///
 /// Usable by any native scheduler instance. Readiness operations retain their buffers in the waiting future without leaving payload pointers in the reactor. Completion backends retain the socket and buffers independently until their operations retire. Finish outstanding operations before exclusive close. Imported TCP resources must remain nonblocking through external aliases.
@@ -172,8 +205,8 @@ impl NativeSocket {
             }
             let fallback = self.inner.fallback()?;
             let ready = match interest {
-                Interest::Readable => fallback.readable().await,
-                Interest::Writable => fallback.writable().await,
+                Interest::Readable => reported(fallback.readable()).await,
+                Interest::Writable => reported(fallback.writable()).await,
             };
             #[cfg(test)]
             let ready = tests::readiness_result(ready);
