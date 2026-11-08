@@ -505,13 +505,13 @@ fn overshoot_reports_order_statistics_of_the_expiries() {
         .iter()
         .map(|metric| (metric.name.as_str(), metric.measurement.clone()))
         .collect();
-    let mean = |value| base_benchmark::Measurement::Mean { value };
+    let quantile = |quantile, value| base_benchmark::Measurement::Quantile { quantile, value };
     assert_eq!(
         values,
         [
-            ("overshoot_p50", mean(50.0)),
-            ("overshoot_p99", mean(99.0)),
-            ("overshoot_max", mean(100.0)),
+            ("overshoot_p50", quantile(0.5, 50.0)),
+            ("overshoot_p99", quantile(0.99, 99.0)),
+            ("overshoot_max", quantile(1.0, 100.0)),
         ]
     );
 }

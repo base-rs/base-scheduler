@@ -81,16 +81,16 @@ target/release/base-scheduler-benchmark-timers --workload stall --workers 2 --it
 target/release/base-scheduler-benchmark-timers --workload periodic --workers 4 --alignment aligned
 ```
 
-Each record repeats every parameter, and reports for its measured operations `wall_time`, `cpu_time`, `user_cpu_time`, `system_cpu_time` and both context-switch counts; summaries divide them by operations. The timer workloads measure from the first task's admission to the last join, and also report `refresh_expirations`. A scenario measures its iterations after the workers have gone idle. `periodic` measures its window from the root thread, which runs no tasks. `expire`, `cycle`, `root-sleep`, `task-sleep`, `task-sleep-pending`, `stall` and `periodic` measure how late each expiry is, and add `overshoot_p50`, `overshoot_p99` and `overshoot_max` in nanoseconds: order statistics of every measured expiry, which summaries report as they are. `alloc` reports `allocations` and `allocated_bytes`, with the sizes of the timer resource and the `After` wrapper as `timer_size` and `after_size`. Process resource usage comes from `getrusage`, so on other systems than Unix every measurement fails.
+Each record repeats every parameter, and reports for its measured operations `wall_time`, `cpu_time`, `user_cpu_time`, `system_cpu_time` and both context-switch counts; summaries divide them by operations. The timer workloads measure from the first task's admission to the last join, and also report `refresh_expirations`. A scenario measures its iterations after the workers have gone idle. `periodic` measures its window from the root thread, which runs no tasks. `expire`, `cycle`, `root-sleep`, `task-sleep`, `task-sleep-pending`, `stall` and `periodic` measure how late each expiry is, and add `overshoot_p50`, `overshoot_p99` and `overshoot_max` in nanoseconds: quantiles 0.5, 0.99 and 1 of every measured expiry, which summaries report as they are, as `ns p50`, `ns p99` and `ns p100`. `alloc` reports `allocations` and `allocated_bytes`, with the sizes of the timer resource and the `After` wrapper as `timer_size` and `after_size`. Process resource usage comes from `getrusage`, so on other systems than Unix every measurement fails.
 
-Two features add counts at a cost to timing, so take timing from a build without them. Each record lists them in its `features` parameter, so the runner rejects a campaign whose artifacts differ in them. Preparation builds every tree with the same features, so take a diagnostic build's records directly from the binary.
+Two features add counts at a cost to timing, so take timing from a build without them. Each record lists them in its `features` parameter, so the runner rejects a campaign whose artifacts differ in them. The scenarios that need them declare their own `features`, so preparation builds each tree once more for them and the timed scenarios never run those builds:
 
-- `allocations` enables the `alloc` workload. It replaces the global allocator with a counting one, which slows every allocation.
-- `diagnostics` adds the Native scheduler's stall rescue counts (`rescues_stuck_polls`, `rescues_long_batches`, `rescues_leaving_idle`, `rescued_timers`) to every Native record. They cover the whole process, so summaries never divide them by operations.
+- `allocations` enables the `alloc` workload, run by the `alloc` scenario. It replaces the global allocator with a counting one, which slows every allocation.
+- `diagnostics` adds the Native scheduler's stall rescue counts (`rescues_stuck_polls`, `rescues_long_batches`, `rescues_leaving_idle`, `rescued_timers`) to every Native record. They cover the whole process, so summaries never divide them by operations. The `stall-rescues` scenario is the control, which must record rescues, and `periodic-rescues` and `periodic-aligned-rescues` count the periodic diagnostics' rescues.
 
 ### Comparing builds
 
-[`Cargo.toml`](Cargo.toml) declares scenarios under `[package.metadata.base-benchmark]`. The timer scenarios compare the Tokio adapter, Native, and Native over io_uring in each round, with Tokio as the baseline of the backend comparison. They use the reusable timer (`reuse`), except `refresh-sleep`, `expire` and `expire-contended`, which use fresh sleeps; other modes and configurations run directly with the binary. The root-thread scenarios measure Native alone, and the `periodic` and `periodic-aligned` scenarios compare Native and io_uring with 4 workers and 1,024 tasks. Run `cargo bake benchmark:list` for every scenario's resolved arguments, and `cargo bake benchmark:smoke` to run each once with tiny arguments.
+[`Cargo.toml`](Cargo.toml) declares scenarios under `[package.metadata.base-benchmark]`. The timer scenarios compare the Tokio adapter, Native, and Native over io_uring in each round, with Tokio as the baseline of the backend comparison. They use the reusable timer (`reuse`), except `refresh-sleep`, `expire` and `expire-contended`, which use fresh sleeps; other modes and configurations run directly with the binary. The root-thread scenarios measure Native alone, and the `periodic` and `periodic-aligned` scenarios compare Native and io_uring with 4 workers and 1,024 tasks. `alloc` and the `-rescues` scenarios run feature builds, described above. Run `cargo bake benchmark:list` for every scenario's resolved arguments, and `cargo bake benchmark:smoke` to run each once with tiny arguments.
 
 To compare revisions, check each out (for example with `git worktree add`), then prepare them, baseline first, and run a scenario:
 
@@ -99,7 +99,22 @@ cargo bake benchmark:prepare --tree main=../main --tree candidate=.
 cargo bake benchmark:run periodic --artifacts target/base-benchmark/prepared-TIME/artifacts.json --cpus 2-5 --rounds 10
 ```
 
-Preparation builds every tree with the same profile and a layout replica: the baseline rebuilt at another path, whose differences from the baseline show how much build layout alone moves a result. Rounds run every artifact and variant in a seeded random order under a host-wide lock, and the report compares each with the baseline, warning when a change is within the replica's range. Screening runs are triage; `--mode recorded` adds the prerequisites for acceptance evidence. See the [base-benchmark usage guide](https://github.com/base-rs/base-benchmark/blob/main/context/usage.md) for every option. Scenario arguments come from the current workspace, so every tree must contain this harness; revisions before it used `run.py` and positional arguments. On a measuring host without Bake, the `base-benchmark` command, installed with `cargo install base-benchmark --root DIR`, offers the same operations, with `--manifest-path` and `--package base-scheduler-benchmark-timers`.
+Preparation builds every tree with the same profile, once for each feature set of the scenarios (`--scenario NAME` prepares only those a scenario needs), and a layout replica: the baseline rebuilt at another path with salted crate metadata, whose differences from the baseline show how much build layout alone moves a result. Rounds run every artifact and variant in a seeded random order under a host-wide lock, and the report compares each with the baseline, warning when a change is within the replica's range. Screening runs are triage; `--mode recorded` adds the prerequisites for acceptance evidence. See the [base-benchmark usage guide](https://github.com/base-rs/base-benchmark/blob/main/context/usage.md) for every option. Scenario arguments come from the current workspace, so every tree must contain this harness. Revisions before it used `run.py` and positional arguments; to compare them, prepare with `--overlay true`, which builds each tree from a copy with this workspace's `benchmarks/timers` in place of its own:
+
+```sh
+cargo bake benchmark:prepare --tree old=../old --tree candidate=. --overlay true --scenario refresh
+```
+
+The harness's dependencies are pinned to this workspace's versions. Where it needs a newer version of a package an old tree locks, such as `signal-hook` 0.4.6 for revisions before the move to `base-benchmark`, the old tree's build uses it too: the manifest lists each such change in `lockfile_changes`, and recorded campaigns refuse them.
+
+To measure on a dedicated host, such as hana, add `--host HOST` to `prepare`, `run` and `smoke`. Local paths are mirrored on the host with `rsync`, the matching `base-benchmark` command is installed there when it is missing, and outputs are copied back, so `summarize` works locally:
+
+```sh
+cargo bake benchmark:prepare --host hana.local --tree main=../main --tree candidate=.
+cargo bake benchmark:run periodic --host hana.local --artifacts target/base-benchmark/prepared-TIME/artifacts.json --cpus 2-5 --rounds 10
+```
+
+On a host without Bake, the `base-benchmark` command, installed with `cargo install base-benchmark --root DIR`, offers the same operations, with `--manifest-path` and `--package base-scheduler-benchmark-timers`.
 
 Keep a reviewed campaign's directory under `results/<topic>/`, with an [investigation record](https://github.com/base-rs/base-benchmark/blob/main/templates/investigation.md).
 

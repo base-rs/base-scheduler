@@ -277,7 +277,7 @@ where
 
 /// Add the 50th and 99th percentiles and the maximum of `overshoot`, in nanoseconds, when there is any.
 ///
-/// They are order statistics of the measured expiries rather than means, but like means they are reported as they are rather than divided by operations.
+/// They are order statistics of the measured expiries, reported as quantiles: as they are, never divided by operations.
 pub fn with_overshoot(sample: Sample, mut overshoot: Vec<u64>) -> Sample {
     overshoot.sort_unstable();
     [
@@ -288,7 +288,10 @@ pub fn with_overshoot(sample: Sample, mut overshoot: Vec<u64>) -> Sample {
     .into_iter()
     .filter_map(|(name, quantile)| {
         let index = ((overshoot.len().checked_sub(1)?) as f64 * quantile) as usize;
-        Some(Metric::mean(name, Unit::Nanoseconds, overshoot[index] as f64).lower_is_better())
+        Some(
+            Metric::quantile(name, Unit::Nanoseconds, quantile, overshoot[index] as f64)
+                .lower_is_better(),
+        )
     })
     .fold(sample, Sample::with)
 }

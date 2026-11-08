@@ -14,7 +14,7 @@ diagnostics = ["base-scheduler-native/diagnostics"]
 [dependencies]
 allocation-counter = { version = "0.8.1", optional = true }
 # Records and `Interval` only; the runner is not linked into the measured binary.
-base-benchmark = { version = "0.1.0", default-features = false }
+base-benchmark = { version = "0.2.0", default-features = false }
 base-scheduler = { path = "../.." }
 base-scheduler-tokio = { path = "../../crates/tokio" }
 base-scheduler-native = { path = "../../crates/native" }
@@ -30,7 +30,7 @@ base-scheduler-timers = { path = "../../crates/timers", features = ["local"] }
 
 # The runner, for the test that smokes every scenario through the shared collector. It supports Unix and is tested on Linux.
 [target.'cfg(target_os = "linux")'.dev-dependencies]
-base-benchmark = "0.1.0"
+base-benchmark = "0.2.0"
 tempfile = "3.27.0"
 
 # Scenarios for `cargo bake benchmark:*` and the `base-benchmark` command. Iteration counts are in `measure-arguments`, so that smoke runs replace them. The timer scenarios compare the Tokio adapter, Native and Native over io_uring in each round; the root-thread scenarios measure Native only.
@@ -155,3 +155,39 @@ variants = [
     { name = "native", arguments = ["--backend", "native"] },
     { name = "iouring", arguments = ["--backend", "iouring"] },
 ]
+
+# Allocation counts need the counting allocator, so this scenario runs its own build, never reaching the timed ones.
+[[package.metadata.base-benchmark.scenario]]
+name = "alloc"
+arguments = ["--workload", "alloc", "--mode", "reuse"]
+measure-arguments = ["--iterations", "100000"]
+features = ["allocations"]
+
+# Stall rescue counts, from a `diagnostics` build. `stall` is the control, which must record rescues; the periodic diagnostics recorded them in most runs.
+[[package.metadata.base-benchmark.scenario]]
+name = "stall-rescues"
+arguments = ["--workload", "stall", "--workers", "4"]
+smoke-arguments = ["--iterations", "1", "--unit-us", "100"]
+measure-arguments = ["--iterations", "10"]
+variants = []
+features = ["diagnostics"]
+
+[[package.metadata.base-benchmark.scenario]]
+name = "periodic-rescues"
+arguments = ["--workload", "periodic", "--workers", "4"]
+smoke-arguments = ["--measure-ms", "30"]
+variants = [
+    { name = "native", arguments = ["--backend", "native"] },
+    { name = "iouring", arguments = ["--backend", "iouring"] },
+]
+features = ["diagnostics"]
+
+[[package.metadata.base-benchmark.scenario]]
+name = "periodic-aligned-rescues"
+arguments = ["--workload", "periodic", "--workers", "4", "--alignment", "aligned"]
+smoke-arguments = ["--measure-ms", "30"]
+variants = [
+    { name = "native", arguments = ["--backend", "native"] },
+    { name = "iouring", arguments = ["--backend", "iouring"] },
+]
+features = ["diagnostics"]
