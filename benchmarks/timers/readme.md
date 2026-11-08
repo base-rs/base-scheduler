@@ -56,7 +56,7 @@ The root-thread scenarios drive a Native scheduler from the root thread. Every d
 | `stall` | A task blocks its worker inside one poll for 200 units while the root thread measures eight sleeps of 10 units, once per iteration. |
 | `task-yield` | Sixteen tasks per worker yield once per iteration each, with no timers. |
 
-`periodic`, the stall rescue design's worker-local timer diagnostic, runs `--tasks` tasks that each sleep `--delay-us` again and again, on `native`, or `iouring` on Linux. It measures a window of `--measure-ms` after a warmup of a third of that, and each expiry inside the window is one operation. `--alignment aligned` rounds each deadline up to a multiple of the delay, so that every task's deadlines fall due together; `--work` adds that many multiply-add steps after each expiry.
+`periodic`, the stall rescue design's worker-local timer diagnostic, runs `--tasks` tasks that each sleep `--delay-us` again and again, on `native`, or `iouring` on Linux. It measures a window of `--measure-ms` after a warmup of a third of that, and each expiry inside the window is one operation. `--measure-expiries N` instead measures from the start, without a warmup, until every task has recorded `N` expiries, however long that takes. The smoke arguments use it, so that a slow host cannot leave the window empty; its figures are not measurements. `--alignment aligned` rounds each deadline up to a multiple of the delay, so that every task's deadlines fall due together; `--work` adds that many multiply-add steps after each expiry.
 
 ## Running
 
@@ -73,6 +73,7 @@ Each process measures one workload and writes one [`base-benchmark`](https://git
 | `--delay-us` | timer workloads, which accept zero; `periodic` | 1,000 |
 | `--unit-us` | scenarios | 1,000 |
 | `--alignment`, `--measure-ms`, `--work` | `periodic` | `unaligned`, 3,000, 0 |
+| `--measure-expiries` | `periodic`, in place of `--measure-ms` | none |
 
 ```sh
 cargo build --release --locked -p base-scheduler-benchmark-timers

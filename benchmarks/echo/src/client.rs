@@ -33,12 +33,46 @@ async fn pace(until: Instant) {
     }
 }
 
+/// How long the measurement window lasts, from the end of the warmup.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) enum Measure {
+    /// A fixed duration: the benchmark's measurement.
+    Seconds(Duration),
+    /// Until each connection has counted this many requests, however long that takes, so that a smoke run cannot come out empty on a slow host. Its rates are not measurements.
+    Requests(u64),
+}
+
+// Where the window ends, published to the connections with its start.
+#[derive(Clone, Copy)]
+enum End {
+    At(Instant),
+    After(u64),
+}
+
+impl End {
+    // Whether a connection that has counted `counted` requests stops before sending at `now`.
+    fn reached(self, counted: u64, now: Instant) -> bool {
+        match self {
+            Self::At(end) => now >= end,
+            Self::After(requests) => counted >= requests,
+        }
+    }
+
+    // Whether a request completed at `completed` finished inside the window.
+    fn includes(self, completed: Instant) -> bool {
+        match self {
+            Self::At(end) => completed <= end,
+            Self::After(_) => true,
+        }
+    }
+}
+
 pub(crate) async fn run(
     address: SocketAddr,
     connections: usize,
     bytes: usize,
     warmup: Duration,
-    duration: Duration,
+    measure: Measure,
     rate: Option<usize>,
 ) -> Result<()> {
     // Each connection sends at an equal share of the offered rate.
@@ -47,7 +81,7 @@ pub(crate) async fn run(
         return Err("offered rate is too high to pace".into());
     }
     let gate = Arc::new(Barrier::new(connections + 1));
-    let (schedule, clock) = watch::channel(None::<(Instant, Instant)>);
+    let (schedule, clock) = watch::channel(None::<(Instant, End)>);
     let mut tasks = Vec::with_capacity(connections);
     for index in 0..connections {
         let mut socket = TcpStream::connect(address)
@@ -80,7 +114,7 @@ pub(crate) async fn run(
                 // A paced request's latency starts at its scheduled send, including any delay before it could be sent.
                 let started = match scheduled.as_mut().zip(interval) {
                     Some((scheduled, interval)) => {
-                        if *scheduled >= measure_end {
+                        if measure_end.reached(latency.len(), *scheduled) {
                             break;
                         }
                         let started = *scheduled;
@@ -92,7 +126,9 @@ pub(crate) async fn run(
                 };
                 // Stop at the end of the window in wall-clock time, even if an overloaded server has left paced requests unsent.
                 let sent = Instant::now();
-                if started >= measure_end || sent >= measure_end {
+                if measure_end.reached(latency.len(), started)
+                    || measure_end.reached(latency.len(), sent)
+                {
                     break;
                 }
                 socket.write_all(&request).await.expect("client write");
@@ -106,7 +142,7 @@ pub(crate) async fn run(
                     .into());
                 }
                 // Count round trips sent and completed inside the shared measurement window; warmup and boundary-crossing requests are excluded. A paced request is counted by when it was actually sent, so an overloaded server's backlog still counts, with its queueing delay in the latency.
-                if sent >= measure_start && completed <= measure_end {
+                if sent >= measure_start && measure_end.includes(completed) {
                     if let Some(send_delay) = send_delay.as_mut() {
                         send_delay.saturating_record((sent - started).as_nanos().max(1) as u64);
                     }
@@ -118,8 +154,12 @@ pub(crate) async fn run(
     }
     gate.wait().await;
     let measure_start = Instant::now() + warmup;
+    let measure_end = match measure {
+        Measure::Seconds(duration) => End::At(measure_start + duration),
+        Measure::Requests(requests) => End::After(requests),
+    };
     schedule
-        .send(Some((measure_start, measure_start + duration)))
+        .send(Some((measure_start, measure_end)))
         .expect("clients await schedule");
     let mut latency = histogram();
     let mut send_delay = histogram();
@@ -134,6 +174,11 @@ pub(crate) async fn run(
     }
     let delay =
         |quantile: f64| rate.map(|_| send_delay.value_at_quantile(quantile) as f64 / 1000.0);
+    // A window of requests ends when its last connection does.
+    let duration = match measure {
+        Measure::Seconds(duration) => duration,
+        Measure::Requests(_) => measure_start.elapsed(),
+    };
     if latency.is_empty() {
         return Err("no complete requests in measurement window".into());
     }
@@ -150,3 +195,6 @@ pub(crate) async fn run(
     );
     Ok(())
 }
+
+#[cfg(test)]
+mod tests;

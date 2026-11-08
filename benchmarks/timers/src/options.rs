@@ -134,6 +134,15 @@ pub struct ScenarioOptions {
     pub unit: Duration,
 }
 
+/// How long the periodic diagnostic's measurement window lasts.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Measure {
+    /// A fixed duration, after a warmup of a third of it: the diagnostic's measurement.
+    Duration(Duration),
+    /// Until every task has recorded this many expiries, without a warmup, however long that takes, so that a smoke run cannot come out empty on a slow host. Its figures are not measurements.
+    Expiries(usize),
+}
+
 /// Options of the periodic timer diagnostic.
 #[derive(Clone, Debug, PartialEq)]
 pub struct PeriodicOptions {
@@ -142,8 +151,8 @@ pub struct PeriodicOptions {
     pub tasks: usize,
     pub delay: Duration,
     pub alignment: Alignment,
-    /// The length of the measurement window, which follows a warmup of a third of it.
-    pub measure: Duration,
+    /// The measurement window.
+    pub measure: Measure,
     /// Multiply-add steps after each expiry.
     pub work: u64,
 }
@@ -172,7 +181,7 @@ impl Benchmark {
                 tasks: arguments.positive("tasks", 1024)?,
                 delay: Duration::from_micros(arguments.positive("delay-us", 1000)?),
                 alignment: arguments.take("alignment", Alignment::Unaligned)?,
-                measure: Duration::from_millis(arguments.positive("measure-ms", 3000)?),
+                measure: arguments.measure()?,
                 work: arguments.take("work", 0)?,
             })
         } else if let Ok(workload) = workload.parse() {
@@ -216,16 +225,22 @@ impl Benchmark {
                 "iterations": options.iterations,
                 "unit_us": options.unit.as_micros() as u64,
             }),
-            Self::Periodic(options) => json!({
-                "workload": "periodic",
-                "backend": options.backend.name(),
-                "workers": options.workers,
-                "tasks": options.tasks,
-                "delay_us": options.delay.as_micros() as u64,
-                "alignment": options.alignment.name(),
-                "measure_ms": options.measure.as_millis() as u64,
-                "work": options.work,
-            }),
+            Self::Periodic(options) => {
+                let (measure, length) = match options.measure {
+                    Measure::Duration(duration) => ("measure_ms", duration.as_millis() as u64),
+                    Measure::Expiries(expiries) => ("measure_expiries", expiries as u64),
+                };
+                json!({
+                    "workload": "periodic",
+                    "backend": options.backend.name(),
+                    "workers": options.workers,
+                    "tasks": options.tasks,
+                    "delay_us": options.delay.as_micros() as u64,
+                    "alignment": options.alignment.name(),
+                    measure: length,
+                    "work": options.work,
+                })
+            }
         };
         // Both features change timing, so a campaign must not compare a build with them to one without.
         parameters["features"] = json!(FEATURES);
@@ -263,6 +278,7 @@ const OPTIONS: &[&str] = &[
     "unit-us",
     "alignment",
     "measure-ms",
+    "measure-expiries",
     "work",
 ];
 
@@ -307,6 +323,19 @@ impl Arguments {
             return Err(invalid(format!("--{name} must be positive")));
         }
         Ok(value)
+    }
+
+    // The periodic window: `--measure-ms`, or `--measure-expiries` instead.
+    fn measure(&mut self) -> io::Result<Measure> {
+        if !self.0.contains_key("measure-expiries") {
+            return Ok(Measure::Duration(Duration::from_millis(
+                self.positive("measure-ms", 3000)?,
+            )));
+        }
+        if self.0.contains_key("measure-ms") {
+            return Err(invalid("use either --measure-ms or --measure-expiries"));
+        }
+        Ok(Measure::Expiries(self.positive("measure-expiries", 1)?))
     }
 
     fn finish(self, workload: &str) -> io::Result<()> {

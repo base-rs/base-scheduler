@@ -81,7 +81,7 @@ fn each_family_has_defaults_and_records_every_parameter() {
             tasks: 1024,
             delay: Duration::from_millis(1),
             alignment: Alignment::Unaligned,
-            measure: Duration::from_secs(3),
+            measure: Measure::Duration(Duration::from_secs(3)),
             work: 0,
         })
     );
@@ -143,6 +143,15 @@ fn every_option_of_each_family_is_accepted() {
     .unwrap();
     assert_eq!(periodic.parameters()["alignment"], "aligned");
     assert_eq!(periodic.parameters()["work"], 5);
+    assert_eq!(periodic.parameters()["measure_ms"], 20);
+    let counted = parse(&["--workload", "periodic", "--measure-expiries", "3"]).unwrap();
+    let Benchmark::Periodic(options) = &counted else {
+        panic!("{counted:?}");
+    };
+    assert_eq!(options.measure, Measure::Expiries(3));
+    // A window of expiries records its count in place of the window's length.
+    assert_eq!(counted.parameters()["measure_expiries"], 3);
+    assert!(counted.parameters().get("measure_ms").is_none());
 }
 
 #[test]
@@ -194,6 +203,25 @@ fn malformed_and_inapplicable_options_are_errors() {
         "--delay-us must be positive"
     );
     assert_eq!(
+        error(&["--workload", "periodic", "--measure-expiries", "0"]),
+        "--measure-expiries must be positive"
+    );
+    assert_eq!(
+        error(&[
+            "--workload",
+            "periodic",
+            "--measure-ms",
+            "30",
+            "--measure-expiries",
+            "1"
+        ]),
+        "use either --measure-ms or --measure-expiries"
+    );
+    assert_eq!(
+        error(&["--measure-expiries", "1"]),
+        "--measure-expiries does not apply to the refresh workload"
+    );
+    assert_eq!(
         error(&["--workload", "spawn", "--unit-us", "0"]),
         "--unit-us must be positive"
     );
@@ -218,6 +246,7 @@ fn every_option_rejects_an_invalid_value() {
             "--delay-us",
             "--alignment",
             "--measure-ms",
+            "--measure-expiries",
             "--work",
         ],
     ];

@@ -488,10 +488,11 @@ fn every_family_measures_into_a_record() {
         "1",
         "--tasks",
         "2",
-        "--measure-ms",
-        "60",
+        "--measure-expiries",
+        "2",
     ]);
     assert_eq!(periodic["parameters"]["workload"], "periodic");
+    assert_eq!(periodic["samples"][0]["operations"], 2 * 2);
     assert!(metric(&periodic, "overshoot_p50").is_some());
 }
 
