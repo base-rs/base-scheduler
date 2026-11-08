@@ -4,4 +4,8 @@ Run `cargo bake agent:context:install` to install dependency context and skills.
 
 Read `context/design.md` before changing the public capabilities or behavioral contracts.
 
+Before planning or changing behavior, discover and read applicable `design/*.md`. Use `base-design-review` to assess plans and changes, and `base-design-author` when user requirements are introduced, changed, or removed. Review design compliance before opening or updating a pull request.
+
+Use `base-security-audit` when reviewing code for security issues, and record each review in `security/audit-*.md`. Use `base-security-advisory` for vulnerability reports and for findings that may warrant an advisory. Before reporting a security finding, read the relevant `// SECURITY:` comments, `design/*.md` and `context/design.md`.
+
 The workspace tests cover runtime-independent support, generic composition, reusable conformance assertions, the Tokio, Native, readiness, and io_uring backends, and the reusable timers. CI requires 100% region coverage for the workspace with `cargo bake --locked test:coverage --all-targets true --all-features true`, and separately for `base-scheduler-timers` with default features and with each of the `driver`, `sharded`, and `local` features (`cargo bake --locked test:coverage --package base-scheduler-timers --all-targets true --features driver`, for example); see `.github/workflows/test.yml`.
