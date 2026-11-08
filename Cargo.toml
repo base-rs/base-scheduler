@@ -47,7 +47,3 @@ futures-lite = "2.6.1"
 
 [target."cfg(unix)".dev-dependencies]
 libc = "0.2"
-
-# The benchmark runner checks an artifact's SHA-256 before each campaign. Unoptimized, that takes over a second for a debug benchmark binary, so the timer benchmark's test of every scenario optimizes the hash.
-[profile.dev.package.sha2]
-opt-level = 3

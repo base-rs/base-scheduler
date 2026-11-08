@@ -87,9 +87,9 @@ dependencies = [
 
 [[package]]
 name = "bake-benchmark"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1f503c3ed9be5c4f255f78b3a5aac368c577dd007812af27f880741e4950cf03"
+checksum = "53a8974f82de8af96dd30289f7043189b710a4ae3186bd5b9c41098b2bf9a4b6"
 dependencies = [
  "bake",
  "base-benchmark",
@@ -181,9 +181,9 @@ dependencies = [
 
 [[package]]
 name = "base-benchmark"
-version = "0.1.1"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7291613db3cdd9e9280a0054e913157abf92cc654c765794822f5ce41eae2c06"
+checksum = "0f7c01a7fc61d94749f9a7f712473d2806977477ef12350470ba9fd140049520"
 dependencies = [
  "nix",
  "serde",
@@ -597,7 +597,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1115,7 +1115,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1356,7 +1356,7 @@ dependencies = [
  "getrandom 0.4.3",
  "once_cell",
  "rustix",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
