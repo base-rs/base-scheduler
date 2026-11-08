@@ -163,12 +163,12 @@ arguments = ["--workload", "alloc", "--mode", "reuse"]
 measure-arguments = ["--iterations", "100000"]
 features = ["allocations"]
 
-# Stall rescue counts, from a `diagnostics` build. `stall` is the control, which must record rescues; the periodic diagnostics recorded them in most runs.
+# Stall rescue counts, from a `diagnostics` build. `stall-rescues` is the control of results/rescue-counts, which must record rescues: 2 workers and 3 iterations recorded 12 stuck-poll rescues in every run. The periodic diagnostics recorded them in most runs.
 [[package.metadata.base-benchmark.scenario]]
 name = "stall-rescues"
-arguments = ["--workload", "stall", "--workers", "4"]
+arguments = ["--workload", "stall", "--workers", "2"]
 smoke-arguments = ["--iterations", "1", "--unit-us", "100"]
-measure-arguments = ["--iterations", "10"]
+measure-arguments = ["--iterations", "3"]
 variants = []
 features = ["diagnostics"]
 

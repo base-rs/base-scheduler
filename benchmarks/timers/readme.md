@@ -105,7 +105,9 @@ Preparation builds every tree with the same profile, once for each feature set o
 cargo bake benchmark:prepare --tree old=../old --tree candidate=. --overlay true --scenario refresh
 ```
 
-The harness's dependencies are pinned to this workspace's versions. Where it needs a newer version of a package an old tree locks, such as `signal-hook` 0.4.6 for revisions before the move to `base-benchmark`, the old tree's build uses it too: the manifest lists each such change in `lockfile_changes`, and recorded campaigns refuse them.
+Packages the old tree does not lock get this workspace's versions. Where the harness needs a newer version of a package the old tree does lock, the old tree's build uses it too: the manifest lists each such change in `lockfile_changes`, and recorded campaigns refuse them, so an overlaid comparison is a screening run. Every revision before the update to `base-benchmark` 0.2 has such changes, such as `base-benchmark` itself and the `toml` crates its runner uses (which the measured binary does not link), and `signal-hook` 0.4.6 for revisions before the move to `base-benchmark`.
+
+Overshoot is reported as quantiles since that update, and as a mean before it. Summaries treat the two as different metrics, so without `--overlay true` a comparison with an older revision warns that the overshoot metrics are defined differently and compares none of them.
 
 To measure on a dedicated host, such as hana, add `--host HOST` to `prepare`, `run` and `smoke`. Local paths are mirrored on the host with `rsync`, the matching `base-benchmark` command is installed there when it is missing, and outputs are copied back, so `summarize` works locally:
 

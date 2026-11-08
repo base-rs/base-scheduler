@@ -81,6 +81,11 @@ fn the_shared_runner_smokes_every_scenario() {
                 .all(|feature| features.contains(&feature.as_str()))
         })
         .collect();
+    // 19 timed scenarios, `alloc` with `allocations`, and three rescue-count scenarios with `diagnostics`.
+    let expected = 19
+        + usize::from(cfg!(feature = "allocations"))
+        + 3 * usize::from(cfg!(feature = "diagnostics"));
+    assert_eq!(scenarios.len(), expected);
     let directory = tempfile::tempdir().unwrap();
     let campaigns = workspace
         .smoke_executable(
