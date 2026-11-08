@@ -85,6 +85,8 @@ See the [design and behavioral contracts](context/design.md) for resource compat
 
 The [TCP echo benchmark](benchmarks/echo/readme.md) compares pure Tokio, the Tokio scheduler adapter, and Native with per-worker io_uring rings using separate server and client processes.
 
+The [performance investigations](performance/index.md) record measured, rejected, and open optimization attempts, so that they are not retried without new evidence.
+
 ## Contributing
 
 Please open an issue or pull request on [GitHub](https://github.com/base-rs/base-scheduler).

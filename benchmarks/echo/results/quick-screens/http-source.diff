@@ -1,0 +1,65 @@
+diff a/benchmarks/hello/Cargo.toml b/benchmarks/hello/Cargo.toml
+--- a/benchmarks/hello/Cargo.toml	2026-11-08 14:19:04.572892665 +1300
++++ b/benchmarks/hello/Cargo.toml	2026-11-06 08:37:55.719897668 +1300
+@@ -22,11 +22,10 @@
+ base-http = { path = "../.." }
+ base-http-server = { path = "../../crates/server" }
+ base-http1 = { path = "../../crates/http1" }
+-base-scheduler = "=0.3.0"
+-base-scheduler-direct = "=0.3.0"
+-base-scheduler-native = "=0.3.0"
+-base-scheduler-selector = "=0.3.0"
+-base-scheduler-tokio = "=0.3.0"
++base-scheduler = "=0.4.0"
++base-scheduler-native = "=0.4.0"
++base-scheduler-selector = "=0.4.0"
++base-scheduler-tokio = "=0.4.0"
+ futures-lite = "2.6.1"
+ futures-util = { version = "0.3.31", default-features = false, features = ["alloc", "async-await"] }
+ http-body-util = "0.1.3"
+@@ -37,7 +36,7 @@
+ rustc-demangle = { version = "=0.1.28", optional = true }
+ 
+ [target.'cfg(target_os = "linux")'.dependencies]
+-base-scheduler-iouring = "=0.3.0"
++base-scheduler-iouring = "=0.4.0"
+ 
+ [profile.release]
+ debug = 1
+Binary files v030/benchmarks/hello/__pycache__/run.cpython-314.pyc and quick/benchmarks/hello/__pycache__/run.cpython-314.pyc differ
+diff a/benchmarks/hello/src/main.rs b/benchmarks/hello/src/main.rs
+--- a/benchmarks/hello/src/main.rs	2026-11-08 14:19:04.689540727 +1300
++++ b/benchmarks/hello/src/main.rs	2026-11-06 08:37:55.719864718 +1300
+@@ -10,7 +10,6 @@
+     Cancellation, SocketAccept, SocketClose, SocketRegistration, SocketSetOption,
+     SocketStreamReading, SocketStreamWriting, Spawn, TcpNoDelay,
+ };
+-use base_scheduler_direct::{DirectOptions, DirectScheduler};
+ use base_scheduler_native::{NativeOptions, NativeScheduler};
+ use base_scheduler_tokio::TokioScheduler;
+ use futures_util::{
+@@ -231,15 +230,6 @@
+             scheduler.block_on(scheduler.shutdown());
+             result
+         }
+-        Some("base-direct") => {
+-            let scheduler = DirectScheduler::new(DirectOptions {
+-                threads: 1,
+-                capacity: MAX_CONNECTIONS,
+-            })?;
+-            let result = futures_lite::future::block_on(base_server(&scheduler));
+-            futures_lite::future::block_on(scheduler.shutdown());
+-            result
+-        }
+         Some(backend @ ("base-tokio" | "hyper-tokio" | "hyper-task-tokio" | "base-tokio-raw" | "tokio-raw" | "tokio-task-raw" | "tokio-connections-raw")) => {
+             let runtime = tokio::runtime::Builder::new_current_thread()
+                 .enable_all()
+@@ -268,7 +258,7 @@
+             })
+         }
+         _ => Err(
+-            "usage: base-http-hello-benchmark base-native|base-native-background|base-iouring|base-iouring-raw|base-iouring-owned-raw|base-iouring-owned-connections-raw|base-iouring-connections-raw|base-direct|base-tokio|hyper-tokio|hyper-task-tokio|base-native-raw|base-tokio-raw|tokio-raw|tokio-task-raw|tokio-connections-raw"
++            "usage: base-http-hello-benchmark base-native|base-native-background|base-iouring|base-iouring-raw|base-iouring-owned-raw|base-iouring-owned-connections-raw|base-iouring-connections-raw|base-tokio|hyper-tokio|hyper-task-tokio|base-native-raw|base-tokio-raw|tokio-raw|tokio-task-raw|tokio-connections-raw"
+                 .into(),
+         ),
+     }

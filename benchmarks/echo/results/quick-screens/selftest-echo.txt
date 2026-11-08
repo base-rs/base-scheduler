@@ -1,0 +1,19 @@
+waiting for /tmp/base-scheduler-perf.lock
+lock held
+building echo in /home/samuel/Developer/claude-bench/quick/trees/main
+building echo in /home/samuel/Developer/claude-bench/quick/trees/main-copy
+round 1/2
+round 2/2
+
+Results: /home/samuel/Developer/claude-bench/quick/results/echo-main-copy-20261106-140907.jsonl
+
+Change is the median of per-round changes from base to candidate; 'better' counts rounds where the candidate improved.
+
+| Case | Backend | requests_per_second base | cand | change (better) | cpu_us_per_request base | cand | change (better) | rtt_p99_us base | cand | change (better) |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 4w 256c | iouring | 4.7e+05 | 4.631e+05 | -1.5% (0/2) | 8.196 | 8.272 | +0.9% (0/2) | 1055 | 1151 | +9.1% (0/2) |
+| 4w 256c | native-poll | 4.489e+05 | 4.463e+05 | -0.6% (0/2) | 8.626 | 8.718 | +1.1% (0/2) | 1213 | 1198 | -1.2% (1/2) |
+| 4w 256c | tokio | 4.5e+05 | control | — | 7.367 | control | — | 1434 | control | — |
+| 4w 32c | iouring | 3.86e+05 | 3.86e+05 | +0.0% (1/2) | 9.667 | 9.706 | +0.4% (1/2) | 229.7 | 234.8 | +2.3% (1/2) |
+| 4w 32c | native-poll | 3.891e+05 | 3.904e+05 | +0.4% (1/2) | 9.555 | 9.589 | +0.4% (1/2) | 225.7 | 193.9 | -13.3% (1/2) |
+| 4w 32c | tokio | 3.635e+05 | control | — | 8.266 | control | — | 246.9 | control | — |

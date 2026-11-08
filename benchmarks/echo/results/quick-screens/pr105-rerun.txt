@@ -1,0 +1,25 @@
+waiting for /tmp/base-scheduler-perf.lock
+lock held
+building echo in /home/samuel/Developer/claude-bench/quick/trees/main-cd51eee
+building echo in /home/samuel/Developer/claude-bench/quick/trees/pr105
+building echo in /home/samuel/Developer/claude-bench/quick/layout/main-cd51eee-layout
+round 1/5
+round 2/5
+round 3/5
+round 4/5
+round 5/5
+
+Results: /home/samuel/Developer/claude-bench/quick/results/echo-pr105-20261106-223038.jsonl
+
+Change is the median of per-round changes from base; 'better' counts rounds that improved on base. 'layout' is identical base source built at another path: changes of that size are build-layout noise.
+
+| Case | Backend | requests_per_second base | cand | candidate change (better) | layout change (better) | cpu_us_per_request base | cand | candidate change (better) | layout change (better) | rtt_p99_us base | cand | candidate change (better) | layout change (better) |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 4w 256c | iouring | 4.598e+05 | 4.635e+05 | +1.0% (3/5) | +0.1% (3/5) | 8.29 | 8.156 | -1.5% (4/5) | -0.1% (3/5) | 1062 | 1092 | -0.9% (3/5) | -2.0% (3/5) |
+| 4w 256c | native | 4.521e+05 | 4.556e+05 | +1.0% (3/5) | +0.2% (3/5) | 8.57 | 8.432 | -1.8% (5/5) | +0.2% (2/5) | 1160 | 1095 | -4.4% (4/5) | -1.8% (3/5) |
+| 4w 256c | native-poll | 4.514e+05 | 4.526e+05 | +0.4% (4/5) | -0.6% (1/5) | 8.531 | 8.323 | -2.1% (5/5) | +0.7% (2/5) | 1114 | 1154 | +3.6% (2/5) | +6.1% (1/5) |
+| 4w 256c | tokio | 4.571e+05 | control | — | — | 7.274 | control | — | — | 1264 | control | — | — |
+| 4w 32c | iouring | 3.934e+05 | 3.964e+05 | +2.1% (4/5) | +1.6% (3/5) | 9.688 | 9.764 | +0.7% (1/5) | +0.1% (2/5) | 230.8 | 226.6 | -4.1% (4/5) | -2.6% (3/5) |
+| 4w 32c | native | 3.899e+05 | 3.914e+05 | -0.6% (2/5) | -1.9% (1/5) | 9.494 | 9.301 | -2.4% (5/5) | +0.5% (2/5) | 230.9 | 229.5 | +4.3% (2/5) | +2.2% (1/5) |
+| 4w 32c | native-poll | 3.899e+05 | 3.959e+05 | +0.8% (4/5) | -2.8% (1/5) | 9.511 | 9.201 | -3.3% (5/5) | -0.6% (3/5) | 227.8 | 210.8 | -7.4% (4/5) | +3.5% (1/5) |
+| 4w 32c | tokio | 3.775e+05 | control | — | — | 8.486 | control | — | — | 238.3 | control | — | — |

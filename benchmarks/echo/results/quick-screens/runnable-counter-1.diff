@@ -1,0 +1,226 @@
+diff -ruN base/crates/native/src/task_service.rs runnable-counter-1/native/src/task_service.rs
+--- a/crates/native/src/task_service.rs	2026-11-08 14:16:33.102520117 +1300
++++ b/crates/native/src/task_service.rs	2026-11-06 19:51:22.115521314 +1300
+@@ -15,7 +15,7 @@
+     io,
+     sync::{
+         Arc, Mutex, Weak,
+-        atomic::{AtomicBool, AtomicUsize, Ordering},
++        atomic::{AtomicUsize, Ordering},
+     },
+ };
+ 
+@@ -24,8 +24,9 @@
+ }
+ pub(crate) type Runnable = async_task::Runnable<TaskState>;
+ 
+-// Arming shares the runnable counter's modification order, so a waiter either sees quiescence or the last runnable sees this bit and notifies it. Keep the bit armed thereafter; drains are cold, and this avoids deregistration races between concurrent or abandoned waiters.
+-const NOTIFY_IDLE: usize = 1 << (usize::BITS - 1);
++// `Shared::state` holds closure and the number of active quiescence waiters. Both change rarely, so retirements read the line without missing in cache.
++const CLOSED: usize = 1;
++const WAITER: usize = 2;
+ 
+ // Pads a value to its own 128-byte block: one cache line on Apple and other 128-byte-line cores, and an adjacent-line prefetch pair on x86-64.
+ #[repr(align(128))]
+@@ -37,6 +38,13 @@
+     }
+ }
+ 
++// One thread's runnable counts. Each worker updates only its own slot, so scheduling and retiring do not move a shared line between cores; threads other than this scheduler's workers share the last slot. Both counts only grow: a runnable is counted where it was scheduled and where it retired, which may differ, so no single slot's difference means anything.
++#[derive(Default)]
++struct RunnableCounts {
++    scheduled: AtomicUsize,
++    retired: AtomicUsize,
++}
++
+ pub(crate) struct Shared {
+     // Serialize registration with closure and distribute new tasks using a round-robin worker cursor. Task ownership itself needs only a count.
+     admission: Mutex<usize>,
+@@ -48,12 +56,13 @@
+     pub(crate) paused: Mutex<Option<std::time::Instant>>,
+     workers_remaining: AtomicUsize,
+     pub(crate) workers: Vec<WorkerState>,
+-    closed: AtomicBool,
+     pub(crate) idle_workers: AtomicUsize,
+     // Task-future ownership can retire before its final runnable returns. Shutdown waits for both.
+     remaining: AtomicUsize,
+-    // Written on every task schedule, by whichever thread wakes the task, and on every runnable retirement, which then reads `closed`. Unpadded, it usually shared a cache line with `closed`, depending on where the allocation started, so that traffic made each retirement's read miss. Padding keeps it off their lines; the remaining fields still share lines with the less frequent spawn and park writes.
+-    outstanding: CachePadded<AtomicUsize>,
++    // `CLOSED` and the `WAITER` count, read by every runnable retirement. Padded so that the spawn and park writes to the other fields do not make those reads miss.
++    state: CachePadded<AtomicUsize>,
++    // Runnable counts per worker, then one for every other thread. A single shared count moved its cache line between cores on every task poll.
++    runnables: Box<[CachePadded<RunnableCounts>]>,
+     changed: Event,
+ }
+ pub(crate) struct TaskService {
+@@ -97,12 +106,26 @@
+     fn drop(&mut self) {
+         self.shared.remaining.fetch_sub(1, Ordering::AcqRel);
+         self.shared.changed.notify(usize::MAX);
+-        if self.shared.closed.load(Ordering::Acquire) {
++        if self.shared.is_closed() {
+             self.shared.wake_all();
+         }
+     }
+ }
+ 
++// Counts a quiescence waiter from before its first check until it returns or is abandoned, so that retirements meanwhile check for quiescence on its behalf.
++struct Waiter<'a>(&'a Shared);
++impl<'a> Waiter<'a> {
++    fn new(shared: &'a Shared) -> Self {
++        shared.state.fetch_add(WAITER, Ordering::SeqCst);
++        Self(shared)
++    }
++}
++impl Drop for Waiter<'_> {
++    fn drop(&mut self) {
++        self.0.state.fetch_sub(WAITER, Ordering::SeqCst);
++    }
++}
++
+ impl Shared {
+     pub(crate) fn new(
+         queues: &[[Worker<Runnable>; 2]],
+@@ -128,10 +151,12 @@
+                     )
+                 })
+                 .collect(),
+-            closed: AtomicBool::new(false),
+             idle_workers: AtomicUsize::new(0),
+             remaining: AtomicUsize::new(0),
+-            outstanding: CachePadded(AtomicUsize::new(0)),
++            state: CachePadded(AtomicUsize::new(0)),
++            runnables: (0..=queues.len())
++                .map(|_| CachePadded(RunnableCounts::default()))
++                .collect(),
+             changed: Event::new(),
+         }
+     }
+@@ -141,21 +166,37 @@
+         self.changed.notify(usize::MAX);
+     }
+ 
+-    #[inline]
++    // Whether any runnable is queued or being polled. Every retirement read is ordered before every schedule read, and a retirement observed through its slot also makes visible the schedule that preceded it. So each observed retirement is matched by an observed schedule, and equal sums mean that every observed schedule has also retired: no runnable was outstanding between the two passes. A runnable scheduled before the check, in the sense of happening before it or of a SeqCst operation preceding it, is observed.
+     pub(crate) fn has_runnables(&self) -> bool {
+-        self.outstanding.load(Ordering::Acquire) & !NOTIFY_IDLE != 0
++        let retired = self.runnables.iter().fold(0usize, |sum, counts| {
++            sum.wrapping_add(counts.retired.load(Ordering::SeqCst))
++        });
++        let scheduled = self.runnables.iter().fold(0usize, |sum, counts| {
++            sum.wrapping_add(counts.scheduled.load(Ordering::SeqCst))
++        });
++        scheduled != retired
+     }
+ 
+     #[inline]
+     pub(crate) fn is_closed(&self) -> bool {
+-        self.closed.load(Ordering::Acquire)
++        self.state.load(Ordering::Acquire) & CLOSED != 0
+     }
+ 
+     #[inline]
+     pub(crate) fn finished(&self) -> bool {
+-        self.closed.load(Ordering::Acquire)
+-            && self.remaining.load(Ordering::Acquire) == 0
+-            && !self.has_runnables()
++        self.is_closed() && self.remaining.load(Ordering::Acquire) == 0 && !self.has_runnables()
++    }
++
++    // The slot of the calling thread: its own if it is one of this scheduler's workers, otherwise the shared one.
++    fn slot(self: &Arc<Self>) -> usize {
++        worker::current(self).unwrap_or(self.workers.len())
++    }
++
++    // Count a runnable before publishing it. Relaxed suffices: its publication orders the count before the runnable's retirement, and before the enqueuer's SeqCst fence that idle workers' searches pair with.
++    fn schedule_runnable(self: &Arc<Self>) {
++        self.runnables[self.slot()]
++            .scheduled
++            .fetch_add(1, Ordering::Relaxed);
+     }
+     pub(crate) fn wake_all(&self) {
+         for worker in &self.workers {
+@@ -179,9 +220,26 @@
+             }
+         }
+     }
+-    pub(crate) fn retire_runnable(&self) {
+-        if self.outstanding.fetch_sub(1, Ordering::AcqRel) == (NOTIFY_IDLE | 1) {
+-            // Draining waits for quiescence; intermediate retirements cannot satisfy that condition.
++    // Retire a runnable polled by a test thread, which may not be a worker.
++    #[cfg(test)]
++    pub(crate) fn retire_runnable(self: &Arc<Self>) {
++        self.retire_runnable_on(self.slot());
++    }
++
++    // Retire a runnable after its poll on worker `slot`. The SeqCst count and state read pair with the SeqCst waiter registration and closure, which precede their own checks: either this retirement sees the waiter or closure and checks on its behalf, or that check observes this retirement.
++    #[inline]
++    pub(crate) fn retire_runnable_on(&self, slot: usize) {
++        self.runnables[slot].retired.fetch_add(1, Ordering::SeqCst);
++        let state = self.state.load(Ordering::SeqCst);
++        if state != 0 {
++            self.retired_while_observed(state);
++        }
++    }
++
++    #[cold]
++    fn retired_while_observed(&self, state: usize) {
++        // Of concurrent final retirements, at least the last to read the counts observes them all, so it reports quiescence; intermediate retirements cannot.
++        if state >= WAITER && !self.has_runnables() {
+             self.changed.notify(usize::MAX);
+         }
+         if self.finished() {
+@@ -255,7 +313,7 @@
+         F::Output: Send + 'static,
+     {
+         let mut admission = self.shared.admission.lock().unwrap();
+-        if self.shared.closed.load(Ordering::Acquire) {
++        if self.shared.is_closed() {
+             drop(admission);
+             return Err(SpawnError::SchedulerClosed);
+         }
+@@ -275,7 +333,7 @@
+             .spawn(
+                 move |_| TaskFuture::new(future, registration),
+                 move |runnable| {
+-                    shared.outstanding.fetch_add(1, Ordering::AcqRel);
++                    shared.schedule_runnable();
+                     worker::schedule(&shared, runnable);
+                 },
+             );
+@@ -290,7 +348,8 @@
+         }
+         {
+             let _admission = self.shared.admission.lock().unwrap();
+-            self.shared.closed.store(true, Ordering::Release);
++            // SeqCst pairs with retirements' state reads; see `retire_runnable_on`.
++            self.shared.state.fetch_or(CLOSED, Ordering::SeqCst);
+         }
+         self.shared.wake_all();
+     }
+@@ -298,11 +357,10 @@
+         self.wait(true).await;
+     }
+     pub(crate) async fn wait(&self, all: bool) {
++        // Registered before the first check, so that a retirement either is observed by a check or sees this waiter and notifies it.
++        let _waiter = Waiter::new(&self.shared);
+         loop {
+             event_listener::listener!(self.shared.changed => listener);
+-            self.shared
+-                .outstanding
+-                .fetch_or(NOTIFY_IDLE, Ordering::AcqRel);
+             // Observe registration retirement first. After close, no new registrations can appear; its release also precedes the final runnable retirement. Reading in reverse order could combine pre-publication quiescence with post-completion registration state.
+             if (!all
+                 || (self.shared.remaining.load(Ordering::Acquire) == 0
+diff -ruN base/crates/native/src/worker.rs runnable-counter-1/native/src/worker.rs
+--- a/crates/native/src/worker.rs	2026-11-08 14:16:33.102799213 +1300
++++ b/crates/native/src/worker.rs	2026-11-06 19:51:15.320611875 +1300
+@@ -475,7 +475,7 @@
+             .heartbeat
+             .polls
+             .fetch_add(1, Ordering::Relaxed);
+-        shared.retire_runnable();
++        shared.retire_runnable_on(identifier);
+         runnable = CURRENT_WORKER.with(|current| {
+             current
+                 .borrow()

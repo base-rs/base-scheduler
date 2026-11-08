@@ -1,0 +1,22 @@
+waiting for /tmp/base-scheduler-perf.lock
+lock held
+building http hello against /home/samuel/Developer/claude-bench/quick/trees/main
+building http hello against /home/samuel/Developer/claude-bench/quick/trees/main-copy
+round 1/2
+round 2/2
+
+Results: /home/samuel/Developer/claude-bench/quick/results/http-main-copy-20261106-140540.jsonl
+
+Change is the median of per-round changes from base to candidate; 'better' counts rounds where the candidate improved.
+
+| Case | Backend | requests_per_second base | cand | change (better) | cpu_us_per_request base | cand | change (better) | rtt_p99_us base | cand | change (better) |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 16c | base-iouring | 1.776e+05 | 1.791e+05 | +0.8% (2/2) | 4.086 | 4.073 | -0.3% (2/2) | 145 | 142 | -2.1% (2/2) |
+| 16c | base-native | 1.763e+05 | 1.738e+05 | -1.4% (0/2) | 4.123 | 4.203 | +1.9% (0/2) | 149.5 | 152.5 | +2.1% (0/2) |
+| 16c | hyper-tokio | 1.659e+05 | control | — | 4.449 | control | — | 167.5 | control | — |
+| 256c | base-iouring | 1.727e+05 | 1.723e+05 | -0.3% (1/2) | 4.258 | 4.262 | +0.0% (1/2) | 1955 | 3385 | +73.0% (1/2) |
+| 256c | base-native | 1.771e+05 | 1.729e+05 | -2.3% (1/2) | 4.136 | 4.228 | +2.4% (1/2) | 3080 | 1975 | -23.4% (1/2) |
+| 256c | hyper-tokio | 1.547e+05 | control | — | 5 | control | — | 1.087e+06 | control | — |
+| 64c | base-iouring | 1.811e+05 | 1.715e+05 | -5.3% (0/2) | 3.994 | 4.282 | +7.2% (0/2) | 495 | 517.5 | +4.5% (1/2) |
+| 64c | base-native | 1.765e+05 | 1.706e+05 | -3.3% (0/2) | 4.12 | 4.289 | +4.2% (0/2) | 1160 | 1155 | +1.2% (1/2) |
+| 64c | hyper-tokio | 1.615e+05 | control | — | 4.546 | control | — | 1285 | control | — |

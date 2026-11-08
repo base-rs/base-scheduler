@@ -1,0 +1,1579 @@
+{
+  "schema": "base-benchmark/summary",
+  "version": 1,
+  "generator": "base-benchmark 0.1.0",
+  "mode": "screening",
+  "evidence": "screening: paired triage with controls; not acceptance evidence",
+  "scenario": "refresh",
+  "rounds": 9,
+  "seed": 1794092269411449649,
+  "decision_rule": null,
+  "aggregation": "each process contributes the median of its samples; subject distributions are across processes; pair differences, changes, and better or worse counts are per round, with differences below the measurement quantum counted as ties; there is no same-binary repeat subject, so run-to-run variation appears only as each subject's spread",
+  "subjects": [
+    {
+      "label": "current/tokio",
+      "processes": 9,
+      "metrics": [
+        {
+          "name": "cpu_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 267.95533333333333,
+            "minimum": 263.82366666666667,
+            "maximum": 278.62333333333333
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "involuntary_context_switches",
+          "unit": "count",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 1.6666666666666667e-6,
+            "minimum": 1e-6,
+            "maximum": 2.666666666666667e-6
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "refresh_expirations",
+          "unit": "count",
+          "phase": "measured",
+          "source": "workload",
+          "direction": "neutral",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 0.0,
+            "minimum": 0.0,
+            "maximum": 0.0
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "system_cpu_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 0.07933333333333334,
+            "minimum": 0.0,
+            "maximum": 0.73
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "user_cpu_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 267.88466666666665,
+            "minimum": 263.7443333333333,
+            "maximum": 278.62333333333333
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "voluntary_context_switches",
+          "unit": "count",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 6.666666666666667e-7,
+            "minimum": 3.3333333333333335e-7,
+            "maximum": 1.3333333333333334e-6
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "wall_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "wall",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 268.38656533333335,
+            "minimum": 264.29348833333336,
+            "maximum": 279.3878823333333
+          },
+          "unavailable": 0
+        }
+      ]
+    },
+    {
+      "label": "current/native",
+      "processes": 9,
+      "metrics": [
+        {
+          "name": "cpu_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 131.94233333333332,
+            "minimum": 129.42866666666666,
+            "maximum": 134.859
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "involuntary_context_switches",
+          "unit": "count",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 6.666666666666667e-7,
+            "minimum": 3.3333333333333335e-7,
+            "maximum": 2e-6
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "refresh_expirations",
+          "unit": "count",
+          "phase": "measured",
+          "source": "workload",
+          "direction": "neutral",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 0.0,
+            "minimum": 0.0,
+            "maximum": 0.0
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "system_cpu_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 0.038,
+            "minimum": 0.0,
+            "maximum": 0.3303333333333333
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "user_cpu_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 131.82866666666666,
+            "minimum": 129.42866666666666,
+            "maximum": 134.859
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "voluntary_context_switches",
+          "unit": "count",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 1.3333333333333334e-6,
+            "minimum": 1e-6,
+            "maximum": 2e-6
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "wall_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "wall",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 132.22332533333332,
+            "minimum": 129.61479733333334,
+            "maximum": 135.188353
+          },
+          "unavailable": 0
+        }
+      ]
+    },
+    {
+      "label": "current/iouring",
+      "processes": 9,
+      "metrics": [
+        {
+          "name": "cpu_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 125.75166666666667,
+            "minimum": 124.308,
+            "maximum": 129.29366666666667
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "involuntary_context_switches",
+          "unit": "count",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 6.666666666666667e-7,
+            "minimum": 3.3333333333333335e-7,
+            "maximum": 2.666666666666667e-6
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "refresh_expirations",
+          "unit": "count",
+          "phase": "measured",
+          "source": "workload",
+          "direction": "neutral",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 0.0,
+            "minimum": 0.0,
+            "maximum": 0.0
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "system_cpu_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 0.02,
+            "minimum": 0.0,
+            "maximum": 0.332
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "user_cpu_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 125.75166666666667,
+            "minimum": 124.014,
+            "maximum": 128.96266666666668
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "voluntary_context_switches",
+          "unit": "count",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 1.6666666666666667e-6,
+            "minimum": 1.3333333333333334e-6,
+            "maximum": 2e-6
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "wall_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "wall",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 125.90379233333333,
+            "minimum": 124.44640566666666,
+            "maximum": 129.52591766666666
+          },
+          "unavailable": 0
+        }
+      ]
+    },
+    {
+      "label": "current-replica/tokio",
+      "processes": 9,
+      "metrics": [
+        {
+          "name": "cpu_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 268.4956666666667,
+            "minimum": 262.61266666666666,
+            "maximum": 276.70533333333333
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "involuntary_context_switches",
+          "unit": "count",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 2e-6,
+            "minimum": 1e-6,
+            "maximum": 2.666666666666667e-6
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "refresh_expirations",
+          "unit": "count",
+          "phase": "measured",
+          "source": "workload",
+          "direction": "neutral",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 0.0,
+            "minimum": 0.0,
+            "maximum": 0.0
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "system_cpu_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 0.327,
+            "minimum": 0.0,
+            "maximum": 1.0066666666666666
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "user_cpu_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 268.444,
+            "minimum": 262.61266666666666,
+            "maximum": 276.041
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "voluntary_context_switches",
+          "unit": "count",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 6.666666666666667e-7,
+            "minimum": 3.3333333333333335e-7,
+            "maximum": 1e-6
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "wall_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "wall",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 269.14807,
+            "minimum": 262.9800583333333,
+            "maximum": 278.175492
+          },
+          "unavailable": 0
+        }
+      ]
+    },
+    {
+      "label": "current-replica/native",
+      "processes": 9,
+      "metrics": [
+        {
+          "name": "cpu_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 130.87333333333333,
+            "minimum": 128.35633333333334,
+            "maximum": 135.02866666666668
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "involuntary_context_switches",
+          "unit": "count",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 6.666666666666667e-7,
+            "minimum": 0.0,
+            "maximum": 1e-6
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "refresh_expirations",
+          "unit": "count",
+          "phase": "measured",
+          "source": "workload",
+          "direction": "neutral",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 0.0,
+            "minimum": 0.0,
+            "maximum": 0.0
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "system_cpu_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 0.05733333333333333,
+            "minimum": 0.0,
+            "maximum": 0.7003333333333334
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "user_cpu_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 130.38533333333334,
+            "minimum": 128.35633333333334,
+            "maximum": 134.66033333333334
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "voluntary_context_switches",
+          "unit": "count",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 1.3333333333333334e-6,
+            "minimum": 1e-6,
+            "maximum": 3.3333333333333333e-6
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "wall_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "wall",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 131.08049466666668,
+            "minimum": 128.504179,
+            "maximum": 135.48840633333333
+          },
+          "unavailable": 0
+        }
+      ]
+    },
+    {
+      "label": "current-replica/iouring",
+      "processes": 9,
+      "metrics": [
+        {
+          "name": "cpu_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 127.09633333333333,
+            "minimum": 123.674,
+            "maximum": 130.05366666666666
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "involuntary_context_switches",
+          "unit": "count",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 1e-6,
+            "minimum": 3.3333333333333335e-7,
+            "maximum": 1.6666666666666667e-6
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "refresh_expirations",
+          "unit": "count",
+          "phase": "measured",
+          "source": "workload",
+          "direction": "neutral",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 0.0,
+            "minimum": 0.0,
+            "maximum": 0.0
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "system_cpu_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 0.0,
+            "minimum": 0.0,
+            "maximum": 0.04633333333333333
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "user_cpu_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 127.09633333333333,
+            "minimum": 123.674,
+            "maximum": 130.03533333333334
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "voluntary_context_switches",
+          "unit": "count",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 1.6666666666666667e-6,
+            "minimum": 1.3333333333333334e-6,
+            "maximum": 1.6666666666666667e-6
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "wall_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "wall",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 127.48108233333333,
+            "minimum": 123.820034,
+            "maximum": 130.22957866666667
+          },
+          "unavailable": 0
+        }
+      ]
+    }
+  ],
+  "pairs": [
+    {
+      "baseline": "current/tokio",
+      "candidate": "current/native",
+      "kind": "variant",
+      "metrics": [
+        {
+          "name": "cpu_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 9,
+          "regressed": 0,
+          "difference": {
+            "median": -134.505,
+            "minimum": -143.76433333333333,
+            "maximum": -132.87966666666668
+          },
+          "change": {
+            "median": -0.5068928615198789,
+            "minimum": -0.5207375532372804,
+            "maximum": -0.49926231486342254
+          },
+          "unresolved": 0,
+          "sign_test_p": 0.00390625
+        },
+        {
+          "name": "involuntary_context_switches",
+          "unit": "count",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 6,
+          "regressed": 0,
+          "difference": {
+            "median": -9.999999999999997e-7,
+            "minimum": -2.3333333333333336e-6,
+            "maximum": 0.0
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 0.031250000000000014
+        },
+        {
+          "name": "refresh_expirations",
+          "unit": "count",
+          "statistic": "per_operation",
+          "direction": "neutral",
+          "rounds": 9,
+          "improved": 0,
+          "regressed": 0,
+          "difference": {
+            "median": 0.0,
+            "minimum": 0.0,
+            "maximum": 0.0
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": null
+        },
+        {
+          "name": "system_cpu_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 0,
+          "regressed": 0,
+          "difference": {
+            "median": -0.07066666666666667,
+            "minimum": -0.7153333333333334,
+            "maximum": 0.05633333333333333
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 1.0
+        },
+        {
+          "name": "user_cpu_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 9,
+          "regressed": 0,
+          "difference": {
+            "median": -134.10533333333336,
+            "minimum": -143.76433333333333,
+            "maximum": -132.936
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 0.00390625
+        },
+        {
+          "name": "voluntary_context_switches",
+          "unit": "count",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 0,
+          "regressed": 7,
+          "difference": {
+            "median": 6.666666666666667e-7,
+            "minimum": 3.3333333333333325e-7,
+            "maximum": 1.3333333333333334e-6
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 0.015625000000000003
+        },
+        {
+          "name": "wall_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 9,
+          "regressed": 0,
+          "difference": {
+            "median": -135.04038600000004,
+            "minimum": -144.19952933333332,
+            "maximum": -133.52732766666668
+          },
+          "change": {
+            "median": -0.5059366912262115,
+            "minimum": -0.5211578455057608,
+            "maximum": -0.49944703019511305
+          },
+          "unresolved": 0,
+          "sign_test_p": 0.00390625
+        }
+      ]
+    },
+    {
+      "baseline": "current/tokio",
+      "candidate": "current/iouring",
+      "kind": "variant",
+      "metrics": [
+        {
+          "name": "cpu_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 9,
+          "regressed": 0,
+          "difference": {
+            "median": -142.12833333333333,
+            "minimum": -149.32966666666667,
+            "maximum": -138.6976666666667
+          },
+          "change": {
+            "median": -0.5322121569238202,
+            "minimum": -0.5380086966216969,
+            "maximum": -0.5210528424843657
+          },
+          "unresolved": 0,
+          "sign_test_p": 0.00390625
+        },
+        {
+          "name": "involuntary_context_switches",
+          "unit": "count",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 7,
+          "regressed": 1,
+          "difference": {
+            "median": -1.0000000000000002e-6,
+            "minimum": -1.6666666666666665e-6,
+            "maximum": 1.0000000000000002e-6
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 0.0703125
+        },
+        {
+          "name": "refresh_expirations",
+          "unit": "count",
+          "statistic": "per_operation",
+          "direction": "neutral",
+          "rounds": 9,
+          "improved": 0,
+          "regressed": 0,
+          "difference": {
+            "median": 0.0,
+            "minimum": 0.0,
+            "maximum": 0.0
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": null
+        },
+        {
+          "name": "system_cpu_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 0,
+          "regressed": 0,
+          "difference": {
+            "median": 0.02,
+            "minimum": -0.7153333333333334,
+            "maximum": 0.331
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 1.0
+        },
+        {
+          "name": "user_cpu_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 9,
+          "regressed": 0,
+          "difference": {
+            "median": -141.41433333333336,
+            "minimum": -149.66066666666666,
+            "maximum": -138.34233333333333
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 0.00390625
+        },
+        {
+          "name": "voluntary_context_switches",
+          "unit": "count",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 0,
+          "regressed": 9,
+          "difference": {
+            "median": 1.0000000000000002e-6,
+            "minimum": 6.666666666666665e-7,
+            "maximum": 1.3333333333333334e-6
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 0.00390625
+        },
+        {
+          "name": "wall_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 9,
+          "regressed": 0,
+          "difference": {
+            "median": -142.73958933333336,
+            "minimum": -149.86196466666667,
+            "maximum": -138.58326300000002
+          },
+          "change": {
+            "median": -0.5320997258160916,
+            "minimum": -0.539086699033003,
+            "maximum": -0.5199428147905388
+          },
+          "unresolved": 0,
+          "sign_test_p": 0.00390625
+        }
+      ]
+    },
+    {
+      "baseline": "current/tokio",
+      "candidate": "current-replica/tokio",
+      "kind": "replica",
+      "metrics": [
+        {
+          "name": "cpu_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 3,
+          "regressed": 6,
+          "difference": {
+            "median": 1.7800000000000296,
+            "minimum": -7.461999999999989,
+            "maximum": 8.75
+          },
+          "change": {
+            "median": 0.006675066750667646,
+            "minimum": -0.0267816765765011,
+            "maximum": 0.03265469618070682
+          },
+          "unresolved": 0,
+          "sign_test_p": 0.5078125
+        },
+        {
+          "name": "involuntary_context_switches",
+          "unit": "count",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 1,
+          "regressed": 3,
+          "difference": {
+            "median": 0.0,
+            "minimum": -1.3333333333333332e-6,
+            "maximum": 6.666666666666667e-7
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 0.625
+        },
+        {
+          "name": "refresh_expirations",
+          "unit": "count",
+          "statistic": "per_operation",
+          "direction": "neutral",
+          "rounds": 9,
+          "improved": 0,
+          "regressed": 0,
+          "difference": {
+            "median": 0.0,
+            "minimum": 0.0,
+            "maximum": 0.0
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": null
+        },
+        {
+          "name": "system_cpu_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 0,
+          "regressed": 0,
+          "difference": {
+            "median": 0.327,
+            "minimum": -0.73,
+            "maximum": 0.6513333333333333
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 1.0
+        },
+        {
+          "name": "user_cpu_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 2,
+          "regressed": 2,
+          "difference": {
+            "median": 1.9766666666666879,
+            "minimum": -7.788999999999987,
+            "maximum": 8.15633333333335
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 1.0
+        },
+        {
+          "name": "voluntary_context_switches",
+          "unit": "count",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 1,
+          "regressed": 2,
+          "difference": {
+            "median": 0.0,
+            "minimum": -3.3333333333333346e-7,
+            "maximum": 3.3333333333333335e-7
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 1.0
+        },
+        {
+          "name": "wall_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 3,
+          "regressed": 6,
+          "difference": {
+            "median": 1.7254403333333244,
+            "minimum": -7.295916666666642,
+            "maximum": 9.788926666666669
+          },
+          "change": {
+            "median": 0.00645211041221172,
+            "minimum": -0.026984468461012323,
+            "maximum": 0.036473236484504845
+          },
+          "unresolved": 0,
+          "sign_test_p": 0.5078125
+        }
+      ]
+    },
+    {
+      "baseline": "current/native",
+      "candidate": "current-replica/native",
+      "kind": "replica",
+      "metrics": [
+        {
+          "name": "cpu_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 5,
+          "regressed": 4,
+          "difference": {
+            "median": -1.0689999999999884,
+            "minimum": -3.754333333333335,
+            "maximum": 2.957333333333338
+          },
+          "change": {
+            "median": -0.008102024369231908,
+            "minimum": -0.02790627189299555,
+            "maximum": 0.02239193970934905
+          },
+          "unresolved": 0,
+          "sign_test_p": 1.0
+        },
+        {
+          "name": "involuntary_context_switches",
+          "unit": "count",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 6,
+          "regressed": 2,
+          "difference": {
+            "median": -3.3333333333333335e-7,
+            "minimum": -1.3333333333333332e-6,
+            "maximum": 3.3333333333333335e-7
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 0.28906250000000006
+        },
+        {
+          "name": "refresh_expirations",
+          "unit": "count",
+          "statistic": "per_operation",
+          "direction": "neutral",
+          "rounds": 9,
+          "improved": 0,
+          "regressed": 0,
+          "difference": {
+            "median": 0.0,
+            "minimum": 0.0,
+            "maximum": 0.0
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": null
+        },
+        {
+          "name": "system_cpu_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 0,
+          "regressed": 0,
+          "difference": {
+            "median": 0.04833333333333333,
+            "minimum": -0.29333333333333333,
+            "maximum": 0.6636666666666666
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 1.0
+        },
+        {
+          "name": "user_cpu_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 2,
+          "regressed": 0,
+          "difference": {
+            "median": -1.7299999999999898,
+            "minimum": -4.407999999999987,
+            "maximum": 2.64433333333335
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 0.5
+        },
+        {
+          "name": "voluntary_context_switches",
+          "unit": "count",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 3,
+          "regressed": 3,
+          "difference": {
+            "median": 0.0,
+            "minimum": -6.666666666666667e-7,
+            "maximum": 1.3333333333333334e-6
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 1.0
+        },
+        {
+          "name": "wall_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 5,
+          "regressed": 4,
+          "difference": {
+            "median": -0.8990829999999903,
+            "minimum": -3.891678666666678,
+            "maximum": 3.0935353333333353
+          },
+          "change": {
+            "median": -0.006799730665776327,
+            "minimum": -0.028787085427889436,
+            "maximum": 0.02336597566029086
+          },
+          "unresolved": 0,
+          "sign_test_p": 1.0
+        }
+      ]
+    },
+    {
+      "baseline": "current-replica/tokio",
+      "candidate": "current-replica/native",
+      "kind": "variant",
+      "metrics": [
+        {
+          "name": "cpu_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 9,
+          "regressed": 0,
+          "difference": {
+            "median": -139.12400000000002,
+            "minimum": -146.27433333333332,
+            "maximum": -127.58399999999997
+          },
+          "change": {
+            "median": -0.5152791632509951,
+            "minimum": -0.5286285290248591,
+            "maximum": -0.48582576621081996
+          },
+          "unresolved": 0,
+          "sign_test_p": 0.00390625
+        },
+        {
+          "name": "involuntary_context_switches",
+          "unit": "count",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 8,
+          "regressed": 0,
+          "difference": {
+            "median": -1.6666666666666665e-6,
+            "minimum": -2.0000000000000003e-6,
+            "maximum": -3.3333333333333325e-7
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 0.007812500000000002
+        },
+        {
+          "name": "refresh_expirations",
+          "unit": "count",
+          "statistic": "per_operation",
+          "direction": "neutral",
+          "rounds": 9,
+          "improved": 0,
+          "regressed": 0,
+          "difference": {
+            "median": 0.0,
+            "minimum": 0.0,
+            "maximum": 0.0
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": null
+        },
+        {
+          "name": "system_cpu_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 0,
+          "regressed": 0,
+          "difference": {
+            "median": -0.005666666666666667,
+            "minimum": -0.38666666666666666,
+            "maximum": 0.36833333333333335
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 1.0
+        },
+        {
+          "name": "user_cpu_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 9,
+          "regressed": 0,
+          "difference": {
+            "median": -138.81766666666664,
+            "minimum": -146.27366666666666,
+            "maximum": -127.95233333333331
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 0.00390625
+        },
+        {
+          "name": "voluntary_context_switches",
+          "unit": "count",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 0,
+          "regressed": 6,
+          "difference": {
+            "median": 6.666666666666667e-7,
+            "minimum": 3.3333333333333325e-7,
+            "maximum": 2.666666666666667e-6
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 0.031250000000000014
+        },
+        {
+          "name": "wall_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 9,
+          "regressed": 0,
+          "difference": {
+            "median": -139.45716033333335,
+            "minimum": -147.18672133333337,
+            "maximum": -127.49165199999999
+          },
+          "change": {
+            "median": -0.5159181313591932,
+            "minimum": -0.5291146257173991,
+            "maximum": -0.48479589216001073
+          },
+          "unresolved": 0,
+          "sign_test_p": 0.00390625
+        }
+      ]
+    },
+    {
+      "baseline": "current/iouring",
+      "candidate": "current-replica/iouring",
+      "kind": "replica",
+      "metrics": [
+        {
+          "name": "cpu_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 2,
+          "regressed": 7,
+          "difference": {
+            "median": 1.3386666666666684,
+            "minimum": -2.197333333333333,
+            "maximum": 4.805999999999983
+          },
+          "change": {
+            "median": 0.010662135613019652,
+            "minimum": -0.016994903075943424,
+            "maximum": 0.03865021794026324
+          },
+          "unresolved": 0,
+          "sign_test_p": 0.1796875
+        },
+        {
+          "name": "involuntary_context_switches",
+          "unit": "count",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 1,
+          "regressed": 3,
+          "difference": {
+            "median": 0.0,
+            "minimum": -1.6666666666666669e-6,
+            "maximum": 6.666666666666667e-7
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 0.625
+        },
+        {
+          "name": "refresh_expirations",
+          "unit": "count",
+          "statistic": "per_operation",
+          "direction": "neutral",
+          "rounds": 9,
+          "improved": 0,
+          "regressed": 0,
+          "difference": {
+            "median": 0.0,
+            "minimum": 0.0,
+            "maximum": 0.0
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": null
+        },
+        {
+          "name": "system_cpu_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 0,
+          "regressed": 0,
+          "difference": {
+            "median": -0.02,
+            "minimum": -0.331,
+            "maximum": 0.009666666666666667
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 1.0
+        },
+        {
+          "name": "user_cpu_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 0,
+          "regressed": 1,
+          "difference": {
+            "median": 1.3586666666666645,
+            "minimum": -2.0776666666666586,
+            "maximum": 5.091666666666683
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 1.0
+        },
+        {
+          "name": "voluntary_context_switches",
+          "unit": "count",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 1,
+          "regressed": 0,
+          "difference": {
+            "median": 0.0,
+            "minimum": -6.666666666666665e-7,
+            "maximum": 3.3333333333333325e-7
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 1.0
+        },
+        {
+          "name": "wall_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 2,
+          "regressed": 7,
+          "difference": {
+            "median": 1.48388433333335,
+            "minimum": -2.2250179999999915,
+            "maximum": 4.9404796666666755
+          },
+          "change": {
+            "median": 0.011642888946218788,
+            "minimum": -0.017178168200483568,
+            "maximum": 0.039643449867420966
+          },
+          "unresolved": 0,
+          "sign_test_p": 0.1796875
+        }
+      ]
+    },
+    {
+      "baseline": "current-replica/tokio",
+      "candidate": "current-replica/iouring",
+      "kind": "variant",
+      "metrics": [
+        {
+          "name": "cpu_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 9,
+          "regressed": 0,
+          "difference": {
+            "median": -141.6036666666667,
+            "minimum": -146.65166666666667,
+            "maximum": -136.56900000000002
+          },
+          "change": {
+            "median": -0.5289375100779108,
+            "minimum": -0.5312888759951025,
+            "maximum": -0.5139563677692016
+          },
+          "unresolved": 0,
+          "sign_test_p": 0.00390625
+        },
+        {
+          "name": "involuntary_context_switches",
+          "unit": "count",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 7,
+          "regressed": 1,
+          "difference": {
+            "median": -1e-6,
+            "minimum": -1.6666666666666667e-6,
+            "maximum": 3.3333333333333346e-7
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 0.0703125
+        },
+        {
+          "name": "refresh_expirations",
+          "unit": "count",
+          "statistic": "per_operation",
+          "direction": "neutral",
+          "rounds": 9,
+          "improved": 0,
+          "regressed": 0,
+          "difference": {
+            "median": 0.0,
+            "minimum": 0.0,
+            "maximum": 0.0
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": null
+        },
+        {
+          "name": "system_cpu_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 0,
+          "regressed": 0,
+          "difference": {
+            "median": -0.327,
+            "minimum": -1.0066666666666666,
+            "maximum": 0.04633333333333333
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 1.0
+        },
+        {
+          "name": "user_cpu_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 9,
+          "regressed": 0,
+          "difference": {
+            "median": -141.21699999999998,
+            "minimum": -146.00566666666666,
+            "maximum": -136.61533333333333
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 0.00390625
+        },
+        {
+          "name": "voluntary_context_switches",
+          "unit": "count",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 0,
+          "regressed": 9,
+          "difference": {
+            "median": 1e-6,
+            "minimum": 3.3333333333333346e-7,
+            "maximum": 1.0000000000000002e-6
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 0.00390625
+        },
+        {
+          "name": "wall_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 9,
+          "regressed": 0,
+          "difference": {
+            "median": -141.87808266666667,
+            "minimum": -147.94591333333335,
+            "maximum": -136.51202566666666
+          },
+          "change": {
+            "median": -0.5285832353352908,
+            "minimum": -0.5321401741695676,
+            "maximum": -0.5130577614326782
+          },
+          "unresolved": 0,
+          "sign_test_p": 0.00390625
+        }
+      ]
+    }
+  ],
+  "warnings": []
+}

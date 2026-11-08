@@ -87,3 +87,7 @@ A task's home is now, in effect, the worker whose controller first registered it
 - Stall rescue fires only timers, so it does not move tasks queued behind a stuck worker by this rule; they remain stealable by idle workers.
 
 Echo load is uniform, so these runs do not measure latency under uneven load. Native-poll's p99 round-trip time improved in these runs, but the layout control's p99 varied widely, so no latency claim is made.
+
+## Correction, 8 November 2026
+
+The "layout" control in these runs, `main`'s source built from a copy at another path, was the same executable as `main`: the echo benchmark is a member of the tree's workspace, which Cargo identifies by relative path, so the copy built byte-identically. Its changes measure run-to-run variation of one executable, not build layout, and build layout was not controlled. The conclusions above hold against run-to-run noise. See the [quick screens' controls](../quick-screens/readme.md#controls) and the [investigation record](../../../../performance/investigation-2026-11-06-driver-wakes.md).
