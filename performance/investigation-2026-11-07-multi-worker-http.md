@@ -11,7 +11,7 @@
 
 ## Hypothesis and constraints
 
-This was the first measurement of multi-worker HTTP against Hyper on a multi-thread Tokio runtime. Run 1, against `main` at `3738ff6`, found Native epoll ahead of Hyper at every load (+6% to +17% throughput, −7% to −15% CPU per request), but io_uring behind Hyper in four of six cases, by 1.7–11.3%. Profiles put io_uring's extra work in monitor handling, cross-ring commands, and `route_ref`. When an idle worker stole a connection task and it waited again, the persistent multishot `PollAdd` was cancelled on the old ring and registered on the new one. A diagnostic build counted 0.30–0.49 rebinds per request at 2–4 workers. Keeping an active poll on its ring should remove that work.
+This was the first measurement of multi-worker HTTP against Hyper on a multi-thread Tokio runtime. Run 1, against `main` at `3738ff6`, found Native epoll ahead of Hyper at every load (+6% to +17% throughput, −7% to −15% CPU per request), but io_uring behind Hyper in four of six cases, by 2.5–9.9%. Profiles put io_uring's extra work in monitor handling, cross-ring commands, and `route_ref`. When an idle worker stole a connection task and it waited again, the persistent multishot `PollAdd` was cancelled on the old ring and registered on the new one. A diagnostic build counted 0.30–0.49 rebinds per request at 2–4 workers. Keeping an active poll on its ring should remove that work.
 
 No wakeup may be lost: the wait and `notify` meet under the status lock, so which ring delivers the notification does not matter. Close, drop, and shutdown must still retire through the poll's own ring.
 
@@ -31,7 +31,7 @@ No wakeup may be lost: the wait and `notify` meet under the status lock, so whic
 | --- | --- | --- | --- |
 | io_uring requests/s, 2 and 4 workers | +14% to +26%, 5/5 in every case, two runs | within ±2.1% | Valid. |
 | io_uring CPU/request | −15% to −24%, 5/5 | | Valid. |
-| io_uring against Hyper | from −11.3% to +3.3% before to +4.0% to +20.0% after | | At about the same load, since wrk limits throughput; level with epoll. |
+| io_uring against Hyper | run 1 of the change: from −6.6% to +4.0% before to +8.6% to +20.7% after; run 2: from −11.3% to +3.3% to +4.0% to +20.0% | | At about the same load, since wrk limits throughput; level with epoll. |
 | Echo, borrowed io_uring, 4 workers, CPU/request | −7% to −12%, 5/5 | same executable | Valid against run-to-run noise. |
 | Native epoll | unchanged | up to +2.5% | As expected. |
 

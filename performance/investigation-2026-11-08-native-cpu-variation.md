@@ -11,7 +11,7 @@
 
 ## Hypothesis and constraints
 
-While checking the timer benchmark's move to `base-benchmark` (#117), CPU per expiry varied widely between processes of the same executable in workloads where timers expire. Native's varied most, more than threefold between processes. In `periodic`, io_uring's stayed within a few percent, which pointed at Native's thread-park idle path, since io_uring workers wait in the ring instead. In `expire-contended`, io_uring and the Tokio adapter also varied by 20–35%, so the variation is not Native's alone.
+While checking the timer benchmark's move to `base-benchmark` (#117), CPU per expiry varied widely between processes of the same executable in workloads where timers expire. Native's varied most, more than threefold between processes. In `periodic`, io_uring's stayed within −13.0% to +1.7% per round, which pointed at Native's thread-park idle path, since io_uring workers wait in the ring instead. In `expire-contended`, io_uring and the Tokio adapter also varied by 20–35%, so the variation is not Native's alone.
 
 ## Frozen variants and preparation
 
