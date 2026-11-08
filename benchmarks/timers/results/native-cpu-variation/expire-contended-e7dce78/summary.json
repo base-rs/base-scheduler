@@ -1,0 +1,2276 @@
+{
+  "schema": "base-benchmark/summary",
+  "version": 1,
+  "generator": "base-benchmark 0.1.0",
+  "mode": "screening",
+  "evidence": "screening: paired triage with controls; not acceptance evidence",
+  "scenario": "expire-contended",
+  "rounds": 9,
+  "seed": 1794092352719987168,
+  "decision_rule": null,
+  "aggregation": "each process contributes the median of its samples; subject distributions are across processes; pair differences, changes, and better or worse counts are per round, with differences below the measurement quantum counted as ties; there is no same-binary repeat subject, so run-to-run variation appears only as each subject's spread",
+  "subjects": [
+    {
+      "label": "current/tokio",
+      "processes": 9,
+      "metrics": [
+        {
+          "name": "cpu_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 7321.71875,
+            "minimum": 5566.9921875,
+            "maximum": 7950.3515625
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "involuntary_context_switches",
+          "unit": "count",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 0.0,
+            "minimum": 0.0,
+            "maximum": 0.0001171875
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "overshoot_max",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "workload",
+          "direction": "lower_is_better",
+          "statistic": "mean",
+          "distribution": {
+            "median": 2391218.0,
+            "minimum": 2215483.0,
+            "maximum": 2617790.0
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "overshoot_p50",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "workload",
+          "direction": "lower_is_better",
+          "statistic": "mean",
+          "distribution": {
+            "median": 1463322.0,
+            "minimum": 1374777.0,
+            "maximum": 1519975.0
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "overshoot_p99",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "workload",
+          "direction": "lower_is_better",
+          "statistic": "mean",
+          "distribution": {
+            "median": 2075770.0,
+            "minimum": 1994186.0,
+            "maximum": 2112407.0
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "refresh_expirations",
+          "unit": "count",
+          "phase": "measured",
+          "source": "workload",
+          "direction": "neutral",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 0.0,
+            "minimum": 0.0,
+            "maximum": 0.0
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "system_cpu_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 1093.984375,
+            "minimum": 933.90625,
+            "maximum": 1247.109375
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "user_cpu_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 6268.4375,
+            "minimum": 4633.0859375,
+            "maximum": 6905.8203125
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "voluntary_context_switches",
+          "unit": "count",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 0.0621484375,
+            "minimum": 0.0602734375,
+            "maximum": 0.066484375
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "wall_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "wall",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 17851.821015625,
+            "minimum": 17493.8645703125,
+            "maximum": 18207.0893359375
+          },
+          "unavailable": 0
+        }
+      ]
+    },
+    {
+      "label": "current/native",
+      "processes": 9,
+      "metrics": [
+        {
+          "name": "cpu_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 2421.5234375,
+            "minimum": 1271.09375,
+            "maximum": 3632.9296875
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "involuntary_context_switches",
+          "unit": "count",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 0.000703125,
+            "minimum": 0.00015625,
+            "maximum": 0.00328125
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "overshoot_max",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "workload",
+          "direction": "lower_is_better",
+          "statistic": "mean",
+          "distribution": {
+            "median": 350375.0,
+            "minimum": 208988.0,
+            "maximum": 3191473.0
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "overshoot_p50",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "workload",
+          "direction": "lower_is_better",
+          "statistic": "mean",
+          "distribution": {
+            "median": 21741.0,
+            "minimum": 7743.0,
+            "maximum": 45651.0
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "overshoot_p99",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "workload",
+          "direction": "lower_is_better",
+          "statistic": "mean",
+          "distribution": {
+            "median": 200723.0,
+            "minimum": 191198.0,
+            "maximum": 226214.0
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "refresh_expirations",
+          "unit": "count",
+          "phase": "measured",
+          "source": "workload",
+          "direction": "neutral",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 0.0,
+            "minimum": 0.0,
+            "maximum": 0.0
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "system_cpu_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 744.0234375,
+            "minimum": 223.28125,
+            "maximum": 1098.28125
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "user_cpu_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 1558.125,
+            "minimum": 759.53125,
+            "maximum": 2646.640625
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "voluntary_context_switches",
+          "unit": "count",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 0.081640625,
+            "minimum": 0.047421875,
+            "maximum": 0.2334375
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "wall_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "wall",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 8241.52765625,
+            "minimum": 8129.424375,
+            "maximum": 8329.2723046875
+          },
+          "unavailable": 0
+        }
+      ]
+    },
+    {
+      "label": "current/iouring",
+      "processes": 9,
+      "metrics": [
+        {
+          "name": "cpu_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 1238.7890625,
+            "minimum": 1134.8046875,
+            "maximum": 1727.734375
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "involuntary_context_switches",
+          "unit": "count",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 0.0005078125,
+            "minimum": 0.000234375,
+            "maximum": 0.000703125
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "overshoot_max",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "workload",
+          "direction": "lower_is_better",
+          "statistic": "mean",
+          "distribution": {
+            "median": 232730.0,
+            "minimum": 203179.0,
+            "maximum": 554243.0
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "overshoot_p50",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "workload",
+          "direction": "lower_is_better",
+          "statistic": "mean",
+          "distribution": {
+            "median": 16513.0,
+            "minimum": 9957.0,
+            "maximum": 23941.0
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "overshoot_p99",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "workload",
+          "direction": "lower_is_better",
+          "statistic": "mean",
+          "distribution": {
+            "median": 197355.0,
+            "minimum": 192271.0,
+            "maximum": 202451.0
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "refresh_expirations",
+          "unit": "count",
+          "phase": "measured",
+          "source": "workload",
+          "direction": "neutral",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 0.0,
+            "minimum": 0.0,
+            "maximum": 0.0
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "system_cpu_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 343.3984375,
+            "minimum": 172.8515625,
+            "maximum": 790.15625
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "user_cpu_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 880.3515625,
+            "minimum": 416.6015625,
+            "maximum": 1304.53125
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "voluntary_context_switches",
+          "unit": "count",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 0.051953125,
+            "minimum": 0.0488671875,
+            "maximum": 0.1946484375
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "wall_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "wall",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 8228.1058203125,
+            "minimum": 8104.2425390625,
+            "maximum": 8290.95046875
+          },
+          "unavailable": 0
+        }
+      ]
+    },
+    {
+      "label": "current-replica/tokio",
+      "processes": 9,
+      "metrics": [
+        {
+          "name": "cpu_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 7548.90625,
+            "minimum": 6044.4140625,
+            "maximum": 8148.0859375
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "involuntary_context_switches",
+          "unit": "count",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 0.0001171875,
+            "minimum": 0.0,
+            "maximum": 0.0005078125
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "overshoot_max",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "workload",
+          "direction": "lower_is_better",
+          "statistic": "mean",
+          "distribution": {
+            "median": 2440873.0,
+            "minimum": 2300892.0,
+            "maximum": 4294712.0
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "overshoot_p50",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "workload",
+          "direction": "lower_is_better",
+          "statistic": "mean",
+          "distribution": {
+            "median": 1475979.0,
+            "minimum": 1374187.0,
+            "maximum": 1527386.0
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "overshoot_p99",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "workload",
+          "direction": "lower_is_better",
+          "statistic": "mean",
+          "distribution": {
+            "median": 2091463.0,
+            "minimum": 2011026.0,
+            "maximum": 2133199.0
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "refresh_expirations",
+          "unit": "count",
+          "phase": "measured",
+          "source": "workload",
+          "direction": "neutral",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 0.0,
+            "minimum": 0.0,
+            "maximum": 0.0
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "system_cpu_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 1312.3828125,
+            "minimum": 701.1328125,
+            "maximum": 2104.2578125
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "user_cpu_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 6006.8359375,
+            "minimum": 4953.046875,
+            "maximum": 7191.484375
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "voluntary_context_switches",
+          "unit": "count",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 0.062265625,
+            "minimum": 0.0578125,
+            "maximum": 0.065859375
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "wall_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "wall",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 17888.6335546875,
+            "minimum": 17573.5668359375,
+            "maximum": 18123.715390625
+          },
+          "unavailable": 0
+        }
+      ]
+    },
+    {
+      "label": "current-replica/native",
+      "processes": 9,
+      "metrics": [
+        {
+          "name": "cpu_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 3355.9765625,
+            "minimum": 1219.8828125,
+            "maximum": 4096.1328125
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "involuntary_context_switches",
+          "unit": "count",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 0.00046875,
+            "minimum": 0.000234375,
+            "maximum": 0.00703125
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "overshoot_max",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "workload",
+          "direction": "lower_is_better",
+          "statistic": "mean",
+          "distribution": {
+            "median": 276983.0,
+            "minimum": 213700.0,
+            "maximum": 10368336.0
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "overshoot_p50",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "workload",
+          "direction": "lower_is_better",
+          "statistic": "mean",
+          "distribution": {
+            "median": 26071.0,
+            "minimum": 9503.0,
+            "maximum": 84789.0
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "overshoot_p99",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "workload",
+          "direction": "lower_is_better",
+          "statistic": "mean",
+          "distribution": {
+            "median": 211710.0,
+            "minimum": 194353.0,
+            "maximum": 1651402.0
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "refresh_expirations",
+          "unit": "count",
+          "phase": "measured",
+          "source": "workload",
+          "direction": "neutral",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 0.0,
+            "minimum": 0.0,
+            "maximum": 0.0
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "system_cpu_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 763.984375,
+            "minimum": 246.6015625,
+            "maximum": 1390.390625
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "user_cpu_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 1965.5859375,
+            "minimum": 724.609375,
+            "maximum": 3117.578125
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "voluntary_context_switches",
+          "unit": "count",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 0.0478125,
+            "minimum": 0.042109375,
+            "maximum": 0.2438671875
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "wall_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "wall",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 8531.7675390625,
+            "minimum": 8231.9623046875,
+            "maximum": 8656.92453125
+          },
+          "unavailable": 0
+        }
+      ]
+    },
+    {
+      "label": "current-replica/iouring",
+      "processes": 9,
+      "metrics": [
+        {
+          "name": "cpu_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 1267.96875,
+            "minimum": 1148.515625,
+            "maximum": 1544.765625
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "involuntary_context_switches",
+          "unit": "count",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 0.0005078125,
+            "minimum": 0.0002734375,
+            "maximum": 0.001015625
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "overshoot_max",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "workload",
+          "direction": "lower_is_better",
+          "statistic": "mean",
+          "distribution": {
+            "median": 237844.0,
+            "minimum": 208187.0,
+            "maximum": 293241.0
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "overshoot_p50",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "workload",
+          "direction": "lower_is_better",
+          "statistic": "mean",
+          "distribution": {
+            "median": 19145.0,
+            "minimum": 11934.0,
+            "maximum": 29252.0
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "overshoot_p99",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "workload",
+          "direction": "lower_is_better",
+          "statistic": "mean",
+          "distribution": {
+            "median": 197782.0,
+            "minimum": 192259.0,
+            "maximum": 203293.0
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "refresh_expirations",
+          "unit": "count",
+          "phase": "measured",
+          "source": "workload",
+          "direction": "neutral",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 0.0,
+            "minimum": 0.0,
+            "maximum": 0.0
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "system_cpu_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 309.5703125,
+            "minimum": 235.8203125,
+            "maximum": 713.828125
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "user_cpu_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 870.6640625,
+            "minimum": 685.0,
+            "maximum": 1235.1953125
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "voluntary_context_switches",
+          "unit": "count",
+          "phase": "measured",
+          "source": "rusage",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 0.0586328125,
+            "minimum": 0.046328125,
+            "maximum": 0.1304296875
+          },
+          "unavailable": 0
+        },
+        {
+          "name": "wall_time",
+          "unit": "nanoseconds",
+          "phase": "measured",
+          "source": "wall",
+          "direction": "lower_is_better",
+          "statistic": "per_operation",
+          "distribution": {
+            "median": 8242.582578125,
+            "minimum": 8103.1285546875,
+            "maximum": 8339.5123046875
+          },
+          "unavailable": 0
+        }
+      ]
+    }
+  ],
+  "pairs": [
+    {
+      "baseline": "current/tokio",
+      "candidate": "current/native",
+      "kind": "variant",
+      "metrics": [
+        {
+          "name": "cpu_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 9,
+          "regressed": 0,
+          "difference": {
+            "median": -4257.265625,
+            "minimum": -6487.6953125,
+            "maximum": -3475.546875
+          },
+          "change": {
+            "median": -0.6373395579580423,
+            "minimum": -0.8263940758445549,
+            "maximum": -0.5289102982965338
+          },
+          "unresolved": 0,
+          "sign_test_p": 0.00390625
+        },
+        {
+          "name": "involuntary_context_switches",
+          "unit": "count",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 0,
+          "regressed": 9,
+          "difference": {
+            "median": 0.000703125,
+            "minimum": 0.00015625,
+            "maximum": 0.0032421875
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 0.00390625
+        },
+        {
+          "name": "overshoot_max",
+          "unit": "nanoseconds",
+          "statistic": "mean",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 7,
+          "regressed": 2,
+          "difference": {
+            "median": -2006495.0,
+            "minimum": -2373165.0,
+            "maximum": 793802.0
+          },
+          "change": {
+            "median": -0.8583488376417927,
+            "minimum": -0.9065528556530509,
+            "maximum": 0.33107211122793734
+          },
+          "unresolved": 0,
+          "sign_test_p": 0.1796875
+        },
+        {
+          "name": "overshoot_p50",
+          "unit": "nanoseconds",
+          "statistic": "mean",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 9,
+          "regressed": 0,
+          "difference": {
+            "median": -1437916.0,
+            "minimum": -1501224.0,
+            "maximum": -1349885.0
+          },
+          "change": {
+            "median": -0.9856964752709748,
+            "minimum": -0.9945932924146889,
+            "maximum": -0.9688030046866223
+          },
+          "unresolved": 0,
+          "sign_test_p": 0.00390625
+        },
+        {
+          "name": "overshoot_p99",
+          "unit": "nanoseconds",
+          "statistic": "mean",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 9,
+          "regressed": 0,
+          "difference": {
+            "median": -1852042.0,
+            "minimum": -1912850.0,
+            "maximum": -1794489.0
+          },
+          "change": {
+            "median": -0.900053000671853,
+            "minimum": -0.9055309890565597,
+            "maximum": -0.8918401762580451
+          },
+          "unresolved": 0,
+          "sign_test_p": 0.00390625
+        },
+        {
+          "name": "refresh_expirations",
+          "unit": "count",
+          "statistic": "per_operation",
+          "direction": "neutral",
+          "rounds": 9,
+          "improved": 0,
+          "regressed": 0,
+          "difference": {
+            "median": 0.0,
+            "minimum": 0.0,
+            "maximum": 0.0
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": null
+        },
+        {
+          "name": "system_cpu_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 5,
+          "regressed": 0,
+          "difference": {
+            "median": -390.7421875,
+            "minimum": -891.6796875,
+            "maximum": 53.75
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 0.0625
+        },
+        {
+          "name": "user_cpu_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 9,
+          "regressed": 0,
+          "difference": {
+            "median": -4057.7734375,
+            "minimum": -5596.015625,
+            "maximum": -3084.8046875
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 0.00390625
+        },
+        {
+          "name": "voluntary_context_switches",
+          "unit": "count",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 3,
+          "regressed": 6,
+          "difference": {
+            "median": 0.019492187499999994,
+            "minimum": -0.013124999999999998,
+            "maximum": 0.16695312499999998
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 0.5078125
+        },
+        {
+          "name": "wall_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 9,
+          "regressed": 0,
+          "difference": {
+            "median": -9675.675273437499,
+            "minimum": -9936.155820312502,
+            "maximum": -9234.2035546875
+          },
+          "change": {
+            "median": -0.5415357369742706,
+            "minimum": -0.5500047998951425,
+            "maximum": -0.5278538379883289
+          },
+          "unresolved": 0,
+          "sign_test_p": 0.00390625
+        }
+      ]
+    },
+    {
+      "baseline": "current/tokio",
+      "candidate": "current/iouring",
+      "kind": "variant",
+      "metrics": [
+        {
+          "name": "cpu_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 9,
+          "regressed": 0,
+          "difference": {
+            "median": -6186.9140625,
+            "minimum": -6711.5625,
+            "maximum": -4136.2890625
+          },
+          "change": {
+            "median": -0.8377204271703902,
+            "minimum": -0.8493878564083861,
+            "maximum": -0.7412451589502381
+          },
+          "unresolved": 0,
+          "sign_test_p": 0.00390625
+        },
+        {
+          "name": "involuntary_context_switches",
+          "unit": "count",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 0,
+          "regressed": 9,
+          "difference": {
+            "median": 0.0005078125,
+            "minimum": 0.0001171875,
+            "maximum": 0.0006640625
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 0.00390625
+        },
+        {
+          "name": "overshoot_max",
+          "unit": "nanoseconds",
+          "statistic": "mean",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 9,
+          "regressed": 0,
+          "difference": {
+            "median": -2128285.0,
+            "minimum": -2378795.0,
+            "maximum": -2003089.0
+          },
+          "change": {
+            "median": -0.9023481536874742,
+            "minimum": -0.9178578907833658,
+            "maximum": -0.7882782805343438
+          },
+          "unresolved": 0,
+          "sign_test_p": 0.00390625
+        },
+        {
+          "name": "overshoot_p50",
+          "unit": "nanoseconds",
+          "statistic": "mean",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 9,
+          "regressed": 0,
+          "difference": {
+            "median": -1447764.0,
+            "minimum": -1503989.0,
+            "maximum": -1355023.0
+          },
+          "change": {
+            "median": -0.98832606702349,
+            "minimum": -0.9930473217839412,
+            "maximum": -0.9842041159952707
+          },
+          "unresolved": 0,
+          "sign_test_p": 0.00390625
+        },
+        {
+          "name": "overshoot_p99",
+          "unit": "nanoseconds",
+          "statistic": "mean",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 9,
+          "regressed": 0,
+          "difference": {
+            "median": -1879199.0,
+            "minimum": -1913440.0,
+            "maximum": -1797272.0
+          },
+          "change": {
+            "median": -0.9035089863688811,
+            "minimum": -0.9078691515879276,
+            "maximum": -0.8992723965438836
+          },
+          "unresolved": 0,
+          "sign_test_p": 0.00390625
+        },
+        {
+          "name": "refresh_expirations",
+          "unit": "count",
+          "statistic": "per_operation",
+          "direction": "neutral",
+          "rounds": 9,
+          "improved": 0,
+          "regressed": 0,
+          "difference": {
+            "median": 0.0,
+            "minimum": 0.0,
+            "maximum": 0.0
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": null
+        },
+        {
+          "name": "system_cpu_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 8,
+          "regressed": 0,
+          "difference": {
+            "median": -753.7109375,
+            "minimum": -967.1875,
+            "maximum": -317.6171875
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 0.007812500000000002
+        },
+        {
+          "name": "user_cpu_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 9,
+          "regressed": 0,
+          "difference": {
+            "median": -5430.5078125,
+            "minimum": -6010.4296875,
+            "maximum": -3702.3046875
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 0.00390625
+        },
+        {
+          "name": "voluntary_context_switches",
+          "unit": "count",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 6,
+          "regressed": 3,
+          "difference": {
+            "median": -0.009960937499999996,
+            "minimum": -0.014531249999999996,
+            "maximum": 0.134375
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 0.5078125
+        },
+        {
+          "name": "wall_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 9,
+          "regressed": 0,
+          "difference": {
+            "median": -9561.631914062502,
+            "minimum": -9961.337656250002,
+            "maximum": -9240.6683203125
+          },
+          "change": {
+            "median": -0.5374802066691866,
+            "minimum": -0.551398712277986,
+            "maximum": -0.5282233827278011
+          },
+          "unresolved": 0,
+          "sign_test_p": 0.00390625
+        }
+      ]
+    },
+    {
+      "baseline": "current/tokio",
+      "candidate": "current-replica/tokio",
+      "kind": "replica",
+      "metrics": [
+        {
+          "name": "cpu_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 4,
+          "regressed": 5,
+          "difference": {
+            "median": 31.5234375,
+            "minimum": -1727.265625,
+            "maximum": 1981.9140625
+          },
+          "change": {
+            "median": 0.003965036923485155,
+            "minimum": -0.21937775660966163,
+            "maximum": 0.3560116478967126
+          },
+          "unresolved": 0,
+          "sign_test_p": 1.0
+        },
+        {
+          "name": "involuntary_context_switches",
+          "unit": "count",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 2,
+          "regressed": 6,
+          "difference": {
+            "median": 0.0001171875,
+            "minimum": -0.0001171875,
+            "maximum": 0.0005078125
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 0.28906250000000006
+        },
+        {
+          "name": "overshoot_max",
+          "unit": "nanoseconds",
+          "statistic": "mean",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 3,
+          "regressed": 6,
+          "difference": {
+            "median": 48701.0,
+            "minimum": -170072.0,
+            "maximum": 2079229.0
+          },
+          "change": {
+            "median": 0.02036660814697777,
+            "minimum": -0.06513810133878728,
+            "maximum": 0.938499189567241
+          },
+          "unresolved": 0,
+          "sign_test_p": 0.5078125
+        },
+        {
+          "name": "overshoot_p50",
+          "unit": "nanoseconds",
+          "statistic": "mean",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 3,
+          "regressed": 6,
+          "difference": {
+            "median": 12657.0,
+            "minimum": -144727.0,
+            "maximum": 95276.0
+          },
+          "change": {
+            "median": 0.00864949751319255,
+            "minimum": -0.09528320892427089,
+            "maximum": 0.06652840913058355
+          },
+          "unresolved": 0,
+          "sign_test_p": 0.5078125
+        },
+        {
+          "name": "overshoot_p99",
+          "unit": "nanoseconds",
+          "statistic": "mean",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 4,
+          "regressed": 5,
+          "difference": {
+            "median": 4529.0,
+            "minimum": -19081.0,
+            "maximum": 123313.0
+          },
+          "change": {
+            "median": 0.0021701692530764483,
+            "minimum": -0.009032823693540082,
+            "maximum": 0.06135323097926948
+          },
+          "unresolved": 0,
+          "sign_test_p": 1.0
+        },
+        {
+          "name": "refresh_expirations",
+          "unit": "count",
+          "statistic": "per_operation",
+          "direction": "neutral",
+          "rounds": 9,
+          "improved": 0,
+          "regressed": 0,
+          "difference": {
+            "median": 0.0,
+            "minimum": 0.0,
+            "maximum": 0.0
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": null
+        },
+        {
+          "name": "system_cpu_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 1,
+          "regressed": 2,
+          "difference": {
+            "median": 252.6171875,
+            "minimum": -410.5859375,
+            "maximum": 1170.3515625
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 1.0
+        },
+        {
+          "name": "user_cpu_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 2,
+          "regressed": 3,
+          "difference": {
+            "median": 4.296875,
+            "minimum": -1664.7265625,
+            "maximum": 1575.5859375
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 0.9999999999999999
+        },
+        {
+          "name": "voluntary_context_switches",
+          "unit": "count",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 4,
+          "regressed": 5,
+          "difference": {
+            "median": 0.00007812499999999833,
+            "minimum": -0.006640624999999997,
+            "maximum": 0.005429687500000002
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 1.0
+        },
+        {
+          "name": "wall_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 4,
+          "regressed": 5,
+          "difference": {
+            "median": 58.13519531249767,
+            "minimum": -367.082890624999,
+            "maximum": 348.6098828125032
+          },
+          "change": {
+            "median": 0.003218008759418689,
+            "minimum": -0.020161536193511354,
+            "maximum": 0.01966248574111651
+          },
+          "unresolved": 0,
+          "sign_test_p": 1.0
+        }
+      ]
+    },
+    {
+      "baseline": "current/native",
+      "candidate": "current-replica/native",
+      "kind": "replica",
+      "metrics": [
+        {
+          "name": "cpu_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 4,
+          "regressed": 5,
+          "difference": {
+            "median": 1345.0,
+            "minimum": -2397.5390625,
+            "maximum": 2662.3828125
+          },
+          "change": {
+            "median": 0.5082439074792979,
+            "minimum": -0.6599464533402148,
+            "maximum": 2.032777595514331
+          },
+          "unresolved": 0,
+          "sign_test_p": 1.0
+        },
+        {
+          "name": "involuntary_context_switches",
+          "unit": "count",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 5,
+          "regressed": 3,
+          "difference": {
+            "median": -0.00019531249999999996,
+            "minimum": -0.0030078125,
+            "maximum": 0.0066015625
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 0.7265625
+        },
+        {
+          "name": "overshoot_max",
+          "unit": "nanoseconds",
+          "statistic": "mean",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 6,
+          "regressed": 3,
+          "difference": {
+            "median": -136675.0,
+            "minimum": -2861503.0,
+            "maximum": 10135954.0
+          },
+          "change": {
+            "median": -0.39008205494113446,
+            "minimum": -0.8983997156484679,
+            "maximum": 43.617638199172056
+          },
+          "unresolved": 0,
+          "sign_test_p": 0.5078125
+        },
+        {
+          "name": "overshoot_p50",
+          "unit": "nanoseconds",
+          "statistic": "mean",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 2,
+          "regressed": 7,
+          "difference": {
+            "median": 4330.0,
+            "minimum": -26654.0,
+            "maximum": 70718.0
+          },
+          "change": {
+            "median": 0.19916287199300853,
+            "minimum": -0.625954498937259,
+            "maximum": 9.133152524861165
+          },
+          "unresolved": 0,
+          "sign_test_p": 0.1796875
+        },
+        {
+          "name": "overshoot_p99",
+          "unit": "nanoseconds",
+          "statistic": "mean",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 4,
+          "regressed": 5,
+          "difference": {
+            "median": 2266.0,
+            "minimum": -29375.0,
+            "maximum": 1451705.0
+          },
+          "change": {
+            "median": 0.010017063488555022,
+            "minimum": -0.1312978259314882,
+            "maximum": 7.269538350601161
+          },
+          "unresolved": 0,
+          "sign_test_p": 1.0
+        },
+        {
+          "name": "refresh_expirations",
+          "unit": "count",
+          "statistic": "per_operation",
+          "direction": "neutral",
+          "rounds": 9,
+          "improved": 0,
+          "regressed": 0,
+          "difference": {
+            "median": 0.0,
+            "minimum": 0.0,
+            "maximum": 0.0
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": null
+        },
+        {
+          "name": "system_cpu_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 2,
+          "regressed": 4,
+          "difference": {
+            "median": 215.78125,
+            "minimum": -851.6796875,
+            "maximum": 878.828125
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 0.6875000000000002
+        },
+        {
+          "name": "user_cpu_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 4,
+          "regressed": 5,
+          "difference": {
+            "median": 759.1015625,
+            "minimum": -1871.7578125,
+            "maximum": 2087.2265625
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 1.0
+        },
+        {
+          "name": "voluntary_context_switches",
+          "unit": "count",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 7,
+          "regressed": 2,
+          "difference": {
+            "median": -0.037617187499999996,
+            "minimum": -0.1828515625,
+            "maximum": 0.1964453125
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 0.1796875
+        },
+        {
+          "name": "wall_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 1,
+          "regressed": 8,
+          "difference": {
+            "median": 243.62523437500022,
+            "minimum": -97.30999999999949,
+            "maximum": 402.3431640625013
+          },
+          "change": {
+            "median": 0.029380722352779998,
+            "minimum": -0.011682893347746082,
+            "maximum": 0.04949220824291167
+          },
+          "unresolved": 0,
+          "sign_test_p": 0.03906249999999999
+        }
+      ]
+    },
+    {
+      "baseline": "current-replica/tokio",
+      "candidate": "current-replica/native",
+      "kind": "variant",
+      "metrics": [
+        {
+          "name": "cpu_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 9,
+          "regressed": 0,
+          "difference": {
+            "median": -4229.140625,
+            "minimum": -6761.9921875,
+            "maximum": -2053.046875
+          },
+          "change": {
+            "median": -0.5575577173638756,
+            "minimum": -0.8471683893195521,
+            "maximum": -0.3396601976256487
+          },
+          "unresolved": 0,
+          "sign_test_p": 0.00390625
+        },
+        {
+          "name": "involuntary_context_switches",
+          "unit": "count",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 1,
+          "regressed": 8,
+          "difference": {
+            "median": 0.0004296875,
+            "minimum": -0.000039062500000000035,
+            "maximum": 0.0069140625
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 0.03906249999999999
+        },
+        {
+          "name": "overshoot_max",
+          "unit": "nanoseconds",
+          "statistic": "mean",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 8,
+          "regressed": 1,
+          "difference": {
+            "median": -2219194.0,
+            "minimum": -3958464.0,
+            "maximum": 8042761.0
+          },
+          "change": {
+            "median": -0.9058857220346982,
+            "minimum": -0.9217065079101928,
+            "maximum": 3.458396740591037
+          },
+          "unresolved": 0,
+          "sign_test_p": 0.03906249999999999
+        },
+        {
+          "name": "overshoot_p50",
+          "unit": "nanoseconds",
+          "statistic": "mean",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 9,
+          "regressed": 0,
+          "difference": {
+            "median": -1429117.0,
+            "minimum": -1500509.0,
+            "maximum": -1290468.0
+          },
+          "change": {
+            "median": -0.9819788496352706,
+            "minimum": -0.9935615615127316,
+            "maximum": -0.9390774326929304
+          },
+          "unresolved": 0,
+          "sign_test_p": 0.00390625
+        },
+        {
+          "name": "overshoot_p99",
+          "unit": "nanoseconds",
+          "statistic": "mean",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 9,
+          "regressed": 0,
+          "difference": {
+            "median": -1871852.0,
+            "minimum": -1918445.0,
+            "maximum": -359624.0
+          },
+          "change": {
+            "median": -0.899542338982327,
+            "minimum": -0.9062950525224636,
+            "maximum": -0.17882613153683746
+          },
+          "unresolved": 0,
+          "sign_test_p": 0.00390625
+        },
+        {
+          "name": "refresh_expirations",
+          "unit": "count",
+          "statistic": "per_operation",
+          "direction": "neutral",
+          "rounds": 9,
+          "improved": 0,
+          "regressed": 0,
+          "difference": {
+            "median": 0.0,
+            "minimum": 0.0,
+            "maximum": 0.0
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": null
+        },
+        {
+          "name": "system_cpu_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 4,
+          "regressed": 1,
+          "difference": {
+            "median": -192.65625,
+            "minimum": -1104.4140625,
+            "maximum": 455.8984375
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 0.375
+        },
+        {
+          "name": "user_cpu_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 9,
+          "regressed": 0,
+          "difference": {
+            "median": -4178.1640625,
+            "minimum": -6173.3203125,
+            "maximum": -2071.9921875
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 0.00390625
+        },
+        {
+          "name": "voluntary_context_switches",
+          "unit": "count",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 8,
+          "regressed": 1,
+          "difference": {
+            "median": -0.0152734375,
+            "minimum": -0.0201953125,
+            "maximum": 0.17976562499999998
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 0.03906249999999999
+        },
+        {
+          "name": "wall_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 9,
+          "regressed": 0,
+          "difference": {
+            "median": -9386.2308203125,
+            "minimum": -9781.687187500002,
+            "maximum": -8935.4503125
+          },
+          "change": {
+            "median": -0.5292484264304991,
+            "minimum": -0.5410732388656064,
+            "maximum": -0.5079160938680474
+          },
+          "unresolved": 0,
+          "sign_test_p": 0.00390625
+        }
+      ]
+    },
+    {
+      "baseline": "current/iouring",
+      "candidate": "current-replica/iouring",
+      "kind": "replica",
+      "metrics": [
+        {
+          "name": "cpu_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 3,
+          "regressed": 6,
+          "difference": {
+            "median": 24.921875,
+            "minimum": -486.796875,
+            "maximum": 345.1171875
+          },
+          "change": {
+            "median": 0.02004902268870601,
+            "minimum": -0.28175446529504866,
+            "maximum": 0.291805661062853
+          },
+          "unresolved": 0,
+          "sign_test_p": 0.5078125
+        },
+        {
+          "name": "involuntary_context_switches",
+          "unit": "count",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 5,
+          "regressed": 4,
+          "difference": {
+            "median": -0.00007812499999999996,
+            "minimum": -0.00031249999999999995,
+            "maximum": 0.0003515625
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 1.0
+        },
+        {
+          "name": "overshoot_max",
+          "unit": "nanoseconds",
+          "statistic": "mean",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 3,
+          "regressed": 6,
+          "difference": {
+            "median": 13177.0,
+            "minimum": -346056.0,
+            "maximum": 60511.0
+          },
+          "change": {
+            "median": 0.05676071505492142,
+            "minimum": -0.624375950620937,
+            "maximum": 0.260005156189576
+          },
+          "unresolved": 0,
+          "sign_test_p": 0.5078125
+        },
+        {
+          "name": "overshoot_p50",
+          "unit": "nanoseconds",
+          "statistic": "mean",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 4,
+          "regressed": 5,
+          "difference": {
+            "median": 2988.0,
+            "minimum": -7543.0,
+            "maximum": 13694.0
+          },
+          "change": {
+            "median": 0.18691354935568616,
+            "minimum": -0.38727730143245875,
+            "maximum": 1.110374610826554
+          },
+          "unresolved": 0,
+          "sign_test_p": 1.0
+        },
+        {
+          "name": "overshoot_p99",
+          "unit": "nanoseconds",
+          "statistic": "mean",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 3,
+          "regressed": 6,
+          "difference": {
+            "median": 906.0,
+            "minimum": -6708.0,
+            "maximum": 7766.0
+          },
+          "change": {
+            "median": 0.004489526914862596,
+            "minimum": -0.03371413349952501,
+            "maximum": 0.04039090658497635
+          },
+          "unresolved": 0,
+          "sign_test_p": 0.5078125
+        },
+        {
+          "name": "refresh_expirations",
+          "unit": "count",
+          "statistic": "per_operation",
+          "direction": "neutral",
+          "rounds": 9,
+          "improved": 0,
+          "regressed": 0,
+          "difference": {
+            "median": 0.0,
+            "minimum": 0.0,
+            "maximum": 0.0
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": null
+        },
+        {
+          "name": "system_cpu_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 1,
+          "regressed": 1,
+          "difference": {
+            "median": -34.6875,
+            "minimum": -507.734375,
+            "maximum": 411.484375
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 1.0
+        },
+        {
+          "name": "user_cpu_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 0,
+          "regressed": 1,
+          "difference": {
+            "median": -66.3671875,
+            "minimum": -360.9765625,
+            "maximum": 774.765625
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 1.0
+        },
+        {
+          "name": "voluntary_context_switches",
+          "unit": "count",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 5,
+          "regressed": 4,
+          "difference": {
+            "median": -0.0008203124999999964,
+            "minimum": -0.13624999999999998,
+            "maximum": 0.0791015625
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 1.0
+        },
+        {
+          "name": "wall_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 4,
+          "regressed": 5,
+          "difference": {
+            "median": 2.4132812499992724,
+            "minimum": -163.86136718750004,
+            "maximum": 138.34003906250018
+          },
+          "change": {
+            "median": 0.0002924256733267683,
+            "minimum": -0.019821164503166067,
+            "maximum": 0.01707007636996316
+          },
+          "unresolved": 0,
+          "sign_test_p": 1.0
+        }
+      ]
+    },
+    {
+      "baseline": "current-replica/tokio",
+      "candidate": "current-replica/iouring",
+      "kind": "variant",
+      "metrics": [
+        {
+          "name": "cpu_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 9,
+          "regressed": 0,
+          "difference": {
+            "median": -6004.140625,
+            "minimum": -6907.1484375,
+            "maximum": -4826.40625
+          },
+          "change": {
+            "median": -0.7989472385573878,
+            "minimum": -0.855688669642158,
+            "maximum": -0.7904634306785194
+          },
+          "unresolved": 0,
+          "sign_test_p": 0.00390625
+        },
+        {
+          "name": "involuntary_context_switches",
+          "unit": "count",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 1,
+          "regressed": 8,
+          "difference": {
+            "median": 0.000390625,
+            "minimum": -0.000234375,
+            "maximum": 0.000859375
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 0.03906249999999999
+        },
+        {
+          "name": "overshoot_max",
+          "unit": "nanoseconds",
+          "statistic": "mean",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 9,
+          "regressed": 0,
+          "difference": {
+            "median": -2195546.0,
+            "minimum": -4084697.0,
+            "maximum": -2033181.0
+          },
+          "change": {
+            "median": -0.899492107946624,
+            "minimum": -0.9510991656716445,
+            "maximum": -0.8739519313348997
+          },
+          "unresolved": 0,
+          "sign_test_p": 0.00390625
+        },
+        {
+          "name": "overshoot_p50",
+          "unit": "nanoseconds",
+          "statistic": "mean",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 9,
+          "regressed": 0,
+          "difference": {
+            "median": -1446727.0,
+            "minimum": -1506373.0,
+            "maximum": -1351005.0
+          },
+          "change": {
+            "median": -0.9868845342710147,
+            "minimum": -0.9917696551724138,
+            "maximum": -0.9801812898421997
+          },
+          "unresolved": 0,
+          "sign_test_p": 0.00390625
+        },
+        {
+          "name": "overshoot_p99",
+          "unit": "nanoseconds",
+          "statistic": "mean",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 9,
+          "regressed": 0,
+          "difference": {
+            "median": -1890681.0,
+            "minimum": -1936694.0,
+            "maximum": -1807733.0
+          },
+          "change": {
+            "median": -0.9043554679188682,
+            "minimum": -0.9081562069166484,
+            "maximum": -0.8989108047335042
+          },
+          "unresolved": 0,
+          "sign_test_p": 0.00390625
+        },
+        {
+          "name": "refresh_expirations",
+          "unit": "count",
+          "statistic": "per_operation",
+          "direction": "neutral",
+          "rounds": 9,
+          "improved": 0,
+          "regressed": 0,
+          "difference": {
+            "median": 0.0,
+            "minimum": 0.0,
+            "maximum": 0.0
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": null
+        },
+        {
+          "name": "system_cpu_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 8,
+          "regressed": 0,
+          "difference": {
+            "median": -848.8671875,
+            "minimum": -1794.6875,
+            "maximum": 12.6953125
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 0.007812500000000002
+        },
+        {
+          "name": "user_cpu_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 9,
+          "regressed": 0,
+          "difference": {
+            "median": -4815.46875,
+            "minimum": -6247.9296875,
+            "maximum": -3832.6171875
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 0.00390625
+        },
+        {
+          "name": "voluntary_context_switches",
+          "unit": "count",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 5,
+          "regressed": 4,
+          "difference": {
+            "median": -0.0004296874999999978,
+            "minimum": -0.01953125,
+            "maximum": 0.06816406250000001
+          },
+          "change": null,
+          "unresolved": 9,
+          "sign_test_p": 1.0
+        },
+        {
+          "name": "wall_time",
+          "unit": "nanoseconds",
+          "statistic": "per_operation",
+          "direction": "lower_is_better",
+          "rounds": 9,
+          "improved": 9,
+          "regressed": 0,
+          "difference": {
+            "median": -9708.670820312498,
+            "minimum": -9881.132812499998,
+            "maximum": -9252.8625390625
+          },
+          "change": {
+            "median": -0.5407260455723593,
+            "minimum": -0.5454780371524282,
+            "maximum": -0.5259586963808779
+          },
+          "unresolved": 0,
+          "sign_test_p": 0.00390625
+        }
+      ]
+    }
+  ],
+  "warnings": [
+    "current/tokio -> current/native: overshoot_max changed in both directions (better 7/9, worse 2/9); inconclusive",
+    "current-replica/tokio -> current-replica/native: overshoot_max changed in both directions (better 8/9, worse 1/9); inconclusive",
+    "current-replica/tokio -> current-replica/native: system_cpu_time changed in both directions (better 4/9, worse 1/9); inconclusive"
+  ]
+}

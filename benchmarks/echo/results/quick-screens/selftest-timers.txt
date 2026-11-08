@@ -1,0 +1,18 @@
+waiting for /tmp/base-scheduler-perf.lock
+lock held
+building the periodic timer diagnostic against trees/main
+building the periodic timer diagnostic against trees/main-copy
+round 1/3
+round 2/3
+round 3/3
+
+Results: /home/samuel/Developer/claude-bench/quick/results/timers-main-copy-20261106-140335.jsonl
+
+Change is the median of per-round changes from base to candidate; 'better' counts rounds where the candidate improved.
+
+| Case | Backend | lateness_p50_us base | cand | change (better) | lateness_p99_us base | cand | change (better) | cpu_seconds base | cand | change (better) |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 4w | iouring | 6.791 | 6.855 | -7.8% (2/3) | 204.5 | 124.8 | -39.0% (2/3) | 3.778 | 3.541 | -6.3% (2/3) |
+| 4w | native | 47.2 | 50.49 | -8.9% (2/3) | 232.3 | 222.1 | +4.5% (1/3) | 8.772 | 9.258 | +5.5% (1/3) |
+| 8w | iouring | 8.095 | 8.147 | +1.3% (1/3) | 175 | 134.8 | +12.2% (1/3) | 7.113 | 7.294 | -1.2% (2/3) |
+| 8w | native | 9.799 | 17.44 | +85.9% (0/3) | 213.4 | 200.4 | +3.7% (1/3) | 7.032 | 15.2 | +48.8% (0/3) |

@@ -1,0 +1,327 @@
+{
+  "schema": "base-benchmark/campaign",
+  "version": 1,
+  "status": "complete",
+  "evidence": "screening: paired triage with controls; not acceptance evidence",
+  "generator": "base-benchmark 0.1.0",
+  "plan": {
+    "schema": "base-benchmark/plan",
+    "version": 1,
+    "mode": "screening",
+    "package": "base-scheduler-benchmark-timers",
+    "scenario": "expire-contended",
+    "rounds": 9,
+    "seed": 1794092352719987168,
+    "cpus": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "perf_events": [],
+    "perf_program": "perf",
+    "timeout_ms": 300000,
+    "lock": "/tmp/base-benchmark-host.lock",
+    "decision_rule": null,
+    "idle_host": false,
+    "invocation": [
+      "base-benchmark",
+      "run",
+      "expire-contended",
+      "--package",
+      "base-scheduler-benchmark-timers",
+      "--artifacts",
+      "/home/samuel/Developer/claude-bench/base-benchmark/prepared-e7dce78/artifacts.json",
+      "--cpus",
+      "0-3",
+      "--rounds",
+      "9",
+      "--output",
+      "/home/samuel/Developer/claude-bench/base-benchmark/campaigns/expire-contended-e7dce78"
+    ],
+    "working_directory": "/home/samuel/Developer/claude-bench/base-benchmark/trees/e7dce78",
+    "environment": {
+      "LC_ALL": "C",
+      "PATH": "/usr/local/sbin:/usr/local/bin:/usr/bin"
+    },
+    "stack_padding": true,
+    "subjects": [
+      {
+        "label": "current/tokio",
+        "artifact": "current",
+        "variant": "tokio",
+        "role": "baseline",
+        "program": "/home/samuel/Developer/claude-bench/base-benchmark/prepared-e7dce78/artifacts/current/base-scheduler-benchmark-timers",
+        "arguments": [
+          "--workload",
+          "expire",
+          "--mode",
+          "sleep",
+          "--tasks",
+          "128",
+          "--workers",
+          "4",
+          "--backend",
+          "tokio",
+          "--iterations",
+          "200"
+        ]
+      },
+      {
+        "label": "current/native",
+        "artifact": "current",
+        "variant": "native",
+        "role": "baseline",
+        "program": "/home/samuel/Developer/claude-bench/base-benchmark/prepared-e7dce78/artifacts/current/base-scheduler-benchmark-timers",
+        "arguments": [
+          "--workload",
+          "expire",
+          "--mode",
+          "sleep",
+          "--tasks",
+          "128",
+          "--workers",
+          "4",
+          "--backend",
+          "native",
+          "--iterations",
+          "200"
+        ]
+      },
+      {
+        "label": "current/iouring",
+        "artifact": "current",
+        "variant": "iouring",
+        "role": "baseline",
+        "program": "/home/samuel/Developer/claude-bench/base-benchmark/prepared-e7dce78/artifacts/current/base-scheduler-benchmark-timers",
+        "arguments": [
+          "--workload",
+          "expire",
+          "--mode",
+          "sleep",
+          "--tasks",
+          "128",
+          "--workers",
+          "4",
+          "--backend",
+          "iouring",
+          "--iterations",
+          "200"
+        ]
+      },
+      {
+        "label": "current-replica/tokio",
+        "artifact": "current-replica",
+        "variant": "tokio",
+        "role": "layout-replica",
+        "program": "/home/samuel/Developer/claude-bench/base-benchmark/prepared-e7dce78/artifacts/current-replica/base-scheduler-benchmark-timers",
+        "arguments": [
+          "--workload",
+          "expire",
+          "--mode",
+          "sleep",
+          "--tasks",
+          "128",
+          "--workers",
+          "4",
+          "--backend",
+          "tokio",
+          "--iterations",
+          "200"
+        ]
+      },
+      {
+        "label": "current-replica/native",
+        "artifact": "current-replica",
+        "variant": "native",
+        "role": "layout-replica",
+        "program": "/home/samuel/Developer/claude-bench/base-benchmark/prepared-e7dce78/artifacts/current-replica/base-scheduler-benchmark-timers",
+        "arguments": [
+          "--workload",
+          "expire",
+          "--mode",
+          "sleep",
+          "--tasks",
+          "128",
+          "--workers",
+          "4",
+          "--backend",
+          "native",
+          "--iterations",
+          "200"
+        ]
+      },
+      {
+        "label": "current-replica/iouring",
+        "artifact": "current-replica",
+        "variant": "iouring",
+        "role": "layout-replica",
+        "program": "/home/samuel/Developer/claude-bench/base-benchmark/prepared-e7dce78/artifacts/current-replica/base-scheduler-benchmark-timers",
+        "arguments": [
+          "--workload",
+          "expire",
+          "--mode",
+          "sleep",
+          "--tasks",
+          "128",
+          "--workers",
+          "4",
+          "--backend",
+          "iouring",
+          "--iterations",
+          "200"
+        ]
+      }
+    ],
+    "pairs": [
+      {
+        "baseline": "current/tokio",
+        "candidate": "current/native",
+        "kind": "variant"
+      },
+      {
+        "baseline": "current/tokio",
+        "candidate": "current/iouring",
+        "kind": "variant"
+      },
+      {
+        "baseline": "current/tokio",
+        "candidate": "current-replica/tokio",
+        "kind": "replica"
+      },
+      {
+        "baseline": "current/native",
+        "candidate": "current-replica/native",
+        "kind": "replica"
+      },
+      {
+        "baseline": "current-replica/tokio",
+        "candidate": "current-replica/native",
+        "kind": "variant"
+      },
+      {
+        "baseline": "current/iouring",
+        "candidate": "current-replica/iouring",
+        "kind": "replica"
+      },
+      {
+        "baseline": "current-replica/tokio",
+        "candidate": "current-replica/iouring",
+        "kind": "variant"
+      }
+    ],
+    "artifacts": {
+      "schema": "base-benchmark/artifacts",
+      "version": 1,
+      "package": "base-scheduler-benchmark-timers",
+      "binary": "base-scheduler-benchmark-timers",
+      "profile": "release",
+      "features": [],
+      "artifacts": [
+        {
+          "label": "current",
+          "role": "baseline",
+          "executable": "/home/samuel/Developer/claude-bench/base-benchmark/prepared-e7dce78/artifacts/current/base-scheduler-benchmark-timers",
+          "sha256": "da9be882dcc90060313b991be6b788538480c141fd8f5ff1dc0cf0d0ab9c303c",
+          "source": {
+            "path": "/home/samuel/Developer/claude-bench/base-benchmark/trees/e7dce78",
+            "revision": "e7dce781ac0623e4db4de562d9d4f9a9f7d22491",
+            "dirty": false,
+            "lockfile_sha256": "b805b37c12a86eb0c0628ec776e9bb9e18d670ac5e22e6a3b78e750c16ddae73",
+            "replica_of": null,
+            "path_dependencies": null
+          },
+          "build": {
+            "command": [
+              "cargo",
+              "build",
+              "--locked",
+              "--message-format=json-render-diagnostics",
+              "--manifest-path",
+              "/home/samuel/Developer/claude-bench/base-benchmark/trees/e7dce78/Cargo.toml",
+              "--package",
+              "base-scheduler-benchmark-timers",
+              "--bin",
+              "base-scheduler-benchmark-timers",
+              "--profile",
+              "release",
+              "--target-dir",
+              "/home/samuel/Developer/claude-bench/base-benchmark/prepared-e7dce78/targets/current"
+            ],
+            "toolchain": "rustc 1.99.1 (58cf8f9c3 2026-10-13) (Arch Linux rust 1:1.99.1-1)\nbinary: rustc\ncommit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67\ncommit-date: 2026-10-13\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.1\nLLVM version: 23.1.3",
+            "cargo": "cargo 1.99.1 (5f94df478 2026-08-27) (Arch Linux rust 1:1.99.1-1)\nrelease: 1.99.1\ncommit-hash: 5f94df4789f005f9a352888e8355ffc645b7ed0e\ncommit-date: 2026-08-27\nhost: x86_64-unknown-linux-gnu\nlibgit2: 1.9.7 (sys:0.21.0 system)\nlibcurl: 8.23.0 (sys:0.4.90+curl-8.21.0 system ssl:OpenSSL/3.6.5)\nos: Arch Linux Rolling Release [64-bit]",
+            "environment": {},
+            "configuration": []
+          }
+        },
+        {
+          "label": "current-replica",
+          "role": "layout-replica",
+          "executable": "/home/samuel/Developer/claude-bench/base-benchmark/prepared-e7dce78/artifacts/current-replica/base-scheduler-benchmark-timers",
+          "sha256": "da9be882dcc90060313b991be6b788538480c141fd8f5ff1dc0cf0d0ab9c303c",
+          "source": {
+            "path": "/home/samuel/Developer/claude-bench/base-benchmark/trees/.e7dce78.base-benchmark-current-replica-prepared-e7dce78-1051909",
+            "revision": "e7dce781ac0623e4db4de562d9d4f9a9f7d22491",
+            "dirty": false,
+            "lockfile_sha256": "b805b37c12a86eb0c0628ec776e9bb9e18d670ac5e22e6a3b78e750c16ddae73",
+            "replica_of": "current",
+            "path_dependencies": null
+          },
+          "build": {
+            "command": [
+              "cargo",
+              "build",
+              "--locked",
+              "--message-format=json-render-diagnostics",
+              "--manifest-path",
+              "/home/samuel/Developer/claude-bench/base-benchmark/trees/.e7dce78.base-benchmark-current-replica-prepared-e7dce78-1051909/Cargo.toml",
+              "--package",
+              "base-scheduler-benchmark-timers",
+              "--bin",
+              "base-scheduler-benchmark-timers",
+              "--profile",
+              "release",
+              "--target-dir",
+              "/home/samuel/Developer/claude-bench/base-benchmark/prepared-e7dce78/targets/current-replica"
+            ],
+            "toolchain": "rustc 1.99.1 (58cf8f9c3 2026-10-13) (Arch Linux rust 1:1.99.1-1)\nbinary: rustc\ncommit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67\ncommit-date: 2026-10-13\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.1\nLLVM version: 23.1.3",
+            "cargo": "cargo 1.99.1 (5f94df478 2026-08-27) (Arch Linux rust 1:1.99.1-1)\nrelease: 1.99.1\ncommit-hash: 5f94df4789f005f9a352888e8355ffc645b7ed0e\ncommit-date: 2026-08-27\nhost: x86_64-unknown-linux-gnu\nlibgit2: 1.9.7 (sys:0.21.0 system)\nlibcurl: 8.23.0 (sys:0.4.90+curl-8.21.0 system ssl:OpenSSL/3.6.5)\nos: Arch Linux Rolling Release [64-bit]",
+            "environment": {},
+            "configuration": []
+          }
+        }
+      ]
+    }
+  },
+  "host": {
+    "hostname": "hana.oriontransfer.co.nz",
+    "kernel": "7.2.14-arch1-1",
+    "cpu_model": "Intel(R) Xeon(R) CPU E3-1240 v6 @ 3.70GHz",
+    "address_space_randomization": "2",
+    "cpus": [
+      {
+        "cpu": 0,
+        "thread_siblings": "0,4",
+        "scaling_governor": "powersave"
+      },
+      {
+        "cpu": 1,
+        "thread_siblings": "1,5",
+        "scaling_governor": "powersave"
+      },
+      {
+        "cpu": 2,
+        "thread_siblings": "2,6",
+        "scaling_governor": "powersave"
+      },
+      {
+        "cpu": 3,
+        "thread_siblings": "3,7",
+        "scaling_governor": "powersave"
+      }
+    ]
+  },
+  "started_unix_ms": 1794092352720,
+  "finished_unix_ms": 1794092369844,
+  "error": null
+}

@@ -1,0 +1,7 @@
+[patch.crates-io]
+base-scheduler = { path = "/home/samuel/Developer/claude-bench/quick/trees/multiworker-http-2" }
+base-scheduler-native = { path = "/home/samuel/Developer/claude-bench/quick/trees/multiworker-http-2/crates/native" }
+base-scheduler-selector = { path = "/home/samuel/Developer/claude-bench/quick/trees/multiworker-http-2/crates/selector" }
+base-scheduler-tokio = { path = "/home/samuel/Developer/claude-bench/quick/trees/multiworker-http-2/crates/tokio" }
+base-scheduler-iouring = { path = "/home/samuel/Developer/claude-bench/quick/trees/multiworker-http-2/crates/iouring" }
+base-scheduler-timers = { path = "/home/samuel/Developer/claude-bench/quick/trees/multiworker-http-2/crates/timers" }

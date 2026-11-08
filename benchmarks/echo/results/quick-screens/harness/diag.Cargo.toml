@@ -1,0 +1,13 @@
+[package]
+name = "diag"
+version = "0.0.0"
+edition = "2024"
+publish = false
+[dependencies]
+base-scheduler = { path = "TREE" }
+base-scheduler-native = { path = "TREE/crates/native" }
+base-scheduler-iouring = { path = "TREE/crates/iouring" }
+hdrhistogram = "7"
+serde_json = "1"
+libc = "0.2"
+[workspace]

@@ -1,0 +1,53 @@
+diff --git a/crates/selector/src/readiness_socket_stream_reader.rs b/crates/selector/src/readiness_socket_stream_reader.rs
+index 4b0dfcf..bbe55ba 100644
+--- a/crates/selector/src/readiness_socket_stream_reader.rs
++++ b/crates/selector/src/readiness_socket_stream_reader.rs
+@@ -308,7 +308,8 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for ReadinessSocketStreamReader
+                 .await?;
+             let result = {
+                 let bytes = buffer.as_mut();
+-                let mut reading = pin!(self.read_with::<false, _>(0, cancellation, |socket| {
++                let capacity = bytes.len();
++                let mut reading = pin!(self.read_with::<true, _>(capacity, cancellation, |socket| {
+                     socket_io::recv_poll(socket, bytes, SocketRecvFlags::default())
+                 }));
+                 poll_fn(|context| Poll::Ready(reading.as_mut().poll(context))).await
+@@ -373,8 +374,9 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for ReadinessSocketStreamReader
+             cancellation.check()?;
+             return Ok(0);
+         }
++        let capacity = buffers.iter().map(|buffer| buffer.len()).sum();
+         let result = self
+-            .read_with::<false, _>(0, cancellation, |socket| {
++            .read_with::<true, _>(capacity, cancellation, |socket| {
+                 socket_io::recvmsg_poll(socket, buffers, SocketRecvFlags::default())
+             })
+             .await?;
+@@ -419,13 +421,23 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for ReadinessSocketStreamReader
+         }
+         // Like `read_owned`, every receive completes synchronously within this
+         // future, which retains the owner and returns it with every outcome.
++        let capacity = (0..buffers.buffer_count())
++            .map(|index| buffers.buffer(index).len())
++            .sum();
+         let result = {
+             let mut vectors = socket_io::IoVectors::new();
+             let buffers = &mut buffers;
+-            self.read_with::<false, _>(0, cancellation, move |socket| {
+-                vectors.recv(socket, buffers, flags)
+-            })
+-            .await
++            if flags == SocketRecvFlags::default() {
++                self.read_with::<true, _>(capacity, cancellation, move |socket| {
++                    vectors.recv(socket, buffers, flags)
++                })
++                .await
++            } else {
++                self.read_with::<false, _>(0, cancellation, move |socket| {
++                    vectors.recv(socket, buffers, flags)
++                })
++                .await
++            }
+         };
+         (result, buffers)
+     }
