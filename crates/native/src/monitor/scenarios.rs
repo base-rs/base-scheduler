@@ -2,6 +2,8 @@
 // Copyright, 2026, by Samuel Williams.
 
 // End-to-end rescue scenarios on running schedulers. Placement uses the crate's worker identity, so these live beside the monitor rather than in the public integration tests.
+//
+// These tests assert causality, not lateness: a blocking poll holds its worker until the test releases it, after the work it stranded has progressed, so that progress can only have come from rescue. Rescue that never happens fails at the test watchdog. Wall-clock lateness depends on how the host schedules threads, so the bound *T* is checked by the benchmark lateness measurements instead (`design/stall-rescue.md`).
 
 use crate::{NativeOptions, NativeScheduler, NativeTask, test_support, worker};
 use base_scheduler::{Cancellation, Clock, Spawn, Timers};
@@ -19,10 +21,8 @@ use std::{
 };
 
 const DELAY: Duration = Duration::from_millis(50);
-// A blocking poll holds its worker for at most `HOLD`, and usually until the test releases it.
-const HOLD: Duration = Duration::from_secs(5);
-// Large compared with the rescue bound of about two milliseconds, and far below `HOLD`.
-const LATE: Duration = Duration::from_millis(250);
+// Longer than any test runs, for a timer that must not fire by itself.
+const NEVER: Duration = Duration::from_secs(3600);
 
 type Sleep = Pin<Box<dyn Future<Output = base_scheduler::OperationResult<()>> + Send>>;
 
@@ -52,12 +52,22 @@ fn reusable(scheduler: &Arc<NativeScheduler>, delay: Duration) -> Sleep {
     })
 }
 
-// Hold the current worker inside one poll until released, standing in for undeclared blocking work.
+// Hold the current worker inside one poll until released, standing in for undeclared blocking work. A failed test never releases it, and the worker stays held until the process exits.
 fn block(released: &AtomicBool) {
-    let deadline = Instant::now() + HOLD;
-    while !released.load(Ordering::Acquire) && Instant::now() < deadline {
+    while !released.load(Ordering::Acquire) {
         std::thread::sleep(Duration::from_millis(1));
     }
+}
+
+// Timers fired by rescue so far.
+fn rescued(scheduler: &NativeScheduler) -> usize {
+    scheduler
+        .tasks
+        .shared
+        .monitor
+        .counters
+        .timers
+        .load(Ordering::Relaxed)
 }
 
 // Spawn copies of a task until one starts on `target`; the others return without running their body.
@@ -71,7 +81,7 @@ where
     F: Future + Send + 'static,
     F::Output: Send + 'static,
 {
-    // Idle workers take spawned tasks promptly; the test watchdog bounds this search.
+    // Idle workers take spawned tasks; the test watchdog bounds this search.
     loop {
         let shared = Arc::clone(&scheduler.tasks.shared);
         let (started, start) = mpsc::channel();
@@ -83,7 +93,7 @@ where
                 if matched { Some(future.await) } else { None }
             })
             .unwrap();
-        if start.recv_timeout(HOLD).unwrap() {
+        if start.recv().unwrap() {
             return task;
         }
         assert!(block_on(task).unwrap().is_none());
@@ -115,7 +125,7 @@ fn wait_on(scheduler: &Arc<NativeScheduler>, target: usize) -> Waiter {
             (Instant::now(), worker::current(&shared))
         }
     });
-    let waker = receive.recv_timeout(HOLD).unwrap();
+    let waker = receive.recv().unwrap();
     Waiter { task, waker }
 }
 
@@ -147,18 +157,22 @@ fn stall_with_timer(
             drop(timer);
         }
     });
-    (receive.recv_timeout(HOLD).unwrap(), task)
+    (receive.recv().unwrap(), task)
 }
 
-fn assert_prompt(label: &str, elapsed: Duration) {
+// A rescued timer still waits for its deadline.
+fn assert_not_early(label: &str, elapsed: Duration) {
     assert!(
         elapsed >= DELAY,
         "{label} completed early after {elapsed:?}"
     );
-    assert!(
-        elapsed < DELAY + LATE,
-        "{label} took {elapsed:?} for a {DELAY:?} deadline"
-    );
+}
+
+// Rescue counts a timer after invoking its waker, so the count can trail the wake it explains.
+fn wait_until(condition: impl Fn() -> bool) {
+    while !condition() {
+        std::thread::sleep(Duration::from_millis(1));
+    }
 }
 
 #[test]
@@ -167,6 +181,7 @@ fn a_timer_left_on_a_worker_that_blocks_fires_for_its_new_waiter() {
         for workers in [2, 4] {
             let scheduler = scheduler(workers);
             for timer in [sleep, reusable] {
+                let before = rescued(&scheduler);
                 let released = Arc::new(AtomicBool::new(false));
                 let (send, receive) = futures_channel::oneshot::channel::<(Instant, Sleep)>();
                 let receive = Arc::new(Mutex::new(Some(receive)));
@@ -200,8 +215,10 @@ fn a_timer_left_on_a_worker_that_blocks_fires_for_its_new_waiter() {
                         registered.elapsed()
                     })
                     .unwrap();
+                // Worker 0 is still held, so only rescue can have fired the timer.
                 let elapsed = block_on(waiter).unwrap();
-                assert_prompt("waiter", elapsed);
+                assert_not_early("waiter", elapsed);
+                wait_until(|| rescued(&scheduler) > before);
                 released.store(true, Ordering::Release);
                 block_on(blocker).unwrap();
             }
@@ -227,7 +244,7 @@ fn a_rescued_task_avoids_its_stuck_preferred_worker_while_others_are_saturated()
                 }
             })
             .unwrap();
-        let busy = receive.recv_timeout(HOLD).unwrap().unwrap();
+        let busy = receive.recv().unwrap().unwrap();
         let stuck = 1 - busy;
         let waiter = wait_on(&scheduler, stuck);
         let released = Arc::new(AtomicBool::new(false));
@@ -238,9 +255,11 @@ fn a_rescued_task_avoids_its_stuck_preferred_worker_while_others_are_saturated()
             waiter.waker,
             &released,
         );
+        // The stuck worker is still held and the busy one never drains, so the task ran because rescue woke it and the busy worker took it.
         let (resumed, ran_on) = block_on(waiter.task).unwrap().unwrap();
-        assert_prompt("rescued task", resumed - registered);
+        assert_not_early("rescued task", resumed - registered);
         assert_eq!(ran_on, Some(busy));
+        wait_until(|| rescued(&scheduler) > 0);
         stop.store(true, Ordering::Release);
         released.store(true, Ordering::Release);
         block_on(saturating).unwrap();
@@ -256,6 +275,7 @@ fn rescue_wakes_a_task_preferring_an_idle_worker_without_losing_it() {
         for workers in [2, 4] {
             let scheduler = scheduler(workers);
             for _ in 0..20 {
+                let before = rescued(&scheduler);
                 let waiter = wait_on(&scheduler, 1);
                 let released = Arc::new(AtomicBool::new(false));
                 let (registered, blocker) = stall_with_timer(
@@ -265,8 +285,10 @@ fn rescue_wakes_a_task_preferring_an_idle_worker_without_losing_it() {
                     waiter.waker,
                     &released,
                 );
+                // A task lost by a rescuing worker that parks is never run, because nothing else wakes that worker while worker 0 is held.
                 let (resumed, _) = block_on(waiter.task).unwrap().unwrap();
-                assert_prompt("woken task", resumed - registered);
+                assert_not_early("woken task", resumed - registered);
+                wait_until(|| rescued(&scheduler) > before);
                 released.store(true, Ordering::Release);
                 block_on(blocker).unwrap();
             }
@@ -283,14 +305,6 @@ impl Wake for Probe {
     }
 }
 
-fn wait_until(condition: impl Fn() -> bool) {
-    let deadline = Instant::now() + HOLD;
-    while !condition() {
-        assert!(Instant::now() < deadline, "condition not reached");
-        std::thread::sleep(Duration::from_millis(1));
-    }
-}
-
 #[test]
 fn a_worker_that_blocks_while_the_monitor_sleeps_without_deadlines_is_still_rescued() {
     test_support::run(|| {
@@ -302,6 +316,7 @@ fn a_worker_that_blocks_while_the_monitor_sleeps_without_deadlines_is_still_resc
                 wait_until(|| {
                     monitor.next.load(Ordering::Relaxed) == crate::worker_timers::NO_DEADLINE
                 });
+                let before = rescued(&scheduler);
                 let probe = Arc::new(Probe::default());
                 let released = Arc::new(AtomicBool::new(false));
                 let (registered, blocker) = stall_with_timer(
@@ -311,8 +326,10 @@ fn a_worker_that_blocks_while_the_monitor_sleeps_without_deadlines_is_still_resc
                     Waker::from(Arc::clone(&probe)),
                     &released,
                 );
+                // A monitor that missed the registration sleeps until woken again, and nothing else fires the timer while worker 0 is held.
                 wait_until(|| probe.0.load(Ordering::SeqCst) > 0);
-                assert_prompt("rescued timer", registered.elapsed());
+                assert_not_early("rescued timer", registered.elapsed());
+                wait_until(|| rescued(&scheduler) > before);
                 released.store(true, Ordering::Release);
                 block_on(blocker).unwrap();
             }
@@ -340,18 +357,18 @@ fn runnable_tasks_queued_behind_a_long_poll_run_on_another_worker() {
                     for waker in wakers {
                         waker.wake();
                     }
-                    send.send(Instant::now()).unwrap();
+                    send.send(()).unwrap();
                     block(&released);
                 }
             });
-            let start = started.recv_timeout(HOLD).unwrap();
+            started.recv().unwrap();
             // Remote wakes enter worker 0's inbox, or skip it once worker 0 is marked stuck.
             for waiter in &remote {
                 waiter.waker.wake_by_ref();
             }
+            // Worker 0 is still held, so every task ran elsewhere or not at all.
             for waiter in local.into_iter().chain(remote) {
-                let (resumed, ran_on) = block_on(waiter.task).unwrap().unwrap();
-                assert!(resumed - start < LATE);
+                let (_, ran_on) = block_on(waiter.task).unwrap().unwrap();
                 assert!(ran_on.is_some_and(|worker| worker != 0), "{ran_on:?}");
             }
             released.store(true, Ordering::Release);
@@ -372,7 +389,7 @@ fn closure_while_the_only_worker_is_stuck_notifies_its_timers_and_shutdown_waits
         });
         let probe = Arc::new(Probe::default());
         let waker = Waker::from(Arc::clone(&probe));
-        let mut waits: Vec<_> = (0..4).map(|_| sleep(&scheduler, HOLD * 10)).collect();
+        let mut waits: Vec<_> = (0..4).map(|_| sleep(&scheduler, NEVER)).collect();
         for wait in &mut waits {
             assert!(
                 wait.as_mut()
@@ -380,12 +397,10 @@ fn closure_while_the_only_worker_is_stuck_notifies_its_timers_and_shutdown_waits
                     .is_pending()
             );
         }
-        let closed = Instant::now();
         scheduler.close();
-        // The worker is still stuck, so a rescuer drains its closed queue and notifies every waiter.
+        // The worker is still held, so a rescuer drains its closed queue and notifies every waiter.
         wait_until(|| probe.0.load(Ordering::SeqCst) == 4);
-        assert!(closed.elapsed() < LATE);
-        assert!(!released.load(Ordering::Acquire));
+        wait_until(|| rescued(&scheduler) >= 4);
         for wait in waits {
             assert_eq!(
                 block_on(wait).unwrap_err().kind(),
@@ -410,7 +425,7 @@ fn reentrant_and_panicking_wakers_do_not_stop_rescue() {
     impl Wake for Reentrant {
         fn wake(self: Arc<Self>) {
             // This runs on a rescuing thread while the owner is stuck, and registers on the same queue.
-            let mut nested = sleep(&self.0, HOLD * 10);
+            let mut nested = sleep(&self.0, NEVER);
             assert!(
                 nested
                     .as_mut()
@@ -437,10 +452,14 @@ fn reentrant_and_panicking_wakers_do_not_stop_rescue() {
         let (_, blocker) =
             stall_with_timer(&scheduler, 0, || sleep(&scheduler, DELAY), waker, &released);
         wait_until(|| woken.load(Ordering::SeqCst) > 0);
-        // Rescue continues after the panic.
+        // The monitor counts that rescue once it has contained the panic.
+        wait_until(|| rescued(&scheduler) > 0);
+        // Rescue continues after the panic: the only worker is still held, so only the monitor can fire this sleep.
+        let before = rescued(&scheduler);
         let start = Instant::now();
         block_on(sleep(&scheduler, DELAY)).unwrap();
-        assert_prompt("later sleep", start.elapsed());
+        assert_not_early("later sleep", start.elapsed());
+        wait_until(|| rescued(&scheduler) > before);
         released.store(true, Ordering::Release);
         block_on(blocker).unwrap();
         for task in std::mem::take(&mut *spawned.lock().unwrap()) {
@@ -506,11 +525,9 @@ fn an_owner_returning_during_a_rescue_loses_no_timer() {
         let never = Cancellation::never();
         for index in 0..200u64 {
             // Root registrations alternate between workers, so half land on the stalling one.
+            // A lost timer never fires: this thread is woken only by the sleep's waker.
             let delay = Duration::from_micros(500 + index % 7 * 400);
-            let deadline = Instant::now() + delay;
             block_on(scheduler.sleep(delay, &never)).unwrap();
-            let late = deadline.elapsed();
-            assert!(late < LATE, "sleep {index} was {late:?} late");
         }
         done.store(true, Ordering::Release);
         block_on(stalls).unwrap();
