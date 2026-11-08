@@ -1,5 +1,9 @@
 # Releases
 
+## Unreleased
+
+- Fix Native socket waits on Windows that could hang although the socket was ready, the same async-io reactor race that 0.4.0 worked around for the Tokio adapter ([smol-rs/polling#271](https://github.com/smol-rs/polling/issues/271)). Each wait now wakes the reactor whenever it leaves interest registered, and still retries its syscall only once the socket is reported ready.
+
 ## v0.5.0
 
 - **Breaking:** remove the Direct backend, `base-scheduler-direct`; 0.4.0 is its final release. Its blocking pool could stop running jobs on Apple platforms ([#83](https://github.com/base-rs/base-scheduler/issues/83)), and its socket retry pulse spun instead of waiting ([#85](https://github.com/base-rs/base-scheduler/issues/85)). Applications should use `base-scheduler-native` as the general backend, or `base-scheduler-tokio` to run on an existing Tokio runtime. Migrate from `DirectScheduler::new(DirectOptions { threads, capacity })` to `NativeScheduler::with_options(NativeOptions { threads, capacity, ..Default::default() })`, or `NativeScheduler::new()` for the defaults. `threads` and `capacity` remain blocking-work limits, but socket I/O no longer counts against them. Direct also used `threads` as its number of task workers, whereas Native defaults `workers` to the available parallelism, so set `workers: threads` to keep the old count. Native's workers drive I/O readiness and timers, so its futures can be polled with `NativeScheduler::block_on`, as spawned tasks, or from another executor; `block_on` panics on a Native worker. `shutdown().await` still retires the scheduler. The published `base-scheduler-direct` 0.4.0 remains available on crates.io but will receive no further releases.
