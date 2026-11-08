@@ -11,7 +11,7 @@
 
 ## Hypothesis and constraints
 
-After the timer queue rework that came with stall rescue, the readiness selector's p50 lateness in the unaligned periodic diagnostic rose by 20–38%. Three questions:
+After the timer queue rework that came with stall rescue, the readiness selector's p50 lateness in the unaligned periodic diagnostic rose by about 20–34%: +19.5% and +25.8% in [rescue-costs](../benchmarks/timers/results/rescue-costs/readme.md), +26% in the acceptance run, and +34.3% in a 4-worker screen. Three questions:
 
 1. Is the rise a real per-expiry cost, or the diagnostic's feedback? Tasks re-arm at run time plus 1 ms, so cheaper expiries can cluster deadlines more tightly.
 2. Would leaving an expiry pass's idle wakes to the ready batch reduce lateness and CPU?
@@ -27,7 +27,7 @@ The worker-local timer diagnostic on hana at 4 and 8 workers, unaligned and alig
 
 ## Evidence and results
 
-- Raw bundles: the JSON files in [timer-batching](../benchmarks/timers/results/timer-batching), and the `quick.py timers` screens [timers-timer-batching-1](../benchmarks/echo/results/quick-screens/results).
+- Raw bundles: the JSON files in [timer-batching](../benchmarks/timers/results/timer-batching), including the `quick.py` screens in its [quick](../benchmarks/timers/results/timer-batching/quick) directory.
 
 | Question | Finding | Validity and interpretation |
 | --- | --- | --- |

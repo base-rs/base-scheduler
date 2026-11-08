@@ -5,7 +5,7 @@
 - Investigation ID: `performance/investigation-2026-11-06-stream-transfer-registration`.
 - Date and author/reviewer: 6–7 November 2026; Claude for Samuel Williams; reviewed and merged in #108 and #110.
 - Evidence class: screening.
-- Evidence validity: valid at 1 worker against run-to-run noise; build layout was not controlled ([why](../benchmarks/echo/results/quick-screens/readme.md#the-layout-control)).
+- Evidence validity: valid at 1 worker against run-to-run noise; build layout was not controlled ([controls](../benchmarks/echo/results/quick-screens/readme.md#controls)).
 - Decision: adopted (#108, then the receive rule in #110).
 - Related investigations: [owned stream readiness](investigation-2026-11-06-owned-stream-readiness.md), [Tokio adapter reads](investigation-2026-11-06-tokio-adapter-reads.md). #110's measurements are recorded in [unified-receive](../benchmarks/echo/results/unified-receive/readme.md).
 
@@ -27,7 +27,7 @@ After #104, pooled `read`, `read_vectored`, `read_vectored_with_flags`, `read_ow
 
 ## Evidence and results
 
-- Raw bundles: [echo-owned-vectored-1–4](../benchmarks/echo/results/quick-screens/results) for #108 and the scalar rule (run 3); for #110, the runs in [unified-receive](../benchmarks/echo/results/unified-receive) and [echo-unified-receive-1–6](../benchmarks/echo/results/quick-screens/results), including runs the record does not use. #108's description and #110's record have the full tables.
+- Raw bundles: [echo-owned-vectored-1–4](../benchmarks/echo/results/quick-screens/results) for #108 and the scalar rule (run 3); for #110, the runs in [unified-receive](../benchmarks/echo/results/unified-receive), and three earlier screens of the same work, `echo-unified-receive-1–3`, in [quick-screens](../benchmarks/echo/results/quick-screens/results). #108's description and #110's record have the full tables.
 
 | Metric and scope | Change, rounds improved | Validity and interpretation |
 | --- | --- | --- |
@@ -36,7 +36,7 @@ After #104, pooled `read`, `read_vectored`, `read_vectored_with_flags`, `read_ow
 | Pooled `read`, 4 workers (#108) | +16% to +25% throughput | Valid; vectored within noise. |
 | Scalar rule on the #108 paths, CPU/request, 1 worker | a further −14% to −18%, to about the scalar cost | Valid screen. |
 | #110, converted paths on every backend, 1 worker | +11% to +36% requests/s, −14% to −33% CPU/request, 5/5 in two runs | Valid against run-to-run noise. |
-| #110, converted paths, 4 workers | +2% to +16% requests/s, −6% to −21% CPU/request | Valid against run-to-run noise. |
+| #110, converted paths, 4 workers | +2% to +16% requests/s, −6% to −21% CPU/request | Valid against run-to-run noise for CPU/request and the Tokio adapter; the selector's +1.8% to +3.7% throughput is within the scalar backends' ±3.3% spread. |
 | #110, scalar paths | within the control | Unchanged, as intended. |
 
 The same-executable control stayed within 1.7% in runs 1–2 and 3.6% in run 4 of #108.

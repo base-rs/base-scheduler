@@ -17,11 +17,11 @@ The behaviour change this needed, rejecting urgent data with `Unsupported` when 
 
 ## Frozen variants and preparation
 
-`main` against the #104 branch, built by `quick.py echo` in each tree. Source identities are those of #104's branch head and its base.
+`main` against the #104 branch, built by `quick.py echo` in the trees `owned-readiness-1` and `-2`; both runs' candidate was the executable `3e3bb744…` ([artifacts](../benchmarks/echo/results/quick-screens/artifacts.txt)). The trees' source revisions were not recorded.
 
 ## Predeclared method
 
-`quick.py echo` on hana: 64-byte messages, 1 and 4 workers, 32 and 256 connections, 5 interleaved rounds per run, raw Tokio as the unchanged control. Changes are medians of per-round changes. These runs had no layout control.
+`quick.py echo` on hana: 64-byte messages, 1 and 4 workers, 32 and 256 connections, 5 interleaved rounds per run, raw Tokio as the unchanged control. Changes are medians of per-round changes. These runs had no copy control ([controls](../benchmarks/echo/results/quick-screens/readme.md#controls)).
 
 ## Evidence and results
 

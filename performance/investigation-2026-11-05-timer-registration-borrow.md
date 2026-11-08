@@ -5,7 +5,7 @@
 - Investigation ID: `performance/investigation-2026-11-05-timer-registration-borrow`.
 - Date and author/reviewer: 5 November 2026, during stall rescue stage 2; Claude for Samuel Williams; reviewed with the stall rescue change.
 - Evidence class: screening.
-- Evidence validity: valid for the stated cases; no layout control.
+- Evidence validity: valid against run-to-run noise for the stated cases, as recorded in the design; build layout was not controlled, and the raw samples were not kept.
 - Decision: adopted.
 - Related investigations: [stall rescue monitor costs](investigation-2026-11-05-stall-rescue-monitor-costs.md).
 

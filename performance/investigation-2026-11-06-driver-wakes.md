@@ -5,7 +5,7 @@
 - Investigation ID: `performance/investigation-2026-11-06-driver-wakes`.
 - Date and author/reviewer: 6 November 2026; Claude for Samuel Williams; reviewed and merged in #105 (`3738ff6`).
 - Evidence class: screening.
-- Evidence validity: valid for CPU per request at 4 workers on the readiness selector, against run-to-run noise. Build layout was not controlled: the echo "layout" control was the same executable ([why](../benchmarks/echo/results/quick-screens/readme.md#the-layout-control)).
+- Evidence validity: valid for CPU per request at 4 workers on the readiness selector, against run-to-run noise. Build layout was not controlled: the echo "layout" control was the same executable ([controls](../benchmarks/echo/results/quick-screens/readme.md#controls)).
 - Decision: adopted (driver-local wakes); rejected (the other wake and steal policies below).
 - Related investigations: [runnable counter](investigation-2026-11-04-runnable-counter.md); [record of the measurements](../benchmarks/echo/results/driver-wakes/readme.md).
 
@@ -25,11 +25,11 @@ Runs 1 and 2 compared `140cc25` with the change; run 3 compared `cd51eee`, after
 
 ## Evidence and results
 
-- Raw bundles: [driver-wakes](../benchmarks/echo/results/driver-wakes) (`quick-1w.jsonl`, `quick-4w-{1,2,3}.jsonl`) and [echo-pr105](../benchmarks/echo/results/quick-screens/results/echo-pr105-20261106-223038.jsonl).
+- Raw bundles: [driver-wakes](../benchmarks/echo/results/driver-wakes) (`quick-1w.jsonl`, `quick-4w-{1,2,3}.jsonl`; run 3 is `echo-pr105` on hana). Run 3's base and its copy were both `84e0bb4b…` ([artifacts](../benchmarks/echo/results/quick-screens/artifacts.txt)).
 
 | Metric and scope | Change, rounds improved | Same-executable control | Validity and interpretation |
 | --- | --- | --- | --- |
-| Borrowed readiness CPU/request, 4 workers | −1.6% to −3.3%, 5/5 in three runs | −0.8% to +1.4% | Valid against run-to-run noise. |
+| Borrowed readiness CPU/request, 4 workers | −1.6% to −3.3% in three runs; 5/5 except 4/5 at 256 connections in run 2 | −0.8% to +1.4% | Valid against run-to-run noise. |
 | Owned readiness CPU/request, 4 workers | −0.6% to −2.4% | −0.6% to +0.5% | Smaller; consistent in run 3. |
 | io_uring, 4 workers | −1.5% to +0.7% | | Unchanged, as expected: rings already completed on the submitting worker. |
 | 1 worker, CPU and throughput | within ±1.1% | up to 2.7% | No effect. |

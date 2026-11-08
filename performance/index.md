@@ -15,10 +15,10 @@ Unless stated, measurements are screens on hana (Intel Xeon E3-1240 v6, 4 cores,
 | [Driver wakes](investigation-2026-11-06-driver-wakes.md) | adopted, rejected | Driver-local wakes cut 4-worker CPU/request 1.6–3.3% (#105); four other wake and steal policies did not help. |
 | [Tokio adapter reads](investigation-2026-11-06-tokio-adapter-reads.md) | adopted | Clearing after short reads and a compact path took the adapter from 18% to 4–7% behind raw Tokio (#107). |
 | [Stream transfers and one receive rule](investigation-2026-11-06-stream-transfer-registration.md) | adopted | Cached registrations for pooled and vectored transfers (#108), then one receive rule for every consuming receive (#110). |
-| [An apparent io_uring HTTP regression](investigation-2026-11-06-iouring-http-regression.md) | rejected | Build-layout noise: a copy of `v0.4.0` "regressed" as much. |
+| [An apparent io_uring HTTP regression](investigation-2026-11-06-iouring-http-regression.md) | rejected | Not established: `main` matched `v0.4.0` while a copy of `v0.4.0` moved 2–4%. |
 | [Timer batching](investigation-2026-11-06-timer-batching.md) | rejected | The periodic diagnostic's p50 rise is mostly its own feedback; deferring idle wakes was a trade-off. |
 | [Multi-worker HTTP](investigation-2026-11-07-multi-worker-http.md) | adopted, open | Keeping io_uring polls on their ring made it 14–26% faster at 2–4 workers (#109); Native's p99 at 4 workers is open. |
-| [Native CPU variation](investigation-2026-11-08-native-cpu-variation.md) | open | Native's CPU per expiry varies up to threefold between processes of one executable; io_uring's does not. |
+| [Native CPU variation](investigation-2026-11-08-native-cpu-variation.md) | open | CPU per expiry varies between processes of one executable: Native's more than threefold; io_uring's and the Tokio adapter's 20–35% in `expire-contended`. |
 
 ## Open ideas
 
@@ -39,9 +39,10 @@ Untested; each would need its own investigation.
 
 ## Measurement notes
 
-- **Build layout.** Identical source built as a different binary differed by 2–3% in HTTP screens and up to 19% in the timer diagnostic, often with 0 of 5 rounds better. Before 8 November 2026, two kinds of control were labelled "layout" but were the same executable: `quick.py`'s echo control, and `base-benchmark` 0.1's replicas. Those measured run-to-run variation only; the [quick-screens readme](../benchmarks/echo/results/quick-screens/readme.md#the-layout-control) says which controls were genuine. `base-benchmark` 0.2 salts replicas so that they differ, and warns when one does not.
+- **Build layout.** Identical source built as a different binary moved HTTP hello by 2–4% ([io_uring regression](investigation-2026-11-06-iouring-http-regression.md)) and the timer diagnostic's p50 by 12.6% at 4 workers ([timer-batching](../benchmarks/timers/results/timer-batching/readme.md)), often with 0 of 5 rounds better. Before 8 November 2026, two kinds of control were labelled "layout" but were the same executable: `quick.py`'s echo control, and `base-benchmark` 0.1's replicas. Those measured run-to-run variation only; the [quick-screens readme](../benchmarks/echo/results/quick-screens/readme.md#controls) says which controls were genuine. `base-benchmark` 0.2 salts replicas so that they differ, and warns when one does not.
 - **The periodic timer diagnostic** is bimodal and driven by its own feedback. Use 9 or more rounds, and prefer the spread mode for per-expiry costs.
 - **wrk timeouts.** The Hyper control times out at 256 connections on one pinned CPU. Record socket errors per sample rather than aborting.
+- **wrk limits multi-worker HTTP.** At 4 workers on hana it shares the server's SMT siblings, so multi-worker comparisons are at about the same load, not capacity.
 - **Agents** must run benchmarks in the foreground: background notifications do not reach a subagent after its turn ends.
 
 ## Test reliability notes

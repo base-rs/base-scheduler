@@ -11,17 +11,17 @@
 
 ## Hypothesis and constraints
 
-This was the first measurement of multi-worker HTTP against Hyper on a multi-thread Tokio runtime. Run 1, against `main` at `3738ff6`, found Native epoll ahead of Hyper at every load (+6% to +17% throughput, −7% to −15% CPU per request), but io_uring 2–10% behind at 2 workers. Profiles put io_uring's extra work in monitor handling, cross-ring commands, and `route_ref`. When an idle worker stole a connection task and it waited again, the persistent multishot `PollAdd` was cancelled on the old ring and registered on the new one. A diagnostic build counted 0.30–0.49 rebinds per request at 2–4 workers. Keeping an active poll on its ring should remove that work.
+This was the first measurement of multi-worker HTTP against Hyper on a multi-thread Tokio runtime. Run 1, against `main` at `3738ff6`, found Native epoll ahead of Hyper at every load (+6% to +17% throughput, −7% to −15% CPU per request), but io_uring behind Hyper in four of six cases, by 1.7–11.3%. Profiles put io_uring's extra work in monitor handling, cross-ring commands, and `route_ref`. When an idle worker stole a connection task and it waited again, the persistent multishot `PollAdd` was cancelled on the old ring and registered on the new one. A diagnostic build counted 0.30–0.49 rebinds per request at 2–4 workers. Keeping an active poll on its ring should remove that work.
 
 No wakeup may be lost: the wait and `notify` meet under the status lock, so which ring delivers the notification does not matter. Close, drop, and shutdown must still retire through the poll's own ring.
 
 ## Frozen variants and preparation
 
-`3738ff6` against `3738ff6` plus the change, each with a private copy of base-http's hello benchmark that spawns one task per connection (`base_http_server::serve` polls every connection in one task). `mw.py` builds it against each tree by absolute path, so its copy build is a genuine layout replicate ([why](../benchmarks/echo/results/quick-screens/readme.md#the-layout-control)). The `[patch]` files are in [mw/patches](../benchmarks/echo/results/quick-screens/mw/patches).
+`3738ff6` against `3738ff6` plus the change, each with a private copy of base-http's hello benchmark that spawns one task per connection (`base_http_server::serve` polls every connection in one task), committed as [http-source.diff](../benchmarks/echo/results/quick-screens/mw/http-source.diff) against base-http `v0.3.0`. `mw.py` builds it against each tree by absolute path, so its copy build is a genuine layout replicate ([controls](../benchmarks/echo/results/quick-screens/readme.md#controls)). The `[patch]` files are in [mw/patches](../benchmarks/echo/results/quick-screens/mw/patches).
 
 ## Predeclared method
 
-`mw.py` on hana: 2 and 4 workers, 16, 64, and 256 connections, wrk on the remaining CPUs, Hyper as the unchanged control, 5 interleaved rounds per run, two runs (the second from a fresh tree with seed 7). An echo cross-check at 4 workers used `quick.py echo`.
+`mw.py` on hana: 2 and 4 workers, 16, 64, and 256 connections, wrk on the remaining CPUs (at 4 workers, the server's SMT siblings), Hyper as the unchanged control, 5 interleaved rounds per run, two runs (the second from a fresh tree with seed 7). An echo cross-check at 4 workers used `quick.py echo`.
 
 ## Evidence and results
 
@@ -31,13 +31,13 @@ No wakeup may be lost: the wait and `notify` meet under the status lock, so whic
 | --- | --- | --- | --- |
 | io_uring requests/s, 2 and 4 workers | +14% to +26%, 5/5 in every case, two runs | within ±2.1% | Valid. |
 | io_uring CPU/request | −15% to −24%, 5/5 | | Valid. |
-| io_uring against Hyper | from 2–11% behind to 4–20% ahead | | At about the same load; level with epoll. |
+| io_uring against Hyper | from −11.3% to +3.3% before to +4.0% to +20.0% after | | At about the same load, since wrk limits throughput; level with epoll. |
 | Echo, borrowed io_uring, 4 workers, CPU/request | −7% to −12%, 5/5 | same executable | Valid against run-to-run noise. |
 | Native epoll | unchanged | up to +2.5% | As expected. |
 
 ## Decision and code disposition
 
-Adopted in #109, with tests that a later wait on another worker keeps the active poll on its ring and that a new poll uses the current worker's ring. The multi-worker benchmark mode lives only in the private base-http copy, under [mw](../benchmarks/echo/results/quick-screens/mw).
+Adopted in #109, with tests that a later wait on another worker keeps the active poll on its ring and that a new poll uses the current worker's ring. The multi-worker benchmark mode is not part of base-http; its source is the diff above.
 
 ## Revisit conditions
 

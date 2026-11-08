@@ -5,7 +5,7 @@
 - Investigation ID: `performance/investigation-2026-11-06-tokio-adapter-reads`.
 - Date and author/reviewer: 6–7 November 2026; Claude for Samuel Williams; reviewed and merged in #107.
 - Evidence class: screening.
-- Evidence validity: valid at 1 and 4 workers for CPU per request, against run-to-run noise; build layout was not controlled ([why](../benchmarks/echo/results/quick-screens/readme.md#the-layout-control)).
+- Evidence validity: valid at 1 and 4 workers for CPU per request, against run-to-run noise; build layout was not controlled ([controls](../benchmarks/echo/results/quick-screens/readme.md#controls)).
 - Decision: adopted.
 - Related investigations: [stream transfers](investigation-2026-11-06-stream-transfer-registration.md), whose receive rule later applied the same clearing to every consuming receive.
 
@@ -33,9 +33,9 @@ Bytes after an urgent mark must stay readable, and a notification racing the cle
 | Metric and scope | Change, rounds improved | Validity and interpretation |
 | --- | --- | --- |
 | CPU/request, 1 worker, change 1 | −14% to −16%, 5/5 in two runs | Valid. |
-| CPU/request, 1 worker, change 2 on change 1 | −3% to −6%, 5/5 in two runs | Valid. |
+| CPU/request, 1 worker, change 2 on change 1 | −3% to −6% in two runs; 5/5 except one 4/5 case in run 3 | Valid. |
 | CPU/request, 4 workers | −8% to −10% (change 1), then −1% to −3% | Valid for change 1; change 2 is small. |
-| Gap to raw Tokio, 1 worker | from about 18% to 4–7% | Raw Tokio 6.03–6.04 µs/request, the adapter 6.36–6.57. |
+| Gap to raw Tokio, 1 worker | throughput from about 18% behind to 4–7% behind; CPU/request 6.36–6.57 µs against raw Tokio's 6.03–6.04, 5–9% more | Run 4. |
 
 The same-executable control stayed within about ±2%.
 
@@ -45,4 +45,4 @@ Both changes were adopted in #107, with tests for each OOB policy, full reads, a
 
 ## Revisit conditions
 
-The remaining 5–9% CPU gap to raw Tokio at 1 worker. [Untested ideas](index.md#open-ideas) for it are listed in the index.
+The remaining 5–9% CPU gap to raw Tokio at 1 worker. [Untested ideas](index.md#open-ideas) for it are listed in the index. The profiles behind them, 2.8 MB of `perf annotate` output, are in `/tmp/ta-prof` on hana and not kept here, so they will not survive a reboot.
