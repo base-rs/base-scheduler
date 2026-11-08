@@ -14,15 +14,49 @@ use tokio::{
     sync::{Barrier, watch},
 };
 
+/// How long the measurement window lasts, from the end of the warmup.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) enum Measure {
+    /// A fixed duration: the benchmark's measurement.
+    Seconds(Duration),
+    /// Until each connection has counted this many requests, however long that takes, so that a smoke run cannot come out empty on a slow host. Its rates are not measurements.
+    Requests(u64),
+}
+
+// Where the window ends, published to the connections with its start.
+#[derive(Clone, Copy, Debug)]
+enum End {
+    At(Instant),
+    After(u64),
+}
+
+impl End {
+    // Whether a connection that has counted `counted` requests stops before sending at `now`.
+    fn reached(self, counted: u64, now: Instant) -> bool {
+        match self {
+            Self::At(end) => now >= end,
+            Self::After(requests) => counted >= requests,
+        }
+    }
+
+    // Whether a request completed at `completed` finished inside the window.
+    fn includes(self, completed: Instant) -> bool {
+        match self {
+            Self::At(end) => completed <= end,
+            Self::After(_) => true,
+        }
+    }
+}
+
 pub(crate) async fn run(
     address: SocketAddr,
     connections: usize,
     workload: Workload,
     warmup: Duration,
-    duration: Duration,
+    measure: Measure,
 ) -> Result<()> {
     let gate = Arc::new(Barrier::new(connections + 1));
-    let (schedule, clock) = watch::channel(None::<(Instant, Instant)>);
+    let (schedule, clock) = watch::channel(None::<(Instant, End)>);
     let expected: Arc<Vec<Vec<Vec<u8>>>> = Arc::new(
         (1..=2)
             .map(|request| {
@@ -55,8 +89,12 @@ pub(crate) async fn run(
     }
     gate.wait().await;
     let start = Instant::now() + warmup;
+    let end = match measure {
+        Measure::Seconds(duration) => End::At(start + duration),
+        Measure::Requests(requests) => End::After(requests),
+    };
     schedule
-        .send(Some((start, start + duration)))
+        .send(Some((start, end)))
         .expect("clients await schedule");
     let mut latency =
         Histogram::<u64>::new_with_bounds(1, 60_000_000_000, 3).expect("valid histogram bounds");
@@ -65,6 +103,11 @@ pub(crate) async fn run(
             .add(task.await.expect("client task completed without panic")?)
             .expect("matching histogram bounds");
     }
+    // A window of requests ends when its last connection does.
+    let duration = match measure {
+        Measure::Seconds(duration) => duration,
+        Measure::Requests(_) => start.elapsed(),
+    };
     if latency.is_empty() {
         return Err("no complete responses in measurement window".into());
     }
@@ -88,7 +131,7 @@ async fn connection(
     workload: Workload,
     expected: Arc<Vec<Vec<Vec<u8>>>>,
     gate: Arc<Barrier>,
-    mut clock: watch::Receiver<Option<(Instant, Instant)>>,
+    mut clock: watch::Receiver<Option<(Instant, End)>>,
     mut now: impl FnMut() -> Instant,
 ) -> Result<Histogram<u64>> {
     let mut response = vec![0; workload.bytes];
@@ -103,7 +146,7 @@ async fn connection(
     let mut request = 0;
     loop {
         let started = now();
-        if started >= end {
+        if end.reached(latency.len(), started) {
             break;
         }
         socket.write_all(&[(request + 1) as u8]).await?;
@@ -115,7 +158,7 @@ async fn connection(
         }
         let completed = now();
         request ^= 1;
-        if started >= start && completed <= end {
+        if started >= start && end.includes(completed) {
             latency
                 .record((completed - started).as_nanos().max(1) as u64)
                 .expect("round trip within histogram bounds");
@@ -145,7 +188,7 @@ mod tests {
                     work: 0,
                 },
                 Duration::ZERO,
-                Duration::from_secs(1),
+                Measure::Seconds(Duration::from_secs(1)),
             ))
         })
         .unwrap_err();
@@ -172,7 +215,7 @@ mod tests {
                     assert_eq!(peer.read(&mut request).await.unwrap(), 0);
                 });
                 let (schedule, clock) = watch::channel(None);
-                schedule.send(Some((start, end))).unwrap();
+                schedule.send(Some((start, End::At(end)))).unwrap();
                 // Script the round-trip times so preemption cannot change which side of the measurement boundary the response falls on.
                 let mut times = [started, completed, end].into_iter();
                 let latency = connection(
@@ -197,6 +240,48 @@ mod tests {
     }
 
     #[test]
+    fn a_window_of_requests_counts_responses_after_the_warmup_until_each_connection_has_its_count()
+    {
+        let runtime = crate::runtime(1);
+        runtime.block_on(async {
+            let (socket, mut peer) = tokio::io::duplex(1);
+            let server = tokio::spawn(async move {
+                for expected in [1, 2] {
+                    let mut request = [0];
+                    peer.read_exact(&mut request).await.unwrap();
+                    assert_eq!(request, [expected]);
+                    peer.write_all(&[69]).await.unwrap();
+                }
+                assert_eq!(peer.read(&mut [0]).await.unwrap(), 0);
+            });
+            let start = Instant::now();
+            let (schedule, clock) = watch::channel(None);
+            schedule.send(Some((start, End::After(1)))).unwrap();
+            // The first round trip starts in the warmup, so it is not counted; the second is, however late it completes, and the count then ends the window.
+            let late = start + Duration::from_secs(30);
+            let mut times = [start - Duration::from_nanos(1), start, start, late, late].into_iter();
+            let latency = connection(
+                socket,
+                Workload {
+                    bytes: 1,
+                    chunks: 1,
+                    work: 0,
+                },
+                Arc::new(vec![vec![vec![69]]; 2]),
+                Arc::new(Barrier::new(1)),
+                clock,
+                || times.next().expect("two round trips and the exit check"),
+            )
+            .await
+            .unwrap();
+            server.await.unwrap();
+            assert_eq!(latency.len(), 1);
+            assert_eq!(latency.max(), latency.highest_equivalent(30_000_000_000));
+            assert!(times.next().is_none());
+        });
+    }
+
+    #[test]
     fn an_empty_measurement_is_reported() {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let runtime = crate::runtime(1);
@@ -210,7 +295,7 @@ mod tests {
                     work: 0,
                 },
                 Duration::ZERO,
-                Duration::ZERO,
+                Measure::Seconds(Duration::ZERO),
             ))
             .unwrap_err();
         assert_eq!(
@@ -226,9 +311,9 @@ mod tests {
             let (socket, peer) = tokio::io::duplex(1);
             drop(peer);
             let (schedule, clock) = watch::channel(None);
-            let start = Instant::now();
+            // A window of requests, so that no slowness can end it before the first write.
             schedule
-                .send(Some((start, start + Duration::from_secs(1))))
+                .send(Some((Instant::now(), End::After(1))))
                 .unwrap();
             let error = connection(
                 socket,

@@ -10,6 +10,10 @@ use std::{
 };
 
 const BINARY: &str = env!("CARGO_BIN_EXE_base-scheduler-benchmark-echo");
+// Smoke runs measure until each connection has counted this many requests, so that a slow host cannot leave the window empty.
+const REQUESTS: u64 = 8;
+const CONNECTIONS: u64 = 4;
+const WARMUP_SECONDS: f64 = 0.03;
 struct Process(Child);
 impl Process {
     fn new(args: &[&str]) -> Self {
@@ -56,7 +60,7 @@ fn smoke(backend: &str) {
     smoke_with(backend, &[]);
 }
 fn smoke_with(backend: &str, rate: &[&str]) {
-    let mut server = Process::new(&["server", backend, "2", "4"]);
+    let mut server = Process::new(&["server", backend, "2", &CONNECTIONS.to_string()]);
     let stdout = server.0.stdout.take().unwrap();
     let (send, recv) = mpsc::channel();
     std::thread::spawn(move || {
@@ -70,27 +74,38 @@ fn smoke_with(backend: &str, rate: &[&str]) {
         send.send(rest).unwrap();
     });
     let address = recv.recv_timeout(Duration::from_secs(10)).unwrap();
+    let measure = format!("requests={REQUESTS}");
     let mut client = Process::new(
         &[
-            &["client", address.trim(), "2", "4", "4096", "0.03", "0.05"],
+            &[
+                "client",
+                address.trim(),
+                "2",
+                &CONNECTIONS.to_string(),
+                "4096",
+                &WARMUP_SECONDS.to_string(),
+                &measure,
+            ],
             rate,
         ]
         .concat(),
     );
     let output = client.finish(true);
     let stats: serde_json::Value = serde_json::from_str(&output).unwrap();
-    assert!(stats["requests"].as_u64().unwrap() > 0);
+    assert_eq!(stats["requests"], CONNECTIONS * REQUESTS);
     assert_eq!(stats["bytes"], 4096);
-    assert_eq!(stats["connections"], 4);
+    assert_eq!(stats["connections"], CONNECTIONS);
     assert!(stats["rtt_p99_us"].as_f64().unwrap() >= stats["rtt_p50_us"].as_f64().unwrap());
     let rate: Option<u64> = rate.first().map(|rate| rate.parse().unwrap());
     assert_eq!(stats["offered_requests_per_second"].as_u64(), rate);
     if let Some(rate) = rate {
-        // Paced connections send no more than the offered rate over warmup and the window, plus one request each at the edge; unpaced ones send thousands.
-        let requests = stats["requests"].as_u64().unwrap();
+        // A paced connection sends its requests one interval apart from the start of the warmup, so its last counted request cannot be sent before REQUESTS - 1 intervals have passed; unpaced ones finish within milliseconds. Allow a microsecond for rounding the interval and warmup to nanoseconds.
+        let elapsed =
+            stats["warmup_seconds"].as_f64().unwrap() + stats["seconds"].as_f64().unwrap();
+        let paced = (REQUESTS - 1) as f64 * CONNECTIONS as f64 / rate as f64;
         assert!(
-            requests <= rate * 8 / 100 + 4,
-            "{requests} paced requests counted"
+            elapsed >= paced - 1e-6,
+            "{elapsed} s for {paced} s of pacing"
         );
         for field in [
             "paced_send_delay_p50_us",
@@ -214,6 +229,8 @@ fn invalid_configuration_fails_before_running_a_workload() {
         vec!["server", "tokio", "invalid", "1"],
         vec!["client", "127.0.0.1:0", "1", "1", "65537", "0", "1"],
         vec!["client", "127.0.0.1:0", "1", "1", "1", "0", "0"],
+        vec!["client", "127.0.0.1:0", "1", "1", "1", "0", "requests=0"],
+        vec!["client", "127.0.0.1:0", "1", "1", "1", "0", "requests=many"],
         vec!["client", "127.0.0.1:0", "1", "1", "1", "-1", "1"],
         vec!["client", "127.0.0.1:0", "1", "1", "1", "NaN", "1"],
         vec!["client", "127.0.0.1:0", "1", "1", "1", "0", "1"],
@@ -247,7 +264,7 @@ fn client_rejects_corrupt_echoes() {
         socket.read_exact(&mut byte).unwrap();
         socket.write_all(&[byte[0].wrapping_add(1)]).unwrap();
     });
-    Process::new(&["client", &address, "1", "1", "1", "0", "0.1"]).finish(false);
+    Process::new(&["client", &address, "1", "1", "1", "0", "requests=1"]).finish(false);
     thread.join().unwrap();
 }
 

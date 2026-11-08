@@ -3,7 +3,7 @@
 
 //! Periodic timers: many tasks each sleep for a fixed delay again and again, and the overshoot of every expiry inside a measurement window is recorded. This is the worker-local timer diagnostic of the stall rescue design.
 
-use crate::options::{Alignment, NativeBackend, PeriodicOptions};
+use crate::options::{Alignment, Measure, NativeBackend, PeriodicOptions};
 use crate::{with_overshoot, with_rescues};
 use base_benchmark::{Interval, ResourceSource, Sample};
 use base_scheduler::{Cancellation, Clock, Spawn};
@@ -14,9 +14,16 @@ use std::{
     time::{Duration, Instant},
 };
 
+// Where the window ends: at an instant, or once each task has recorded a number of expiries.
+#[derive(Clone, Copy)]
+enum End {
+    At(Instant),
+    After(usize),
+}
+
 struct Window {
     start: Instant,
-    end: Instant,
+    end: End,
     delay: Duration,
     aligned: bool,
     work: u64,
@@ -35,6 +42,33 @@ impl Window {
         epoch + self.delay * u32::try_from(ticks).unwrap()
     }
 
+    // Whether a task that has recorded `recorded` expiries has reached the end of the window.
+    fn ended(&self, recorded: usize) -> bool {
+        match self.end {
+            End::At(end) => Instant::now() >= end,
+            End::After(expiries) => recorded >= expiries,
+        }
+    }
+
+    // Whether an expiry of `target`, observed at `now`, falls inside the window.
+    fn includes(&self, target: Instant, now: Instant) -> bool {
+        target >= self.start
+            && match self.end {
+                End::At(end) => now < end,
+                End::After(_) => true,
+            }
+    }
+
+    // How many expiries a task can record inside the window, at most.
+    fn capacity(&self) -> usize {
+        match self.end {
+            End::At(end) => {
+                (end.duration_since(self.start).as_nanos() / self.delay.as_nanos()) as usize + 1
+            }
+            End::After(expiries) => expiries,
+        }
+    }
+
     // Simulated work after each expiry, `work` multiply-add steps.
     fn work(&self) {
         let mut value = 1u64;
@@ -46,12 +80,18 @@ impl Window {
     }
 }
 
-/// Measure the window: its CPU time and wall time, with every expiry inside it as one operation and the overshoot of each. The window follows a warmup of a third of its length.
+/// Measure the window: its CPU time and wall time, with every expiry inside it as one operation and the overshoot of each. A window of a duration follows a warmup of a third of its length; a window of expiries starts at once.
 pub fn measure<R: ResourceSource>(options: &PeriodicOptions, source: R) -> io::Result<Sample> {
-    let start = Instant::now() + options.measure / 3;
+    let (start, end) = match options.measure {
+        Measure::Duration(measure) => {
+            let start = Instant::now() + measure / 3;
+            (start, End::At(start + measure))
+        }
+        Measure::Expiries(expiries) => (Instant::now(), End::After(expiries)),
+    };
     let window = Arc::new(Window {
         start,
-        end: start + options.measure,
+        end,
         delay: options.delay,
         aligned: options.alignment == Alignment::Aligned,
         work: options.work,
@@ -112,14 +152,28 @@ fn run<S: Selector + 'static, R: ResourceSource>(
                 .unwrap()
         })
         .collect();
-    let sample = measure_window(&window, source);
-    let overshoot = scheduler.block_on(async {
-        let mut overshoot = Vec::new();
-        for handle in handles {
-            overshoot.extend(handle.await.unwrap());
+    let join = || {
+        scheduler.block_on(async {
+            let mut overshoot = Vec::new();
+            for handle in handles {
+                overshoot.extend(handle.await.unwrap());
+            }
+            overshoot
+        })
+    };
+    std::thread::sleep(window.start.saturating_duration_since(Instant::now()));
+    let interval = Interval::start_with(source);
+    // A window of a duration ends at its instant, and one of expiries when the last task has recorded them.
+    let (sample, overshoot) = match window.end {
+        End::At(end) => {
+            std::thread::sleep(end.saturating_duration_since(Instant::now()));
+            (interval.and_then(|interval| interval.finish(1)), join())
         }
-        overshoot
-    });
+        End::After(_) => {
+            let overshoot = join();
+            (interval.and_then(|interval| interval.finish(1)), overshoot)
+        }
+    };
     let sample = sample.and_then(|mut sample| {
         if overshoot.is_empty() {
             return Err(io::Error::other(
@@ -133,26 +187,16 @@ fn run<S: Selector + 'static, R: ResourceSource>(
     sample
 }
 
-// The resource usage between the window's start and end. Its operations are the window's expiries, counted once the tasks finish.
-fn measure_window<R: ResourceSource>(window: &Window, source: R) -> io::Result<Sample> {
-    std::thread::sleep(window.start.saturating_duration_since(Instant::now()));
-    let interval = Interval::start_with(source)?;
-    std::thread::sleep(window.end.saturating_duration_since(Instant::now()));
-    interval.finish(1)
-}
-
 async fn expiries<S: Clock>(scheduler: &S, window: &Window) -> Vec<u64> {
     let never = Cancellation::never();
-    let window_length = window.end.duration_since(window.start);
     // Reserve for the window's expiries up front, so that recording rarely allocates, but not unboundedly for very short delays.
-    let expected = (window_length.as_nanos() / window.delay.as_nanos()) as usize + 1;
-    let mut overshoot = Vec::with_capacity(expected.min(1 << 16));
-    while Instant::now() < window.end {
+    let mut overshoot = Vec::with_capacity(window.capacity().min(1 << 16));
+    while !window.ended(overshoot.len()) {
         let target = window.target();
         scheduler.sleep_until(target, &never).await.unwrap();
         let now = Instant::now();
         assert!(now >= target, "timer fired early");
-        if target >= window.start && now < window.end {
+        if window.includes(target, now) {
             overshoot.push(now.duration_since(target).as_nanos() as u64);
         }
         window.work();

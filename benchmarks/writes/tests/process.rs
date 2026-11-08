@@ -95,14 +95,15 @@ fn every_backend_exchanges_validated_responses_and_rejects_invalid_requests() {
                 "3",
                 "2",
                 "0.02",
-                "0.1",
+                // Measure until each connection has counted four requests, so that a slow host cannot leave the window empty.
+                "requests=4",
             ])
             .output()
             .unwrap();
         let detail = format!("{backend}: {}", String::from_utf8_lossy(&client.stderr));
         assert!(client.status.success(), "{detail}");
         let report: serde_json::Value = serde_json::from_slice(&client.stdout).unwrap();
-        assert!(report["requests"].as_u64().unwrap() > 0);
+        assert_eq!(report["requests"], 2 * 4, "{detail}");
         server.finish(true);
 
         let (server, address) = Server::start(backend, 1, 0);
@@ -136,7 +137,7 @@ fn client_rejects_corrupt_payloads() {
             "1",
             "0",
             "0",
-            "0.1",
+            "requests=1",
         ])
         .output()
         .unwrap();
@@ -224,7 +225,7 @@ fn client_reports_a_response_cut_short_by_disconnect() {
             "1",
             "0",
             "0",
-            "0.1",
+            "requests=1",
         ])
         .output()
         .unwrap();
