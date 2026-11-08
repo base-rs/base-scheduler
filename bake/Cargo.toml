@@ -6,5 +6,5 @@ publish = false
 
 [dependencies]
 bake = "0.20.0"
-bake-benchmark = "0.1.0"
+bake-benchmark = "0.2.0"
 base-project = ">=0.1.0"

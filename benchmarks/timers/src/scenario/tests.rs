@@ -50,7 +50,7 @@ fn a_stalled_worker_does_not_hold_root_sleeps() {
     assert!(
         matches!(
             sample.metric("overshoot_max").unwrap().measurement,
-            Measurement::Mean { value } if value < 100_000_000.0
+            Measurement::Quantile { value, .. } if value < 100_000_000.0
         ),
         "a root sleep was too late: {sample:?}"
     );
