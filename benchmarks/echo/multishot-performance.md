@@ -57,7 +57,7 @@ The io_uring implementation has 100% measured region coverage (2911/2911 regions
 Run on Aiko, or adjust the runner’s CPU sets for another host:
 
 ```sh
-flock -x /tmp/base-benchmark-host.lock env CARGO_TARGET_DIR="$HOME/.cache/core-scheduler-recvmsg-multishot/target" python3 benchmarks/echo/results/recvmsg-multishot/run.py --repeats 5 --seconds 2 --output /tmp/recvmsg-multishot.json
+( flock -x 9 && env CARGO_TARGET_DIR="$HOME/.cache/core-scheduler-recvmsg-multishot/target" python3 benchmarks/echo/results/recvmsg-multishot/run.py --repeats 5 --seconds 2 --output /tmp/recvmsg-multishot.json ) 9</tmp/base-benchmark-host.lock
 ```
 
 The [runner](results/recvmsg-multishot/run.py) records source status and executable identity. Reproduce from the clean implementation commit above; later documentation-only commits include the report and raw output.

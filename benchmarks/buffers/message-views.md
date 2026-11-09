@@ -79,9 +79,9 @@ cargo build --release --locked -p core-scheduler-buffer-benchmark --bin sockets
 The runner refuses to overwrite an existing output file and records binary hashes:
 
 ```sh
-flock /tmp/base-benchmark-host.lock python3 benchmarks/buffers/message_views.py \
+( flock 9 && python3 benchmarks/buffers/message_views.py \
   --before /path/to/baseline/sockets --after /path/to/candidate/sockets \
-  --output /tmp/message-views.jsonl
+  --output /tmp/message-views.jsonl ) 9</tmp/base-benchmark-host.lock
 ```
 
 For the longer check, select one backend at a time with a fresh output path and `--backends iouring` or `--backends tokio`, plus `--workers 1 --workloads tcp-small --repeats 21 --iterations 15000`.
