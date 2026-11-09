@@ -737,132 +737,147 @@ mod tests {
     use super::*;
     #[test]
     fn pipelines_preserve_slices_and_return_every_lease() {
-        for mode in ["copy", "registered-copy", "zc", "fixed-zc"] {
-            for transport in ["tcp", "udp"] {
-                for ownership in ["pooled", "retained"] {
-                    for placement in ["local", "handoff"] {
-                        let args = [
-                            "pipeline", mode, transport, "4096", "2", "4", ownership, placement,
-                        ]
-                        .map(str::to_owned);
-                        let result = execute(&args);
-                        assert_eq!(result["bytes"], (4096 - HEADER) * 8);
+        crate::test_support::run(|| {
+            for mode in ["copy", "registered-copy", "zc", "fixed-zc"] {
+                for transport in ["tcp", "udp"] {
+                    for ownership in ["pooled", "retained"] {
+                        for placement in ["local", "handoff"] {
+                            let args = [
+                                "pipeline", mode, transport, "4096", "2", "4", ownership, placement,
+                            ]
+                            .map(str::to_owned);
+                            crate::test_support::step(format!("running {args:?}"));
+                            let result = execute(&args);
+                            assert_eq!(result["bytes"], (4096 - HEADER) * 8);
+                        }
                     }
                 }
             }
-        }
+        });
     }
     #[test]
     fn large_streams_and_small_packets_preserve_sequence() {
-        for mode in ["copy", "fixed-zc"] {
-            for (transport, size) in [("tcp", "131072"), ("udp", "1200")] {
-                let args = [
-                    "pipeline", mode, transport, size, "2", "8", "retained", "handoff",
-                ]
-                .map(str::to_owned);
-                assert_eq!(execute(&args)["iterations"], 8);
+        crate::test_support::run(|| {
+            for mode in ["copy", "fixed-zc"] {
+                for (transport, size) in [("tcp", "131072"), ("udp", "1200")] {
+                    let args = [
+                        "pipeline", mode, transport, size, "2", "8", "retained", "handoff",
+                    ]
+                    .map(str::to_owned);
+                    crate::test_support::step(format!("running {args:?}"));
+                    assert_eq!(execute(&args)["iterations"], 8);
+                }
             }
-        }
+        });
     }
     #[test]
     fn short_sends_keep_each_notification_owner_until_retirement() {
-        for mode in ["copy", "zc", "fixed-zc"] {
+        crate::test_support::run(|| {
+            for mode in ["copy", "zc", "fixed-zc"] {
+                let work = Workload {
+                    mode: mode.into(),
+                    transport: "tcp".into(),
+                    size: 131072,
+                    depth: 1,
+                    iterations: 16,
+                    retained: true,
+                    handoff: false,
+                    listen: None,
+                };
+                let storage = Storage::new(&work);
+                let (sockets, peers) = super::peers(&work);
+                let size: libc::c_int = 4096;
+                // SAFETY: The live socket and initialized integer have the sizes required by SO_SNDBUF. Limiting its send queue induces valid short stream transfers.
+                assert_eq!(
+                    unsafe {
+                        libc::setsockopt(
+                            sockets[0].as_raw_fd(),
+                            libc::SOL_SOCKET,
+                            libc::SO_SNDBUF,
+                            (&size as *const libc::c_int).cast(),
+                            std::mem::size_of_val(&size) as libc::socklen_t,
+                        )
+                    },
+                    0
+                );
+                let driver = Driver::new(work.clone(), storage.clone(), sockets);
+                if work.registered() {
+                    storage.register(&driver.ring, work.size);
+                }
+                crate::test_support::step(format!("receiving short {mode} sends"));
+                let counters = receive(driver, None);
+                crate::test_support::step("joining the peer threads");
+                for peer in peers {
+                    peer.join().unwrap();
+                }
+                assert!(counters.short_sends > 0);
+                let leases: Vec<_> = (0..storage.pool.capacity())
+                    .map(|_| storage.pool.try_acquire().unwrap())
+                    .collect();
+                assert!(storage.pool.try_acquire().is_none());
+                drop(leases);
+            }
+        });
+    }
+    #[test]
+    fn abandoned_receive_does_not_recycle_kernel_storage() {
+        crate::test_support::run(|| {
             let work = Workload {
-                mode: mode.into(),
+                mode: "copy".into(),
                 transport: "tcp".into(),
-                size: 131072,
+                size: 4096,
                 depth: 1,
-                iterations: 16,
-                retained: true,
+                iterations: 1,
+                retained: false,
                 handoff: false,
                 listen: None,
             };
             let storage = Storage::new(&work);
-            let (sockets, peers) = super::peers(&work);
-            let size: libc::c_int = 4096;
-            // SAFETY: The live socket and initialized integer have the sizes required by SO_SNDBUF. Limiting its send queue induces valid short stream transfers.
-            assert_eq!(
-                unsafe {
-                    libc::setsockopt(
-                        sockets[0].as_raw_fd(),
-                        libc::SOL_SOCKET,
-                        libc::SO_SNDBUF,
-                        (&size as *const libc::c_int).cast(),
-                        std::mem::size_of_val(&size) as libc::socklen_t,
-                    )
-                },
-                0
-            );
-            let driver = Driver::new(work.clone(), storage.clone(), sockets);
-            if work.registered() {
-                storage.register(&driver.ring, work.size);
-            }
-            let counters = receive(driver, None);
-            for peer in peers {
-                peer.join().unwrap();
-            }
-            assert!(counters.short_sends > 0);
-            let leases: Vec<_> = (0..storage.pool.capacity())
+            let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+            let client = std::net::TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+            let (server, _) = listener.accept().unwrap();
+            let mut driver = Driver::new(work, storage.clone(), Arc::new(vec![server.into()]));
+            driver.queue(Flight::Receive {
+                connection: 0,
+                buffer: storage.pool.try_acquire().unwrap(),
+                filled: 0,
+            });
+            driver.ring.submit().unwrap();
+            drop(driver);
+            drop(client);
+            // The failure policy deliberately leaks this accepted request's owner. Even after the ring is destroyed, that slot must never be advertised for writing without observing retirement.
+            let leases: Vec<_> = (0..storage.pool.capacity() - 1)
                 .map(|_| storage.pool.try_acquire().unwrap())
                 .collect();
             assert!(storage.pool.try_acquire().is_none());
             drop(leases);
-        }
-    }
-    #[test]
-    fn abandoned_receive_does_not_recycle_kernel_storage() {
-        let work = Workload {
-            mode: "copy".into(),
-            transport: "tcp".into(),
-            size: 4096,
-            depth: 1,
-            iterations: 1,
-            retained: false,
-            handoff: false,
-            listen: None,
-        };
-        let storage = Storage::new(&work);
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let client = std::net::TcpStream::connect(listener.local_addr().unwrap()).unwrap();
-        let (server, _) = listener.accept().unwrap();
-        let mut driver = Driver::new(work, storage.clone(), Arc::new(vec![server.into()]));
-        driver.queue(Flight::Receive {
-            connection: 0,
-            buffer: storage.pool.try_acquire().unwrap(),
-            filled: 0,
         });
-        driver.ring.submit().unwrap();
-        drop(driver);
-        drop(client);
-        // The failure policy deliberately leaks this accepted request's owner. Even after the ring is destroyed, that slot must never be advertised for writing without observing retirement.
-        let leases: Vec<_> = (0..storage.pool.capacity() - 1)
-            .map(|_| storage.pool.try_acquire().unwrap())
-            .collect();
-        assert!(storage.pool.try_acquire().is_none());
-        drop(leases);
     }
 
     #[test]
     fn defaults_run_and_invalid_workloads_fail_before_submission() {
-        assert_eq!(execute(&["pipeline".into()])["iterations"], 1000);
-        let valid = [
-            "pipeline", "copy", "tcp", "4096", "1", "1", "pooled", "local",
-        ];
-        for (position, value) in [
-            (1, "invalid"),
-            (2, "invalid"),
-            (3, "16"),
-            (4, "0"),
-            (5, "0"),
-            (6, "invalid"),
-            (7, "invalid"),
-        ] {
-            let mut args = valid.map(str::to_owned);
-            args[position] = value.into();
+        crate::test_support::run(|| {
+            crate::test_support::step("running the default pipeline");
+            assert_eq!(execute(&["pipeline".into()])["iterations"], 1000);
+            let valid = [
+                "pipeline", "copy", "tcp", "4096", "1", "1", "pooled", "local",
+            ];
+            for (position, value) in [
+                (1, "invalid"),
+                (2, "invalid"),
+                (3, "16"),
+                (4, "0"),
+                (5, "0"),
+                (6, "invalid"),
+                (7, "invalid"),
+            ] {
+                let mut args = valid.map(str::to_owned);
+                args[position] = value.into();
+                assert!(std::panic::catch_unwind(|| execute(&args)).is_err());
+            }
+            let args = ["pipeline", "copy", "udp", "65536", "1", "1"].map(str::to_owned);
             assert!(std::panic::catch_unwind(|| execute(&args)).is_err());
-        }
-        let args = ["pipeline", "copy", "udp", "65536", "1", "1"].map(str::to_owned);
-        assert!(std::panic::catch_unwind(|| execute(&args)).is_err());
+        });
     }
     fn isolated(work: &Workload) -> (Driver, std::net::TcpStream) {
         let storage = Storage::new(work);
@@ -877,133 +892,142 @@ mod tests {
 
     #[test]
     fn notifications_decode_actual_zero_copy_and_partial_copy_reports() {
-        let work = Workload {
-            mode: "zc".into(),
-            transport: "tcp".into(),
-            size: 4096,
-            depth: 1,
-            iterations: 1,
-            retained: false,
-            handoff: false,
-            listen: None,
-        };
-        for result in [0, 128] {
-            let (mut driver, _client) = isolated(&work);
-            let owner = driver
-                .storage
-                .pool
-                .try_acquire()
-                .unwrap()
-                .freeze()
-                .slice(0..128);
-            let id = driver.free.pop().unwrap();
-            // Model the valid state after a send result promised a later notification. The kernel has retired its access before this CQE is decoded. Physical-network measurements observe res=0, while newer kernels may report a positive copied-byte count.
-            driver.pending[id] = Some(Flight::Notification(owner));
-            driver.active = 1;
-            driver.complete_send(id, result, 1 << 3);
-            assert_eq!(driver.counters.notifications, 1);
-            assert_eq!(driver.counters.copied_notifications, 0);
-            assert_eq!(driver.counters.copied_bytes, result as u64);
-            assert_eq!(driver.active, 0);
-        }
+        crate::test_support::run(|| {
+            let work = Workload {
+                mode: "zc".into(),
+                transport: "tcp".into(),
+                size: 4096,
+                depth: 1,
+                iterations: 1,
+                retained: false,
+                handoff: false,
+                listen: None,
+            };
+            for result in [0, 128] {
+                let (mut driver, _client) = isolated(&work);
+                let owner = driver
+                    .storage
+                    .pool
+                    .try_acquire()
+                    .unwrap()
+                    .freeze()
+                    .slice(0..128);
+                let id = driver.free.pop().unwrap();
+                // Model the valid state after a send result promised a later notification. The kernel has retired its access before this CQE is decoded. Physical-network measurements observe res=0, while newer kernels may report a positive copied-byte count.
+                driver.pending[id] = Some(Flight::Notification(owner));
+                driver.active = 1;
+                driver.complete_send(id, result, 1 << 3);
+                assert_eq!(driver.counters.notifications, 1);
+                assert_eq!(driver.counters.copied_notifications, 0);
+                assert_eq!(driver.counters.copied_bytes, result as u64);
+                assert_eq!(driver.active, 0);
+            }
+        });
     }
 
     #[test]
     fn truncated_requests_and_reset_peers_fail_without_recycling_live_owners() {
-        let work = Workload {
-            mode: "copy".into(),
-            transport: "tcp".into(),
-            size: 4096,
-            depth: 1,
-            iterations: 1,
-            retained: false,
-            handoff: false,
-            listen: None,
-        };
-        let (driver, mut client) = isolated(&work);
-        client.write_all(&[42; 8]).unwrap();
-        client.shutdown(std::net::Shutdown::Write).unwrap();
-        assert!(
-            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| receive(driver, None)))
-                .is_err()
-        );
+        crate::test_support::run(|| {
+            let work = Workload {
+                mode: "copy".into(),
+                transport: "tcp".into(),
+                size: 4096,
+                depth: 1,
+                iterations: 1,
+                retained: false,
+                handoff: false,
+                listen: None,
+            };
+            let (driver, mut client) = isolated(&work);
+            client.write_all(&[42; 8]).unwrap();
+            client.shutdown(std::net::Shutdown::Write).unwrap();
+            assert!(
+                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| receive(driver, None)))
+                    .is_err()
+            );
 
-        let (mut driver, client) = isolated(&work);
-        let linger = libc::linger {
-            l_onoff: 1,
-            l_linger: 0,
-        };
-        // SAFETY: SO_LINGER receives the live socket and an initialized native linger value of the required size. Closing with a zero timeout resets this real TCP connection.
-        assert_eq!(
-            unsafe {
-                libc::setsockopt(
-                    client.as_raw_fd(),
-                    libc::SOL_SOCKET,
-                    libc::SO_LINGER,
-                    (&linger as *const libc::linger).cast(),
-                    std::mem::size_of_val(&linger) as libc::socklen_t,
-                )
-            },
-            0
-        );
-        drop(client);
-        let buffer = driver.storage.pool.try_acquire().unwrap();
-        let offset = driver.storage.offset(&buffer);
-        let owner = buffer.freeze().slice(offset..offset + work.size);
-        driver.queue(Flight::Send(Sending {
-            connection: 0,
-            buffer: owner,
-        }));
-        let mut completions = Vec::new();
-        driver.collect(&mut completions);
-        let (id, result, flags) = completions.pop().unwrap();
-        assert!(completions.is_empty());
-        assert!(result < 0);
-        assert!(
-            std::panic::catch_unwind(std::panic::AssertUnwindSafe(
-                || driver.complete_send(id, result, flags)
-            ))
-            .is_err()
-        );
+            let (mut driver, client) = isolated(&work);
+            let linger = libc::linger {
+                l_onoff: 1,
+                l_linger: 0,
+            };
+            // SAFETY: SO_LINGER receives the live socket and an initialized native linger value of the required size. Closing with a zero timeout resets this real TCP connection.
+            assert_eq!(
+                unsafe {
+                    libc::setsockopt(
+                        client.as_raw_fd(),
+                        libc::SOL_SOCKET,
+                        libc::SO_LINGER,
+                        (&linger as *const libc::linger).cast(),
+                        std::mem::size_of_val(&linger) as libc::socklen_t,
+                    )
+                },
+                0
+            );
+            drop(client);
+            let buffer = driver.storage.pool.try_acquire().unwrap();
+            let offset = driver.storage.offset(&buffer);
+            let owner = buffer.freeze().slice(offset..offset + work.size);
+            driver.queue(Flight::Send(Sending {
+                connection: 0,
+                buffer: owner,
+            }));
+            let mut completions = Vec::new();
+            driver.collect(&mut completions);
+            let (id, result, flags) = completions.pop().unwrap();
+            assert!(completions.is_empty());
+            assert!(result < 0);
+            assert!(
+                std::panic::catch_unwind(std::panic::AssertUnwindSafe(
+                    || driver.complete_send(id, result, flags)
+                ))
+                .is_err()
+            );
+        });
     }
 
     #[test]
     fn shared_pool_pressure_drives_completions_and_waits_for_external_owners() {
-        let work = Workload {
-            mode: "copy".into(),
-            transport: "tcp".into(),
-            size: 4096,
-            depth: 2,
-            iterations: 2,
-            retained: false,
-            handoff: false,
-            listen: None,
-        };
-        let storage = Storage::new(&work);
-        let held: Vec<_> = (0..storage.pool.capacity() - 1)
-            .map(|_| storage.pool.try_acquire().unwrap())
-            .collect();
-        let (sockets, peers) = super::peers(&work);
-        let counters = receive(Driver::new(work.clone(), storage.clone(), sockets), None);
-        assert!(counters.pool_stalls > 0);
-        for peer in peers {
-            peer.join().unwrap();
-        }
-        drop(held);
-
-        let held: Vec<_> = (0..storage.pool.capacity())
-            .map(|_| storage.pool.try_acquire().unwrap())
-            .collect();
-        let (sockets, peers) = super::peers(&work);
-        let returning = std::thread::spawn(move || {
-            // Application processing may retain all capacity independently of either ring. Release it later while the receive thread waits without an outstanding kernel request.
-            std::thread::sleep(Duration::from_millis(50));
+        crate::test_support::run(|| {
+            let work = Workload {
+                mode: "copy".into(),
+                transport: "tcp".into(),
+                size: 4096,
+                depth: 2,
+                iterations: 2,
+                retained: false,
+                handoff: false,
+                listen: None,
+            };
+            let storage = Storage::new(&work);
+            let held: Vec<_> = (0..storage.pool.capacity() - 1)
+                .map(|_| storage.pool.try_acquire().unwrap())
+                .collect();
+            let (sockets, peers) = super::peers(&work);
+            crate::test_support::step("receiving under shared pool pressure");
+            let counters = receive(Driver::new(work.clone(), storage.clone(), sockets), None);
+            assert!(counters.pool_stalls > 0);
+            crate::test_support::step("joining the peer threads");
+            for peer in peers {
+                peer.join().unwrap();
+            }
             drop(held);
+
+            let held: Vec<_> = (0..storage.pool.capacity())
+                .map(|_| storage.pool.try_acquire().unwrap())
+                .collect();
+            let (sockets, peers) = super::peers(&work);
+            let returning = std::thread::spawn(move || {
+                // Application processing may retain all capacity independently of either ring. Release it later while the receive thread waits without an outstanding kernel request.
+                std::thread::sleep(Duration::from_millis(50));
+                drop(held);
+            });
+            receive(Driver::new(work, storage, sockets), None);
+            returning.join().unwrap();
+            crate::test_support::step("joining the peer threads");
+            for peer in peers {
+                peer.join().unwrap();
+            }
         });
-        receive(Driver::new(work, storage, sockets), None);
-        returning.join().unwrap();
-        for peer in peers {
-            peer.join().unwrap();
-        }
     }
 }

@@ -258,5 +258,9 @@ fn main() {
 }
 
 #[cfg(test)]
+#[path = "../test_support.rs"]
+mod test_support;
+
+#[cfg(test)]
 #[path = "files/tests.rs"]
 mod tests;

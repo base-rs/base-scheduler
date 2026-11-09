@@ -175,49 +175,100 @@ mod tests {
 
     #[test]
     fn failed_socket_configuration_is_reported() {
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let address = listener.local_addr().unwrap();
-        let runtime = crate::runtime(1);
-        let error = crate::tests::fail_setup("client TCP_NODELAY", || {
-            runtime.block_on(run(
-                address,
-                1,
-                Workload {
-                    bytes: 1,
-                    chunks: 1,
-                    work: 0,
-                },
-                Duration::ZERO,
-                Measure::Seconds(Duration::from_secs(1)),
-            ))
-        })
-        .unwrap_err();
-        assert_eq!(error.to_string(), "client TCP_NODELAY");
+        crate::test_support::run(|| {
+            let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+            let address = listener.local_addr().unwrap();
+            let runtime = crate::runtime(1);
+            let error = crate::tests::fail_setup("client TCP_NODELAY", || {
+                runtime.block_on(run(
+                    address,
+                    1,
+                    Workload {
+                        bytes: 1,
+                        chunks: 1,
+                        work: 0,
+                    },
+                    Duration::ZERO,
+                    Measure::Seconds(Duration::from_secs(1)),
+                ))
+            })
+            .unwrap_err();
+            assert_eq!(error.to_string(), "client TCP_NODELAY");
+        });
     }
 
     #[test]
     fn responses_must_start_and_finish_inside_the_measurement_window() {
-        let runtime = crate::runtime(1);
-        runtime.block_on(async {
-            let start = Instant::now();
-            let end = start + Duration::from_secs(1);
-            for (started, completed, count) in [
-                (start - Duration::from_nanos(1), start, 0),
-                (start, end, 1),
-                (start, end + Duration::from_nanos(1), 0),
-            ] {
+        crate::test_support::run(|| {
+            let runtime = crate::runtime(1);
+            runtime.block_on(async {
+                let start = Instant::now();
+                let end = start + Duration::from_secs(1);
+                for (started, completed, count) in [
+                    (start - Duration::from_nanos(1), start, 0),
+                    (start, end, 1),
+                    (start, end + Duration::from_nanos(1), 0),
+                ] {
+                    crate::test_support::step(format!(
+                        "measuring a response completed at {completed:?}"
+                    ));
+                    let (socket, mut peer) = tokio::io::duplex(1);
+                    let server = tokio::spawn(async move {
+                        let mut request = [0];
+                        peer.read_exact(&mut request).await.unwrap();
+                        assert_eq!(request, [1]);
+                        peer.write_all(&[69]).await.unwrap();
+                        assert_eq!(peer.read(&mut request).await.unwrap(), 0);
+                    });
+                    let (schedule, clock) = watch::channel(None);
+                    schedule.send(Some((start, End::At(end)))).unwrap();
+                    // Script the round-trip times so preemption cannot change which side of the measurement boundary the response falls on.
+                    let mut times = [started, completed, end].into_iter();
+                    let latency = connection(
+                        socket,
+                        Workload {
+                            bytes: 1,
+                            chunks: 1,
+                            work: 0,
+                        },
+                        Arc::new(vec![vec![vec![69]]; 2]),
+                        Arc::new(Barrier::new(1)),
+                        clock,
+                        || times.next().expect("one round trip and the exit check"),
+                    )
+                    .await
+                    .unwrap();
+                    server.await.unwrap();
+                    assert_eq!(latency.len(), count);
+                    assert!(times.next().is_none());
+                }
+            });
+        });
+    }
+
+    #[test]
+    fn a_window_of_requests_counts_responses_after_the_warmup_until_each_connection_has_its_count()
+    {
+        crate::test_support::run(|| {
+            let runtime = crate::runtime(1);
+            runtime.block_on(async {
                 let (socket, mut peer) = tokio::io::duplex(1);
                 let server = tokio::spawn(async move {
-                    let mut request = [0];
-                    peer.read_exact(&mut request).await.unwrap();
-                    assert_eq!(request, [1]);
-                    peer.write_all(&[69]).await.unwrap();
-                    assert_eq!(peer.read(&mut request).await.unwrap(), 0);
+                    for expected in [1, 2] {
+                        let mut request = [0];
+                        peer.read_exact(&mut request).await.unwrap();
+                        assert_eq!(request, [expected]);
+                        peer.write_all(&[69]).await.unwrap();
+                    }
+                    assert_eq!(peer.read(&mut [0]).await.unwrap(), 0);
                 });
+                let start = Instant::now();
                 let (schedule, clock) = watch::channel(None);
-                schedule.send(Some((start, End::At(end)))).unwrap();
-                // Script the round-trip times so preemption cannot change which side of the measurement boundary the response falls on.
-                let mut times = [started, completed, end].into_iter();
+                schedule.send(Some((start, End::After(1)))).unwrap();
+                // The first round trip starts in the warmup, so it is not counted; the second is, however late it completes, and the count then ends the window.
+                let late = start + Duration::from_secs(30);
+                let mut times =
+                    [start - Duration::from_nanos(1), start, start, late, late].into_iter();
                 let latency = connection(
                     socket,
                     Workload {
@@ -228,111 +279,74 @@ mod tests {
                     Arc::new(vec![vec![vec![69]]; 2]),
                     Arc::new(Barrier::new(1)),
                     clock,
-                    || times.next().expect("one round trip and the exit check"),
+                    || times.next().expect("two round trips and the exit check"),
                 )
                 .await
                 .unwrap();
                 server.await.unwrap();
-                assert_eq!(latency.len(), count);
+                assert_eq!(latency.len(), 1);
+                assert_eq!(latency.max(), latency.highest_equivalent(30_000_000_000));
                 assert!(times.next().is_none());
-            }
-        });
-    }
-
-    #[test]
-    fn a_window_of_requests_counts_responses_after_the_warmup_until_each_connection_has_its_count()
-    {
-        let runtime = crate::runtime(1);
-        runtime.block_on(async {
-            let (socket, mut peer) = tokio::io::duplex(1);
-            let server = tokio::spawn(async move {
-                for expected in [1, 2] {
-                    let mut request = [0];
-                    peer.read_exact(&mut request).await.unwrap();
-                    assert_eq!(request, [expected]);
-                    peer.write_all(&[69]).await.unwrap();
-                }
-                assert_eq!(peer.read(&mut [0]).await.unwrap(), 0);
             });
-            let start = Instant::now();
-            let (schedule, clock) = watch::channel(None);
-            schedule.send(Some((start, End::After(1)))).unwrap();
-            // The first round trip starts in the warmup, so it is not counted; the second is, however late it completes, and the count then ends the window.
-            let late = start + Duration::from_secs(30);
-            let mut times = [start - Duration::from_nanos(1), start, start, late, late].into_iter();
-            let latency = connection(
-                socket,
-                Workload {
-                    bytes: 1,
-                    chunks: 1,
-                    work: 0,
-                },
-                Arc::new(vec![vec![vec![69]]; 2]),
-                Arc::new(Barrier::new(1)),
-                clock,
-                || times.next().expect("two round trips and the exit check"),
-            )
-            .await
-            .unwrap();
-            server.await.unwrap();
-            assert_eq!(latency.len(), 1);
-            assert_eq!(latency.max(), latency.highest_equivalent(30_000_000_000));
-            assert!(times.next().is_none());
         });
     }
 
     #[test]
     fn an_empty_measurement_is_reported() {
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let runtime = crate::runtime(1);
-        let error = runtime
-            .block_on(run(
-                listener.local_addr().unwrap(),
-                1,
-                Workload {
-                    bytes: 1,
-                    chunks: 1,
-                    work: 0,
-                },
-                Duration::ZERO,
-                Measure::Seconds(Duration::ZERO),
-            ))
-            .unwrap_err();
-        assert_eq!(
-            error.to_string(),
-            "no complete responses in measurement window"
-        );
+        crate::test_support::run(|| {
+            let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+            let runtime = crate::runtime(1);
+            let error = runtime
+                .block_on(run(
+                    listener.local_addr().unwrap(),
+                    1,
+                    Workload {
+                        bytes: 1,
+                        chunks: 1,
+                        work: 0,
+                    },
+                    Duration::ZERO,
+                    Measure::Seconds(Duration::ZERO),
+                ))
+                .unwrap_err();
+            assert_eq!(
+                error.to_string(),
+                "no complete responses in measurement window"
+            );
+        });
     }
 
     #[test]
     fn failed_request_writes_return_the_transport_error() {
-        let runtime = crate::runtime(1);
-        runtime.block_on(async {
-            let (socket, peer) = tokio::io::duplex(1);
-            drop(peer);
-            let (schedule, clock) = watch::channel(None);
-            // A window of requests, so that no slowness can end it before the first write.
-            schedule
-                .send(Some((Instant::now(), End::After(1))))
-                .unwrap();
-            let error = connection(
-                socket,
-                Workload {
-                    bytes: 1,
-                    chunks: 1,
-                    work: 0,
-                },
-                Arc::new(vec![vec![vec![0]]; 2]),
-                Arc::new(Barrier::new(1)),
-                clock,
-                Instant::now,
-            )
-            .await
-            .unwrap_err();
-            assert_eq!(
-                error.downcast::<io::Error>().unwrap().kind(),
-                io::ErrorKind::BrokenPipe
-            );
+        crate::test_support::run(|| {
+            let runtime = crate::runtime(1);
+            runtime.block_on(async {
+                let (socket, peer) = tokio::io::duplex(1);
+                drop(peer);
+                let (schedule, clock) = watch::channel(None);
+                // A window of requests, so that no slowness can end it before the first write.
+                schedule
+                    .send(Some((Instant::now(), End::After(1))))
+                    .unwrap();
+                let error = connection(
+                    socket,
+                    Workload {
+                        bytes: 1,
+                        chunks: 1,
+                        work: 0,
+                    },
+                    Arc::new(vec![vec![vec![0]]; 2]),
+                    Arc::new(Barrier::new(1)),
+                    clock,
+                    Instant::now,
+                )
+                .await
+                .unwrap_err();
+                assert_eq!(
+                    error.downcast::<io::Error>().unwrap().kind(),
+                    io::ErrorKind::BrokenPipe
+                );
+            });
         });
     }
 }

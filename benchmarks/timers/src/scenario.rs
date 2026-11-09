@@ -17,6 +17,37 @@ use std::{
 
 /// Measure a scenario over its iterations, with the overshoot of each measured sleep. Every duration is a multiple of the unit: sleeps last one unit, a pulse 1,000 units, and a stall blocks a worker for 200 units while root sleeps of 10 units are measured.
 pub fn measure<R: ResourceSource>(options: &ScenarioOptions, source: R) -> io::Result<Sample> {
+    measure_with(options, source, Arc::new(Timed(options.unit)))
+}
+
+/// How the stall scenario's task holds its worker, and how the root thread follows it.
+trait Stall: Send + Sync + 'static {
+    /// Block the current worker, inside one poll of the stalling task.
+    fn hold(&self);
+    /// On the root thread, once the stalling task is spawned: return when the root sleeps should start.
+    fn held(&self);
+    /// On the root thread, once the root sleeps are measured, before the stalling task is joined.
+    fn measured(&self);
+}
+
+/// A measured stall: the task blocks its worker for 200 units, and the root sleeps start 5 units in.
+struct Timed(Duration);
+
+impl Stall for Timed {
+    fn hold(&self) {
+        std::thread::sleep(self.0 * 200);
+    }
+    fn held(&self) {
+        std::thread::sleep(self.0 * 5);
+    }
+    fn measured(&self) {}
+}
+
+fn measure_with<R: ResourceSource>(
+    options: &ScenarioOptions,
+    source: R,
+    stall: Arc<dyn Stall>,
+) -> io::Result<Sample> {
     let scheduler = Arc::new(
         NativeScheduler::with_options(NativeOptions {
             workers: options.workers,
@@ -33,6 +64,7 @@ pub fn measure<R: ResourceSource>(options: &ScenarioOptions, source: R) -> io::R
             options.workers,
             options.iterations,
             options.unit,
+            &stall,
         );
         let sample = interval.finish(options.iterations as u64)?;
         Ok(with_rescues(with_overshoot(sample, overshoot), &scheduler))
@@ -48,6 +80,7 @@ fn run(
     workers: usize,
     iterations: usize,
     unit: Duration,
+    stall: &Arc<dyn Stall>,
 ) -> Vec<u64> {
     let never = Cancellation::never();
     let mut overshoot = Vec::new();
@@ -110,16 +143,16 @@ fn run(
                 .unwrap();
             block_on(pulse).unwrap();
         }
-        // A task blocks its worker inside one poll for 200 units while the root thread measures eight sleeps of 10 units. Root registrations go to each worker in turn, so some land on the blocked one.
+        // A task blocks its worker inside one poll while the root thread measures eight sleeps of 10 units. Root registrations go to each worker in turn, so some land on the blocked one.
         ScenarioWorkload::Stall => {
             for _ in 0..iterations {
-                let blocker = scheduler
-                    .spawn(async move { std::thread::sleep(unit * 200) })
-                    .unwrap();
-                std::thread::sleep(unit * 5);
+                let holder = Arc::clone(stall);
+                let blocker = scheduler.spawn(async move { holder.hold() }).unwrap();
+                stall.held();
                 for _ in 0..8 {
                     overshoot.push(root_sleep(scheduler, unit * 10));
                 }
+                stall.measured();
                 block_on(blocker).unwrap();
             }
         }

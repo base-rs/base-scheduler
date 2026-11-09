@@ -4,6 +4,10 @@
 use base_scheduler::*;
 #[path = "../multishot.rs"]
 mod multishot;
+
+#[cfg(test)]
+#[path = "../test_support.rs"]
+mod test_support;
 use multishot::Multishot;
 #[cfg(target_os = "linux")]
 use multishot::Receiver;
@@ -521,61 +525,68 @@ mod tests {
 
     #[test]
     fn receivers_preserve_tcp_and_udp_data_on_each_backend() {
-        #[cfg(target_os = "linux")]
-        let backends = ["tokio", "native", "iouring"];
-        #[cfg(not(target_os = "linux"))]
-        let backends = ["tokio", "native"];
-        for backend in backends {
-            for mode in ["raw", "pool", "shared", "multi", "multi-retain"] {
-                if mode.starts_with("multi") && backend != "iouring" {
-                    continue;
-                }
-                for transport in ["tcp", "udp"] {
-                    for traffic in ["echo", "receive"] {
-                        let args = [
-                            "sockets", backend, mode, "64", "2", "1", transport, "4", traffic,
-                        ]
-                        .map(str::to_owned);
-                        let result = execute(&args);
-                        assert_eq!(result["iterations"], 2);
-                        assert_eq!(result["transport"], transport);
-                        assert_eq!(result["traffic"], traffic);
-                        assert_eq!(result["window"], 4);
-                        assert_eq!(result["bytes_received"], 2 * 4 * 64);
-                        assert!(result["receive_calls"].as_u64().unwrap() >= 8);
-                        if transport == "udp" {
-                            assert_eq!(result["receive_calls"], 8);
-                            assert_eq!(result["short_receives"], 0);
+        crate::test_support::run(|| {
+            #[cfg(target_os = "linux")]
+            let backends = ["tokio", "native", "iouring"];
+            #[cfg(not(target_os = "linux"))]
+            let backends = ["tokio", "native"];
+            for backend in backends {
+                for mode in ["raw", "pool", "shared", "multi", "multi-retain"] {
+                    if mode.starts_with("multi") && backend != "iouring" {
+                        continue;
+                    }
+                    for transport in ["tcp", "udp"] {
+                        for traffic in ["echo", "receive"] {
+                            let args = [
+                                "sockets", backend, mode, "64", "2", "1", transport, "4", traffic,
+                            ]
+                            .map(str::to_owned);
+                            crate::test_support::step(format!("running {args:?}"));
+                            let result = execute(&args);
+                            assert_eq!(result["iterations"], 2);
+                            assert_eq!(result["transport"], transport);
+                            assert_eq!(result["traffic"], traffic);
+                            assert_eq!(result["window"], 4);
+                            assert_eq!(result["bytes_received"], 2 * 4 * 64);
+                            assert!(result["receive_calls"].as_u64().unwrap() >= 8);
+                            if transport == "udp" {
+                                assert_eq!(result["receive_calls"], 8);
+                                assert_eq!(result["short_receives"], 0);
+                            }
                         }
                     }
                 }
             }
-        }
-        assert_eq!(execute(&[])["mode"], "pool");
+            assert_eq!(execute(&[])["mode"], "pool");
+        });
     }
 
     #[test]
     fn receivers_share_capacity_across_concurrent_connections() {
-        #[cfg(target_os = "linux")]
-        let backends = ["tokio", "native", "iouring"];
-        #[cfg(not(target_os = "linux"))]
-        let backends = ["tokio", "native"];
-        for backend in backends {
-            for mode in ["pool", "shared"] {
-                for transport in ["tcp", "udp"] {
-                    let args = [
-                        "sockets", backend, mode, "64", "2", "2", transport, "4", "receive", "4",
-                    ]
-                    .map(str::to_owned);
-                    let result = execute(&args);
-                    assert_eq!(result["connections"], 4);
-                    assert_eq!(result["iterations"], 2);
-                    assert_eq!(result["bytes_received"], 4 * 2 * 4 * 64);
-                    assert!(result["receive_calls"].as_u64().unwrap() >= 32);
-                    assert!(result["messages_per_second"].as_f64().unwrap() > 0.0);
+        crate::test_support::run(|| {
+            #[cfg(target_os = "linux")]
+            let backends = ["tokio", "native", "iouring"];
+            #[cfg(not(target_os = "linux"))]
+            let backends = ["tokio", "native"];
+            for backend in backends {
+                for mode in ["pool", "shared"] {
+                    for transport in ["tcp", "udp"] {
+                        let args = [
+                            "sockets", backend, mode, "64", "2", "2", transport, "4", "receive",
+                            "4",
+                        ]
+                        .map(str::to_owned);
+                        crate::test_support::step(format!("running {args:?}"));
+                        let result = execute(&args);
+                        assert_eq!(result["connections"], 4);
+                        assert_eq!(result["iterations"], 2);
+                        assert_eq!(result["bytes_received"], 4 * 2 * 4 * 64);
+                        assert!(result["receive_calls"].as_u64().unwrap() >= 32);
+                        assert!(result["messages_per_second"].as_f64().unwrap() > 0.0);
+                    }
                 }
             }
-        }
+        });
     }
 
     #[test]

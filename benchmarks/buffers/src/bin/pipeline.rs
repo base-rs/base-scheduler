@@ -5,6 +5,10 @@
 #[path = "pipeline/linux.rs"]
 mod linux;
 
+#[cfg(all(test, target_os = "linux"))]
+#[path = "../test_support.rs"]
+mod test_support;
+
 fn main() {
     #[cfg(target_os = "linux")]
     println!("{}", linux::execute(&std::env::args().collect::<Vec<_>>()));

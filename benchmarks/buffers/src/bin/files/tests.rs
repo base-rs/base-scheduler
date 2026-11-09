@@ -129,27 +129,33 @@ fn submitted_output_retries_only_the_suffix_and_propagates_errors() {
 
 #[test]
 fn pipelines_copy_partial_tails_on_each_backend() {
-    #[cfg(target_os = "linux")]
-    let backends = ["tokio", "native", "iouring"];
-    #[cfg(not(target_os = "linux"))]
-    let backends = ["tokio", "native"];
-    for backend in backends {
-        for mode in ["vec-serial", "vec-join", "serial", "join", "submit"] {
-            let args = ["files", backend, mode, "4096", "10001", "2"].map(str::to_owned);
-            let result = execute(&args);
-            assert_eq!(result["bytes"], 10001);
-            assert_eq!(result["backend"], backend);
+    crate::test_support::run(|| {
+        #[cfg(target_os = "linux")]
+        let backends = ["tokio", "native", "iouring"];
+        #[cfg(not(target_os = "linux"))]
+        let backends = ["tokio", "native"];
+        for backend in backends {
+            for mode in ["vec-serial", "vec-join", "serial", "join", "submit"] {
+                let args = ["files", backend, mode, "4096", "10001", "2"].map(str::to_owned);
+                crate::test_support::step(format!("running {args:?}"));
+                let result = execute(&args);
+                assert_eq!(result["bytes"], 10001);
+                assert_eq!(result["backend"], backend);
+            }
         }
-    }
-    assert_eq!(execute(&[])["mode"], "join");
+        crate::test_support::step("running the default pipeline");
+        assert_eq!(execute(&[])["mode"], "join");
+    });
 }
 
 #[test]
 fn empty_input_returns_eof() {
-    assert_eq!(
-        execute(&["files", "native", "join", "4096", "0", "1"].map(str::to_owned))["bytes"],
-        0
-    );
+    crate::test_support::run(|| {
+        assert_eq!(
+            execute(&["files", "native", "join", "4096", "0", "1"].map(str::to_owned))["bytes"],
+            0
+        );
+    });
 }
 
 #[test]

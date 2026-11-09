@@ -116,6 +116,9 @@ pub fn run(args: &[String]) -> Result<()> {
 }
 
 #[cfg(test)]
+mod test_support;
+
+#[cfg(test)]
 mod tests {
     use super::*;
 

@@ -131,41 +131,55 @@ fn main() {
 }
 
 #[cfg(test)]
+mod test_support;
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn matched_workloads_run_on_each_backend() {
-        #[cfg(target_os = "linux")]
-        let backends = ["native", "tokio", "iouring", "iouring-unregistered"];
-        #[cfg(not(target_os = "linux"))]
-        let backends = ["native", "tokio"];
-        for backend in backends {
-            for mode in ["ordinary", "monitor"] {
-                for workload in ["read-at", "write-at"] {
-                    let args = ["files", backend, mode, workload, "2", "2", "1", "4096"]
-                        .map(str::to_owned);
-                    let result = execute(&args);
-                    assert_eq!(result["operations"], 4);
-                    assert_eq!(result["backend"], backend);
+        crate::test_support::run(|| {
+            #[cfg(target_os = "linux")]
+            let backends = ["native", "tokio", "iouring", "iouring-unregistered"];
+            #[cfg(not(target_os = "linux"))]
+            let backends = ["native", "tokio"];
+            for backend in backends {
+                for mode in ["ordinary", "monitor"] {
+                    for workload in ["read-at", "write-at"] {
+                        crate::test_support::step(format!(
+                            "running {workload} in {mode} mode on {backend}"
+                        ));
+                        let args = ["files", backend, mode, workload, "2", "2", "1", "4096"]
+                            .map(str::to_owned);
+                        let result = execute(&args);
+                        assert_eq!(result["operations"], 4);
+                        assert_eq!(result["backend"], backend);
+                    }
                 }
             }
-        }
-        assert_eq!(execute(&[])["mode"], "monitor");
+            crate::test_support::step("running the default workload");
+            assert_eq!(execute(&[])["mode"], "monitor");
+        });
     }
 
     #[cfg(target_os = "linux")]
     #[test]
     fn migration_workloads_run_with_registered_and_unregistered_files() {
-        for backend in ["iouring-migration", "iouring-unregistered-migration"] {
-            for mode in ["ordinary", "monitor"] {
-                for workload in ["read-at", "write-at"] {
-                    let args = ["files", backend, mode, workload, "1", "4", "2", "4096"]
-                        .map(str::to_owned);
-                    assert_eq!(execute(&args)["operations"], 4);
+        crate::test_support::run(|| {
+            for backend in ["iouring-migration", "iouring-unregistered-migration"] {
+                for mode in ["ordinary", "monitor"] {
+                    for workload in ["read-at", "write-at"] {
+                        crate::test_support::step(format!(
+                            "running {workload} in {mode} mode on {backend}"
+                        ));
+                        let args = ["files", backend, mode, workload, "1", "4", "2", "4096"]
+                            .map(str::to_owned);
+                        assert_eq!(execute(&args)["operations"], 4);
+                    }
                 }
             }
-        }
+        });
     }
 
     #[cfg(target_os = "linux")]

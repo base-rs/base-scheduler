@@ -58,16 +58,25 @@ fn main() {
 }
 
 #[cfg(test)]
+#[path = "../test_support.rs"]
+mod test_support;
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn shared_and_local_leases_can_be_moved_and_frozen() {
-        for shared in [false, true] {
-            for frozen in [false, true] {
-                let result = measure(2, 100, shared, frozen);
-                assert!(result["leases_per_second"].as_f64().unwrap() > 0.0);
+        crate::test_support::run(|| {
+            for shared in [false, true] {
+                for frozen in [false, true] {
+                    crate::test_support::step(format!(
+                        "measuring shared: {shared}, frozen: {frozen}"
+                    ));
+                    let result = measure(2, 100, shared, frozen);
+                    assert!(result["leases_per_second"].as_f64().unwrap() > 0.0);
+                }
             }
-        }
+        });
     }
 }
