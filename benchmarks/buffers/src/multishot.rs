@@ -61,27 +61,29 @@ mod tests {
 
     #[test]
     fn portable_backends_reject_the_retired_multishot_control() {
-        let scheduler = base_scheduler_native::NativeScheduler::with_options(
-            base_scheduler_native::NativeOptions {
-                workers: 1,
-                ..Default::default()
-            },
-        )
-        .unwrap();
-        scheduler.block_on(async {
-            let never = Cancellation::never();
-            let socket = scheduler
-                .socket_open(SocketDomain::Ipv4, SocketType::Datagram, None, &never)
-                .await
-                .unwrap();
-            let error = scheduler
-                .multishot(&socket, 8, 64, &never)
-                .await
-                .err()
-                .unwrap();
-            assert_eq!(error.kind(), std::io::ErrorKind::Unsupported);
-            scheduler.socket_close(socket).await.unwrap();
-            scheduler.shutdown().await;
+        crate::test_support::run(|| {
+            let scheduler = base_scheduler_native::NativeScheduler::with_options(
+                base_scheduler_native::NativeOptions {
+                    workers: 1,
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+            scheduler.block_on(async {
+                let never = Cancellation::never();
+                let socket = scheduler
+                    .socket_open(SocketDomain::Ipv4, SocketType::Datagram, None, &never)
+                    .await
+                    .unwrap();
+                let error = scheduler
+                    .multishot(&socket, 8, 64, &never)
+                    .await
+                    .err()
+                    .unwrap();
+                assert_eq!(error.kind(), std::io::ErrorKind::Unsupported);
+                scheduler.socket_close(socket).await.unwrap();
+                scheduler.shutdown().await;
+            });
         });
     }
 }

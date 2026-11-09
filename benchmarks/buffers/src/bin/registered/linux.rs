@@ -405,99 +405,112 @@ mod tests {
 
     #[test]
     fn registered_and_ordinary_buffers_preserve_data() {
-        for mode in ["ordinary", "fixed"] {
-            for kind in ["tcp", "udp", "cached", "direct"] {
-                for direction in ["read", "write"] {
-                    for ownership in ["pooled", "retained"] {
-                        let args = [
-                            "registered",
-                            mode,
-                            kind,
-                            direction,
-                            "4096",
-                            "2",
-                            "3",
-                            ownership,
-                        ]
-                        .map(str::to_owned);
-                        let result = execute(&args);
-                        assert_eq!(result["bytes"], 4096 * 2 * 3);
-                        assert!(result["gib_per_second"].as_f64().unwrap() > 0.0);
+        crate::test_support::run(|| {
+            for mode in ["ordinary", "fixed"] {
+                for kind in ["tcp", "udp", "cached", "direct"] {
+                    for direction in ["read", "write"] {
+                        for ownership in ["pooled", "retained"] {
+                            let args = [
+                                "registered",
+                                mode,
+                                kind,
+                                direction,
+                                "4096",
+                                "2",
+                                "3",
+                                ownership,
+                            ]
+                            .map(str::to_owned);
+                            crate::test_support::step(format!("running {args:?}"));
+                            let result = execute(&args);
+                            assert_eq!(result["bytes"], 4096 * 2 * 3);
+                            assert!(result["gib_per_second"].as_f64().unwrap() > 0.0);
+                        }
                     }
                 }
             }
-        }
+        });
     }
 
     #[test]
     fn stream_transfers_reassemble_partial_completions() {
-        for mode in ["ordinary", "fixed"] {
-            let args = [
-                "registered",
-                mode,
-                "tcp",
-                "read",
-                "131072",
-                "2",
-                "8",
-                "retained",
-            ]
-            .map(str::to_owned);
-            assert_eq!(execute(&args)["bytes"], 131072 * 2 * 8);
-        }
+        crate::test_support::run(|| {
+            for mode in ["ordinary", "fixed"] {
+                let args = [
+                    "registered",
+                    mode,
+                    "tcp",
+                    "read",
+                    "131072",
+                    "2",
+                    "8",
+                    "retained",
+                ]
+                .map(str::to_owned);
+                crate::test_support::step(format!("running {args:?}"));
+                assert_eq!(execute(&args)["bytes"], 131072 * 2 * 8);
+            }
+        });
     }
 
     #[test]
     fn small_network_payloads_do_not_discard_allocator_pages() {
-        for mode in ["ordinary", "fixed"] {
-            for (kind, size) in [("tcp", "64"), ("udp", "1200")] {
-                let args = ["registered", mode, kind, "read", size, "1", "3", "retained"]
-                    .map(str::to_owned);
-                assert_eq!(execute(&args)["iterations"], 3);
+        crate::test_support::run(|| {
+            for mode in ["ordinary", "fixed"] {
+                for (kind, size) in [("tcp", "64"), ("udp", "1200")] {
+                    let args = ["registered", mode, kind, "read", size, "1", "3", "retained"]
+                        .map(str::to_owned);
+                    crate::test_support::step(format!("running {args:?}"));
+                    assert_eq!(execute(&args)["iterations"], 3);
+                }
             }
-        }
+        });
     }
 
     #[test]
     #[should_panic(expected = "I/O did not progress")]
     fn unexpected_end_of_file_rejects_a_truncated_sample() {
-        let work = Workload {
-            fixed: true,
-            kind: "cached".into(),
-            write: false,
-            size: 4096,
-            depth: 1,
-            iterations: 1,
-            retained: false,
-            directory: ".".into(),
-        };
-        let (mut driver, peers, _) = Driver::new(work);
-        assert!(peers.is_empty());
-        File::from(driver.files[0].try_clone().unwrap())
-            .set_len(0)
-            .unwrap();
-        driver.run(1);
+        crate::test_support::run(|| {
+            let work = Workload {
+                fixed: true,
+                kind: "cached".into(),
+                write: false,
+                size: 4096,
+                depth: 1,
+                iterations: 1,
+                retained: false,
+                directory: ".".into(),
+            };
+            let (mut driver, peers, _) = Driver::new(work);
+            assert!(peers.is_empty());
+            File::from(driver.files[0].try_clone().unwrap())
+                .set_len(0)
+                .unwrap();
+            driver.run(1);
+        });
     }
 
     #[test]
     fn uncollected_requests_retain_their_pool_storage_during_unwinding() {
-        let work = Workload {
-            fixed: true,
-            kind: "cached".into(),
-            write: false,
-            size: 4096,
-            depth: 1,
-            iterations: 1,
-            retained: false,
-            directory: ".".into(),
-        };
-        let (mut driver, peers, _) = Driver::new(work);
-        assert!(peers.is_empty());
-        let pool = driver.pool.clone();
-        driver.start(0, 0);
-        driver.ring.submit().unwrap();
-        drop(driver);
-        let leases: Vec<_> = std::iter::from_fn(|| pool.try_acquire()).collect();
-        assert_eq!(leases.len(), pool.capacity() - 1);
+        crate::test_support::run(|| {
+            let work = Workload {
+                fixed: true,
+                kind: "cached".into(),
+                write: false,
+                size: 4096,
+                depth: 1,
+                iterations: 1,
+                retained: false,
+                directory: ".".into(),
+            };
+            let (mut driver, peers, _) = Driver::new(work);
+            assert!(peers.is_empty());
+            let pool = driver.pool.clone();
+            driver.start(0, 0);
+            driver.ring.submit().unwrap();
+            drop(driver);
+            let leases: Vec<_> = std::iter::from_fn(|| pool.try_acquire()).collect();
+            assert_eq!(leases.len(), pool.capacity() - 1);
+        });
     }
 }

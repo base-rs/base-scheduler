@@ -258,17 +258,26 @@ fn main() {
 }
 
 #[cfg(all(test, target_os = "linux"))]
+#[path = "../test_support.rs"]
+mod test_support;
+
+#[cfg(all(test, target_os = "linux"))]
 mod tests {
     #[test]
     fn owned_state_moves_between_entered_workers_and_closes() {
-        for workers in [1, 2] {
-            for registered in [false, true] {
-                for write in [false, true] {
-                    let sample = super::linux::run(workers, 2, 4, 4096, write, registered);
-                    assert_eq!(sample["operations"], 8);
-                    assert_eq!(sample["migrations"], if workers == 1 { 0 } else { 3 });
+        crate::test_support::run(|| {
+            for workers in [1, 2] {
+                for registered in [false, true] {
+                    for write in [false, true] {
+                        crate::test_support::step(format!(
+                            "migrating between {workers} workers, registered: {registered}, writing: {write}"
+                        ));
+                        let sample = super::linux::run(workers, 2, 4, 4096, write, registered);
+                        assert_eq!(sample["operations"], 8);
+                        assert_eq!(sample["migrations"], if workers == 1 { 0 } else { 3 });
+                    }
                 }
             }
-        }
+        });
     }
 }

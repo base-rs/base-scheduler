@@ -6,6 +6,7 @@ use std::{
     net::TcpListener,
     process::{Child, Command, Stdio},
     sync::mpsc,
+    thread::JoinHandle,
     time::{Duration, Instant},
 };
 
@@ -14,7 +15,31 @@ const BINARY: &str = env!("CARGO_BIN_EXE_base-scheduler-benchmark-echo");
 const REQUESTS: u64 = 8;
 const CONNECTIONS: u64 = 4;
 const WARMUP_SECONDS: f64 = 0.03;
-struct Process(Child);
+// Turns a hang into a failure. It bounds no expected speed, so it is far longer than any run needs.
+const WATCHDOG: Duration = Duration::from_secs(60);
+
+// Fail the test, naming it and the step it reached.
+fn expired(step: &str) -> ! {
+    panic!(
+        "{}: test watchdog expired after {WATCHDOG:?} while {step}",
+        std::thread::current().name().unwrap_or("unnamed test")
+    )
+}
+
+// Join a thread, failing if the watchdog expires first.
+fn join<T>(thread: JoinHandle<T>, step: &str) -> T {
+    let until = Instant::now() + WATCHDOG;
+    while !thread.is_finished() {
+        if Instant::now() >= until {
+            expired(step);
+        }
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    thread.join().unwrap()
+}
+
+// A benchmark process and its arguments.
+struct Process(Child, String);
 impl Process {
     fn new(args: &[&str]) -> Self {
         Self(
@@ -24,15 +49,18 @@ impl Process {
                 .stderr(Stdio::piped())
                 .spawn()
                 .unwrap(),
+            format!("{args:?}"),
         )
     }
     fn finish(&mut self, success: bool) -> String {
-        let until = Instant::now() + Duration::from_secs(15);
+        let until = Instant::now() + WATCHDOG;
         let status = loop {
             if let Some(status) = self.0.try_wait().unwrap() {
                 break status;
             }
-            assert!(Instant::now() < until, "benchmark process timed out");
+            if Instant::now() >= until {
+                expired(&format!("waiting for the benchmark process {}", self.1));
+            }
             std::thread::sleep(Duration::from_millis(5));
         };
         let mut stderr = String::new();
@@ -73,7 +101,9 @@ fn smoke_with(backend: &str, rate: &[&str]) {
         stdout.read_to_string(&mut rest).unwrap();
         send.send(rest).unwrap();
     });
-    let address = recv.recv_timeout(Duration::from_secs(10)).unwrap();
+    let address = recv
+        .recv_timeout(WATCHDOG)
+        .unwrap_or_else(|_| expired(&format!("waiting for the {backend} server's address")));
     let measure = format!("requests={REQUESTS}");
     let mut client = Process::new(
         &[
@@ -118,7 +148,9 @@ fn smoke_with(backend: &str, rate: &[&str]) {
         assert!(stats["paced_send_delay_max_us"].is_null());
     }
     server.finish(true);
-    let rest = recv.recv_timeout(Duration::from_secs(10)).unwrap();
+    let rest = recv
+        .recv_timeout(WATCHDOG)
+        .unwrap_or_else(|_| expired(&format!("reading the {backend} server's report")));
     // Native servers end by reporting their rescue counts.
     let rescues = rest
         .lines()
@@ -265,7 +297,7 @@ fn client_rejects_corrupt_echoes() {
         socket.write_all(&[byte[0].wrapping_add(1)]).unwrap();
     });
     Process::new(&["client", &address, "1", "1", "1", "0", "requests=1"]).finish(false);
-    thread.join().unwrap();
+    join(thread, "waiting for the test server to finish");
 }
 
 #[test]
@@ -276,7 +308,7 @@ fn client_rejects_an_empty_measurement() {
         let _ = listener.accept().unwrap();
     });
     Process::new(&["client", &address, "1", "1", "1", "0", "0.000000001"]).finish(false);
-    thread.join().unwrap();
+    join(thread, "waiting for the test server to finish");
 }
 
 #[test]

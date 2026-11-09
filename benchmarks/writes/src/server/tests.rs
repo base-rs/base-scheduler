@@ -375,37 +375,40 @@ fn writer_failures_still_retire_both_directions() {
 
 #[test]
 fn scheduler_admission_and_task_failures_are_returned() {
-    let runtime = crate::runtime(1);
-    for (steps, expected) in [
-        (vec![("register", failure("registration"))], "registration"),
-        (
-            vec![("register", Ok(0)), ("spawn", failure("closed"))],
-            "the scheduler is closed",
-        ),
-        (
-            vec![("register", Ok(0)), ("spawn", Ok(0))],
-            "task cancelled",
-        ),
-        (
-            vec![("register", Ok(0)), ("spawn", Ok(1))],
-            "connection failed",
-        ),
-    ] {
-        let scheduler = Script::new(steps);
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let socket = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
-        let _accepted = listener.accept().unwrap();
-        let error = runtime
-            .block_on(scheduler_server(
-                Arc::clone(&scheduler),
-                vec![socket],
-                WORKLOAD,
-                |_, _, _| async { Err("connection failed".into()) },
-            ))
-            .unwrap_err();
-        assert_eq!(error.to_string(), expected);
-        scheduler.finished();
-    }
+    crate::test_support::run(|| {
+        let runtime = crate::runtime(1);
+        for (steps, expected) in [
+            (vec![("register", failure("registration"))], "registration"),
+            (
+                vec![("register", Ok(0)), ("spawn", failure("closed"))],
+                "the scheduler is closed",
+            ),
+            (
+                vec![("register", Ok(0)), ("spawn", Ok(0))],
+                "task cancelled",
+            ),
+            (
+                vec![("register", Ok(0)), ("spawn", Ok(1))],
+                "connection failed",
+            ),
+        ] {
+            crate::test_support::step(format!("serving until {expected}"));
+            let scheduler = Script::new(steps);
+            let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+            let socket = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+            let _accepted = listener.accept().unwrap();
+            let error = runtime
+                .block_on(scheduler_server(
+                    Arc::clone(&scheduler),
+                    vec![socket],
+                    WORKLOAD,
+                    |_, _, _| async { Err("connection failed".into()) },
+                ))
+                .unwrap_err();
+            assert_eq!(error.to_string(), expected);
+            scheduler.finished();
+        }
+    });
 }
 
 #[test]
@@ -439,78 +442,90 @@ fn script_rejects_operations_outside_the_benchmark_contract() {
 
 #[test]
 fn setup_failures_are_reported_before_connections_start() {
-    for operation in [
-        "bind listener",
-        "listener address",
-        "report listener",
-        "accept connection",
-    ] {
-        let error =
-            crate::tests::fail_setup(operation, || run("tokio", 1, 1, WORKLOAD, 0)).unwrap_err();
-        assert_eq!(error.to_string(), operation);
-    }
-    for operation in [
-        "accept connection",
-        "server TCP_NODELAY",
-        "send buffer",
-        "send buffer size",
-    ] {
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let _client = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
-        let error = crate::tests::fail_setup(operation, || accept_connections(&listener, 1, 65536))
+    crate::test_support::run(|| {
+        for operation in [
+            "bind listener",
+            "listener address",
+            "report listener",
+            "accept connection",
+        ] {
+            crate::test_support::step(format!("running a server that fails to {operation}"));
+            let error = crate::tests::fail_setup(operation, || run("tokio", 1, 1, WORKLOAD, 0))
+                .unwrap_err();
+            assert_eq!(error.to_string(), operation);
+        }
+        for operation in [
+            "accept connection",
+            "server TCP_NODELAY",
+            "send buffer",
+            "send buffer size",
+        ] {
+            let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+            let _client = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+            crate::test_support::step(format!("accepting a connection that fails at {operation}"));
+            let error =
+                crate::tests::fail_setup(operation, || accept_connections(&listener, 1, 65536))
+                    .unwrap_err();
+            assert_eq!(error.to_string(), operation);
+        }
+        let runtime = crate::runtime(1);
+        for operation in ["nonblocking stream", "Tokio stream registration"] {
+            let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+            let client = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+            let (_peer, _) = listener.accept().unwrap();
+            crate::test_support::step(format!("serving a connection that fails at {operation}"));
+            let error = crate::tests::fail_setup(operation, || {
+                runtime.block_on(tokio_connection(client, WORKLOAD))
+            })
             .unwrap_err();
-        assert_eq!(error.to_string(), operation);
-    }
-    let runtime = crate::runtime(1);
-    for operation in ["nonblocking stream", "Tokio stream registration"] {
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let client = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
-        let (_peer, _) = listener.accept().unwrap();
-        let error = crate::tests::fail_setup(operation, || {
-            runtime.block_on(tokio_connection(client, WORKLOAD))
-        })
-        .unwrap_err();
-        assert_eq!(error.to_string(), operation);
-    }
+            assert_eq!(error.to_string(), operation);
+        }
+    });
 }
 
 #[test]
 fn tokio_connection_reports_a_reset_while_waiting_for_a_request() {
-    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    let peer = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
-    let (socket, _) = listener.accept().unwrap();
-    crate::runtime(1).block_on(async {
-        let mut connection = std::pin::pin!(tokio_connection(socket, WORKLOAD));
-        let mut context = std::task::Context::from_waker(std::task::Waker::noop());
-        assert!(connection.as_mut().poll(&mut context).is_pending());
-        socket2::SockRef::from(&peer)
-            .set_linger(Some(std::time::Duration::ZERO))
-            .unwrap();
-        drop(peer);
-        let error = connection.await.unwrap_err();
-        assert_eq!(
-            error.downcast::<io::Error>().unwrap().kind(),
-            ErrorKind::ConnectionReset
-        );
+    crate::test_support::run(|| {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let peer = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+        let (socket, _) = listener.accept().unwrap();
+        crate::runtime(1).block_on(async {
+            let mut connection = std::pin::pin!(tokio_connection(socket, WORKLOAD));
+            let mut context = std::task::Context::from_waker(std::task::Waker::noop());
+            assert!(connection.as_mut().poll(&mut context).is_pending());
+            socket2::SockRef::from(&peer)
+                .set_linger(Some(std::time::Duration::ZERO))
+                .unwrap();
+            drop(peer);
+            let error = connection.await.unwrap_err();
+            assert_eq!(
+                error.downcast::<io::Error>().unwrap().kind(),
+                ErrorKind::ConnectionReset
+            );
+        });
     });
 }
 
 #[cfg(target_os = "linux")]
 #[test]
 fn native_runtime_setup_failures_are_returned() {
-    for (backend, operation) in [
-        ("native-monitor", "native runtime"),
-        ("iouring-writer", "io_uring selector"),
-    ] {
-        let error = crate::tests::fail_setup(operation, || serve(backend, 1, WORKLOAD, Vec::new()))
+    crate::test_support::run(|| {
+        for (backend, operation) in [
+            ("native-monitor", "native runtime"),
+            ("iouring-writer", "io_uring selector"),
+        ] {
+            crate::test_support::step(format!("serving {backend} with a failing {operation}"));
+            let error =
+                crate::tests::fail_setup(operation, || serve(backend, 1, WORKLOAD, Vec::new()))
+                    .unwrap_err();
+            assert_eq!(error.to_string(), operation);
+        }
+        if base_scheduler_iouring::IoUringSelector::new(Default::default()).is_ok() {
+            let error = crate::tests::fail_setup("io_uring runtime", || {
+                serve("iouring-writer", 1, WORKLOAD, Vec::new())
+            })
             .unwrap_err();
-        assert_eq!(error.to_string(), operation);
-    }
-    if base_scheduler_iouring::IoUringSelector::new(Default::default()).is_ok() {
-        let error = crate::tests::fail_setup("io_uring runtime", || {
-            serve("iouring-writer", 1, WORKLOAD, Vec::new())
-        })
-        .unwrap_err();
-        assert_eq!(error.to_string(), "io_uring runtime");
-    }
+            assert_eq!(error.to_string(), "io_uring runtime");
+        }
+    });
 }
