@@ -50,13 +50,17 @@ impl Window {
         }
     }
 
-    // Whether an expiry of `target`, observed at `now`, falls inside the window.
-    fn includes(&self, target: Instant, now: Instant) -> bool {
-        target >= self.start
+    // Record the overshoot of an expiry of `target`, observed at `now`, if it falls inside the window. Whether it does depends only on the instants given, so tests reach both outcomes deterministically.
+    #[inline]
+    fn record(&self, overshoot: &mut Vec<u64>, target: Instant, now: Instant) {
+        let included = target >= self.start
             && match self.end {
                 End::At(end) => now < end,
                 End::After(_) => true,
-            }
+            };
+        if included {
+            overshoot.push(now.duration_since(target).as_nanos() as u64);
+        }
     }
 
     // How many expiries a task can record inside the window, at most.
@@ -196,9 +200,7 @@ async fn expiries<S: Clock>(scheduler: &S, window: &Window) -> Vec<u64> {
         scheduler.sleep_until(target, &never).await.unwrap();
         let now = Instant::now();
         assert!(now >= target, "timer fired early");
-        if window.includes(target, now) {
-            overshoot.push(now.duration_since(target).as_nanos() as u64);
-        }
+        window.record(&mut overshoot, target, now);
         window.work();
     }
     overshoot

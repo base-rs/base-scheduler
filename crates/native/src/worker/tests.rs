@@ -506,6 +506,15 @@ fn a_nonblocking_turn_without_a_driver_does_not_park() {
     super::drive(&mut None, Some(std::time::Duration::ZERO));
 }
 
+// A driverless worker idle with a pending timer parks until its deadline. Workers reach this only if they compute the wait before the deadline passes, so it is covered here directly.
+#[test]
+fn a_timed_turn_without_a_driver_parks_until_its_timeout() {
+    // Nothing unparks this thread: a park without its timeout would hang until the watchdog.
+    crate::test_support::run(|| {
+        super::drive(&mut None, Some(std::time::Duration::from_millis(1)));
+    });
+}
+
 #[test]
 fn a_rescue_turns_an_empty_idle_search_into_a_retry() {
     assert!(matches!(
