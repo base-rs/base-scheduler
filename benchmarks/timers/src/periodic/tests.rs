@@ -31,6 +31,13 @@ fn window(start: Instant, end: End) -> Window {
     }
 }
 
+// What `window` records for an expiry of `target` observed at `now`: its overshoot, or nothing.
+fn recorded(window: &Window, target: Instant, now: Instant) -> Vec<u64> {
+    let mut overshoot = Vec::new();
+    window.record(&mut overshoot, target, now);
+    overshoot
+}
+
 #[test]
 fn a_timed_window_includes_expiries_due_after_its_start_and_observed_before_its_end() {
     let start = Instant::now();
@@ -38,9 +45,10 @@ fn a_timed_window_includes_expiries_due_after_its_start_and_observed_before_its_
     let open = window(start, End::At(end));
     // The number recorded never ends a timed window.
     assert!(!open.ended(usize::MAX));
-    assert!(open.includes(start, start));
-    assert!(!open.includes(start - Duration::from_nanos(1), start));
-    assert!(!open.includes(start, end));
+    assert_eq!(recorded(&open, start, start), [0]);
+    assert_eq!(recorded(&open, start, start + Duration::from_nanos(5)), [5]);
+    assert!(recorded(&open, start - Duration::from_nanos(1), start).is_empty());
+    assert!(recorded(&open, start, end).is_empty());
     // One expiry per delay, and one more for a deadline at the start.
     assert_eq!(open.capacity(), 3_600_001);
     assert!(window(start, End::At(start)).ended(0));
@@ -53,8 +61,8 @@ fn a_window_of_expiries_ends_at_its_count_and_includes_every_later_deadline() {
     let late = start + Duration::from_secs(3600);
     assert!(!counted.ended(1));
     assert!(counted.ended(2));
-    assert!(counted.includes(start, late));
-    assert!(!counted.includes(start - Duration::from_nanos(1), late));
+    assert_eq!(recorded(&counted, start, late), [3_600_000_000_000]);
+    assert!(recorded(&counted, start - Duration::from_nanos(1), late).is_empty());
     assert_eq!(counted.capacity(), 2);
 }
 
