@@ -7,27 +7,31 @@ use futures_lite::future::block_on;
 #[test]
 fn racing_exhaustion_and_returns_do_not_lose_capacity_or_notifications() {
     let pool = HeapBufferPool::new(2, 16).unwrap();
-    let (done, finished) = std::sync::mpsc::channel();
+    let iterations = if cfg!(miri) { 8 } else { 3000 };
+    let (progress, advanced) = std::sync::mpsc::channel();
     let mut handles = Vec::new();
     for value in 0..4 {
         let pool = pool.clone();
-        let done = done.clone();
+        let progress = progress.clone();
         handles.push(std::thread::spawn(move || {
             block_on(async {
-                for _ in 0..if cfg!(miri) { 8 } else { 3000 } {
+                for _ in 0..iterations {
                     let mut buffer = pool.acquire(&Cancellation::never()).await.unwrap();
                     buffer.as_mut().fill(value);
                     std::thread::yield_now();
                     assert_eq!(buffer.as_ref(), [value; 16]);
                     let frozen = buffer.freeze();
                     assert_eq!(frozen.view(..4).as_ref(), [value; 4]);
+                    drop(frozen);
+                    progress.send(()).unwrap();
                 }
             });
-            done.send(()).unwrap();
         }));
     }
-    for _ in 0..4 {
-        finished
+    drop(progress);
+    // A lost wakeup strands its waiter once the other threads finish, so the watchdog bounds the wait for each completed iteration rather than the whole workload, whose duration grows with host load because every holder yields its CPU.
+    for _ in 0..4 * iterations {
+        advanced
             .recv_timeout(std::time::Duration::from_secs(30))
             .unwrap();
     }
