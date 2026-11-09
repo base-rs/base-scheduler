@@ -38,6 +38,33 @@ CASES = {
     ],
 }
 
+# The host lock base-benchmark takes for every campaign, shared by every Base project and user on the host.
+HOST_LOCK = "/tmp/base-benchmark-host.lock"
+
+
+def open_host_lock(path=HOST_LOCK):
+    """Open the host lock read-only as base-benchmark does, since flock needs no write access.
+
+    It never follows a symbolic link. An existing lock is opened without O_CREAT, which Linux's fs.protected_regular forbids for another user's file in a sticky /tmp; a missing one is created exclusively and made usable by every user.
+    """
+    flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC
+    while True:
+        try:
+            return os.open(path, flags)
+        except FileNotFoundError:
+            pass
+        try:
+            descriptor = os.open(path, flags | os.O_CREAT | os.O_EXCL, 0o666)
+        except FileExistsError:
+            # Another process created it first; open theirs.
+            continue
+        try:
+            os.fchmod(descriptor, 0o666)
+        except OSError:
+            # The lock still works for this user; others would fail to open it with a clear error.
+            pass
+        return descriptor
+
 
 def digest(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
@@ -129,8 +156,8 @@ def main():
     if args.perf_stat:
         args.perf_stat = args.perf_stat.resolve()
         args.perf_stat.mkdir(parents=True, exist_ok=True)
-    with open("/tmp/base-scheduler-perf.lock", "a") as lock:
-        print("Waiting for /tmp/base-scheduler-perf.lock", flush=True)
+    with os.fdopen(open_host_lock(), "rb") as lock:
+        print(f"Waiting for {HOST_LOCK}", flush=True)
         fcntl.flock(lock, fcntl.LOCK_EX)
         metadata = {
             "started_unix": time.time(),

@@ -8,7 +8,7 @@ Build every variant in the same optimized executable:
 
 ```sh
 cargo build --release --locked -p base-scheduler-benchmark-files
-TMPDIR=/dev/shm flock /tmp/base-scheduler-perf.lock python3 benchmarks/files/run.py --affinity --output /tmp/files.jsonl
+TMPDIR=/dev/shm flock /tmp/base-benchmark-host.lock python3 benchmarks/files/run.py --affinity --output /tmp/files.jsonl
 python3 benchmarks/files/summarize.py /tmp/files.jsonl
 ```
 
@@ -49,7 +49,7 @@ See [results](results.md) for the measured comparison, source identity, and raw 
 Compare fixed-file caching with registration disabled in the same binary, and optionally the original monitor executable:
 
 ```sh
-TMPDIR=/dev/shm flock /tmp/base-scheduler-perf.lock python3 benchmarks/files/registration.py --baseline-binary /path/to/original/executable --output /tmp/registration.jsonl
+TMPDIR=/dev/shm flock /tmp/base-benchmark-host.lock python3 benchmarks/files/registration.py --baseline-binary /path/to/original/executable --output /tmp/registration.jsonl
 ```
 
 `iouring` uses the default fixed-file cache; `iouring-unregistered` sets its capacity to zero while retaining the same ring-cache and request implementation. The optional original executable measures the previous monitor implementation before ring-cache changes. Registering files does not change application I/O semantics, and unavailable registration falls back to ordinary descriptors.

@@ -98,7 +98,7 @@ Miri passes the 14 applicable public buffer-pool tests, including simultaneously
 Build the baseline and candidate separately with `cargo build --release --locked -p core-scheduler-buffer-benchmark --bins`. On an otherwise idle Linux host with provided-buffer ring and multishot receive support:
 
 ```sh
-flock /tmp/core-scheduler-perf.lock \
+flock /tmp/base-benchmark-host.lock \
   python3 benchmarks/buffers/worker_owned.py \
   --baseline /path/to/baseline/release --candidate /path/to/candidate/release \
   --candidate-revision COMMIT --repeats 7 --iterations 10000 --cpus 2-9 \

@@ -85,13 +85,13 @@ The [provenance manifest](experiments/receive-cost/provenance.json) maps each da
 The isolation, cache, placement, and cursor datasets record exact arguments and environment overrides per sample. Replace the recorded executable path with a newly built binary. For example, after applying `cursor.patch`:
 
 ```sh
-flock /tmp/core-scheduler-perf.lock \
+flock /tmp/base-benchmark-host.lock \
   taskset -c 2-15 /path/to/sockets iouring pool 65536 30000 2 tcp 8 receive 8 total
-flock /tmp/core-scheduler-perf.lock \
+flock /tmp/base-benchmark-host.lock \
   env POOL_CURSOR=1 taskset -c 2-15 /path/to/sockets iouring pool 65536 30000 2 tcp 8 receive 8 total
-flock /tmp/core-scheduler-perf.lock \
+flock /tmp/base-benchmark-host.lock \
   env POOL_ROTATE=1 taskset -c 2-15 /path/to/sockets iouring pool 65536 30000 2 tcp 8 receive 8 total
-flock /tmp/core-scheduler-perf.lock \
+flock /tmp/base-benchmark-host.lock \
   taskset -c 2-15 /path/to/sockets iouring pool 65536 30000 2 tcp 8 receive 8 worker-equal
 ```
 

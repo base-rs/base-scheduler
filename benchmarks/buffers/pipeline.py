@@ -56,7 +56,7 @@ def main():
                            str(size), str(depth), str(iterations), ownership, placement]
                 if args.server_host:
                     command[3] = args.server_binary
-                    command = ['ssh', args.server_host, 'flock', '/tmp/base-scheduler-perf.lock'] + command
+                    command = ['ssh', args.server_host, 'flock', '/tmp/base-benchmark-host.lock'] + command
                 if args.remote:
                     server = subprocess.Popen(command + ['0.0.0.0:0'], text=True,
                                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)

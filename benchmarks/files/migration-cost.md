@@ -47,7 +47,7 @@ patch -p1 < benchmarks/files/experiments/invalidate-on-migration.patch
 cargo build --release --locked -p core-scheduler-file-benchmark --bin migration
 cp target/release/migration /tmp/migration-cost-invalidate
 patch -R -p1 < benchmarks/files/experiments/invalidate-on-migration.patch
-TMPDIR=/dev/shm flock /tmp/core-scheduler-perf.lock python3 benchmarks/files/migration.py --retain /tmp/migration-cost-retain --invalidate /tmp/migration-cost-invalidate --output /tmp/migration-cost.jsonl
+TMPDIR=/dev/shm flock /tmp/base-benchmark-host.lock python3 benchmarks/files/migration.py --retain /tmp/migration-cost-retain --invalidate /tmp/migration-cost-invalidate --output /tmp/migration-cost.jsonl
 ```
 
 The runner's CPU sets are specific to this host. Adjust them before using another machine. The binary also accepts `WORKERS BURST ROUNDS SIZE [read|write] [unregistered]`. Tests exercise read/write, registered/unregistered, one/two-worker handoff, and explicit close. Both policy builds passed the io_uring unit tests and benchmark tests with warnings denied. The retained workspace also passed the full all-feature Linux source-region coverage gate (24985/24985 measured regions).

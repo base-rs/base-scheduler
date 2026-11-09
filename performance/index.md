@@ -2,7 +2,7 @@
 
 Measured and rejected optimization attempts on base-scheduler, kept so that they are not retried without new evidence. Each record follows the [base-benchmark investigation convention](https://github.com/base-rs/base-benchmark/blob/main/context/investigations.md) and links its raw results under `benchmarks/*/results/`. Records written before 8 November 2026 were reconstructed from a working log and the pull requests that adopted the changes; where a measurement was not retained, the record says so.
 
-Unless stated, measurements are screens on hana (Intel Xeon E3-1240 v6, 4 cores, 8 threads). Screens are triage, not acceptance evidence.
+Unless stated, measurements are screens on [hana](https://github.com/base-rs/base-benchmark/blob/main/hosts/hana.md). Screens are triage, not acceptance evidence.
 
 ## Investigations
 

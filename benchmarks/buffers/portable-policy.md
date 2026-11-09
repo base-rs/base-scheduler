@@ -38,7 +38,7 @@ Build each revision separately using `CARGO_PROFILE_RELEASE_DEBUG=1 cargo build 
 
 ```sh
 mkdir /tmp/portable-policy-results
-flock /tmp/core-scheduler-perf.lock env PERF_LOCK_HELD=1 \
+flock /tmp/base-benchmark-host.lock env PERF_LOCK_HELD=1 \
   python3 benchmarks/buffers/experiments/portable-policy/run.py \
   /tmp/portable-policy-results /path/to/sockets-baseline /path/to/sockets-candidate
 ```
