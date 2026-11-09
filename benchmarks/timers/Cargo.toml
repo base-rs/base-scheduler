@@ -141,7 +141,7 @@ variants = []
 [[package.metadata.base-benchmark.scenario]]
 name = "periodic"
 arguments = ["--workload", "periodic", "--workers", "4"]
-smoke-arguments = ["--measure-ms", "30"]
+smoke-arguments = ["--measure-expiries", "1"]
 variants = [
     { name = "native", arguments = ["--backend", "native"] },
     { name = "iouring", arguments = ["--backend", "iouring"] },
@@ -150,7 +150,7 @@ variants = [
 [[package.metadata.base-benchmark.scenario]]
 name = "periodic-aligned"
 arguments = ["--workload", "periodic", "--workers", "4", "--alignment", "aligned"]
-smoke-arguments = ["--measure-ms", "30"]
+smoke-arguments = ["--measure-expiries", "1"]
 variants = [
     { name = "native", arguments = ["--backend", "native"] },
     { name = "iouring", arguments = ["--backend", "iouring"] },
@@ -175,7 +175,7 @@ features = ["diagnostics"]
 [[package.metadata.base-benchmark.scenario]]
 name = "periodic-rescues"
 arguments = ["--workload", "periodic", "--workers", "4"]
-smoke-arguments = ["--measure-ms", "30"]
+smoke-arguments = ["--measure-expiries", "1"]
 variants = [
     { name = "native", arguments = ["--backend", "native"] },
     { name = "iouring", arguments = ["--backend", "iouring"] },
@@ -185,7 +185,7 @@ features = ["diagnostics"]
 [[package.metadata.base-benchmark.scenario]]
 name = "periodic-aligned-rescues"
 arguments = ["--workload", "periodic", "--workers", "4", "--alignment", "aligned"]
-smoke-arguments = ["--measure-ms", "30"]
+smoke-arguments = ["--measure-expiries", "1"]
 variants = [
     { name = "native", arguments = ["--backend", "native"] },
     { name = "iouring", arguments = ["--backend", "iouring"] },

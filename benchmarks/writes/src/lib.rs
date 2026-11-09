@@ -53,6 +53,18 @@ fn seconds(value: &str) -> Result<Duration> {
     Ok(Duration::try_from_secs_f64(value.parse::<f64>()?)?)
 }
 
+// The measurement window: a positive duration in seconds, or `requests=N`.
+fn measure(value: &str) -> Result<client::Measure> {
+    if let Some(requests) = value.strip_prefix("requests=") {
+        return Ok(client::Measure::Requests(positive(requests)? as u64));
+    }
+    let duration = seconds(value)?;
+    if duration.is_zero() {
+        return Err("measurement duration must be positive".into());
+    }
+    Ok(client::Measure::Seconds(duration))
+}
+
 fn runtime(workers: usize) -> tokio::runtime::Runtime {
     tokio::runtime::Builder::new_multi_thread()
         .worker_threads(workers)
@@ -90,19 +102,16 @@ pub fn run(args: &[String]) -> Result<()> {
             args[8].parse()?,
         ),
         Some("client") if args.len() == 10 => {
-            let duration = seconds(&args[9])?;
-            if duration.is_zero() {
-                return Err("measurement duration must be positive".into());
-            }
+            let measure = measure(&args[9])?;
             runtime(positive(&args[3])?).block_on(client::run(
                 args[2].parse()?,
                 positive(&args[4])?,
                 Workload::parse(&args[5..8])?,
                 seconds(&args[8])?,
-                duration,
+                measure,
             ))
         }
-        _ => Err("Usage: base-scheduler-benchmark-writes server BACKEND WORKERS CONNECTIONS BYTES CHUNKS WORK SEND_BUFFER\n       base-scheduler-benchmark-writes client ADDRESS WORKERS CONNECTIONS BYTES CHUNKS WORK WARMUP_SECONDS MEASURE_SECONDS\nBackends: tokio, tokio-monitor, tokio-writer, native-monitor, iouring-monitor, iouring-writer. SEND_BUFFER=0 uses the OS default; otherwise it requests SO_SNDBUF bytes. Native backends require Linux.".into()),
+        _ => Err("Usage: base-scheduler-benchmark-writes server BACKEND WORKERS CONNECTIONS BYTES CHUNKS WORK SEND_BUFFER\n       base-scheduler-benchmark-writes client ADDRESS WORKERS CONNECTIONS BYTES CHUNKS WORK WARMUP_SECONDS MEASURE_SECONDS|requests=N\nBackends: tokio, tokio-monitor, tokio-writer, native-monitor, iouring-monitor, iouring-writer. SEND_BUFFER=0 uses the OS default; otherwise it requests SO_SNDBUF bytes. Native backends require Linux. requests=N measures until each connection has counted N requests instead, for smoke runs: its rates are not measurements.".into()),
     }
 }
 
@@ -145,6 +154,10 @@ mod tests {
         assert!(positive("n").is_err());
         assert!(seconds("-1").is_err());
         assert!(seconds("invalid").is_err());
+        for value in ["0", "invalid", "requests=0", "requests=many"] {
+            assert!(measure(value).is_err(), "{value}");
+        }
+        assert_eq!(measure("requests=2").unwrap(), client::Measure::Requests(2));
         assert!(run(&["benchmark".into()]).is_err());
         for values in [
             ["0", "1", "0"],

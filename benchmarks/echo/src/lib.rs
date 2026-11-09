@@ -7,7 +7,7 @@ mod server;
 use std::{error::Error, time::Duration};
 type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;
 
-const USAGE: &str = "Usage: base-scheduler-benchmark-echo server BACKEND WORKERS CONNECTIONS\n       base-scheduler-benchmark-echo client ADDRESS WORKERS CONNECTIONS BYTES WARMUP_SECONDS MEASURE_SECONDS [RATE]\nBackends: tokio; tokio-adapter, native and iouring, each alone (owned reads) or with a -poll, -monitor, -vectored, -owned-vectored or -pooled suffix; iouring-multishot (io_uring requires Linux). Server binds 127.0.0.1:0 and prints its address. RATE paces requests per second across all connections and measures latency from each scheduled send; without it, each connection sends its next request on receiving a response.";
+const USAGE: &str = "Usage: base-scheduler-benchmark-echo server BACKEND WORKERS CONNECTIONS\n       base-scheduler-benchmark-echo client ADDRESS WORKERS CONNECTIONS BYTES WARMUP_SECONDS MEASURE_SECONDS|requests=N [RATE]\nBackends: tokio; tokio-adapter, native and iouring, each alone (owned reads) or with a -poll, -monitor, -vectored, -owned-vectored or -pooled suffix; iouring-multishot (io_uring requires Linux). Server binds 127.0.0.1:0 and prints its address. RATE paces requests per second across all connections and measures latency from each scheduled send; without it, each connection sends its next request on receiving a response. requests=N measures until each connection has counted N requests instead, for smoke runs: its rates are not measurements.";
 
 fn positive(value: &str) -> Result<usize> {
     let value = value.parse::<usize>()?;
@@ -19,6 +19,18 @@ fn positive(value: &str) -> Result<usize> {
 
 fn seconds(value: &str) -> Result<Duration> {
     Ok(Duration::try_from_secs_f64(value.parse::<f64>()?)?)
+}
+
+// The measurement window: a positive duration in seconds, or `requests=N`.
+fn measure(value: &str) -> Result<client::Measure> {
+    if let Some(requests) = value.strip_prefix("requests=") {
+        return Ok(client::Measure::Requests(positive(requests)? as u64));
+    }
+    let duration = seconds(value)?;
+    if duration.is_zero() {
+        return Err("use a positive measurement duration".into());
+    }
+    Ok(client::Measure::Seconds(duration))
 }
 
 fn runtime(workers: usize) -> tokio::runtime::Runtime {
@@ -39,9 +51,9 @@ pub fn run(args: &[String]) -> Result<()> {
             let connections = positive(&args[4])?;
             let bytes = positive(&args[5])?;
             let warmup = seconds(&args[6])?;
-            let duration = seconds(&args[7])?;
-            if bytes > 65536 || duration.is_zero() {
-                return Err("use 1..=65536 bytes and a positive measurement duration".into());
+            let measure = measure(&args[7])?;
+            if bytes > 65536 {
+                return Err("use 1..=65536 bytes".into());
             }
             let rate = args.get(8).map(|rate| positive(rate)).transpose()?;
             runtime(positive(&args[3])?).block_on(client::run(
@@ -49,7 +61,7 @@ pub fn run(args: &[String]) -> Result<()> {
                 connections,
                 bytes,
                 warmup,
-                duration,
+                measure,
                 rate,
             ))
         }

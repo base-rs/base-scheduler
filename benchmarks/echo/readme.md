@@ -127,6 +127,8 @@ target/release/base-scheduler-benchmark-echo server iouring 4 4
 target/release/base-scheduler-benchmark-echo client 127.0.0.1:PORT 4 4 64 1 3
 ```
 
+In place of the measurement seconds, `requests=N` measures until each connection has counted `N` requests, however long that takes, and reports the time until the last connection finished as `seconds`. Smoke tests use it, so that a slow or oversubscribed host cannot leave their window empty; its rates and latencies are not measurements.
+
 Smoke tests exercise each available backend, payload validation, invalid inputs, and empty measurement windows. A controlled socket fixture verifies partial writes, zero-progress errors, and buffer reuse:
 
 ```sh
