@@ -6,8 +6,16 @@ import hashlib
 import itertools
 import json
 import random
+import shlex
 import subprocess
 from pathlib import Path
+
+# The host lock base-benchmark takes for every campaign, shared by every Base project and user on the host.
+HOST_LOCK = '/tmp/base-benchmark-host.lock'
+# Hold the host lock on the server host for the command's lifetime. The redirection opens the lock read-only without
+# O_CREAT, as base-benchmark does: `flock FILE` opens with O_CREAT, which Linux's fs.protected_regular forbids for
+# another user's file in a sticky /tmp. `sh -c` keeps this independent of the remote login shell.
+REMOTE_LOCKED = f'exec 9<{HOST_LOCK} && flock 9 && exec "$@"'
 
 
 def main():
@@ -56,7 +64,7 @@ def main():
                            str(size), str(depth), str(iterations), ownership, placement]
                 if args.server_host:
                     command[3] = args.server_binary
-                    command = ['ssh', args.server_host, 'flock', '/tmp/base-scheduler-perf.lock'] + command
+                    command = ['ssh', args.server_host, shlex.join(['sh', '-c', REMOTE_LOCKED, 'sh'] + command)]
                 if args.remote:
                     server = subprocess.Popen(command + ['0.0.0.0:0'], text=True,
                                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)

@@ -675,7 +675,7 @@ These are the maintainer's decisions, recorded here and removed from the open qu
   - the worker-local timer diagnostic as a Cargo target in the private benchmark package.
 
   Each is added in the first stage 2 pull request that measures against it, and its baseline is measured on `main` with the same harness. The diagnostic and the spawn benchmark were first used as scripts, as above, and became package targets afterwards.
-- **11. Noise and host:** budgets are checked on Linux on hana (Xeon E3-1240 v6, 4 cores and 8 threads), which the maintainer chose over Aiko for stability, using the CPU pinning and exclusive benchmark lock procedure of the existing echo reports (for example [`benchmarks/echo/double-buffered-ready-performance.md`](../benchmarks/echo/double-buffered-ready-performance.md)). Each case takes 9 paired, randomly ordered runs of `main` and the branch:
+- **11. Noise and host:** budgets are checked on Linux on [hana](https://github.com/base-rs/base-benchmark/blob/main/hosts/hana.md), which the maintainer chose over Aiko for stability, using the CPU pinning procedure of the existing echo reports (for example [`benchmarks/echo/double-buffered-ready-performance.md`](../benchmarks/echo/double-buffered-ready-performance.md)) under the exclusive host lock `/tmp/base-benchmark-host.lock` that hana's document asks every measurement to take. Each case takes 9 paired, randomly ordered runs of `main` and the branch:
   - "within noise" means the branch's median lies inside `main`'s min–max range for that case;
   - "≤ ~3%" is the difference of the paired medians.
 

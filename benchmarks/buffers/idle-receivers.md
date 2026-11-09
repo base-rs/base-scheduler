@@ -69,9 +69,9 @@ cargo build --release --locked -p core-scheduler-buffer-benchmark --bin sockets
 The runner refuses to overwrite an existing output file. It records binary hashes and checks each benchmark subprocess's result:
 
 ```sh
-flock /tmp/core-scheduler-perf.lock python3 benchmarks/buffers/idle_receivers.py \
+( flock 9 && python3 benchmarks/buffers/idle_receivers.py \
   --before /path/to/sockets-baseline --after /path/to/sockets-candidate \
-  --output /tmp/idle-receivers.jsonl
+  --output /tmp/idle-receivers.jsonl ) 9</tmp/base-benchmark-host.lock
 ```
 
 For the longer focused check, use the same command with a fresh output path and `--repeats 21 --iterations 15000 --backends tokio --workers 1 --workloads tcp-small udp`.
@@ -79,6 +79,6 @@ For the longer focused check, use the same command with a fresh output path and 
 For syscall diagnosis, run the following separately for each binary and compare call counts:
 
 ```sh
-flock /tmp/core-scheduler-perf.lock strace -f -c -e trace=poll,epoll_wait,epoll_ctl,recvmsg \
-  taskset -c 2-5 /path/to/sockets tokio pool 64 3000 1 tcp 1 receive
+( flock 9 && strace -f -c -e trace=poll,epoll_wait,epoll_ctl,recvmsg \
+  taskset -c 2-5 /path/to/sockets tokio pool 64 3000 1 tcp 1 receive ) 9</tmp/base-benchmark-host.lock
 ```

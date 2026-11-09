@@ -85,14 +85,14 @@ The [provenance manifest](experiments/receive-cost/provenance.json) maps each da
 The isolation, cache, placement, and cursor datasets record exact arguments and environment overrides per sample. Replace the recorded executable path with a newly built binary. For example, after applying `cursor.patch`:
 
 ```sh
-flock /tmp/core-scheduler-perf.lock \
-  taskset -c 2-15 /path/to/sockets iouring pool 65536 30000 2 tcp 8 receive 8 total
-flock /tmp/core-scheduler-perf.lock \
-  env POOL_CURSOR=1 taskset -c 2-15 /path/to/sockets iouring pool 65536 30000 2 tcp 8 receive 8 total
-flock /tmp/core-scheduler-perf.lock \
-  env POOL_ROTATE=1 taskset -c 2-15 /path/to/sockets iouring pool 65536 30000 2 tcp 8 receive 8 total
-flock /tmp/core-scheduler-perf.lock \
-  taskset -c 2-15 /path/to/sockets iouring pool 65536 30000 2 tcp 8 receive 8 worker-equal
+( flock 9 && \
+  taskset -c 2-15 /path/to/sockets iouring pool 65536 30000 2 tcp 8 receive 8 total ) 9</tmp/base-benchmark-host.lock
+( flock 9 && \
+  env POOL_CURSOR=1 taskset -c 2-15 /path/to/sockets iouring pool 65536 30000 2 tcp 8 receive 8 total ) 9</tmp/base-benchmark-host.lock
+( flock 9 && \
+  env POOL_ROTATE=1 taskset -c 2-15 /path/to/sockets iouring pool 65536 30000 2 tcp 8 receive 8 total ) 9</tmp/base-benchmark-host.lock
+( flock 9 && \
+  taskset -c 2-15 /path/to/sockets iouring pool 65536 30000 2 tcp 8 receive 8 worker-equal ) 9</tmp/base-benchmark-host.lock
 ```
 
 Every connection warms up for 1,000 bursts. Most samples measure 30,000 bursts per connection; the hardware-counter run measures 60,000. The topology control always uses burst size eight and varies connection count between one and eight; it does not vary burst size. The isolation experiment explicitly varies burst size at a fixed eight connections. Shuffle the case list independently within each repeat using the manifest seed. Pair ratios by `repeat` within a dataset and matching worker/size/burst topology. Different datasets use different experimental binaries, so their absolute medians should not be combined into one additive cost breakdown. Ranges are observed matched-repeat ranges, not confidence intervals.

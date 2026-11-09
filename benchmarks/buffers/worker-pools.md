@@ -49,11 +49,11 @@ Keep the ownership model as the basis for further experiments. Before promoting 
 Build the baseline and candidate in separate checkouts with `cargo build --release --locked -p core-scheduler-buffer-benchmark --bins`, then run on an otherwise idle Linux host:
 
 ```sh
-flock -x /tmp/core-scheduler-perf.lock \
+( flock -x 9 && \
   python3 benchmarks/buffers/pool_contract.py \
   --before /path/to/baseline/release --after /path/to/candidate/release \
   --repeats 7 --socket-iterations 10000 --match '^sockets iouring' \
-  --output /tmp/worker-pools.jsonl
+  --output /tmp/worker-pools.jsonl ) 9</tmp/base-benchmark-host.lock
 python3 benchmarks/buffers/summarize_pool_contract.py \
   /tmp/worker-pools.jsonl --output /tmp/worker-pools-summary.json
 ```

@@ -110,7 +110,7 @@ Packages the old tree does not lock get this workspace's versions. Where the har
 
 Overshoot is reported as quantiles since that update, and as a mean before it. Summaries treat the two as different metrics, so without `--overlay true` a comparison with an older revision warns that the overshoot metrics are defined differently and compares none of them.
 
-To measure on a dedicated host, such as hana, add `--host HOST` to `prepare`, `run` and `smoke`. Local paths are mirrored on the host with `rsync`, the matching `base-benchmark` command is installed there when it is missing, and outputs are copied back, so `summarize` works locally:
+To measure on a dedicated host, such as [hana](https://github.com/base-rs/base-benchmark/blob/main/hosts/hana.md), add `--host HOST` to `prepare`, `run` and `smoke`. Local paths are mirrored on the host with `rsync`, the matching `base-benchmark` command is installed there when it is missing, and outputs are copied back, so `summarize` works locally:
 
 ```sh
 cargo bake benchmark:prepare --host hana.local --tree main=../main --tree candidate=.

@@ -80,10 +80,10 @@ Baseline source is commit `7593620`; remote Rust/Cargo sources were verified byt
 Both builds use `cargo build --release --locked -p core-scheduler-buffer-benchmark --bins`. Host: Aiko, AMD Ryzen 9 9950X3D, Linux 7.2.6, Rust 1.99.0 / LLVM 23.1.1. Each benchmark process and its threads use CPUs 2–9; peer and scheduler threads share that CPU set. There are no concurrent task-owned builds, tests, profiling sessions, or timed benchmarks.
 
 ```sh
-flock -x /tmp/core-scheduler-perf.lock python3 benchmarks/buffers/pool_contract.py \
+( flock -x 9 && python3 benchmarks/buffers/pool_contract.py \
   --before /home/samuel/.cache/core-scheduler-pool-contract/before \
   --after /home/samuel/.cache/core-scheduler-pool-contract/after \
-  --output benchmarks/buffers/results/pool-contract.jsonl
+  --output benchmarks/buffers/results/pool-contract.jsonl ) 9</tmp/base-benchmark-host.lock
 ```
 
 Long validation adds `--validation --repeats 11` and writes a separate results file. The identical-binary control uses the `after` directory for both arguments and filters with `--match '^(sockets native shared 64 20000 2|files tokio submit)'`.
