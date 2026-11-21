@@ -6,7 +6,7 @@ Proposed 2026-11-21; not yet accepted or implemented.
 
 A scheduler can run tasks that borrow from the code which created them, provided every such task has finished, and been destroyed, before that code's scope ends. This is structured concurrency, as `std::thread::scope` provides for threads: an application creates its scheduler, runs its program inside one scope, and the scope does not return until every task started in it is gone.
 
-Interface:
+### Interface
 
 - The interface crate defines a capability, `SpawnScoped`, with one entry point, `scope`. It takes an asynchronous root, which receives a `&Scope`, and blocks the calling thread until the root has returned and every task spawned through the scope has been destroyed, then returns the root's output:
 
@@ -31,13 +31,13 @@ Interface:
 
 - Panics follow `std::thread::scope`. If the root panics, `scope` still waits for every task, then resumes the root's panic. A task's panic is reported to its handle as `TaskError::Panicked`, as now. If a task panicked and its handle was dropped without observing the panic, `scope` panics after every task has been destroyed, so a failure is never silent. A panic during a task's or output's destruction is contained as the existing guards contain it.
 
-Soundness boundary:
+### Soundness boundary
 
 - When `scope` returns, normally or by unwinding, no task's future or output remains, and nothing the backend still holds, such as a waker, queued runnable or I/O registration, can reach either. A backend that cannot guarantee this for some path, such as an abrupt runtime teardown, blocks `scope` until it can, rather than returning; a scope that waits forever is a bug, never unsoundness.
 - The interface crate implements `scope`, `Scope` and `ScopedTask` once for every backend, on top of an `unsafe` backend primitive that spawns a future without the `'static` bound. That primitive's contract states exactly what the backend guarantees about destroying the future and its storage, and the interface crate's join, panic and output handling rely only on that contract. Each `unsafe` block carries a `// SAFETY:` comment naming the obligation it discharges.
 - Outputs are delivered through storage the scope owns, never left in a runtime's own task storage after the task is destroyed, since a runtime may drop such storage later, from another thread. A task whose handle was dropped has its output destroyed before the scope's join completes.
 
-Backends:
+### Backends
 
 - Native implements the primitive with `async-task`'s `spawn_unchecked`, whose documented condition, that borrowed data outlive the task's `Runnable` and `Task`, the backend satisfies by tracking both for each scoped task.
 - The Tokio adapter implements it by erasing the future's lifetime before `Runtime::spawn`, with a guard in the spawned future that reports its destruction, including when Tokio destroys it on abort or runtime shutdown. `scope` waits for that report, so a Tokio runtime destroyed while a scope is active cannot leave a borrowed future alive.
