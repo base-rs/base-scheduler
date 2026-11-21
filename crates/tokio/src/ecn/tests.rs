@@ -304,8 +304,15 @@ mod supported {
                 kind,
             )
         };
+        // Loopback delivery can trail the send on macOS, so block until the datagram is queued.
         let wait = || {
-            crate::socket_io::wait(&receiver, crate::Interest::Readable).unwrap();
+            let mut descriptor = libc::pollfd {
+                fd: std::os::fd::AsRawFd::as_raw_fd(&receiver),
+                events: libc::POLLIN,
+                revents: 0,
+            };
+            // SAFETY: One initialized pollfd, retained through the call.
+            assert_eq!(unsafe { libc::poll(&mut descriptor, 1, 5000) }, 1);
         };
         set_send(&sender, Ecn::Ect0).unwrap();
         sender.send_to(b"a", &address).unwrap();
