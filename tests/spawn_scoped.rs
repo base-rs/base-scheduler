@@ -3,7 +3,7 @@
 
 // The interface's scope, slot and panic paths, driven deterministically by a test-only backend that polls tasks on whichever thread calls `run`.
 
-use base_scheduler::{ScopeToken, SpawnError, SpawnScoped, TaskError};
+use base_scheduler::{Placement, ScopeToken, SocketOperation, SpawnError, SpawnScoped, TaskError};
 use std::{
     future::{Future, pending, poll_fn},
     panic::{AssertUnwindSafe, catch_unwind},
@@ -71,6 +71,11 @@ impl Inline {
             entry.destroy(task);
         }
     }
+}
+
+// A scheduler, so that it can place work in place too.
+impl SocketOperation for Inline {
+    type Socket = ();
 }
 
 struct InlineHandle(Arc<Entry>);
@@ -358,4 +363,49 @@ fn closed_backend_rejects_and_drops_the_future() {
     });
     assert!(matches!(result, Err(SpawnError::SchedulerClosed)));
     assert_eq!(drops.load(Ordering::SeqCst), 1);
+}
+
+// Generic supervision, as a server writes it: the scheduler places work in place, and a scope spawns it.
+async fn supervise<'a, P: Placement<'a, Scheduler = Inline>>(placement: P, value: &'a u32) -> u32 {
+    let placed = placement.place(async move { *value + 1 }).unwrap();
+    placed.await.unwrap()
+}
+
+#[test]
+fn the_scheduler_places_work_in_place() {
+    let inline = Inline::default();
+    let value = 41;
+    assert!(std::ptr::eq(Placement::scheduler(&inline), &inline));
+    // Nothing is spawned: the work completes as the caller polls it.
+    assert_eq!(
+        futures_lite::future::block_on(supervise(&inline, &value)),
+        42
+    );
+    assert!(inline.tasks.lock().unwrap().is_empty());
+}
+
+#[test]
+fn a_scope_places_work_as_its_tasks() {
+    let inline = Inline::default();
+    let value = 6;
+    let value = &value;
+    let (output, panicked, closed) = inline.scope(async |scope| {
+        assert!(std::ptr::eq(Placement::scheduler(scope), &inline));
+        let mut output = std::pin::pin!(supervise(scope, value));
+        assert!(poll_once(&mut output).await.is_pending());
+        assert_eq!(inline.tasks.lock().unwrap().len(), 1);
+        inline.run();
+        let output = output.await;
+        let task = scope.place(async { panic!("placed") }).unwrap();
+        inline.run();
+        let panicked = matches!(task.await, Err(TaskError::Panicked(_)));
+        inline.closed.store(true, Ordering::SeqCst);
+        let closed = matches!(
+            scope.place(async {}).map(drop),
+            Err(SpawnError::SchedulerClosed)
+        );
+        (output, panicked, closed)
+    });
+    assert_eq!(output, 7);
+    assert!(panicked && closed);
 }
