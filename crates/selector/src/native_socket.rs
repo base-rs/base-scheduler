@@ -143,13 +143,39 @@ async fn reported(ready: impl std::future::Future<Output = io::Result<()>>) -> i
 
 /// An owned nonblocking socket with lazily retained readiness registrations.
 ///
-/// Usable by any native scheduler instance. Readiness operations retain their buffers in the waiting future without leaving payload pointers in the reactor. Completion backends retain the socket and buffers independently until their operations retire. Finish outstanding operations before exclusive close. Imported TCP resources must remain nonblocking through external aliases.
+/// Usable by any native scheduler instance. Readiness operations retain their buffers in the waiting future without leaving payload pointers in the reactor. Completion backends retain the socket and buffers independently until their operations retire. Finish outstanding operations before exclusive close. Imported TCP resources must remain nonblocking through external aliases. Borrow its native descriptor through `AsFd` and `AsRawFd`, or `AsSocket` and `AsRawSocket` on Windows, for options the interface does not provide; it must stay open and nonblocking.
 #[derive(Debug)]
 pub struct NativeSocket {
     // Drop registrations before the final native owner. They hold only a weak native reference.
     #[cfg(unix)]
     pub(crate) registrations: Arc<crate::readiness_driver::SocketRegistrations>,
     pub(crate) inner: Arc<RegisteredSocket>,
+}
+
+// Borrowing the descriptor cannot close it or outlive this owner. The backend relies on the socket staying open and nonblocking, which external aliases must preserve.
+#[cfg(unix)]
+impl std::os::fd::AsFd for NativeSocket {
+    fn as_fd(&self) -> std::os::fd::BorrowedFd<'_> {
+        std::os::fd::AsFd::as_fd(self.get_ref())
+    }
+}
+#[cfg(unix)]
+impl std::os::fd::AsRawFd for NativeSocket {
+    fn as_raw_fd(&self) -> std::os::fd::RawFd {
+        std::os::fd::AsRawFd::as_raw_fd(self.get_ref())
+    }
+}
+#[cfg(windows)]
+impl std::os::windows::io::AsSocket for NativeSocket {
+    fn as_socket(&self) -> std::os::windows::io::BorrowedSocket<'_> {
+        std::os::windows::io::AsSocket::as_socket(self.get_ref())
+    }
+}
+#[cfg(windows)]
+impl std::os::windows::io::AsRawSocket for NativeSocket {
+    fn as_raw_socket(&self) -> std::os::windows::io::RawSocket {
+        std::os::windows::io::AsRawSocket::as_raw_socket(self.get_ref())
+    }
 }
 impl NativeSocket {
     /// Retain the registered native socket for another I/O backend.

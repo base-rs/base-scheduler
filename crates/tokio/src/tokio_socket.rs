@@ -214,10 +214,36 @@ async fn windows_ready(ready: impl std::future::Future<Output = io::Result<()>>)
 
 /// A nonblocking socket associated with the adapter's Tokio runtime.
 ///
-/// A descriptor can represent an unconnected, bound, listening, connected, or datagram socket. Unix readiness registration is deferred until an operation needs to wait, so an unconnected socket cannot retain stale closed readiness after connecting or listening. It is deliberately not `Clone`; operation futures borrow it, and accepted shutdown jobs privately retain its registration until completion. Explicit close consumes exclusive ownership.
+/// A descriptor can represent an unconnected, bound, listening, connected, or datagram socket. Unix readiness registration is deferred until an operation needs to wait, so an unconnected socket cannot retain stale closed readiness after connecting or listening. It is deliberately not `Clone`; operation futures borrow it, and accepted shutdown jobs privately retain its registration until completion. Explicit close consumes exclusive ownership. Borrow its native descriptor through `AsFd` and `AsRawFd`, or `AsSocket` and `AsRawSocket` on Windows, for options the interface does not provide; it must stay open and nonblocking.
 pub struct TokioSocket {
     pub(crate) inner: Arc<RegisteredSocket>,
     runtime: Id,
+}
+
+// Borrowing the descriptor cannot close it or outlive this owner. The backend relies on the socket staying open and nonblocking, which external aliases must preserve.
+#[cfg(unix)]
+impl std::os::fd::AsFd for TokioSocket {
+    fn as_fd(&self) -> std::os::fd::BorrowedFd<'_> {
+        std::os::fd::AsFd::as_fd(self.get_ref())
+    }
+}
+#[cfg(unix)]
+impl std::os::fd::AsRawFd for TokioSocket {
+    fn as_raw_fd(&self) -> std::os::fd::RawFd {
+        std::os::fd::AsRawFd::as_raw_fd(self.get_ref())
+    }
+}
+#[cfg(windows)]
+impl std::os::windows::io::AsSocket for TokioSocket {
+    fn as_socket(&self) -> std::os::windows::io::BorrowedSocket<'_> {
+        std::os::windows::io::AsSocket::as_socket(self.get_ref())
+    }
+}
+#[cfg(windows)]
+impl std::os::windows::io::AsRawSocket for TokioSocket {
+    fn as_raw_socket(&self) -> std::os::windows::io::RawSocket {
+        std::os::windows::io::AsRawSocket::as_raw_socket(self.get_ref())
+    }
 }
 
 impl TokioSocket {

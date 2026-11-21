@@ -40,7 +40,7 @@ A runner receives one async closure and creates a **fresh isolated fixture for e
 | `spawn_tests!` | Fixture | `SpawnFixture` |
 | `spawn_dispatch_tests!` | Fixture | `SpawnFixture + Sync`, with a background executor driver |
 | `spawn_scoped_tests!` | Fixture, synchronously | `SpawnScopedFixture`, with at least two workers |
-| `packet_ecn_tests!` | Fixture | `PacketEcnFixture`, one module per family where the backend supports ECN; `LoopbackEcnFixture` provides one from a socket descriptor |
+| `packet_ecn_tests!` | Fixture | `PacketEcnFixture`, one module per family where the backend supports ECN; `LoopbackEcnFixture` provides one for sockets implementing `AsFd`, or without native setters elsewhere |
 | `packet_ecn_unsupported_tests!` | Fixture | `EcnOptionFixture`, where the backend or platform does not support ECN |
 | `address_resolution_tests!` | Fixture | `AddressResolutionFixture` |
 | `address_resolution_ip_tests!` | Fixture and `domain: SocketDomain` macro argument | `AddressResolutionFixture`, one supported family per module |

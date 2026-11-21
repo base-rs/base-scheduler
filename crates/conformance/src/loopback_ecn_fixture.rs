@@ -20,7 +20,7 @@ pub enum EcnFamily {
     DualStack,
 }
 
-/// A [`PacketEcnFixture`](crate::PacketEcnFixture) over loopback, opened through the scheduler's own socket capabilities: a bound sender and receiver of one family, and a stream socket. Its native setters use the descriptor the runner's accessor returns.
+/// A [`PacketEcnFixture`](crate::PacketEcnFixture) over loopback, opened through the scheduler's own socket capabilities: a bound sender and receiver of one family, and a stream socket. Its native setters borrow the sockets' descriptors through `AsFd`.
 pub struct LoopbackEcnFixture<'s, S: SocketOperation> {
     scheduler: &'s S,
     #[cfg_attr(
@@ -36,53 +36,48 @@ pub struct LoopbackEcnFixture<'s, S: SocketOperation> {
         allow(dead_code)
     )]
     destination: SocketAddress,
-    #[cfg(unix)]
-    #[cfg_attr(
-        not(any(target_os = "linux", target_os = "android", target_os = "macos")),
-        allow(dead_code)
-    )]
-    descriptor: fn(&S::Socket) -> std::os::fd::RawFd,
+}
+
+#[cfg(unix)]
+impl<'s, S> LoopbackEcnFixture<'s, S>
+where
+    S: SocketOpen + SocketBind + SocketLocalAddress + SocketClose,
+    S::Socket: std::os::fd::AsFd,
+{
+    /// Open the fixture's sockets.
+    pub async fn open(scheduler: &'s S, family: EcnFamily) -> Self {
+        Self::open_with(scheduler, family, |socket, only_v6| {
+            let value = libc::c_int::from(only_v6);
+            set(
+                descriptor(socket),
+                libc::IPPROTO_IPV6,
+                libc::IPV6_V6ONLY,
+                value,
+            );
+        })
+        .await
+    }
+}
+
+#[cfg(not(unix))]
+impl<'s, S> LoopbackEcnFixture<'s, S>
+where
+    S: SocketOpen + SocketBind + SocketLocalAddress + SocketClose,
+{
+    /// Open the fixture's sockets, leaving IPv6 sockets with the system's default `IPV6_V6ONLY`, which is enabled on Windows.
+    pub async fn open(scheduler: &'s S, family: EcnFamily) -> Self {
+        Self::open_with(scheduler, family, |_, _| {}).await
+    }
 }
 
 impl<'s, S> LoopbackEcnFixture<'s, S>
 where
     S: SocketOpen + SocketBind + SocketLocalAddress + SocketClose,
 {
-    /// Open the fixture's sockets. `descriptor` returns a socket's native descriptor.
-    #[cfg(unix)]
-    pub async fn open(
-        scheduler: &'s S,
-        family: EcnFamily,
-        descriptor: fn(&S::Socket) -> std::os::fd::RawFd,
-    ) -> Self {
-        Self::open_with(
-            scheduler,
-            family,
-            |socket, only_v6| {
-                let value = libc::c_int::from(only_v6);
-                set(
-                    descriptor(socket),
-                    libc::IPPROTO_IPV6,
-                    libc::IPV6_V6ONLY,
-                    value,
-                );
-            },
-            descriptor,
-        )
-        .await
-    }
-
-    /// Open the fixture's sockets, leaving IPv6 sockets with the system's default `IPV6_V6ONLY`, which is enabled on Windows.
-    #[cfg(not(unix))]
-    pub async fn open(scheduler: &'s S, family: EcnFamily) -> Self {
-        Self::open_with(scheduler, family, |_, _| {}).await
-    }
-
     async fn open_with(
         scheduler: &'s S,
         family: EcnFamily,
         only_v6: impl Fn(&S::Socket, bool),
-        #[cfg(unix)] descriptor: fn(&S::Socket) -> std::os::fd::RawFd,
     ) -> Self {
         let never = Cancellation::never();
         let (domain, local): (_, SocketAddress) = match family {
@@ -133,8 +128,6 @@ where
             receiver,
             stream,
             destination,
-            #[cfg(unix)]
-            descriptor,
         }
     }
 
@@ -163,6 +156,11 @@ where
 }
 
 #[cfg(unix)]
+fn descriptor(socket: &impl std::os::fd::AsFd) -> std::os::fd::RawFd {
+    std::os::fd::AsRawFd::as_raw_fd(&socket.as_fd())
+}
+
+#[cfg(unix)]
 fn set(descriptor: std::os::fd::RawFd, level: libc::c_int, name: libc::c_int, value: libc::c_int) {
     // SAFETY: The value is a live `c_int` of the length passed.
     let result = unsafe {
@@ -179,7 +177,7 @@ fn set(descriptor: std::os::fd::RawFd, level: libc::c_int, name: libc::c_int, va
 
 #[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
 mod native {
-    use super::{EcnFamily, LoopbackEcnFixture, set};
+    use super::{EcnFamily, LoopbackEcnFixture, descriptor, set};
     use crate::{EcnRole, PacketEcnFixture};
     use base_scheduler::{
         ReceiveEcn, SendEcn, SocketAddress, SocketOperation, SocketOptions, SocketPacketReading,
@@ -203,9 +201,9 @@ mod native {
         value
     }
 
-    impl<S: SocketOperation> LoopbackEcnFixture<'_, S> {
+    impl<S: SocketOperation<Socket: std::os::fd::AsFd>> LoopbackEcnFixture<'_, S> {
         fn descriptor_of(&self, role: EcnRole) -> std::os::fd::RawFd {
-            (self.descriptor)(match role {
+            descriptor(match role {
                 EcnRole::Sender => &self.sender,
                 EcnRole::Receiver => &self.receiver,
             })
@@ -229,6 +227,7 @@ mod native {
             + SocketOptions<SendEcn>
             + SocketPacketReading
             + SocketPacketWriting,
+        S::Socket: std::os::fd::AsFd,
     {
         fn socket(&self, role: EcnRole) -> &S::Socket {
             match role {
