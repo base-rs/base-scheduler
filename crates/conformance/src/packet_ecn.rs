@@ -3,10 +3,15 @@
 
 //! Packet ECN: reporting each datagram's marking through every portable receive form, marking sent datagrams, and the options' gets and rejections.
 
-use crate::{EcnOptionFixture, EcnRole, PacketEcnFixture};
+use crate::EcnOptionFixture;
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
+use crate::{EcnRole, PacketEcnFixture};
 use base_scheduler::*;
-use std::io::{self, IoSliceMut};
+use std::io;
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
+use std::io::IoSliceMut;
 
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
 /// The portable packet receive forms.
 #[derive(Clone, Copy, Debug)]
 enum Form {
@@ -20,6 +25,7 @@ enum Form {
     PooledReader,
 }
 
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
 const FORMS: [Form; 8] = [
     Form::Read,
     Form::ReadInto,
@@ -35,11 +41,13 @@ fn never() -> Cancellation {
     Cancellation::never()
 }
 
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
 // The sockets' kernel options are those of the fixture; the readers are constructed when called.
 struct Pair<'f, F: PacketEcnFixture> {
     fixture: &'f F,
 }
 
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
 impl<'f, F: PacketEcnFixture> Pair<'f, F>
 where
     <F::Scheduler as SocketOperation>::Socket: 'static,
@@ -156,12 +164,14 @@ where
     }
 }
 
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
 fn assert_every(reports: Vec<(Form, Option<Ecn>)>, expected: Option<Ecn>) {
     for (form, ecn) in reports {
         assert_eq!(ecn, expected, "{form:?} reported the wrong marking");
     }
 }
 
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
 /// With `ReceiveEcn` enabled, a sender's `SendEcn` marking of ECT(0), and separately CE, is reported by every receive form, including peeks and owned and pooled receives.
 pub async fn markings<F: PacketEcnFixture>(fixture: &F)
 where
@@ -175,6 +185,7 @@ where
     }
 }
 
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
 /// Reporting follows options set after a reader or pooled reader was constructed, in both directions.
 pub async fn after_construction<F: PacketEcnFixture>(fixture: &F)
 where
@@ -203,6 +214,7 @@ where
     }
 }
 
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
 /// With reporting disabled, every form reports `None` for a marked datagram; absence is never reported as `NotEct`.
 pub async fn disabled<F: PacketEcnFixture>(fixture: &F)
 where
@@ -213,6 +225,7 @@ where
     assert_every(pair.every_form().await, None);
 }
 
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
 /// Reporting enabled through the kernel option directly, not `ReceiveEcn`, is reported too.
 pub async fn native_reporting<F: PacketEcnFixture>(fixture: &F)
 where
@@ -224,6 +237,7 @@ where
     assert_every(pair.every_form().await, Some(Ecn::Ce));
 }
 
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
 /// `SendEcn` preserves DSCP bits set beforehand.
 pub async fn dscp<F: PacketEcnFixture>(fixture: &F)
 where
@@ -237,6 +251,7 @@ where
     assert_eq!(fixture.native_class(EcnRole::Sender), 0xb8);
 }
 
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
 /// Gets of both options return the kernel's values, including after native changes.
 pub async fn gets<F: PacketEcnFixture>(fixture: &F)
 where

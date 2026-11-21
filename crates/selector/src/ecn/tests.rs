@@ -74,6 +74,7 @@ mod supported {
         let ipv6 = dual_stack(false);
         set_receive(&ipv6, true).unwrap();
         assert!(ipv6.recv_tclass_v6().unwrap());
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         assert!(
             !ipv6.recv_tos_v4().unwrap(),
             "an IPv6-only socket configured IPv4"
@@ -81,6 +82,7 @@ mod supported {
         assert!(receive(&ipv6).unwrap());
     }
 
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     #[test]
     fn dual_stack_receive_configures_both_sides_and_gets_the_ipv6_option() {
         let socket = dual_stack(true);
@@ -106,6 +108,7 @@ mod supported {
         ipv6.set_tclass_v6(0x28).unwrap();
         set_send(&ipv6, Ecn::Ce).unwrap();
         assert_eq!(ipv6.tclass_v6().unwrap(), 0x2b);
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         assert_eq!(
             ipv6.tos_v4().unwrap() & 0b11,
             0,
@@ -114,6 +117,7 @@ mod supported {
         assert_eq!(send(&ipv6).unwrap(), Ecn::Ce);
     }
 
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     #[test]
     fn dual_stack_send_marks_both_sides_and_gets_the_ipv6_option() {
         let socket = dual_stack(true);
@@ -125,6 +129,7 @@ mod supported {
         assert_eq!(send(&socket).unwrap(), Ecn::Ect0);
     }
 
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     fn failing(index: usize, call: impl FnOnce() -> io::Result<()>) {
         OPTION_FAILURE.with(|slot| slot.set(Some((index, io::ErrorKind::PermissionDenied))));
         assert_eq!(call().unwrap_err().kind(), io::ErrorKind::PermissionDenied);
@@ -132,6 +137,7 @@ mod supported {
     }
 
     // A dual-stack set that fails part-way returns the error and leaves the calls already made in place, and gets report that kernel state. Each set first reads the address and `IPV6_V6ONLY`.
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     #[test]
     fn dual_stack_failures_leave_the_kernel_state() {
         let socket = dual_stack(true);
@@ -149,6 +155,18 @@ mod supported {
     }
 
     // Every system call of every set and get fails in turn, and the operation returns the failure.
+    // On macOS a dual-stack socket is configured through its IPv6 options alone.
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn dual_stack_sockets_use_the_ipv6_options() {
+        let socket = dual_stack(true);
+        set_receive(&socket, true).unwrap();
+        assert!(socket.recv_tclass_v6().unwrap() && receive(&socket).unwrap());
+        set_send(&socket, Ecn::Ce).unwrap();
+        assert_eq!(socket.tclass_v6().unwrap() & 0b11, 0b11);
+        assert_eq!(send(&socket).unwrap(), Ecn::Ce);
+    }
+
     #[test]
     fn every_call_failure_is_returned() {
         for socket in [datagram(Domain::IPV4), dual_stack(false), dual_stack(true)] {
@@ -362,5 +380,7 @@ mod conformance {
     #[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
     family!(dual_stack, DualStack, packet_ecn_tests);
     #[cfg(not(any(target_os = "linux", target_os = "android", target_os = "macos")))]
-    family!(unsupported, Ipv4, packet_ecn_unsupported_tests);
+    family!(unsupported_ipv4, Ipv4, packet_ecn_unsupported_tests);
+    #[cfg(not(any(target_os = "linux", target_os = "android", target_os = "macos")))]
+    family!(unsupported_ipv6, Ipv6, packet_ecn_unsupported_tests);
 }

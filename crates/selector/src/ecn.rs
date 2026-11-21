@@ -19,25 +19,20 @@ fn packet(socket: &Socket) -> io::Result<()> {
 }
 
 // A one-shot local shim fails the system call with this index, counting from zero, of one set or get: `getsockname`, then `IPV6_V6ONLY` on an IPv6 socket, then the options themselves. A test can so fail the second option call of a dual-stack set.
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
 #[cfg(test)]
 thread_local! {
     pub(crate) static OPTION_FAILURE: std::cell::Cell<Option<(usize, io::ErrorKind)>> = const { std::cell::Cell::new(None) };
 }
 
 // Each system call of one set or get, in order.
-#[cfg_attr(
-    not(any(target_os = "linux", target_os = "android", target_os = "macos")),
-    allow(dead_code)
-)]
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
 struct Calls {
     #[cfg(test)]
     index: usize,
 }
 
-#[cfg_attr(
-    not(any(target_os = "linux", target_os = "android", target_os = "macos")),
-    allow(dead_code)
-)]
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
 impl Calls {
     fn new() -> Self {
         Self {
@@ -73,26 +68,30 @@ mod options {
     #[derive(Clone, Copy)]
     enum Family {
         V4,
-        /// An IPv6 socket, and whether it also carries IPv4-mapped traffic.
-        V6 {
-            dual_stack: bool,
-        },
+        /// An IPv6 socket, IPv6-only or, where the IPv4 options do not apply to it, dual-stack.
+        V6,
+        /// A dual-stack IPv6 socket, whose IPv4-mapped traffic the IPv4 options report and mark.
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        DualStack,
     }
 
     fn family(socket: &Socket, calls: &mut Calls) -> io::Result<Family> {
         let address = calls.call(|| socket.local_addr())?;
         if address.is_ipv4() {
-            Ok(Family::V4)
-        } else if address.is_ipv6() {
-            Ok(Family::V6 {
-                dual_stack: !calls.call(|| socket.only_v6())?,
-            })
-        } else {
-            Err(io::Error::new(
+            return Ok(Family::V4);
+        }
+        if !address.is_ipv6() {
+            return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "ECN options apply to IP sockets",
-            ))
+            ));
         }
+        // macOS rejects the IPv4 options on any IPv6 socket.
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        if !calls.call(|| socket.only_v6())? {
+            return Ok(Family::DualStack);
+        }
+        Ok(Family::V6)
     }
 
     fn mark(byte: u32, ecn: Ecn) -> u32 {
@@ -103,13 +102,12 @@ mod options {
         let mut calls = Calls::new();
         match family(socket, &mut calls)? {
             Family::V4 => calls.call(|| socket.set_recv_tos_v4(enabled)),
-            Family::V6 { dual_stack } => {
+            Family::V6 => calls.call(|| socket.set_recv_tclass_v6(enabled)),
+            // Mapped IPv4 datagrams are reported through the IPv4 option.
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            Family::DualStack => {
                 calls.call(|| socket.set_recv_tclass_v6(enabled))?;
-                // Mapped IPv4 datagrams are reported through the IPv4 option.
-                if dual_stack {
-                    calls.call(|| socket.set_recv_tos_v4(enabled))?;
-                }
-                Ok(())
+                calls.call(|| socket.set_recv_tos_v4(enabled))
             }
         }
     }
@@ -118,7 +116,7 @@ mod options {
         let mut calls = Calls::new();
         match family(socket, &mut calls)? {
             Family::V4 => calls.call(|| socket.recv_tos_v4()),
-            Family::V6 { .. } => calls.call(|| socket.recv_tclass_v6()),
+            _ => calls.call(|| socket.recv_tclass_v6()),
         }
     }
 
@@ -128,16 +126,18 @@ mod options {
             let tos = calls.call(|| socket.tos_v4())?;
             calls.call(|| socket.set_tos_v4(mark(tos, ecn)))
         };
+        let set_v6 = |calls: &mut Calls| {
+            let class = calls.call(|| socket.tclass_v6())?;
+            calls.call(|| socket.set_tclass_v6(mark(class, ecn)))
+        };
         match family(socket, &mut calls)? {
             Family::V4 => set_v4(&mut calls),
-            Family::V6 { dual_stack } => {
-                let class = calls.call(|| socket.tclass_v6())?;
-                calls.call(|| socket.set_tclass_v6(mark(class, ecn)))?;
-                // Mapped IPv4 destinations use the IPv4 option.
-                if dual_stack {
-                    set_v4(&mut calls)?;
-                }
-                Ok(())
+            Family::V6 => set_v6(&mut calls),
+            // Mapped IPv4 destinations use the IPv4 option.
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            Family::DualStack => {
+                set_v6(&mut calls)?;
+                set_v4(&mut calls)
             }
         }
     }
@@ -146,7 +146,7 @@ mod options {
         let mut calls = Calls::new();
         let byte = match family(socket, &mut calls)? {
             Family::V4 => calls.call(|| socket.tos_v4())?,
-            Family::V6 { .. } => calls.call(|| socket.tclass_v6())?,
+            _ => calls.call(|| socket.tclass_v6())?,
         };
         Ok(Ecn::from_bits(byte as u8))
     }

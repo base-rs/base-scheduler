@@ -6,6 +6,7 @@ use base_scheduler::{
     Cancellation, ReceiveEcn, SendEcn, SocketAddress, SocketBind, SocketClose, SocketDomain,
     SocketLocalAddress, SocketOpen, SocketOperation, SocketOptions, SocketProtocol, SocketType,
 };
+#[cfg(unix)]
 use std::net::{Ipv4Addr, SocketAddrV6};
 
 /// The packet socket family a [`LoopbackEcnFixture`] opens.
@@ -14,7 +15,8 @@ pub enum EcnFamily {
     Ipv4,
     /// IPv6 sockets with `IPV6_V6ONLY` enabled.
     Ipv6,
-    /// IPv6 sockets with `IPV6_V6ONLY` disabled, the sender reaching the receiver at an IPv4-mapped address.
+    /// IPv6 sockets with `IPV6_V6ONLY` disabled, the sender reaching the receiver at an IPv4-mapped address. Needs native access.
+    #[cfg(unix)]
     DualStack,
 }
 
@@ -70,14 +72,9 @@ where
         .await
     }
 
-    /// Open the fixture's sockets. Without native access only IPv4 is available.
+    /// Open the fixture's sockets, leaving IPv6 sockets with the system's default `IPV6_V6ONLY`, which is enabled on Windows.
     #[cfg(not(unix))]
     pub async fn open(scheduler: &'s S, family: EcnFamily) -> Self {
-        assert_eq!(
-            family,
-            EcnFamily::Ipv4,
-            "only IPv4 is available without native access"
-        );
         Self::open_with(scheduler, family, |_, _| {}).await
     }
 
@@ -91,6 +88,7 @@ where
         let (domain, local): (_, SocketAddress) = match family {
             EcnFamily::Ipv4 => (SocketDomain::Ipv4, "127.0.0.1:0".parse().unwrap()),
             EcnFamily::Ipv6 => (SocketDomain::Ipv6, "[::1]:0".parse().unwrap()),
+            #[cfg(unix)]
             EcnFamily::DualStack => (SocketDomain::Ipv6, "[::]:0".parse().unwrap()),
         };
         let datagram = || async {
@@ -122,6 +120,7 @@ where
             .unwrap();
         let address = scheduler.socket_local_address(&receiver).unwrap();
         let destination = match family {
+            #[cfg(unix)]
             EcnFamily::DualStack => {
                 SocketAddrV6::new(Ipv4Addr::LOCALHOST.to_ipv6_mapped(), address.port(), 0, 0).into()
             }
@@ -216,7 +215,10 @@ mod native {
             match self.family {
                 EcnFamily::Ipv4 => (true, false),
                 EcnFamily::Ipv6 => (false, true),
-                EcnFamily::DualStack => (true, true),
+                // macOS rejects the IPv4 options on an IPv6 socket.
+                EcnFamily::DualStack => {
+                    (cfg!(any(target_os = "linux", target_os = "android")), true)
+                }
             }
         }
     }
