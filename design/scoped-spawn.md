@@ -1,6 +1,6 @@
 # Scoped spawning
 
-Proposed 2026-11-21; not yet accepted or implemented.
+Accepted 2026-11-21; not yet implemented.
 
 ## Requirement
 
