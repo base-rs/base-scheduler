@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add scoped spawning. `SpawnScoped::scope` runs an asynchronous root on the calling thread and blocks until every task spawned through its `Scope` has been destroyed, as `std::thread::scope` does for threads, so scoped tasks run on the scheduler's workers while borrowing anything that outlives the call, including the scheduler itself. Awaiting a `ScopedTask` returns its output or `TaskError`, and dropping it destroys the task, as for spawned tasks. A root panic is resumed after the join; a task panic whose handle was dropped unobserved makes `scope` panic after the join. Call `scope` from synchronous code, such as a program's root; Native panics on its workers, and Tokio inside a runtime's asynchronous context. Code without a blocking root, such as code embedded in an existing Tokio application, keeps using `Spawn`. Native and the Tokio adapter implement it; other backends implement the unsafe `SpawnScoped::spawn_unchecked`, and the conformance crate's `spawn_scoped_tests!` checks them. See [`design/scoped-spawn.md`](design/scoped-spawn.md).
 - Fix Native socket waits on Windows that could hang although the socket was ready, the same async-io reactor race that 0.4.0 worked around for the Tokio adapter ([smol-rs/polling#271](https://github.com/smol-rs/polling/issues/271)). Each wait now wakes the reactor whenever it leaves interest registered, and still retries its syscall only once the socket is reported ready.
 
 ## v0.5.0

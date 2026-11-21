@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::TokioTask;
-use base_scheduler::{SpawnError, TaskError};
+use base_scheduler::{ScopeToken, SpawnError, TaskError};
 use event_listener::Event;
 use std::{
     collections::BTreeMap,
@@ -87,6 +87,18 @@ impl<F: Future> Drop for TaskFuture<F> {
         crate::panic::discard(self.future.take());
     }
 }
+// A scoped task's future with its lifetime erased, so that Tokio accepts it. The token is declared after the future, so it is released only once the future has been destroyed, also when the future's destructor unwinds.
+struct ScopedFuture {
+    future: Pin<Box<dyn Future<Output = ()> + Send + 'static>>,
+    _token: ScopeToken,
+}
+impl Future for ScopedFuture {
+    type Output = ();
+    fn poll(mut self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<()> {
+        self.future.as_mut().poll(context)
+    }
+}
+
 pub(crate) struct TaskOutcome<T>(
     pub(crate) Option<Result<T, TaskError>>,
     #[cfg(test)] Option<Arc<tests::Status>>,
@@ -151,6 +163,32 @@ impl TaskService {
             inner,
             #[cfg(test)]
             status,
+        })
+    }
+    /// Spawn a scoped task, whose future need not be `'static`.
+    ///
+    /// # Safety
+    ///
+    /// Everything `future` borrows must remain valid until `token` is released, which happens once Tokio destroys the future.
+    pub(crate) unsafe fn spawn_scoped<F>(
+        &self,
+        future: F,
+        token: ScopeToken,
+    ) -> Result<TokioTask<()>, SpawnError>
+    where
+        F: Future<Output = ()> + Send,
+    {
+        let future: Pin<Box<dyn Future<Output = ()> + Send + '_>> = Box::pin(future);
+        // SAFETY: Only the lifetime changes. The caller keeps the future's borrowed data valid until `token` is released, `ScopedFuture` releases it only after destroying the future, and Tokio never polls or drops a task's future after destroying it.
+        let future = unsafe {
+            std::mem::transmute::<
+                Pin<Box<dyn Future<Output = ()> + Send + '_>>,
+                Pin<Box<dyn Future<Output = ()> + Send + 'static>>,
+            >(future)
+        };
+        self.spawn(ScopedFuture {
+            future,
+            _token: token,
         })
     }
     pub(crate) fn close(&self) {

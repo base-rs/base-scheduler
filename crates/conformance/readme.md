@@ -22,7 +22,7 @@ mod ipv4 {
 
 The conformance crate owns each suite's case list. Updating this dependency automatically includes new cases in every backend using that suite; backends do not maintain copies of test names. Each expansion produces separate `#[test]` functions such as `blocking::pre_cancelled_submission` and `ipv4::pending_read_cancellation`. Normal `cargo test` listing, filtering, parallel execution, and failure reporting work without a custom test harness. A failed assertion does not prevent sibling cases from running.
 
-A runner receives one async closure and creates a **fresh isolated fixture for each invocation**. For a blocking implementation named `Backend`, its signature is `fn run_blocking(test: impl AsyncFnOnce(&Backend))`. Stream and datagram runners accept `impl AsyncFnOnce(&Backend, &BackendSocket, &BackendSocket)`, supplying the scheduler, sender, and receiver by reference. Fixture runners accept `impl AsyncFnOnce(&Fixture)`. Async closures require Rust 1.85 or later; the workspace minimum is Rust 1.87. Runners may add `Send + 'static` when moving the closure to a deadline-controlled thread; operation futures need not be boxed.
+A runner receives one async closure and creates a **fresh isolated fixture for each invocation**. For a blocking implementation named `Backend`, its signature is `fn run_blocking(test: impl AsyncFnOnce(&Backend))`. Stream and datagram runners accept `impl AsyncFnOnce(&Backend, &BackendSocket, &BackendSocket)`, supplying the scheduler, sender, and receiver by reference. Fixture runners accept `impl AsyncFnOnce(&Fixture)`. Scoped spawning runners are synchronous, `fn run_scoped(test: impl FnOnce(&Fixture))`, because `SpawnScoped::scope` blocks: call the case on a thread outside the scheduler's workers, then shut the scheduler down. Async closures require Rust 1.85 or later; the workspace minimum is Rust 1.87. Runners may add `Send + 'static` when moving the closure to a deadline-controlled thread; operation futures need not be boxed.
 
 | Macro | Runner supplies | Required capabilities or fixture |
 | --- | --- | --- |
@@ -39,6 +39,7 @@ A runner receives one async closure and creates a **fresh isolated fixture for e
 | `clock_tests!` | Fixture | `ClockFixture` |
 | `spawn_tests!` | Fixture | `SpawnFixture` |
 | `spawn_dispatch_tests!` | Fixture | `SpawnFixture + Sync`, with a background executor driver |
+| `spawn_scoped_tests!` | Fixture, synchronously | `SpawnScopedFixture`, with at least two workers |
 | `address_resolution_tests!` | Fixture | `AddressResolutionFixture` |
 | `address_resolution_ip_tests!` | Fixture and `domain: SocketDomain` macro argument | `AddressResolutionFixture`, one supported family per module |
 | `signals_tests!` | Fixture | `SignalsFixture` |
