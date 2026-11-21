@@ -1310,3 +1310,22 @@ fn uncancellable_writes_wait_after_would_block() {
         });
     });
 }
+
+// The raw and borrowed descriptor forms name the socket's own descriptor.
+#[test]
+fn descriptors_borrow_the_native_socket() {
+    let runtime = crate::test_support::runtime();
+    let socket = runtime.block_on(async { TokioSocket::new(runtime.handle(), socket()).unwrap() });
+    #[cfg(unix)]
+    {
+        use std::os::fd::{AsFd, AsRawFd};
+        assert_eq!(socket.as_raw_fd(), socket.get_ref().as_raw_fd());
+        assert_eq!(socket.as_fd().as_raw_fd(), socket.as_raw_fd());
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::io::{AsRawSocket, AsSocket};
+        assert_eq!(socket.as_raw_socket(), socket.get_ref().as_raw_socket());
+        assert_eq!(socket.as_socket().as_raw_socket(), socket.as_raw_socket());
+    }
+}

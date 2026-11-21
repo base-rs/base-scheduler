@@ -304,8 +304,15 @@ mod supported {
                 kind,
             )
         };
+        // Loopback delivery can trail the send on macOS, so block until the datagram is queued.
         let wait = || {
-            crate::socket_io::wait(&receiver, crate::Interest::Readable).unwrap();
+            let mut descriptor = libc::pollfd {
+                fd: std::os::fd::AsRawFd::as_raw_fd(&receiver),
+                events: libc::POLLIN,
+                revents: 0,
+            };
+            // SAFETY: One initialized pollfd, retained through the call.
+            assert_eq!(unsafe { libc::poll(&mut descriptor, 1, 5000) }, 1);
         };
         set_send(&sender, Ecn::Ect0).unwrap();
         sender.send_to(b"a", &address).unwrap();
@@ -328,58 +335,4 @@ mod supported {
             None
         );
     }
-}
-
-// The conformance suite over loopback, for every family.
-mod conformance {
-    use crate::{TokioScheduler, test_support};
-    use base_scheduler_conformance::{EcnFamily, LoopbackEcnFixture};
-    use futures_lite::future::block_on;
-
-    fn run(
-        family: EcnFamily,
-        test: impl AsyncFnOnce(&LoopbackEcnFixture<'_, TokioScheduler>) + Send + 'static,
-    ) {
-        test_support::run(move || {
-            let scheduler = test_support::scheduler();
-            #[cfg(unix)]
-            let fixture = block_on(LoopbackEcnFixture::open(&scheduler, family, |socket| {
-                std::os::fd::AsRawFd::as_raw_fd(socket.get_ref())
-            }));
-            #[cfg(not(unix))]
-            let fixture = block_on(LoopbackEcnFixture::open(&scheduler, family));
-            let result =
-                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| block_on(test(&fixture))));
-            block_on(fixture.close());
-            block_on(scheduler.shutdown());
-            if let Err(payload) = result {
-                std::panic::resume_unwind(payload);
-            }
-        });
-    }
-
-    macro_rules! family {
-        ($name:ident, $family:ident, $suite:ident) => {
-            mod $name {
-                use super::*;
-                fn run(
-                    test: impl AsyncFnOnce(&LoopbackEcnFixture<'_, TokioScheduler>) + Send + 'static,
-                ) {
-                    super::run(EcnFamily::$family, test);
-                }
-                base_scheduler_conformance::$suite!(run: run);
-            }
-        };
-    }
-
-    #[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
-    family!(ipv4, Ipv4, packet_ecn_tests);
-    #[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
-    family!(ipv6, Ipv6, packet_ecn_tests);
-    #[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
-    family!(dual_stack, DualStack, packet_ecn_tests);
-    #[cfg(not(any(target_os = "linux", target_os = "android", target_os = "macos")))]
-    family!(unsupported_ipv4, Ipv4, packet_ecn_unsupported_tests);
-    #[cfg(not(any(target_os = "linux", target_os = "android", target_os = "macos")))]
-    family!(unsupported_ipv6, Ipv6, packet_ecn_unsupported_tests);
 }

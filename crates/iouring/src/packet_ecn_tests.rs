@@ -1,11 +1,9 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-// Packet ECN over loopback: the conformance suite for every family, and the multishot experiment's reporting and payload capacity.
+// Packet ECN on the multishot experiment: its reporting and payload capacity, over loopback. `tests/packet_ecn.rs` runs the conformance suite.
 
-use crate::{
-    IoUringOptions, IoUringSelector, RecvMsgMultishotOptions, retained_socket::SocketSource,
-};
+use crate::{IoUringOptions, IoUringSelector, RecvMsgMultishotOptions};
 use base_scheduler::{
     Cancellation, Ecn, ReceiveEcn, SendEcn, SocketRecvFlags, SocketRecvMessage, SocketSetOption,
 };
@@ -14,7 +12,6 @@ use base_scheduler_conformance::{
 };
 use futures_lite::future::block_on;
 use std::{
-    os::fd::AsRawFd,
     panic::{AssertUnwindSafe, catch_unwind},
     sync::mpsc,
     time::Duration,
@@ -33,9 +30,7 @@ fn run(
             })
             .unwrap();
             let thread = std::thread::spawn(move || driver.run());
-            let fixture = block_on(LoopbackEcnFixture::open(&selector, family, |socket| {
-                socket.retain_socket().as_raw_fd()
-            }));
+            let fixture = block_on(LoopbackEcnFixture::open(&selector, family));
             let result = catch_unwind(AssertUnwindSafe(|| block_on(test(&fixture))));
             block_on(fixture.close());
             block_on(selector.shutdown());
@@ -53,23 +48,6 @@ fn run(
         std::panic::resume_unwind(panic);
     }
 }
-
-macro_rules! family {
-    ($name:ident, $family:ident) => {
-        mod $name {
-            use super::*;
-            fn run(
-                test: impl AsyncFnOnce(&LoopbackEcnFixture<'_, IoUringSelector>) + Send + 'static,
-            ) {
-                super::run(EcnFamily::$family, test);
-            }
-            base_scheduler_conformance::packet_ecn_tests!(run: run);
-        }
-    };
-}
-family!(ipv4, Ipv4);
-family!(ipv6, Ipv6);
-family!(dual_stack, DualStack);
 
 // A multishot receiver reports the marking while reporting is enabled, including when it was enabled after the receiver was constructed, and none while disabled. Control storage does not reduce the configured payload capacity.
 #[test]

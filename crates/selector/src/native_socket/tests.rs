@@ -261,3 +261,24 @@ fn readiness_errors_return_without_retrying_the_operation() {
         }
     });
 }
+
+// The raw and borrowed descriptor forms name the socket's own descriptor.
+#[test]
+fn descriptors_borrow_the_native_socket() {
+    let socket = NativeSocket::new(
+        socket2::Socket::new(socket2::Domain::IPV4, socket2::Type::DGRAM, None).unwrap(),
+    )
+    .unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::fd::{AsFd, AsRawFd};
+        assert_eq!(socket.as_raw_fd(), socket.get_ref().as_raw_fd());
+        assert_eq!(socket.as_fd().as_raw_fd(), socket.as_raw_fd());
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::io::{AsRawSocket, AsSocket};
+        assert_eq!(socket.as_raw_socket(), socket.get_ref().as_raw_socket());
+        assert_eq!(socket.as_socket().as_raw_socket(), socket.as_raw_socket());
+    }
+}
