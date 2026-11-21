@@ -1,5 +1,9 @@
 # Releases
 
+## v0.6.2
+
+- Add `Placement`, so a library can write its supervision once and let its caller choose whether work runs in place or as scope tasks. ([#143](https://github.com/base-rs/base-scheduler/pull/143))
+
 ## v0.6.1
 
 - Add `Scope::scheduler`, so code given only a scope can use its scheduler's other capabilities. ([#141](https://github.com/base-rs/base-scheduler/pull/141))
