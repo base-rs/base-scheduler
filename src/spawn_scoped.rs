@@ -9,8 +9,8 @@ use std::{
     panic::{AssertUnwindSafe, catch_unwind, resume_unwind},
     pin::{Pin, pin},
     sync::{
-        Arc, Condvar, Mutex, MutexGuard, PoisonError,
-        atomic::{AtomicBool, Ordering},
+        Arc, Mutex, MutexGuard, PoisonError,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     task::{Context, Poll, Wake, Waker},
     thread::{self, Thread},
@@ -87,7 +87,12 @@ pub unsafe trait SpawnScoped {
         self.check_blocking();
         let scope = Scope {
             scheduler: self,
-            state: Arc::new(ScopeState::default()),
+            state: Arc::new(ScopeState {
+                live: AtomicUsize::new(0),
+                waiting: AtomicBool::new(false),
+                unobserved_panic: AtomicBool::new(false),
+                waiter: thread::current(),
+            }),
             scope: PhantomData,
             env: PhantomData,
         };
@@ -103,25 +108,25 @@ pub unsafe trait SpawnScoped {
     }
 }
 
-#[derive(Default)]
 struct ScopeState {
     /// Tasks whose tokens have not been released.
-    live: Mutex<usize>,
-    released: Condvar,
+    live: AtomicUsize,
+    /// The root has returned and `waiter` is waiting for `live` to reach zero.
+    waiting: AtomicBool,
     unobserved_panic: AtomicBool,
+    /// The thread that entered the scope.
+    waiter: Thread,
 }
 
 impl ScopeState {
-    fn lock(&self) -> MutexGuard<'_, usize> {
-        self.live.lock().unwrap_or_else(PoisonError::into_inner)
-    }
     fn wait_released(&self) {
-        let mut live = self.lock();
-        while *live != 0 {
-            live = self
-                .released
-                .wait(live)
-                .unwrap_or_else(PoisonError::into_inner);
+        // Pairs with the release in `ScopeToken::drop`: either this load sees
+        // zero, or the release that reaches zero sees `waiting` and unparks.
+        // Only the final release unparks, so tasks ending while the root runs
+        // do not wake its thread.
+        self.waiting.store(true, Ordering::SeqCst);
+        while self.live.load(Ordering::SeqCst) != 0 {
+            thread::park();
         }
     }
 }
@@ -135,7 +140,9 @@ pub struct ScopeToken {
 
 impl ScopeToken {
     fn new(state: &Arc<ScopeState>) -> Self {
-        *state.lock() += 1;
+        // The spawning root or task still holds its own claim, so the count
+        // cannot be observed at zero while this task is live.
+        state.live.fetch_add(1, Ordering::Relaxed);
         Self {
             state: state.clone(),
         }
@@ -144,10 +151,12 @@ impl ScopeToken {
 
 impl Drop for ScopeToken {
     fn drop(&mut self) {
-        let mut live = self.state.lock();
-        *live -= 1;
-        if *live == 0 {
-            self.state.released.notify_all();
+        // This token's `Arc` keeps the state alive for the unpark, even if the
+        // waiter returns as soon as the count reaches zero.
+        if self.state.live.fetch_sub(1, Ordering::SeqCst) == 1
+            && self.state.waiting.load(Ordering::SeqCst)
+        {
+            self.state.waiter.unpark();
         }
     }
 }
@@ -182,7 +191,7 @@ impl<'scope, 'env, S: SpawnScoped> Scope<'scope, 'env, S> {
             future: ManuallyDrop::new(future),
             completed: false,
             slot: slot.clone(),
-            scope: self.state.clone(),
+            scope: &self.state,
         };
         let token = ScopeToken::new(&self.state);
         // SAFETY: `task` borrows only data that outlives `'scope`. `scope`
@@ -193,9 +202,8 @@ impl<'scope, 'env, S: SpawnScoped> Scope<'scope, 'env, S> {
         Ok(ScopedTask {
             _handle: handle,
             slot,
-            scope: self.state.clone(),
+            scope: &self.state,
             finished: false,
-            lifetime: PhantomData,
         })
     }
 }
@@ -221,14 +229,15 @@ impl<T> Slot<T> {
 
 /// The future a backend runs for a scoped task: it delivers the task's output
 /// or panic to its slot, or `TaskError::Cancelled` if it is destroyed first.
-struct Delivered<F: Future> {
+struct Delivered<'scope, F: Future> {
     future: ManuallyDrop<F>,
     completed: bool,
     slot: Arc<Slot<F::Output>>,
-    scope: Arc<ScopeState>,
+    // The scope outlives its tasks, so tasks borrow its state.
+    scope: &'scope ScopeState,
 }
 
-impl<F: Future> Future for Delivered<F> {
+impl<F: Future> Future for Delivered<'_, F> {
     type Output = ();
     fn poll(self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<()> {
         // SAFETY: `future` is structurally pinned: nothing moves it out, `Drop`
@@ -263,7 +272,7 @@ impl<F: Future> Future for Delivered<F> {
     }
 }
 
-impl<F: Future> Drop for Delivered<F> {
+impl<F: Future> Drop for Delivered<'_, F> {
     fn drop(&mut self) {
         // SAFETY: `future` is destroyed in place, exactly once, and not used
         // afterwards.
@@ -300,12 +309,11 @@ impl<F: Future> Drop for Delivered<F> {
 #[must_use = "await the task or retain its owning handle"]
 pub struct ScopedTask<'scope, S: SpawnScoped, T> {
     slot: Arc<Slot<T>>,
-    scope: Arc<ScopeState>,
+    scope: &'scope ScopeState,
     finished: bool,
     // Dropped after `Drop` marks the slot abandoned, so that the task's
     // destruction does not report a cancellation.
     _handle: S::ScopedHandle,
-    lifetime: PhantomData<&'scope ()>,
 }
 
 // The backend handle is owned, never polled, so it is not pinned.
