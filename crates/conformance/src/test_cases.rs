@@ -14,3 +14,17 @@ macro_rules! __conformance_test_cases {
         )+
     };
 }
+
+// The synchronous form, for cases that block the runner's thread themselves.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __conformance_blocking_test_cases {
+    ($run:path; $($name:ident => $case:path),+ $(,)?) => {
+        $(
+            #[test]
+            fn $name() {
+                $run(|fixture| $case(fixture));
+            }
+        )+
+    };
+}

@@ -1,8 +1,9 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
+use crate::NativeScopedTask;
 use crate::{NativeExecutorOptions, NativeOptions, NativeTask, ReadinessSelector};
-use base_scheduler::{Spawn, SpawnError};
+use base_scheduler::{ScopeToken, Spawn, SpawnError, SpawnScoped};
 use base_scheduler_selector::{Selector, SelectorOptions};
 use std::{future::Future, io};
 
@@ -175,6 +176,29 @@ impl<S: Selector> Drop for NativeScheduler<S> {
         self.close();
     }
 }
+// SAFETY: `TaskService::spawn_scoped` registers the task before it is
+// runnable, releases the token only once the task's handle and every runnable
+// have ended, so async-task can no longer poll or drop the future, rejects a
+// closed scheduler by dropping the future and token before returning, and runs
+// the future inside `TaskFuture`, which contains destructor panics.
+unsafe impl<S: Selector> SpawnScoped for NativeScheduler<S> {
+    type ScopedHandle = NativeScopedTask;
+    unsafe fn spawn_unchecked<F>(
+        &self,
+        future: F,
+        token: ScopeToken,
+    ) -> Result<NativeScopedTask, SpawnError>
+    where
+        F: Future<Output = ()> + Send,
+    {
+        // SAFETY: The caller guarantees the future's borrowed data outlives `token`.
+        unsafe { self.tasks.spawn_scoped(future, token) }
+    }
+    fn check_blocking(&self) {
+        crate::worker::assert_outside_worker();
+    }
+}
+
 impl<S: Selector> Spawn for NativeScheduler<S> {
     type Handle<Output: Send + 'static> = NativeTask<Output>;
     fn spawn<F>(&self, future: F) -> Result<Self::Handle<F::Output>, SpawnError>

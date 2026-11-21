@@ -3,8 +3,9 @@
 
 use super::*;
 use crate::{NativeScheduler, test_support};
+use base_scheduler::SpawnScoped;
 use base_scheduler::{Cancellation, Spawn, TaskError};
-use base_scheduler_conformance::SpawnFixture;
+use base_scheduler_conformance::{SpawnFixture, SpawnScopedFixture};
 use futures_lite::future::block_on;
 use std::{
     panic::{AssertUnwindSafe, catch_unwind},
@@ -43,6 +44,55 @@ mod conformance {
 }
 mod dispatch {
     base_scheduler_conformance::spawn_dispatch_tests!(run: super::run);
+}
+
+impl SpawnScopedFixture for NativeScheduler {
+    type Scheduler = Self;
+    fn scheduler(&self) -> &Self {
+        self
+    }
+    fn close(&self) {
+        self.tasks.close();
+    }
+}
+// Two workers, so that scoped tasks can be observed running in parallel.
+fn scoped_scheduler() -> NativeScheduler {
+    NativeScheduler::with_options(crate::NativeOptions {
+        workers: 2,
+        threads: 1,
+        capacity: 4,
+        ..Default::default()
+    })
+    .unwrap()
+}
+fn run_scoped(test: impl FnOnce(&NativeScheduler) + Send + 'static) {
+    test_support::run(move || {
+        let scheduler = scoped_scheduler();
+        let result = catch_unwind(AssertUnwindSafe(|| test(&scheduler)));
+        block_on(scheduler.shutdown());
+        if let Err(payload) = result {
+            std::panic::resume_unwind(payload);
+        }
+    });
+}
+mod scoped {
+    base_scheduler_conformance::spawn_scoped_tests!(run: super::run_scoped);
+}
+
+#[test]
+fn scope_panics_on_a_worker() {
+    run_scoped(|scheduler| {
+        let panicked = scheduler.scope(async |scope| {
+            scope
+                .spawn(async {
+                    catch_unwind(AssertUnwindSafe(|| scheduler.scope(async |_| ()))).is_err()
+                })
+                .unwrap()
+                .await
+                .unwrap()
+        });
+        assert!(panicked, "a worker entered a blocking scope");
+    });
 }
 
 // Keep workers at their admission boundary so stealing cannot obscure initial placement.

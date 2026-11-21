@@ -2,12 +2,12 @@
 // Copyright, 2026, by Samuel Williams.
 
 use crate::{
-    NativeTask,
+    NativeScopedTask, NativeTask,
     native_task::TaskFuture,
     thread,
     worker::{self, WorkerState},
 };
-use base_scheduler::SpawnError;
+use base_scheduler::{ScopeToken, SpawnError};
 use crossbeam_deque::Worker;
 use event_listener::Event;
 use std::{
@@ -21,6 +21,38 @@ use std::{
 
 pub(crate) struct TaskState {
     pub(crate) worker: AtomicUsize,
+    /// For a scoped task, what can still reach its future.
+    pub(crate) scoped: Option<Arc<ScopedHolders>>,
+}
+
+/// What can still poll or drop a scoped task's future: its `Task` handle, and
+/// each of its queued or running runnables. When the last ends, async-task can
+/// no longer reach the future, so the scope's token is released.
+///
+/// Dropping the handle of a task whose future is idle schedules a runnable to
+/// destroy the future before the handle's own release, and a closed or
+/// completed task never schedules again, so the count cannot rise from zero.
+pub(crate) struct ScopedHolders {
+    count: AtomicUsize,
+    token: Mutex<Option<ScopeToken>>,
+}
+impl ScopedHolders {
+    fn new(token: ScopeToken) -> Arc<Self> {
+        // The task's handle is the first holder.
+        Arc::new(Self {
+            count: AtomicUsize::new(1),
+            token: Mutex::new(Some(token)),
+        })
+    }
+    pub(crate) fn acquire(&self) {
+        self.count.fetch_add(1, Ordering::AcqRel);
+    }
+    pub(crate) fn release(&self) {
+        if self.count.fetch_sub(1, Ordering::AcqRel) == 1 {
+            let token = self.token.lock().unwrap().take();
+            drop(token);
+        }
+    }
 }
 pub(crate) type Runnable = async_task::Runnable<TaskState>;
 
@@ -271,6 +303,7 @@ impl TaskService {
         let (runnable, task) = async_task::Builder::new()
             .metadata(TaskState {
                 worker: AtomicUsize::new(worker),
+                scoped: None,
             })
             .spawn(
                 move |_| TaskFuture::new(future, registration),
@@ -282,6 +315,63 @@ impl TaskService {
         drop(admission);
         runnable.schedule();
         Ok(NativeTask(task))
+    }
+    /// Spawn a scoped task, whose future need not be `'static`.
+    ///
+    /// # Safety
+    ///
+    /// Everything `future` borrows must remain valid until `token` is
+    /// released, which happens once its handle and runnables have all ended.
+    pub(crate) unsafe fn spawn_scoped<F>(
+        &self,
+        future: F,
+        token: ScopeToken,
+    ) -> Result<NativeScopedTask, SpawnError>
+    where
+        F: Future<Output = ()> + Send,
+    {
+        let mut admission = self.shared.admission.lock().unwrap();
+        if self.shared.closed.load(Ordering::Acquire) {
+            drop(admission);
+            drop(future);
+            drop(token);
+            return Err(SpawnError::SchedulerClosed);
+        }
+        let worker = *admission;
+        *admission = (worker + 1) % self.shared.workers.len();
+        self.shared.remaining.fetch_add(1, Ordering::Release);
+        let registration = TaskRegistration {
+            shared: Arc::clone(&self.shared),
+        };
+        let shared = Arc::clone(&self.shared);
+        let holders = ScopedHolders::new(token);
+        let scheduled = Arc::clone(&holders);
+        // SAFETY: The future is `Send` and the schedule function is `Send`,
+        // `Sync` and `'static`, so only the borrowing condition applies: the
+        // future's borrowed data must outlive its runnables. The caller
+        // guarantees it outlives `token`, which `ScopedHolders` releases only
+        // once the task's handle and every runnable have ended.
+        let (runnable, task) = unsafe {
+            async_task::Builder::new()
+                .metadata(TaskState {
+                    worker: AtomicUsize::new(worker),
+                    scoped: Some(Arc::clone(&holders)),
+                })
+                .spawn_unchecked(
+                    move |_| TaskFuture::new(future, registration),
+                    move |runnable| {
+                        scheduled.acquire();
+                        shared.outstanding.fetch_add(1, Ordering::AcqRel);
+                        worker::schedule(&shared, runnable);
+                    },
+                )
+        };
+        drop(admission);
+        runnable.schedule();
+        Ok(NativeScopedTask {
+            task: Some(task),
+            holders,
+        })
     }
     pub(crate) fn close(&self) {
         // Close every timer queue first, so that anyone observing scheduler closure also observes its queues closed.
