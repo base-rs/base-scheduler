@@ -1,5 +1,10 @@
 # Releases
 
+## v0.6.1
+
+- Add `Scope::scheduler`, so code given only a scope can use its scheduler's other capabilities. ([#141](https://github.com/base-rs/base-scheduler/pull/141))
+- Generate release notes from pull request titles and `Breaking:` paragraphs. ([#140](https://github.com/base-rs/base-scheduler/pull/140))
+
 ## v0.6.0
 
 - Implement std's `AsFd` and `AsRawFd`, or `AsSocket` and `AsRawSocket` on Windows, for `NativeSocket` and the Tokio adapter's `TokioSocket`, so applications and tests can set native options the interface does not provide, such as through socket2's `SockRef`. The socket must stay open and nonblocking.

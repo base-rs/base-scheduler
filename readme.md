@@ -40,6 +40,11 @@ Prepare a release from a clean checkout of `main` with `cargo bake cargo:release
 
 See [releases.md](releases.md) for the full release history.
 
+### v0.6.1
+
+- Add `Scope::scheduler`, so code given only a scope can use its scheduler's other capabilities. ([#141](https://github.com/base-rs/base-scheduler/pull/141))
+- Generate release notes from pull request titles and `Breaking:` paragraphs. ([#140](https://github.com/base-rs/base-scheduler/pull/140))
+
 ### v0.6.0
 
 - Implement std's `AsFd` and `AsRawFd`, or `AsSocket` and `AsRawSocket` on Windows, for `NativeSocket` and the Tokio adapter's `TokioSocket`, so applications and tests can set native options the interface does not provide, such as through socket2's `SockRef`. The socket must stay open and nonblocking.
@@ -63,13 +68,6 @@ See [releases.md](releases.md) for the full release history.
 - Keep a Native task woken by a worker's own driver turn on that worker, which owns the readiness registration or ring operation that woke it, instead of sending it to the worker that last polled it. After an idle worker stole a task, each later readiness event of that task was pushed into the thief's inbox, often with a wake. Borrowed-buffer echo on Linux epoll with four workers uses about 2–3% less CPU per request. Wakes from task polls and other threads still prefer the last polling worker. See [`benchmarks/echo/results/driver-wakes`](benchmarks/echo/results/driver-wakes/readme.md).
 - Register Native timers from root futures and other executors by locking the chosen worker's queue directly, rather than sending it a command and awaiting an acknowledgment. Such registrations no longer allocate, and waker updates and release no longer wait for that worker.
 - Pad Native's runnable counter to its own cache line. Whichever thread wakes a task updates it, and each runnable retirement updates it and then reads the scheduler's closed flag, which shared its line. The timer benchmark's `reuse yield` case with 64 tasks on 4 workers runs about 7% faster (114 to 106 ns per operation), with about the same instruction count.
-
-### v0.4.0
-
-- **Breaking:** add the required `SocketStreamReader::try_read_into`, which attempts one borrowed read now without waiting or consulting cached readiness. Polling `read_into` once with a no-op waker is not equivalent: Native, readiness and Tokio readers that have established progress wait on cached readiness first, so a single poll can miss input or EOF the kernel has already queued. Implementations of `SocketStreamReader` outside this workspace must add the method; wrappers should forward it.
-- Use Native's own epoll readiness driver on Android, as on Linux, rather than the portable `polling` fallback. Android stream readers therefore follow the Linux readiness rules: without OOB support, a short receive clears readiness and reported urgent data returns `Unsupported`.
-- Fix blocking pools on Apple platforms that could stop running jobs, permanently: the readiness selector's pool, which Native uses, and the Tokio adapter's pool. There, the default pthread condition variable stops waking anyone once one waiter has been passed over for 2^23 newer waits ([ioquatix/macos-pthread-cond-hang](https://github.com/ioquatix/macos-pthread-cond-hang)), which an idle worker in a busy pool can be. Idle workers now wait again every second. The direct scheduler's pool, which stopped that way in [#83](https://github.com/base-rs/base-scheduler/issues/83), is unchanged.
-- Fix Tokio adapter socket waits on Windows that could hang although the socket was ready. async-io's IOCP reactor can miss interest registered from another thread ([smol-rs/polling#271](https://github.com/smol-rs/polling/issues/271)); each wait now wakes the reactor after registering interest and retries its syscall at least every 10 seconds.
 
 <!-- bake-readme:releases:end -->
 
