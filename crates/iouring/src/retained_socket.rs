@@ -84,7 +84,7 @@ pub(crate) fn recvmsg(
     } else {
         (buffers.as_ptr().cast(), buffers.len())
     };
-    let mut control = ecn::Control::new();
+    let mut control = ecn::Control::default();
     let mut control_length = 0;
     // SAFETY: IoSliceMut is ABI-compatible with iovec; header, control and exclusive payload pointers remain live through recvmsg and are not retained afterward.
     let ((bytes, truncated, control_truncated), address) = unsafe {

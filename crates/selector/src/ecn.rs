@@ -18,13 +18,13 @@ fn packet(socket: &Socket) -> io::Result<()> {
     Ok(())
 }
 
-// A one-shot local shim fails the option call with this index, counting from zero, so a test can fail the second call of a dual-stack set.
+// A one-shot local shim fails the system call with this index, counting from zero, of one set or get: `getsockname`, then `IPV6_V6ONLY` on an IPv6 socket, then the options themselves. A test can so fail the second option call of a dual-stack set.
 #[cfg(test)]
 thread_local! {
     pub(crate) static OPTION_FAILURE: std::cell::Cell<Option<(usize, io::ErrorKind)>> = const { std::cell::Cell::new(None) };
 }
 
-// Each kernel option call of one set or get, in order.
+// Each system call of one set or get, in order.
 #[cfg_attr(
     not(any(target_os = "linux", target_os = "android", target_os = "macos")),
     allow(dead_code)
@@ -79,13 +79,13 @@ mod options {
         },
     }
 
-    fn family(socket: &Socket) -> io::Result<Family> {
-        let address = socket.local_addr()?;
+    fn family(socket: &Socket, calls: &mut Calls) -> io::Result<Family> {
+        let address = calls.call(|| socket.local_addr())?;
         if address.is_ipv4() {
             Ok(Family::V4)
         } else if address.is_ipv6() {
             Ok(Family::V6 {
-                dual_stack: !socket.only_v6()?,
+                dual_stack: !calls.call(|| socket.only_v6())?,
             })
         } else {
             Err(io::Error::new(
@@ -101,7 +101,7 @@ mod options {
 
     pub(super) fn set_receive(socket: &Socket, enabled: bool) -> io::Result<()> {
         let mut calls = Calls::new();
-        match family(socket)? {
+        match family(socket, &mut calls)? {
             Family::V4 => calls.call(|| socket.set_recv_tos_v4(enabled)),
             Family::V6 { dual_stack } => {
                 calls.call(|| socket.set_recv_tclass_v6(enabled))?;
@@ -116,7 +116,7 @@ mod options {
 
     pub(super) fn receive(socket: &Socket) -> io::Result<bool> {
         let mut calls = Calls::new();
-        match family(socket)? {
+        match family(socket, &mut calls)? {
             Family::V4 => calls.call(|| socket.recv_tos_v4()),
             Family::V6 { .. } => calls.call(|| socket.recv_tclass_v6()),
         }
@@ -128,7 +128,7 @@ mod options {
             let tos = calls.call(|| socket.tos_v4())?;
             calls.call(|| socket.set_tos_v4(mark(tos, ecn)))
         };
-        match family(socket)? {
+        match family(socket, &mut calls)? {
             Family::V4 => set_v4(&mut calls),
             Family::V6 { dual_stack } => {
                 let class = calls.call(|| socket.tclass_v6())?;
@@ -144,7 +144,7 @@ mod options {
 
     pub(super) fn send(socket: &Socket) -> io::Result<Ecn> {
         let mut calls = Calls::new();
-        let byte = match family(socket)? {
+        let byte = match family(socket, &mut calls)? {
             Family::V4 => calls.call(|| socket.tos_v4())?,
             Family::V6 { .. } => calls.call(|| socket.tclass_v6())?,
         };
@@ -198,6 +198,7 @@ pub fn send(socket: &Socket) -> io::Result<Ecn> {
 
 /// Control storage for one ECN marking message of either form: a one-byte IPv4 TOS or an `int` IPv6 traffic class.
 #[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
+#[derive(Default)]
 #[repr(C, align(8))]
 pub struct Control(pub [u8; CONTROL_SPACE]);
 
@@ -206,21 +207,6 @@ pub struct Control(pub [u8; CONTROL_SPACE]);
 // SAFETY: `CMSG_SPACE` only computes an aligned length.
 pub const CONTROL_SPACE: usize =
     unsafe { libc::CMSG_SPACE(std::mem::size_of::<libc::c_int>() as u32) } as usize;
-
-#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
-impl Control {
-    /// Zeroed control storage.
-    pub const fn new() -> Self {
-        Self([0; CONTROL_SPACE])
-    }
-}
-
-#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
-impl Default for Control {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 
 /// The marking in `control`, the control data a receive returned, unless the system `truncated` it: another control message can displace the marking, so truncation reports none even if the marking arrived intact. Other control messages are ignored.
 #[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]

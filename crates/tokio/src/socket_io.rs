@@ -347,7 +347,7 @@ unsafe fn recv_vectors(
                 header.msg_namelen = *length;
                 // Every packet receive passes room for one ECN marking; with reporting disabled the system attaches nothing.
                 #[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
-                let mut control = crate::ecn::Control::new();
+                let mut control = crate::ecn::Control::default();
                 #[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
                 if receive == Receive::Packet {
                     header.msg_control = control.0.as_mut_ptr().cast();

@@ -2,17 +2,10 @@
 // Copyright, 2026, by Samuel Williams.
 
 use super::*;
-use socket2::{Domain, Protocol, SockAddr};
-use std::net::SocketAddr;
+use socket2::{Domain, Protocol};
 
 fn datagram(domain: Domain) -> Socket {
     Socket::new(domain, Type::DGRAM, Some(Protocol::UDP)).unwrap()
-}
-
-fn dual_stack(dual: bool) -> Socket {
-    let socket = datagram(Domain::IPV6);
-    socket.set_only_v6(!dual).unwrap();
-    socket
 }
 
 #[test]
@@ -50,6 +43,14 @@ fn unsupported_platforms_reject_packet_sockets() {
 #[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
 mod supported {
     use super::*;
+    use socket2::SockAddr;
+    use std::net::SocketAddr;
+
+    fn dual_stack(dual: bool) -> Socket {
+        let socket = datagram(Domain::IPV6);
+        socket.set_only_v6(!dual).unwrap();
+        socket
+    }
 
     #[cfg(unix)]
     #[test]
@@ -130,20 +131,48 @@ mod supported {
         assert!(OPTION_FAILURE.with(|slot| slot.get()).is_none());
     }
 
-    // A dual-stack set that fails part-way returns the error and leaves the calls already made in place, and gets report that kernel state.
+    // A dual-stack set that fails part-way returns the error and leaves the calls already made in place, and gets report that kernel state. Each set first reads the address and `IPV6_V6ONLY`.
     #[test]
     fn dual_stack_failures_leave_the_kernel_state() {
         let socket = dual_stack(true);
-        failing(1, || set_receive(&socket, true));
+        // The second option call: `IP_RECVTOS`, after `IPV6_RECVTCLASS`.
+        failing(3, || set_receive(&socket, true));
         assert!(receive(&socket).unwrap());
         assert!(!socket.recv_tos_v4().unwrap());
 
-        // Calls: read and set the traffic class, then read and set the TOS.
-        failing(2, || set_send(&socket, Ecn::Ce));
+        // Option calls: read and set the traffic class, then read and set the TOS.
+        failing(4, || set_send(&socket, Ecn::Ce));
         assert_eq!(send(&socket).unwrap(), Ecn::Ce);
         assert_eq!(socket.tos_v4().unwrap() & 0b11, 0);
-        failing(0, || set_send(&socket, Ecn::NotEct));
+        failing(2, || set_send(&socket, Ecn::NotEct));
         assert_eq!(send(&socket).unwrap(), Ecn::Ce);
+    }
+
+    // Every system call of every set and get fails in turn, and the operation returns the failure.
+    #[test]
+    fn every_call_failure_is_returned() {
+        for socket in [datagram(Domain::IPV4), dual_stack(false), dual_stack(true)] {
+            let operations: [&dyn Fn() -> io::Result<()>; 4] = [
+                &|| set_receive(&socket, true),
+                &|| receive(&socket).map(drop),
+                &|| set_send(&socket, Ecn::Ect0),
+                &|| send(&socket).map(drop),
+            ];
+            for operation in operations {
+                for index in 0.. {
+                    OPTION_FAILURE
+                        .with(|slot| slot.set(Some((index, io::ErrorKind::PermissionDenied))));
+                    let result = operation();
+                    // An index past the operation's last call is never reached.
+                    if OPTION_FAILURE.with(|slot| slot.take()).is_some() {
+                        result.unwrap();
+                        assert!(index > 0);
+                        break;
+                    }
+                    assert_eq!(result.unwrap_err().kind(), io::ErrorKind::PermissionDenied);
+                }
+            }
+        }
     }
 
     // One control message: a header, then data padded to `CMSG_SPACE`.
@@ -281,4 +310,56 @@ mod supported {
             None
         );
     }
+}
+
+// The conformance suite over loopback, for every family.
+mod conformance {
+    use crate::{TokioScheduler, test_support};
+    use base_scheduler_conformance::{EcnFamily, LoopbackEcnFixture};
+    use futures_lite::future::block_on;
+
+    fn run(
+        family: EcnFamily,
+        test: impl AsyncFnOnce(&LoopbackEcnFixture<'_, TokioScheduler>) + Send + 'static,
+    ) {
+        test_support::run(move || {
+            let scheduler = test_support::scheduler();
+            #[cfg(unix)]
+            let fixture = block_on(LoopbackEcnFixture::open(&scheduler, family, |socket| {
+                std::os::fd::AsRawFd::as_raw_fd(socket.get_ref())
+            }));
+            #[cfg(not(unix))]
+            let fixture = block_on(LoopbackEcnFixture::open(&scheduler, family));
+            let result =
+                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| block_on(test(&fixture))));
+            block_on(fixture.close());
+            block_on(scheduler.shutdown());
+            if let Err(payload) = result {
+                std::panic::resume_unwind(payload);
+            }
+        });
+    }
+
+    macro_rules! family {
+        ($name:ident, $family:ident, $suite:ident) => {
+            mod $name {
+                use super::*;
+                fn run(
+                    test: impl AsyncFnOnce(&LoopbackEcnFixture<'_, TokioScheduler>) + Send + 'static,
+                ) {
+                    super::run(EcnFamily::$family, test);
+                }
+                base_scheduler_conformance::$suite!(run: run);
+            }
+        };
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
+    family!(ipv4, Ipv4, packet_ecn_tests);
+    #[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
+    family!(ipv6, Ipv6, packet_ecn_tests);
+    #[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
+    family!(dual_stack, DualStack, packet_ecn_tests);
+    #[cfg(not(any(target_os = "linux", target_os = "android", target_os = "macos")))]
+    family!(unsupported, Ipv4, packet_ecn_unsupported_tests);
 }

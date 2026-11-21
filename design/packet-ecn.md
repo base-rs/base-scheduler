@@ -1,6 +1,6 @@
 # Packet ECN
 
-Accepted 2026-11-20; not yet implemented.
+Accepted 2026-11-20; implemented 2026-11-21.
 
 ## Requirement
 
@@ -123,3 +123,10 @@ The updated `compile_fail` doctest in `src/socket_recv_message.rs` must fail onl
 Inspect each receive path to confirm that it makes no additional system call, passes control storage of the fixed size above, and keeps no per-socket reporting state, and that multishot payload capacity is unchanged.
 
 Measure the scheduler's packet receive paths with reporting disabled, to record the control buffer's cost, using the buffer benchmark's `sockets` binary (`benchmarks/buffers/src/bin/sockets.rs`, package `base-scheduler-benchmark-buffers`) with the `udp` transport. Run it for the `tokio`, `native` and `iouring` backends in the `raw`, `pool` and `shared` modes, and for `iouring` also in `multi` and `multi-retain`. Compare against the revision before this change, built from the same benchmark source on matched hardware and build settings, and record any difference. No numerical threshold has been agreed.
+
+Recorded 2026-11-21:
+
+- The conformance suite runs over loopback for IPv4, IPv6 and dual-stack sockets on the readiness selector, which Native forwards to, on io_uring and on the Tokio adapter, as unit tests of each crate, where the fixture can reach the socket's descriptor. Its unsupported suite runs on platforms without support, and in the conformance crate against an option-only model, which also checks that the suite rejects a backend accepting an unsupported setting or a stream socket. Releasing control storage from io_uring's single-shot requests, discarding the DSCP bits or skipping a dual-stack socket's IPv4 side each makes the suite fail.
+- The `compile_fail` doctest fails only because of its borrow error. Removing the final use of the address view does not make it compile, because the view is an opaque type that may have a destructor, so its borrow lasts to the end of the scope; ending the borrow with `drop(address)` before `into_payload` does.
+- Linux runs dual-stack sockets as specified. The macOS dual-stack run is the CI's.
+- The UDP receive benchmark, receive-only traffic of 64-byte datagrams in windows of 16 on one worker, nine runs of each configuration alternating in shuffled order, changed throughput by −1.2% to +1.2% across the nine portable configurations and the two io_uring multishot modes, within the runs' 1–2% spread. Repeated with 25 runs each, Native's `raw` mode changed by −0.4% and io_uring's by +0.9%. The samples are in [`packet-ecn.jsonl`](../benchmarks/buffers/results/packet-ecn.jsonl), measured on an AMD Ryzen 9 9950X3D with Linux 7.2.14 against `main` at `7eda32f`.

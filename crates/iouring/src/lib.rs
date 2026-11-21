@@ -55,5 +55,7 @@ mod socket_message;
 use interest::Interest;
 use socket_message::SocketMessage;
 
+#[cfg(test)]
+mod packet_ecn_tests;
 #[cfg(all(test, target_pointer_width = "64"))]
 mod test_buffers;

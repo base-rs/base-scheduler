@@ -287,7 +287,7 @@ impl IoUringSelector {
             header: UnsafeCell::new(unsafe { std::mem::zeroed() }),
             // SAFETY: sockaddr_storage is an integer-only C structure.
             address: UnsafeCell::new(unsafe { std::mem::zeroed() }),
-            control: UnsafeCell::new(ecn::Control::new()),
+            control: UnsafeCell::new(ecn::Control::default()),
             operation,
             prepare,
             reply: Cell::new(Some(reply)),
