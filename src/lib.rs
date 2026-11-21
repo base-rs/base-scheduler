@@ -105,6 +105,7 @@ mod pipe_reading;
 mod pipe_writer;
 #[cfg(unix)]
 mod pipe_writing;
+mod placement;
 mod process_wait;
 mod process_wait_flags;
 mod process_wait_result;
@@ -213,6 +214,7 @@ pub use pipe_reading::PipeReading;
 pub use pipe_writer::PipeWriter;
 #[cfg(unix)]
 pub use pipe_writing::PipeWriting;
+pub use placement::Placement;
 pub use process_wait::ProcessWait;
 pub use process_wait_flags::ProcessWaitFlags;
 pub use process_wait_result::ProcessWaitResult;
