@@ -410,8 +410,13 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for ReadinessSocketStreamReader
     fn try_read_vectored(&mut self, buffers: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
         let empty = buffers.iter().all(|buffer| buffer.is_empty());
         self.try_read_with(empty, |socket| {
-            socket_io::recvmsg_poll(socket, buffers, SocketRecvFlags::default())
-                .map(|result| result.bytes)
+            socket_io::recvmsg_poll(
+                socket,
+                buffers,
+                SocketRecvFlags::default(),
+                socket_io::Receive::Stream,
+            )
+            .map(|result| result.bytes)
         })
     }
 
@@ -428,8 +433,13 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for ReadinessSocketStreamReader
         let capacity = buffers.iter().map(|buffer| buffer.len()).sum();
         let count = self
             .read_with(capacity, cancellation, |socket| {
-                socket_io::recvmsg_poll(socket, buffers, SocketRecvFlags::default())
-                    .map(|result| result.bytes)
+                socket_io::recvmsg_poll(
+                    socket,
+                    buffers,
+                    SocketRecvFlags::default(),
+                    socket_io::Receive::Stream,
+                )
+                .map(|result| result.bytes)
             })
             .await?;
         if count == 0 {
@@ -452,7 +462,7 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for ReadinessSocketStreamReader
         if flags.peek {
             return self
                 .peek_with(cancellation, |socket| {
-                    socket_io::recvmsg_poll(socket, buffers, flags)
+                    socket_io::recvmsg_poll(socket, buffers, flags, socket_io::Receive::Stream)
                 })
                 .await;
         }
@@ -461,7 +471,8 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for ReadinessSocketStreamReader
         let capacity = buffers.iter().map(|buffer| buffer.len()).sum();
         let count = self
             .read_with(capacity, cancellation, |socket| {
-                received = socket_io::recvmsg_poll(socket, buffers, flags)?;
+                received =
+                    socket_io::recvmsg_poll(socket, buffers, flags, socket_io::Receive::Stream)?;
                 Ok(received.bytes)
             })
             .await?;
@@ -489,7 +500,7 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for ReadinessSocketStreamReader
             let mut vectors = socket_io::IoVectors::new();
             let result = self
                 .peek_with(cancellation, |socket| {
-                    vectors.recv(socket, &mut buffers, flags)
+                    vectors.recv(socket, &mut buffers, flags, socket_io::Receive::Stream)
                 })
                 .await;
             return (result, buffers);
@@ -504,7 +515,7 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for ReadinessSocketStreamReader
             let mut vectors = socket_io::IoVectors::new();
             let (buffers, received) = (&mut buffers, &mut received);
             self.read_with(capacity, cancellation, move |socket| {
-                *received = vectors.recv(socket, buffers, flags)?;
+                *received = vectors.recv(socket, buffers, flags, socket_io::Receive::Stream)?;
                 Ok(received.bytes)
             })
             .await

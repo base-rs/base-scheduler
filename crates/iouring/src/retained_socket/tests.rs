@@ -119,6 +119,7 @@ fn oversized_native_messages_are_rejected_before_accessing_payload_pages() {
             &retained,
             &mut [IoSliceMut::new(mapping.bytes_mut())],
             SocketRecvFlags::default(),
+            Receive::Packet,
         )
         .unwrap_err()
         .kind(),

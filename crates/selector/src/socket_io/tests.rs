@@ -149,7 +149,12 @@ fn invalid_vector_counts_fail_before_iterating_or_performing_native_io() {
     );
     assert_eq!(
         vectors
-            .recv(&socket, &mut buffers, SocketRecvFlags::default())
+            .recv(
+                &socket,
+                &mut buffers,
+                SocketRecvFlags::default(),
+                Receive::Packet
+            )
             .unwrap_err()
             .kind(),
         io::ErrorKind::InvalidInput
@@ -161,7 +166,12 @@ fn invalid_vector_counts_fail_before_iterating_or_performing_native_io() {
     let mut target = [vec![0x5a; 2]];
     assert_eq!(
         vectors
-            .recv(&socket, &mut target, SocketRecvFlags::default())
+            .recv(
+                &socket,
+                &mut target,
+                SocketRecvFlags::default(),
+                Receive::Packet
+            )
             .unwrap_err()
             .kind(),
         io::ErrorKind::WouldBlock
@@ -208,8 +218,15 @@ fn prepared_messages_bypass_scratch_and_native_attempts_need_no_vector_allocatio
                 .unwrap(),
             3
         );
-        let result =
-            retry(|| vectors.recv(&receiver, &mut target, SocketRecvFlags::default())).unwrap();
+        let result = retry(|| {
+            vectors.recv(
+                &receiver,
+                &mut target,
+                SocketRecvFlags::default(),
+                Receive::Packet,
+            )
+        })
+        .unwrap();
         assert_eq!(result.bytes, 3);
     });
     assert_eq!(
@@ -254,6 +271,7 @@ fn zero_capacity_message_receives_use_a_real_native_vector_and_report_os_results
             &receiver,
             &mut Vec::<Vec<u8>>::new(),
             SocketRecvFlags::default(),
+            Receive::Packet,
         )
     })
     .unwrap();
@@ -285,9 +303,15 @@ fn missing_control_storage_reports_discarded_packet_metadata() {
     sender
         .send_to(b"x", &receiver.local_addr().unwrap())
         .unwrap();
-    let result =
-        retry(|| IoVectors::new().recv(&receiver, &mut [vec![0; 4]], SocketRecvFlags::default()))
-            .unwrap();
+    let result = retry(|| {
+        IoVectors::new().recv(
+            &receiver,
+            &mut [vec![0; 4]],
+            SocketRecvFlags::default(),
+            Receive::Packet,
+        )
+    })
+    .unwrap();
     assert_eq!(result.bytes, 1);
     assert!(result.control_truncated);
     assert!(!result.truncated);
@@ -303,7 +327,12 @@ fn message_receive_preserves_shutdown_errors() {
     socket.set_nonblocking(true).unwrap();
     socket.shutdown(std::net::Shutdown::Read).unwrap();
     let error = IoVectors::new()
-        .recv(&socket, &mut [vec![0; 1]], SocketRecvFlags::default())
+        .recv(
+            &socket,
+            &mut [vec![0; 1]],
+            SocketRecvFlags::default(),
+            Receive::Packet,
+        )
         .unwrap_err();
     assert_eq!(error.raw_os_error(), Some(WSAESHUTDOWN));
 }
@@ -332,7 +361,8 @@ fn borrowed_native_io_enforces_nonblocking_without_allocating_vectors() {
         recvmsg_poll(
             &receiver,
             &mut [IoSliceMut::new(&mut target)],
-            SocketRecvFlags::default()
+            SocketRecvFlags::default(),
+            Receive::Packet
         )
         .unwrap_err()
         .kind(),
@@ -355,6 +385,7 @@ fn borrowed_native_io_enforces_nonblocking_without_allocating_vectors() {
                 &receiver,
                 &mut [IoSliceMut::new(&mut first), IoSliceMut::new(&mut second)],
                 SocketRecvFlags::default(),
+                Receive::Packet,
             )
         })
         .unwrap();
@@ -415,6 +446,7 @@ fn every_borrowed_attempt_propagates_nonblocking_setup_failure_before_io() {
                 &receiver,
                 &mut [IoSliceMut::new(&mut target)],
                 SocketRecvFlags::default(),
+                Receive::Packet,
             )
             .unwrap_err(),
         };
@@ -516,7 +548,8 @@ fn borrowed_message_lengths_are_validated_before_native_access() {
         recvmsg_poll(
             &socket,
             &mut [IoSliceMut::new(mapping.bytes())],
-            SocketRecvFlags::default()
+            SocketRecvFlags::default(),
+            Receive::Packet
         )
         .unwrap_err()
         .kind(),

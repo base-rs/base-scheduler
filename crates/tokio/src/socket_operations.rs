@@ -245,6 +245,7 @@ impl TokioScheduler {
         socket: &TokioSocket,
         buffer: &mut [std::io::IoSliceMut<'_>],
         flags: SocketRecvFlags,
+        receive: socket_io::Receive,
         cancellation: &Cancellation,
     ) -> OperationResult<SocketRecvResult> {
         self.socket_operation(
@@ -252,7 +253,7 @@ impl TokioScheduler {
             buffer,
             cancellation,
             Interest::Readable,
-            |socket, buffer| socket_io::recvmsg_poll(socket, buffer, flags),
+            |socket, buffer| socket_io::recvmsg_poll(socket, buffer, flags, receive),
         )
         .await
         .0
@@ -326,7 +327,7 @@ impl TokioScheduler {
             buffers,
             cancellation,
             Interest::Readable,
-            move |socket, buffers| vectors.recv(socket, buffers, flags),
+            move |socket, buffers| vectors.recv(socket, buffers, flags, socket_io::Receive::Packet),
         )
         .await
     }

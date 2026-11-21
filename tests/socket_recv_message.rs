@@ -16,6 +16,7 @@ fn metadata(bytes: usize, address: Option<SocketAddress>) -> SocketRecvResult {
         address,
         truncated: true,
         control_truncated: true,
+        ecn: None,
     }
 }
 
@@ -55,6 +56,7 @@ fn empty_payloads_and_clear_flags_are_preserved() {
             address: None,
             truncated: false,
             control_truncated: false,
+            ecn: None,
         },
         Vec::new(),
     );
@@ -166,4 +168,45 @@ fn custom_immutable_messages_can_decode_metadata_lazily_and_move_between_workers
     let address: SocketAddress = "[fe80::2%4]:80".parse().unwrap();
     let reference = &address;
     assert_eq!(SocketAddressView::to_socket_address(&reference), address);
+}
+
+// A message type that cannot carry a marking reports none through the provided method; a portable message reports its result's.
+#[test]
+fn messages_report_the_ecn_marking_they_carry() {
+    struct Plain(Vec<u8>);
+    impl SocketRecvMessage for Plain {
+        type Payload = Vec<u8>;
+        fn address(&self) -> Option<impl SocketAddressView + '_> {
+            None::<&SocketAddress>
+        }
+        fn payload(&self) -> &[u8] {
+            &self.0
+        }
+        fn truncated(&self) -> bool {
+            false
+        }
+        fn control_truncated(&self) -> bool {
+            false
+        }
+        fn into_payload(self) -> Vec<u8> {
+            self.0
+        }
+    }
+    let plain = Plain(b"x".to_vec());
+    assert!(plain.address().is_none());
+    assert!(!plain.truncated() && !plain.control_truncated());
+    assert_eq!(plain.ecn(), None);
+    assert_eq!(plain.payload(), b"x");
+    assert_eq!(plain.into_payload(), b"x");
+    let message = OwnedSocketRecvMessage::new(
+        SocketRecvResult {
+            ecn: Some(Ecn::Ce),
+            ..metadata(0, None)
+        },
+        Vec::new(),
+    );
+    assert_eq!(message.ecn(), Some(Ecn::Ce));
+    for byte in 0..=u8::MAX {
+        assert_eq!(Ecn::from_bits(byte).bits(), byte & 0b11);
+    }
 }

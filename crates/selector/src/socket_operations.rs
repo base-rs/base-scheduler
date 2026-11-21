@@ -312,7 +312,9 @@ impl ReadinessSelector {
             buffer,
             cancellation,
             Interest::Readable,
-            |socket, buffer| socket_io::recvmsg_poll(socket, buffer, flags),
+            |socket, buffer| {
+                socket_io::recvmsg_poll(socket, buffer, flags, socket_io::Receive::Packet)
+            },
         )
         .await
         .0
@@ -389,7 +391,7 @@ impl ReadinessSelector {
             buffers,
             cancellation,
             Interest::Readable,
-            move |socket, buffers| vectors.recv(socket, buffers, flags),
+            move |socket, buffers| vectors.recv(socket, buffers, flags, socket_io::Receive::Packet),
         )
         .await
     }

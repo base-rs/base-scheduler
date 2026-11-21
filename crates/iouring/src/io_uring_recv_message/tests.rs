@@ -23,7 +23,8 @@ fn native_addresses_decode_unaligned_ipv4_and_ipv6_metadata_without_exposing_it_
         storage.as_mut()[name.clone()].copy_from_slice(native);
         storage.as_mut()[200..204].copy_from_slice(b"data");
         let payload = crate::IoUringBuffer::new(storage, 200, 4);
-        let mut message = IoUringRecvMessage::native(payload, name, true, true);
+        let mut message =
+            IoUringRecvMessage::native(payload, name, true, true, Some(base_scheduler::Ecn::Ce));
         let pointer = message.payload().as_ptr();
         assert_eq!(message.payload(), b"data");
         let view = message.address().unwrap();
@@ -33,6 +34,7 @@ fn native_addresses_decode_unaligned_ipv4_and_ipv6_metadata_without_exposing_it_
         assert_eq!(message.address().unwrap().to_socket_address(), expected);
         assert!(message.truncated());
         assert!(message.control_truncated());
+        assert_eq!(message.ecn(), Some(base_scheduler::Ecn::Ce));
         let payload = message.into_payload();
         assert_eq!(payload.as_ref(), b"Xata");
         assert_eq!(payload.as_ref().as_ptr(), pointer);
@@ -64,9 +66,12 @@ fn portable_metadata_and_empty_payloads_use_the_same_message_contract() {
                 address,
                 truncated: false,
                 control_truncated: false,
+                ecn: address.map(|_| base_scheduler::Ecn::Ect0),
             },
             payload,
         ));
+        // A message built from a portable result keeps its marking.
+        assert_eq!(message.ecn(), address.map(|_| base_scheduler::Ecn::Ect0));
         assert_eq!(
             message.address().map(|view| view.to_socket_address()),
             address

@@ -198,8 +198,13 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for IoUringSocketStreamReader<'
     fn try_read_vectored(&mut self, buffers: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
         let empty = buffers.iter().all(|buffer| buffer.is_empty());
         self.try_read_with(empty, |socket| {
-            crate::retained_socket::recvmsg(socket, buffers, SocketRecvFlags::default())
-                .map(|result| result.bytes)
+            crate::retained_socket::recvmsg(
+                socket,
+                buffers,
+                SocketRecvFlags::default(),
+                crate::retained_socket::Receive::Stream,
+            )
+            .map(|result| result.bytes)
         })
     }
 
@@ -223,8 +228,13 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for IoUringSocketStreamReader<'
                 capacity,
                 cancellation,
                 |socket| {
-                    crate::retained_socket::recvmsg(socket, buffers, SocketRecvFlags::default())
-                        .map(|result| result.bytes)
+                    crate::retained_socket::recvmsg(
+                        socket,
+                        buffers,
+                        SocketRecvFlags::default(),
+                        crate::retained_socket::Receive::Stream,
+                    )
+                    .map(|result| result.bytes)
                 },
             )
             .await?;
@@ -251,7 +261,13 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for IoUringSocketStreamReader<'
         if flags.peek {
             return self
                 .scheduler
-                .socket_monitor_recvmsg_poll(&mut self.monitor, buffers, flags, cancellation)
+                .socket_monitor_recvmsg_poll(
+                    &mut self.monitor,
+                    buffers,
+                    flags,
+                    crate::retained_socket::Receive::Stream,
+                    cancellation,
+                )
                 .await;
         }
         let mut received = SocketRecvResult::default();
@@ -264,7 +280,12 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for IoUringSocketStreamReader<'
                 capacity,
                 cancellation,
                 |socket| {
-                    received = crate::retained_socket::recvmsg(socket, buffers, flags)?;
+                    received = crate::retained_socket::recvmsg(
+                        socket,
+                        buffers,
+                        flags,
+                        crate::retained_socket::Receive::Stream,
+                    )?;
                     Ok(received.bytes)
                 },
             )
@@ -293,7 +314,13 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for IoUringSocketStreamReader<'
         };
         let (result, buffers) = self
             .scheduler
-            .socket_recvmsg(self.monitor.socket(), buffers, flags, cancellation)
+            .socket_recvmsg(
+                self.monitor.socket(),
+                buffers,
+                flags,
+                crate::retained_socket::Receive::Stream,
+                cancellation,
+            )
             .await;
         // A consuming receive of nothing is EOF; a peek consumes nothing.
         self.eof |= !flags.peek && matches!(&result, Ok(result) if result.bytes == 0);

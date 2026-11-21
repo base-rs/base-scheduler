@@ -680,7 +680,8 @@ fn borrowed_operations_reject_closed_schedulers_and_preserve_storage_on_errors()
             &socket,
             &mut [IoSliceMut::new(&mut target)],
             SocketRecvFlags::default(),
-            &never
+            crate::socket_io::Receive::Packet,
+            &never,
         ))
         .unwrap_err()
         .kind(),

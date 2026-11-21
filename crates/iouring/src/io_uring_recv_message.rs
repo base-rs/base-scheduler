@@ -2,8 +2,8 @@
 // Copyright, 2026, by Samuel Williams.
 
 use base_scheduler::{
-    IoBuf, IoBufMut, OwnedSocketRecvMessage, SocketAddress, SocketAddressView, SocketRecvMessage,
-    SocketRecvMessageMut,
+    Ecn, IoBuf, IoBufMut, OwnedSocketRecvMessage, SocketAddress, SocketAddressView,
+    SocketRecvMessage, SocketRecvMessageMut,
 };
 use std::{
     net::{Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6},
@@ -16,6 +16,7 @@ pub struct IoUringRecvMessage<B: IoBuf = crate::IoUringBuffer> {
     address: Address,
     truncated: bool,
     control_truncated: bool,
+    ecn: Option<Ecn>,
 }
 
 enum Address {
@@ -34,12 +35,14 @@ impl<B: IoBuf> IoUringRecvMessage<B> {
         name: Range<usize>,
         truncated: bool,
         control_truncated: bool,
+        ecn: Option<Ecn>,
     ) -> Self {
         Self {
             payload,
             address: Address::Native(name),
             truncated,
             control_truncated,
+            ecn,
         }
     }
 
@@ -50,6 +53,7 @@ impl<B: IoBuf> IoUringRecvMessage<B> {
             ),
             truncated: message.truncated(),
             control_truncated: message.control_truncated(),
+            ecn: message.ecn(),
             payload: message.into_payload(),
         }
     }
@@ -73,6 +77,9 @@ impl<B: MessageStorage> SocketRecvMessage for IoUringRecvMessage<B> {
     }
     fn control_truncated(&self) -> bool {
         self.control_truncated
+    }
+    fn ecn(&self) -> Option<Ecn> {
+        self.ecn
     }
     fn into_payload(self) -> B {
         self.payload

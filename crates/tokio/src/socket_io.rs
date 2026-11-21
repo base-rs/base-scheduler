@@ -29,7 +29,7 @@ thread_local! {
     pub(crate) static SOCKET_TYPE_ERROR: std::cell::Cell<Option<io::ErrorKind>> = const { std::cell::Cell::new(None) };
 }
 
-fn socket_type(socket: &Socket) -> io::Result<Type> {
+pub(crate) fn socket_type(socket: &Socket) -> io::Result<Type> {
     #[cfg(test)]
     if let Some(error) = SOCKET_TYPE_ERROR.with(|slot| slot.take()) {
         return Err(error.into());
@@ -266,10 +266,11 @@ impl IoVectors {
         socket: &Socket,
         buffers: &mut B,
         flags: SocketRecvFlags,
+        receive: Receive,
     ) -> io::Result<SocketRecvResult> {
         let (vectors, count) = self.receiving(buffers)?;
         // SAFETY: The sequence retains the vector array and all payload ranges until this synchronous call returns.
-        unsafe { recv_vectors(socket, vectors, count, recv_flags(flags)) }
+        unsafe { recv_vectors(socket, vectors, count, recv_flags(flags), receive) }
     }
 }
 
@@ -319,15 +320,23 @@ unsafe fn send_vectors(
     }
 }
 
+/// Whether a receive is of a packet socket, which passes control storage and reports its ECN marking, or of a stream, which reports none.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum Receive {
+    Stream,
+    Packet,
+}
+
 // SAFETY: The caller must retain the I/O-vector array and every payload range through this synchronous call; receive ranges must be exclusive. No pointers are retained after return.
 unsafe fn recv_vectors(
     socket: &Socket,
     vectors: *const NativeVector,
     count: usize,
     flags: i32,
+    receive: Receive,
 ) -> io::Result<SocketRecvResult> {
-    // SAFETY: try_init provides address storage and length initialized to capacity. The syscall fills only this storage, writes initialized payload within supplied ranges, and retains no pointers after return.
-    let ((bytes, truncated, control_truncated), address) = unsafe {
+    // SAFETY: try_init provides address storage and length initialized to capacity. The syscall fills only this storage and the control storage, writes initialized payload within supplied ranges, and retains no pointers after return.
+    let ((bytes, truncated, control_truncated, ecn), address) = unsafe {
         SockAddr::try_init(|address, length| {
             #[cfg(unix)]
             {
@@ -336,12 +345,32 @@ unsafe fn recv_vectors(
                 header.msg_iovlen = count as _;
                 header.msg_name = address.cast();
                 header.msg_namelen = *length;
+                // Every packet receive passes room for one ECN marking; with reporting disabled the system attaches nothing.
+                #[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
+                let mut control = crate::ecn::Control::default();
+                #[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
+                if receive == Receive::Packet {
+                    header.msg_control = control.0.as_mut_ptr().cast();
+                    header.msg_controllen = crate::ecn::CONTROL_SPACE as _;
+                }
                 let bytes = result_count(libc::recvmsg(socket.as_raw_fd(), &mut header, flags))?;
                 *length = header.msg_namelen;
+                let control_truncated = header.msg_flags & libc::MSG_CTRUNC != 0;
+                #[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
+                let ecn = crate::ecn::parse(
+                    &control.0[..(header.msg_controllen as usize).min(crate::ecn::CONTROL_SPACE)],
+                    control_truncated,
+                );
+                #[cfg(not(any(target_os = "linux", target_os = "android", target_os = "macos")))]
+                let ecn = {
+                    let _ = receive;
+                    None
+                };
                 Ok((
                     bytes,
                     header.msg_flags & libc::MSG_TRUNC != 0,
-                    header.msg_flags & libc::MSG_CTRUNC != 0,
+                    control_truncated,
+                    ecn,
                 ))
             }
             #[cfg(windows)]
@@ -359,10 +388,11 @@ unsafe fn recv_vectors(
                     ptr::null_mut(),
                     None,
                 );
+                let _ = receive;
                 match result_count(result as isize) {
-                    Ok(_) => Ok((bytes as usize, false, false)),
+                    Ok(_) => Ok((bytes as usize, false, false, None)),
                     Err(error) if error.raw_os_error() == Some(WSAEMSGSIZE) => {
-                        Ok((bytes as usize, true, false))
+                        Ok((bytes as usize, true, false, None))
                     }
                     Err(error) => Err(error),
                 }
@@ -374,6 +404,7 @@ unsafe fn recv_vectors(
         address: address.as_socket(),
         truncated,
         control_truncated,
+        ecn,
     })
 }
 
@@ -445,6 +476,7 @@ pub(crate) fn recvmsg_poll(
     socket: &Socket,
     buffers: &mut [IoSliceMut<'_>],
     flags: SocketRecvFlags,
+    receive: Receive,
 ) -> io::Result<SocketRecvResult> {
     validate_lengths(buffers.len(), buffers.iter().map(|buffer| buffer.len()))?;
     let empty = native_vector(&[]);
@@ -457,7 +489,7 @@ pub(crate) fn recvmsg_poll(
     poll_nonblocking(socket)?;
     let flags = POLL_FLAGS | recv_flags(flags);
     // SAFETY: IoSliceMut has the native layout. The array and exclusive payload ranges remain live throughout this synchronous call; vector entries are read only.
-    unsafe { recv_vectors(socket, vectors, count, flags) }
+    unsafe { recv_vectors(socket, vectors, count, flags, receive) }
 }
 
 fn native_vector(bytes: &[u8]) -> NativeVector {

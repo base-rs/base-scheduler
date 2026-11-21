@@ -411,10 +411,11 @@ impl IoUringSelector {
         monitor: &mut Storage,
         buffers: &mut [std::io::IoSliceMut<'_>],
         flags: SocketRecvFlags,
+        receive: crate::retained_socket::Receive,
         cancellation: &Cancellation,
     ) -> OperationResult<SocketRecvResult> {
         self.monitor_io(monitor, Interest::Readable, cancellation, |socket| {
-            crate::retained_socket::recvmsg(socket, buffers, flags)
+            crate::retained_socket::recvmsg(socket, buffers, flags, receive)
         })
         .await
     }

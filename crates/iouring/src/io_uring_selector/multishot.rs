@@ -247,6 +247,8 @@ impl IoUringSelector {
         // SAFETY: A zeroed msghdr with only name/control capacities is the multishot ABI. The immutable header stays in its boxed request until final completion.
         let mut header: libc::msghdr = unsafe { std::mem::zeroed() };
         header.msg_namelen = std::mem::size_of::<libc::sockaddr_storage>() as _;
+        // Room for one ECN marking in every provided buffer; with reporting disabled the system attaches nothing.
+        header.msg_controllen = base_scheduler_selector::ecn::CONTROL_SPACE;
         let request = MultiRequest {
             identifier,
             _permit: Some(permit),
@@ -371,11 +373,19 @@ impl PendingRequest for MultiRequest {
         }
         let name = parsed.name_data();
         let name_offset = name.as_ptr() as usize - bytes.as_ptr() as usize;
+        let control_truncated = parsed.is_control_data_truncated();
+        // Stream receives report no marking.
+        let ecn = if self.stream {
+            None
+        } else {
+            base_scheduler_selector::ecn::parse(parsed.control_data(), control_truncated)
+        };
         let message = IoUringRecvMessage::native(
             buffer,
             name_offset..name_offset + name.len(),
             parsed.is_payload_truncated(),
-            parsed.is_control_data_truncated(),
+            control_truncated,
+            ecn,
         );
         let notify = {
             let mut received = self.state.received.lock().unwrap();

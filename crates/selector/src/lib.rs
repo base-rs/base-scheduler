@@ -8,8 +8,11 @@
 compile_error!("base-scheduler-selector currently supports Unix and Windows");
 
 mod blocking_pool;
+// Shared with the io_uring backend; not a stable interface.
 mod blocking_task;
 mod buffer_pooling;
+#[doc(hidden)]
+pub mod ecn;
 #[cfg(target_os = "linux")]
 mod file_extensions;
 mod file_io;

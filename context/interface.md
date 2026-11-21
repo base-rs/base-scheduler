@@ -79,7 +79,7 @@ The submission token continues to govern accepted output until its send result. 
 | `write_owned` | `(B: IoBuf, address, C) → BufferResult<B>` | Retain a stable owner through one send and return it alongside the result. |
 | `close` | `() → io::Result<()>` | Await registration retirement without closing or shutting down the socket. |
 
-`SocketRecvResult` contains the copied byte count, optional source address, payload truncation, and ancillary-data truncation. Ancillary bytes themselves are not exposed. Ordinary packet reads consume packets; explicit receive flags can request peeking. Buffer registration remains an implementation strategy.
+`SocketRecvResult` contains the copied byte count, optional source address, payload truncation, ancillary-data truncation, and a packet's ECN marking. Packet receives pass room for one marking message and report it as `ecn: Option<Ecn>` when the system supplied it, which it does while reporting is enabled; otherwise, after truncated control data, and for streams, `ecn` is `None`, never `Ecn::NotEct`. Other ancillary bytes are not exposed. Ordinary packet reads consume packets; explicit receive flags can request peeking. Buffer registration remains an implementation strategy.
 
 ## Bound file I/O
 
@@ -162,7 +162,7 @@ Files are opened only through `FileOpen`. Importing native file descriptors or h
 | [`SocketSetOption<O>::socket_set_option`](https://github.com/base-rs/base-scheduler/blob/main/src/socket_set_option.rs) | `(K, option: O, value: O::Value, C) → OperationResult<()>` asynchronously | Set a typed option. |
 | [`AddressResolution::address_resolve`](https://github.com/base-rs/base-scheduler/blob/main/src/address_resolution.rs) | `(name: Option<&str>, AddressService, AddressHints, C) → OperationResult<Addresses>` asynchronously | Owned associated resolution result; independent of connect policy. Preserve ordering, duplicates, socket type, protocol, and IPv6 scope. |
 
-`SocketAddress` is the standard-library IP `SocketAddr`; this is not a Unix-domain or arbitrary native-address interface. `SocketOption` associates a `Value: Send`; supplied boolean options are `TcpNoDelay`, `SocketReuseAddress`, and `SocketKeepalive`. Implementations may support additional typed options independently.
+`SocketAddress` is the standard-library IP `SocketAddr`; this is not a Unix-domain or arbitrary native-address interface. `SocketOption` associates a `Value: Send`; supplied boolean options are `TcpNoDelay`, `SocketReuseAddress`, `SocketKeepalive` and `ReceiveEcn`, which enables a packet socket's ECN reporting. `SendEcn`, whose value is an `Ecn`, sets the marking of every datagram a packet socket sends, preserving the DSCP bits. On a dual-stack socket the ECN options also configure the IPv4 options on Linux and Android, while macOS uses the IPv6 options for IPv4-mapped traffic too; gets read the IPv6 option. Stream sockets reject them with `InvalidInput`; a backend or platform without support returns `Unsupported`. Implementations may support additional typed options independently.
 
 `AddressService` selects a port or named service. Resolver errors are `AddressResolveError` carried inside `OperationError::Io`, preserving a portable category and native code when available. [`AddressInfoCollection::entries`](https://github.com/base-rs/base-scheduler/blob/main/src/address_info_collection.rs) returns borrowed `AddressInfoView` entries exposing `address`, `socket_type`, `protocol`, and explicit `to_address_info` materialization. The result owner can retain the original native address list.
 
@@ -213,6 +213,7 @@ Dropping an ordinary clock wait releases its registration. Reusable timer waits 
 | `SocketRecvMessage::address` | `(&message) → Option<impl SocketAddressView>` | Borrow source metadata in its backend representation. |
 | `payload` | `(&message) → &[u8]` | Exactly completed bytes, excluding metadata and unused capacity. |
 | `truncated`, `control_truncated` | `(&message) → bool` | Describe the receive independently of later payload edits. |
+| `ecn` | `(&message) → Option<Ecn>` | The datagram's ECN marking when the system supplied it. Provided as `None` for message types that cannot carry it. |
 | `into_payload` | `(message by value) → Payload: IoBuf` | Transfer ownership of exactly the visible payload range. Borrowed address views cannot survive extraction. |
 | `SocketRecvMessageMut::payload_mut` | `(&mut message) → &mut [u8]` | Exclusive parsing or decryption access. |
 | `SocketAddressView::to_socket_address` | `(&view) → SocketAddress` | Explicit portable endpoint conversion preserving IPv6 scope and flow information. |

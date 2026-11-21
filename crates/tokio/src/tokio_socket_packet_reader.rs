@@ -72,6 +72,7 @@ impl SocketPacketReader for TokioSocketPacketReader<'_> {
                     &self.socket,
                     &mut vectors,
                     SocketRecvFlags::default(),
+                    crate::socket_io::Receive::Packet,
                     cancellation,
                 ));
                 poll_fn(|context| Poll::Ready(receive.as_mut().poll(context))).await
@@ -122,7 +123,13 @@ impl SocketPacketReader for TokioSocketPacketReader<'_> {
         }
         let result = self
             .scheduler
-            .socket_recvmsg_poll(&self.socket, buffers, flags, cancellation)
+            .socket_recvmsg_poll(
+                &self.socket,
+                buffers,
+                flags,
+                crate::socket_io::Receive::Packet,
+                cancellation,
+            )
             .await?;
         Ok(result)
     }
