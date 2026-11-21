@@ -1,6 +1,6 @@
 # Scoped spawning
 
-Accepted 2026-11-21; not yet implemented.
+Accepted and implemented 2026-11-21.
 
 ## Requirement
 
@@ -70,3 +70,5 @@ Inspect the interface crate's `scope` implementation and the backend primitive: 
 - On Tokio, shutting the runtime down during a scope destroys its tasks, and `scope` returns only after their destruction is reported.
 
 The workspace's coverage requirement applies. Running the interface crate's scope tests under Miri, with a test-only backend primitive, is desirable where the tools permit, and its result is recorded.
+
+Recorded 2026-11-21 with Miri on nightly 2026-11-19: the interface crate's ten scope tests in `tests/spawn_scoped.rs`, run against an inline test backend, and the Tokio adapter's scoped conformance and shutdown cases report no undefined behaviour. Native cannot run under Miri, which does not emulate `timerfd_create`. Its token release was checked instead by releasing tokens at spawn, which the conformance cases detect.

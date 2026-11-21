@@ -8,8 +8,8 @@ use crate::{
 };
 use base_scheduler::{
     Blocking, BlockingError, BufferResult, Cancellation, FileClose, FileOpen, FileOperation,
-    FileOptions, FileSeek, FileStat, FileSync, FileTruncate, IoBuf, OperationResult, Spawn,
-    SpawnError, SyncMode, TaskError,
+    FileOptions, FileSeek, FileStat, FileSync, FileTruncate, IoBuf, OperationResult, ScopeToken,
+    Spawn, SpawnError, SpawnScoped, SyncMode, TaskError,
 };
 use futures_channel::oneshot;
 use std::{
@@ -163,6 +163,28 @@ impl Spawn for TokioScheduler {
         F::Output: Send + 'static,
     {
         self.tasks.spawn(future)
+    }
+}
+
+// SAFETY: `TaskService::spawn_scoped` registers the task before it is runnable and keeps the token beside the future in the same Tokio task, released only when Tokio destroys that future: on completion, after the abort that dropping the handle requests, or when the runtime shuts down. A rejected spawn destroys the future, then the token, before returning. `TaskFuture` contains destructor panics.
+unsafe impl SpawnScoped for TokioScheduler {
+    type ScopedHandle = crate::TokioTask<()>;
+    unsafe fn spawn_unchecked<F>(
+        &self,
+        future: F,
+        token: ScopeToken,
+    ) -> Result<Self::ScopedHandle, SpawnError>
+    where
+        F: std::future::Future<Output = ()> + Send,
+    {
+        // SAFETY: The caller guarantees the future's borrowed data outlives `token`.
+        unsafe { self.tasks.spawn_scoped(future, token) }
+    }
+    fn check_blocking(&self) {
+        // Use Tokio's own check: a thread driving asynchronous tasks must not block, but a blocking-pool thread may.
+        if let Ok(runtime) = tokio::runtime::Handle::try_current() {
+            runtime.block_on(async {});
+        }
     }
 }
 

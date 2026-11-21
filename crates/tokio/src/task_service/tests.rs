@@ -3,8 +3,9 @@
 
 use super::*;
 use crate::{TokioScheduler, test_support};
+use base_scheduler::SpawnScoped;
 use base_scheduler::{Cancellation, Spawn};
-use base_scheduler_conformance::SpawnFixture;
+use base_scheduler_conformance::{SpawnFixture, SpawnScopedFixture};
 use futures_lite::future::block_on;
 
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -163,6 +164,93 @@ mod conformance {
 }
 mod dispatch {
     base_scheduler_conformance::spawn_dispatch_tests!(run: super::run);
+}
+
+impl SpawnScopedFixture for TokioScheduler {
+    type Scheduler = Self;
+    fn scheduler(&self) -> &Self {
+        self
+    }
+    fn close(&self) {
+        self.tasks.close();
+    }
+}
+fn run_scoped(test: impl FnOnce(&TokioScheduler) + Send + 'static) {
+    test_support::run(move || {
+        let scheduler = test_support::scheduler();
+        let result = catch_unwind(AssertUnwindSafe(|| test(&scheduler)));
+        block_on(scheduler.shutdown());
+        if let Err(payload) = result {
+            std::panic::resume_unwind(payload);
+        }
+    });
+}
+mod scoped {
+    base_scheduler_conformance::spawn_scoped_tests!(run: super::run_scoped);
+}
+
+#[test]
+fn scope_panics_inside_a_task_and_runs_on_a_blocking_thread() {
+    run_scoped(|scheduler| {
+        let panicked = scheduler.scope(async |scope| {
+            scope
+                .spawn(async {
+                    catch_unwind(AssertUnwindSafe(|| scheduler.scope(async |_| ()))).is_err()
+                })
+                .unwrap()
+                .await
+                .unwrap()
+        });
+        assert!(panicked, "a runtime worker entered a blocking scope");
+    });
+    let blocking = test_support::runtime().spawn_blocking(|| {
+        let scheduler = test_support::scheduler();
+        let output =
+            scheduler.scope(async |scope| scope.spawn(async { 3 }).unwrap().await.unwrap());
+        block_on(scheduler.shutdown());
+        output
+    });
+    assert_eq!(block_on(blocking).unwrap(), 3);
+}
+
+// Shutting the runtime down destroys a scope's tasks, and the scope returns only once their destruction is reported.
+#[test]
+fn runtime_shutdown_destroys_scoped_tasks() {
+    struct Late<'a>(&'a std::sync::atomic::AtomicUsize);
+    impl Drop for Late<'_> {
+        fn drop(&mut self) {
+            std::thread::sleep(std::time::Duration::from_millis(20));
+            self.0.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+    test_support::run(|| {
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .enable_all()
+            .build()
+            .unwrap();
+        let scheduler = TokioScheduler::new(runtime.handle().clone());
+        let drops = std::sync::atomic::AtomicUsize::new(0);
+        let (started, entered) = std::sync::mpsc::channel();
+        let (scheduler, drops_ref) = (&scheduler, &drops);
+        let result = std::thread::scope(|threads| {
+            let scoped = threads.spawn(move || {
+                scheduler.scope(async |scope| {
+                    let task = scope.spawn(async move {
+                        let _capture = Late(drops_ref);
+                        started.send(()).unwrap();
+                        std::future::pending::<()>().await
+                    });
+                    task.unwrap().await
+                })
+            });
+            entered.recv().unwrap();
+            drop(runtime);
+            scoped.join().unwrap()
+        });
+        assert!(matches!(result, Err(TaskError::Cancelled)));
+        assert_eq!(drops.load(Ordering::SeqCst), 1);
+    });
 }
 
 #[test]

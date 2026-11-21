@@ -91,6 +91,7 @@ fn worker_state() -> WorkerState {
 fn runnable() -> Runnable {
     let state = TaskState {
         worker: AtomicUsize::new(0),
+        scoped: None,
     };
     let (runnable, _task) = async_task::Builder::new()
         .metadata(state)

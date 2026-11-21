@@ -25,6 +25,24 @@ impl<T> Future for NativeTask<T> {
     }
 }
 
+/// The owning handle of a task spawned into a scope. Dropping it requests
+/// destruction after any active poll returns; the scope waits for that
+/// destruction. The task reports its output through the scope.
+#[must_use = "retain the task's owning handle"]
+pub struct NativeScopedTask {
+    pub(crate) task: Option<async_task::Task<TaskOutcome<()>, TaskState>>,
+    pub(crate) holders: std::sync::Arc<crate::task_service::ScopedHolders>,
+}
+
+impl Drop for NativeScopedTask {
+    fn drop(&mut self) {
+        // Dropping the handle may schedule a runnable to destroy an idle
+        // future, which holds the token from then on.
+        drop(self.task.take());
+        self.holders.release();
+    }
+}
+
 // async-task aborts if its future or stored output destructor unwinds. Keep both user-owned values behind guards, including when the task is abandoned.
 pub(crate) struct TaskFuture<F: Future> {
     future: ManuallyDrop<F>,

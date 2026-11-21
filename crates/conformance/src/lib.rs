@@ -20,6 +20,7 @@ pub mod socket_registration;
 pub mod socket_resources;
 pub mod socket_stream_writing;
 pub mod spawn;
+pub mod spawn_scoped;
 
 mod address_resolution_fixture;
 mod address_resolution_ip_tests;
@@ -59,6 +60,8 @@ mod socket_set_option_tests;
 mod socket_tests;
 mod spawn_dispatch_tests;
 mod spawn_fixture;
+mod spawn_scoped_fixture;
+mod spawn_scoped_tests;
 mod spawn_tests;
 mod test_cases;
 
@@ -75,6 +78,7 @@ pub use socket_io_guard::SocketIoGuard;
 pub use socket_option_fixture::SocketOptionFixture;
 pub use socket_registration_fixture::SocketRegistrationFixture;
 pub use spawn_fixture::SpawnFixture;
+pub use spawn_scoped_fixture::SpawnScopedFixture;
 
 // Macro expansions must resolve their support dependency through this crate even when dependencies are renamed by a backend.
 #[doc(hidden)]

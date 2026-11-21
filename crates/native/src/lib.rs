@@ -30,7 +30,7 @@ pub use base_scheduler_selector::{
 pub use native_executor_options::NativeExecutorOptions;
 pub use native_options::NativeOptions;
 pub use native_scheduler::NativeScheduler;
-pub use native_task::NativeTask;
+pub use native_task::{NativeScopedTask, NativeTask};
 #[cfg(feature = "diagnostics")]
 pub use rescue_statistics::RescueStatistics;
 

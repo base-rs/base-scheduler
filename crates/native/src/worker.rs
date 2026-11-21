@@ -474,10 +474,15 @@ fn run_ready_batch(shared: &Shared, first: Runnable) {
     let mut runnable = Some(first);
     while let Some(task) = runnable {
         task.metadata().worker.store(identifier, Ordering::Relaxed);
+        let scoped = task.metadata().scoped.clone();
         // Contain task-machinery panics as well as the guarded future's panics.
         crate::panic::contain(|| {
             task.run();
         });
+        // The runnable has ended, so it can no longer reach a scoped future.
+        if let Some(scoped) = scoped {
+            scoped.release();
+        }
         #[cfg(any(test, feature = "diagnostics"))]
         shared.workers[identifier]
             .heartbeat
