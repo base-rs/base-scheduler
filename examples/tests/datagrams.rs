@@ -102,6 +102,7 @@ impl Receives {
             address: Some("127.0.0.1:1234".parse().unwrap()),
             truncated: truncated || copied < bytes.len(),
             control_truncated: false,
+            ecn: None,
         })
     }
 }

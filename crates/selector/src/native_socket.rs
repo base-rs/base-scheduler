@@ -239,7 +239,12 @@ impl NativeSocket {
         buffers: &mut [io::IoSliceMut<'_>],
         flags: SocketRecvFlags,
     ) -> io::Result<SocketRecvResult> {
-        crate::socket_io::recvmsg_poll(self.get_ref(), buffers, flags)
+        crate::socket_io::recvmsg_poll(
+            self.get_ref(),
+            buffers,
+            flags,
+            crate::socket_io::Receive::Packet,
+        )
     }
 
     /// Attempt a synchronous nonblocking message send using the borrowed I/O vectors directly. No payload, vector, or address pointer survives this call.

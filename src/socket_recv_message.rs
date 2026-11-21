@@ -1,7 +1,7 @@
 // Released under the MIT License.
 // Copyright, 2026, by Samuel Williams.
 
-use crate::{IoBuf, SocketAddressView};
+use crate::{Ecn, IoBuf, SocketAddressView};
 
 /// An owned received stream chunk or datagram, with backend-associated payload storage and metadata. The message may move between workers and outlive its receiver and scheduler. Its accessors describe contents and ownership, without prescribing allocation, copying, registration, or receive strategy.
 ///
@@ -11,7 +11,7 @@ use crate::{IoBuf, SocketAddressView};
 /// use base_scheduler::{OwnedSocketRecvMessage, SocketAddressView, SocketRecvMessage, SocketRecvResult};
 /// let message = OwnedSocketRecvMessage::new(SocketRecvResult {
 ///     bytes: 1, address: Some("127.0.0.1:1234".parse().unwrap()),
-///     truncated: false, control_truncated: false,
+///     truncated: false, control_truncated: false, ecn: None,
 /// }, vec![0]);
 /// let address = message.address().unwrap();
 /// let payload = message.into_payload();
@@ -30,8 +30,13 @@ pub trait SocketRecvMessage: Send + 'static {
     /// Whether a datagram exceeded the supplied payload capacity. The exposed bytes are the received prefix, not the original datagram length.
     fn truncated(&self) -> bool;
 
-    /// Whether the receive discarded ancillary data. This interface does not expose a control buffer.
+    /// Whether the receive discarded ancillary data. See `SocketRecvResult::control_truncated`.
     fn control_truncated(&self) -> bool;
+
+    /// The datagram's ECN marking, when the system supplied it. See `SocketRecvResult::ecn`. The default reports none, for messages that cannot carry it.
+    fn ecn(&self) -> Option<Ecn> {
+        None
+    }
 
     /// Consume the message and return independently owned storage exposing the same payload bytes and range as `payload()`, including any modifications through `SocketRecvMessageMut`. The owner can be passed to owned I/O or retained after receiver shutdown. Address views cannot outlive this transfer.
     fn into_payload(self) -> Self::Payload;

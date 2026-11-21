@@ -79,6 +79,7 @@ impl SocketPacketReader for IoUringSocketPacketReader<'_> {
                     &mut self.monitor,
                     &mut vectors,
                     SocketRecvFlags::default(),
+                    crate::retained_socket::Receive::Packet,
                     cancellation,
                 ));
                 poll_fn(|context| Poll::Ready(receive.as_mut().poll(context))).await
@@ -125,6 +126,7 @@ impl SocketPacketReader for IoUringSocketPacketReader<'_> {
                 &mut self.monitor,
                 buffers,
                 SocketRecvFlags::default(),
+                crate::retained_socket::Receive::Packet,
                 cancellation,
             )
             .await
@@ -142,7 +144,13 @@ impl SocketPacketReader for IoUringSocketPacketReader<'_> {
         }
         self.operations.check_idle()?;
         self.scheduler
-            .socket_monitor_recvmsg_poll(&mut self.monitor, buffers, flags, cancellation)
+            .socket_monitor_recvmsg_poll(
+                &mut self.monitor,
+                buffers,
+                flags,
+                crate::retained_socket::Receive::Packet,
+                cancellation,
+            )
             .await
     }
     async fn read_owned_vectored<Buffers: base_scheduler::IoBufSequenceMut>(
@@ -166,7 +174,13 @@ impl SocketPacketReader for IoUringSocketPacketReader<'_> {
         };
         let (result, buffers) = self
             .scheduler
-            .socket_recvmsg(self.monitor.socket(), buffers, flags, cancellation)
+            .socket_recvmsg(
+                self.monitor.socket(),
+                buffers,
+                flags,
+                crate::retained_socket::Receive::Packet,
+                cancellation,
+            )
             .await;
         (result, buffers.into_inner())
     }

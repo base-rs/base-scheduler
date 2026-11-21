@@ -65,7 +65,10 @@ impl Pool {
     ) -> io::Result<Arc<Self>> {
         options.validate()?;
         let entries = options.buffers.next_power_of_two();
-        let overhead = 16 + std::mem::size_of::<libc::sockaddr_storage>();
+        // The kernel's `io_uring_recvmsg_out` header, the name and the control data precede each payload, so `buffer_size` remains the payload capacity.
+        let overhead = 16
+            + std::mem::size_of::<libc::sockaddr_storage>()
+            + base_scheduler_selector::ecn::CONTROL_SPACE;
         let buffer_size = options.buffer_size.saturating_add(overhead);
         let length = buffer_size.saturating_mul(options.buffers as usize);
         if buffer_size > i32::MAX as usize || length > isize::MAX as usize {

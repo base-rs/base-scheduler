@@ -232,6 +232,7 @@ impl SocketStreamReader for Stream {
             address: None,
             truncated: false,
             control_truncated: false,
+            ecn: None,
         })
     }
     async fn read_owned_vectored<B: IoBufSequenceMut>(

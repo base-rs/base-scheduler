@@ -16,6 +16,7 @@ fn metadata(bytes: usize, address: Option<SocketAddress>) -> SocketRecvResult {
         address,
         truncated: true,
         control_truncated: true,
+        ecn: None,
     }
 }
 
@@ -55,6 +56,7 @@ fn empty_payloads_and_clear_flags_are_preserved() {
             address: None,
             truncated: false,
             control_truncated: false,
+            ecn: None,
         },
         Vec::new(),
     );

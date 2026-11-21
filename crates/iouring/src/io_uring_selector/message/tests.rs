@@ -42,7 +42,13 @@ async fn operation<B: IoBufSequenceMut>(
         (result, message.buffers)
     } else {
         let (result, buffers) = selector
-            .socket_recvmsg(socket, buffers, SocketRecvFlags::default(), token)
+            .socket_recvmsg(
+                socket,
+                buffers,
+                SocketRecvFlags::default(),
+                crate::retained_socket::Receive::Packet,
+                token,
+            )
             .await;
         (result.map(|result| result.bytes), buffers)
     }
@@ -298,6 +304,7 @@ fn ordinary_sequences_preserve_datagram_addresses_flags_and_payloads() {
                 &receiver,
                 [vec![0; 2].into_boxed_slice(), vec![0; 2].into_boxed_slice()],
                 SocketRecvFlags { peek },
+                crate::retained_socket::Receive::Packet,
                 &never,
             ),
         );
@@ -341,7 +348,13 @@ fn ordinary_sequences_preserve_datagram_addresses_flags_and_payloads() {
     .unwrap();
     let (result, buffers) = drive(
         &mut driver,
-        selector.socket_recvmsg(&receiver, [vec![0]], SocketRecvFlags::default(), &never),
+        selector.socket_recvmsg(
+            &receiver,
+            [vec![0]],
+            SocketRecvFlags::default(),
+            crate::retained_socket::Receive::Packet,
+            &never,
+        ),
     );
     assert!(result.unwrap().control_truncated);
     assert_eq!(buffers, [vec![42]]);
@@ -363,6 +376,7 @@ fn empty_receive_consumes_one_datagram_without_replacing_the_sequence() {
             &socket,
             Vec::<Vec<u8>>::new(),
             SocketRecvFlags::default(),
+            crate::retained_socket::Receive::Packet,
             &never,
         ),
     );
@@ -373,7 +387,13 @@ fn empty_receive_consumes_one_datagram_without_replacing_the_sequence() {
         .unwrap();
     let (result, buffers) = drive(
         &mut driver,
-        selector.socket_recvmsg(&socket, [vec![0; 4]], SocketRecvFlags::default(), &never),
+        selector.socket_recvmsg(
+            &socket,
+            [vec![0; 4]],
+            SocketRecvFlags::default(),
+            crate::retained_socket::Receive::Packet,
+            &never,
+        ),
     );
     assert_eq!(result.unwrap().bytes, 4);
     assert_eq!(buffers, [b"next".to_vec()]);
@@ -451,6 +471,7 @@ fn inline_prepared_vectors_survive_submission_and_are_used_without_copying() {
             &receiver,
             InlineBuffers::new(vec![0; 6]),
             SocketRecvFlags::default(),
+            crate::retained_socket::Receive::Packet,
             &never,
         ),
     );
@@ -474,6 +495,7 @@ fn submitted_message_keeps_payload_alive_after_waiter_drop_until_driver_retireme
             drops: Arc::clone(&drops),
         }]),
         SocketRecvFlags::default(),
+        crate::retained_socket::Receive::Packet,
         &never,
     ));
     assert!(block_on(poll_once(&mut operation)).is_none());

@@ -4,6 +4,7 @@
 use super::socket::{retain_socket, retry_operation};
 use super::*;
 use crate::{Interest, SocketMessage};
+use base_scheduler_selector::ecn;
 use std::cell::UnsafeCell;
 
 type MessageResult<B> = (io::Result<SocketRecvResult>, B);
@@ -12,7 +13,7 @@ type Prepare<B> = fn(&mut B, &mut Vec<libc::iovec>) -> (*mut libc::iovec, usize)
 #[derive(Clone, Copy)]
 enum MessageOperation {
     Send(SocketSendFlags, Option<SocketAddress>),
-    Receive(SocketRecvFlags),
+    Receive(SocketRecvFlags, crate::retained_socket::Receive),
 }
 
 // The request is boxed before entry() derives any pointers. It stays at that address until the original CQE. UnsafeCell permits kernel-written metadata and inline prepared vectors to coexist with the driver's shared bookkeeping references; exclusive access resumes only after retirement.
@@ -24,6 +25,8 @@ struct MessageRequest<B: IoBufSequence> {
     vectors: Vec<libc::iovec>,
     header: UnsafeCell<libc::msghdr>,
     address: UnsafeCell<libc::sockaddr_storage>,
+    // Retained with the header until original completion, as the address is.
+    control: UnsafeCell<ecn::Control>,
     prepare: Prepare<B>,
     operation: MessageOperation,
     reply: Cell<Option<oneshot::Sender<MessageResult<B>>>>,
@@ -82,9 +85,14 @@ impl<B: IoBufSequence> PendingRequest for MessageRequest<B> {
                     )
                     .build()
             }
-            MessageOperation::Receive(flags) => {
+            MessageOperation::Receive(flags, receive) => {
                 header.msg_name = address.cast();
                 header.msg_namelen = std::mem::size_of::<libc::sockaddr_storage>() as _;
+                // Every packet receive passes room for one ECN marking; with reporting disabled the system attaches nothing.
+                if receive == crate::retained_socket::Receive::Packet {
+                    header.msg_control = self.control.get().cast();
+                    header.msg_controllen = ecn::CONTROL_SPACE;
+                }
                 opcode::RecvMsg::new(descriptor, self.header.get())
                     .flags(if flags.peek { libc::MSG_PEEK as _ } else { 0 })
                     .build()
@@ -138,11 +146,15 @@ impl<B: IoBufSequence> MessageRequest<B> {
             .expect("copying completed address metadata is infallible");
             address.as_socket()
         };
+        let control_truncated = header.msg_flags & libc::MSG_CTRUNC != 0;
+        // A stream receive passed no control storage, so its length stays zero.
+        let control = &self.control.get_mut().0[..header.msg_controllen.min(ecn::CONTROL_SPACE)];
         SocketRecvResult {
             bytes,
             address,
             truncated: header.msg_flags & libc::MSG_TRUNC != 0,
-            control_truncated: header.msg_flags & libc::MSG_CTRUNC != 0,
+            control_truncated,
+            ecn: ecn::parse(control, control_truncated),
         }
     }
 }
@@ -275,6 +287,7 @@ impl IoUringSelector {
             header: UnsafeCell::new(unsafe { std::mem::zeroed() }),
             // SAFETY: sockaddr_storage is an integer-only C structure.
             address: UnsafeCell::new(unsafe { std::mem::zeroed() }),
+            control: UnsafeCell::new(ecn::Control::new()),
             operation,
             prepare,
             reply: Cell::new(Some(reply)),
@@ -333,6 +346,7 @@ impl IoUringSelector {
         socket: &impl SocketSource,
         buffers: B,
         flags: SocketRecvFlags,
+        receive: crate::retained_socket::Receive,
         cancellation: &Cancellation,
     ) -> (OperationResult<SocketRecvResult>, B) {
         if let Err(error) = cancellation
@@ -353,7 +367,7 @@ impl IoUringSelector {
                     Arc::clone(&controller),
                     socket,
                     buffers,
-                    MessageOperation::Receive(flags),
+                    MessageOperation::Receive(flags, receive),
                     receiving,
                     cancellation,
                 )

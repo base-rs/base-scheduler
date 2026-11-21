@@ -1578,7 +1578,8 @@ fn datagram_boundaries_including_empty_messages_reuse_one_registration() {
                 &mut reader,
                 &mut buffers,
                 SocketRecvFlags::default(),
-                &never
+                crate::retained_socket::Receive::Packet,
+                &never,
             ));
             assert!(receive.as_mut().poll(&mut context).is_pending());
             worker.turn(Some(Duration::ZERO)).unwrap();

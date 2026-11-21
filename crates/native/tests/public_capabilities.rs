@@ -153,6 +153,7 @@ fn metadata(bytes: usize) -> SocketRecvResult {
         address: None,
         truncated: false,
         control_truncated: false,
+        ecn: None,
     }
 }
 impl SocketPacketReader for Reader<'_> {

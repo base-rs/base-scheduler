@@ -3,8 +3,8 @@
 
 use crate::{TokioScheduler, TokioSocket};
 use base_scheduler::{
-    Cancellation, OperationResult, SocketGetOption, SocketKeepalive, SocketOption,
-    SocketRegistration, SocketReuseAddress, SocketSetOption, TcpNoDelay,
+    Cancellation, Ecn, OperationResult, ReceiveEcn, SendEcn, SocketGetOption, SocketKeepalive,
+    SocketOption, SocketRegistration, SocketReuseAddress, SocketSetOption, TcpNoDelay,
 };
 use socket2::Socket;
 use std::{
@@ -32,6 +32,22 @@ macro_rules! option {
 option!(SocketReuseAddress, reuse_address, set_reuse_address);
 option!(SocketKeepalive, keepalive, set_keepalive);
 option!(TcpNoDelay, tcp_nodelay, set_tcp_nodelay);
+impl NativeOption for ReceiveEcn {
+    fn get(self, socket: &Socket) -> io::Result<bool> {
+        crate::ecn::receive(socket)
+    }
+    fn set(self, socket: &Socket, value: bool) -> io::Result<()> {
+        crate::ecn::set_receive(socket, value)
+    }
+}
+impl NativeOption for SendEcn {
+    fn get(self, socket: &Socket) -> io::Result<Ecn> {
+        crate::ecn::send(socket)
+    }
+    fn set(self, socket: &Socket, value: Ecn) -> io::Result<()> {
+        crate::ecn::set_send(socket, value)
+    }
+}
 
 impl<O: NativeOption + 'static> SocketGetOption<O> for TokioScheduler {
     async fn socket_get_option(

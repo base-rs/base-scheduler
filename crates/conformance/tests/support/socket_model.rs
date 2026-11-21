@@ -56,6 +56,7 @@ impl<'a, M: SocketModel> Reader<'a, M> {
             address: None,
             truncated: false,
             control_truncated: false,
+            ecn: None,
         })
     }
     async fn owned<B: IoBufSequenceMut>(
@@ -83,6 +84,7 @@ impl<'a, M: SocketModel> Reader<'a, M> {
                 address: None,
                 truncated: false,
                 control_truncated: false,
+                ecn: None,
             }),
             buffers,
         )
@@ -231,6 +233,7 @@ impl<M: SocketModel> SocketPacketReader for Reader<'_, M> {
                 address: None,
                 truncated: false,
                 control_truncated: false,
+                ecn: None,
             })
     }
     async fn read_vectored(

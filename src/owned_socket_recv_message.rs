@@ -42,6 +42,10 @@ impl<B: IoBuf> SocketRecvMessage for OwnedSocketRecvMessage<B> {
         self.result.control_truncated
     }
 
+    fn ecn(&self) -> Option<crate::Ecn> {
+        self.result.ecn
+    }
+
     fn into_payload(self) -> B {
         self.payload
     }

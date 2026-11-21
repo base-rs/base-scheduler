@@ -250,8 +250,13 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for TokioSocketStreamReader<'_,
     fn try_read_vectored(&mut self, buffers: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
         let empty = buffers.iter().all(|buffer| buffer.is_empty());
         self.try_read_with(empty, |socket| {
-            crate::socket_io::recvmsg_poll(socket, buffers, SocketRecvFlags::default())
-                .map(|result| result.bytes)
+            crate::socket_io::recvmsg_poll(
+                socket,
+                buffers,
+                SocketRecvFlags::default(),
+                crate::socket_io::Receive::Stream,
+            )
+            .map(|result| result.bytes)
         })
     }
 
@@ -281,7 +286,13 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for TokioSocketStreamReader<'_,
         if flags.peek {
             return self
                 .scheduler
-                .socket_recvmsg_poll(&self.socket, buffers, flags, cancellation)
+                .socket_recvmsg_poll(
+                    &self.socket,
+                    buffers,
+                    flags,
+                    crate::socket_io::Receive::Stream,
+                    cancellation,
+                )
                 .await;
         }
         let mut received = SocketRecvResult::default();
@@ -290,7 +301,12 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for TokioSocketStreamReader<'_,
             buffers.iter().map(|buffer| buffer.len()).sum(),
             cancellation,
             |socket: &socket2::Socket| {
-                received = crate::socket_io::recvmsg_poll(socket, buffers, flags)?;
+                received = crate::socket_io::recvmsg_poll(
+                    socket,
+                    buffers,
+                    flags,
+                    crate::socket_io::Receive::Stream,
+                )?;
                 Ok(received.bytes)
             }
         )?;
@@ -334,7 +350,12 @@ impl<const SUPPORT_OOB: bool> SocketStreamReader for TokioSocketStreamReader<'_,
                 .sum(),
             cancellation,
             |socket: &socket2::Socket| {
-                received = vectors.recv(socket, &mut buffers, flags)?;
+                received = vectors.recv(
+                    socket,
+                    &mut buffers,
+                    flags,
+                    crate::socket_io::Receive::Stream,
+                )?;
                 Ok(received.bytes)
             }
         );

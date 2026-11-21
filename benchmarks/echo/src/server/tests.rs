@@ -128,6 +128,7 @@ impl SocketStreamReader for Reader<'_> {
                 address: None,
                 truncated: false,
                 control_truncated: false,
+                ecn: None,
             }),
             buffers,
         )

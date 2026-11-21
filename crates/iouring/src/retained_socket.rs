@@ -2,7 +2,7 @@
 // Copyright, 2026, by Samuel Williams.
 
 use base_scheduler::{SocketRecvFlags, SocketRecvResult, SocketSendFlags};
-use base_scheduler_selector::NativeSocket;
+use base_scheduler_selector::{NativeSocket, ecn};
 use socket2::SockAddr;
 use std::{
     io::{self, IoSlice, IoSliceMut},
@@ -60,11 +60,19 @@ pub(crate) fn send(
         )
     })
 }
+/// Whether a receive is of a packet socket, which passes control storage and reports its ECN marking, or of a stream, which reports none.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum Receive {
+    Stream,
+    Packet,
+}
+
 #[inline]
 pub(crate) fn recvmsg(
     socket: &RegisteredSocket,
     buffers: &mut [IoSliceMut<'_>],
     flags: SocketRecvFlags,
+    receive: Receive,
 ) -> io::Result<SocketRecvResult> {
     validate(buffers.len(), buffers.iter().map(|buffer| buffer.len()))?;
     let empty = libc::iovec {
@@ -76,7 +84,9 @@ pub(crate) fn recvmsg(
     } else {
         (buffers.as_ptr().cast(), buffers.len())
     };
-    // SAFETY: IoSliceMut is ABI-compatible with iovec; header and exclusive payload pointers remain live through recvmsg and are not retained afterward.
+    let mut control = ecn::Control::new();
+    let mut control_length = 0;
+    // SAFETY: IoSliceMut is ABI-compatible with iovec; header, control and exclusive payload pointers remain live through recvmsg and are not retained afterward.
     let ((bytes, truncated, control_truncated), address) = unsafe {
         SockAddr::try_init(|address, length| {
             let mut header: libc::msghdr = std::mem::zeroed();
@@ -84,12 +94,18 @@ pub(crate) fn recvmsg(
             header.msg_iovlen = count;
             header.msg_name = address.cast();
             header.msg_namelen = *length;
+            // Every packet receive passes room for one ECN marking; with reporting disabled the system attaches nothing.
+            if receive == Receive::Packet {
+                header.msg_control = control.0.as_mut_ptr().cast();
+                header.msg_controllen = ecn::CONTROL_SPACE;
+            }
             let bytes = result_count(libc::recvmsg(
                 socket.as_raw_fd(),
                 &mut header,
                 libc::MSG_DONTWAIT | recv_flags(flags),
             ))?;
             *length = header.msg_namelen;
+            control_length = header.msg_controllen.min(ecn::CONTROL_SPACE);
             Ok((
                 bytes,
                 header.msg_flags & libc::MSG_TRUNC != 0,
@@ -102,6 +118,7 @@ pub(crate) fn recvmsg(
         address: address.as_socket(),
         truncated,
         control_truncated,
+        ecn: ecn::parse(&control.0[..control_length], control_truncated),
     })
 }
 #[inline]
