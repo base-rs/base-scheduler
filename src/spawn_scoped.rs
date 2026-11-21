@@ -172,6 +172,13 @@ pub struct Scope<'scope, 'env: 'scope, S: SpawnScoped> {
 }
 
 impl<'scope, 'env, S: SpawnScoped> Scope<'scope, 'env, S> {
+    /// The scheduler this scope's tasks run on, borrowed for `'env`, so code
+    /// given only the scope can use the scheduler's other capabilities, and
+    /// tasks may borrow it too.
+    pub fn scheduler(&self) -> &'env S {
+        self.scheduler
+    }
+
     /// Register `future` before it becomes runnable and run it on the
     /// scheduler's workers. A closed scheduler returns
     /// `SpawnError::SchedulerClosed`, dropping `future` without polling it.
