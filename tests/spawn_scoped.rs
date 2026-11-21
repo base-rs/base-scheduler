@@ -150,6 +150,19 @@ fn output_wakes_the_parked_root() {
 }
 
 #[test]
+fn scopes_lend_their_scheduler() {
+    let inline = Inline::default();
+    let same = inline.scope(async |scope| {
+        // A task may borrow the scheduler the scope lends.
+        let scheduler = scope.scheduler();
+        let task = scope.spawn(async move { std::ptr::eq(scheduler, scope.scheduler()) });
+        inline.run();
+        std::ptr::eq(scope.scheduler(), &inline) && task.unwrap().await.unwrap()
+    });
+    assert!(same);
+}
+
+#[test]
 fn completed_output_is_taken_without_waiting() {
     let inline = Inline::default();
     let output = inline.scope(async |scope| {
