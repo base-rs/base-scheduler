@@ -1,5 +1,9 @@
 # Releases
 
+## v0.6.3
+
+- Rename `Placement` to `Parent`, as Async's `parent:` names what owns the tasks a library starts, keeping `Placement` as an alias until 0.7. ([#145](https://github.com/base-rs/base-scheduler/pull/145))
+
 ## v0.6.2
 
 - Add `Placement`, so a library can write its supervision once and let its caller choose whether work runs in place or as scope tasks. ([#143](https://github.com/base-rs/base-scheduler/pull/143))
