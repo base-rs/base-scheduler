@@ -40,6 +40,10 @@ Prepare a release from a clean checkout of `main` with `cargo bake cargo:release
 
 See [releases.md](releases.md) for the full release history.
 
+### v0.6.4
+
+- Add `Cancellation::watch`, whose waits share one registration with the task that waits, so a connection that watches its cancellation waits on it about as cheaply as on `never`. ([#148](https://github.com/base-rs/base-scheduler/pull/148))
+
 ### v0.6.3
 
 - Rename `Placement` to `Parent`, as Async's `parent:` names what owns the tasks a library starts, keeping `Placement` as an alias until 0.7. ([#145](https://github.com/base-rs/base-scheduler/pull/145))
@@ -47,11 +51,6 @@ See [releases.md](releases.md) for the full release history.
 ### v0.6.2
 
 - Add `Placement`, so a library can write its supervision once and let its caller choose whether work runs in place or as scope tasks. ([#143](https://github.com/base-rs/base-scheduler/pull/143))
-
-### v0.6.1
-
-- Add `Scope::scheduler`, so code given only a scope can use its scheduler's other capabilities. ([#141](https://github.com/base-rs/base-scheduler/pull/141))
-- Generate release notes from pull request titles and `Breaking:` paragraphs. ([#140](https://github.com/base-rs/base-scheduler/pull/140))
 
 <!-- bake-readme:releases:end -->
 
