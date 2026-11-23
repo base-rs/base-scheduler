@@ -96,7 +96,7 @@ async fn echo<S: SocketStreamReading + SocketStreamWriting>(scheduler: &S, socke
 where
     S::Socket: 'static,
 {
-    let never = Cancellation::never();
+    let cancellation = connection_cancellation();
     let mut reader = scheduler
         .socket_stream_reader(&socket)
         .expect("stream reader");
@@ -105,7 +105,7 @@ where
         .expect("stream writer");
     let mut buffer = vec![0; BUFFER_SIZE];
     loop {
-        let (result, returned) = reader.read_owned(buffer, &never).await;
+        let (result, returned) = reader.read_owned(buffer, &cancellation).await;
         buffer = returned;
         let count = result.expect("echo operation");
         if count == 0 {
@@ -113,7 +113,9 @@ where
         }
         let mut sent = 0;
         while sent < count {
-            let (result, returned) = writer.write_owned(buffer.slice(sent..count), &never).await;
+            let (result, returned) = writer
+                .write_owned(buffer.slice(sent..count), &cancellation)
+                .await;
             buffer = returned.into_inner();
             let count = result.expect("echo operation");
             assert!(count != 0, "echo write made zero progress");
@@ -135,7 +137,7 @@ where
     S: SocketStreamReading + SocketStreamWriting,
     S::Socket: 'static,
 {
-    let never = Cancellation::never();
+    let cancellation = connection_cancellation();
     let mut reader = scheduler
         .socket_stream_reader(&socket)
         .expect("stream reader");
@@ -145,7 +147,7 @@ where
     let mut buffer = vec![0; BUFFER_SIZE];
     loop {
         let count = reader
-            .read_into(&mut buffer, &never)
+            .read_into(&mut buffer, &cancellation)
             .await
             .expect("stream read");
         if count == 0 {
@@ -154,7 +156,7 @@ where
         let mut sent = 0;
         while sent < count {
             let written = writer
-                .write(&buffer[sent..count], &never)
+                .write(&buffer[sent..count], &cancellation)
                 .await
                 .expect("stream write");
             assert!(written != 0, "stream write made zero progress");
@@ -170,17 +172,20 @@ where
     S: SocketStreamReading + SocketStreamWriting,
     S::Socket: 'static,
 {
-    let never = Cancellation::never();
+    let cancellation = connection_cancellation();
     let mut reader = scheduler
         .socket_stream_reader(&socket)
         .expect("stream reader");
     let mut writer = scheduler
         .socket_stream_writer(&socket)
         .expect("stream writer");
-    while let Some(chunk) = reader.read(&never).await.expect("pooled read") {
+    while let Some(chunk) = reader.read(&cancellation).await.expect("pooled read") {
         let mut bytes = chunk.as_ref();
         while !bytes.is_empty() {
-            let written = writer.write(bytes, &never).await.expect("stream write");
+            let written = writer
+                .write(bytes, &cancellation)
+                .await
+                .expect("stream write");
             assert!(written != 0, "stream write made zero progress");
             bytes = &bytes[written..];
         }
@@ -201,7 +206,7 @@ where
     S: SocketStreamReading + SocketStreamWriting,
     S::Socket: 'static,
 {
-    let never = Cancellation::never();
+    let cancellation = connection_cancellation();
     let mut reader = scheduler
         .socket_stream_reader(&socket)
         .expect("stream reader");
@@ -213,7 +218,10 @@ where
         let count = {
             let (head, tail) = buffer.split_at_mut(HALF);
             reader
-                .read_vectored(&mut [IoSliceMut::new(head), IoSliceMut::new(tail)], &never)
+                .read_vectored(
+                    &mut [IoSliceMut::new(head), IoSliceMut::new(tail)],
+                    &cancellation,
+                )
                 .await
                 .expect("vectored read")
         };
@@ -226,7 +234,7 @@ where
             let written = writer
                 .write_vectored(
                     &[IoSlice::new(&buffer[head]), IoSlice::new(&buffer[tail])],
-                    &never,
+                    &cancellation,
                 )
                 .await
                 .expect("vectored write");
@@ -243,7 +251,7 @@ where
     S: SocketStreamReading + SocketStreamWriting,
     S::Socket: 'static,
 {
-    let never = Cancellation::never();
+    let cancellation = connection_cancellation();
     let mut reader = scheduler
         .socket_stream_reader(&socket)
         .expect("stream reader");
@@ -253,7 +261,7 @@ where
     let mut buffers = [vec![0; HALF], vec![0; HALF]];
     loop {
         let (result, returned) = reader
-            .read_owned_vectored(buffers, SocketRecvFlags::default(), &never)
+            .read_owned_vectored(buffers, SocketRecvFlags::default(), &cancellation)
             .await;
         buffers = returned;
         let count = result.expect("owned vectored read").bytes;
@@ -271,7 +279,7 @@ where
                         second.slice(tail.start - HALF..tail.end - HALF),
                     ],
                     SocketSendFlags::default(),
-                    &never,
+                    &cancellation,
                 )
                 .await;
             buffers = [first.into_inner(), second.into_inner()];
@@ -291,39 +299,44 @@ async fn multishot_server(
     let listener = scheduler
         .register_listener(listener)
         .expect("register listener");
-    let never = Cancellation::never();
+    let cancellation = connection_cancellation();
     let mut tasks = Vec::with_capacity(connections);
     for _ in 0..connections {
         let (socket, _) = scheduler
-            .socket_accept(&listener, &never)
+            .socket_accept(&listener, &cancellation)
             .await
             .expect("accept connection");
         scheduler
-            .socket_set_option(&socket, TcpNoDelay, true, &never)
+            .socket_set_option(&socket, TcpNoDelay, true, &cancellation)
             .await
             .expect("TCP_NODELAY");
         let shared = Arc::clone(&scheduler);
         tasks.push(
             scheduler
                 .spawn(async move {
-                    let never = Cancellation::never();
+                    let cancellation = connection_cancellation();
                     let mut receiving = shared
                         .selector()
                         .socket_recvmsg_multishot(
                             &socket,
                             base_scheduler_iouring::RecvMsgMultishotOptions::default(),
                             SocketRecvFlags::default(),
-                            &never,
+                            &cancellation,
                         )
                         .await
                         .expect("start multishot receive");
                     let mut writer = shared.socket_stream_writer(&socket).expect("stream writer");
-                    while let Some(message) =
-                        receiving.recv(&never).await.expect("multishot receive")
+                    while let Some(message) = receiving
+                        .recv(&cancellation)
+                        .await
+                        .expect("multishot receive")
                     {
                         let mut bytes = message.payload();
                         while !bytes.is_empty() {
-                            let sent = writer.write(bytes, &never).await.expect("echo write");
+                            let sent = writer
+                                .write(bytes, &cancellation)
+                                .await
+                                .expect("echo write");
                             assert_ne!(sent, 0, "echo write made zero progress");
                             bytes = &bytes[sent..];
                         }
@@ -362,14 +375,14 @@ async fn scheduler_server<S>(
         .register_listener(listener)
         .expect("scheduler listener registration");
     let mut tasks = Vec::with_capacity(connections);
-    let never = Cancellation::never();
+    let cancellation = connection_cancellation();
     for _ in 0..connections {
         let (socket, _) = scheduler
-            .socket_accept(&listener, &never)
+            .socket_accept(&listener, &cancellation)
             .await
             .expect("accept connection");
         scheduler
-            .socket_set_option(&socket, TcpNoDelay, true, &never)
+            .socket_set_option(&socket, TcpNoDelay, true, &cancellation)
             .await
             .expect("TCP_NODELAY");
         let shared = Arc::clone(&scheduler);
@@ -395,6 +408,38 @@ async fn scheduler_server<S>(
     }
 }
 
+// What each connection's operations are given: `never`, or, selected by a
+// `+plain` or `+watched` backend suffix, a child of one server-wide signal, as
+// an HTTP server gives each connection, plain or watched.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Cancel {
+    Never,
+    Plain,
+    Watched,
+}
+
+static CANCEL: std::sync::OnceLock<Cancel> = std::sync::OnceLock::new();
+static SERVER: std::sync::LazyLock<Cancellation> = std::sync::LazyLock::new(Cancellation::new);
+
+fn connection_cancellation() -> Cancellation {
+    match CANCEL.get().copied().unwrap_or(Cancel::Never) {
+        Cancel::Never => Cancellation::never(),
+        Cancel::Plain => SERVER.child(),
+        Cancel::Watched => SERVER.child().watch(),
+    }
+}
+
+// Split a backend's cancellation suffix from its name.
+fn cancel(backend: &str) -> (&str, Cancel) {
+    if let Some(backend) = backend.strip_suffix("+plain") {
+        (backend, Cancel::Plain)
+    } else if let Some(backend) = backend.strip_suffix("+watched") {
+        (backend, Cancel::Watched)
+    } else {
+        (backend, Cancel::Never)
+    }
+}
+
 // The payload calls selected by a scheduler backend's suffix, shared by the
 // Tokio adapter, Native readiness and io_uring backends.
 fn payload(suffix: &str) -> Option<Payload> {
@@ -409,6 +454,8 @@ fn payload(suffix: &str) -> Option<Payload> {
 }
 
 pub(crate) fn run(backend: &str, workers: usize, connections: usize) -> Result<()> {
+    let (backend, kind) = cancel(backend);
+    let _ = CANCEL.set(kind);
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind echo listener");
     let selected = |prefix: &str| backend.strip_prefix(prefix).and_then(payload);
     match backend {

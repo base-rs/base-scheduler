@@ -214,6 +214,16 @@ fn tokio_adapter_pooled() {
 fn native_readiness_monitor_alias() {
     smoke("native-monitor");
 }
+
+#[test]
+fn native_readiness_with_plain_cancellations() {
+    smoke("native-monitor+plain");
+}
+
+#[test]
+fn native_readiness_with_watched_cancellations() {
+    smoke("native-monitor+watched");
+}
 #[test]
 fn offered_rate_reports_paced_requests() {
     smoke_with("tokio", &["400"]);

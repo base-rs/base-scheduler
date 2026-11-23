@@ -1,6 +1,6 @@
 # Watched cancellations
 
-Accepted 2026-11-23, and implemented in `base-scheduler` the same day; base-http's adoption and the validation campaign follow `base-scheduler` 0.6.4. The user chose to declare that a task's waits share a cancellation, rather than have each reader infer it, and the shape measured below as B2, with a release as 0.6.4.
+Accepted 2026-11-23, implemented in `base-scheduler` 0.6.4, adopted by base-http, and validated on 2026-11-24. The user chose to declare that a task's waits share a cancellation, rather than have each reader infer it, and the shape measured below as B2, with a release as 0.6.4.
 
 ## Requirement
 
@@ -80,4 +80,4 @@ The user preferred declaring that a task's waits share a cancellation to having 
 - Allocation tests: waits on plain cancellations, and the owner's waits on a watched one, do not allocate.
 - The conformance suite's stream scenarios on every backend with watched cancellations, cancelled while waiting and between operations.
 - Miri over the registry, the watch and their races.
-- A campaign of 20 rounds on hana, with a layout replica of each build, of base-http's hello benchmark through `Server::run` watching each connection against the build that passes `never`, and of the echo benchmark with a watched cancellation against `never`: the difference within noise.
+- A campaign of 20 rounds on hana of base-http's hello benchmark through `Server::run` watching each connection, against the same build passing `never` with a layout replica of it, and the echo benchmark with a watched cancellation against `never`: the difference within noise. Done on 2026-11-24: watching came to +1.0% in wall time against `never`, while the unchanged Hyper control moved +2.9%, and 6.4% faster and 14.9% lower in user CPU per request than base-http before it, in 19 and 20 of 20 rounds (base-http's `benchmarks/hello/connection-placement.md`); in the [echo benchmark](../benchmarks/echo/watched-cancellation.md), a watched cancellation was within noise of `never` at one connection and 32, and a plain one cost about 10% more user CPU per request.
