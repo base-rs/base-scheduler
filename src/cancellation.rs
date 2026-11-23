@@ -215,6 +215,9 @@ impl Cancellation {
                 owner: OnceLock::new(),
                 wakers: Mutex::new(Wakers::default()),
             });
+            // Lock once during setup, rather than on the first wait: on some
+            // platforms a mutex allocates its storage when first locked.
+            drop(created.wakers());
             watch = Some(Arc::clone(&created));
             created
         });
