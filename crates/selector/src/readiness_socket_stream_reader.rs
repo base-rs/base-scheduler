@@ -94,9 +94,8 @@ impl<'a, const SUPPORT_OOB: bool> ReadinessSocketStreamReader<'a, SUPPORT_OOB> {
             &self.scheduler.readiness,
             &self.registration,
         ) {
-            cancellation.check()?;
             self.scheduler.check_open()?;
-            let mut receiving = std::pin::pin!(Receive::<_, SUPPORT_OOB> {
+            let receiving = Receive::<_, SUPPORT_OOB> {
                 group,
                 direction: registration.direction(Interest::Readable),
                 socket: self.socket.get_ref(),
@@ -104,17 +103,25 @@ impl<'a, const SUPPORT_OOB: bool> ReadinessSocketStreamReader<'a, SUPPORT_OOB> {
                 capacity,
                 probe: !self.established,
                 listener: None,
-            });
-            let result = std::future::poll_fn(|context| {
-                if let Poll::Ready(result) = receiving.as_mut().poll(context) {
-                    return Poll::Ready(result.map_err(Into::into));
-                }
-                cancellation
-                    .poll_watched(context)
-                    .unwrap_or(Poll::Pending)
-                    .map(|()| Err(base_scheduler::Cancelled.into()))
-            })
-            .await;
+            };
+            // A never-cancelled read awaits the receive alone, measured faster
+            // than sharing the watched path's wrapper.
+            let result = if cancellation.is_never() {
+                receiving.await.map_err(Into::into)
+            } else {
+                cancellation.check()?;
+                let mut receiving = std::pin::pin!(receiving);
+                std::future::poll_fn(|context| {
+                    if let Poll::Ready(result) = receiving.as_mut().poll(context) {
+                        return Poll::Ready(result.map_err(Into::into));
+                    }
+                    cancellation
+                        .poll_watched(context)
+                        .unwrap_or(Poll::Pending)
+                        .map(|()| Err(base_scheduler::Cancelled.into()))
+                })
+                .await
+            };
             if matches!(result, Ok(count) if count != 0) {
                 self.established = true;
             }

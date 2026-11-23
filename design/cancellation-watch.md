@@ -60,6 +60,10 @@ B and B2 come from a second campaign, with B at −3.3% and −8.4% there; `neve
 - **B over A**: a watched cancellation covers every wait in the task, the socket's and the library's alike, with one registration, and needs one call per connection; A covered only the waits that were given their own watch, and changed every reader, writer and library loop.
 - **B2 over B**: the general path's wrapper futures cost what remained; the compact path removes them.
 
+### The implementation measured
+
+Two screening campaigns of 10 rounds on hana compared base-http's hello benchmark built with `base-scheduler` 0.6.3, `main`, and with this implementation, `never-new` and `watched`, against the 0.6.3 build that passes `never`. Watched connections came to −4.6% wall time and −10.0% user CPU against `main`, as the prototype had, and within noise of `never`: +1.3% in wall time against it, and +1.4% against `never-new`, where the Hyper control, unchanged in every build, read +1.4% and +1.7%. A first version shared one compact path between `never` and watched reads in the readiness reader; it put `never-new` 1.3% behind `never` in wall time, worse in 8 of 10 rounds while the control was 0.7% ahead, so a never-cancelled read awaits its receive alone again, which measured −1.3% against `never`.
+
 ### Declared rather than inferred
 
 The user preferred declaring that a task's waits share a cancellation to having each reader infer it from repeated arguments: the relationship belongs to the task, and one declaration serves every operation and library it uses. A trait making operations generic over plain and watched cancellations would declare it in the types, but compile every operation twice and change every backend's traits; the runtime field declares it at no cost to compile time and no change to signatures, as base-project's conventions prefer.
