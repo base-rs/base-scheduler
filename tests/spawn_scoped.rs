@@ -3,7 +3,7 @@
 
 // The interface's scope, slot and panic paths, driven deterministically by a test-only backend that polls tasks on whichever thread calls `run`.
 
-use base_scheduler::{Placement, ScopeToken, SocketOperation, SpawnError, SpawnScoped, TaskError};
+use base_scheduler::{Parent, ScopeToken, SocketOperation, SpawnError, SpawnScoped, TaskError};
 use std::{
     future::{Future, pending, poll_fn},
     panic::{AssertUnwindSafe, catch_unwind},
@@ -366,16 +366,34 @@ fn closed_backend_rejects_and_drops_the_future() {
 }
 
 // Generic supervision, as a server writes it: the scheduler places work in place, and a scope spawns it.
-async fn supervise<'a, P: Placement<'a, Scheduler = Inline>>(placement: P, value: &'a u32) -> u32 {
-    let placed = placement.place(async move { *value + 1 }).unwrap();
+async fn supervise<'a, P: Parent<'a, Scheduler = Inline>>(parent: P, value: &'a u32) -> u32 {
+    let placed = parent.place(async move { *value + 1 }).unwrap();
     placed.await.unwrap()
+}
+
+// Supervision written against the trait's name in 0.6.2.
+async fn supervise_placed<'a, P: base_scheduler::Placement<'a, Scheduler = Inline>>(
+    placement: P,
+    value: &'a u32,
+) -> u32 {
+    supervise(placement, value).await
+}
+
+#[test]
+fn placement_is_the_former_name_of_parent() {
+    let inline = Inline::default();
+    let value = 1;
+    assert_eq!(
+        futures_lite::future::block_on(supervise_placed(&inline, &value)),
+        2
+    );
 }
 
 #[test]
 fn the_scheduler_places_work_in_place() {
     let inline = Inline::default();
     let value = 41;
-    assert!(std::ptr::eq(Placement::scheduler(&inline), &inline));
+    assert!(std::ptr::eq(Parent::scheduler(&inline), &inline));
     // Nothing is spawned: the work completes as the caller polls it.
     assert_eq!(
         futures_lite::future::block_on(supervise(&inline, &value)),
@@ -390,7 +408,7 @@ fn a_scope_places_work_as_its_tasks() {
     let value = 6;
     let value = &value;
     let (output, panicked, closed) = inline.scope(async |scope| {
-        assert!(std::ptr::eq(Placement::scheduler(scope), &inline));
+        assert!(std::ptr::eq(Parent::scheduler(scope), &inline));
         let mut output = std::pin::pin!(supervise(scope, value));
         assert!(poll_once(&mut output).await.is_pending());
         assert_eq!(inline.tasks.lock().unwrap().len(), 1);

@@ -8,20 +8,27 @@ use std::{
     task::{Context, Poll},
 };
 
-/// Where work runs: polled in place by whoever polls its caller, or as a task
-/// of a [`Scope`]. A library that starts independent work, such as a server's
-/// connections, takes a placement and writes its supervision once; the caller
-/// chooses by passing the scheduler, `&scheduler`, or a scope.
+/// The parent of work that a library starts, such as a server's connections,
+/// as Async's `parent:` is the task, barrier or semaphore that runs and owns
+/// the tasks it is given. The work cannot outlive its parent. A library takes
+/// a parent and writes its supervision once; the caller chooses by passing the
+/// scheduler, `&scheduler`, or a [`Scope`]:
 ///
-/// Work placed by the scheduler is the work's own future, wrapped without
-/// allocation, so callers that poll it in place cost what polling the work
-/// directly does. Work placed by a scope runs on the scheduler's workers; see
-/// [`SpawnScoped::scope`] for what it may borrow.
-pub trait Placement<'a>: Copy + Send + Sync {
+/// - Given the scheduler, the work is part of the calling future, as Async's
+///   default parent is the current task: it is polled in place by whoever
+///   polls its caller. Its future is the work's own, wrapped without
+///   allocation, so polling it costs what polling the work directly does.
+/// - Given a scope, the work runs as a task of the scope, on the scheduler's
+///   workers, as a barrier's tasks do; see [`SpawnScoped::scope`] for what it
+///   may borrow.
+///
+/// This trait was named `Placement` in 0.6.2, which remains an alias for it
+/// until 0.7.
+pub trait Parent<'a>: Copy + Send + Sync {
     /// The scheduler the work uses.
     type Scheduler: ?Sized;
 
-    /// The scheduler, borrowed for as long as placed work may borrow it.
+    /// The scheduler, borrowed for as long as the parent's work may borrow it.
     fn scheduler(self) -> &'a Self::Scheduler;
 
     /// Place `work`, returning a future of its output that owns it: dropping
@@ -40,8 +47,8 @@ pub trait Placement<'a>: Copy + Send + Sync {
 
 // Telling the two implementations apart relies on `Scope` implementing no
 // scheduler capability, which only this crate can guarantee: every scheduler a
-// placement serves implements `SocketOperation`, and `Scope` does not.
-impl<'a, S: SocketOperation + ?Sized> Placement<'a> for &'a S {
+// parent serves implements `SocketOperation`, and `Scope` does not.
+impl<'a, S: SocketOperation + ?Sized> Parent<'a> for &'a S {
     type Scheduler = S;
 
     fn scheduler(self) -> &'a S {
@@ -60,7 +67,7 @@ impl<'a, S: SocketOperation + ?Sized> Placement<'a> for &'a S {
     }
 }
 
-impl<'scope, 'env, S: SpawnScoped + Sync> Placement<'scope> for &'scope Scope<'scope, 'env, S> {
+impl<'scope, 'env, S: SpawnScoped + Sync> Parent<'scope> for &'scope Scope<'scope, 'env, S> {
     type Scheduler = S;
 
     fn scheduler(self) -> &'scope S {
@@ -79,7 +86,7 @@ impl<'scope, 'env, S: SpawnScoped + Sync> Placement<'scope> for &'scope Scope<'s
     }
 }
 
-/// Work polled in place, its output wrapped as a placement's.
+/// Work polled in place, its output wrapped as a parent's.
 struct InPlace<F>(F);
 
 impl<F: Future> Future for InPlace<F> {

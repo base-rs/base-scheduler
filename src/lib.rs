@@ -97,6 +97,7 @@ mod io_buffers_mut;
 mod notify;
 mod operation_error;
 mod owned_socket_recv_message;
+mod parent;
 #[cfg(unix)]
 mod pipe_reader;
 #[cfg(unix)]
@@ -105,7 +106,6 @@ mod pipe_reading;
 mod pipe_writer;
 #[cfg(unix)]
 mod pipe_writing;
-mod placement;
 mod process_wait;
 mod process_wait_flags;
 mod process_wait_result;
@@ -206,6 +206,9 @@ pub use io_buffers_mut::IoBuffersMut;
 pub use notify::Notify;
 pub use operation_error::{OperationError, OperationResult};
 pub use owned_socket_recv_message::OwnedSocketRecvMessage;
+pub use parent::Parent;
+/// The name of [`Parent`] in 0.6.2, kept as an alias until 0.7.
+pub use parent::Parent as Placement;
 #[cfg(unix)]
 pub use pipe_reader::PipeReader;
 #[cfg(unix)]
@@ -214,7 +217,6 @@ pub use pipe_reading::PipeReading;
 pub use pipe_writer::PipeWriter;
 #[cfg(unix)]
 pub use pipe_writing::PipeWriting;
-pub use placement::Placement;
 pub use process_wait::ProcessWait;
 pub use process_wait_flags::ProcessWaitFlags;
 pub use process_wait_result::ProcessWaitResult;
