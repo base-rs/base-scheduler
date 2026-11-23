@@ -1,60 +1,80 @@
-# Cancellation watches
+# Watched cancellations
 
-Proposed 2026-11-23, awaiting the user's review.
+Accepted 2026-11-23; not yet implemented. The user chose to declare that a task's waits share a cancellation, rather than have each reader infer it, and the shape measured below as B2, with a release as 0.6.4.
 
 ## Requirement
 
-A socket operation given a cancellation that is not `Cancellation::never()` costs, in the steady state, what one given `never` does, plus an atomic load and a waker comparison: no lock, no waker clone and no allocation per operation. A connection waits on the same cancellation for every read and write, so its stream reader and writer keep one registration with it across operations, renewed only when the waiting task's waker changes, as Async ties stopping to the task rather than to each operation: `task.stop` raises in the task's fiber wherever it waits, and no I/O call registers anything to make that possible.
+A task that waits on one cancellation many times, such as a connection whose every read, write and handler wait shares its server's shutdown, declares it once, and then each wait costs what a wait on `Cancellation::never()` does, plus an atomic load and a waker comparison: no lock, no waker clone and no allocation per wait. As Async ties stopping to the task rather than to each operation, so that `task.stop` reaches the fiber wherever it waits, a watched cancellation ties its registration to the task rather than to each wait.
 
 ### Interface
 
-`base-scheduler` gains `CancellationWatch`, a reusable registration with one cancellation at a time:
-
 ```rust
-let mut watch = CancellationWatch::new();
-// In a poll function, as often as the operation waits:
-if watch.poll(cancellation, context).is_ready() {
-    return Poll::Ready(Err(Cancelled.into()));
-}
+let cancellation = cancellation.watch();       // once, in the task that waits
+reader.read_into(&mut buffer, &cancellation).await?;
+writer.write_all(&response, &cancellation).await?;
 ```
 
-- `poll(&mut self, cancellation, context)` returns `Ready` once `cancellation` is cancelled. Otherwise it ensures that cancelling it wakes `context`'s waker, and returns `Pending`.
-- The watch registers with the first cancellation it is given, and keeps the registration across polls and across operations. A later poll with the same cancellation and a waker that `will_wake` the registered one takes no lock. A different waker replaces the registered one under the cancellation's lock; a different cancellation moves the registration.
-- `Cancellation::never()` is never registered: `poll` returns `Pending` at once.
-- Dropping the watch removes its registration.
-- A registration outlives the operation that made it, so cancelling may wake a task that is no longer waiting on it, which futures permit; cancellation happens once per cancellation, so each registration causes at most one such wake.
+- `Cancellation::watch(&self) -> Cancellation` returns a cancellation with the same signal and one registration, the watch, that every wait on it shares. Operations keep taking `&Cancellation`: a watched cancellation is an ordinary `Cancellation`, told apart at run time by an optional field, so no operation, trait or backend gains a parameter, and nothing is compiled twice.
+- A watched cancellation belongs to one task. Its watch registers the first waiting task's waker and keeps it across waits. A wait whose waker `will_wake` the registered one compares the waker's data and vtable pointers, held in atomics, without a lock. A wait with a different waker, from another task, registers itself as a wait on a plain cancellation does, so it stays correct at today's cost and leaves the owner's registration in place.
+- Cloning a watched cancellation, or taking its `child`, gives a plain cancellation sharing the signal, so a watch is never shared by accident. `Cancellation::never().watch()` is `never`.
+- `cancelled()` on a watched cancellation waits through the watch, so existing code such as `pin!(cancellation.cancelled())` becomes cheaper without change.
+- `Cancellation::poll_watched(&self, context) -> Option<Poll<()>>` lets a library's own waits take the same path without a future: `Some(Poll::Pending)` for `never`, the watch's result for a watched cancellation, and `None` for a plain one, whose waits keep a registration in their own state through `cancelled()`.
+- The watch is removed when the watched cancellation is dropped, or once it is cancelled, since cancelling wakes and discards every registration.
 
-`Cancellation::cancelled()` keeps its signature and behaviour, implemented over the same registry as a watch for one wait.
+A `Cancellation` grows from one pointer to two.
 
-### Backends
+### Registry
 
-Each backend's socket stream reader and writer holds a watch for each direction and uses it in place of `cancellation.cancelled()` on its waiting path: the readiness selector's `read_with` and `write_with`, which today go through `cancellable`, io_uring's stream reader and writer, and Tokio's. Other operations, such as accepts, connects and timers, keep `cancelled()`: they wait once per call rather than once per request, so a registration per wait costs them little. Native's never-cancelled fast paths stay as they are.
+Each node keeps its wakers in an intrusive list in place of its `event_listener::Event`, as `event_listener` does, so that waiting never allocates however many tasks wait: each registration, in a wait's future or a watch, holds its own list entry. Cancelling sets the flag, closes the list, and wakes every waker; a registration that finds the list closed is cancelled. Registering checks the flag after it registers, preserving a racing cancellation.
 
-### Cost
+### Compact paths
 
-A `Cancellation`'s node replaces its `event_listener::Event` with a registry of wakers, a slot vector and free list under a `Mutex`, which cancelling takes once to wake every registered waker after setting the cancelled flag. A watch caches its node, its slot and a clone of the registered waker, so it compares wakers without the lock. Registration takes the lock once; checking the flag after registering preserves a racing cancellation, as `cancelled()` does now.
+Wherever a backend or library already gives `never` a compact path, a watched cancellation takes it too, checking the watch only when the operation would wait:
+
+- the readiness selector's stream reader, whose compact receive future a watched read awaits directly, and its stream writer;
+- io_uring's and Tokio's stream readers and writers;
+- in base-http, the server's `cancellable`, the client's `checked` and request lending, through `poll_watched`.
+
+Each is one more case beside `never` in a place that already special-cases it, as `context/conventions.md` in base-project asks of fast paths. Other operations, such as accepts, connects and timers, wait once per call and keep `cancelled()`.
 
 ## Rationale
 
-The M6 rerun of base-http's hello benchmark found serving through `Server::run` about 11% slower per request than the M5 baseline's own accept loop, because the loop gave each connection `Cancellation::never()` while `Server::run`, as M5's `serve` did, gives each a child of the server's cancellation (base-http `benchmarks/hello/connection-placement.md`). On hana, the same build with and without that child, profiled under the same load, cost 33.2 and 30.7 user-space samples per thousand requests. With the child, `event_listener`'s list took 12.5% of all samples, registering (4.4% and 3.6% for insertion) and removing (3.6% and 0.9%) a listener under its lock for each wait, and cloning and dropping the task's waker for each registration took 3.7%; none of these appear without it.
+### The cost
 
-Every real server has a shutdown cancellation, and every client driver a lifetime, so this is the cost applications pay, not a benchmark artefact. Making `cancelled()` cheaper would still lock twice per wait; a watch removes the registration from the steady state altogether.
+The M6 rerun of base-http's hello benchmark found serving through `Server::run` about 11% slower per request than the M5 baseline's own accept loop, because the loop gave every connection `Cancellation::never()` while `Server::run`, as M5's `serve` did, gives each a child of the server's cancellation (base-http `benchmarks/hello/connection-placement.md`). On hana, the same build with and without that child, profiled under the same load, took 33.2 and 30.7 user-space samples per thousand requests. With the child, registering and removing an `event_listener` listener under its lock for each wait took 12.5% of all samples, and cloning and dropping the task's waker for each registration 3.7%. Every real server has a shutdown cancellation, and every client driver a lifetime, so this is the cost applications pay.
+
+### The options measured
+
+Prototypes on hana, each a build of base-http's hello benchmark serving `base-native` with `hyper-tokio` as a control, compared with `main` over 10 rounds, the server on CPU 3 and the client on CPUs 1 and 2:
+
+| Prototype | What it changes | Wall time | User CPU |
+| --- | --- | ---: | ---: |
+| Registry | The waker registry in place of `event_listener`, a registration per wait | +0.8% | −1.5% |
+| A | A `CancellationWatch` that the readiness reader and writer keep, and the server's connection loop another | −1.6% | −4.0% |
+| B | `Cancellation::watch()`, called once per connection | −2.6% | −9.6% |
+| B2 | B, with watched cancellations taking the reader's compact path | −4.8% | −10.2% |
+| `never` | Connections given `Cancellation::never()` | −6.8% to −7.6% | −13.6% to −17.1% |
+
+B and B2 come from a second campaign, with B at −3.3% and −8.4% there; `never`'s two figures are from each campaign. The Hyper control, unchanged in every build, moved by up to 5% between builds, so differences of a few percent are at this host's noise. Profiled under the same load, B2 and `never` took 28.5 user-space samples per thousand requests each; the one difference was more 144-byte copies in B2, 1.4 points of the samples in `memmove`, from a wrapper future that the implementation removes.
+
+- **The lock was not the cost**: the registry alone, still registering per wait, saved nothing. Registering and removing a registration for every wait, and the waker clones it takes, was.
+- **B over A**: a watched cancellation covers every wait in the task, the socket's and the library's alike, with one registration, and needs one call per connection; A covered only the waits that were given their own watch, and changed every reader, writer and library loop.
+- **B2 over B**: the general path's wrapper futures cost what remained; the compact path removes them.
+
+### Declared rather than inferred
+
+The user preferred declaring that a task's waits share a cancellation to having each reader infer it from repeated arguments: the relationship belongs to the task, and one declaration serves every operation and library it uses. A trait making operations generic over plain and watched cancellations would declare it in the types, but compile every operation twice and change every backend's traits; the runtime field declares it at no cost to compile time and no change to signatures, as base-project's conventions prefer.
 
 ## Scope
 
-- `base-scheduler`: `CancellationWatch`, the registry in `Cancellation`, and `cancelled()` over it.
-- The readiness selector, io_uring and Tokio backends' socket stream readers and writers.
-- Following, in base-http: the server's `cancellable` and the client's `checked` wait once or more per request on the connection's cancellation, and can hold a watch in the connection's state in the same way.
+- `base-scheduler`: `Cancellation::watch`, `poll_watched`, the intrusive registry, and `cancelled()` over it.
+- The readiness selector, io_uring and Tokio backends' stream readers and writers.
+- base-http: the server watches each connection's cancellation, the client driver each connection's lifetime, and `cancellable`, `checked` and request lending take the watched path, after `base-scheduler` 0.6.4.
 
 ## Validation
 
-- Unit tests of the watch: same cancellation and waker without the lock, a changed waker, a changed cancellation, `never`, cancellation before and after registering, a cancellation racing registration on another thread, cancellation of an ancestor, and dropping a watch before and after cancellation.
-- The conformance suite's cancellation scenarios pass on every backend, with stream reads and writes cancelled while waiting and between operations.
-- Miri over the registry and watch.
-- The echo benchmark with a real cancellation against `never`, and base-http's hello benchmark through `Server::run` against the build that passes `never`, on hana: the difference within noise.
-
-## Open questions
-
-1. **Its name.** `CancellationWatch` says what it does and sits beside `Cancellation` and `Cancelled`. A shorter `Watch`, or a method `Cancellation::watch()` returning one bound to that cancellation, would lose the reuse across cancellations, which a reader needs because callers pass the cancellation per operation. Recommendation: `CancellationWatch`.
-2. **Whether `cancelled()` uses the new registry or keeps `event_listener`.** One registry per cancellation is simpler, and cancelling then wakes one list rather than two. `event_listener` stays a dependency either way, for the buffer pool and the backends. Recommendation: one registry.
-3. **Release.** The change is additive, so 0.6.4. Recommendation: 0.6.4, with base-http's follow-up after it.
+- Unit tests of the registry and watch: a repeated wait takes no lock, a second task's wait registers itself and both are woken, cancellation before and after registering, a cancellation racing registration on another thread, an ancestor's cancellation, clones and children are plain, `never().watch()`, and dropping a watched cancellation before and after cancellation.
+- Allocation tests: waits on plain and watched cancellations do not allocate, however many tasks wait.
+- The conformance suite's stream scenarios on every backend with watched cancellations, cancelled while waiting and between operations.
+- Miri over the registry, the watch and their races.
+- A campaign of 20 rounds on hana, with a layout replica of each build, of base-http's hello benchmark through `Server::run` watching each connection against the build that passes `never`, and of the echo benchmark with a watched cancellation against `never`: the difference within noise.
