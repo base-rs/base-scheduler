@@ -1,5 +1,9 @@
 # Releases
 
+## v0.6.4
+
+- Add `Cancellation::watch`, whose waits share one registration with the task that waits, so a connection that watches its cancellation waits on it about as cheaply as on `never`. ([#148](https://github.com/base-rs/base-scheduler/pull/148))
+
 ## v0.6.3
 
 - Rename `Placement` to `Parent`, as Async's `parent:` names what owns the tasks a library starts, keeping `Placement` as an alias until 0.7. ([#145](https://github.com/base-rs/base-scheduler/pull/145))
