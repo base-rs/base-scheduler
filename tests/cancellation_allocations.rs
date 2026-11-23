@@ -131,3 +131,32 @@ fn a_registered_wait_can_be_polled_on_another_thread() {
             .is_ready()
     );
 }
+
+#[test]
+fn the_owners_waits_on_a_watched_signal_do_not_allocate() {
+    let root = Cancellation::new();
+    let child = root.child();
+    // Making the watch registers it with its signal, outside the measurement.
+    let watched = [root.watch(), child.watch()];
+    let waker = Waker::from(Arc::new(WakeCounter::default()));
+    let allocations = allocation_counter::measure(|| {
+        for token in &watched {
+            for _ in 0..16 {
+                let mut waiting = pin!(token.cancelled());
+                assert!(
+                    waiting
+                        .as_mut()
+                        .poll(&mut Context::from_waker(&waker))
+                        .is_pending()
+                );
+                assert!(
+                    token
+                        .poll_watched(&mut Context::from_waker(&waker))
+                        .unwrap()
+                        .is_pending()
+                );
+            }
+        }
+    });
+    assert_eq!(allocations.count_total, 0);
+}

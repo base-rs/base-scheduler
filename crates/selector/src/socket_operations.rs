@@ -100,6 +100,21 @@ impl ReadinessSelector {
             return operation.await.map_err(Into::into);
         }
         let mut operation = pin!(operation);
+        #[cfg(unix)]
+        if cancellation.is_watched() && self.readiness.is_some() {
+            // A watched signal's waits share its registration, so poll it
+            // directly rather than through a cancellation future of their own.
+            return poll_fn(|context| {
+                if let Poll::Ready(result) = operation.as_mut().poll(context) {
+                    return Poll::Ready(result.map_err(Into::into));
+                }
+                cancellation
+                    .poll_watched(context)
+                    .unwrap_or(Poll::Pending)
+                    .map(|()| Err(Cancelled.into()))
+            })
+            .await;
+        }
         let mut cancelled = pin!(cancellation.cancelled());
         let mut closed = pin!(self.closed.cancelled());
         poll_fn(|context| {

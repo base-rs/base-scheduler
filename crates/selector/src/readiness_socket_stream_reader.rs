@@ -86,15 +86,17 @@ impl<'a, const SUPPORT_OOB: bool> ReadinessSocketStreamReader<'a, SUPPORT_OOB> {
         cancellation: &Cancellation,
         mut receive: impl FnMut(&socket2::Socket) -> io::Result<usize> + Send + Unpin,
     ) -> OperationResult<usize> {
-        // An established registration needs no setup, and a never-cancelled
-        // worker wait observes driver closure itself. Keep its state compact.
+        // An established registration needs no setup, and a worker wait
+        // observes driver closure itself. Keep its state compact when the
+        // cancellation is never, or watched, whose waits share a registration.
         if let (true, Some(group), Some(registration)) = (
-            cancellation.is_never(),
+            cancellation.is_never() || cancellation.is_watched(),
             &self.scheduler.readiness,
             &self.registration,
         ) {
+            cancellation.check()?;
             self.scheduler.check_open()?;
-            let result = Receive::<_, SUPPORT_OOB> {
+            let mut receiving = std::pin::pin!(Receive::<_, SUPPORT_OOB> {
                 group,
                 direction: registration.direction(Interest::Readable),
                 socket: self.socket.get_ref(),
@@ -102,12 +104,21 @@ impl<'a, const SUPPORT_OOB: bool> ReadinessSocketStreamReader<'a, SUPPORT_OOB> {
                 capacity,
                 probe: !self.established,
                 listener: None,
-            }
+            });
+            let result = std::future::poll_fn(|context| {
+                if let Poll::Ready(result) = receiving.as_mut().poll(context) {
+                    return Poll::Ready(result.map_err(Into::into));
+                }
+                cancellation
+                    .poll_watched(context)
+                    .unwrap_or(Poll::Pending)
+                    .map(|()| Err(base_scheduler::Cancelled.into()))
+            })
             .await;
             if matches!(result, Ok(count) if count != 0) {
                 self.established = true;
             }
-            return result.map_err(Into::into);
+            return result;
         }
         let result = {
             let scheduler = self.scheduler;

@@ -3,9 +3,10 @@
 
 use crate::Cancelled;
 use event_listener::Event;
-use std::future::pending;
+use std::future::{pending, poll_fn};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, PoisonError, Weak};
+use std::sync::{Arc, Mutex, MutexGuard, OnceLock, PoisonError, Weak};
+use std::task::{Context, Poll, Waker};
 
 struct Node {
     cancelled: AtomicBool,
@@ -17,6 +18,8 @@ struct Node {
     // This node's slot in its parent's children.
     index: usize,
     children: Mutex<Children>,
+    // The watches made from this node's signals, which cancelling wakes.
+    watches: Mutex<Slots<Arc<Watch>>>,
 }
 
 // Weak child registrations, addressed by a slot each child records.
@@ -62,6 +65,7 @@ impl Node {
             parent,
             index,
             children: Mutex::new(Children::default()),
+            watches: Mutex::new(Slots::default()),
         }
     }
 }
@@ -102,9 +106,35 @@ impl Drop for Node {
 /// assert!(!system.is_cancelled());
 /// assert!(system.cancel());
 /// ```
-#[derive(Clone)]
+///
+/// A task that waits on one signal many times, such as a connection whose reads,
+/// writes and handler waits all share its server's cancellation, can [`watch`](Self::watch)
+/// it once, so that its waits share one registration rather than each registering.
 pub struct Cancellation {
     node: Option<Arc<Node>>,
+    // The registration this value's waits share, for a value made by `watch`.
+    watch: Option<Arc<Watch>>,
+}
+
+/// Clones share the signal, but not a watch: a clone of a watched signal is plain.
+impl Clone for Cancellation {
+    fn clone(&self) -> Self {
+        Self {
+            node: self.node.clone(),
+            watch: None,
+        }
+    }
+}
+
+impl Drop for Cancellation {
+    fn drop(&mut self) {
+        if let (Some(node), Some(watch)) = (&self.node, &self.watch) {
+            node.watches
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .remove(watch.slot);
+        }
+    }
 }
 
 impl Cancellation {
@@ -112,12 +142,16 @@ impl Cancellation {
     pub fn new() -> Self {
         Self {
             node: Some(Arc::new(Node::new(Arc::new(Mutex::new(())), None, 0))),
+            watch: None,
         }
     }
 
     /// Create a signal which cannot be cancelled and requires no allocation. `cancel` always returns false and `cancelled` remains pending forever.
     pub const fn never() -> Self {
-        Self { node: None }
+        Self {
+            node: None,
+            watch: None,
+        }
     }
 
     /// Whether this signal can never be cancelled. This is true for [`Self::never`] and its clones; its children are independently cancellable. Backends can omit cancellation registration for these signals.
@@ -145,7 +179,69 @@ impl Cancellation {
         } else {
             children.insert(Arc::downgrade(&child));
         }
-        Self { node: Some(child) }
+        Self {
+            node: Some(child),
+            watch: None,
+        }
+    }
+
+    /// The same signal, watched: every wait on the returned value shares one
+    /// registration with the first task that waits on it, so that task's later
+    /// waits take no lock, clone no waker and allocate nothing. Waits by other
+    /// tasks are still woken, at the cost of a lock each.
+    ///
+    /// Call it once in the task that waits, and pass the value by reference to
+    /// its operations. Its clones and children are plain, so a watch is never
+    /// shared by accident. A watch of [`never`](Self::never) is `never`.
+    ///
+    /// ```
+    /// use base_scheduler::Cancellation;
+    ///
+    /// let server = Cancellation::new();
+    /// // In each connection's task:
+    /// let connection = server.child().watch();
+    /// assert!(connection.is_watched());
+    /// assert!(!connection.clone().is_watched());
+    /// ```
+    pub fn watch(&self) -> Self {
+        let Some(node) = &self.node else {
+            return Self::never();
+        };
+        let mut watches = node.watches.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut watch = None;
+        watches.insert(|slot| {
+            let created = Arc::new(Watch {
+                slot,
+                owner: OnceLock::new(),
+                wakers: Mutex::new(Wakers::default()),
+            });
+            watch = Some(Arc::clone(&created));
+            created
+        });
+        drop(watches);
+        Self {
+            node: Some(Arc::clone(node)),
+            watch,
+        }
+    }
+
+    /// Whether this value was made by [`watch`](Self::watch), so its waits share a registration.
+    pub fn is_watched(&self) -> bool {
+        self.watch.is_some()
+    }
+
+    /// Poll for cancellation without a future, for operations that keep their
+    /// own state across waits. For a watched signal, this is ready once it is
+    /// cancelled, and otherwise ensures that cancelling it wakes `context`'s
+    /// waker, through its watch. For [`never`](Self::never) it is pending.
+    /// For a plain signal it returns `None`, registering nothing: wait on it
+    /// through [`cancelled`](Self::cancelled), whose future keeps the registration.
+    pub fn poll_watched(&self, context: &mut Context<'_>) -> Option<Poll<()>> {
+        match (&self.node, &self.watch) {
+            (None, _) => Some(Poll::Pending),
+            (Some(node), Some(watch)) => Some(watch.poll(node, context)),
+            (Some(_), None) => None,
+        }
     }
 
     /// Request cancellation of this signal and all its descendants. Returns true only for the first request on this signal. Repeated requests never escalate. Waiters are woken after the entire family lock is released. Concurrent observers may see propagation in progress, but all descendants are cancelled when this call returns. This does not wait for their work.
@@ -173,6 +269,16 @@ impl Cancellation {
         drop(tree);
         for node in cancelled {
             node.event.notify(usize::MAX);
+            let wakers: Vec<Waker> = node
+                .watches
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .slots
+                .iter()
+                .flatten()
+                .flat_map(|watch| watch.take())
+                .collect();
+            wakers.into_iter().for_each(Waker::wake);
         }
         true
     }
@@ -195,16 +301,120 @@ impl Cancellation {
         }
     }
 
-    /// Wait for cancellation using standard future polling and wakeups. This future is immediately ready if already cancelled. Dropping the wait unregisters its listener without cancelling the signal or other waiters. Listener storage is retained inline in the future, without a separate allocation.
+    /// Wait for cancellation using standard future polling and wakeups. This future is immediately ready if already cancelled. Dropping the wait unregisters its listener without cancelling the signal or other waiters. Listener storage is retained inline in the future, without a separate allocation. A watched signal's wait uses its watch instead, registering nothing of its own.
     pub async fn cancelled(&self) {
         let Some(node) = &self.node else {
             return pending().await;
         };
+        if let Some(watch) = &self.watch {
+            return poll_fn(|context| watch.poll(node, context)).await;
+        }
         event_listener::listener!(node.event => listener);
         // Register before checking to preserve a racing cancellation notification.
         if !node.cancelled.load(Ordering::Acquire) {
             listener.await;
         }
+    }
+}
+
+// Values addressed by the slot each records, with released slots reused.
+struct Slots<T> {
+    slots: Vec<Option<T>>,
+    free: Vec<usize>,
+}
+
+impl<T> Default for Slots<T> {
+    fn default() -> Self {
+        Self {
+            slots: Vec::new(),
+            free: Vec::new(),
+        }
+    }
+}
+
+impl<T> Slots<T> {
+    fn insert(&mut self, value: impl FnOnce(usize) -> T) -> usize {
+        match self.free.pop() {
+            Some(index) => {
+                self.slots[index] = Some(value(index));
+                index
+            }
+            None => {
+                let index = self.slots.len();
+                self.slots.push(Some(value(index)));
+                index
+            }
+        }
+    }
+
+    fn remove(&mut self, index: usize) {
+        self.slots[index] = None;
+        self.free.push(index);
+    }
+}
+
+// One registration shared by every wait on a watched signal. The first waker to
+// wait is its owner's: a wait whose waker will wake the owner's takes no lock.
+// A wait with another waker, as from another task, is added to the others,
+// under the lock, so that it is still woken.
+struct Watch {
+    slot: usize,
+    // The owner's waker data and vtable addresses, compared as `Waker::will_wake` does.
+    owner: OnceLock<(usize, usize)>,
+    wakers: Mutex<Wakers>,
+}
+
+#[derive(Default)]
+struct Wakers {
+    owner: Option<Waker>,
+    // Each with the identity of the waker it was cloned from, compared as the owner's is.
+    others: Vec<((usize, usize), Waker)>,
+}
+
+fn identity(waker: &Waker) -> (usize, usize) {
+    (
+        waker.data() as usize,
+        std::ptr::from_ref(waker.vtable()) as usize,
+    )
+}
+
+impl Watch {
+    fn wakers(&self) -> MutexGuard<'_, Wakers> {
+        self.wakers.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    fn poll(&self, node: &Node, context: &mut Context<'_>) -> Poll<()> {
+        let waker = context.waker();
+        let identity = identity(waker);
+        // The owner's waits register nothing more.
+        if self.owner.get() != Some(&identity) {
+            let mut wakers = self.wakers();
+            let owner = *self.owner.get_or_init(|| {
+                wakers.owner = Some(waker.clone());
+                identity
+            });
+            if owner != identity && !wakers.others.iter().any(|(other, _)| *other == identity) {
+                wakers.others.push((identity, waker.clone()));
+            }
+        }
+        // Checked after registering. Cancelling sets the flag before it takes
+        // the registered wakers, under their lock, to wake them: either it finds
+        // this waker, or this observes the flag. The owner is woken at most once,
+        // and its next poll observes the flag.
+        if node.cancelled.load(Ordering::Acquire) {
+            Poll::Ready(())
+        } else {
+            Poll::Pending
+        }
+    }
+
+    fn take(&self) -> impl Iterator<Item = Waker> {
+        let mut wakers = self.wakers();
+        let owner = wakers.owner.take();
+        let others = std::mem::take(&mut wakers.others);
+        owner
+            .into_iter()
+            .chain(others.into_iter().map(|(_, waker)| waker))
     }
 }
 

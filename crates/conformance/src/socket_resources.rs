@@ -18,6 +18,18 @@ where
     let mut writer = scheduler.socket_stream_writer(receiver).unwrap();
     let mut sender_read = scheduler.socket_stream_reader(sender).unwrap();
     let mut sender_write = scheduler.socket_stream_writer(sender).unwrap();
+    // A watched signal's first wait registers the reader as a plain one's does.
+    let watching = Cancellation::new();
+    let watched = watching.watch();
+    let mut data = [0];
+    let (read, write) = zip(
+        reader.read_into(&mut data, &watched),
+        sender_write.write(b"w", &watched),
+    )
+    .await;
+    assert_eq!(read.unwrap(), 1);
+    assert_eq!(write.unwrap(), 1);
+    assert_eq!(data, *b"w");
     for byte in *b"ab" {
         let mut data = [0];
         let (read, write) = zip(
@@ -67,6 +79,24 @@ where
     cancelled(waiting.await);
     cancelled(reader.read_into(&mut data, &cancellation).await);
     cancelled(writer.write(&data, &cancellation).await);
+    // Established operations on a watched signal progress, then observe its
+    // cancellation while waiting and between operations.
+    for byte in *b"xy" {
+        let (read, write) = zip(
+            reader.read_into(&mut data, &watched),
+            sender_write.write(&[byte], &watched),
+        )
+        .await;
+        assert_eq!(read.unwrap(), 1);
+        assert_eq!(write.unwrap(), 1);
+        assert_eq!(data, [byte]);
+    }
+    let mut waiting = Box::pin(reader.read_into(&mut data, &watched));
+    assert!(poll_once(waiting.as_mut()).await.is_none());
+    watching.cancel();
+    cancelled(waiting.await);
+    cancelled(reader.read_into(&mut data, &watched).await);
+    cancelled(writer.write(&data, &watched).await);
     let mut pending = Box::pin(reader.read_into(&mut data, &never));
     assert!(poll_once(pending.as_mut()).await.is_none());
     drop(pending);
