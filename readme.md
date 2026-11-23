@@ -40,6 +40,10 @@ Prepare a release from a clean checkout of `main` with `cargo bake cargo:release
 
 See [releases.md](releases.md) for the full release history.
 
+### v0.6.3
+
+- Rename `Placement` to `Parent`, as Async's `parent:` names what owns the tasks a library starts, keeping `Placement` as an alias until 0.7. ([#145](https://github.com/base-rs/base-scheduler/pull/145))
+
 ### v0.6.2
 
 - Add `Placement`, so a library can write its supervision once and let its caller choose whether work runs in place or as scope tasks. ([#143](https://github.com/base-rs/base-scheduler/pull/143))
@@ -48,13 +52,6 @@ See [releases.md](releases.md) for the full release history.
 
 - Add `Scope::scheduler`, so code given only a scope can use its scheduler's other capabilities. ([#141](https://github.com/base-rs/base-scheduler/pull/141))
 - Generate release notes from pull request titles and `Breaking:` paragraphs. ([#140](https://github.com/base-rs/base-scheduler/pull/140))
-
-### v0.6.0
-
-- Implement std's `AsFd` and `AsRawFd`, or `AsSocket` and `AsRawSocket` on Windows, for `NativeSocket` and the Tokio adapter's `TokioSocket`, so applications and tests can set native options the interface does not provide, such as through socket2's `SockRef`. The socket must stay open and nonblocking.
-- **Breaking:** add packet ECN. `SocketRecvResult` gains `ecn: Option<Ecn>`, the datagram's Explicit Congestion Notification marking when the system supplied it, and `SocketRecvMessage` gains a provided `ecn()` that returns `None`, overridden by `OwnedSocketRecvMessage` and `IoUringRecvMessage`. The `ReceiveEcn` option enables reporting on a packet socket (`IP_RECVTOS`, `IPV6_RECVTCLASS`), and `SendEcn` sets the marking of every datagram it sends, preserving the DSCP bits (`IP_TOS`, `IPV6_TCLASS`); on a dual-stack socket both also configure the IPv4 options on Linux and Android, while macOS uses the IPv6 options for IPv4-mapped traffic too. Every packet receive now passes room for one marking message, with no additional system call or per-socket state, so reports and gets always reflect the kernel's options, including options set natively. Native, the readiness selector, io_uring (including multishot receivers, whose configured payload capacity is unchanged) and the Tokio adapter implement them on Linux, Android and macOS; elsewhere, including Windows, the options return `Unsupported`, and stream sockets reject them with `InvalidInput`. The UDP receive benchmark shows no measurable cost. The conformance crate adds `packet_ecn_tests!`, `packet_ecn_unsupported_tests!` and `LoopbackEcnFixture`. To migrate, add `ecn: None`, or the reported marking, to `SocketRecvResult` struct literals, and the field or `..` to patterns that destructure it. See [`design/packet-ecn.md`](design/packet-ecn.md).
-- Add scoped spawning. `SpawnScoped::scope` runs an asynchronous root on the calling thread and blocks until every task spawned through its `Scope` has been destroyed, as `std::thread::scope` does for threads, so scoped tasks run on the scheduler's workers while borrowing anything that outlives the call, including the scheduler itself. Awaiting a `ScopedTask` returns its output or `TaskError`, and dropping it destroys the task, as for spawned tasks. A root panic is resumed after the join; a task panic whose handle was dropped unobserved makes `scope` panic after the join. Call `scope` from synchronous code, such as a program's root; Native panics on its workers, and Tokio inside a runtime's asynchronous context. Code without a blocking root, such as code embedded in an existing Tokio application, keeps using `Spawn`. Native and the Tokio adapter implement it; other backends implement the unsafe `SpawnScoped::spawn_unchecked`, and the conformance crate's `spawn_scoped_tests!` checks them. See [`design/scoped-spawn.md`](design/scoped-spawn.md).
-- Fix Native socket waits on Windows that could hang although the socket was ready, the same async-io reactor race that 0.4.0 worked around for the Tokio adapter ([smol-rs/polling#271](https://github.com/smol-rs/polling/issues/271)). Each wait now wakes the reactor whenever it leaves interest registered, and still retries its syscall only once the socket is reported ready.
 
 <!-- bake-readme:releases:end -->
 
