@@ -257,10 +257,28 @@ pub async fn pending_borrowed_cancellation<S: SocketTestScheduler>(
     socket: &S::Socket,
 ) {
     let token = Cancellation::new();
+    pending_borrowed(scheduler, socket, &token, &token).await;
+}
+
+/// As [`pending_borrowed_cancellation`], waiting on a watched signal, whose waits share one registration.
+pub async fn pending_watched_cancellation<S: SocketTestScheduler>(
+    scheduler: &S,
+    socket: &S::Socket,
+) {
+    let token = Cancellation::new();
+    pending_borrowed(scheduler, socket, &token.watch(), &token).await;
+}
+
+async fn pending_borrowed<S: SocketTestScheduler>(
+    scheduler: &S,
+    socket: &S::Socket,
+    waiting_on: &Cancellation,
+    token: &Cancellation,
+) {
     let mut reader = scheduler.socket_stream_reader(socket).unwrap();
     let mut buffer = [0];
     {
-        let mut waiting = pin!(reader.read_into(&mut buffer, &token));
+        let mut waiting = pin!(reader.read_into(&mut buffer, waiting_on));
         assert!(poll_once(&mut waiting).await.is_none());
         token.cancel();
         cancelled(waiting.await);

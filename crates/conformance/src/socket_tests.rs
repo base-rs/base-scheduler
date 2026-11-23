@@ -26,6 +26,10 @@ macro_rules! socket_tests {
                 let _ = sender;
                 $crate::socket::pending_borrowed_cancellation(scheduler, receiver).await;
             },
+            pending_watched_read_cancellation => |scheduler, sender, receiver| {
+                let _ = sender;
+                $crate::socket::pending_watched_cancellation(scheduler, receiver).await;
+            },
         }
     };
 }
